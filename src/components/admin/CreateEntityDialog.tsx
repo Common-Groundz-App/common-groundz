@@ -25,6 +25,15 @@ import { Plus } from 'lucide-react';
 
 import { EntityType } from '@/services/recommendation/types';
 import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
+import { fetchCategoriesByType } from '@/services/categoryService';
+import { searchTags, getOrCreateTag } from '@/services/tagService';
+import { useDebounce } from '@/hooks/use-debounce';
+import { Badge } from '@/components/ui/badge';
+import { X, Loader2 } from 'lucide-react';
+import { Database } from '@/integrations/supabase/types';
+
+type Tag = Database['public']['Tables']['tags']['Row'];
+type Category = Database['public']['Tables']['categories']['Row'];
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -51,6 +60,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     image_url: '',
     website_url: '',
     venue: '',
+    category_id: null as string | null,
+    metadata: {} as Record<string, any>,
   });
   
   const [businessHours, setBusinessHours] = useState({});
@@ -60,6 +71,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [showMediaUploadModal, setShowMediaUploadModal] = useState(false);
   const [otherTypeReason, setOtherTypeReason] = useState('');
   const [primaryMediaUrl, setPrimaryMediaUrl] = useState<string | null>(null);
+  
+  // Category selector state
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  
+  // Tag input state
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  const [tagInput, setTagInput] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState<Tag[]>([]);
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [loadingTags, setLoadingTags] = useState(false);
+  const debouncedTagInput = useDebounce(tagInput, 300);
 
   // Load draft from sessionStorage on mount
   useEffect(() => {
@@ -75,6 +98,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           setUploadedMedia(draft.uploadedMedia || []);
           setOtherTypeReason(draft.otherTypeReason || '');
           setPrimaryMediaUrl(draft.primaryMediaUrl || null);
+          setSelectedTags(draft.selectedTags || []);
           setDraftRestored(true);
         }
       } catch (error) {
@@ -86,6 +110,47 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       loadDraft();
     }
   }, [open]);
+
+  // Load categories when type changes
+  useEffect(() => {
+    if (formData.type) {
+      setLoadingCategories(true);
+      fetchCategoriesByType(formData.type)
+        .then(setCategories)
+        .catch(err => {
+          console.error('Error loading categories:', err);
+          setCategories([]);
+        })
+        .finally(() => setLoadingCategories(false));
+    } else {
+      setCategories([]);
+    }
+  }, [formData.type]);
+
+  // Tag autocomplete
+  useEffect(() => {
+    const loadSuggestions = async () => {
+      if (debouncedTagInput.length < 2) {
+        setTagSuggestions([]);
+        return;
+      }
+      
+      setLoadingTags(true);
+      try {
+        const results = await searchTags(debouncedTagInput);
+        const filtered = results.filter(
+          tag => !selectedTags.find(t => t.id === tag.id)
+        );
+        setTagSuggestions(filtered);
+      } catch (error) {
+        console.error('Error searching tags:', error);
+      } finally {
+        setLoadingTags(false);
+      }
+    };
+    
+    loadSuggestions();
+  }, [debouncedTagInput, selectedTags]);
 
   // Save draft to sessionStorage on changes
   useEffect(() => {
@@ -100,7 +165,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           selectedParent,
           uploadedMedia,
           otherTypeReason,
-          primaryMediaUrl
+          primaryMediaUrl,
+          selectedTags
         };
         sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       } catch (error) {
@@ -112,7 +178,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     return () => clearTimeout(timeoutId);
   }, [formData, businessHours, contactInfo, selectedParent, uploadedMedia, open]);
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | null | Record<string, any>) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -124,6 +190,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       image_url: '',
       website_url: '',
       venue: '',
+      category_id: null,
+      metadata: {},
     });
     setBusinessHours({});
     setContactInfo({});
@@ -133,12 +201,60 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setDraftRestored(false);
     setOtherTypeReason('');
     setPrimaryMediaUrl(null);
+    setSelectedTags([]);
+    setTagInput('');
+    setTagSuggestions([]);
+    setCategories([]);
     
     // Clear draft from sessionStorage
     try {
       sessionStorage.removeItem(DRAFT_KEY);
     } catch (error) {
       console.error('Failed to clear draft:', error);
+    }
+  };
+
+  // Tag handling functions
+  const handleAddTag = (tag: Tag) => {
+    if (selectedTags.length >= 10) return;
+    if (!selectedTags.find(t => t.id === tag.id)) {
+      setSelectedTags([...selectedTags, tag]);
+    }
+    setTagInput('');
+    setTagSuggestions([]);
+    setShowTagSuggestions(false);
+  };
+
+  const handleCreateNewTag = async (tagName: string) => {
+    if (selectedTags.length >= 10) return;
+    try {
+      setLoadingTags(true);
+      const newTag = await getOrCreateTag(tagName);
+      handleAddTag(newTag);
+    } catch (error) {
+      console.error('Error creating tag:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create tag',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingTags(false);
+    }
+  };
+
+  const handleRemoveTag = (tagId: string) => {
+    setSelectedTags(selectedTags.filter(t => t.id !== tagId));
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      if (tagSuggestions.length > 0) {
+        handleAddTag(tagSuggestions[0]);
+      } else {
+        handleCreateNewTag(tagInput.trim());
+      }
     }
   };
 
@@ -165,6 +281,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setLoading(true);
     try {
     const metadata = {
+      ...formData.metadata,
       business_hours: businessHours,
       contact: contactInfo,
       ...(formData.type === 'others' && otherTypeReason.trim() && {
@@ -196,12 +313,30 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           metadata,
           created_by: user?.id || null,
           slug: hierarchicalSlug,
-          parent_id: selectedParent?.id || null
+          parent_id: selectedParent?.id || null,
+          category_id: formData.category_id || null
         }])
         .select()
         .single();
 
       if (error) throw error;
+
+      // Save tags
+      if (newEntity && selectedTags.length > 0) {
+        const tagAssignments = selectedTags.map(tag => ({
+          entity_id: newEntity.id,
+          tag_id: tag.id,
+          created_by: user?.id
+        }));
+        
+        const { error: tagsError } = await supabase
+          .from('entity_tags')
+          .insert(tagAssignments);
+        
+        if (tagsError) {
+          console.error('Error saving tags:', tagsError);
+        }
+      }
 
       // Upload media if any
       if (newEntity && uploadedMedia.length > 0) {
@@ -308,6 +443,106 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Category Selector */}
+            {formData.type && (
+              <div className="space-y-2">
+                <Label htmlFor="category">Primary Category</Label>
+                <Select
+                  value={formData.category_id || ''}
+                  onValueChange={(value) => handleInputChange('category_id', value || null)}
+                  disabled={!formData.type || loadingCategories || loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={
+                      !formData.type 
+                        ? "Select a type first" 
+                        : loadingCategories 
+                          ? "Loading categories..." 
+                          : "Select category (optional)"
+                    } />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No Category</SelectItem>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.parent_id ? `↳ ${cat.name}` : cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Entities without categories will be flagged for admin review
+                </p>
+              </div>
+            )}
+
+            {/* Tag Input */}
+            <div className="space-y-2">
+              <Label>
+                Tags
+                {selectedTags.length > 0 && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({selectedTags.length}/10)
+                  </span>
+                )}
+              </Label>
+              
+              {selectedTags.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2 p-2 border rounded-md bg-muted/50">
+                  {selectedTags.map(tag => (
+                    <Badge key={tag.id} variant="secondary" className="gap-1">
+                      {tag.name}
+                      <X 
+                        className="h-3 w-3 cursor-pointer hover:text-destructive" 
+                        onClick={() => handleRemoveTag(tag.id)} 
+                      />
+                    </Badge>
+                  ))}
+                </div>
+              )}
+              
+              <div className="relative">
+                <Input
+                  placeholder={
+                    selectedTags.length >= 10 
+                      ? "Maximum 10 tags reached" 
+                      : "Add tags (e.g., korean-beauty, cruelty-free)"
+                  }
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyDown={handleTagKeyDown}
+                  onFocus={() => setShowTagSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
+                  disabled={selectedTags.length >= 10 || loading}
+                />
+                
+                {loadingTags && (
+                  <Loader2 className="absolute right-3 top-3 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+                
+                {showTagSuggestions && tagSuggestions.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto">
+                    {tagSuggestions.map(tag => (
+                      <div
+                        key={tag.id}
+                        className="px-3 py-2 hover:bg-accent cursor-pointer flex justify-between items-center"
+                        onClick={() => handleAddTag(tag)}
+                      >
+                        <span>{tag.name}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {tag.usage_count} uses
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              <p className="text-xs text-muted-foreground">
+                Press Enter to create new tags, or select from suggestions
+              </p>
             </div>
 
             {formData.type === 'others' && (
@@ -420,6 +655,232 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 disabled={loading}
               />
             </div>
+
+            {/* Type-Specific Metadata Fields */}
+            {formData.type === EntityType.Product && (
+              <div className="space-y-4 p-4 border rounded-md bg-muted/50">
+                <h4 className="font-semibold text-sm">Product Metadata</h4>
+                
+                <div className="space-y-2">
+                  <Label>Brand Origin</Label>
+                  <Input
+                    placeholder="e.g., Korea, USA, France"
+                    value={formData.metadata?.brand_origin || ''}
+                    onChange={(e) => handleInputChange('metadata', {
+                      ...formData.metadata,
+                      brand_origin: e.target.value
+                    })}
+                    disabled={loading}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Price Tier</Label>
+                  <Select
+                    value={formData.metadata?.price_tier || ''}
+                    onValueChange={(value) => handleInputChange('metadata', {
+                      ...formData.metadata,
+                      price_tier: value
+                    })}
+                    disabled={loading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select price tier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="budget">Budget (&lt;$20)</SelectItem>
+                      <SelectItem value="mid-range">Mid-Range ($20-$50)</SelectItem>
+                      <SelectItem value="luxury">Luxury ($50+)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Product Characteristics</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {['cruelty-free', 'vegan', 'organic', 'hypoallergenic'].map(trait => (
+                      <label key={trait} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.metadata?.characteristics?.includes(trait) || false}
+                          onChange={(e) => {
+                            const current = formData.metadata?.characteristics || [];
+                            const updated = e.target.checked
+                              ? [...current, trait]
+                              : current.filter((t: string) => t !== trait);
+                            handleInputChange('metadata', {
+                              ...formData.metadata,
+                              characteristics: updated
+                            });
+                          }}
+                          disabled={loading}
+                          className="rounded"
+                        />
+                        <span className="text-sm capitalize">{trait.replace('-', ' ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {formData.type === EntityType.Food && (
+              <div className="space-y-4 p-4 border rounded-md bg-muted/50">
+                <h4 className="font-semibold text-sm">Food Metadata</h4>
+                
+                <div className="space-y-2">
+                  <Label>Cuisines</Label>
+                  <Input
+                    placeholder="e.g., Italian, Korean, Mexican (comma-separated)"
+                    value={formData.metadata?.cuisines?.join(', ') || ''}
+                    onChange={(e) => handleInputChange('metadata', {
+                      ...formData.metadata,
+                      cuisines: e.target.value.split(',').map(c => c.trim()).filter(Boolean)
+                    })}
+                    disabled={loading}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Dietary Tags</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {['vegetarian', 'vegan', 'gluten-free', 'halal', 'kosher'].map(diet => (
+                      <label key={diet} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.metadata?.dietary_tags?.includes(diet) || false}
+                          onChange={(e) => {
+                            const current = formData.metadata?.dietary_tags || [];
+                            const updated = e.target.checked
+                              ? [...current, diet]
+                              : current.filter((t: string) => t !== diet);
+                            handleInputChange('metadata', {
+                              ...formData.metadata,
+                              dietary_tags: updated
+                            });
+                          }}
+                          disabled={loading}
+                          className="rounded"
+                        />
+                        <span className="text-sm capitalize">{diet.replace('-', ' ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {formData.type === EntityType.Place && (
+              <div className="space-y-4 p-4 border rounded-md bg-muted/50">
+                <h4 className="font-semibold text-sm">Place Metadata</h4>
+                
+                <div className="space-y-2">
+                  <Label>Location Type</Label>
+                  <Select
+                    value={formData.metadata?.location_type || ''}
+                    onValueChange={(value) => handleInputChange('metadata', {
+                      ...formData.metadata,
+                      location_type: value
+                    })}
+                    disabled={loading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select location type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="indoor">Indoor</SelectItem>
+                      <SelectItem value="outdoor">Outdoor</SelectItem>
+                      <SelectItem value="mixed">Mixed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Accessibility Features</Label>
+                  <div className="flex flex-wrap gap-3">
+                    {['wheelchair-accessible', 'parking-available', 'pet-friendly'].map(feature => (
+                      <label key={feature} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.metadata?.accessibility?.includes(feature) || false}
+                          onChange={(e) => {
+                            const current = formData.metadata?.accessibility || [];
+                            const updated = e.target.checked
+                              ? [...current, feature]
+                              : current.filter((f: string) => f !== feature);
+                            handleInputChange('metadata', {
+                              ...formData.metadata,
+                              accessibility: updated
+                            });
+                          }}
+                          disabled={loading}
+                          className="rounded"
+                        />
+                        <span className="text-sm">{feature.replace('-', ' ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(formData.type === EntityType.TVShow || formData.type === EntityType.Movie) && (
+              <div className="space-y-4 p-4 border rounded-md bg-muted/50">
+                <h4 className="font-semibold text-sm">Media Metadata</h4>
+                
+                <div className="space-y-2">
+                  <Label>Genres</Label>
+                  <Input
+                    placeholder="e.g., Action, Drama, Comedy (comma-separated)"
+                    value={formData.metadata?.genres?.join(', ') || ''}
+                    onChange={(e) => handleInputChange('metadata', {
+                      ...formData.metadata,
+                      genres: e.target.value.split(',').map(g => g.trim()).filter(Boolean)
+                    })}
+                    disabled={loading}
+                  />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Release Year</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g., 2024"
+                      value={formData.metadata?.release_year || ''}
+                      onChange={(e) => handleInputChange('metadata', {
+                        ...formData.metadata,
+                        release_year: parseInt(e.target.value) || null
+                      })}
+                      disabled={loading}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Content Rating</Label>
+                    <Select
+                      value={formData.metadata?.content_rating || ''}
+                      onValueChange={(value) => handleInputChange('metadata', {
+                        ...formData.metadata,
+                        content_rating: value
+                      })}
+                      disabled={loading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select rating" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="G">G</SelectItem>
+                        <SelectItem value="PG">PG</SelectItem>
+                        <SelectItem value="PG-13">PG-13</SelectItem>
+                        <SelectItem value="R">R</SelectItem>
+                        <SelectItem value="TV-MA">TV-MA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <ParentEntitySelector
               selectedParent={selectedParent}
