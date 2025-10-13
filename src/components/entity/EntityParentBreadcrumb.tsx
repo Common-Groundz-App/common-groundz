@@ -5,6 +5,7 @@ import { ChevronRight, Home } from 'lucide-react';
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Entity } from '@/services/recommendation/types';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface EntityParentBreadcrumbProps {
   currentEntity: Entity;
@@ -64,9 +65,9 @@ export const EntityParentBreadcrumb: React.FC<EntityParentBreadcrumbProps> = ({
               <BreadcrumbLink asChild>
                 <Link 
                   to={`/${currentEntity.type}s`}
-                  className="hover:text-foreground transition-colors font-medium capitalize"
+                  className="hover:text-foreground transition-colors font-medium"
                 >
-                  {currentEntity.type}s
+                  {getEntityTypeLabel(currentEntity.type)}s
                 </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>

@@ -145,7 +145,7 @@ export function ParentEntitySelector({
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{selectedParent.name}</p>
               <Badge variant="outline" className="text-xs">
-                {selectedParent.type}
+                {getEntityTypeLabel(selectedParent.type)}
               </Badge>
             </div>
             <Button

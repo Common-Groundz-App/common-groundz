@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 export const EntityV3 = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -590,7 +591,7 @@ export const EntityV3 = () => {
                         <img src={place.image} alt={place.name} className="w-12 h-12 rounded object-cover" />
                         <div>
                           <h4 className="font-medium text-sm">{place.name}</h4>
-                          <p className="text-xs text-muted-foreground">{place.type}</p>
+                          <p className="text-xs text-muted-foreground">{getEntityTypeLabel(place.type)}</p>
                         </div>
                       </div>
                     ))}

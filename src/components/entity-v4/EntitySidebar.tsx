@@ -19,6 +19,7 @@ import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { 
   shouldShowBusinessHours, 
   shouldShowContactInfo, 
@@ -128,8 +129,8 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
                 <h4 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
                   {parentEntity.name}
                 </h4>
-                <p className="text-xs text-muted-foreground capitalize">
-                  {parentEntity.type.replace('_', ' ')}
+                <p className="text-xs text-muted-foreground">
+                  {getEntityTypeLabel(parentEntity.type)}
                 </p>
               </div>
               <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -257,8 +258,8 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
                     />
                     <div className="flex-1 min-w-0">
                       <h4 className="font-medium text-sm truncate">{relatedEntity.name}</h4>
-                      <div className="text-xs text-muted-foreground capitalize">
-                        {relatedEntity.type.replace('_', ' ')}
+                      <div className="text-xs text-muted-foreground">
+                        {getEntityTypeLabel(relatedEntity.type)}
                       </div>
                       {(relatedEntity as any).reviewCount > 0 ? (
                         <div className="flex items-center gap-1 mt-1">

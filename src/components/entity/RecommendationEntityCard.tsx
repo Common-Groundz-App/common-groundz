@@ -6,6 +6,7 @@ import { analytics } from '@/services/analytics';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface RecommendationData {
   id: string;
@@ -114,7 +115,7 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
           <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1 leading-tight text-sm">
             {recommendation.name}
           </h3>
-          <p className="text-xs text-muted-foreground capitalize">{recommendation.type}</p>
+          <p className="text-xs text-muted-foreground">{getEntityTypeLabel(recommendation.type)}</p>
         </div>
         
         {/* Rating */}

@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { AdminReview, ReviewUpdate } from '@/hooks/admin/useAdminReviews';
 import { formatDistanceToNow } from 'date-fns';
 import { Star, Clock, User } from 'lucide-react';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface ReviewPreviewModalProps {
   review: AdminReview | null;
@@ -72,7 +73,7 @@ export const ReviewPreviewModal: React.FC<ReviewPreviewModalProps> = ({
                 </span>
                 {review.entity && (
                   <span>
-                    {review.entity.name} ({review.entity.type})
+                    {review.entity.name} ({getEntityTypeLabel(review.entity.type)})
                   </span>
                 )}
               </CardDescription>

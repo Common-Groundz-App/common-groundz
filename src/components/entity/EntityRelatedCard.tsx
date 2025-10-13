@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Entity } from '@/services/recommendation/types';
 import { Users, ArrowRight, Book, Film, MapPin } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 
 interface EntityRelatedCardProps {
   entity: Entity;
@@ -126,7 +127,7 @@ export const EntityRelatedCard: React.FC<EntityRelatedCardProps> = ({ entity }) 
               </div>
               <Badge variant="outline" className="text-xs">
                 {getEntityIcon(relatedEntity.type)}
-                <span className="ml-1">{relatedEntity.type}</span>
+                <span className="ml-1">{getEntityTypeLabel(relatedEntity.type)}</span>
               </Badge>
             </div>
           ))}
