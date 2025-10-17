@@ -354,6 +354,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 value={formData.category_id}
                 onChange={(id) => handleInputChange('category_id', id)}
                 disabled={loading}
+                mode="drill-down"
               />
             )}
 
