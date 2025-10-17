@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
+import { Badge } from '@/components/ui/badge';
 
 interface ProductResultItemProps {
   result: ProductSearchResult;
@@ -49,9 +50,9 @@ export function ProductResultItem({ result, onClick }: ProductResultItemProps) {
             className="text-xs mt-1"
           />
         ) : (
-          <p className="text-xs text-muted-foreground truncate">
+          <Badge variant="outline" className="text-xs mt-1">
             {result.venue || result.metadata?.author || result.metadata?.publisher || 'Product'}
-          </p>
+          </Badge>
         )}
         {result.metadata?.rating && (
           <p className="text-xs text-muted-foreground">

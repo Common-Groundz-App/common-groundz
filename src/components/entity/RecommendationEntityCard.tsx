@@ -8,6 +8,7 @@ import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
+import { Badge } from '@/components/ui/badge';
 
 interface RecommendationData {
   id: string;
@@ -125,7 +126,9 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
               className="text-xs mt-1"
             />
           ) : (
-            <p className="text-xs text-muted-foreground">{getEntityTypeLabel(recommendation.type)}</p>
+            <Badge variant="secondary" className="text-xs mt-1">
+              {getEntityTypeLabel(recommendation.type)}
+            </Badge>
           )}
         </div>
         

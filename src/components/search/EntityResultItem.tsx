@@ -45,7 +45,9 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
               className="text-xs py-0 px-1.5 h-5 bg-muted/50"
             />
           ) : (
-            <span className="text-xs text-muted-foreground">{getEntityTypeLabel(entity.type)}</span>
+            <Badge variant="outline" className="text-xs py-0 px-1.5 h-5 bg-muted/50">
+              {getEntityTypeLabel(entity.type)}
+            </Badge>
           )}
         </div>
         {entity.venue && (
