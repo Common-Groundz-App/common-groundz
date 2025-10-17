@@ -30,6 +30,7 @@ import { getPostTypeLabel } from './utils/postUtils';
 import TagBadge from './TagBadge';
 import { feedbackActions } from '@/services/feedbackService';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
+import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -278,13 +279,22 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       <div className="mt-4">
         <div className="flex flex-wrap gap-2">
           {entities.map(entity => (
-            <TagBadge
-              key={entity.id}
-              type="entity"
-              label={entity.name}
-              entityType={entity.type as any}
-              onClick={() => handleEntityClick(entity)}
-            />
+            <div key={entity.id} className="flex flex-col gap-1">
+              <TagBadge
+                type="entity"
+                label={entity.name}
+                entityType={entity.type as any}
+                onClick={() => handleEntityClick(entity)}
+              />
+              {entity.category_id && (
+                <EntityCategoryBadge 
+                  categoryId={entity.category_id} 
+                  showFullPath={false}
+                  variant="outline"
+                  className="text-xs"
+                />
+              )}
+            </div>
           ))}
         </div>
       </div>

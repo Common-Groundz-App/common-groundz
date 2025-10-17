@@ -26,6 +26,7 @@ export interface EntitySearchResult {
   image_url: string | null;
   description: string | null;
   slug: string | null;
+  category_id?: string | null;
 }
 
 export interface UserSearchResult {

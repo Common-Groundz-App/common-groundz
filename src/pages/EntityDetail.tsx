@@ -43,6 +43,7 @@ import { Helmet } from 'react-helmet-async';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
 import { handleSlugRedirect, handleHierarchicalRedirect } from '@/services/entityRedirectService';
 import { getEntityPageVersion } from '@/utils/entityVersionUtils';
+import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 
 import EntityDetailV2 from './EntityDetailV2';
 
@@ -535,9 +536,12 @@ const EntityDetailOriginal = () => {
                       {getEntityTypeLabel(entity?.type || '')}
                     </Badge>
                     {entity?.category_id && (
-                      <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        Category
-                      </Badge>
+                      <EntityCategoryBadge 
+                        categoryId={entity.category_id} 
+                        showFullPath={true}
+                        variant="secondary"
+                        className="text-sm"
+                      />
                     )}
                   </div>
                   {contextualField?.value && (

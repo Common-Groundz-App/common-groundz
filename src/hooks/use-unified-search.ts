@@ -28,6 +28,7 @@ export interface EntitySearchResult {
   slug: string | null;
   parent_id?: string | null;
   parent_slug?: string | null;
+  category_id?: string | null;
 }
 
 export interface ReviewSearchResult {

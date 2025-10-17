@@ -3,6 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ProductSearchResult } from '@/hooks/use-unified-search';
+import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 
 interface ProductResultItemProps {
   result: ProductSearchResult;
@@ -40,9 +41,18 @@ export function ProductResultItem({ result, onClick }: ProductResultItemProps) {
         <p className="font-medium text-sm text-foreground truncate">
           {result.name}
         </p>
-        <p className="text-xs text-muted-foreground truncate">
-          {result.venue || result.metadata?.author || result.metadata?.publisher || 'Product'}
-        </p>
+        {result.metadata?.category_id ? (
+          <EntityCategoryBadge 
+            categoryId={result.metadata.category_id} 
+            showFullPath={false}
+            variant="outline"
+            className="text-xs mt-1"
+          />
+        ) : (
+          <p className="text-xs text-muted-foreground truncate">
+            {result.venue || result.metadata?.author || result.metadata?.publisher || 'Product'}
+          </p>
+        )}
         {result.metadata?.rating && (
           <p className="text-xs text-muted-foreground">
             ⭐ {result.metadata.rating}

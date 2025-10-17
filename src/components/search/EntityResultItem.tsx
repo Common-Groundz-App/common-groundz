@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
+import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 
 interface EntityResultItemProps {
   entity: EntitySearchResult;
@@ -36,9 +37,16 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <p className="text-sm font-medium truncate">{entity.name}</p>
-          <Badge variant="outline" className="text-xs py-0 px-1.5 h-5 bg-muted/50">
-            {getEntityTypeLabel(entity.type)}
-          </Badge>
+          {entity.category_id ? (
+            <EntityCategoryBadge 
+              categoryId={entity.category_id} 
+              showFullPath={false}
+              variant="outline"
+              className="text-xs py-0 px-1.5 h-5 bg-muted/50"
+            />
+          ) : (
+            <span className="text-xs text-muted-foreground">{getEntityTypeLabel(entity.type)}</span>
+          )}
         </div>
         {entity.venue && (
           <div className="flex items-center text-xs text-muted-foreground mb-1">

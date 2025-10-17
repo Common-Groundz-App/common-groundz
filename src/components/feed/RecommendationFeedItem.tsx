@@ -31,6 +31,7 @@ import { formatRelativeDate } from '@/utils/dateUtils';
 import { feedbackActions } from '@/services/feedbackService';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
+import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -264,7 +265,15 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            <Badge>{getEntityTypeLabel(recommendation.category)}</Badge>
+            {recommendation.entity?.category_id ? (
+              <EntityCategoryBadge 
+                categoryId={recommendation.entity.category_id} 
+                showFullPath={false}
+                variant="default"
+              />
+            ) : (
+              <Badge>{getEntityTypeLabel(recommendation.category)}</Badge>
+            )}
             
             {isOwner && (
               <DropdownMenu>
@@ -315,7 +324,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
         
         {/* Add entity badge if an entity is linked */}
         {recommendation.entity && (
-          <div className="mb-4">
+          <div className="mb-4 flex items-center gap-2">
             <Badge 
               variant="outline" 
               className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-300 cursor-pointer hover:bg-violet-200"
@@ -323,6 +332,14 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             >
               {recommendation.entity.name}
             </Badge>
+            {recommendation.entity.category_id && (
+              <EntityCategoryBadge 
+                categoryId={recommendation.entity.category_id} 
+                showFullPath={false}
+                variant="secondary"
+                className="text-xs"
+              />
+            )}
           </div>
         )}
         
