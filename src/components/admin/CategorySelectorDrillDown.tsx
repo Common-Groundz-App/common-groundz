@@ -155,7 +155,14 @@ export const CategorySelectorDrillDown: React.FC<CategorySelectorDrillDownProps>
           </Button>
         </PopoverTrigger>
         
-        <PopoverContent className="w-[400px] p-0" align="start">
+        <PopoverContent 
+          className="w-[400px] p-0 pointer-events-auto z-50" 
+          align="start"
+          onMouseDown={(e) => {
+            // Ensure pointer events work properly
+            e.stopPropagation();
+          }}
+        >
           <Command>
             {/* Breadcrumb header with back button */}
             <div className="flex items-center border-b px-3 py-2 bg-muted/50">
