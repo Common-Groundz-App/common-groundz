@@ -5,6 +5,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 import { Badge } from '@/components/ui/badge';
+import { shouldHideCategory } from '@/services/categoryService';
 
 interface ProductResultItemProps {
   result: ProductSearchResult;
@@ -42,7 +43,7 @@ export function ProductResultItem({ result, onClick }: ProductResultItemProps) {
         <p className="font-medium text-sm text-foreground truncate">
           {result.name}
         </p>
-        {result.metadata?.category_id ? (
+        {result.metadata?.category_id && !shouldHideCategory(result.metadata.category_id) ? (
           <EntityCategoryBadge 
             categoryId={result.metadata.category_id} 
             showFullPath={false}

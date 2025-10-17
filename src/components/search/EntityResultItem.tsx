@@ -9,6 +9,7 @@ import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
+import { shouldHideCategory } from '@/services/categoryService';
 
 interface EntityResultItemProps {
   entity: EntitySearchResult;
@@ -37,7 +38,7 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <p className="text-sm font-medium truncate">{entity.name}</p>
-          {entity.category_id ? (
+          {entity.category_id && !shouldHideCategory(entity.category_id) ? (
             <EntityCategoryBadge 
               categoryId={entity.category_id} 
               showFullPath={false}

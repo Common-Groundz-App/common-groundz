@@ -8,6 +8,20 @@ type Category = Database['public']['Tables']['categories']['Row'];
 type DatabaseEntityType = Database['public']['Enums']['entity_type'];
 
 /**
+ * Constant for the "Uncategorized" category ID
+ * This category should be hidden in the UI and show entity type instead
+ */
+export const UNCATEGORIZED_CATEGORY_ID = 'f47565ec-5d6e-470d-9b76-6a08fc911204';
+
+/**
+ * Helper function to check if a category should be hidden from display
+ * Returns true for the "Uncategorized" category
+ */
+export const shouldHideCategory = (categoryId: string | null | undefined): boolean => {
+  return categoryId === UNCATEGORIZED_CATEGORY_ID;
+};
+
+/**
  * Extended category type with children info preloaded via join
  */
 export interface CategoryWithChildren extends Category {

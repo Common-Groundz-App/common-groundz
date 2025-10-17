@@ -32,6 +32,7 @@ import { feedbackActions } from '@/services/feedbackService';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
+import { shouldHideCategory } from '@/services/categoryService';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -265,7 +266,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            {recommendation.entity?.category_id ? (
+            {recommendation.entity?.category_id && !shouldHideCategory(recommendation.entity.category_id) ? (
               <EntityCategoryBadge 
                 categoryId={recommendation.entity.category_id} 
                 showFullPath={false}
