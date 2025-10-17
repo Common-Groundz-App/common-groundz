@@ -118,17 +118,13 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
           <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors line-clamp-1 leading-tight text-sm">
             {recommendation.name}
           </h3>
-          {recommendation.category_id ? (
+          {recommendation.category_id && (
             <EntityCategoryBadge 
               categoryId={recommendation.category_id} 
               showFullPath={false}
               variant="secondary"
               className="text-xs mt-1"
             />
-          ) : (
-            <Badge variant="secondary" className="text-xs mt-1">
-              {getEntityTypeLabel(recommendation.type)}
-            </Badge>
           )}
         </div>
         

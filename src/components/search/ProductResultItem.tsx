@@ -49,11 +49,11 @@ export function ProductResultItem({ result, onClick }: ProductResultItemProps) {
             variant="outline"
             className="text-xs mt-1"
           />
-        ) : (
-          <Badge variant="outline" className="text-xs mt-1">
-            {result.venue || result.metadata?.author || result.metadata?.publisher || 'Product'}
-          </Badge>
-        )}
+        ) : (result.venue || result.metadata?.author || result.metadata?.publisher) ? (
+          <p className="text-xs text-muted-foreground mt-1">
+            {result.venue || result.metadata?.author || result.metadata?.publisher}
+          </p>
+        ) : null}
         {result.metadata?.rating && (
           <p className="text-xs text-muted-foreground">
             ⭐ {result.metadata.rating}

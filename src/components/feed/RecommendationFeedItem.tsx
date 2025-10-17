@@ -265,14 +265,12 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
-            {recommendation.entity?.category_id ? (
+            {recommendation.entity?.category_id && (
               <EntityCategoryBadge 
                 categoryId={recommendation.entity.category_id} 
                 showFullPath={false}
                 variant="default"
               />
-            ) : (
-              <Badge>{getEntityTypeLabel(recommendation.category)}</Badge>
             )}
             
             {isOwner && (
