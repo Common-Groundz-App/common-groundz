@@ -905,6 +905,7 @@ const AdminEntityEdit = () => {
                         disabled={entity.is_deleted}
                         label="Primary Category"
                         required={false}
+                        mode="drill-down"
                       />
                     )}
 
