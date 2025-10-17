@@ -50,3 +50,84 @@ export const fetchAllCategories = async (): Promise<Category[]> => {
   if (error) throw error;
   return data || [];
 };
+
+/**
+ * Recursively fetch all parent categories for a given category
+ * Returns array ordered from root to leaf: [grandparent, parent, child]
+ */
+export const getCategoryPath = async (
+  categoryId: string
+): Promise<Category[]> => {
+  const path: Category[] = [];
+  let currentId: string | null = categoryId;
+  
+  while (currentId) {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('id', currentId)
+      .single();
+    
+    if (error || !data) break;
+    
+    path.unshift(data); // Add to beginning of array
+    currentId = data.parent_id;
+  }
+  
+  return path;
+};
+
+/**
+ * Get formatted breadcrumb string for a category
+ * Example: "Apps & Software > Productivity Apps"
+ */
+export const getCategoryBreadcrumb = async (
+  categoryId: string
+): Promise<string> => {
+  const path = await getCategoryPath(categoryId);
+  return path.map(c => c.name).join(' > ');
+};
+
+/**
+ * Fetch children of a specific category (or root categories if parentId is null)
+ */
+export const fetchCategoryChildren = async (
+  entityType: EntityType | string,
+  parentId: string | null = null
+): Promise<Category[]> => {
+  const canonicalType = getCanonicalType(
+    typeof entityType === 'string' ? entityType : entityType
+  );
+  const mappedType = mapEntityTypeToString(canonicalType as any) as DatabaseEntityType;
+  
+  const query = supabase
+    .from('categories')
+    .select('*')
+    .eq('entity_type', mappedType)
+    .order('name');
+  
+  if (parentId === null) {
+    query.is('parent_id', null);
+  } else {
+    query.eq('parent_id', parentId);
+  }
+  
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+};
+
+/**
+ * Check if a category has children
+ */
+export const categoryHasChildren = async (
+  categoryId: string
+): Promise<boolean> => {
+  const { count, error } = await supabase
+    .from('categories')
+    .select('id', { count: 'exact', head: true })
+    .eq('parent_id', categoryId);
+  
+  if (error) return false;
+  return (count || 0) > 0;
+};

@@ -12,6 +12,7 @@ import { EntityType } from '@/services/recommendation/types';
 import { getCanonicalType, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { Loader2 } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { CategorySelectorDrillDown } from './CategorySelectorDrillDown';
 
 // Export Category type for reuse by callers
 export type Category = Database['public']['Tables']['categories']['Row'];
@@ -27,6 +28,7 @@ interface CategorySelectorProps {
   showNoCategoryOption?: boolean;
   disabled?: boolean;
   className?: string;
+  mode?: 'flat' | 'drill-down'; // NEW: Support both UX patterns
 }
 
 export const CategorySelector: React.FC<CategorySelectorProps> = ({
@@ -38,8 +40,27 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
   required = false,
   showNoCategoryOption = true,
   disabled = false,
-  className = ''
+  className = '',
+  mode = 'flat' // Default to current flat dropdown behavior
 }) => {
+  // Conditionally render drill-down mode
+  if (mode === 'drill-down') {
+    return (
+      <CategorySelectorDrillDown
+        entityType={entityType}
+        value={value}
+        onChange={onChange}
+        label={label}
+        placeholder={placeholder}
+        required={required}
+        showNoCategoryOption={showNoCategoryOption}
+        disabled={disabled}
+        className={className}
+      />
+    );
+  }
+  
+  // Continue with flat dropdown mode below
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
