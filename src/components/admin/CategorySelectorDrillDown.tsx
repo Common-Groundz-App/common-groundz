@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { ChevronRight, ChevronLeft, Check, Loader2 } from 'lucide-react';
-import { fetchCategoryChildren, getCategoryPath, categoryHasChildren } from '@/services/categoryService';
+import { fetchCategoryChildren, getCategoryPath, CategoryWithChildren } from '@/services/categoryService';
 import { EntityType } from '@/services/recommendation/types';
 import { getCanonicalType, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { cn } from '@/lib/utils';
@@ -38,8 +38,7 @@ export const CategorySelectorDrillDown: React.FC<CategorySelectorDrillDownProps>
   const [open, setOpen] = useState(false);
   const [currentParent, setCurrentParent] = useState<string | null>(null);
   const [navigationStack, setNavigationStack] = useState<Category[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [categoriesWithChildren, setCategoriesWithChildren] = useState<Set<string>>(new Set());
+  const [categories, setCategories] = useState<CategoryWithChildren[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPath, setSelectedPath] = useState<Category[]>([]);
 
@@ -52,19 +51,7 @@ export const CategorySelectorDrillDown: React.FC<CategorySelectorDrillDownProps>
       try {
         const canonicalType = getCanonicalType(entityType);
         const data = await fetchCategoryChildren(canonicalType, currentParent);
-        setCategories(data);
-        
-        // Check which categories have children
-        const hasChildrenSet = new Set<string>();
-        await Promise.all(
-          data.map(async (cat) => {
-            const hasChildren = await categoryHasChildren(cat.id);
-            if (hasChildren) {
-              hasChildrenSet.add(cat.id);
-            }
-          })
-        );
-        setCategoriesWithChildren(hasChildrenSet);
+        setCategories(data); // Data already includes has_children flag
       } catch (err) {
         console.error('Error loading categories:', err);
         setCategories([]);
@@ -216,9 +203,9 @@ export const CategorySelectorDrillDown: React.FC<CategorySelectorDrillDownProps>
                     </CommandItem>
                   )}
                   
-                  {categories.map((category) => {
-                    const isSelected = value === category.id;
-                    const hasChildren = categoriesWithChildren.has(category.id);
+              {categories.map((category) => {
+                const isSelected = value === category.id;
+                const hasChildren = category.has_children;
                     
                     return (
                       <CommandItem

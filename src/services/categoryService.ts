@@ -7,6 +7,14 @@ import { getCanonicalType } from '@/services/entityTypeHelpers';
 type Category = Database['public']['Tables']['categories']['Row'];
 type DatabaseEntityType = Database['public']['Enums']['entity_type'];
 
+/**
+ * Extended category type with children info preloaded via join
+ */
+export interface CategoryWithChildren extends Category {
+  has_children: boolean;
+  children?: { id: string }[] | null; // Supabase join result
+}
+
 export const fetchCategoriesByType = async (
   entityType: EntityType | string
 ): Promise<Category[]> => {
@@ -89,12 +97,13 @@ export const getCategoryBreadcrumb = async (
 };
 
 /**
- * Fetch children of a specific category (or root categories if parentId is null)
+ * Fetch children of a specific category with has_children flag preloaded
+ * Uses Supabase join to avoid N+1 queries
  */
 export const fetchCategoryChildren = async (
   entityType: EntityType | string,
   parentId: string | null = null
-): Promise<Category[]> => {
+): Promise<CategoryWithChildren[]> => {
   const canonicalType = getCanonicalType(
     typeof entityType === 'string' ? entityType : entityType
   );
@@ -102,7 +111,10 @@ export const fetchCategoryChildren = async (
   
   const query = supabase
     .from('categories')
-    .select('*')
+    .select(`
+      *,
+      children:categories!parent_id(id)
+    `)
     .eq('entity_type', mappedType)
     .order('name');
   
@@ -114,7 +126,13 @@ export const fetchCategoryChildren = async (
   
   const { data, error } = await query;
   if (error) throw error;
-  return data || [];
+  
+  // Transform data to add has_children flag
+  // Note: Supabase returns children: null when no descendants exist
+  return (data || []).map((cat: any) => ({
+    ...cat,
+    has_children: Array.isArray(cat.children) && cat.children.length > 0
+  }));
 };
 
 /**
