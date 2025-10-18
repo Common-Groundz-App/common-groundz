@@ -21,13 +21,14 @@ import { MediaItem } from '@/types/media';
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 
 const MAX_MEDIA_ITEMS = 4;
-import { Plus } from 'lucide-react';
+import { Plus, Sparkles, Loader2 } from 'lucide-react';
 
 import { EntityType } from '@/services/recommendation/types';
 import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
 import { Database } from '@/integrations/supabase/types';
 import { CategorySelector } from './CategorySelector';
 import { TagInput } from './TagInput';
+import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 
 type Tag = Database['public']['Tables']['tags']['Row'];
 
@@ -70,6 +71,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   
   // Tag input state
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  
+  // URL analysis state
+  const [analyzeUrl, setAnalyzeUrl] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [showAnalyzeButton, setShowAnalyzeButton] = useState(false);
+  const [aiPredictions, setAiPredictions] = useState<any>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   // Load draft from sessionStorage on mount
   useEffect(() => {
@@ -150,6 +158,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setOtherTypeReason('');
     setPrimaryMediaUrl(null);
     setSelectedTags([]);
+    setAnalyzeUrl('');
+    setShowAnalyzeButton(false);
+    setAiPredictions(null);
+    setShowPreviewModal(false);
     
     // Clear draft from sessionStorage
     try {
@@ -157,6 +169,149 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     } catch (error) {
       console.error('Failed to clear draft:', error);
     }
+  };
+
+  // Validate URL format
+  const isValidUrl = (url: string): boolean => {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
+  // Call edge function to analyze URL
+  const handleAnalyzeUrl = async () => {
+    if (!analyzeUrl || !isValidUrl(analyzeUrl)) {
+      toast({
+        title: "Invalid URL",
+        description: "Please enter a valid HTTP/HTTPS URL",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setAnalyzing(true);
+    
+    try {
+      console.log('Analyzing URL:', analyzeUrl);
+      
+      const { data, error } = await supabase.functions.invoke('analyze-entity-url', {
+        body: { url: analyzeUrl }
+      });
+      
+      if (error) throw error;
+      
+      console.log('AI Analysis Result:', data);
+      
+      setAiPredictions(data);
+      setShowPreviewModal(true);
+      
+    } catch (error: any) {
+      console.error('URL Analysis Error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to analyze URL. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // Apply AI predictions to form
+  const applyAiPredictions = () => {
+    if (!aiPredictions?.predictions) {
+      toast({
+        title: "No Predictions",
+        description: "No predictions available to apply",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const pred = aiPredictions.predictions;
+    let appliedCount = 0;
+    
+    // Apply type
+    if (pred.type) {
+      handleInputChange('type', pred.type);
+      appliedCount++;
+    }
+    
+    // Apply name
+    if (pred.name) {
+      handleInputChange('name', pred.name);
+      appliedCount++;
+    }
+    
+    // Apply description
+    if (pred.description) {
+      handleInputChange('description', pred.description);
+      appliedCount++;
+    }
+    
+    // Apply category
+    if (pred.category_id) {
+      handleInputChange('category_id', pred.category_id);
+      appliedCount++;
+    }
+    
+    // Apply tags
+    if (pred.tags && Array.isArray(pred.tags) && pred.tags.length > 0) {
+      const newTags = pred.tags.map((tagName: string) => ({
+        id: crypto.randomUUID(),
+        name: tagName,
+        slug: tagName.toLowerCase().replace(/\s+/g, '-'),
+        usage_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      
+      setSelectedTags(prev => {
+        const existingNames = prev.map(t => t.name.toLowerCase());
+        const filtered = newTags.filter(t => !existingNames.includes(t.name.toLowerCase()));
+        return [...prev, ...filtered];
+      });
+      
+      if (newTags.length > 0) appliedCount++;
+    }
+    
+    // Apply primary image
+    if (pred.images && pred.images.length > 0) {
+      handleInputChange('image_url', pred.images[0]);
+      appliedCount++;
+    }
+    
+    // Apply website URL from analyzed URL
+    if (aiPredictions.metadata?.analyzed_url) {
+      handleInputChange('website_url', aiPredictions.metadata.analyzed_url);
+    }
+    
+    // Apply additional metadata
+    if (pred.additional_data && Object.keys(pred.additional_data).length > 0) {
+      handleInputChange('metadata', {
+        ...formData.metadata,
+        ai_extracted_data: pred.additional_data
+      });
+    }
+    
+    // Close modal
+    setShowPreviewModal(false);
+    
+    // Clear analyze URL input
+    setAnalyzeUrl('');
+    setShowAnalyzeButton(false);
+    
+    // Show success toast
+    toast({
+      title: "Form Updated",
+      description: `Successfully applied ${appliedCount} fields from URL analysis`,
+    });
+    
+    console.log('✅ Applied predictions:', pred);
   };
 
 
@@ -314,6 +469,53 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           </TabsList>
 
           <TabsContent value="basic" className="space-y-4">
+            {/* Analyze URL Input - Placed first for quick access */}
+            <div className="space-y-2 p-4 border-2 border-dashed border-primary/20 rounded-lg bg-primary/5">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="analyze_url" className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span className="font-semibold">Auto-Fill from URL (Optional)</span>
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Paste any URL (Goodreads, IMDb, Amazon, App Store, etc.) to automatically extract entity details
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  id="analyze_url"
+                  value={analyzeUrl}
+                  onChange={(e) => {
+                    setAnalyzeUrl(e.target.value);
+                    setShowAnalyzeButton(isValidUrl(e.target.value));
+                  }}
+                  placeholder="https://www.goodreads.com/book/show/5907..."
+                  disabled={loading || analyzing}
+                  className="flex-1"
+                />
+                {showAnalyzeButton && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    onClick={handleAnalyzeUrl}
+                    disabled={loading || analyzing}
+                    className="shrink-0"
+                  >
+                    {analyzing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Analyze
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name *</Label>
@@ -767,6 +969,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           
           setShowMediaUploadModal(false);
         }}
+      />
+      
+      {/* AI Preview Modal */}
+      <AutoFillPreviewModal
+        open={showPreviewModal}
+        onOpenChange={setShowPreviewModal}
+        predictions={aiPredictions}
+        onApply={applyAiPredictions}
       />
     </Dialog>
   );

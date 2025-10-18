@@ -57,3 +57,7 @@ verify_jwt = false
 
 [functions.cleanup-temp-photos]
 verify_jwt = false
+
+[functions.analyze-entity-url]
+verify_jwt = false
+
