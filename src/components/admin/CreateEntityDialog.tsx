@@ -19,9 +19,13 @@ import { SimpleMediaUploadModal } from '@/components/entity-v4/SimpleMediaUpload
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { MediaItem } from '@/types/media';
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
+import { DynamicFieldGroup } from './DynamicFieldGroup';
+import { entityTypeConfig } from '@/config/entityTypeConfig';
+import { validateUrlForType, getSuggestedEntityType } from '@/config/urlPatterns';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const MAX_MEDIA_ITEMS = 4;
-import { Plus, Sparkles, Loader2 } from 'lucide-react';
+import { Plus, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
 
 import { EntityType } from '@/services/recommendation/types';
 import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
@@ -59,6 +63,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     venue: '',
     category_id: null as string | null,
     metadata: {} as Record<string, any>,
+    authors: [] as string[],
+    languages: [] as string[],
+    isbn: '',
+    publication_year: null as number | null,
+    cast_crew: {} as Record<string, any>,
+    ingredients: [] as string[],
+    specifications: {} as Record<string, any>,
+    price_info: {} as Record<string, any>,
+    nutritional_info: {} as Record<string, any>,
+    external_ratings: {} as Record<string, any>,
   });
   
   const [businessHours, setBusinessHours] = useState({});
@@ -78,6 +92,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [showAnalyzeButton, setShowAnalyzeButton] = useState(false);
   const [aiPredictions, setAiPredictions] = useState<any>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showUrlMismatchDialog, setShowUrlMismatchDialog] = useState(false);
+  const [urlMismatchMessage, setUrlMismatchMessage] = useState('');
 
   // Load draft from sessionStorage on mount
   useEffect(() => {
@@ -137,6 +153,58 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const handleInputChange = (field: string, value: string | null | Record<string, any>) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+  
+  // Handle type-specific field updates based on storage column
+  const handleTypeSpecificFieldChange = (fieldKey: string, value: any) => {
+    const typeConfig = entityTypeConfig[formData.type];
+    if (!typeConfig) return;
+    
+    const fieldConfig = typeConfig.fields.find(f => f.key === fieldKey);
+    if (!fieldConfig) return;
+    
+    const storageColumn = fieldConfig.storageColumn || 'metadata';
+    
+    setFormData(prev => {
+      const updated: any = { ...prev };
+      
+      switch (storageColumn) {
+        case 'metadata':
+          updated.metadata = { ...prev.metadata, [fieldKey]: value };
+          break;
+        case 'cast_crew':
+          updated.cast_crew = { ...prev.cast_crew, [fieldKey]: value };
+          break;
+        case 'specifications':
+          updated.specifications = { ...prev.specifications, [fieldKey]: value };
+          break;
+        case 'price_info':
+          updated.price_info = { ...prev.price_info, [fieldKey]: value };
+          break;
+        case 'nutritional_info':
+          updated.nutritional_info = { ...prev.nutritional_info, [fieldKey]: value };
+          break;
+        case 'external_ratings':
+          updated.external_ratings = { ...prev.external_ratings, [fieldKey]: value };
+          break;
+        default:
+          // Direct column like authors, isbn, publication_year, etc.
+          updated[storageColumn] = value;
+      }
+      
+      return updated;
+    });
+  };
+  
+  // Determine which tabs to show based on entity type
+  const getVisibleTabs = () => {
+    const typeConfig = entityTypeConfig[formData.type];
+    if (!typeConfig) return ['basic'];
+    return typeConfig.showTabs;
+  };
+  
+  const shouldShowTab = (tabName: string) => {
+    return getVisibleTabs().includes(tabName as any);
+  };
 
   const resetForm = () => {
     setFormData({
@@ -148,6 +216,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       venue: '',
       category_id: null,
       metadata: {},
+      authors: [],
+      languages: [],
+      isbn: '',
+      publication_year: null,
+      cast_crew: {},
+      ingredients: [],
+      specifications: {},
+      price_info: {},
+      nutritional_info: {},
+      external_ratings: {},
     });
     setBusinessHours({});
     setContactInfo({});
@@ -233,11 +311,32 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
     
     const pred = aiPredictions.predictions;
+    
+    // Validate URL matches entity type if type is predicted
+    if (pred.type && analyzeUrl) {
+      const validation = validateUrlForType(analyzeUrl, pred.type);
+      if (!validation.isValid) {
+        const suggestedType = getSuggestedEntityType(analyzeUrl);
+        setUrlMismatchMessage(
+          validation.message + 
+          (suggestedType ? ` This URL appears to be for a ${suggestedType}.` : '')
+        );
+        setShowUrlMismatchDialog(true);
+        return;
+      }
+    }
+    
+    applyPredictionsToForm(pred);
+  };
+  
+  const applyPredictionsToForm = (pred: any) => {
     let appliedCount = 0;
     
     // Apply type
     if (pred.type) {
       handleInputChange('type', pred.type);
+      // Clear category when type changes to avoid orphaned selections
+      handleInputChange('category_id', null);
       appliedCount++;
     }
     
@@ -462,10 +561,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="basic">Basic Info</TabsTrigger>
-            <TabsTrigger value="contact">Contact</TabsTrigger>
-            <TabsTrigger value="hours">Business Hours</TabsTrigger>
+          <TabsList className={`grid w-full ${getVisibleTabs().length === 4 ? 'grid-cols-4' : getVisibleTabs().length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            {shouldShowTab('basic') && <TabsTrigger value="basic">Basic Info</TabsTrigger>}
+            {shouldShowTab('contact') && <TabsTrigger value="contact">Contact</TabsTrigger>}
+            {shouldShowTab('businessHours') && <TabsTrigger value="hours">Business Hours</TabsTrigger>}
+            {shouldShowTab('details') && formData.type && formData.type !== 'others' && (
+              <TabsTrigger value="details">{getEntityTypeLabel(formData.type)} Details</TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="basic" className="space-y-4">
@@ -667,16 +769,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="venue">Venue</Label>
-              <Input
-                id="venue"
-                value={formData.venue}
-                onChange={(e) => handleInputChange('venue', e.target.value)}
-                placeholder="Venue or location"
-                disabled={loading}
-              />
-            </div>
+            {shouldShowTab('businessHours') && (
+              <div className="space-y-2">
+                <Label htmlFor="venue">Venue</Label>
+                <Input
+                  id="venue"
+                  value={formData.venue}
+                  onChange={(e) => handleInputChange('venue', e.target.value)}
+                  placeholder="Venue or location"
+                  disabled={loading}
+                />
+              </div>
+            )}
 
             {/* Type-Specific Metadata Fields */}
             {formData.type === EntityType.Product && (
@@ -926,6 +1030,34 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               disabled={loading}
             />
           </TabsContent>
+
+          {/* Dynamic Details Tab */}
+          {formData.type && formData.type !== 'others' && (
+            <TabsContent value="details" className="space-y-4">
+              {(() => {
+                const typeConfig = entityTypeConfig[formData.type];
+                if (!typeConfig || !typeConfig.fieldGroups) return null;
+
+                return typeConfig.fieldGroups.map((group, index) => {
+                  const groupFields = typeConfig.fields.filter(f => 
+                    group.fields.includes(f.key)
+                  );
+                  
+                  return (
+                    <DynamicFieldGroup
+                      key={index}
+                      title={group.title}
+                      icon={group.icon}
+                      fields={groupFields}
+                      formData={formData}
+                      onChange={handleTypeSpecificFieldChange}
+                      disabled={loading}
+                    />
+                  );
+                });
+              })()}
+            </TabsContent>
+          )}
         </Tabs>
 
         <div className="flex justify-end gap-2 pt-4 border-t">
@@ -978,6 +1110,34 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         predictions={aiPredictions}
         onApply={applyAiPredictions}
       />
+      
+      {/* URL Mismatch Warning Dialog */}
+      <AlertDialog open={showUrlMismatchDialog} onOpenChange={setShowUrlMismatchDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              URL Type Mismatch
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {urlMismatchMessage}
+              <br /><br />
+              Would you like to proceed anyway or adjust the entity type?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (aiPredictions?.predictions) {
+                applyPredictionsToForm(aiPredictions.predictions);
+              }
+              setShowUrlMismatchDialog(false);
+            }}>
+              Proceed Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 };
