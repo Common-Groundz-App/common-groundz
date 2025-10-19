@@ -81,12 +81,7 @@ serve(async (req) => {
             role: "user",
             parts: [
               { text: systemPrompt },
-              {
-                fileData: {
-                  mimeType: "text/uri-list",
-                  fileUri: url
-                }
-              }
+              { text: url }
             ]
           }],
           tools: [
