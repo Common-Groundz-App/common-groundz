@@ -6,19 +6,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import TagInput from '@/components/preferences/TagInput';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { EntityFieldConfig } from '@/config/entityTypeConfig';
+import { AlertCircle, Sparkles } from 'lucide-react';
 
 interface DynamicFieldRendererProps {
   field: EntityFieldConfig;
   value: any;
   onChange: (value: any) => void;
   disabled?: boolean;
+  error?: string;
+  aiGenerated?: boolean;
 }
 
 export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
   field,
   value,
   onChange,
-  disabled = false
+  disabled = false,
+  error,
+  aiGenerated = false
 }) => {
   const renderField = () => {
     switch (field.type) {
@@ -136,12 +141,24 @@ export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
 
   return (
     <div className="space-y-2">
-      <Label htmlFor={field.key}>
-        {field.label}
+      <Label htmlFor={field.key} className="flex items-center gap-2">
+        <span>{field.label}</span>
         {field.required && <span className="text-destructive ml-1">*</span>}
+        {aiGenerated && (
+          <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+            <Sparkles className="h-3 w-3" />
+            AI
+          </span>
+        )}
       </Label>
       {renderField()}
-      {field.helpText && (
+      {error && (
+        <p className="text-sm text-destructive flex items-center gap-1">
+          <AlertCircle className="h-3 w-3" />
+          {error}
+        </p>
+      )}
+      {field.helpText && !error && (
         <p className="text-sm text-muted-foreground">{field.helpText}</p>
       )}
     </div>

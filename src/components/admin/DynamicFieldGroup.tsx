@@ -10,6 +10,8 @@ interface DynamicFieldGroupProps {
   formData: any;
   onChange: (key: string, value: any) => void;
   disabled?: boolean;
+  errors?: Record<string, string>;
+  aiFilledFields?: Set<string>;
 }
 
 export const DynamicFieldGroup: React.FC<DynamicFieldGroupProps> = ({
@@ -18,7 +20,9 @@ export const DynamicFieldGroup: React.FC<DynamicFieldGroupProps> = ({
   fields,
   formData,
   onChange,
-  disabled = false
+  disabled = false,
+  errors = {},
+  aiFilledFields = new Set()
 }) => {
   const getFieldValue = (field: EntityFieldConfig) => {
     const column = field.storageColumn || 'metadata';
@@ -57,6 +61,8 @@ export const DynamicFieldGroup: React.FC<DynamicFieldGroupProps> = ({
             value={getFieldValue(field)}
             onChange={(value) => onChange(field.key, value)}
             disabled={disabled}
+            error={errors[field.key]}
+            aiGenerated={aiFilledFields.has(field.key)}
           />
         ))}
       </CardContent>

@@ -20,7 +20,7 @@ import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { MediaItem } from '@/types/media';
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { DynamicFieldGroup } from './DynamicFieldGroup';
-import { entityTypeConfig } from '@/config/entityTypeConfig';
+import { entityTypeConfig, EntityFieldConfig } from '@/config/entityTypeConfig';
 import { validateUrlForType, getSuggestedEntityType } from '@/config/urlPatterns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
@@ -51,6 +51,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
   
   const DRAFT_KEY = 'create-entity-draft';
   
@@ -152,6 +154,41 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
   const handleInputChange = (field: string, value: string | null | Record<string, any>) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear AI-filled marker when manually edited
+    if (aiFilledFields.has(field)) {
+      setAiFilledFields(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(field);
+        return newSet;
+      });
+    }
+    
+    // Clear error when field is updated
+    if (fieldErrors[field]) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
+  };
+  
+  // Validate field
+  const validateField = (field: EntityFieldConfig, value: any): string | null => {
+    if (field.required && !value) {
+      return `${field.label} is required`;
+    }
+    if (field.type === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      return 'Invalid email format';
+    }
+    if (field.type === 'url' && value && !/^https?:\/\/.+/.test(value)) {
+      return 'Invalid URL format';
+    }
+    if (field.type === 'number' && value && isNaN(Number(value))) {
+      return 'Must be a valid number';
+    }
+    return null;
   };
   
   // Handle type-specific field updates based on storage column
@@ -193,13 +230,35 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       
       return updated;
     });
+    
+    // Clear AI-filled marker when manually edited
+    if (aiFilledFields.has(fieldKey)) {
+      setAiFilledFields(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(fieldKey);
+        return newSet;
+      });
+    }
+    
+    // Validate and update errors
+    const error = validateField(fieldConfig, value);
+    setFieldErrors(prev => {
+      const newErrors = { ...prev };
+      if (error) {
+        newErrors[fieldKey] = error;
+      } else {
+        delete newErrors[fieldKey];
+      }
+      return newErrors;
+    });
   };
   
   // Determine which tabs to show based on entity type
   const getVisibleTabs = () => {
     const typeConfig = entityTypeConfig[formData.type];
-    if (!typeConfig) return ['basic'];
-    return typeConfig.showTabs;
+    const baseTabs = typeConfig ? typeConfig.showTabs : ['basic'];
+    // Always add preview tab at the end
+    return [...baseTabs, 'preview'];
   };
   
   const shouldShowTab = (tabName: string) => {
@@ -240,6 +299,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setShowAnalyzeButton(false);
     setAiPredictions(null);
     setShowPreviewModal(false);
+    setFieldErrors({});
+    setAiFilledFields(new Set());
     
     // Clear draft from sessionStorage
     try {
@@ -331,30 +392,35 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   
   const applyPredictionsToForm = (pred: any) => {
     let appliedCount = 0;
+    const filledFields = new Set<string>();
     
     // Apply type
     if (pred.type) {
       handleInputChange('type', pred.type);
       // Clear category when type changes to avoid orphaned selections
       handleInputChange('category_id', null);
+      filledFields.add('type');
       appliedCount++;
     }
     
     // Apply name
     if (pred.name) {
       handleInputChange('name', pred.name);
+      filledFields.add('name');
       appliedCount++;
     }
     
     // Apply description
     if (pred.description) {
       handleInputChange('description', pred.description);
+      filledFields.add('description');
       appliedCount++;
     }
     
     // Apply category
     if (pred.category_id) {
       handleInputChange('category_id', pred.category_id);
+      filledFields.add('category_id');
       appliedCount++;
     }
     
@@ -381,21 +447,28 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     // Apply primary image
     if (pred.images && pred.images.length > 0) {
       handleInputChange('image_url', pred.images[0]);
+      filledFields.add('image_url');
       appliedCount++;
     }
     
     // Apply website URL from analyzed URL
     if (aiPredictions.metadata?.analyzed_url) {
       handleInputChange('website_url', aiPredictions.metadata.analyzed_url);
+      filledFields.add('website_url');
     }
     
-    // Apply additional metadata
+    // Track AI-filled metadata fields
     if (pred.additional_data && Object.keys(pred.additional_data).length > 0) {
+      Object.keys(pred.additional_data).forEach(key => filledFields.add(key));
+      
       handleInputChange('metadata', {
         ...formData.metadata,
         ai_extracted_data: pred.additional_data
       });
     }
+    
+    // Update AI-filled fields tracker
+    setAiFilledFields(filledFields);
     
     // Close modal
     setShowPreviewModal(false);
@@ -613,13 +686,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="space-y-4">
-          <TabsList className={`grid w-full ${getVisibleTabs().length === 4 ? 'grid-cols-4' : getVisibleTabs().length === 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full grid-cols-${Math.min(getVisibleTabs().length, 5)}`}>
             {shouldShowTab('basic') && <TabsTrigger value="basic">Basic Info</TabsTrigger>}
             {shouldShowTab('contact') && <TabsTrigger value="contact">Contact</TabsTrigger>}
             {shouldShowTab('businessHours') && <TabsTrigger value="hours">Business Hours</TabsTrigger>}
             {shouldShowTab('details') && formData.type && formData.type !== 'others' && (
               <TabsTrigger value="details">{getEntityTypeLabel(formData.type)} Details</TabsTrigger>
             )}
+            {shouldShowTab('preview') && <TabsTrigger value="preview">Preview</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="basic" className="space-y-4">
@@ -879,12 +953,66 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                       formData={formData}
                       onChange={handleTypeSpecificFieldChange}
                       disabled={loading}
+                      errors={fieldErrors}
+                      aiFilledFields={aiFilledFields}
                     />
                   );
                 });
               })()}
             </TabsContent>
           )}
+          
+          {/* Preview JSON Tab */}
+          <TabsContent value="preview" className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">Final Data Structure</Label>
+              <p className="text-sm text-muted-foreground">
+                Review the data that will be saved to the database. Check for any missing or incorrect values.
+              </p>
+            </div>
+            <div className="bg-muted rounded-md overflow-auto max-h-[500px]">
+              <pre className="text-xs p-4 font-mono">
+                {JSON.stringify({
+                  // Basic fields
+                  name: formData.name || '(empty)',
+                  type: formData.type || '(empty)',
+                  description: formData.description || '(empty)',
+                  category_id: formData.category_id || null,
+                  image_url: primaryMediaUrl || uploadedMedia[0]?.url || formData.image_url || null,
+                  website_url: formData.website_url || null,
+                  venue: formData.venue || null,
+                  
+                  // Type-specific direct columns (only if not empty)
+                  ...(formData.authors.length > 0 && { authors: formData.authors }),
+                  ...(formData.isbn && { isbn: formData.isbn }),
+                  ...(formData.publication_year && { publication_year: formData.publication_year }),
+                  ...(formData.languages.length > 0 && { languages: formData.languages }),
+                  ...(formData.ingredients.length > 0 && { ingredients: formData.ingredients }),
+                  
+                  // JSONB columns (only if not empty)
+                  ...(Object.keys(formData.metadata).length > 0 && { metadata: formData.metadata }),
+                  ...(Object.keys(formData.cast_crew).length > 0 && { cast_crew: formData.cast_crew }),
+                  ...(Object.keys(formData.specifications).length > 0 && { specifications: formData.specifications }),
+                  ...(Object.keys(formData.price_info).length > 0 && { price_info: formData.price_info }),
+                  ...(Object.keys(formData.nutritional_info).length > 0 && { nutritional_info: formData.nutritional_info }),
+                  ...(Object.keys(formData.external_ratings).length > 0 && { external_ratings: formData.external_ratings }),
+                  
+                  // Contact & Business Hours
+                  ...(Object.keys(contactInfo).length > 0 && { contact_info: contactInfo }),
+                  ...(Object.keys(businessHours).length > 0 && { business_hours: businessHours }),
+                  
+                  // Parent entity
+                  ...(selectedParent && { parent_id: selectedParent.id, parent_name: selectedParent.name }),
+                  
+                  // Tags
+                  ...(selectedTags.length > 0 && { tags: selectedTags.map(t => t.name) }),
+                  
+                  // Media
+                  ...(uploadedMedia.length > 0 && { uploaded_media_count: uploadedMedia.length }),
+                }, null, 2)}
+              </pre>
+            </div>
+          </TabsContent>
         </Tabs>
 
         <div className="flex justify-end gap-2 pt-4 border-t">
