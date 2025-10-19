@@ -433,6 +433,47 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       });
       return;
     }
+    
+    // Validate type-specific required fields from config
+    const typeConfig = entityTypeConfig[formData.type];
+    if (typeConfig?.requiredFields) {
+      for (const fieldKey of typeConfig.requiredFields) {
+        const fieldConfig = typeConfig.fields.find(f => f.key === fieldKey);
+        if (!fieldConfig) continue;
+        
+        const storageColumn = fieldConfig.storageColumn || 'metadata';
+        let value;
+        
+        switch (storageColumn) {
+          case 'metadata':
+            value = formData.metadata?.[fieldKey];
+            break;
+          case 'cast_crew':
+            value = formData.cast_crew?.[fieldKey];
+            break;
+          case 'specifications':
+            value = formData.specifications?.[fieldKey];
+            break;
+          case 'price_info':
+            value = formData.price_info?.[fieldKey];
+            break;
+          default:
+            value = formData[storageColumn as keyof typeof formData];
+        }
+        
+        // Check if value is empty (handles strings, arrays, null, undefined)
+        const isEmpty = !value || (Array.isArray(value) && value.length === 0) || value === '';
+        
+        if (isEmpty) {
+          toast({
+            title: 'Validation Error',
+            description: `${fieldConfig.label} is required for ${getEntityTypeLabel(formData.type)}`,
+            variant: 'destructive'
+          });
+          return;
+        }
+      }
+    }
 
     setLoading(true);
     try {
@@ -470,7 +511,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           created_by: user?.id || null,
           slug: hierarchicalSlug,
           parent_id: selectedParent?.id || null,
-          category_id: formData.category_id || null
+          category_id: formData.category_id || null,
+          // Type-specific columns
+          authors: formData.authors.length > 0 ? formData.authors : null,
+          languages: formData.languages.length > 0 ? formData.languages : null,
+          isbn: formData.isbn || null,
+          publication_year: formData.publication_year || null,
+          cast_crew: Object.keys(formData.cast_crew).length > 0 ? formData.cast_crew : null,
+          ingredients: formData.ingredients.length > 0 ? formData.ingredients : null,
+          specifications: Object.keys(formData.specifications).length > 0 ? formData.specifications : null,
+          price_info: Object.keys(formData.price_info).length > 0 ? formData.price_info : null,
+          nutritional_info: Object.keys(formData.nutritional_info).length > 0 ? formData.nutritional_info : null,
+          external_ratings: Object.keys(formData.external_ratings).length > 0 ? formData.external_ratings : null,
         }])
         .select()
         .single();
@@ -657,6 +709,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 entityType={formData.type as EntityType}
                 value={formData.category_id}
                 onChange={(id) => handleInputChange('category_id', id)}
+                filterByEntityType={formData.type}
                 disabled={loading}
                 mode="drill-down"
               />
@@ -779,232 +832,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   placeholder="Venue or location"
                   disabled={loading}
                 />
-              </div>
-            )}
-
-            {/* Type-Specific Metadata Fields */}
-            {formData.type === EntityType.Product && (
-              <div className="space-y-4 p-4 border rounded-md bg-muted/50">
-                <h4 className="font-semibold text-sm">Product Metadata</h4>
-                
-                <div className="space-y-2">
-                  <Label>Brand Origin</Label>
-                  <Input
-                    placeholder="e.g., Korea, USA, France"
-                    value={formData.metadata?.brand_origin || ''}
-                    onChange={(e) => handleInputChange('metadata', {
-                      ...formData.metadata,
-                      brand_origin: e.target.value
-                    })}
-                    disabled={loading}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Price Tier</Label>
-                  <Select
-                    value={formData.metadata?.price_tier || ''}
-                    onValueChange={(value) => handleInputChange('metadata', {
-                      ...formData.metadata,
-                      price_tier: value
-                    })}
-                    disabled={loading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select price tier" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="budget">Budget (&lt;$20)</SelectItem>
-                      <SelectItem value="mid-range">Mid-Range ($20-$50)</SelectItem>
-                      <SelectItem value="luxury">Luxury ($50+)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Product Characteristics</Label>
-                  <div className="flex flex-wrap gap-3">
-                    {['cruelty-free', 'vegan', 'organic', 'hypoallergenic'].map(trait => (
-                      <label key={trait} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.metadata?.characteristics?.includes(trait) || false}
-                          onChange={(e) => {
-                            const current = formData.metadata?.characteristics || [];
-                            const updated = e.target.checked
-                              ? [...current, trait]
-                              : current.filter((t: string) => t !== trait);
-                            handleInputChange('metadata', {
-                              ...formData.metadata,
-                              characteristics: updated
-                            });
-                          }}
-                          disabled={loading}
-                          className="rounded"
-                        />
-                        <span className="text-sm capitalize">{trait.replace('-', ' ')}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {formData.type === EntityType.Food && (
-              <div className="space-y-4 p-4 border rounded-md bg-muted/50">
-                <h4 className="font-semibold text-sm">Food Metadata</h4>
-                
-                <div className="space-y-2">
-                  <Label>Cuisines</Label>
-                  <Input
-                    placeholder="e.g., Italian, Korean, Mexican (comma-separated)"
-                    value={formData.metadata?.cuisines?.join(', ') || ''}
-                    onChange={(e) => handleInputChange('metadata', {
-                      ...formData.metadata,
-                      cuisines: e.target.value.split(',').map(c => c.trim()).filter(Boolean)
-                    })}
-                    disabled={loading}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Dietary Tags</Label>
-                  <div className="flex flex-wrap gap-3">
-                    {['vegetarian', 'vegan', 'gluten-free', 'halal', 'kosher'].map(diet => (
-                      <label key={diet} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.metadata?.dietary_tags?.includes(diet) || false}
-                          onChange={(e) => {
-                            const current = formData.metadata?.dietary_tags || [];
-                            const updated = e.target.checked
-                              ? [...current, diet]
-                              : current.filter((t: string) => t !== diet);
-                            handleInputChange('metadata', {
-                              ...formData.metadata,
-                              dietary_tags: updated
-                            });
-                          }}
-                          disabled={loading}
-                          className="rounded"
-                        />
-                        <span className="text-sm capitalize">{diet.replace('-', ' ')}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {formData.type === EntityType.Place && (
-              <div className="space-y-4 p-4 border rounded-md bg-muted/50">
-                <h4 className="font-semibold text-sm">Place Metadata</h4>
-                
-                <div className="space-y-2">
-                  <Label>Location Type</Label>
-                  <Select
-                    value={formData.metadata?.location_type || ''}
-                    onValueChange={(value) => handleInputChange('metadata', {
-                      ...formData.metadata,
-                      location_type: value
-                    })}
-                    disabled={loading}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select location type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="indoor">Indoor</SelectItem>
-                      <SelectItem value="outdoor">Outdoor</SelectItem>
-                      <SelectItem value="mixed">Mixed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label>Accessibility Features</Label>
-                  <div className="flex flex-wrap gap-3">
-                    {['wheelchair-accessible', 'parking-available', 'pet-friendly'].map(feature => (
-                      <label key={feature} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={formData.metadata?.accessibility?.includes(feature) || false}
-                          onChange={(e) => {
-                            const current = formData.metadata?.accessibility || [];
-                            const updated = e.target.checked
-                              ? [...current, feature]
-                              : current.filter((f: string) => f !== feature);
-                            handleInputChange('metadata', {
-                              ...formData.metadata,
-                              accessibility: updated
-                            });
-                          }}
-                          disabled={loading}
-                          className="rounded"
-                        />
-                        <span className="text-sm">{feature.replace('-', ' ')}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {(formData.type === EntityType.TVShow || formData.type === EntityType.Movie) && (
-              <div className="space-y-4 p-4 border rounded-md bg-muted/50">
-                <h4 className="font-semibold text-sm">Media Metadata</h4>
-                
-                <div className="space-y-2">
-                  <Label>Genres</Label>
-                  <Input
-                    placeholder="e.g., Action, Drama, Comedy (comma-separated)"
-                    value={formData.metadata?.genres?.join(', ') || ''}
-                    onChange={(e) => handleInputChange('metadata', {
-                      ...formData.metadata,
-                      genres: e.target.value.split(',').map(g => g.trim()).filter(Boolean)
-                    })}
-                    disabled={loading}
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Release Year</Label>
-                    <Input
-                      type="number"
-                      placeholder="e.g., 2024"
-                      value={formData.metadata?.release_year || ''}
-                      onChange={(e) => handleInputChange('metadata', {
-                        ...formData.metadata,
-                        release_year: parseInt(e.target.value) || null
-                      })}
-                      disabled={loading}
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Content Rating</Label>
-                    <Select
-                      value={formData.metadata?.content_rating || ''}
-                      onValueChange={(value) => handleInputChange('metadata', {
-                        ...formData.metadata,
-                        content_rating: value
-                      })}
-                      disabled={loading}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select rating" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="G">G</SelectItem>
-                        <SelectItem value="PG">PG</SelectItem>
-                        <SelectItem value="PG-13">PG-13</SelectItem>
-                        <SelectItem value="R">R</SelectItem>
-                        <SelectItem value="TV-MA">TV-MA</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
               </div>
             )}
 

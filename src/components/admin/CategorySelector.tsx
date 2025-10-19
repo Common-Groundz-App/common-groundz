@@ -29,6 +29,7 @@ interface CategorySelectorProps {
   disabled?: boolean;
   className?: string;
   mode?: 'flat' | 'drill-down'; // NEW: Support both UX patterns
+  filterByEntityType?: string; // NEW: Filter categories by entity type
 }
 
 export const CategorySelector: React.FC<CategorySelectorProps> = ({
@@ -41,7 +42,8 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
   showNoCategoryOption = true,
   disabled = false,
   className = '',
-  mode = 'flat' // Default to current flat dropdown behavior
+  mode = 'flat', // Default to current flat dropdown behavior
+  filterByEntityType
 }) => {
   // Conditionally render drill-down mode
   if (mode === 'drill-down') {
@@ -67,7 +69,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
   
   useEffect(() => {
     const loadCategories = async () => {
-      if (!entityType) {
+      if (!entityType && !filterByEntityType) {
         setCategories([]);
         return;
       }
@@ -76,9 +78,9 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
       setError(null);
       
       try {
-        // ✅ CRITICAL: Canonicalize type before API call
-        // This ensures legacy types (tv, activity) are normalized to canonical types (tv_show, experience)
-        const canonicalType = getCanonicalType(entityType);
+        // Use filterByEntityType if provided, otherwise use entityType
+        const typeToFetch = filterByEntityType || entityType;
+        const canonicalType = getCanonicalType(typeToFetch);
         
         const data = await fetchCategoriesByType(canonicalType);
         setCategories(data);
@@ -92,7 +94,7 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
     };
     
     loadCategories();
-  }, [entityType]);
+  }, [entityType, filterByEntityType]);
   
   const getPlaceholderText = () => {
     if (loading) return 'Loading categories...';
