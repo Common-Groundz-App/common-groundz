@@ -77,23 +77,26 @@ serve(async (req) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [
-              { text: systemPrompt },
-              { 
-                fileData: {
-                  mimeType: "text/uri-list",
-                  fileUri: url
-                }
-              }
-            ]
-          }],
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: systemPrompt }
+              ]
+            }
+          ],
+          toolConfig: {
+            urlContext: {
+              urls: [
+                { url: url }
+              ]
+            }
+          },
           generationConfig: {
             temperature: 0.2,
             topP: 0.8,
             topK: 40,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 2048
           }
         })
       }
