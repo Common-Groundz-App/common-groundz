@@ -1,14 +1,13 @@
 import React from 'react';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Plus, X, Book, Film, Utensils, Package, MapPin, Tv, GraduationCap, Smartphone, Gamepad2, Compass } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 import { getCanonicalType } from '@/services/entityTypeHelpers';
-import { EntityType } from '@/services/recommendation/types';
+import { entityTypeConfig, EntityFieldConfig } from '@/config/entityTypeConfig';
+import { DynamicFieldRenderer } from './DynamicFieldRenderer';
 
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
 
@@ -23,526 +22,242 @@ export const EntityTypeSpecificFields: React.FC<EntityTypeSpecificFieldsProps> =
   onChange,
   disabled = false
 }) => {
-  const updateArrayField = (field: keyof DatabaseEntity, index: number, value: string) => {
-    const currentArray = (entity[field] as string[]) || [];
-    const newArray = [...currentArray];
-    newArray[index] = value;
-    onChange(field, newArray.filter(item => item.trim() !== ''));
+  // Validate metadata format on mount and changes
+  React.useEffect(() => {
+    if (entity.metadata && typeof entity.metadata !== 'object') {
+      console.warn('Invalid metadata format for entity:', entity.id, entity.metadata);
+    }
+    if (entity.cast_crew && typeof entity.cast_crew !== 'object') {
+      console.warn('Invalid cast_crew format for entity:', entity.id, entity.cast_crew);
+    }
+    if (entity.specifications && typeof entity.specifications !== 'object') {
+      console.warn('Invalid specifications format for entity:', entity.id, entity.specifications);
+    }
+  }, [entity.id, entity.metadata, entity.cast_crew, entity.specifications]);
+
+  // Helper to read field value from correct storage column
+  const getFieldValue = (entity: DatabaseEntity, field: EntityFieldConfig) => {
+    const column = field.storageColumn || 'metadata';
+    
+    switch (column) {
+      case 'metadata':
+        return entity.metadata?.[field.key];
+      case 'cast_crew':
+        return entity.cast_crew?.[field.key];
+      case 'specifications':
+        return entity.specifications?.[field.key];
+      case 'price_info':
+        return entity.price_info?.[field.key];
+      case 'nutritional_info':
+        return entity.nutritional_info?.[field.key];
+      case 'external_ratings':
+        return entity.external_ratings?.[field.key];
+      case 'authors':
+      case 'languages':
+      case 'ingredients':
+        return entity[column];
+      default:
+        return entity[column as keyof DatabaseEntity];
+    }
   };
 
-  const addToArrayField = (field: keyof DatabaseEntity) => {
-    const currentArray = (entity[field] as string[]) || [];
-    onChange(field, [...currentArray, '']);
-  };
-
-  const removeFromArrayField = (field: keyof DatabaseEntity, index: number) => {
-    const currentArray = (entity[field] as string[]) || [];
-    const newArray = currentArray.filter((_, i) => i !== index);
-    onChange(field, newArray);
-  };
-
-  const updateJsonField = (field: keyof DatabaseEntity, key: string, value: any) => {
-    const current = (entity[field] as any) || {};
-    onChange(field, {
-      ...current,
-      [key]: value || undefined
+  // Helper to update field value to correct storage column
+  const setFieldValue = (field: EntityFieldConfig, value: any) => {
+    const column = field.storageColumn || 'metadata';
+    
+    // For direct columns (authors, isbn, publication_year, etc.)
+    if (['authors', 'languages', 'ingredients', 'isbn', 'publication_year'].includes(column)) {
+      onChange(column as keyof DatabaseEntity, value);
+      return;
+    }
+    
+    // For JSONB columns
+    const currentData = entity[column as keyof DatabaseEntity] || {};
+    onChange(column as keyof DatabaseEntity, {
+      ...(typeof currentData === 'object' ? currentData : {}),
+      [field.key]: value
     });
   };
 
-  const renderBookFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Book className="h-4 w-4" />
-          Book Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Authors */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">Authors</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => addToArrayField('authors')}
-              disabled={disabled}
-              className="h-8"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Add Author
-            </Button>
-          </div>
-          {(entity.authors || []).map((author, index) => (
-            <div key={index} className="flex gap-2">
-              <Input
-                value={author}
-                onChange={(e) => updateArrayField('authors', index, e.target.value)}
-                placeholder="Author name"
-                disabled={disabled}
-                className="text-sm"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => removeFromArrayField('authors', index)}
-                disabled={disabled}
-                className="h-9 w-9 p-0 flex-shrink-0"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-        </div>
+  // Get canonical type and config with fallback
+  const canonicalType = getCanonicalType(entity.type) || 'generic';
+  const typeConfig = entityTypeConfig[canonicalType] || entityTypeConfig.generic;
 
-        {/* ISBN */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">ISBN</Label>
-          <Input
-            value={entity.isbn || ''}
-            onChange={(e) => onChange('isbn', e.target.value)}
-            placeholder="978-0-123456-78-9"
-            disabled={disabled}
-            className="text-sm"
-          />
-        </div>
-
-        {/* Publication Year */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Publication Year</Label>
-          <Input
-            type="number"
-            value={entity.publication_year || ''}
-            onChange={(e) => onChange('publication_year', e.target.value ? parseInt(e.target.value) : null)}
-            placeholder="2023"
-            disabled={disabled}
-            className="text-sm"
-          />
-        </div>
-
-        {/* Languages */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">Languages</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => addToArrayField('languages')}
-              disabled={disabled}
-              className="h-8"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Add Language
-            </Button>
-          </div>
-          {(entity.languages || []).map((language, index) => (
-            <div key={index} className="flex gap-2">
-              <Input
-                value={language}
-                onChange={(e) => updateArrayField('languages', index, e.target.value)}
-                placeholder="English, Spanish, etc."
-                disabled={disabled}
-                className="text-sm"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => removeFromArrayField('languages', index)}
-                disabled={disabled}
-                className="h-9 w-9 p-0 flex-shrink-0"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderMovieFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Film className="h-4 w-4" />
-          Movie Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Release Year */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Release Year</Label>
-          <Input
-            type="number"
-            value={entity.publication_year || ''}
-            onChange={(e) => onChange('publication_year', e.target.value ? parseInt(e.target.value) : null)}
-            placeholder="2023"
-            disabled={disabled}
-            className="text-sm"
-          />
-        </div>
-
-        {/* Cast & Crew */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Cast & Crew (JSON)</Label>
-          <Textarea
-            value={entity.cast_crew ? JSON.stringify(entity.cast_crew, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('cast_crew', parsed);
-              } catch {
-                // Invalid JSON, don't update
-              }
-            }}
-            placeholder='{"director": "Director Name", "cast": ["Actor 1", "Actor 2"]}'
-            disabled={disabled}
-            rows={4}
-            className="text-sm font-mono"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderFoodFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Utensils className="h-4 w-4" />
-          Food Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Ingredients */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium">Ingredients</Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => addToArrayField('ingredients')}
-              disabled={disabled}
-              className="h-8"
-            >
-              <Plus className="h-3 w-3 mr-1" />
-              Add Ingredient
-            </Button>
-          </div>
-          {(entity.ingredients || []).map((ingredient, index) => (
-            <div key={index} className="flex gap-2">
-              <Input
-                value={ingredient}
-                onChange={(e) => updateArrayField('ingredients', index, e.target.value)}
-                placeholder="Ingredient name"
-                disabled={disabled}
-                className="text-sm"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => removeFromArrayField('ingredients', index)}
-                disabled={disabled}
-                className="h-9 w-9 p-0 flex-shrink-0"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-        </div>
-
-        {/* Nutritional Info */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Nutritional Information (JSON)</Label>
-          <Textarea
-            value={entity.nutritional_info ? JSON.stringify(entity.nutritional_info, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('nutritional_info', parsed);
-              } catch {
-                // Invalid JSON, don't update
-              }
-            }}
-            placeholder='{"calories": 250, "protein": "12g", "carbs": "30g"}'
-            disabled={disabled}
-            rows={3}
-            className="text-sm font-mono"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderProductFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Package className="h-4 w-4" />
-          Product Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Specifications */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Specifications (JSON)</Label>
-          <Textarea
-            value={entity.specifications ? JSON.stringify(entity.specifications, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('specifications', parsed);
-              } catch {
-                // Invalid JSON, don't update
-              }
-            }}
-            placeholder='{"dimensions": "10x5x2 inches", "weight": "1.5 lbs", "material": "plastic"}'
-            disabled={disabled}
-            rows={4}
-            className="text-sm font-mono"
-          />
-        </div>
-
-        {/* Price Info */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Price Information (JSON)</Label>
-          <Textarea
-            value={entity.price_info ? JSON.stringify(entity.price_info, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('price_info', parsed);
-              } catch {
-                // Invalid JSON, don't update
-              }
-            }}
-            placeholder='{"price": "$29.99", "currency": "USD", "discount": "10%"}'
-            disabled={disabled}
-            rows={3}
-            className="text-sm font-mono"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderPlaceFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <MapPin className="h-4 w-4" />
-          Place Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* External Ratings */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">External Ratings (JSON)</Label>
-          <Textarea
-            value={entity.external_ratings ? JSON.stringify(entity.external_ratings, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('external_ratings', parsed);
-              } catch {
-                // Invalid JSON, don't update
-              }
-            }}
-            placeholder='{"google": 4.5, "yelp": 4.2, "tripadvisor": 4.0}'
-            disabled={disabled}
-            rows={3}
-            className="text-sm font-mono"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderTVShowFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Tv className="h-4 w-4" />
-          TV Show Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Release Year</Label>
-          <Input
-            type="number"
-            value={entity.publication_year || ''}
-            onChange={(e) => onChange('publication_year', e.target.value ? parseInt(e.target.value) : null)}
-            placeholder="2023"
-            disabled={disabled}
-            className="text-sm"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Cast & Crew (JSON)</Label>
-          <Textarea
-            value={entity.cast_crew ? JSON.stringify(entity.cast_crew, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('cast_crew', parsed);
-              } catch {}
-            }}
-            placeholder='{"network": "HBO", "seasons": 8, "episodes": 73}'
-            disabled={disabled}
-            rows={4}
-            className="text-sm font-mono"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderCourseFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <GraduationCap className="h-4 w-4" />
-          Course Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Specifications (JSON)</Label>
-          <Textarea
-            value={entity.specifications ? JSON.stringify(entity.specifications, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('specifications', parsed);
-              } catch {}
-            }}
-            placeholder='{"instructor": "Name", "duration": "6 weeks", "platform": "Coursera"}'
-            disabled={disabled}
-            rows={4}
-            className="text-sm font-mono"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderAppFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Smartphone className="h-4 w-4" />
-          App Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Specifications (JSON)</Label>
-          <Textarea
-            value={entity.specifications ? JSON.stringify(entity.specifications, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('specifications', parsed);
-              } catch {}
-            }}
-            placeholder='{"platform": "iOS/Android", "version": "2.0", "developer": "Company"}'
-            disabled={disabled}
-            rows={4}
-            className="text-sm font-mono"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderGameFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Gamepad2 className="h-4 w-4" />
-          Game Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Specifications (JSON)</Label>
-          <Textarea
-            value={entity.specifications ? JSON.stringify(entity.specifications, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('specifications', parsed);
-              } catch {}
-            }}
-            placeholder='{"platform": "PC/Console", "genre": "RPG", "developer": "Studio"}'
-            disabled={disabled}
-            rows={4}
-            className="text-sm font-mono"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderExperienceFields = () => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Compass className="h-4 w-4" />
-          Experience Details
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Specifications (JSON)</Label>
-          <Textarea
-            value={entity.specifications ? JSON.stringify(entity.specifications, null, 2) : ''}
-            onChange={(e) => {
-              try {
-                const parsed = JSON.parse(e.target.value);
-                onChange('specifications', parsed);
-              } catch {}
-            }}
-            placeholder='{"duration": "2 hours", "location": "City, State", "booking_url": "https://..."}'
-            disabled={disabled}
-            rows={4}
-            className="text-sm font-mono"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  // Render based on entity type using canonical helpers
-  const canonicalType = getCanonicalType(entity.type);
-  switch (canonicalType) {
-    case EntityType.Book:
-      return renderBookFields();
-    case EntityType.Movie:
-    case EntityType.TVShow:
-      return canonicalType === EntityType.TVShow ? renderTVShowFields() : renderMovieFields();
-    case EntityType.Food:
-      return renderFoodFields();
-    case EntityType.Product:
-      return renderProductFields();
-    case EntityType.Place:
-      return renderPlaceFields();
-    case EntityType.Course:
-      return renderCourseFields();
-    case EntityType.App:
-      return renderAppFields();
-    case EntityType.Game:
-      return renderGameFields();
-    case EntityType.Experience:
-      return renderExperienceFields();
-    default:
-      return null;
+  // Missing config fallback
+  if (!typeConfig || !typeConfig.fields || typeConfig.fields.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-6">
+          <p className="text-sm text-muted-foreground text-center">
+            No configuration found for entity type: <strong>{canonicalType}</strong>
+          </p>
+          <p className="text-xs text-muted-foreground text-center mt-2">
+            Contact support to add field configuration for this type.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
+
+  return (
+    <div className="space-y-6">
+      {/* Config-driven fields organized by groups */}
+      {typeConfig.fieldGroups ? (
+        typeConfig.fieldGroups.map((group, index) => {
+          const groupFields = typeConfig.fields.filter(f => 
+            group.fields.includes(f.key)
+          );
+          
+          return (
+            <Card key={index}>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {group.icon && <span>{group.icon}</span>}
+                  <span>{group.title}</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {groupFields.map(field => (
+                  <DynamicFieldRenderer
+                    key={field.key}
+                    field={field}
+                    value={getFieldValue(entity, field)}
+                    onChange={(value) => setFieldValue(field, value)}
+                    disabled={disabled}
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          );
+        })
+      ) : (
+        // Fallback: render all fields without groups
+        <Card>
+          <CardContent className="space-y-4 pt-6">
+            {typeConfig.fields.map(field => (
+              <DynamicFieldRenderer
+                key={field.key}
+                field={field}
+                value={getFieldValue(entity, field)}
+                onChange={(value) => setFieldValue(field, value)}
+                disabled={disabled}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Advanced JSON Editors (collapsible) */}
+      {(entity.cast_crew || entity.nutritional_info || entity.specifications || entity.external_ratings || entity.price_info) && (
+        <Collapsible>
+          <Card>
+            <CardHeader>
+              <CollapsibleTrigger className="flex items-center justify-between w-full [&[data-state=open]>svg]:rotate-180">
+                <CardTitle className="text-lg">🔧 Advanced Editors</CardTitle>
+                <ChevronDown className="h-4 w-4 transition-transform duration-200" />
+              </CollapsibleTrigger>
+            </CardHeader>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                {/* Cast & Crew (Movies/TV Shows) */}
+                {entity.cast_crew && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Cast & Crew (JSON)</Label>
+                    <Textarea
+                      value={JSON.stringify(entity.cast_crew, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          onChange('cast_crew', JSON.parse(e.target.value));
+                        } catch (err) {
+                          // Invalid JSON, ignore
+                        }
+                      }}
+                      disabled={disabled}
+                      className="font-mono text-xs min-h-[120px]"
+                    />
+                  </div>
+                )}
+                
+                {/* Nutritional Info (Food) */}
+                {entity.nutritional_info && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Nutritional Info (JSON)</Label>
+                    <Textarea
+                      value={JSON.stringify(entity.nutritional_info, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          onChange('nutritional_info', JSON.parse(e.target.value));
+                        } catch (err) {
+                          // Invalid JSON, ignore
+                        }
+                      }}
+                      disabled={disabled}
+                      className="font-mono text-xs min-h-[120px]"
+                    />
+                  </div>
+                )}
+                
+                {/* Specifications (Products/Apps/Games) */}
+                {entity.specifications && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Specifications (JSON)</Label>
+                    <Textarea
+                      value={JSON.stringify(entity.specifications, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          onChange('specifications', JSON.parse(e.target.value));
+                        } catch (err) {
+                          // Invalid JSON, ignore
+                        }
+                      }}
+                      disabled={disabled}
+                      className="font-mono text-xs min-h-[120px]"
+                    />
+                  </div>
+                )}
+                
+                {/* Price Info (Products) */}
+                {entity.price_info && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Price Info (JSON)</Label>
+                    <Textarea
+                      value={JSON.stringify(entity.price_info, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          onChange('price_info', JSON.parse(e.target.value));
+                        } catch (err) {
+                          // Invalid JSON, ignore
+                        }
+                      }}
+                      disabled={disabled}
+                      className="font-mono text-xs min-h-[120px]"
+                    />
+                  </div>
+                )}
+                
+                {/* External Ratings (Places) */}
+                {entity.external_ratings && (
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">External Ratings (JSON)</Label>
+                    <Textarea
+                      value={JSON.stringify(entity.external_ratings, null, 2)}
+                      onChange={(e) => {
+                        try {
+                          onChange('external_ratings', JSON.parse(e.target.value));
+                        } catch (err) {
+                          // Invalid JSON, ignore
+                        }
+                      }}
+                      disabled={disabled}
+                      className="font-mono text-xs min-h-[120px]"
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+      )}
+    </div>
+  );
 };

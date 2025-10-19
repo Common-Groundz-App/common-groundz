@@ -209,10 +209,29 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
     ]
   },
 
+  generic: {
+    showTabs: ['basic'],
+    hideTabs: ['contact', 'businessHours', 'details'],
+    requiredFields: [],
+    fields: [
+      { key: 'description', label: 'Description', type: 'textarea', storageColumn: 'metadata', placeholder: 'Add details about this item' },
+      { key: 'tags', label: 'Tags', type: 'tags', storageColumn: 'metadata', placeholder: 'Add tags' },
+    ],
+    fieldGroups: [
+      { title: '📝 Basic Information', icon: '📝', fields: ['description', 'tags'] }
+    ]
+  },
+  
   others: {
     showTabs: ['basic'],
     hideTabs: ['contact', 'businessHours', 'details'],
     requiredFields: [],
-    fields: [],
+    fields: [
+      { key: 'description', label: 'Description', type: 'textarea', storageColumn: 'metadata', placeholder: 'Add details about this item' },
+      { key: 'tags', label: 'Tags', type: 'tags', storageColumn: 'metadata', placeholder: 'Add tags' },
+    ],
+    fieldGroups: [
+      { title: '📝 Basic Information', icon: '📝', fields: ['description', 'tags'] }
+    ]
   }
 };
