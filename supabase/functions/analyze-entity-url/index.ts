@@ -23,7 +23,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('🔍 Analyzing URL:', url);
+    console.log('🔍 [v2.5-URL-TEXT-FIX] Analyzing URL:', url);
 
     // Initialize Supabase client
     const supabaseClient = createClient(
