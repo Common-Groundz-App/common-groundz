@@ -79,15 +79,12 @@ serve(async (req) => {
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: systemPrompt },
-              {
-                fileData: {
-                  fileUri: url,
-                  mimeType: "text/html"
-                }
-              }
+              { text: systemPrompt }
             ]
           }],
+          urlContext: [
+            { url }
+          ],
           generationConfig: {
             temperature: 0.2,
             topP: 0.8,
