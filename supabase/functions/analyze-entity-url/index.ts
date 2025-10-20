@@ -96,7 +96,7 @@ serve(async (req) => {
               text: systemPrompt
             }]
           },
-          tools: [{ googleSearchRetrieval: {} }],
+          tools: [{ googleSearch: {} }],
           generationConfig: {
             temperature: 0.2,
             topP: 0.8,
