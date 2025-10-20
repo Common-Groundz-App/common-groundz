@@ -1,4 +1,4 @@
-import { entityTypeConfig, EntityFieldConfig, FieldType } from '../../../shared/config/entityTypeConfig.ts';
+import { entityTypeConfig, EntityFieldConfig, FieldType } from './entity-config.ts';
 
 /**
  * Generate comprehensive system prompt from shared entity config
