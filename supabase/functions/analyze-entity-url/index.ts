@@ -101,8 +101,7 @@ serve(async (req) => {
             temperature: 0.2,
             topP: 0.8,
             topK: 40,
-            maxOutputTokens: 2048,
-            responseMimeType: 'application/json'
+            maxOutputTokens: 2048
           }
         })
       }
@@ -126,12 +125,28 @@ serve(async (req) => {
     // Extract JSON from response
     let aiPredictions;
     try {
-      aiPredictions = JSON.parse(aiText);
+      let jsonText = aiText.trim();
+      
+      // Handle markdown-wrapped JSON (e.g., ```json {...} ```)
+      const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
+      const match = jsonText.match(jsonRegex);
+      if (match && match[1]) {
+        jsonText = match[1].trim();
+      } else {
+        // Try plain ``` wrapping
+        const plainCodeBlock = /```\s*([\s\S]*?)\s*```/;
+        const plainMatch = jsonText.match(plainCodeBlock);
+        if (plainMatch && plainMatch[1]) {
+          jsonText = plainMatch[1].trim();
+        }
+      }
+      
+      aiPredictions = JSON.parse(jsonText);
       console.log('✅ Parsed AI Predictions:', aiPredictions);
     } catch (parseError) {
       console.error('❌ Failed to parse AI response:', parseError);
       console.error('Raw AI text:', aiText);
-      // Fallback: try to extract JSON object from text
+      // Final fallback: extract any JSON object
       const jsonMatch = aiText.match(/\{[\s\S]*\}/);
       const jsonText = jsonMatch ? jsonMatch[0] : aiText;
       aiPredictions = JSON.parse(jsonText);
