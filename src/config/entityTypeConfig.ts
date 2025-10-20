@@ -62,7 +62,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
     ]
   },
 
-  tvshow: {
+  tv_show: {
     showTabs: ['basic', 'details'],
     hideTabs: ['contact', 'businessHours'],
     requiredFields: ['release_year'],
