@@ -81,11 +81,11 @@ serve(async (req) => {
             {
               role: 'user',
               parts: [
-                { text: systemPrompt },
-                { url: url }
+                { text: `${systemPrompt}\n\n**URL to Analyze:** ${url}` }
               ]
             }
           ],
+          tools: [{ googleSearch: {} }],
           generationConfig: {
             temperature: 0.2,
             topP: 0.8,
