@@ -49,6 +49,10 @@ serve(async (req) => {
 6. Provide a confidence score (0.0-1.0)
 7. Extract any structured data like prices, ratings, authors, cast, etc.
 8. Explain your reasoning
+9. **Extract the main entity image URL.**
+   - The URL **MUST be a full, absolute URL**.
+   - **Prioritize the 'og:image' meta tag**.
+   - If no image is found, set 'image_url' to null.
 
 **Entity Types Available:**
 - book, movie, app, product, place, food, tv_show, person, others
@@ -62,6 +66,7 @@ serve(async (req) => {
   "tags": ["classic", "adventure", "fantasy", "tolkien"],
   "confidence": 0.95,
   "reasoning": "URL pattern matches Goodreads book page, title and author clearly identified",
+  "image_url": "https://example.com/book-cover.jpg",
   "additional_data": {
     "author": "J.R.R. Tolkien",
     "publication_year": 1937,
@@ -81,16 +86,23 @@ serve(async (req) => {
             {
               role: 'user',
               parts: [
-                { text: `${systemPrompt}\n\n**URL to Analyze:** ${url}` }
+                { text: `Analyze this URL: ${url}` }
               ]
             }
           ],
-          tools: [{ googleSearch: {} }],
+          systemInstruction: {
+            role: 'system',
+            parts: [{
+              text: systemPrompt
+            }]
+          },
+          tools: [{ googleSearchRetrieval: {} }],
           generationConfig: {
             temperature: 0.2,
             topP: 0.8,
             topK: 40,
-            maxOutputTokens: 2048
+            maxOutputTokens: 2048,
+            responseMimeType: 'application/json'
           }
         })
       }
@@ -114,19 +126,15 @@ serve(async (req) => {
     // Extract JSON from response
     let aiPredictions;
     try {
-      const jsonMatch = aiText.match(/```json\n([\s\S]*?)\n```/) || 
-                       aiText.match(/```\n([\s\S]*?)\n```/) ||
-                       aiText.match(/\{[\s\S]*\}/);
-      
-      const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiText;
-      aiPredictions = JSON.parse(jsonText);
-      
+      aiPredictions = JSON.parse(aiText);
       console.log('✅ Parsed AI Predictions:', aiPredictions);
-      
     } catch (parseError) {
       console.error('❌ Failed to parse AI response:', parseError);
       console.error('Raw AI text:', aiText);
-      throw new Error('AI returned invalid JSON format');
+      // Fallback: try to extract JSON object from text
+      const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+      const jsonText = jsonMatch ? jsonMatch[0] : aiText;
+      aiPredictions = JSON.parse(jsonText);
     }
 
     // Match category to existing categories in database
@@ -171,6 +179,7 @@ serve(async (req) => {
         confidence: aiPredictions.confidence || 0.5,
         reasoning: aiPredictions.reasoning || 'No reasoning provided',
         additional_data: aiPredictions.additional_data || {},
+        image_url: aiPredictions.image_url || null,
         images: extractedImages
       },
       metadata: {
