@@ -1,6 +1,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { generateSystemPrompt } from './prompt-generator.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,7 +24,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('🔍 [v2.5-URL-TEXT-FIX] Analyzing URL:', url);
+    console.log('🔍 [Phase2-URL-Context] Analyzing URL:', url);
 
     // Initialize Supabase client
     const supabaseClient = createClient(
@@ -38,44 +39,10 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY not configured in Supabase secrets');
     }
 
-    const systemPrompt = `You are an expert entity analyzer for a recommendation platform. Analyze the provided URL and extract structured entity information.
+    // Generate dynamic prompt from shared config
+    const systemPrompt = generateSystemPrompt();
 
-**Instructions:**
-1. Determine the entity type (book, movie, app, product, place, food, tv_show, person, or others)
-2. Extract a clean, proper name (not the site name)
-3. Write a concise 2-3 sentence description suitable for users
-4. Suggest the best matching category path (e.g., "Books > Fantasy", "Movies > Action & Adventure")
-5. Generate 3-5 relevant tags (lowercase, hyphenated, e.g., "classic", "science-fiction")
-6. Provide a confidence score (0.0-1.0)
-7. Extract any structured data like prices, ratings, authors, cast, etc.
-8. Explain your reasoning
-9. **Extract the main entity image URL.**
-   - The URL **MUST be a full, absolute URL**.
-   - **Prioritize the 'og:image' meta tag**.
-   - If no image is found, set 'image_url' to null.
-
-**Entity Types Available:**
-- book, movie, app, product, place, food, tv_show, person, others
-
-**Return ONLY valid JSON** in this exact format:
-{
-  "type": "book",
-  "name": "The Hobbit",
-  "description": "A fantasy adventure novel by J.R.R. Tolkien about Bilbo Baggins' journey with dwarves to reclaim their treasure from the dragon Smaug.",
-  "suggested_category": "Books > Fantasy",
-  "tags": ["classic", "adventure", "fantasy", "tolkien"],
-  "confidence": 0.95,
-  "reasoning": "URL pattern matches Goodreads book page, title and author clearly identified",
-  "image_url": "https://example.com/book-cover.jpg",
-  "additional_data": {
-    "author": "J.R.R. Tolkien",
-    "publication_year": 1937,
-    "rating": 4.3,
-    "pages": 310
-  }
-}`;
-
-    // Call Gemini with URL context
+    // Call Gemini with URL grounding + search fallback
     const geminiResponse = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
@@ -86,7 +53,7 @@ serve(async (req) => {
             {
               role: 'user',
               parts: [
-                { text: `Analyze this URL: ${url}` }
+                { text: `Analyze this URL and extract all relevant entity data: ${url}` }
               ]
             }
           ],
@@ -97,6 +64,11 @@ serve(async (req) => {
             }]
           },
           tools: [{ googleSearch: {} }],
+          toolConfig: {
+            urlContext: {
+              urls: [{ url }]
+            }
+          },
           generationConfig: {
             temperature: 0.2,
             topP: 0.8,
@@ -152,35 +124,87 @@ serve(async (req) => {
       aiPredictions = JSON.parse(jsonText);
     }
 
-    // Match category to existing categories in database
-    let categoryId = null;
-    let matchedCategory = null;
+    // Match category to existing categories in database with path-based scoring
+    let categoryId: string | null = null;
+    let matchedCategoryName: string | null = null;
+    const suggestedCategoryPath = aiPredictions.suggested_category || null;
     
-    if (aiPredictions.suggested_category && aiPredictions.type) {
-      const leafCategory = aiPredictions.suggested_category.split(' > ').pop()?.trim();
+    if (suggestedCategoryPath && aiPredictions.type) {
+      console.log('🔍 Matching category:', suggestedCategoryPath, 'for type:', aiPredictions.type);
       
-      if (leafCategory) {
-        const { data: categories, error: catError } = await supabaseClient
-          .from('categories')
-          .select('id, name, parent_id')
-          .eq('entity_type', aiPredictions.type)
-          .ilike('name', `%${leafCategory}%`)
-          .limit(1);
+      // Fetch all categories for this entity type
+      const { data: categories, error: catError } = await supabaseClient
+        .from('categories')
+        .select('id, name, parent_id')
+        .eq('entity_type', aiPredictions.type);
+      
+      if (!catError && categories && categories.length > 0) {
+        // Build hierarchy map for path reconstruction
+        const categoryMap = new Map(categories.map(c => [c.id, c]));
         
-        if (!catError && categories && categories.length > 0) {
-          categoryId = categories[0].id;
-          matchedCategory = categories[0].name;
-          console.log('✅ Matched category:', matchedCategory);
-        } else {
-          console.log('⚠️ No matching category found for:', leafCategory);
+        // Build full paths for all categories
+        const categoryPaths = categories.map(cat => {
+          const path: string[] = [];
+          let current = cat;
+          while (current) {
+            path.unshift(current.name);
+            current = current.parent_id ? categoryMap.get(current.parent_id) : null;
+          }
+          return { id: cat.id, name: cat.name, fullPath: path };
+        });
+        
+        // Split AI suggestion into segments
+        const suggestedSegments = suggestedCategoryPath
+          .split('>')
+          .map(s => s.trim().toLowerCase());
+        
+        // Score each category based on path matching (leaf to root)
+        let bestMatch = null;
+        let bestScore = 0;
+        
+        for (const catPath of categoryPaths) {
+          const pathSegments = catPath.fullPath.map(p => p.toLowerCase());
+          let score = 0;
+          
+          // Score from leaf (right) to root (left)
+          const minLength = Math.min(suggestedSegments.length, pathSegments.length);
+          for (let i = 0; i < minLength; i++) {
+            const suggestedPart = suggestedSegments[suggestedSegments.length - 1 - i];
+            const pathPart = pathSegments[pathSegments.length - 1 - i];
+            
+            // Exact match
+            if (suggestedPart === pathPart) {
+              score += (i + 2) * 10; // Weight deeper matches heavily
+            }
+            // Partial match (contains)
+            else if (suggestedPart.includes(pathPart) || pathPart.includes(suggestedPart)) {
+              score += (i + 1) * 5;
+            }
+            // Mismatch breaks the chain
+            else {
+              break;
+            }
+          }
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = catPath;
+          }
         }
+        
+        if (bestMatch && bestScore >= 10) { // Minimum threshold
+          categoryId = bestMatch.id;
+          matchedCategoryName = bestMatch.fullPath.join(' > ');
+          console.log('✅ Matched category:', matchedCategoryName, 'with score:', bestScore);
+        } else {
+          console.log('⚠️ No strong match found. Suggested:', suggestedCategoryPath);
+        }
+      } else if (catError) {
+        console.error('Error fetching categories:', catError);
       }
     }
 
-    // Extract images if provided by Gemini
-    const extractedImages = aiPredictions.images || [];
-
-    // Return structured result
+    // Return structured result with BOTH matched and suggested categories
     const result = {
       success: true,
       predictions: {
@@ -188,8 +212,8 @@ serve(async (req) => {
         name: aiPredictions.name,
         description: aiPredictions.description,
         category_id: categoryId,
-        suggested_category_path: aiPredictions.suggested_category,
-        matched_category_name: matchedCategory,
+        suggested_category_path: suggestedCategoryPath,
+        matched_category_name: matchedCategoryName,
         tags: aiPredictions.tags || [],
         confidence: aiPredictions.confidence || 0.5,
         reasoning: aiPredictions.reasoning || 'No reasoning provided',
@@ -201,7 +225,7 @@ serve(async (req) => {
         analyzed_url: url,
         model: 'gemini-2.5-flash',
         timestamp: new Date().toISOString(),
-        method: 'url_context_api'
+        method: 'url_context_grounding'
       }
     };
 

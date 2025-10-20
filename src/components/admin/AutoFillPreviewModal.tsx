@@ -104,10 +104,30 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
               value={pred.type ? getEntityTypeLabel(pred.type) : ''} 
             />
             <PreviewField label="Name" value={pred.name} />
-            <PreviewField 
-              label="Category" 
-              value={pred.matched_category_name || pred.suggested_category_path} 
-            />
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Category</Label>
+              {pred.matched_category_name ? (
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">{pred.matched_category_name}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Matched in database ✓</p>
+                  </div>
+                </div>
+              ) : pred.suggested_category_path ? (
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">{pred.suggested_category_path}</p>
+                    <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-0.5">
+                      No exact match - select manually
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No category suggested</p>
+              )}
+            </div>
             <PreviewField label="Tags" value={pred.tags} />
             <PreviewField 
               label="Description" 

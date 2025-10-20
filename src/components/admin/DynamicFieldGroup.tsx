@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DynamicFieldRenderer } from './DynamicFieldRenderer';
-import type { EntityFieldConfig } from '@/config/entityTypeConfig';
+import type { EntityFieldConfig } from '../../../shared/config/entityTypeConfig';
 
 interface DynamicFieldGroupProps {
   title: string;

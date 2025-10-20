@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronDown } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
 import { getCanonicalType } from '@/services/entityTypeHelpers';
-import { entityTypeConfig, EntityFieldConfig } from '@/config/entityTypeConfig';
+import { entityTypeConfig, EntityFieldConfig } from '../../../shared/config/entityTypeConfig';
 import { DynamicFieldRenderer } from './DynamicFieldRenderer';
 
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];

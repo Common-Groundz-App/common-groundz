@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TagInput from '@/components/preferences/TagInput';
 import { Checkbox } from '@/components/ui/checkbox';
-import type { EntityFieldConfig } from '@/config/entityTypeConfig';
+import type { EntityFieldConfig } from '../../../shared/config/entityTypeConfig';
 import { AlertCircle, Sparkles } from 'lucide-react';
 
 interface DynamicFieldRendererProps {

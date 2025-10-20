@@ -20,7 +20,7 @@ import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { MediaItem } from '@/types/media';
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { DynamicFieldGroup } from './DynamicFieldGroup';
-import { entityTypeConfig, EntityFieldConfig } from '@/config/entityTypeConfig';
+import { entityTypeConfig, EntityFieldConfig } from '../../../shared/config/entityTypeConfig';
 import { validateUrlForType, getSuggestedEntityType } from '@/config/urlPatterns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
@@ -394,10 +394,53 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     let appliedCount = 0;
     const filledFields = new Set<string>();
     
-    // Apply type
+    // Helper: Get natural empty value by field type
+    const getEmptyValueForFieldType = (fieldType: EntityFieldConfig['type']): any => {
+      switch (fieldType) {
+        case 'tags':
+        case 'multi-select':
+          return [];
+        case 'number':
+          return null;
+        default:
+          return '';
+      }
+    };
+
+    // 1. CLEAR PREVIOUS TYPE-SPECIFIC DATA
+    if (formData.type && formData.type !== pred.type) {
+      console.log(`🧹 Clearing ${formData.type} data before switching to ${pred.type}`);
+      
+      const previousConfig = entityTypeConfig[formData.type];
+      if (previousConfig?.fields) {
+        previousConfig.fields.forEach(field => {
+          const emptyValue = getEmptyValueForFieldType(field.type);
+          const storageCol = field.storageColumn;
+          
+          if (storageCol === 'metadata') {
+            setFormData(prev => ({ ...prev, metadata: { ...prev.metadata, [field.key]: emptyValue } }));
+          } else if (storageCol === 'specifications') {
+            setFormData(prev => ({ ...prev, specifications: { ...prev.specifications, [field.key]: emptyValue } }));
+          } else if (storageCol === 'cast_crew') {
+            setFormData(prev => ({ ...prev, cast_crew: { ...prev.cast_crew, [field.key]: emptyValue } }));
+          } else if (storageCol === 'price_info') {
+            setFormData(prev => ({ ...prev, price_info: { ...prev.price_info, [field.key]: emptyValue } }));
+          } else if (storageCol === 'nutritional_info') {
+            setFormData(prev => ({ ...prev, nutritional_info: {} }));
+          } else if (storageCol === 'ingredients') {
+            setFormData(prev => ({ ...prev, ingredients: [] }));
+          } else if (storageCol === 'external_ratings') {
+            setFormData(prev => ({ ...prev, external_ratings: {} }));
+          } else if (storageCol) {
+            setFormData(prev => ({ ...prev, [storageCol]: emptyValue }));
+          }
+        });
+      }
+    }
+    
+    // 2. Apply type
     if (pred.type) {
       handleInputChange('type', pred.type);
-      // Clear category when type changes to avoid orphaned selections
       handleInputChange('category_id', null);
       filledFields.add('type');
       appliedCount++;
@@ -457,14 +500,23 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       filledFields.add('website_url');
     }
     
-    // Track AI-filled metadata fields
-    if (pred.additional_data && Object.keys(pred.additional_data).length > 0) {
-      Object.keys(pred.additional_data).forEach(key => filledFields.add(key));
+    // 3. MAP TYPE-SPECIFIC FIELDS FROM ADDITIONAL_DATA
+    if (pred.additional_data && pred.type) {
+      const typeConfig = entityTypeConfig[pred.type];
       
-      handleInputChange('metadata', {
-        ...formData.metadata,
-        ai_extracted_data: pred.additional_data
-      });
+      if (typeConfig?.fields) {
+        console.log(`📋 Mapping additional fields for ${pred.type}`);
+        
+        typeConfig.fields.forEach(fieldConfig => {
+          const aiValue = pred.additional_data[fieldConfig.key];
+          
+          if (aiValue !== undefined && aiValue !== null) {
+            handleTypeSpecificFieldChange(fieldConfig.key, aiValue);
+            filledFields.add(fieldConfig.key);
+            appliedCount++;
+          }
+        });
+      }
     }
     
     // Update AI-filled fields tracker
