@@ -81,17 +81,11 @@ serve(async (req) => {
             {
               role: 'user',
               parts: [
-                { text: systemPrompt }
-              ]
-            }
-          ],
-          toolConfig: {
-            urlContext: {
-              urls: [
+                { text: systemPrompt },
                 { url: url }
               ]
             }
-          },
+          ],
           generationConfig: {
             temperature: 0.2,
             topP: 0.8,
