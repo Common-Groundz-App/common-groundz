@@ -424,24 +424,24 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       appliedCount++;
     }
     
-    // Apply tags
-    if (pred.tags && Array.isArray(pred.tags) && pred.tags.length > 0) {
-      const newTags = pred.tags.map((tagName: string) => ({
-        id: crypto.randomUUID(),
-        name: tagName,
-        slug: tagName.toLowerCase().replace(/\s+/g, '-'),
-        usage_count: 0,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
-      
-      setSelectedTags(prev => {
-        const existingNames = prev.map(t => t.name.toLowerCase());
-        const filtered = newTags.filter(t => !existingNames.includes(t.name.toLowerCase()));
-        return [...prev, ...filtered];
-      });
-      
-      if (newTags.length > 0) appliedCount++;
+    // Apply tags - ALWAYS clear old tags when applying predictions
+    if (pred.tags && Array.isArray(pred.tags)) {
+      if (pred.tags.length > 0) {
+        const newTags = pred.tags.map((tagName: string) => ({
+          id: crypto.randomUUID(),
+          name: tagName,
+          slug: tagName.toLowerCase().replace(/\s+/g, '-'),
+          usage_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }));
+        
+        setSelectedTags(newTags); // Replace entirely
+        filledFields.add('tags');
+        appliedCount++;
+      } else {
+        setSelectedTags([]); // Clear when empty array
+      }
     }
     
     // Apply primary image
@@ -794,6 +794,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               value={selectedTags}
               onChange={setSelectedTags}
               disabled={loading}
+              onClearAll={() => setSelectedTags([])}
             />
 
             {formData.type === 'others' && (

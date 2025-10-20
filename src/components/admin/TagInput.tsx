@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { X, Loader2 } from 'lucide-react';
 import { searchTags, getOrCreateTag } from '@/services/tagService';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -19,6 +20,7 @@ interface TagInputProps {
   maxTags?: number;
   disabled?: boolean;
   className?: string;
+  onClearAll?: () => void;
 }
 
 export const TagInput: React.FC<TagInputProps> = ({
@@ -28,7 +30,8 @@ export const TagInput: React.FC<TagInputProps> = ({
   placeholder = 'Add tags (e.g., korean-beauty, cruelty-free)',
   maxTags = 10,
   disabled = false,
-  className = ''
+  className = '',
+  onClearAll
 }) => {
   const [input, setInput] = useState('');
   const [suggestions, setSuggestions] = useState<Tag[]>([]);
@@ -121,6 +124,20 @@ export const TagInput: React.FC<TagInputProps> = ({
     onChange(value.filter(t => t.id !== tagId));
   };
   
+  // Clear all tags at once
+  const handleClearAll = () => {
+    if (onClearAll) {
+      onClearAll(); // Use parent handler if provided
+    } else {
+      onChange([]); // Fallback to direct clearing
+    }
+    
+    // Clear UI state
+    setInput('');
+    setSuggestions([]);
+    setShowSuggestions(false);
+  };
+  
   // Handle keyboard interactions
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && input.trim()) {
@@ -147,15 +164,29 @@ export const TagInput: React.FC<TagInputProps> = ({
   
   return (
     <div className={`space-y-2 ${className}`}>
-      {/* Label with tag count */}
-      <Label htmlFor="tag-input">
-        {label}
+      {/* Label with tag count and clear button */}
+      <div className="flex items-center justify-between">
+        <Label htmlFor="tag-input">
+          {label}
+          {value.length > 0 && (
+            <span className="text-xs text-muted-foreground ml-2">
+              ({value.length}/{maxTags})
+            </span>
+          )}
+        </Label>
+        
         {value.length > 0 && (
-          <span className="text-xs text-muted-foreground ml-2">
-            ({value.length}/{maxTags})
-          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleClearAll}
+            className="h-7 text-xs text-muted-foreground hover:text-destructive"
+          >
+            Clear All
+          </Button>
         )}
-      </Label>
+      </div>
       
       {/* Selected tags display */}
       {value.length > 0 && (
