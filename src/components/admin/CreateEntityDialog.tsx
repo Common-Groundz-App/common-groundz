@@ -894,6 +894,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 placeholder="https://example.com"
                 disabled={loading}
               />
+              <p className="text-sm text-muted-foreground">Official website (visible to all users)</p>
             </div>
 
             {shouldShowTab('businessHours') && (

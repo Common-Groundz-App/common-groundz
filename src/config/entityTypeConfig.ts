@@ -209,6 +209,90 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
     ]
   },
 
+  brand: {
+    showTabs: ['basic', 'contact', 'details'],
+    hideTabs: ['businessHours'],
+    requiredFields: ['industry'],
+    fields: [
+      { key: 'industry', label: 'Industry', type: 'select', storageColumn: 'metadata', required: true, options: ['Fashion', 'Technology', 'Food & Beverage', 'Beauty', 'Automotive', 'Entertainment', 'Health & Wellness', 'Finance', 'Retail', 'Sports', 'Media', 'Education', 'Travel', 'Other'] },
+      { key: 'founded_year', label: 'Founded Year', type: 'number', storageColumn: 'publication_year', placeholder: 'e.g., 1998' },
+      { key: 'headquarters', label: 'Headquarters', type: 'text', storageColumn: 'metadata', placeholder: 'City, Country' },
+      { key: 'brand_values', label: 'Brand Values', type: 'multi-select', storageColumn: 'metadata', options: ['Sustainable', 'Eco-Friendly', 'Ethical', 'Innovative', 'Luxury', 'Affordable', 'Inclusive', 'Local', 'Artisan', 'Family-Owned'] },
+      { key: 'product_categories', label: 'Product Categories', type: 'tags', storageColumn: 'metadata', placeholder: 'e.g., Shoes, Electronics, Apparel' },
+      { key: 'parent_company', label: 'Parent Company', type: 'text', storageColumn: 'metadata', placeholder: 'If applicable' },
+      { key: 'tagline', label: 'Tagline', type: 'text', storageColumn: 'metadata', placeholder: 'Brand slogan or motto' },
+      { key: 'social_links', label: 'Social Media Links', type: 'tags', storageColumn: 'metadata', placeholder: 'e.g., @instagram, linkedin.com/company/...', helpText: 'Add social media handles or profile URLs' },
+      { key: 'target_audience', label: 'Target Audience', type: 'tags', storageColumn: 'metadata', placeholder: 'e.g., Students, Professionals, Families', helpText: 'Who is this brand primarily for?' },
+    ],
+    fieldGroups: [
+      { title: '🏢 Brand Info', icon: '🏢', fields: ['industry', 'founded_year', 'headquarters', 'parent_company'] },
+      { title: '💎 Brand Identity', icon: '💎', fields: ['brand_values', 'product_categories', 'tagline', 'social_links', 'target_audience'] },
+    ]
+  },
+
+  event: {
+    showTabs: ['basic', 'contact', 'details'],
+    hideTabs: ['businessHours'],
+    requiredFields: ['event_type', 'start_date'],
+    fields: [
+      { key: 'event_type', label: 'Event Type', type: 'select', storageColumn: 'metadata', required: true, options: ['Conference', 'Concert', 'Festival', 'Workshop', 'Sports', 'Exhibition', 'Networking', 'Webinar', 'Meetup', 'Competition', 'Other'] },
+      { key: 'start_date', label: 'Start Date', type: 'text', storageColumn: 'metadata', required: true, placeholder: 'e.g., June 15, 2024 or 2024-06-15', helpText: 'Can be specific date or flexible description' },
+      { key: 'end_date', label: 'End Date', type: 'text', storageColumn: 'metadata', placeholder: 'e.g., June 17, 2024 or 2024-06-17' },
+      { key: 'venue', label: 'Venue', type: 'text', storageColumn: 'metadata', placeholder: 'Location or platform name' },
+      { key: 'organizer', label: 'Organizer', type: 'text', storageColumn: 'metadata', placeholder: 'Event organizer name' },
+      { key: 'ticket_price', label: 'Ticket Price Range', type: 'select', storageColumn: 'price_info', options: ['Free', '$', '$$', '$$$', '$$$$'] },
+      { key: 'format', label: 'Event Format', type: 'select', storageColumn: 'metadata', options: ['In-Person', 'Virtual', 'Hybrid'] },
+      { key: 'capacity', label: 'Capacity', type: 'text', storageColumn: 'specifications', placeholder: 'e.g., 500 attendees' },
+      { key: 'age_restriction', label: 'Age Restriction', type: 'select', storageColumn: 'metadata', options: ['All Ages', '18+', '21+', 'Kids Only', 'Family-Friendly'] },
+    ],
+    fieldGroups: [
+      { title: '🎟️ Event Details', icon: '🎟️', fields: ['event_type', 'start_date', 'end_date', 'venue', 'format'] },
+      { title: '📋 Event Info', icon: '📋', fields: ['organizer', 'ticket_price', 'capacity', 'age_restriction'] },
+    ]
+  },
+
+  service: {
+    showTabs: ['basic', 'contact', 'businessHours', 'details'],
+    hideTabs: [],
+    requiredFields: ['service_category'],
+    fields: [
+      { key: 'service_category', label: 'Service Category', type: 'select', storageColumn: 'metadata', required: true, options: ['Home Services', 'Professional Services', 'Creative Services', 'Health & Wellness', 'Education', 'Technology', 'Transportation', 'Financial', 'Legal', 'Marketing', 'Consulting', 'Other'] },
+      { key: 'provider_name', label: 'Provider/Company Name', type: 'text', storageColumn: 'metadata', placeholder: 'Business or individual name' },
+      { key: 'service_areas', label: 'Service Areas', type: 'tags', storageColumn: 'metadata', placeholder: 'Cities or regions served' },
+      { key: 'pricing_model', label: 'Pricing Model', type: 'select', storageColumn: 'price_info', options: ['Hourly Rate', 'Fixed Price', 'Subscription', 'Quote-Based', 'Free Consultation', 'Package Deals'] },
+      { key: 'years_in_business', label: 'Years in Business', type: 'number', storageColumn: 'metadata', placeholder: 'e.g., 10' },
+      { key: 'certifications', label: 'Certifications', type: 'tags', storageColumn: 'specifications', placeholder: 'Add certifications' },
+      { key: 'insurance', label: 'Insured/Licensed', type: 'select', storageColumn: 'metadata', options: ['Yes', 'No', 'Bonded & Insured'] },
+      { key: 'service_languages', label: 'Languages Offered', type: 'tags', storageColumn: 'languages', placeholder: 'e.g., English, Spanish' },
+      { key: 'target_audience', label: 'Target Audience', type: 'tags', storageColumn: 'metadata', placeholder: 'e.g., Students, Professionals, Families', helpText: 'Who is this service primarily for?' },
+    ],
+    fieldGroups: [
+      { title: '🛠️ Service Details', icon: '🛠️', fields: ['service_category', 'provider_name', 'service_areas', 'pricing_model', 'target_audience'] },
+      { title: '✅ Credentials', icon: '✅', fields: ['years_in_business', 'certifications', 'insurance', 'service_languages'] },
+    ]
+  },
+
+  professional: {
+    showTabs: ['basic', 'contact', 'businessHours', 'details'],
+    hideTabs: [],
+    requiredFields: ['profession', 'specialty'],
+    fields: [
+      { key: 'profession', label: 'Profession', type: 'select', storageColumn: 'metadata', required: true, options: ['Doctor', 'Lawyer', 'Accountant', 'Consultant', 'Therapist', 'Coach', 'Architect', 'Engineer', 'Designer', 'Real Estate Agent', 'Financial Advisor', 'Other'] },
+      { key: 'specialty', label: 'Specialty', type: 'text', storageColumn: 'metadata', required: true, placeholder: 'e.g., Family Medicine, Tax Law, UX Design' },
+      { key: 'years_experience', label: 'Years of Experience', type: 'number', storageColumn: 'metadata', placeholder: 'e.g., 15' },
+      { key: 'education', label: 'Education', type: 'tags', storageColumn: 'metadata', placeholder: 'Degrees and institutions' },
+      { key: 'certifications', label: 'Certifications', type: 'tags', storageColumn: 'specifications', placeholder: 'Professional certifications' },
+      { key: 'languages_spoken', label: 'Languages Spoken', type: 'tags', storageColumn: 'languages', placeholder: 'e.g., English, Mandarin' },
+      { key: 'consultation_fee', label: 'Consultation Fee', type: 'text', storageColumn: 'price_info', placeholder: 'e.g., $200/hour or Free initial consultation' },
+      { key: 'availability', label: 'Availability', type: 'select', storageColumn: 'metadata', options: ['By Appointment', 'Walk-ins Welcome', 'Emergency Available', 'Virtual Consultations', '24/7 Available'] },
+      { key: 'accepts_insurance', label: 'Accepts Insurance', type: 'select', storageColumn: 'metadata', options: ['Yes', 'No', 'Some Plans'] },
+    ],
+    fieldGroups: [
+      { title: '👨‍⚕️ Professional Info', icon: '👨‍⚕️', fields: ['profession', 'specialty', 'years_experience', 'education'] },
+      { title: '📜 Credentials & Availability', icon: '📜', fields: ['certifications', 'languages_spoken', 'consultation_fee', 'availability', 'accepts_insurance'] },
+    ]
+  },
+
   generic: {
     showTabs: ['basic'],
     hideTabs: ['contact', 'businessHours', 'details'],
@@ -223,15 +307,16 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
   },
   
   others: {
-    showTabs: ['basic'],
-    hideTabs: ['contact', 'businessHours', 'details'],
+    showTabs: ['basic', 'details'],
+    hideTabs: ['contact', 'businessHours'],
     requiredFields: [],
     fields: [
-      { key: 'description', label: 'Description', type: 'textarea', storageColumn: 'metadata', placeholder: 'Add details about this item' },
-      { key: 'tags', label: 'Tags', type: 'tags', storageColumn: 'metadata', placeholder: 'Add tags' },
+      { key: 'category', label: 'Category', type: 'text', storageColumn: 'metadata', placeholder: 'What type of item is this?' },
+      { key: 'key_features', label: 'Key Features', type: 'tags', storageColumn: 'metadata', placeholder: 'Add key features or characteristics' },
+      { key: 'additional_info', label: 'Additional Information', type: 'textarea', storageColumn: 'metadata', placeholder: 'Any other relevant details' },
     ],
     fieldGroups: [
-      { title: '📝 Basic Information', icon: '📝', fields: ['description', 'tags'] }
+      { title: '📝 General Information', icon: '📝', fields: ['category', 'key_features', 'additional_info'] }
     ]
   }
 };
