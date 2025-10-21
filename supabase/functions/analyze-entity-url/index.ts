@@ -64,11 +64,6 @@ serve(async (req) => {
             }]
           },
           tools: [{ googleSearch: {} }],
-          toolConfig: {
-            urlContext: {
-              urls: [{ url }]
-            }
-          },
           generationConfig: {
             temperature: 0.2,
             topP: 0.8,
