@@ -199,6 +199,11 @@ serve(async (req) => {
       }
     }
 
+    // Map single image_url from Gemini to images array format
+    const extractedImages = aiPredictions.image_url
+      ? [{ url: aiPredictions.image_url }]
+      : [];
+
     // Return structured result with BOTH matched and suggested categories
     const result = {
       success: true,
