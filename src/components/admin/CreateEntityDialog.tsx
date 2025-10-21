@@ -192,8 +192,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   };
   
   // Handle type-specific field updates based on storage column
-  const handleTypeSpecificFieldChange = (fieldKey: string, value: any) => {
-    const typeConfig = entityTypeConfig[formData.type];
+  const handleTypeSpecificFieldChange = (fieldKey: string, value: any, targetType?: string) => {
+    const entityType = targetType ?? formData.type;
+    const typeConfig = entityTypeConfig[entityType];
     if (!typeConfig) return;
     
     const fieldConfig = typeConfig.fields.find(f => f.key === fieldKey);
@@ -511,7 +512,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           const aiValue = pred.additional_data[fieldConfig.key];
           
           if (aiValue !== undefined && aiValue !== null) {
-            handleTypeSpecificFieldChange(fieldConfig.key, aiValue);
+            handleTypeSpecificFieldChange(fieldConfig.key, aiValue, pred.type);
             filledFields.add(fieldConfig.key);
             appliedCount++;
           }
