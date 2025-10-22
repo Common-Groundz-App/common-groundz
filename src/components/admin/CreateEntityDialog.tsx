@@ -25,7 +25,8 @@ import { validateUrlForType, getSuggestedEntityType } from '@/config/urlPatterns
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const MAX_MEDIA_ITEMS = 4;
-import { Plus, Sparkles, Loader2, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Plus, Sparkles, Loader2, AlertTriangle, ExternalLink, X } from 'lucide-react';
+import { getOrCreateTag } from '@/services/tagService';
 
 import { EntityType } from '@/services/recommendation/types';
 import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
@@ -342,6 +343,33 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
   };
 
+  // Helper to add images to media gallery
+  const addImageToMediaGallery = (imageUrl: string, source: 'metadata' | 'ai') => {
+    // Deduplicate - check if image already exists
+    const exists = uploadedMedia.some(item => item.url === imageUrl);
+    if (exists) {
+      console.log('🖼️ Image already in gallery:', imageUrl);
+      return;
+    }
+    
+    const newMediaItem: MediaItem = {
+      id: crypto.randomUUID(),
+      url: imageUrl,
+      type: 'image',
+      order: uploadedMedia.length,
+      caption: source === 'metadata' ? 'From URL metadata' : 'AI-extracted',
+    };
+    
+    setUploadedMedia(prev => [...prev, newMediaItem]);
+    
+    // Set as primary if no primary exists
+    if (!primaryMediaUrl && uploadedMedia.length === 0) {
+      setPrimaryMediaUrl(imageUrl);
+    }
+    
+    console.log(`🖼️ Added ${source} image to gallery:`, imageUrl);
+  };
+
   // Call edge function to analyze URL
   const handleAnalyzeUrl = async () => {
     if (!analyzeUrl || !isValidUrl(analyzeUrl)) {
@@ -403,7 +431,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   };
 
   // Apply AI predictions to form
-  const applyAiPredictions = () => {
+  const applyAiPredictions = async () => {
     if (!aiPredictions?.predictions) {
       toast({
         title: "No Predictions",
@@ -429,10 +457,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       }
     }
     
-    applyPredictionsToForm(pred);
+    await applyPredictionsToForm(pred);
   };
   
-  const applyPredictionsToForm = (pred: any) => {
+  const applyPredictionsToForm = async (pred: any) => {
     let appliedCount = 0;
     const filledFields = new Set<string>();
     
@@ -509,21 +537,33 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       appliedCount++;
     }
     
-    // Apply tags - ALWAYS clear old tags when applying predictions
+    // Apply tags - Use tag service to get real tag IDs
     if (pred.tags && Array.isArray(pred.tags)) {
       if (pred.tags.length > 0) {
-        const newTags = pred.tags.map((tagName: string) => ({
-          id: crypto.randomUUID(),
-          name: tagName,
-          slug: tagName.toLowerCase().replace(/\s+/g, '-'),
-          usage_count: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
+        console.log('🏷️ Creating/fetching tags:', pred.tags);
         
-        setSelectedTags(newTags); // Replace entirely
-        filledFields.add('tags');
-        appliedCount++;
+        try {
+          // Fetch or create all tags in parallel
+          const tagPromises = pred.tags.map((tagName: string) => 
+            getOrCreateTag(tagName)
+          );
+          
+          const realTags = await Promise.all(tagPromises);
+          
+          setSelectedTags(realTags); // Set with real database IDs
+          filledFields.add('tags');
+          appliedCount++;
+          
+          console.log('✅ Tags ready with real IDs:', realTags.map(t => t.id));
+        } catch (tagError) {
+          console.error('❌ Failed to create/fetch tags:', tagError);
+          toast({
+            title: "Tag Creation Failed",
+            description: "Some tags couldn't be created. You can add them manually.",
+            variant: "default"
+          });
+          // Continue without tags rather than failing entirely
+        }
       } else {
         setSelectedTags([]); // Clear when empty array
       }
@@ -532,14 +572,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     // Apply image - prefer metadata og:image over AI prediction
     if (urlMetadata?.image) {
       handleInputChange('image_url', urlMetadata.image);
+      addImageToMediaGallery(urlMetadata.image, 'metadata');
       filledFields.add('image_url');
       appliedCount++;
       console.log('🖼️ Applied metadata image:', urlMetadata.image);
     } else if (pred.images && pred.images.length > 0) {
-      handleInputChange('image_url', pred.images[0]);
+      // CRITICAL: pred.images contains objects with .url field, not strings
+      const imageUrl = pred.images[0].url;
+      handleInputChange('image_url', imageUrl);
+      addImageToMediaGallery(imageUrl, 'ai');
       filledFields.add('image_url');
       appliedCount++;
-      console.log('🖼️ Applied AI image:', pred.images[0]);
+      console.log('🖼️ Applied AI image:', imageUrl);
     }
     
     // Apply website URL from analyzed URL
@@ -573,15 +617,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     // Close modal
     setShowPreviewModal(false);
     
-    // Clear analyze URL input and metadata
-    setAnalyzeUrl('');
-    setUrlMetadata(null);
-    setShowAnalyzeButton(false);
-    
     // Show success toast
+    const mediaAdded = urlMetadata?.image || (pred.images && pred.images.length > 0);
     toast({
       title: "Form Updated",
-      description: `Successfully applied ${appliedCount} fields from URL analysis`,
+      description: `Applied ${appliedCount} fields${mediaAdded ? ' (including image to gallery)' : ''} from URL analysis`,
     });
     
     console.log('✅ Applied predictions:', pred);
@@ -818,8 +858,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                     setAnalyzeUrl(newUrl);
                     setShowAnalyzeButton(isValidUrl(newUrl));
                     
-                    // Clear preview when URL changes
-                    if (urlMetadata) setUrlMetadata(null);
+                    // Clear preview only if URL is different from current metadata URL
+                    if (urlMetadata && newUrl !== urlMetadata.url) {
+                      setUrlMetadata(null);
+                    }
                   }}
                   placeholder="https://www.goodreads.com/book/show/5907..."
                   disabled={loading || analyzing}
@@ -850,7 +892,26 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               
               {/* URL Preview Card */}
               {urlMetadata && (
-                <div className="mt-3 border rounded-lg p-4 bg-muted/30">
+                <a 
+                  href={urlMetadata.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="block mt-3 border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 transition-colors group relative"
+                >
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setUrlMetadata(null);
+                      setAnalyzeUrl('');
+                      setShowAnalyzeButton(false);
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
                   <div className="flex items-start gap-3">
                     {urlMetadata.favicon && (
                       <img 
@@ -860,7 +921,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                         onError={(e) => e.currentTarget.style.display = 'none'}
                       />
                     )}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 pr-8">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs text-muted-foreground">{urlMetadata.siteName}</span>
                         <ExternalLink className="h-3 w-3 text-muted-foreground" />
@@ -877,7 +938,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                       />
                     )}
                   </div>
-                </div>
+                </a>
               )}
             </div>
             
