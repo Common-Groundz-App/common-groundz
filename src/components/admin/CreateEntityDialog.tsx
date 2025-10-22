@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ import { validateUrlForType, getSuggestedEntityType } from '@/config/urlPatterns
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const MAX_MEDIA_ITEMS = 4;
-import { Plus, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Sparkles, Loader2, AlertTriangle, ExternalLink } from 'lucide-react';
 
 import { EntityType } from '@/services/recommendation/types';
 import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
@@ -96,6 +96,25 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showUrlMismatchDialog, setShowUrlMismatchDialog] = useState(false);
   const [urlMismatchMessage, setUrlMismatchMessage] = useState('');
+  const [urlMetadata, setUrlMetadata] = useState<any>(null);
+  
+  // Metadata cache with TTL
+  const metadataCache = useRef(new Map<string, { data: any; timestamp: number }>());
+  
+  const getCachedMetadata = (url: string) => {
+    const cached = metadataCache.current.get(url);
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    
+    if (cached && Date.now() - cached.timestamp < FIVE_MINUTES) {
+      console.log('✅ Using cached metadata for:', url);
+      return cached.data;
+    }
+    return null;
+  };
+  
+  const setCachedMetadata = (url: string, data: any) => {
+    metadataCache.current.set(url, { data, timestamp: Date.now() });
+  };
 
   // Load draft from sessionStorage on mount
   useEffect(() => {
@@ -300,6 +319,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setShowAnalyzeButton(false);
     setAiPredictions(null);
     setShowPreviewModal(false);
+    setUrlMetadata(null);
     setFieldErrors({});
     setAiFilledFields(new Set());
     
@@ -336,21 +356,42 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setAnalyzing(true);
     
     try {
-      console.log('Analyzing URL:', analyzeUrl);
+      console.log('🔍 Analyzing URL:', analyzeUrl);
       
-      const { data, error } = await supabase.functions.invoke('analyze-entity-url', {
-        body: { url: analyzeUrl }
-      });
+      // Check cache first
+      const cachedMetadata = getCachedMetadata(analyzeUrl);
       
-      if (error) throw error;
+      // Call both functions in parallel (skip metadata if cached)
+      const [metadataResult, aiResult] = await Promise.all([
+        cachedMetadata 
+          ? Promise.resolve({ data: cachedMetadata, error: null })
+          : supabase.functions.invoke('fetch-url-metadata', { body: { url: analyzeUrl } }),
+        supabase.functions.invoke('analyze-entity-url', { body: { url: analyzeUrl } })
+      ]);
       
-      console.log('AI Analysis Result:', data);
+      // Handle metadata
+      if (metadataResult.error) {
+        console.error('⚠️ Metadata fetch error:', metadataResult.error);
+      } else if (metadataResult.data) {
+        console.log('📄 Metadata:', metadataResult.data);
+        setUrlMetadata(metadataResult.data);
+        if (!cachedMetadata) {
+          setCachedMetadata(analyzeUrl, metadataResult.data);
+        }
+      }
       
-      setAiPredictions(data);
+      // Handle AI predictions
+      if (aiResult.error) {
+        throw aiResult.error;
+      }
+      
+      console.log('🤖 AI Analysis:', aiResult.data);
+      
+      setAiPredictions(aiResult.data);
       setShowPreviewModal(true);
       
     } catch (error: any) {
-      console.error('URL Analysis Error:', error);
+      console.error('❌ URL Analysis Error:', error);
       toast({
         title: "Analysis Failed",
         description: error.message || "Failed to analyze URL. Please try again.",
@@ -488,11 +529,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       }
     }
     
-    // Apply primary image
-    if (pred.images && pred.images.length > 0) {
+    // Apply image - prefer metadata og:image over AI prediction
+    if (urlMetadata?.image) {
+      handleInputChange('image_url', urlMetadata.image);
+      filledFields.add('image_url');
+      appliedCount++;
+      console.log('🖼️ Applied metadata image:', urlMetadata.image);
+    } else if (pred.images && pred.images.length > 0) {
       handleInputChange('image_url', pred.images[0]);
       filledFields.add('image_url');
       appliedCount++;
+      console.log('🖼️ Applied AI image:', pred.images[0]);
     }
     
     // Apply website URL from analyzed URL
@@ -526,8 +573,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     // Close modal
     setShowPreviewModal(false);
     
-    // Clear analyze URL input
+    // Clear analyze URL input and metadata
     setAnalyzeUrl('');
+    setUrlMetadata(null);
     setShowAnalyzeButton(false);
     
     // Show success toast
@@ -766,8 +814,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   id="analyze_url"
                   value={analyzeUrl}
                   onChange={(e) => {
-                    setAnalyzeUrl(e.target.value);
-                    setShowAnalyzeButton(isValidUrl(e.target.value));
+                    const newUrl = e.target.value;
+                    setAnalyzeUrl(newUrl);
+                    setShowAnalyzeButton(isValidUrl(newUrl));
+                    
+                    // Clear preview when URL changes
+                    if (urlMetadata) setUrlMetadata(null);
                   }}
                   placeholder="https://www.goodreads.com/book/show/5907..."
                   disabled={loading || analyzing}
@@ -795,6 +847,38 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   </Button>
                 )}
               </div>
+              
+              {/* URL Preview Card */}
+              {urlMetadata && (
+                <div className="mt-3 border rounded-lg p-4 bg-muted/30">
+                  <div className="flex items-start gap-3">
+                    {urlMetadata.favicon && (
+                      <img 
+                        src={urlMetadata.favicon} 
+                        alt="Site icon"
+                        className="w-6 h-6 rounded flex-shrink-0"
+                        onError={(e) => e.currentTarget.style.display = 'none'}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-muted-foreground">{urlMetadata.siteName}</span>
+                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                      </div>
+                      <h4 className="font-medium text-sm mb-1 line-clamp-1">{urlMetadata.title}</h4>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{urlMetadata.description}</p>
+                    </div>
+                    {urlMetadata.image && (
+                      <img 
+                        src={urlMetadata.image} 
+                        alt="Preview"
+                        className="w-20 h-20 object-cover rounded flex-shrink-0"
+                        onError={(e) => e.currentTarget.style.display = 'none'}
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
