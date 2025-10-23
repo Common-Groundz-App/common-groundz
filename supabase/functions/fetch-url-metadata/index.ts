@@ -45,6 +45,48 @@ serve(async (req) => {
 
     console.log(`🔍 Extracting images from: ${pageDomain}`);
 
+    // ===== PHASE 1: E-COMMERCE DETECTION =====
+    let isEcommercePage = false;
+    let hasProductSchema = false;
+
+    // Check JSON-LD for Product schema (most reliable)
+    const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
+    jsonLdScripts.forEach(script => {
+      try {
+        const text = script.text;
+        if (text.includes('"@type":"Product"') || text.includes('"@type": "Product"')) {
+          isEcommercePage = true;
+          hasProductSchema = true;
+        }
+      } catch (e) {
+        // Ignore parse errors for detection
+      }
+    });
+
+    // Check URL patterns
+    const productUrlPatterns = ['/product/', '/products/', '/shop/', '/p/', '/item/', '/buy/'];
+    if (productUrlPatterns.some(pattern => url.toLowerCase().includes(pattern))) {
+      isEcommercePage = true;
+    }
+
+    // Check Open Graph type
+    const ogType = doc.querySelector('meta[property="og:type"]')?.getAttribute('content');
+    if (ogType && (ogType.includes('product') || ogType === 'product.item')) {
+      isEcommercePage = true;
+    }
+
+    console.log(`🔍 Page type: ${isEcommercePage ? 'E-commerce Product' : 'General Content'}`);
+    console.log(`📦 Has Product Schema: ${hasProductSchema}`);
+
+    // Smart thresholds
+    const MIN_PRODUCT_GALLERY_IMAGES = 3; // If we have 3+ from gallery, it's likely complete
+    const MAX_ECOMMERCE_IMAGES = 8; // Cap product pages at 8 images
+    const MAX_GENERAL_IMAGES = 10; // Allow more for non-product pages
+
+    // Track which layers contributed images
+    let layer1Count = 0; // JSON-LD
+    let layer2Count = 0; // Gallery selectors
+
     // Helper: Extract filename without query params
     const getImageFilename = (imgUrl: string): string => {
       try {
@@ -110,7 +152,6 @@ serve(async (req) => {
 
     // ===== LAYER 1: JSON-LD PRODUCT SCHEMA (HIGHEST PRIORITY) =====
     console.log('📦 Layer 1: Checking JSON-LD Product schema...');
-    const jsonLdScripts = doc.querySelectorAll('script[type="application/ld+json"]');
     jsonLdScripts.forEach(script => {
       try {
         const data = JSON.parse(script.text);
@@ -141,11 +182,14 @@ serve(async (req) => {
           }
         });
       } catch (e) {
-        console.warn('Failed to parse JSON-LD:', e);
-      }
-    });
+      console.warn('Failed to parse JSON-LD:', e);
+    }
+  });
 
-    // ===== LAYER 2: E-COMMERCE GALLERY SELECTORS (HIGH PRIORITY) =====
+  layer1Count = imageUrls.length;
+  console.log(`📦 Layer 1 found: ${layer1Count} images`);
+
+  // ===== LAYER 2: E-COMMERCE GALLERY SELECTORS (HIGH PRIORITY) =====
     console.log('🖼️ Layer 2: Checking product gallery selectors...');
     const gallerySelectors = [
       '[class*="product-gallery"] img',
@@ -173,14 +217,27 @@ serve(async (req) => {
         console.log(`Found ${galleryImages.length} images with selector: ${selector}`);
         galleryImages.forEach(img => {
           const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
-          if (src) addImage(src, `Gallery (${selector})`);
-        });
-      }
-    }
+      if (src) addImage(src, `Gallery (${selector})`);
+    });
+  }
+}
 
-    // ===== LAYER 3: OPEN GRAPH IMAGES (FALLBACK) =====
-    // Only if we have fewer than 3 images so far
-    if (imageUrls.length < 3) {
+layer2Count = imageUrls.length - layer1Count;
+console.log(`🖼️ Layer 2 found: ${layer2Count} images`);
+
+const highConfidenceImages = layer1Count + layer2Count;
+
+// ===== PHASE 2: DECISION POINT - Should we continue to fallback layers? =====
+let shouldContinueToFallbacks = true;
+
+if (isEcommercePage && highConfidenceImages >= MIN_PRODUCT_GALLERY_IMAGES) {
+  console.log(`✅ E-commerce page with ${highConfidenceImages} gallery images found - skipping fallback layers`);
+  shouldContinueToFallbacks = false;
+}
+
+// ===== LAYER 3: OPEN GRAPH IMAGES (FALLBACK) =====
+// Only if we have fewer than 3 images so far AND we should continue
+if (shouldContinueToFallbacks && imageUrls.length < 3) {
       console.log('🌐 Layer 3: Checking Open Graph images...');
       const ogImages = doc.querySelectorAll('meta[property="og:image"], meta[property="og:image:secure_url"]');
       ogImages.forEach(tag => {
@@ -189,8 +246,8 @@ serve(async (req) => {
       });
     }
 
-    // ===== LAYER 4: TWITTER CARD IMAGES (FALLBACK) =====
-    if (imageUrls.length < 3) {
+// ===== LAYER 4: TWITTER CARD IMAGES (FALLBACK) =====
+if (shouldContinueToFallbacks && imageUrls.length < 3) {
       console.log('🐦 Layer 4: Checking Twitter card images...');
       const twitterImages = doc.querySelectorAll('meta[name="twitter:image"], meta[property="twitter:image"]');
       twitterImages.forEach(tag => {
@@ -199,9 +256,9 @@ serve(async (req) => {
       });
     }
 
-    // ===== LAYER 5: BODY IMG TAGS (LAST RESORT) =====
-    // Only if we still have fewer than 2 images
-    if (imageUrls.length < 2) {
+// ===== LAYER 5: BODY IMG TAGS (LAST RESORT) =====
+// Only if we still have fewer than 2 images AND we should continue
+if (shouldContinueToFallbacks && imageUrls.length < 2) {
       console.log('🔍 Layer 5: Checking body <img> tags (last resort)...');
       const bodyImages = doc.querySelectorAll('img');
       
@@ -246,11 +303,20 @@ serve(async (req) => {
         console.warn('Failed to normalize image URL:', imgUrl, e);
       }
       
-      // Cap at 10 images
-      if (normalizedImages.length >= 10) break;
+      // Apply context-aware cap
+      const maxImages = isEcommercePage ? MAX_ECOMMERCE_IMAGES : MAX_GENERAL_IMAGES;
+      if (normalizedImages.length >= maxImages) break;
+    }
+
+    // ===== PHASE 3: APPLY FINAL CAP BASED ON PAGE TYPE =====
+    const maxImages = isEcommercePage ? MAX_ECOMMERCE_IMAGES : MAX_GENERAL_IMAGES;
+    if (normalizedImages.length > maxImages) {
+      console.log(`📏 Capping from ${normalizedImages.length} to ${maxImages} images (${isEcommercePage ? 'e-commerce' : 'general'} page)`);
+      normalizedImages.length = maxImages;
     }
 
     console.log(`✅ Final result: Extracted ${normalizedImages.length} images from ${url}`);
+    console.log(`📊 Sources breakdown - JSON-LD: ${layer1Count}, Gallery: ${layer2Count}, Fallback: ${normalizedImages.length - (layer1Count + layer2Count)}`);
 
     // Keep first image for backward compatibility
     const primaryImage = normalizedImages[0] || '';
@@ -273,11 +339,19 @@ serve(async (req) => {
       description: doc.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
                   doc.querySelector('meta[name="description"]')?.getAttribute('content') || '',
       image: primaryImage, // First image for backward compatibility
-      images: normalizedImages, // NEW: Full gallery array
+      images: normalizedImages, // Full gallery array
       favicon: normalizedFavicon,
       siteName: doc.querySelector('meta[property="og:site_name"]')?.getAttribute('content') || 
                 new URL(url).hostname,
       url: url,
+      // PHASE 4: Context information for frontend intelligence
+      pageType: isEcommercePage ? 'product' : 'general',
+      hasProductSchema: hasProductSchema,
+      imageSourceBreakdown: {
+        jsonLd: layer1Count,
+        gallery: layer2Count,
+        fallback: normalizedImages.length - (layer1Count + layer2Count)
+      }
     };
 
     console.log('✅ Metadata extracted:', {
