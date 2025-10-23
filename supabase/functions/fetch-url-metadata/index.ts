@@ -288,12 +288,7 @@ serve(async (req) => {
       '.gallery img',
       '#product-photos img',
       '[id*="product-gallery"] img',
-      '[id*="ProductGallery"] img',
-      // Goodreads book cover selectors
-      '[class*="BookCover"] img',
-      '[class*="book-cover"] img',
-      '.ResponsiveImage img',
-      '[aria-label*="Book cover"] img'
+      '[id*="ProductGallery"] img'
     ];
 
     for (const selector of gallerySelectors) {
