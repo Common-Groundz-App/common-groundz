@@ -2876,27 +2876,33 @@ export type Database = {
         Args: { p_category: string; p_user_id: string }
         Returns: number
       }
-      calculate_trending_hashtags: {
-        Args:
-          | { p_limit?: number }
-          | { result_limit?: number; time_window_hours?: number }
-        Returns: {
-          created_at: string
-          id: string
-          name_norm: string
-          name_original: string
-          post_count: number
-          trending_score: number
-        }[]
-      }
+      calculate_trending_hashtags:
+        | {
+            Args: { result_limit?: number; time_window_hours?: number }
+            Returns: {
+              created_at: string
+              id: string
+              name_norm: string
+              name_original: string
+              post_count: number
+              trending_score: number
+            }[]
+          }
+        | {
+            Args: { p_limit?: number }
+            Returns: {
+              created_at: string
+              id: string
+              name_norm: string
+              name_original: string
+              post_count: number
+            }[]
+          }
       calculate_trending_score: {
         Args: { p_entity_id: string }
         Returns: number
       }
-      calculate_trust_score: {
-        Args: { p_review_id: string }
-        Returns: number
-      }
+      calculate_trust_score: { Args: { p_review_id: string }; Returns: number }
       calculate_user_reputation: {
         Args: { p_user_id: string }
         Returns: number
@@ -2921,18 +2927,9 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: boolean
       }
-      cleanup_expired_cached_photos: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      cleanup_spaced_hashtags: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      create_storage_helper_functions: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
+      cleanup_expired_cached_photos: { Args: never; Returns: number }
+      cleanup_spaced_hashtags: { Args: never; Returns: Json }
+      create_storage_helper_functions: { Args: never; Returns: undefined }
       create_storage_open_policy: {
         Args: { bucket_id: string }
         Returns: boolean
@@ -2953,20 +2950,23 @@ export type Database = {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
       }
-      detect_potential_duplicates: {
-        Args: Record<PropertyKey, never> | { similarity_threshold?: number }
-        Returns: number
-      }
-      fix_duplicate_slugs: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      generate_entity_slug: {
-        Args: { entity_id?: string; name: string } | { name: string }
-        Returns: string
-      }
+      detect_potential_duplicates:
+        | { Args: { similarity_threshold?: number }; Returns: number }
+        | {
+            Args: never
+            Returns: {
+              detection_method: string
+              entity_a_id: string
+              entity_b_id: string
+              similarity_score: number
+            }[]
+          }
+      fix_duplicate_slugs: { Args: never; Returns: number }
+      generate_entity_slug:
+        | { Args: { name: string }; Returns: string }
+        | { Args: { entity_id?: string; name: string }; Returns: string }
       get_admin_analytics: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           entities_with_dynamic_reviews: number
           recent_ai_generations: number
@@ -2975,28 +2975,62 @@ export type Database = {
           total_reviews: number
         }[]
       }
-      get_aggregated_network_recommendations_discovery: {
-        Args:
-          | { p_entity_id: string; p_limit?: number; p_user_id: string }
-          | { p_following_ids: string[]; p_limit?: number; p_user_id: string }
-          | { p_limit?: number; p_user_id: string }
-        Returns: {
-          average_rating: number
-          entity_id: string
-          entity_image_url: string
-          entity_name: string
-          entity_slug: string
-          entity_type: Database["public"]["Enums"]["entity_type"]
-          latest_recommendation_date: string
-          network_score: number
-          parent_id: string
-          parent_slug: string
-          recommendation_count: number
-          recommender_avatars: string[]
-          recommender_ids: string[]
-          recommender_names: string[]
-        }[]
-      }
+      get_aggregated_network_recommendations_discovery:
+        | {
+            Args: { p_limit?: number; p_user_id: string }
+            Returns: {
+              average_rating: number
+              entity_id: string
+              entity_image_url: string
+              entity_name: string
+              entity_slug: string
+              entity_type: Database["public"]["Enums"]["entity_type"]
+              latest_recommendation_date: string
+              network_score: number
+              parent_id: string
+              parent_slug: string
+              recommendation_count: number
+              recommender_avatars: string[]
+              recommender_ids: string[]
+              recommender_names: string[]
+            }[]
+          }
+        | {
+            Args: {
+              p_following_ids: string[]
+              p_limit?: number
+              p_user_id: string
+            }
+            Returns: {
+              average_rating: number
+              entity_id: string
+              entity_image_url: string
+              entity_name: string
+              entity_type: Database["public"]["Enums"]["entity_type"]
+              entity_venue: string
+              recent_activity_count: number
+              recommendation_count: number
+              recommender_avatars: string[]
+              recommender_user_ids: string[]
+              recommender_usernames: string[]
+            }[]
+          }
+        | {
+            Args: { p_entity_id: string; p_limit?: number; p_user_id: string }
+            Returns: {
+              average_rating: number
+              entity_id: string
+              entity_image_url: string
+              entity_name: string
+              entity_slug: string
+              entity_type: string
+              parent_slug: string
+              recommendation_count: number
+              recommender_avatars: string[]
+              recommender_user_ids: string[]
+              recommender_usernames: string[]
+            }[]
+          }
       get_cached_products: {
         Args: { query_text: string }
         Returns: {
@@ -3012,6 +3046,12 @@ export type Database = {
           updated_at: string
           venue: string | null
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "cached_products"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       get_categories_by_parent: {
         Args: { parent_uuid?: string }
@@ -3024,7 +3064,7 @@ export type Database = {
         }[]
       }
       get_category_hierarchy: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           description: string
           id: string
@@ -3090,10 +3130,7 @@ export type Database = {
           username: string
         }[]
       }
-      get_dynamic_rating: {
-        Args: { p_entity_id: string }
-        Returns: number
-      }
+      get_dynamic_rating: { Args: { p_entity_id: string }; Returns: number }
       get_entity_follower_names: {
         Args: { follower_limit?: number; input_entity_id: string }
         Returns: {
@@ -3128,10 +3165,7 @@ export type Database = {
           username: string
         }[]
       }
-      get_entity_saves_count: {
-        Args: { p_entity_id: string }
-        Returns: number
-      }
+      get_entity_saves_count: { Args: { p_entity_id: string }; Returns: number }
       get_entity_suggestion_stats: {
         Args: { entity_uuid: string }
         Returns: {
@@ -3183,7 +3217,7 @@ export type Database = {
         }[]
       }
       get_moderation_metrics: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avg_user_reputation: number
           content_quality_score: number
@@ -3235,10 +3269,7 @@ export type Database = {
           username: string
         }[]
       }
-      get_overall_rating: {
-        Args: { p_entity_id: string }
-        Returns: number
-      }
+      get_overall_rating: { Args: { p_entity_id: string }; Returns: number }
       get_personalized_entities: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: {
@@ -3327,17 +3358,24 @@ export type Database = {
         Args: { p_min_count?: number; p_user_id: string }
         Returns: boolean
       }
-      has_network_recommendations: {
-        Args:
-          | {
+      has_network_recommendations:
+        | {
+            Args: {
+              p_entity_id: string
+              p_min_count?: number
+              p_user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
               p_current_user_id: string
               p_entity_id: string
               p_min_following?: number
               p_min_recommendations?: number
             }
-          | { p_entity_id: string; p_min_count?: number; p_user_id: string }
-        Returns: boolean
-      }
+            Returns: boolean
+          }
       increment_comment_count: {
         Args: { item_id: string; table_name: string }
         Returns: undefined
@@ -3362,14 +3400,8 @@ export type Database = {
         Args: { mentioned_user_id: string; post_id: string }
         Returns: undefined
       }
-      is_admin_user: {
-        Args: { user_email: string }
-        Returns: boolean
-      }
-      is_current_user_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
+      is_admin_user: { Args: { user_email: string }; Returns: boolean }
+      is_current_user_admin: { Args: never; Returns: boolean }
       is_query_fresh: {
         Args: { query_text: string; ttl_hours?: number }
         Returns: boolean
@@ -3395,7 +3427,7 @@ export type Database = {
         }[]
       }
       preview_hierarchical_migration: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           current_slug: string
           entity_id: string
@@ -3406,12 +3438,9 @@ export type Database = {
           would_change: boolean
         }[]
       }
-      repair_hashtag_relationships: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      repair_hashtag_relationships: { Args: never; Returns: Json }
       run_duplicate_detection: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           duplicates_found: number
           duplicates_inserted: number
@@ -3453,10 +3482,7 @@ export type Database = {
         Args: { p_review_id: string; p_user_id: string }
         Returns: boolean
       }
-      update_all_trending_scores: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
+      update_all_trending_scores: { Args: never; Returns: number }
       update_comment: {
         Args: {
           p_comment_id: string
