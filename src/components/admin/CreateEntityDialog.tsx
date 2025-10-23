@@ -642,21 +642,51 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       }
     }
     
-    // Apply image - prefer metadata og:image over AI prediction
-    if (urlMetadata?.image) {
+    // Apply images - prefer metadata images over AI prediction
+    let imagesApplied = 0;
+
+    // Priority 1: URL metadata images (from og:image, JSON-LD, etc.)
+    if (urlMetadata?.images && Array.isArray(urlMetadata.images) && urlMetadata.images.length > 0) {
+      console.log(`🖼️ Processing ${urlMetadata.images.length} metadata images`);
+      
+      urlMetadata.images.forEach((imageUrl: string) => {
+        addImageToMediaGallery(imageUrl, 'metadata');
+        imagesApplied++;
+      });
+      
+      // Set first image as primary
+      handleInputChange('image_url', urlMetadata.images[0]);
+      filledFields.add('image_url');
+      appliedCount++;
+      
+      console.log(`✅ Applied ${imagesApplied} metadata images to gallery`);
+    } 
+    // Fallback 1: Single metadata image (backward compatibility)
+    else if (urlMetadata?.image) {
       handleInputChange('image_url', urlMetadata.image);
       addImageToMediaGallery(urlMetadata.image, 'metadata');
       filledFields.add('image_url');
       appliedCount++;
-      console.log('🖼️ Applied metadata image:', urlMetadata.image);
-    } else if (pred.images && pred.images.length > 0) {
-      // CRITICAL: pred.images contains objects with .url field, not strings
-      const imageUrl = pred.images[0].url;
-      handleInputChange('image_url', imageUrl);
-      addImageToMediaGallery(imageUrl, 'ai');
+      imagesApplied = 1;
+      console.log('🖼️ Applied single metadata image:', urlMetadata.image);
+    } 
+    // Fallback 2: AI-predicted images
+    else if (pred.images && Array.isArray(pred.images) && pred.images.length > 0) {
+      console.log(`🖼️ Processing ${pred.images.length} AI-predicted images`);
+      
+      pred.images.forEach((imageObj: any) => {
+        const imageUrl = imageObj.url || imageObj;
+        addImageToMediaGallery(imageUrl, 'ai');
+        imagesApplied++;
+      });
+      
+      // Set first image as primary
+      const firstImageUrl = pred.images[0].url || pred.images[0];
+      handleInputChange('image_url', firstImageUrl);
       filledFields.add('image_url');
       appliedCount++;
-      console.log('🖼️ Applied AI image:', imageUrl);
+      
+      console.log(`✅ Applied ${imagesApplied} AI images to gallery`);
     }
     
     // Apply website URL from analyzed URL
@@ -690,11 +720,15 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     // Close modal
     setShowPreviewModal(false);
     
-    // Show success toast
-    const mediaAdded = urlMetadata?.image || (pred.images && pred.images.length > 0);
+    // Show success toast with image count
+    const imageCount = imagesApplied || 0;
+    const mediaMessage = imageCount > 0 
+      ? ` (including ${imageCount} image${imageCount > 1 ? 's' : ''} added to gallery)` 
+      : '';
+
     toast({
       title: "Form Updated",
-      description: `Applied ${appliedCount} fields${mediaAdded ? ' (including image to gallery)' : ''} from URL analysis`,
+      description: `Applied ${appliedCount} fields${mediaMessage} from URL analysis`,
     });
     
     console.log('✅ Applied predictions:', pred);
@@ -1097,12 +1131,20 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                       <p className="text-xs text-muted-foreground line-clamp-2">{urlMetadata.description}</p>
                     </div>
                     {urlMetadata.image && (
-                      <img 
-                        src={urlMetadata.image} 
-                        alt="Preview"
-                        className="w-20 h-20 object-cover rounded flex-shrink-0"
-                        onError={(e) => e.currentTarget.style.display = 'none'}
-                      />
+                      <div className="relative flex-shrink-0">
+                        <img 
+                          src={urlMetadata.image} 
+                          alt="Preview"
+                          className="w-20 h-20 object-cover rounded"
+                          onError={(e) => e.currentTarget.style.display = 'none'}
+                        />
+                        {/* Image count badge */}
+                        {urlMetadata.images && urlMetadata.images.length > 1 && (
+                          <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
+                            +{urlMetadata.images.length - 1}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 </a>
