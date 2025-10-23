@@ -78,6 +78,86 @@ serve(async (req) => {
     console.log(`🔍 Page type: ${isEcommercePage ? 'E-commerce Product' : 'General Content'}`);
     console.log(`📦 Has Product Schema: ${hasProductSchema}`);
 
+    // ===== HELPER: EXTRACT PRODUCT KEYWORDS FROM URL =====
+    const extractProductKeywords = (url: string): string[] => {
+      try {
+        const urlObj = new URL(url);
+        const pathSegments = urlObj.pathname.split('/').filter(Boolean);
+        
+        // Get the last segment (usually the product slug)
+        // e.g., /products/cosmix-smarter-multivitamin-women -> "cosmix-smarter-multivitamin-women"
+        const productSlug = pathSegments[pathSegments.length - 1] || '';
+        
+        // Split by common separators and clean up
+        const keywords = productSlug
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, ' ') // Replace separators with spaces
+          .split(' ')
+          .filter(word => word.length > 2); // Filter out short words
+        
+        // Common stop words to exclude
+        const stopWords = ['the', 'and', 'for', 'with', 'from', 'product', 'item'];
+        return keywords.filter(k => !stopWords.includes(k));
+      } catch {
+        return [];
+      }
+    };
+
+    // ===== HELPER: CHECK IMAGE RELEVANCE TO PRODUCT =====
+    const isImageRelevantToProduct = (
+      imgUrl: string,
+      imgElement: Element | null,
+      productKeywords: string[]
+    ): boolean => {
+      if (productKeywords.length === 0) return true; // No context, accept all
+      
+      // Get all text signals from the image
+      const src = imgUrl.toLowerCase();
+      const alt = imgElement?.getAttribute('alt')?.toLowerCase() || '';
+      const title = imgElement?.getAttribute('title')?.toLowerCase() || '';
+      const dataTitle = imgElement?.getAttribute('data-title')?.toLowerCase() || '';
+      
+      // Combine all signals
+      const allText = `${src} ${alt} ${title} ${dataTitle}`;
+      
+      // Check if at least ONE product keyword appears in the image context
+      const hasProductKeyword = productKeywords.some(keyword => 
+        allText.includes(keyword)
+      );
+      
+      // CRITICAL: Cross-product exclusion
+      // If image contains keywords from OTHER products, reject it
+      const crossProductTerms = [
+        'protein', 'collagen', 'greens', 'superfood', 'pancake',
+        'glow', 'probiotic', 'fiber', 'immunity', 'calm',
+        'energy', 'detox', 'cleanse', 'gut', 'hair', 'skin'
+      ];
+      
+      // Only apply cross-product filter if we have product context
+      if (productKeywords.length > 0) {
+        for (const term of crossProductTerms) {
+          if (allText.includes(term)) {
+            // If this term is actually IN our product keywords, it's OK
+            // e.g., if we're ON the protein page, "protein" is expected
+            if (productKeywords.includes(term)) {
+              continue; // Not a cross-product match
+            }
+            // This is a different product
+            console.log(`⚠️ Rejecting cross-product image (contains "${term}"): ${imgUrl.substring(imgUrl.lastIndexOf('/') + 1)}`);
+            return false;
+          }
+        }
+      }
+      
+      return hasProductKeyword;
+    };
+
+    // Extract product context if e-commerce page
+    const productKeywords = isEcommercePage ? extractProductKeywords(url) : [];
+    if (productKeywords.length > 0) {
+      console.log(`🏷️ Product keywords: [${productKeywords.join(', ')}]`);
+    }
+
     // Smart thresholds
     const MIN_PRODUCT_GALLERY_IMAGES = 3; // If we have 3+ from gallery, it's likely complete
     const MAX_ECOMMERCE_IMAGES = 8; // Cap product pages at 8 images
@@ -225,6 +305,70 @@ serve(async (req) => {
 layer2Count = imageUrls.length - layer1Count;
 console.log(`🖼️ Layer 2 found: ${layer2Count} images`);
 
+// ===== PRODUCT-SPECIFIC FILTERING FOR E-COMMERCE =====
+if (isEcommercePage && imageUrls.length > 0 && productKeywords.length > 0) {
+  console.log('🎯 Applying product-specific image filtering...');
+  
+  // We need to re-extract images with metadata to check relevance
+  // Store images with their elements for filtering
+  const imageData: Array<{url: string, element: Element | null}> = [];
+  
+  // Re-scan gallery with element metadata
+  for (const selector of gallerySelectors) {
+    const galleryImages = doc.querySelectorAll(selector);
+    galleryImages.forEach(img => {
+      const src = img.getAttribute('src') || 
+                   img.getAttribute('data-src') || 
+                   img.getAttribute('data-lazy-src');
+      if (src) {
+        // Normalize to absolute URL
+        try {
+          const absoluteSrc = src.startsWith('http') 
+            ? src 
+            : new URL(src, url).href;
+          
+          // Check if this URL was collected in our imageUrls
+          if (imageUrls.includes(absoluteSrc)) {
+            imageData.push({ url: absoluteSrc, element: img });
+          }
+        } catch (e) {
+          // Skip malformed URLs
+        }
+      }
+    });
+  }
+  
+  // Filter images by product relevance
+  const beforeCount = imageUrls.length;
+  const filteredUrls: string[] = [];
+  
+  imageUrls.forEach(imgUrl => {
+    // Find the element metadata for this URL
+    const imgData = imageData.find(d => d.url === imgUrl);
+    
+    if (isImageRelevantToProduct(imgUrl, imgData?.element || null, productKeywords)) {
+      filteredUrls.push(imgUrl);
+    } else {
+      console.log(`🚫 Filtered out: ${imgUrl.substring(imgUrl.lastIndexOf('/') + 1)}`);
+    }
+  });
+  
+  imageUrls.length = 0;
+  imageUrls.push(...filteredUrls);
+  
+  const afterCount = imageUrls.length;
+  const removedCount = beforeCount - afterCount;
+  
+  if (removedCount > 0) {
+    console.log(`✂️ Removed ${removedCount} non-matching images`);
+  }
+  
+  console.log(`✅ Product filtering complete: ${imageUrls.length} relevant images retained`);
+  
+  // Update layer counts to reflect filtering
+  layer2Count = imageUrls.length - layer1Count;
+}
+
 const highConfidenceImages = layer1Count + layer2Count;
 
 // ===== PHASE 2: DECISION POINT - Should we continue to fallback layers? =====
@@ -351,7 +495,8 @@ if (shouldContinueToFallbacks && imageUrls.length < 2) {
         jsonLd: layer1Count,
         gallery: layer2Count,
         fallback: normalizedImages.length - (layer1Count + layer2Count)
-      }
+      },
+      productKeywords: productKeywords.length > 0 ? productKeywords : undefined
     };
 
     console.log('✅ Metadata extracted:', {
