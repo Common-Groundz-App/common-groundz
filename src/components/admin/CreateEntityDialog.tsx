@@ -358,6 +358,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       type: 'image',
       order: uploadedMedia.length,
       caption: source === 'metadata' ? 'From URL metadata' : 'AI-extracted',
+      source: 'external', // Mark as external URL (not uploaded file)
     };
     
     setUploadedMedia(prev => [...prev, newMediaItem]);
@@ -691,6 +692,25 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
     setLoading(true);
     try {
+      // Check for duplicate website URL if provided
+      if (formData.website_url.trim()) {
+        const { data: existingEntity, error: checkError } = await supabase
+          .from('entities')
+          .select('id, name')
+          .eq('website_url', formData.website_url.trim())
+          .maybeSingle();
+        
+        if (existingEntity && !checkError) {
+          toast({
+            title: 'Duplicate Website URL',
+            description: `An entity "${existingEntity.name}" already exists with this website URL.`,
+            variant: 'destructive'
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
     const metadata = {
       ...formData.metadata,
       business_hours: businessHours,
@@ -766,14 +786,60 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           console.error('No authenticated user for media upload');
         } else {
           try {
-            const uploadedPhotos = await uploadEntityMediaBatch(
-              uploadedMedia,
-              newEntity.id,
-              user.id,
-              (progress, total) => {
-                console.log(`Uploading media: ${progress}/${total}`);
+            // Separate external URLs from uploaded files
+            const externalMedia = uploadedMedia.filter(item => item.source === 'external');
+            const uploadedFiles = uploadedMedia.filter(item => item.source !== 'external');
+            
+            const uploadedPhotos: any[] = [];
+            
+            // Handle uploaded files (existing logic)
+            if (uploadedFiles.length > 0) {
+              console.log('📤 Uploading file-based media:', uploadedFiles.length);
+              const filePhotos = await uploadEntityMediaBatch(
+                uploadedFiles,
+                newEntity.id,
+                user.id,
+                (progress, total) => {
+                  console.log(`Uploading files: ${progress}/${total}`);
+                }
+              );
+              uploadedPhotos.push(...filePhotos);
+            }
+            
+            // Handle external URLs separately - insert directly into entity_photos
+            if (externalMedia.length > 0) {
+              console.log('🌐 Inserting external media URLs:', externalMedia.length);
+              
+              for (const mediaItem of externalMedia) {
+                const { data: photoData, error: photoError } = await supabase
+                  .from('entity_photos')
+                  .insert({
+                    entity_id: newEntity.id,
+                    user_id: user.id,
+                    url: mediaItem.url,
+                    caption: mediaItem.caption || null,
+                    alt_text: mediaItem.alt || null,
+                    category: mediaItem.category || 'general',
+                    status: 'approved',
+                    moderation_status: 'approved',
+                    width: mediaItem.width || null,
+                    height: mediaItem.height || null,
+                    content_type: 'image/*'
+                  })
+                  .select()
+                  .single();
+                
+                if (photoError) {
+                  console.error('❌ Failed to insert external media:', photoError);
+                  throw photoError;
+                }
+                
+                if (photoData) {
+                  uploadedPhotos.push(photoData);
+                  console.log('✅ External media inserted:', mediaItem.url);
+                }
               }
-            );
+            }
 
             // Set first media item as primary image
             if (uploadedPhotos.length > 0 && uploadedMedia[0]) {
@@ -782,11 +848,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 .update({ image_url: uploadedMedia[0].url })
                 .eq('id', newEntity.id);
             }
-          } catch (mediaError) {
+          } catch (mediaError: any) {
             console.error('Error uploading media:', mediaError);
+            
+            // Show detailed error message
+            const errorMessage = mediaError?.message || 
+                                mediaError?.error_description || 
+                                'Some media failed to upload';
+            
             toast({
               title: 'Warning',
-              description: 'Entity created, but some media failed to upload.',
+              description: `Entity created, but media upload failed: ${errorMessage}`,
               variant: 'default'
             });
           }
@@ -801,11 +873,32 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       resetForm();
       onOpenChange(false);
       onEntityCreated();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating entity:', error);
+      
+      // Extract detailed error information
+      let errorMessage = 'Unknown error';
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error_description) {
+        errorMessage = error.error_description;
+      } else if (error?.details) {
+        errorMessage = error.details;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      // Special handling for common errors
+      if (errorMessage.includes('duplicate key') && errorMessage.includes('website_url')) {
+        errorMessage = 'An entity with this website URL already exists. Please use a different URL or update the existing entity.';
+      } else if (errorMessage.includes('storage.policies')) {
+        errorMessage = 'Storage configuration error. Please contact support.';
+      }
+      
       toast({
-        title: 'Error',
-        description: `Failed to create entity: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        title: 'Failed to Create Entity',
+        description: errorMessage,
         variant: 'destructive'
       });
     } finally {
