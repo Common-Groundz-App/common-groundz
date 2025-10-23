@@ -117,6 +117,59 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     metadataCache.current.set(url, { data, timestamp: Date.now() });
   };
 
+  // URL metadata persistence constants
+  const METADATA_STORAGE_KEY = 'entity_url_metadata_preview';
+  const METADATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+  // Save URL metadata to localStorage with expiration
+  const saveUrlMetadataToStorage = (url: string, metadata: any) => {
+    try {
+      const data = {
+        url,
+        metadata,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + METADATA_TTL
+      };
+      localStorage.setItem(METADATA_STORAGE_KEY, JSON.stringify(data));
+      console.log('💾 Saved URL metadata to localStorage:', url);
+    } catch (error) {
+      console.warn('Failed to save URL metadata to localStorage:', error);
+    }
+  };
+
+  // Load URL metadata from localStorage (with expiration check)
+  const loadUrlMetadataFromStorage = (): { url: string; metadata: any } | null => {
+    try {
+      const stored = localStorage.getItem(METADATA_STORAGE_KEY);
+      if (!stored) return null;
+      
+      const data = JSON.parse(stored);
+      
+      // Check expiration
+      if (Date.now() > data.expiresAt) {
+        console.log('🗑️ URL metadata expired, clearing...');
+        localStorage.removeItem(METADATA_STORAGE_KEY);
+        return null;
+      }
+      
+      console.log('✅ Restored URL metadata from localStorage:', data.url);
+      return { url: data.url, metadata: data.metadata };
+    } catch (error) {
+      console.warn('Failed to load URL metadata from localStorage:', error);
+      return null;
+    }
+  };
+
+  // Clear URL metadata from localStorage
+  const clearUrlMetadataFromStorage = () => {
+    try {
+      localStorage.removeItem(METADATA_STORAGE_KEY);
+      console.log('🗑️ Cleared URL metadata from localStorage');
+    } catch (error) {
+      console.warn('Failed to clear URL metadata from localStorage:', error);
+    }
+  };
+
   // Load draft from sessionStorage on mount
   useEffect(() => {
     const loadDraft = () => {
@@ -133,6 +186,15 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           setPrimaryMediaUrl(draft.primaryMediaUrl || null);
           setSelectedTags(draft.selectedTags || []);
           setDraftRestored(true);
+        }
+        
+        // Restore URL metadata preview
+        const storedMetadata = loadUrlMetadataFromStorage();
+        if (storedMetadata) {
+          setAnalyzeUrl(storedMetadata.url);
+          setUrlMetadata(storedMetadata.metadata);
+          setShowAnalyzeButton(isValidUrl(storedMetadata.url));
+          console.log('🔄 Restored URL preview:', storedMetadata.url);
         }
       } catch (error) {
         console.error('Failed to load draft:', error);
@@ -171,6 +233,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     const timeoutId = setTimeout(saveDraft, 500);
     return () => clearTimeout(timeoutId);
   }, [formData, businessHours, contactInfo, selectedParent, uploadedMedia, open]);
+
+  // Save URL metadata to localStorage whenever it changes
+  useEffect(() => {
+    if (urlMetadata && analyzeUrl) {
+      saveUrlMetadataToStorage(analyzeUrl, urlMetadata);
+    }
+  }, [urlMetadata, analyzeUrl]);
 
   const handleInputChange = (field: string, value: string | null | Record<string, any>) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -330,6 +399,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     } catch (error) {
       console.error('Failed to clear draft:', error);
     }
+    
+    // Clear URL metadata from localStorage
+    clearUrlMetadataFromStorage();
   };
 
   // Validate URL format
@@ -692,12 +764,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
     setLoading(true);
     try {
-      // Check for duplicate website URL if provided
+      // Check for duplicate website URL if provided (only among non-deleted entities)
       if (formData.website_url.trim()) {
         const { data: existingEntity, error: checkError } = await supabase
           .from('entities')
           .select('id, name')
           .eq('website_url', formData.website_url.trim())
+          .eq('is_deleted', false)
           .maybeSingle();
         
         if (existingEntity && !checkError) {
@@ -1001,6 +1074,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                       setUrlMetadata(null);
                       setAnalyzeUrl('');
                       setShowAnalyzeButton(false);
+                      clearUrlMetadataFromStorage();
                     }}
                   >
                     <X className="h-3 w-3" />
