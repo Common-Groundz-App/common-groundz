@@ -23,13 +23,48 @@ serve(async (req) => {
       );
     }
 
+    // Array of real browser User-Agents for anti-bot evasion
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15'
+    ];
+    
+    // Pick random User-Agent for better anti-bot evasion
+    const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
+    
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': randomUserAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0'
       },
-      signal: AbortSignal.timeout(10000) // 10-second timeout
+      signal: AbortSignal.timeout(15000) // Increased to 15s for slower sites
     });
+    
+    // Check for bot-blocking responses
+    if (!response.ok) {
+      console.warn(`⚠️ HTTP ${response.status} ${response.statusText} from ${url}`);
+    }
+    
     const html = await response.text();
+    
+    // Detect anti-bot error pages
+    if (html.includes('503 Service Unavailable') || 
+        html.includes('Access Denied') ||
+        html.includes('blocked') ||
+        html.length < 1000) {
+      console.warn('⚠️ Detected anti-bot/error page - limited data available');
+    }
     const doc = parse(html);
 
     // Extract favicon
@@ -190,6 +225,24 @@ serve(async (req) => {
         // Parent domain match (e.g., cdn.cosmix.in matches cosmix.in)
         if (imgDomain.endsWith(`.${pageDomain}`)) return true;
         
+        // Domain-specific CDN mappings (for sites with different CDN domains)
+        const domainCdnMap: Record<string, string[]> = {
+          'goodreads.com': ['gr-assets.com', 'images.gr-assets.com', 'i.gr-assets.com'],
+          'amazon.in': ['m.media-amazon.com', 'images-na.ssl-images-amazon.com'],
+          'amazon.com': ['m.media-amazon.com', 'images-na.ssl-images-amazon.com'],
+          'flipkart.com': ['rukminim1.flixcart.com', 'rukminim2.flixcart.com'],
+          'nykaa.com': ['images-static.nykaa.com'],
+        };
+        
+        for (const [domain, cdns] of Object.entries(domainCdnMap)) {
+          if (pageDomain.includes(domain)) {
+            if (cdns.some(cdn => imgDomain.includes(cdn))) {
+              console.log(`✅ Whitelisted CDN for ${domain}: ${imgDomain}`);
+              return true;
+            }
+          }
+        }
+        
         // Known product CDNs
         const trustedCDNs = [
           'cloudinary.com',
@@ -272,6 +325,13 @@ serve(async (req) => {
   // ===== LAYER 2: E-COMMERCE GALLERY SELECTORS (HIGH PRIORITY) =====
     console.log('🖼️ Layer 2: Checking product gallery selectors...');
     const gallerySelectors = [
+      // Goodreads book covers (HIGH PRIORITY for books)
+      '[class*="BookCover"] img',
+      '[class*="book-cover"] img',
+      '.ResponsiveImage img',
+      '[aria-label*="Book cover"] img',
+      
+      // E-commerce product galleries
       '[class*="product-gallery"] img',
       '[class*="ProductGallery"] img',
       '[class*="product-images"] img',
@@ -288,12 +348,7 @@ serve(async (req) => {
       '.gallery img',
       '#product-photos img',
       '[id*="product-gallery"] img',
-      '[id*="ProductGallery"] img',
-      // Goodreads book cover selectors
-      '[class*="BookCover"] img',
-      '[class*="book-cover"] img',
-      '.ResponsiveImage img',
-      '[aria-label*="Book cover"] img'
+      '[id*="ProductGallery"] img'
     ];
 
     for (const selector of gallerySelectors) {
@@ -501,7 +556,18 @@ if (shouldContinueToFallbacks && imageUrls.length < 2) {
         gallery: layer2Count,
         fallback: normalizedImages.length - (layer1Count + layer2Count)
       },
-      productKeywords: productKeywords.length > 0 ? productKeywords : undefined
+      productKeywords: productKeywords.length > 0 ? productKeywords : undefined,
+      // Debug information for troubleshooting
+      debug: {
+        httpStatus: response.status,
+        detectedAsBot: html.includes('503') || html.includes('Access Denied'),
+        totalImagesScanned: seenUrls.size,
+        rejectedImageCount: seenUrls.size - normalizedImages.length,
+        domainFiltering: {
+          pageDomain: pageDomain,
+          appliedCdnWhitelist: pageDomain.includes('goodreads') || pageDomain.includes('amazon')
+        }
+      }
     };
 
     console.log('✅ Metadata extracted:', {

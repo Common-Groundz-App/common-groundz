@@ -456,6 +456,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
     setAnalyzing(true);
     
+    // Clear old state before analyzing new URL
+    setUrlMetadata(null);
+    setAiPredictions(null);
+    setUploadedMedia([]);
+    setPrimaryMediaUrl(null);
+    
     try {
       console.log('🔍 Analyzing URL:', analyzeUrl);
       
