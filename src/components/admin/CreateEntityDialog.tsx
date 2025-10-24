@@ -25,7 +25,7 @@ import { validateUrlForType, getSuggestedEntityType } from '@/config/urlPatterns
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const MAX_MEDIA_ITEMS = 4;
-import { Plus, Sparkles, Loader2, AlertTriangle, ExternalLink, X } from 'lucide-react';
+import { Plus, Sparkles, Loader2, AlertTriangle, ExternalLink, X, Info } from 'lucide-react';
 import { getOrCreateTag } from '@/services/tagService';
 
 import { EntityType } from '@/services/recommendation/types';
@@ -1154,6 +1154,26 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                     )}
                   </div>
                 </a>
+              )}
+
+              {/* Enhanced Extraction Badge */}
+              {urlMetadata?.blocked && (
+                <div className="mt-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2">
+                  <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 text-sm">
+                    <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                      Enhanced Extraction Used
+                    </p>
+                    <p className="text-blue-700 dark:text-blue-300 text-xs">
+                      This site blocks standard requests. We used ScraperAPI to fetch authentic product images directly from the source.
+                      {urlMetadata.blockedReason && (
+                        <span className="block text-blue-600 dark:text-blue-400 mt-1">
+                          Reason: {urlMetadata.blockedReason}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
             

@@ -23,6 +23,11 @@ serve(async (req) => {
       );
     }
 
+    // Track fetch method used
+    let fetchMethod: 'direct' | 'scraper-api' = 'direct';
+    let blockedReason: string | null = null;
+    let httpStatus: number | undefined = undefined;
+
     // Array of real browser User-Agents for anti-bot evasion
     const userAgents = [
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -34,37 +39,113 @@ serve(async (req) => {
     // Pick random User-Agent for better anti-bot evasion
     const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
     
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': randomUserAgent,
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Cache-Control': 'max-age=0'
-      },
-      signal: AbortSignal.timeout(15000) // Increased to 15s for slower sites
-    });
-    
-    // Check for bot-blocking responses
-    if (!response.ok) {
-      console.warn(`⚠️ HTTP ${response.status} ${response.statusText} from ${url}`);
+    // ===== TIER 1: DIRECT FETCH (TRY FIRST) =====
+    let html: string;
+
+    try {
+      console.log('🔄 Attempting direct fetch...');
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': randomUserAgent,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'DNT': '1',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Cache-Control': 'max-age=0'
+        },
+        signal: AbortSignal.timeout(15000) // 15s timeout for direct fetch
+      });
+      
+      httpStatus = response.status;
+      
+      // ===== BLOCK DETECTION: Check HTTP status codes =====
+      if ([403, 503, 429].includes(response.status)) {
+        blockedReason = `HTTP ${response.status} ${response.statusText}`;
+        throw new Error(blockedReason);
+      }
+      
+      if (!response.ok) {
+        console.warn(`⚠️ HTTP ${response.status} ${response.statusText} from ${url}`);
+      }
+      
+      html = await response.text();
+      
+      // ===== BLOCK DETECTION: Check for anti-bot patterns =====
+      const antiBotPatterns = [
+        '503 Service Unavailable',
+        'Access Denied',
+        'blocked',
+        'captcha',
+        'security check',
+        'unusual traffic'
+      ];
+      
+      const hasAntiBotPattern = antiBotPatterns.some(pattern => 
+        html.toLowerCase().includes(pattern.toLowerCase())
+      );
+      
+      // ===== BLOCK DETECTION: Check for suspiciously small response =====
+      const isSuspiciouslySmall = html.length < 1000;
+      
+      if (hasAntiBotPattern || isSuspiciouslySmall) {
+        blockedReason = hasAntiBotPattern 
+          ? 'Anti-bot page detected' 
+          : 'Suspiciously small HTML response';
+        
+        console.warn(`⚠️ ${blockedReason} (${html.length} bytes)`);
+        throw new Error(blockedReason);
+      }
+      
+      console.log(`✅ Direct fetch succeeded (${html.length} bytes)`);
+      
+    } catch (directFetchError) {
+      // ===== TIER 2: SCRAPERAPI FALLBACK =====
+      console.error(`❌ Direct fetch failed: ${directFetchError.message}`);
+      
+      const scraperApiKey = Deno.env.get('SCRAPER_API_KEY');
+      
+      if (!scraperApiKey) {
+        console.error('⚠️ ScraperAPI key not configured - cannot fallback');
+        throw new Error(`Direct fetch failed (${blockedReason || directFetchError.message}) and no ScraperAPI key configured`);
+      }
+      
+      console.log('🔄 Attempting ScraperAPI fallback...');
+      fetchMethod = 'scraper-api';
+      
+      try {
+        // ScraperAPI with JavaScript rendering enabled
+        const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=true`;
+        
+        const scraperResponse = await fetch(scraperUrl, {
+          signal: AbortSignal.timeout(30000) // 30s timeout for ScraperAPI (JS rendering takes longer)
+        });
+        
+        if (!scraperResponse.ok) {
+          throw new Error(`ScraperAPI returned ${scraperResponse.status}: ${scraperResponse.statusText}`);
+        }
+        
+        html = await scraperResponse.text();
+        
+        // Validate ScraperAPI response
+        if (html.length < 500) {
+          throw new Error('ScraperAPI returned suspiciously small response');
+        }
+        
+        console.log(`✅ ScraperAPI fallback succeeded (${html.length} bytes)`);
+        console.log(`💰 ScraperAPI credit used for: ${url}`);
+        
+      } catch (scraperError) {
+        console.error(`❌ ScraperAPI fallback also failed: ${scraperError.message}`);
+        throw new Error(`Both direct fetch and ScraperAPI failed. Direct: ${blockedReason || directFetchError.message}. ScraperAPI: ${scraperError.message}`);
+      }
     }
-    
-    const html = await response.text();
-    
-    // Detect anti-bot error pages
-    if (html.includes('503 Service Unavailable') || 
-        html.includes('Access Denied') ||
-        html.includes('blocked') ||
-        html.length < 1000) {
-      console.warn('⚠️ Detected anti-bot/error page - limited data available');
-    }
+
     const doc = parse(html);
 
     // Extract favicon
@@ -231,7 +312,7 @@ serve(async (req) => {
           'amazon.in': ['m.media-amazon.com', 'images-na.ssl-images-amazon.com'],
           'amazon.com': ['m.media-amazon.com', 'images-na.ssl-images-amazon.com'],
           'flipkart.com': ['rukminim1.flixcart.com', 'rukminim2.flixcart.com'],
-          'nykaa.com': ['images-static.nykaa.com'],
+          'nykaa.com': ['images-static.nykaa.com', 'adn-static1.nykaa.com', 'adn-static2.nykaa.com'],
         };
         
         for (const [domain, cdns] of Object.entries(domainCdnMap)) {
@@ -551,6 +632,10 @@ if (shouldContinueToFallbacks && imageUrls.length < 2) {
       // PHASE 4: Context information for frontend intelligence
       pageType: isEcommercePage ? 'product' : 'general',
       hasProductSchema: hasProductSchema,
+      // Fetch method tracking
+      fetchMethod: fetchMethod, // 'direct' or 'scraper-api'
+      blocked: fetchMethod === 'scraper-api', // true if original fetch was blocked
+      blockedReason: blockedReason || undefined,
       imageSourceBreakdown: {
         jsonLd: layer1Count,
         gallery: layer2Count,
@@ -559,13 +644,13 @@ if (shouldContinueToFallbacks && imageUrls.length < 2) {
       productKeywords: productKeywords.length > 0 ? productKeywords : undefined,
       // Debug information for troubleshooting
       debug: {
-        httpStatus: response.status,
-        detectedAsBot: html.includes('503') || html.includes('Access Denied'),
+        httpStatus: httpStatus,
+        detectedAsBot: fetchMethod === 'scraper-api',
         totalImagesScanned: seenUrls.size,
         rejectedImageCount: seenUrls.size - normalizedImages.length,
         domainFiltering: {
           pageDomain: pageDomain,
-          appliedCdnWhitelist: pageDomain.includes('goodreads') || pageDomain.includes('amazon')
+          appliedCdnWhitelist: pageDomain.includes('goodreads') || pageDomain.includes('amazon') || pageDomain.includes('nykaa')
         }
       }
     };
