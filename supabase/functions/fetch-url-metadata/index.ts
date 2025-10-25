@@ -39,8 +39,28 @@ serve(async (req) => {
     // Pick random User-Agent for better anti-bot evasion
     const randomUserAgent = userAgents[Math.floor(Math.random() * userAgents.length)];
     
+    // ===== PHASE 2: SMART DOMAIN ROUTING =====
+    const hostname = new URL(url).hostname;
+    
+    // Known problematic domains that ALWAYS need ScraperAPI
+    const alwaysUseScraper = [
+      'nykaa.com',
+      'amazon.in', 'amazon.com', 'amazon.co.uk',
+      'flipkart.com',
+      'myntra.com'
+    ];
+    
+    // Check if this domain always needs ScraperAPI
+    const shouldSkipDirectFetch = alwaysUseScraper.some(domain => hostname.includes(domain));
+    
     // ===== TIER 1: DIRECT FETCH (TRY FIRST) =====
     let html: string;
+
+    if (shouldSkipDirectFetch) {
+      console.log(`🎯 Known e-commerce domain detected: ${hostname} - skipping direct fetch, using ScraperAPI directly`);
+      // Will skip to ScraperAPI fallback by throwing error
+      throw new Error('Known problematic domain - using ScraperAPI');
+    }
 
     try {
       console.log('🔄 Attempting direct fetch...');
@@ -91,7 +111,7 @@ serve(async (req) => {
       );
       
       // ===== BLOCK DETECTION: Check for suspiciously small response =====
-      const isSuspiciouslySmall = html.length < 1000;
+      const isSuspiciouslySmall = html.length < 300; // SPAs often have minimal HTML
       
       if (hasAntiBotPattern || isSuspiciouslySmall) {
         blockedReason = hasAntiBotPattern 
@@ -115,34 +135,79 @@ serve(async (req) => {
         throw new Error(`Direct fetch failed (${blockedReason || directFetchError.message}) and no ScraperAPI key configured`);
       }
       
+      // ===== PHASE 3: RESILIENT TWO-STAGE SCRAPERAPI RETRY =====
       console.log('🔄 Attempting ScraperAPI fallback...');
       fetchMethod = 'scraper-api';
+      let scraperSuccess = false;
       
+      // STAGE 1: Try static scraping first (faster, cheaper)
       try {
-        // ScraperAPI with JavaScript rendering enabled
-        const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&render=true`;
+        console.log('📥 Stage 1: ScraperAPI static mode (premium)...');
+        
+        const hostname = new URL(url).hostname;
+        const needsJsRendering = [
+          'nykaa.com',
+          'amazon.in', 'amazon.com', 'amazon.co.uk',
+          'flipkart.com',
+          'myntra.com'
+        ].some(domain => hostname.includes(domain));
+        
+        // Stage 1: Static scraping (no JS rendering)
+        const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&premium=true`;
         
         const scraperResponse = await fetch(scraperUrl, {
-          signal: AbortSignal.timeout(30000) // 30s timeout for ScraperAPI (JS rendering takes longer)
+          signal: AbortSignal.timeout(20000) // Static mode is faster
         });
         
-        if (!scraperResponse.ok) {
-          throw new Error(`ScraperAPI returned ${scraperResponse.status}: ${scraperResponse.statusText}`);
+        if (scraperResponse.ok) {
+          html = await scraperResponse.text();
+          
+          if (html.length >= 300) {
+            console.log(`✅ ScraperAPI static succeeded (${html.length} bytes)`);
+            console.log(`💰 ScraperAPI credit used (static, 1 credit) for: ${url}`);
+            scraperSuccess = true;
+          }
         }
-        
-        html = await scraperResponse.text();
-        
-        // Validate ScraperAPI response
-        if (html.length < 500) {
-          throw new Error('ScraperAPI returned suspiciously small response');
+      } catch (stage1Error) {
+        console.warn(`⚠️ Stage 1 (static) failed: ${stage1Error.message}`);
+      }
+      
+      // STAGE 2: If static failed, try JS rendering
+      if (!scraperSuccess) {
+        try {
+          console.log('📥 Stage 2: ScraperAPI JS rendering mode...');
+          
+          const hostname = new URL(url).hostname;
+          const needsJsRendering = [
+            'nykaa.com',
+            'amazon.in', 'amazon.com', 'amazon.co.uk',
+            'flipkart.com',
+            'myntra.com'
+          ].some(domain => hostname.includes(domain));
+          
+          const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}${needsJsRendering ? '&render=true' : ''}&premium=true`;
+          
+          const scraperResponse = await fetch(scraperUrl, {
+            signal: AbortSignal.timeout(60000) // JS rendering takes longer
+          });
+          
+          if (!scraperResponse.ok) {
+            throw new Error(`ScraperAPI returned ${scraperResponse.status}: ${scraperResponse.statusText}`);
+          }
+          
+          html = await scraperResponse.text();
+          
+          if (html.length < 300) {
+            throw new Error('ScraperAPI returned suspiciously small response');
+          }
+          
+          console.log(`✅ ScraperAPI JS rendering succeeded (${html.length} bytes)`);
+          console.log(`💰 ScraperAPI credit used (JS render, ${needsJsRendering ? '5-10' : '1'} credits) for: ${url}`);
+          
+        } catch (stage2Error) {
+          console.error(`❌ Both ScraperAPI stages failed: ${stage2Error.message}`);
+          throw new Error(`All extraction methods failed. Stage 1 (static): Failed. Stage 2 (JS render): ${stage2Error.message}`);
         }
-        
-        console.log(`✅ ScraperAPI fallback succeeded (${html.length} bytes)`);
-        console.log(`💰 ScraperAPI credit used for: ${url}`);
-        
-      } catch (scraperError) {
-        console.error(`❌ ScraperAPI fallback also failed: ${scraperError.message}`);
-        throw new Error(`Both direct fetch and ScraperAPI failed. Direct: ${blockedReason || directFetchError.message}. ScraperAPI: ${scraperError.message}`);
       }
     }
 
@@ -665,10 +730,29 @@ if (shouldContinueToFallbacks && imageUrls.length < 2) {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error fetching metadata:', error);
+    console.error('❌ Complete failure - Error fetching metadata:', error);
+    
+    // ===== PHASE 4: GRACEFUL FAILURE HANDLING =====
+    // Return partial results instead of complete failure
+    // This allows Gemini-extracted metadata to still be used
     return new Response(
-      JSON.stringify({ error: 'Failed to fetch metadata' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        error: 'Failed to extract images',
+        errorDetails: error.message,
+        title: '',
+        description: '',
+        images: [],
+        image: null,
+        favicon: '',
+        siteName: new URL(url).hostname,
+        url: url,
+        pageType: 'unknown',
+        fetchMethod: 'failed',
+        blocked: true,
+        blockedReason: error.message,
+        partialExtraction: true
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } } // 200, not 500
     );
   }
 });

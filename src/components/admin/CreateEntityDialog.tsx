@@ -1157,7 +1157,24 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               )}
 
               {/* Enhanced Extraction Badge */}
-              {urlMetadata?.blocked && (
+              {urlMetadata?.partialExtraction ? (
+                <div className="mt-3 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 flex items-start gap-2">
+                  <Info className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 text-sm">
+                    <p className="font-medium text-orange-900 dark:text-orange-100 mb-1">
+                      ⚠️ Image Extraction Failed
+                    </p>
+                    <p className="text-orange-700 dark:text-orange-300 text-xs">
+                      Unable to extract images from this source. You can manually upload images below.
+                      {urlMetadata.blockedReason && (
+                        <span className="block text-orange-600 dark:text-orange-400 mt-1">
+                          Reason: {urlMetadata.blockedReason}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              ) : urlMetadata?.blocked && (
                 <div className="mt-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2">
                   <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1 text-sm">
