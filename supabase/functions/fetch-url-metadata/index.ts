@@ -27,6 +27,8 @@ serve(async (req) => {
     let fetchMethod: 'direct' | 'scraper-api' = 'direct';
     let blockedReason: string | null = null;
     let httpStatus: number | undefined = undefined;
+    let html: string = '';
+    let shouldUseScraper = false;
 
     // Array of real browser User-Agents for anti-bot evasion
     const userAgents = [
@@ -54,85 +56,91 @@ serve(async (req) => {
     const shouldSkipDirectFetch = alwaysUseScraper.some(domain => hostname.includes(domain));
     
     // ===== TIER 1: DIRECT FETCH (TRY FIRST) =====
-    let html: string;
 
     if (shouldSkipDirectFetch) {
-      console.log(`🎯 Known e-commerce domain detected: ${hostname} - skipping direct fetch, using ScraperAPI directly`);
-      // Will skip to ScraperAPI fallback by throwing error
-      throw new Error('Known problematic domain - using ScraperAPI');
+      blockedReason = 'Known problematic domain';
+      fetchMethod = 'scraper-api';
+      console.log(`ℹ️ Skipping direct fetch for ${hostname}, proceeding to ScraperAPI fallback.`);
+      shouldUseScraper = true;
     }
 
-    try {
-      console.log('🔄 Attempting direct fetch...');
-      
-      const response = await fetch(url, {
-        headers: {
-          'User-Agent': randomUserAgent,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'DNT': '1',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Cache-Control': 'max-age=0'
-        },
-        signal: AbortSignal.timeout(15000) // 15s timeout for direct fetch
-      });
-      
-      httpStatus = response.status;
-      
-      // ===== BLOCK DETECTION: Check HTTP status codes =====
-      if ([403, 503, 429].includes(response.status)) {
-        blockedReason = `HTTP ${response.status} ${response.statusText}`;
-        throw new Error(blockedReason);
-      }
-      
-      if (!response.ok) {
-        console.warn(`⚠️ HTTP ${response.status} ${response.statusText} from ${url}`);
-      }
-      
-      html = await response.text();
-      
-      // ===== BLOCK DETECTION: Check for anti-bot patterns =====
-      const antiBotPatterns = [
-        '503 Service Unavailable',
-        'Access Denied',
-        'blocked',
-        'captcha',
-        'security check',
-        'unusual traffic'
-      ];
-      
-      const hasAntiBotPattern = antiBotPatterns.some(pattern => 
-        html.toLowerCase().includes(pattern.toLowerCase())
-      );
-      
-      // ===== BLOCK DETECTION: Check for suspiciously small response =====
-      const isSuspiciouslySmall = html.length < 300; // SPAs often have minimal HTML
-      
-      if (hasAntiBotPattern || isSuspiciouslySmall) {
-        blockedReason = hasAntiBotPattern 
-          ? 'Anti-bot page detected' 
-          : 'Suspiciously small HTML response';
+    // Only attempt direct fetch if flag is not set
+    if (!shouldUseScraper) {
+      try {
+        console.log('🔄 Attempting direct fetch...');
         
-        console.warn(`⚠️ ${blockedReason} (${html.length} bytes)`);
-        throw new Error(blockedReason);
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': randomUserAgent,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
+          },
+          signal: AbortSignal.timeout(15000) // 15s timeout for direct fetch
+        });
+        
+        httpStatus = response.status;
+        
+        // ===== BLOCK DETECTION: Check HTTP status codes =====
+        if ([403, 503, 429].includes(response.status)) {
+          blockedReason = `HTTP ${response.status} ${response.statusText}`;
+          throw new Error(blockedReason);
+        }
+        
+        if (!response.ok) {
+          console.warn(`⚠️ HTTP ${response.status} ${response.statusText} from ${url}`);
+        }
+        
+        html = await response.text();
+        
+        // ===== BLOCK DETECTION: Check for anti-bot patterns =====
+        const antiBotPatterns = [
+          '503 Service Unavailable',
+          'Access Denied',
+          'blocked',
+          'captcha',
+          'security check',
+          'unusual traffic'
+        ];
+        
+        const hasAntiBotPattern = antiBotPatterns.some(pattern => 
+          html.toLowerCase().includes(pattern.toLowerCase())
+        );
+        
+        // ===== BLOCK DETECTION: Check for suspiciously small response =====
+        const isSuspiciouslySmall = html.length < 300; // SPAs often have minimal HTML
+        
+        if (hasAntiBotPattern || isSuspiciouslySmall) {
+          blockedReason = hasAntiBotPattern 
+            ? 'Anti-bot page detected' 
+            : 'Suspiciously small HTML response';
+          
+          console.warn(`⚠️ ${blockedReason} (${html.length} bytes)`);
+          throw new Error(blockedReason);
+        }
+        
+        console.log(`✅ Direct fetch succeeded (${html.length} bytes)`);
+        
+      } catch (directFetchError) {
+        shouldUseScraper = true;
+        console.error(`❌ Direct fetch failed: ${directFetchError.message}`);
       }
-      
-      console.log(`✅ Direct fetch succeeded (${html.length} bytes)`);
-      
-    } catch (directFetchError) {
-      // ===== TIER 2: SCRAPERAPI FALLBACK =====
-      console.error(`❌ Direct fetch failed: ${directFetchError.message}`);
-      
+    }
+
+    // ===== TIER 2: SCRAPERAPI FALLBACK =====
+    if (shouldUseScraper) {
       const scraperApiKey = Deno.env.get('SCRAPER_API_KEY');
       
       if (!scraperApiKey) {
         console.error('⚠️ ScraperAPI key not configured - cannot fallback');
-        throw new Error(`Direct fetch failed (${blockedReason || directFetchError.message}) and no ScraperAPI key configured`);
+        throw new Error(`Direct fetch failed (${blockedReason || 'unknown reason'}) and no ScraperAPI key configured`);
       }
       
       // ===== PHASE 3: RESILIENT TWO-STAGE SCRAPERAPI RETRY =====
