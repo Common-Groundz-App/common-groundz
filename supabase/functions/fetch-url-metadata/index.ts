@@ -13,8 +13,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let url: string = ''; // ✅ Declare outside try block for proper scoping
+
   try {
-    const { url } = await req.json();
+    const body = await req.json();
+    url = body.url; // ✅ Assign after declaration
     
     if (!url) {
       return new Response(
