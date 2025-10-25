@@ -514,7 +514,13 @@ serve(async (req) => {
       '[class*="upsell"]',
       '[data-section-type="collection"]',
       '[class*="product-recommendations"]',
-      '[class*="complementary"]'
+      '[class*="complementary"]',
+      '[class*="product-card"]',
+      '[class*="collection-grid"]',
+      '[class*="product-reviews"]',
+      '[class*="footer"]',
+      '[class*="header"]',
+      '[class*="banner"]'
     ];
 
     // ===== REFINED GALLERY SELECTORS (PRIORITY ORDER) =====
@@ -614,77 +620,21 @@ serve(async (req) => {
     // Log collected images (batch, not per-image)
     console.log(`📸 Collected ${collectedGalleryImages.size} unique images from gallery selectors`);
 
-    // Add images to extraction
-    collectedGalleryImages.forEach(({ url }) => {
+    // Add top 7 gallery images sorted by priority
+    const topGalleryImages = Array.from(collectedGalleryImages.values())
+      .sort((a, b) => a.priority - b.priority)
+      .slice(0, 7);
+
+    topGalleryImages.forEach(({ url }) => {
       addImage(url, 'Gallery');
     });
+
+    console.log(`✅ Added ${topGalleryImages.length} gallery images (top 7 by priority)`);
 
 layer2Count = imageUrls.length - layer1Count;
 console.log(`🖼️ Layer 2 found: ${layer2Count} images`);
 
-// ===== PRODUCT-SPECIFIC FILTERING FOR E-COMMERCE =====
-if (isEcommercePage && imageUrls.length > 0 && productKeywords.length > 0) {
-  console.log('🎯 Applying product-specific image filtering...');
-  
-  // We need to re-extract images with metadata to check relevance
-  // Store images with their elements for filtering
-  const imageData: Array<{url: string, element: Element | null}> = [];
-  
-  // Re-scan gallery with element metadata
-  for (const selector of gallerySelectors) {
-    const galleryImages = doc.querySelectorAll(selector);
-    galleryImages.forEach(img => {
-      const src = img.getAttribute('src') || 
-                   img.getAttribute('data-src') || 
-                   img.getAttribute('data-lazy-src');
-      if (src) {
-        // Normalize to absolute URL
-        try {
-          const absoluteSrc = src.startsWith('http') 
-            ? src 
-            : new URL(src, url).href;
-          
-          // Check if this URL was collected in our imageUrls
-          if (imageUrls.includes(absoluteSrc)) {
-            imageData.push({ url: absoluteSrc, element: img });
-          }
-        } catch (e) {
-          // Skip malformed URLs
-        }
-      }
-    });
-  }
-  
-  // Filter images by product relevance
-  const beforeCount = imageUrls.length;
-  const filteredUrls: string[] = [];
-  
-  imageUrls.forEach(imgUrl => {
-    // Find the element metadata for this URL
-    const imgData = imageData.find(d => d.url === imgUrl);
-    
-    if (isImageRelevantToProduct(imgUrl, imgData?.element || null, productKeywords)) {
-      filteredUrls.push(imgUrl);
-    } else {
-      console.log(`🚫 Filtered out: ${imgUrl.substring(imgUrl.lastIndexOf('/') + 1)}`);
-    }
-  });
-  
-  imageUrls.length = 0;
-  imageUrls.push(...filteredUrls);
-  
-  const afterCount = imageUrls.length;
-  const removedCount = beforeCount - afterCount;
-  
-  if (removedCount > 0) {
-    console.log(`✂️ Removed ${removedCount} non-matching images`);
-  }
-  
-  console.log(`✅ Product filtering complete: ${imageUrls.length} relevant images retained`);
-  
-  // Update layer counts to reflect filtering
-  layer2Count = imageUrls.length - layer1Count;
-}
+// Product keyword filtering removed - trust gallery selectors instead
 
 const highConfidenceImages = layer1Count + layer2Count;
 
@@ -717,54 +667,7 @@ if (shouldContinueToFallbacks && imageUrls.length < 3) {
       });
     }
 
-// ===== LAYER 5: BODY IMG TAGS (LAST RESORT) =====
-// Only if we still have fewer than 2 images AND we should continue
-if (shouldContinueToFallbacks && imageUrls.length < 2) {
-      console.log('🔍 Layer 5: Checking body <img> tags (last resort)...');
-      const bodyImages = doc.querySelectorAll('img');
-      
-      for (const img of bodyImages) {
-        const src = img.getAttribute('src');
-        if (!src) continue;
-        
-        // Skip tiny images, icons, SVGs, tracking pixels
-        const width = parseInt(img.getAttribute('width') || '0');
-        const height = parseInt(img.getAttribute('height') || '0');
-        const alt = img.getAttribute('alt') || '';
-        const className = img.getAttribute('class') || '';
-        
-        // Quality filters
-        const isTiny = (width > 0 && width < 200) || (height > 0 && height < 200);
-        const isIcon = src.includes('icon') || src.includes('logo') || alt.toLowerCase().includes('icon') || className.includes('icon');
-        const isSvg = src.endsWith('.svg');
-        const isTracking = src.includes('pixel') || src.includes('track') || src.includes('analytics');
-        
-        if (!isTiny && !isIcon && !isSvg && !isTracking) {
-          if (width > 200 || height > 200 || (!width && !height)) {
-            addImage(src, 'Body Image');
-            if (imageUrls.length >= 10) break;
-          }
-        }
-      }
-    }
-
-    // ===== HASHED-FILENAME FALLBACK =====
-    // If all images were filtered out due to hashed filenames (no keyword matches)
-    // but we DID find gallery images, keep the first few as fallback
-    if (imageUrls.length === 0 && collectedGalleryImages && collectedGalleryImages.size > 0) {
-      console.warn('⚠️ No keyword matches found (likely hashed CDN filenames) – using gallery images as fallback');
-      
-      // Take up to 5 images from gallery, prioritized by selector rank
-      const fallbackImages = Array.from(collectedGalleryImages.values())
-        .sort((a, b) => a.priority - b.priority) // Higher priority selectors first
-        .slice(0, 5);
-      
-      fallbackImages.forEach(({ url }) => {
-        addImage(url, 'Gallery Fallback');
-      });
-      
-      console.log(`✅ Added ${fallbackImages.length} gallery images as fallback`);
-    }
+// Layer 5 body scan removed - prevents noise from unrelated product images
 
     // ===== NORMALIZE ALL URLS TO ABSOLUTE =====
     const normalizedImages: string[] = [];
