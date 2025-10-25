@@ -7,6 +7,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const DEBUG = false; // ✅ Global debug toggle - set to true for verbose logs
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -57,6 +59,15 @@ serve(async (req) => {
     
     // Check if this domain always needs ScraperAPI
     const shouldSkipDirectFetch = alwaysUseScraper.some(domain => hostname.includes(domain));
+    
+    if (shouldSkipDirectFetch) {
+      blockedReason = 'Known problematic domain';
+      fetchMethod = 'scraper-api';
+      console.log(`ℹ️ Skipping direct fetch for ${hostname}, proceeding to ScraperAPI fallback.`);
+      shouldUseScraper = true;
+    } else {
+      console.log(`🔄 Attempting direct fetch for ${hostname}...`);
+    }
     
     // ===== TIER 1: DIRECT FETCH (TRY FIRST) =====
 
@@ -481,22 +492,59 @@ serve(async (req) => {
 
   // ===== LAYER 2: E-COMMERCE GALLERY SELECTORS (HIGH PRIORITY) =====
     console.log('🖼️ Layer 2: Checking product gallery selectors...');
+    
+    // ===== FIND PRODUCT CONTAINER FIRST =====
+    const productContainer = doc.querySelector('[itemtype*="schema.org/Product"]') ||
+                             doc.querySelector('[data-product-id]') ||
+                             doc.querySelector('.product-single') ||
+                             doc.querySelector('.product-detail') ||
+                             doc.querySelector('main');
+
+    if (productContainer) {
+      console.log('✅ Found product container, scanning images within it only');
+    } else if (DEBUG) {
+      console.warn('⚠️ No product container found, using page-wide scan');
+    }
+
+    // ===== EXCLUSION SELECTORS =====
+    const excludeSelectors = [
+      '[class*="recommended"]',
+      '[class*="related-products"]',
+      '[class*="cross-sell"]',
+      '[class*="upsell"]',
+      '[data-section-type="collection"]',
+      '[class*="product-recommendations"]',
+      '[class*="complementary"]'
+    ];
+
+    // ===== REFINED GALLERY SELECTORS (PRIORITY ORDER) =====
     const gallerySelectors = [
-      // Goodreads book covers (HIGH PRIORITY for books)
+      // PRIORITY 1: Goodreads book covers (HIGH PRIORITY for books)
       '[class*="BookCover"] img',
       '[class*="book-cover"] img',
       '.ResponsiveImage img',
       '[aria-label*="Book cover"] img',
       
-      // E-commerce product galleries
-      '[class*="product-gallery"] img',
-      '[class*="ProductGallery"] img',
+      // PRIORITY 2: Shopify/WooCommerce specific
+      '.product__media-list img',
+      '.product-single__photo img',
+      '#ProductPhotos img',
+      '.woocommerce-product-gallery img',
+      
+      // PRIORITY 3: Product-specific containers only
+      '[class*="product-gallery"]:not([class*="recommend"]) img',
+      '[class*="ProductGallery"]:not([class*="Related"]) img',
+      '[data-product-images] img',
       '[class*="product-images"] img',
       '[class*="product__media"] img',
       '[class*="product-media"] img',
-      '[class*="swiper-slide"] img',
-      '[class*="carousel"] img',
-      '[class*="thumbnail"] img',
+      
+      // PRIORITY 4: Swiper ONLY in product context
+      '.product [class*="swiper-slide"] img',
+      '[data-product-gallery] [class*="swiper"] img',
+      '[class*="product"] [class*="carousel"] img',
+      
+      // PRIORITY 5: Generic fallback
       '[data-gallery-image]',
       '[data-product-image]',
       '[class*="ImageGallery"] img',
@@ -505,19 +553,72 @@ serve(async (req) => {
       '.gallery img',
       '#product-photos img',
       '[id*="product-gallery"] img',
-      '[id*="ProductGallery"] img'
+      '[id*="ProductGallery"] img',
+      '[class*="thumbnail"] img'
     ];
 
-    for (const selector of gallerySelectors) {
-      const galleryImages = doc.querySelectorAll(selector);
-      if (galleryImages.length > 0) {
-        console.log(`Found ${galleryImages.length} images with selector: ${selector}`);
-        galleryImages.forEach(img => {
-          const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
-      if (src) addImage(src, `Gallery (${selector})`);
+    // ===== BATCH COLLECTION WITH EARLY EXIT =====
+    const collectedGalleryImages = new Map<string, { url: string; source: string; priority: number }>();
+    let foundMainGallery = false;
+    const seenFilenames = new Set<string>();
+
+    for (let i = 0; i < gallerySelectors.length; i++) {
+      const selector = gallerySelectors[i];
+      const priority = i; // Lower index = higher priority
+      
+      // Scope selector to product container if found
+      const scopedSelector = productContainer 
+        ? productContainer.querySelectorAll(selector)
+        : doc.querySelectorAll(selector);
+      
+      if (DEBUG && scopedSelector.length > 0) {
+        console.log(`Checking selector [${i}]: ${selector} (${scopedSelector.length} matches)`);
+      }
+      
+      scopedSelector.forEach(img => {
+        // Check if image is in excluded section
+        const isExcluded = excludeSelectors.some(excludeSelector => {
+          const parent = img.closest(excludeSelector);
+          return parent !== null;
+        });
+        
+        if (isExcluded) {
+          if (DEBUG) console.log(`⏭️ Skipping excluded: ${img.getAttribute('src')}`);
+          return;
+        }
+        
+        const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
+        if (!src) return;
+        
+        const filename = getImageFilename(src);
+        
+        if (!seenFilenames.has(filename)) {
+          seenFilenames.add(filename);
+          collectedGalleryImages.set(src, { url: src, source: selector, priority });
+        } else if (DEBUG) {
+          console.log(`⏭️ Skipping duplicate filename: ${filename}`);
+        }
+      });
+      
+      // Early exit if we found main gallery (priority 0-5 selectors with 3+ images)
+      if (i <= 5 && collectedGalleryImages.size >= 3) {
+        console.log(`✅ Found main product gallery with ${collectedGalleryImages.size} images using high-priority selectors`);
+        foundMainGallery = true;
+        break;
+      }
+    }
+
+    if (!foundMainGallery && collectedGalleryImages.size > 0 && DEBUG) {
+      console.log(`⚠️ Main gallery not found with high-priority selectors, used ${collectedGalleryImages.size} images from fallback selectors`);
+    }
+
+    // Log collected images (batch, not per-image)
+    console.log(`📸 Collected ${collectedGalleryImages.size} unique images from gallery selectors`);
+
+    // Add images to extraction
+    collectedGalleryImages.forEach(({ url }) => {
+      addImage(url, 'Gallery');
     });
-  }
-}
 
 layer2Count = imageUrls.length - layer1Count;
 console.log(`🖼️ Layer 2 found: ${layer2Count} images`);
@@ -646,6 +747,24 @@ if (shouldContinueToFallbacks && imageUrls.length < 2) {
           }
         }
       }
+    }
+
+    // ===== HASHED-FILENAME FALLBACK =====
+    // If all images were filtered out due to hashed filenames (no keyword matches)
+    // but we DID find gallery images, keep the first few as fallback
+    if (imageUrls.length === 0 && collectedGalleryImages && collectedGalleryImages.size > 0) {
+      console.warn('⚠️ No keyword matches found (likely hashed CDN filenames) – using gallery images as fallback');
+      
+      // Take up to 5 images from gallery, prioritized by selector rank
+      const fallbackImages = Array.from(collectedGalleryImages.values())
+        .sort((a, b) => a.priority - b.priority) // Higher priority selectors first
+        .slice(0, 5);
+      
+      fallbackImages.forEach(({ url }) => {
+        addImage(url, 'Gallery Fallback');
+      });
+      
+      console.log(`✅ Added ${fallbackImages.length} gallery images as fallback`);
     }
 
     // ===== NORMALIZE ALL URLS TO ABSOLUTE =====
