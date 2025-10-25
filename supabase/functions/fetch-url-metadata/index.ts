@@ -560,7 +560,6 @@ serve(async (req) => {
     // ===== BATCH COLLECTION WITH EARLY EXIT =====
     const collectedGalleryImages = new Map<string, { url: string; source: string; priority: number }>();
     let foundMainGallery = false;
-    const seenFilenames = new Set<string>();
 
     for (let i = 0; i < gallerySelectors.length; i++) {
       const selector = gallerySelectors[i];
