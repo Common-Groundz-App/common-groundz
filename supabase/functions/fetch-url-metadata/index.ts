@@ -186,6 +186,25 @@ serve(async (req) => {
           
           if (html.length >= 300) {
             console.log(`✅ ScraperAPI static succeeded (${html.length} bytes)`);
+            
+            // Detect incomplete Swiper galleries (Shopify/Cosmix/modern e-commerce)
+            const hasSwiperStructure = html.includes('swiper-slide') || 
+                                       html.includes('product-thumbs-wrapper') ||
+                                       html.includes('data-section-type="product"');
+            
+            if (hasSwiperStructure) {
+              const visibleImages = (html.match(/<img[^>]+src=/gi) || []).length;
+              const swiperSlides = (html.match(/swiper-slide/g) || []).length;
+              
+              // If Swiper detected but images don't match slides, trigger JS render
+              if (visibleImages < 5 || swiperSlides > visibleImages + 2) {
+                console.warn(`⚠️ Swiper detected (${swiperSlides} slides) but only ${visibleImages} images — incomplete HTML`);
+                throw new Error('Swiper gallery incomplete - need JS render');
+              }
+              
+              console.log(`✅ Swiper detected: ${swiperSlides} slides, ${visibleImages} images — HTML looks complete`);
+            }
+            
             console.log(`💰 ScraperAPI credit used (static, 1 credit) for: ${url}`);
             scraperSuccess = true;
           }
@@ -457,9 +476,22 @@ serve(async (req) => {
         if (baseFilename) seenFilenames.add(baseFilename);
       }
       
-      // Domain filter
-      if (!isSameDomainOrCDN(imgUrl)) {
-        if (DEBUG) console.log(`⚠️ Skipping external domain: ${imgUrl} from ${source}`);
+      // Domain filter - accept same-host or known CDNs
+      try {
+        // Handle relative URLs
+        const absoluteUrl = imgUrl.startsWith('http') ? imgUrl : new URL(imgUrl, url).href;
+        const imgHost = new URL(absoluteUrl).hostname;
+        const pageHost = new URL(url).hostname;
+        
+        // Accept if:
+        // 1. Same hostname (e.g., cosmix.in/cdn/... and cosmix.in/products/...)
+        // 2. Known CDN (checked by isSameDomainOrCDN)
+        if (imgHost !== pageHost && !isSameDomainOrCDN(absoluteUrl)) {
+          if (DEBUG) console.log(`⚠️ Skipping external domain: ${imgHost} (page: ${pageHost}) from ${source}`);
+          return false;
+        }
+      } catch (e) {
+        console.warn(`⚠️ Failed to parse image URL: ${imgUrl}`, e);
         return false;
       }
       
@@ -657,6 +689,15 @@ serve(async (req) => {
 
     // Log collected images (batch, not per-image)
     console.log(`📸 Collected ${collectedGalleryImages.size} unique images from gallery selectors`);
+    
+    // Enhanced debug logging for gallery extraction
+    if (DEBUG && productContainer) {
+      console.log(`🔍 Gallery extraction debug:`);
+      console.log(`  - Container: ${productContainer.className || 'main'}`);
+      console.log(`  - Swiper slides found: ${productContainer.querySelectorAll('.swiper-slide').length || 0}`);
+      console.log(`  - Images in slides: ${productContainer.querySelectorAll('.swiper-slide img').length || 0}`);
+      console.log(`  - Collected URLs: ${collectedGalleryImages.size}`);
+    }
 
     // Add top 7 gallery images sorted by priority
     const topGalleryImages = Array.from(collectedGalleryImages.values())
