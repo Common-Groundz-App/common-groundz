@@ -443,16 +443,8 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           return imgUrl;
         }
         
-        // Fix protocol-relative URLs (//domain.com/path → https://domain.com/path)
-        let normalizedUrl = imgUrl;
-        if (normalizedUrl.startsWith('//')) {
-          normalizedUrl = 'https:' + normalizedUrl;
-          if (DEBUG) {
-            console.log(`🔧 Fixed protocol-relative URL: //${normalizedUrl.slice(8, 40)}...`);
-          }
-        }
-        
-        const urlObj = new URL(normalizedUrl);
+        // Protocol-relative URLs already fixed by normalizeImageUrl()
+        const urlObj = new URL(imgUrl);
         const searchParams = urlObj.searchParams;
         
         // Remove size-limiting parameters
@@ -466,13 +458,13 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         // Reconstruct URL (keeps 'v=' version parameter for cache busting)
         urlObj.search = searchParams.toString();
         
-        const finalUrl = urlObj.toString();
+        const normalizedUrl = urlObj.toString();
         
-        if (DEBUG && imgUrl !== finalUrl) {
+        if (DEBUG && imgUrl !== normalizedUrl) {
           console.log(`🔧 Normalized Shopify URL: ${imgUrl.split('?')[0].slice(-40)}... → width=${targetWidth}`);
         }
         
-        return finalUrl;
+        return normalizedUrl;
       } catch (e) {
         console.warn(`⚠️ Failed to normalize Shopify URL: ${imgUrl}`, e);
         return imgUrl; // Return original if normalization fails
@@ -481,12 +473,37 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
 
     /**
      * Normalize e-commerce image URLs for better quality
-     * Currently supports: Shopify
+     * Currently supports: Shopify, Tira Beauty
      */
     const normalizeImageUrl = (imgUrl: string): string => {
+      // Fix protocol-relative URLs universally (//domain.com → https://domain.com)
+      // This handles Shopify, Tira, Nykaa, Myntra, and any future CDN
+      if (imgUrl.startsWith('//')) {
+        imgUrl = 'https:' + imgUrl;
+        if (DEBUG) {
+          console.log(`🔧 Fixed protocol-relative URL globally: //${imgUrl.slice(8, 40)}...`);
+        }
+      }
+      
       // Shopify CDN normalization
       if (imgUrl.includes('cdn.shopify.com') || imgUrl.includes('/cdn/shop/')) {
         return normalizeShopifyImageUrl(imgUrl, 1920);
+      }
+      
+      // Tira Beauty CDN normalization (remove dpr parameter for higher quality)
+      if (imgUrl.includes('cdn.tirabeauty.com')) {
+        try {
+          const urlObj = new URL(imgUrl);
+          // Tira uses ?dpr=1 or ?dpr=2 - remove to get original quality
+          urlObj.searchParams.delete('dpr');
+          const normalized = urlObj.toString();
+          if (DEBUG && imgUrl !== normalized) {
+            console.log(`🔧 Normalized Tira URL: removed dpr parameter`);
+          }
+          return normalized;
+        } catch (e) {
+          console.warn(`⚠️ Failed to normalize Tira URL: ${imgUrl}`, e);
+        }
       }
       
       // Future: Add support for other platforms
@@ -640,6 +657,12 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       '[class*="product"] img[data-src]',                 // Product container with data-src
       '[class*="gallery"] img[data-src]',                 // Gallery container with data-src
       
+      // PRIORITY 0.5: Lazy-loaded image selectors (Tira, Nykaa, etc.)
+      'img.lazyload[data-src]',                           // LazyLoad.js pattern
+      'img.product-detail-image[data-src]',               // Tira Beauty main image
+      '.product-image-images img[data-src]',              // Tira Beauty image container
+      'img[src^="data:image"][data-src]',                 // Images with placeholder + data-src
+      
       // PRIORITY 1: Goodreads book covers (HIGH PRIORITY for books)
       '[class*="BookCover"] img',
       '[class*="book-cover"] img',
@@ -731,13 +754,14 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           return;
         }
         
-        let src = img.getAttribute('src') ||
-                     img.getAttribute('data-src') ||
+        // Prioritize data-* attributes over src (for lazy-loaded images)
+        let src = img.getAttribute('data-src') ||
                      img.getAttribute('data-lazy-src') ||
                      img.getAttribute('data-image') ||
                      // Extract first URL from srcset (responsive images)
                      img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
-                     img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0];
+                     img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                     img.getAttribute('src');  // src is now LAST (fallback only)
         if (!src) return;
         
         // Normalize URL for better quality (Shopify/e-commerce CDNs)
@@ -780,12 +804,13 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           const isExcluded = excludeSelectors.some(ex => img.closest(ex) !== null);
           if (isExcluded) return;
           
-          let src = img.getAttribute('src') ||
-                       img.getAttribute('data-src') ||
+          // Prioritize data-* attributes over src (for lazy-loaded images)
+          let src = img.getAttribute('data-src') ||
                        img.getAttribute('data-lazy-src') ||
                        img.getAttribute('data-image') ||
                        img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
-                       img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0];
+                       img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                       img.getAttribute('src');  // src is now LAST (fallback only)
           
           if (!src) return;
           
