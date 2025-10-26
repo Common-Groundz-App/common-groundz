@@ -443,7 +443,16 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           return imgUrl;
         }
         
-        const urlObj = new URL(imgUrl);
+        // Fix protocol-relative URLs (//domain.com/path → https://domain.com/path)
+        let normalizedUrl = imgUrl;
+        if (normalizedUrl.startsWith('//')) {
+          normalizedUrl = 'https:' + normalizedUrl;
+          if (DEBUG) {
+            console.log(`🔧 Fixed protocol-relative URL: //${normalizedUrl.slice(8, 40)}...`);
+          }
+        }
+        
+        const urlObj = new URL(normalizedUrl);
         const searchParams = urlObj.searchParams;
         
         // Remove size-limiting parameters
@@ -457,13 +466,13 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         // Reconstruct URL (keeps 'v=' version parameter for cache busting)
         urlObj.search = searchParams.toString();
         
-        const normalizedUrl = urlObj.toString();
+        const finalUrl = urlObj.toString();
         
-        if (DEBUG && imgUrl !== normalizedUrl) {
+        if (DEBUG && imgUrl !== finalUrl) {
           console.log(`🔧 Normalized Shopify URL: ${imgUrl.split('?')[0].slice(-40)}... → width=${targetWidth}`);
         }
         
-        return normalizedUrl;
+        return finalUrl;
       } catch (e) {
         console.warn(`⚠️ Failed to normalize Shopify URL: ${imgUrl}`, e);
         return imgUrl; // Return original if normalization fails
