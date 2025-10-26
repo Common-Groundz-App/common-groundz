@@ -9,17 +9,15 @@ const corsHeaders = {
 
 const DEBUG = false; // ✅ Global debug toggle - set to true for verbose logs
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+// Main metadata extraction function - supports recursive retry
+const extractMetadata = async (url: string, stage: number = 0, forceJsRender: boolean = false): Promise<Response> => {
+  // Prevent infinite retry loops
+  if (stage > 1) {
+    console.warn(`⚠️ Stage ${stage} exceeded retry limit, using current results`);
+    // Will continue with normal processing
   }
 
-  let url: string = ''; // ✅ Declare outside try block for proper scoping
-
   try {
-    const body = await req.json();
-    url = body.url; // ✅ Assign after declaration
     
     if (!url) {
       return new Response(
@@ -33,7 +31,7 @@ serve(async (req) => {
     let blockedReason: string | null = null;
     let httpStatus: number | undefined = undefined;
     let html: string = '';
-    let shouldUseScraper = false;
+    let shouldUseScraper = forceJsRender; // Force scraper if this is a retry
 
     // Array of real browser User-Agents for anti-bot evasion
     const userAgents = [
@@ -58,15 +56,15 @@ serve(async (req) => {
     ];
     
     // Check if this domain always needs ScraperAPI
-    const shouldSkipDirectFetch = alwaysUseScraper.some(domain => hostname.includes(domain));
+    const shouldSkipDirectFetch = alwaysUseScraper.some(domain => hostname.includes(domain)) || forceJsRender;
     
     if (shouldSkipDirectFetch) {
-      blockedReason = 'Known problematic domain';
+      blockedReason = forceJsRender ? 'Retry with JS render' : 'Known problematic domain';
       fetchMethod = 'scraper-api';
-      console.log(`ℹ️ Skipping direct fetch for ${hostname}, proceeding to ScraperAPI fallback.`);
+      console.log(`ℹ️ ${forceJsRender ? 'Forcing JS render for retry' : `Skipping direct fetch for ${hostname}`}, proceeding to ScraperAPI.`);
       shouldUseScraper = true;
     } else {
-      console.log(`🔄 Attempting direct fetch for ${hostname}...`);
+      console.log(`🔄 Stage ${stage}: Attempting direct fetch for ${hostname}...`);
     }
     
     // ===== TIER 1: DIRECT FETCH (TRY FIRST) =====
@@ -162,8 +160,15 @@ serve(async (req) => {
       fetchMethod = 'scraper-api';
       let scraperSuccess = false;
       
-      // STAGE 1: Try static scraping first (faster, cheaper)
+      // STAGE 1: Try static scraping first (faster, cheaper) - unless forcing JS render
       try {
+        const shouldForceJsNow = forceJsRender || stage > 0;
+        
+        if (shouldForceJsNow) {
+          console.log(`📥 Forcing JS render (stage ${stage})...`);
+          throw new Error('Skip static, go straight to JS render');
+        }
+        
         console.log('📥 Stage 1: ScraperAPI static mode (premium)...');
         
         const hostname = new URL(url).hostname;
@@ -186,25 +191,6 @@ serve(async (req) => {
           
           if (html.length >= 300) {
             console.log(`✅ ScraperAPI static succeeded (${html.length} bytes)`);
-            
-            // Detect incomplete Swiper galleries (Shopify/Cosmix/modern e-commerce)
-            const hasSwiperStructure = html.includes('swiper-slide') || 
-                                       html.includes('product-thumbs-wrapper') ||
-                                       html.includes('data-section-type="product"');
-            
-            if (hasSwiperStructure) {
-              const visibleImages = (html.match(/<img[^>]+src=/gi) || []).length;
-              const swiperSlides = (html.match(/swiper-slide/g) || []).length;
-              
-              // If Swiper detected but images don't match slides, trigger JS render
-              if (visibleImages < 5 || swiperSlides > visibleImages + 2) {
-                console.warn(`⚠️ Swiper detected (${swiperSlides} slides) but only ${visibleImages} images — incomplete HTML`);
-                throw new Error('Swiper gallery incomplete - need JS render');
-              }
-              
-              console.log(`✅ Swiper detected: ${swiperSlides} slides, ${visibleImages} images — HTML looks complete`);
-            }
-            
             console.log(`💰 ScraperAPI credit used (static, 1 credit) for: ${url}`);
             scraperSuccess = true;
           }
@@ -691,12 +677,22 @@ serve(async (req) => {
     console.log(`📸 Collected ${collectedGalleryImages.size} unique images from gallery selectors`);
     
     // Enhanced debug logging for gallery extraction
-    if (DEBUG && productContainer) {
-      console.log(`🔍 Gallery extraction debug:`);
-      console.log(`  - Container: ${productContainer.className || 'main'}`);
-      console.log(`  - Swiper slides found: ${productContainer.querySelectorAll('.swiper-slide').length || 0}`);
-      console.log(`  - Images in slides: ${productContainer.querySelectorAll('.swiper-slide img').length || 0}`);
-      console.log(`  - Collected URLs: ${collectedGalleryImages.size}`);
+    if (productContainer) {
+      const swiperSlides = productContainer.querySelectorAll('.swiper-slide');
+      const imagesInSlides = productContainer.querySelectorAll('.swiper-slide img');
+      
+      if (DEBUG) {
+        console.log(`🔍 Gallery extraction debug:`);
+        console.log(`  - Container: ${productContainer.className || 'main'}`);
+        console.log(`  - Swiper slides found: ${swiperSlides.length || 0}`);
+        console.log(`  - Images in slides: ${imagesInSlides.length || 0}`);
+        console.log(`  - Collected URLs: ${collectedGalleryImages.size}`);
+      }
+      
+      // Warn if Swiper exists but no images collected
+      if (swiperSlides.length > 0 && collectedGalleryImages.size === 0) {
+        console.warn(`⚠️ Swiper structure detected (${swiperSlides.length} slides) but no images collected — HTML may be incomplete`);
+      }
     }
 
     // Add top 7 gallery images sorted by priority
@@ -836,6 +832,33 @@ if (shouldContinueToFallbacks && imageUrls.length < 3) {
       imageCount: normalizedImages.length
     });
 
+    // --- RESULT-BASED JS RENDER FALLBACK ---
+    // Check if we should retry with JS rendering based on actual results
+    const hasSwiperStructure = html.includes('swiper-slide') || 
+                               html.includes('product-thumbs-wrapper') ||
+                               html.includes('data-section-type="product"');
+    
+    const extractedImageCount = normalizedImages.length;
+    
+    // Only retry if:
+    // 1. This is the first attempt (stage === 0)
+    // 2. Swiper/dynamic structure detected
+    // 3. We got very few images (< 3)
+    // 4. It's an e-commerce page
+    if (stage === 0 && hasSwiperStructure && extractedImageCount < 3 && isEcommercePage) {
+      console.warn(`⚠️ Only ${extractedImageCount} images extracted from e-commerce page with Swiper structure`);
+      console.log(`🔄 Retrying with JS render to load dynamic gallery...`);
+      
+      try {
+        // Recursive call with stage=1 and forceJsRender=true
+        return await extractMetadata(url, 1, true);
+      } catch (retryError) {
+        console.error(`❌ JS render retry failed:`, retryError);
+        // Fall through to return current results
+        console.log(`⚠️ Using partial results from static fetch (${extractedImageCount} images)`);
+      }
+    }
+
     return new Response(
       JSON.stringify(metadata),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -864,6 +887,35 @@ if (shouldContinueToFallbacks && imageUrls.length < 3) {
         partialExtraction: true
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } } // 200, not 500
+    );
+  }
+};
+
+// Serve function that handles the request
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body = await req.json();
+    const url = body.url;
+    
+    if (!url) {
+      return new Response(
+        JSON.stringify({ error: 'URL is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Call the extraction function (starts at stage 0)
+    return await extractMetadata(url, 0, false);
+  } catch (error) {
+    console.error('❌ Request handling error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Invalid request', details: error.message }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
