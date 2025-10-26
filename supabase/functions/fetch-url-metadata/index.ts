@@ -432,6 +432,61 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       }
     };
 
+    /**
+     * Normalize Shopify CDN image URLs to request high-resolution versions
+     * Strips size/crop parameters and replaces with targetWidth
+     */
+    const normalizeShopifyImageUrl = (imgUrl: string, targetWidth: number = 1920): string => {
+      try {
+        // Only process Shopify CDN URLs
+        if (!imgUrl.includes('cdn.shopify.com') && !imgUrl.includes('/cdn/shop/')) {
+          return imgUrl;
+        }
+        
+        const urlObj = new URL(imgUrl);
+        const searchParams = urlObj.searchParams;
+        
+        // Remove size-limiting parameters
+        searchParams.delete('width');
+        searchParams.delete('height');
+        searchParams.delete('crop');
+        
+        // Add high-resolution width
+        searchParams.set('width', targetWidth.toString());
+        
+        // Reconstruct URL (keeps 'v=' version parameter for cache busting)
+        urlObj.search = searchParams.toString();
+        
+        const normalizedUrl = urlObj.toString();
+        
+        if (DEBUG && imgUrl !== normalizedUrl) {
+          console.log(`🔧 Normalized Shopify URL: ${imgUrl.split('?')[0].slice(-40)}... → width=${targetWidth}`);
+        }
+        
+        return normalizedUrl;
+      } catch (e) {
+        console.warn(`⚠️ Failed to normalize Shopify URL: ${imgUrl}`, e);
+        return imgUrl; // Return original if normalization fails
+      }
+    };
+
+    /**
+     * Normalize e-commerce image URLs for better quality
+     * Currently supports: Shopify
+     */
+    const normalizeImageUrl = (imgUrl: string): string => {
+      // Shopify CDN normalization
+      if (imgUrl.includes('cdn.shopify.com') || imgUrl.includes('/cdn/shop/')) {
+        return normalizeShopifyImageUrl(imgUrl, 1920);
+      }
+      
+      // Future: Add support for other platforms
+      // if (imgUrl.includes('images-na.ssl-images-amazon.com')) { ... }
+      // if (imgUrl.includes('images-static.nykaa.com')) { ... }
+      
+      return imgUrl;
+    };
+
     // Helper: Add image with duplicate checking
     const addImage = (imgUrl: string, source: string): boolean => {
       // Check exact URL duplication first
@@ -499,7 +554,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
             const productImages = Array.isArray(item.image) ? item.image : [item.image];
             productImages.forEach(img => {
               const imgUrl = typeof img === 'string' ? img : img.url || img.contentUrl;
-              if (imgUrl) addImage(imgUrl, 'JSON-LD Product');
+              if (imgUrl) addImage(normalizeImageUrl(imgUrl), 'JSON-LD Product');
             });
           }
           
@@ -667,7 +722,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           return;
         }
         
-        const src = img.getAttribute('src') ||
+        let src = img.getAttribute('src') ||
                      img.getAttribute('data-src') ||
                      img.getAttribute('data-lazy-src') ||
                      img.getAttribute('data-image') ||
@@ -676,11 +731,14 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
                      img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0];
         if (!src) return;
         
-        const filename = getImageFilename(src);
+        // Normalize URL for better quality (Shopify/e-commerce CDNs)
+        const normalizedSrc = normalizeImageUrl(src);
+        
+        const filename = getImageFilename(normalizedSrc);
         
         if (!seenFilenames.has(filename)) {
           seenFilenames.add(filename);
-          collectedGalleryImages.set(src, { url: src, source: selector, priority });
+          collectedGalleryImages.set(normalizedSrc, { url: normalizedSrc, source: selector, priority });
         } else if (DEBUG) {
           console.log(`⏭️ Skipping duplicate filename: ${filename}`);
         }
@@ -713,7 +771,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           const isExcluded = excludeSelectors.some(ex => img.closest(ex) !== null);
           if (isExcluded) return;
           
-          const src = img.getAttribute('src') ||
+          let src = img.getAttribute('src') ||
                        img.getAttribute('data-src') ||
                        img.getAttribute('data-lazy-src') ||
                        img.getAttribute('data-image') ||
@@ -722,11 +780,14 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           
           if (!src) return;
           
-          const filename = getImageFilename(src);
+          // Normalize URL for better quality (Shopify/e-commerce CDNs)
+          const normalizedSrc = normalizeImageUrl(src);
+          
+          const filename = getImageFilename(normalizedSrc);
           
           if (!seenFilenames.has(filename)) {
             seenFilenames.add(filename);
-            collectedGalleryImages.set(src, { url: src, source: `${selector} (full doc)`, priority: i });
+            collectedGalleryImages.set(normalizedSrc, { url: normalizedSrc, source: `${selector} (full doc)`, priority: i });
           }
         });
         
