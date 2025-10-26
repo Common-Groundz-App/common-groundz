@@ -568,6 +568,14 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
 
     // ===== REFINED GALLERY SELECTORS (PRIORITY ORDER) =====
     const gallerySelectors = [
+      // PRIORITY 0: Broad attribute-based selectors (for JS-rendered galleries)
+      'img[data-src^="https://cosmix.in/cdn/shop"]',     // Cosmix CDN images with data-src
+      'img[data-src^="http"]',                            // Any external image with data-src
+      'img[data-srcset]',                                 // Responsive images
+      'img[data-lazy-src]',                               // Lazy-loaded images
+      '[class*="product"] img[data-src]',                 // Product container with data-src
+      '[class*="gallery"] img[data-src]',                 // Gallery container with data-src
+      
       // PRIORITY 1: Goodreads book covers (HIGH PRIORITY for books)
       '[class*="BookCover"] img',
       '[class*="book-cover"] img',
@@ -616,6 +624,23 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     // ===== BATCH COLLECTION WITH EARLY EXIT =====
     const collectedGalleryImages = new Map<string, { url: string; source: string; priority: number }>();
     let foundMainGallery = false;
+
+    // DEBUG: Log HTML structure for troubleshooting
+    if (DEBUG && productContainer) {
+      console.log(`🔍 Pre-extraction debug:`);
+      console.log(`  - Product container found: ${productContainer.tagName}.${productContainer.className}`);
+      console.log(`  - Total <img> tags in container: ${productContainer.querySelectorAll('img').length}`);
+      console.log(`  - Images with [data-src]: ${productContainer.querySelectorAll('img[data-src]').length}`);
+      console.log(`  - Images with [src]: ${productContainer.querySelectorAll('img[src]').length}`);
+      console.log(`  - Swiper slides: ${productContainer.querySelectorAll('.swiper-slide').length}`);
+      console.log(`  - Images in swiper slides: ${productContainer.querySelectorAll('.swiper-slide img').length}`);
+      
+      // Sample first 3 images for inspection
+      const sampleImages = Array.from(productContainer.querySelectorAll('img')).slice(0, 3);
+      sampleImages.forEach((img, idx) => {
+        console.log(`  - Sample img[${idx}]: src="${img.getAttribute('src')}" data-src="${img.getAttribute('data-src')}" class="${img.className}"`);
+      });
+    }
 
     for (let i = 0; i < gallerySelectors.length; i++) {
       const selector = gallerySelectors[i];
@@ -671,6 +696,46 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
 
     if (!foundMainGallery && collectedGalleryImages.size > 0 && DEBUG) {
       console.log(`⚠️ Main gallery not found with high-priority selectors, used ${collectedGalleryImages.size} images from fallback selectors`);
+    }
+
+    // FALLBACK: If scoped search found nothing, retry without container restriction
+    if (collectedGalleryImages.size === 0 && productContainer) {
+      console.warn(`⚠️ No images found in scoped search, retrying without container restriction...`);
+      
+      // Retry top priority selectors on full document
+      const retrySelectors = gallerySelectors.slice(0, 15); // Top 15 selectors only
+      
+      retrySelectors.forEach((selector, i) => {
+        const imgs = doc.querySelectorAll(selector);
+        
+        imgs.forEach(img => {
+          // Check exclusions
+          const isExcluded = excludeSelectors.some(ex => img.closest(ex) !== null);
+          if (isExcluded) return;
+          
+          const src = img.getAttribute('src') ||
+                       img.getAttribute('data-src') ||
+                       img.getAttribute('data-lazy-src') ||
+                       img.getAttribute('data-image') ||
+                       img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                       img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0];
+          
+          if (!src) return;
+          
+          const filename = getImageFilename(src);
+          
+          if (!seenFilenames.has(filename)) {
+            seenFilenames.add(filename);
+            collectedGalleryImages.set(src, { url: src, source: `${selector} (full doc)`, priority: i });
+          }
+        });
+        
+        // Early exit if we found enough
+        if (collectedGalleryImages.size >= 5) {
+          console.log(`✅ Full document search found ${collectedGalleryImages.size} images`);
+          return;
+        }
+      });
     }
 
     // Log collected images (batch, not per-image)
