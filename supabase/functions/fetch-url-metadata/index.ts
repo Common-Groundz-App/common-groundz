@@ -429,24 +429,42 @@ serve(async (req) => {
 
     // Helper: Add image with duplicate checking
     const addImage = (imgUrl: string, source: string): boolean => {
-      if (!imgUrl || seenUrls.has(imgUrl)) return false;
-      
-      // Check filename duplication
-      const filename = getImageFilename(imgUrl);
-      if (filename && seenFilenames.has(filename)) {
-        console.log(`⚠️ Skipping duplicate filename: ${filename} from ${source}`);
+      // Check exact URL duplication first
+      if (!imgUrl || seenUrls.has(imgUrl)) {
+        if (DEBUG) console.log(`⏭️ Skipping exact URL duplicate: ${imgUrl}`);
         return false;
+      }
+      
+      // Check duplicates by origin + filename (strip query params for CDN variants)
+      const filename = getImageFilename(imgUrl);
+      try {
+        // Strip query parameters (e.g., ?v=123, ?width=800) for smarter deduplication
+        const baseFilename = filename.split('?')[0];
+        const normalizedKey = `${new URL(imgUrl, url).origin}/${baseFilename}`;
+        
+        if (seenFilenames.has(normalizedKey)) {
+          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${baseFilename} (${normalizedKey}) from ${source}`);
+          return false;
+        }
+        seenFilenames.add(normalizedKey);
+      } catch (e) {
+        // If URL parsing fails, fall back to filename-only check
+        const baseFilename = filename.split('?')[0];
+        if (baseFilename && seenFilenames.has(baseFilename)) {
+          if (DEBUG) console.log(`⏭️ Skipping duplicate filename: ${baseFilename} from ${source}`);
+          return false;
+        }
+        if (baseFilename) seenFilenames.add(baseFilename);
       }
       
       // Domain filter
       if (!isSameDomainOrCDN(imgUrl)) {
-        console.log(`⚠️ Skipping external domain: ${imgUrl} from ${source}`);
+        if (DEBUG) console.log(`⚠️ Skipping external domain: ${imgUrl} from ${source}`);
         return false;
       }
       
       imageUrls.push(imgUrl);
       seenUrls.add(imgUrl);
-      if (filename) seenFilenames.add(filename);
       console.log(`✅ Added from ${source}: ${imgUrl}`);
       return true;
     };
