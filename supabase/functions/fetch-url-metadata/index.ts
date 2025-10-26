@@ -516,6 +516,9 @@ serve(async (req) => {
                              doc.querySelector('[data-product-id]') ||
                              doc.querySelector('.product-single') ||
                              doc.querySelector('.product-detail') ||
+                             doc.querySelector('[class*="product-main"]') ||
+                             doc.querySelector('[data-section-type="product"]') ||
+                             doc.querySelector('[class*="product-view"]') ||
                              doc.querySelector('main');
 
     if (productContainer) {
@@ -538,7 +541,11 @@ serve(async (req) => {
       '[class*="product-reviews"]',
       '[class*="footer"]',
       '[class*="header"]',
-      '[class*="banner"]'
+      '[class*="banner"]',
+      '[class*="product-thumbs-nav"]',
+      '[class*="swiper-pagination"]',
+      '[class*="slider-nav"]',
+      '[class*="carousel-indicators"]'
     ];
 
     // ===== REFINED GALLERY SELECTORS (PRIORITY ORDER) =====
@@ -562,8 +569,15 @@ serve(async (req) => {
       '[class*="product-images"] img',
       '[class*="product__media"] img',
       '[class*="product-media"] img',
+      '[class*="product-main-media"] img',
+      '[class*="main-product-image-wrapper"] img',
+      '[class*="image-container"] img',
       
-      // PRIORITY 4: Swiper ONLY in product context
+      // PRIORITY 4: Swiper/carousel-based galleries (Cosmix, modern Shopify)
+      '.product-thumbs-wrapper .swiper-slide img',
+      '.swiper-container .swiper-slide img',
+      '[class*="product-slider"] .swiper-slide img',
+      '.product-gallery .swiper-slide img',
       '.product [class*="swiper-slide"] img',
       '[data-product-gallery] [class*="swiper"] img',
       '[class*="product"] [class*="carousel"] img',
@@ -610,7 +624,13 @@ serve(async (req) => {
           return;
         }
         
-        const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
+        const src = img.getAttribute('src') ||
+                     img.getAttribute('data-src') ||
+                     img.getAttribute('data-lazy-src') ||
+                     img.getAttribute('data-image') ||
+                     // Extract first URL from srcset (responsive images)
+                     img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                     img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0];
         if (!src) return;
         
         const filename = getImageFilename(src);
