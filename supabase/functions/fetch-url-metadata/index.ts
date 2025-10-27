@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const DEBUG = false; // ✅ Global debug toggle - set to true for verbose logs
+const DEBUG = true; // ⬅️ TEMPORARILY ENABLED for Tira troubleshooting
 
 // Main metadata extraction function - supports recursive retry
 const extractMetadata = async (url: string, stage: number = 0, forceJsRender: boolean = false): Promise<Response> => {
@@ -174,6 +174,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         const hostname = new URL(url).hostname;
         const needsJsRendering = [
           'nykaa.com',
+          'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
           'amazon.in', 'amazon.com', 'amazon.co.uk',
           'flipkart.com',
           'myntra.com'
@@ -207,6 +208,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           const hostname = new URL(url).hostname;
           const needsJsRendering = [
             'nykaa.com',
+            'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
             'amazon.in', 'amazon.com', 'amazon.co.uk',
             'flipkart.com',
             'myntra.com'
@@ -405,6 +407,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           'amazon.com': ['m.media-amazon.com', 'images-na.ssl-images-amazon.com'],
           'flipkart.com': ['rukminim1.flixcart.com', 'rukminim2.flixcart.com'],
           'nykaa.com': ['images-static.nykaa.com', 'adn-static1.nykaa.com', 'adn-static2.nykaa.com'],
+          'tirabeauty.com': ['cdn.tirabeauty.com'],
         };
         
         for (const [domain, cdns] of Object.entries(domainCdnMap)) {
@@ -443,16 +446,8 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           return imgUrl;
         }
         
-        // Fix protocol-relative URLs (//domain.com/path → https://domain.com/path)
-        let normalizedUrl = imgUrl;
-        if (normalizedUrl.startsWith('//')) {
-          normalizedUrl = 'https:' + normalizedUrl;
-          if (DEBUG) {
-            console.log(`🔧 Fixed protocol-relative URL: //${normalizedUrl.slice(8, 40)}...`);
-          }
-        }
-        
-        const urlObj = new URL(normalizedUrl);
+        // Protocol-relative URLs already fixed by normalizeImageUrl()
+        const urlObj = new URL(imgUrl);
         const searchParams = urlObj.searchParams;
         
         // Remove size-limiting parameters
@@ -466,13 +461,13 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         // Reconstruct URL (keeps 'v=' version parameter for cache busting)
         urlObj.search = searchParams.toString();
         
-        const finalUrl = urlObj.toString();
+        const normalizedUrl = urlObj.toString();
         
-        if (DEBUG && imgUrl !== finalUrl) {
+        if (DEBUG && imgUrl !== normalizedUrl) {
           console.log(`🔧 Normalized Shopify URL: ${imgUrl.split('?')[0].slice(-40)}... → width=${targetWidth}`);
         }
         
-        return finalUrl;
+        return normalizedUrl;
       } catch (e) {
         console.warn(`⚠️ Failed to normalize Shopify URL: ${imgUrl}`, e);
         return imgUrl; // Return original if normalization fails
@@ -481,12 +476,50 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
 
     /**
      * Normalize e-commerce image URLs for better quality
-     * Currently supports: Shopify
+     * Currently supports: Shopify, Tira Beauty
      */
     const normalizeImageUrl = (imgUrl: string): string => {
+      // Fix protocol-relative URLs universally (//domain.com → https://domain.com)
+      // This handles Shopify, Tira, Nykaa, Myntra, and any future CDN
+      if (imgUrl.startsWith('//')) {
+        imgUrl = 'https:' + imgUrl;
+        if (DEBUG) {
+          console.log(`🔧 Fixed protocol-relative URL globally: //${imgUrl.slice(8, 40)}...`);
+        }
+      }
+      
       // Shopify CDN normalization
       if (imgUrl.includes('cdn.shopify.com') || imgUrl.includes('/cdn/shop/')) {
         return normalizeShopifyImageUrl(imgUrl, 1920);
+      }
+      
+      // Tira Beauty CDN normalization
+      if (imgUrl.includes('cdn.tirabeauty.com')) {
+        try {
+          const urlObj = new URL(imgUrl);
+          
+          // Step 1: Remove dpr parameter for original quality
+          urlObj.searchParams.delete('dpr');
+          
+          // Step 2: Replace resize-w:XX with original/ for full-size images
+          let pathname = urlObj.pathname;
+          if (pathname.includes('/resize-w:')) {
+            // Replace /resize-w:60/ or /resize-w:540/ with /original/
+            pathname = pathname.replace(/\/resize-w:\d+\//, '/original/');
+            urlObj.pathname = pathname;
+            if (DEBUG) {
+              console.log(`🔧 Tira URL: Replaced resize-w: with original/`);
+            }
+          }
+          
+          const normalized = urlObj.toString();
+          if (DEBUG && imgUrl !== normalized) {
+            console.log(`🔧 Normalized Tira URL: ${imgUrl.slice(-60)} → ${normalized.slice(-60)}`);
+          }
+          return normalized;
+        } catch (e) {
+          console.warn(`⚠️ Failed to normalize Tira URL: ${imgUrl}`, e);
+        }
       }
       
       // Future: Add support for other platforms
@@ -590,6 +623,107 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
   layer1Count = imageUrls.length;
   console.log(`📦 Layer 1 found: ${layer1Count} images`);
 
+  // ===== LAYER 2.5: SCRIPT/JSON-LD EXTRACTION (For Vue/React SPAs like Tira Beauty) =====
+  if (imageUrls.length < 5 && hostname.includes('tirabeauty.com')) {
+    console.log('📜 Layer 2.5: Extracting images from page scripts for Tira Beauty...');
+    
+    const scripts = doc.querySelectorAll('script[type="application/ld+json"], script:not([src])');
+    const scriptImages = new Set<string>();
+    let scriptImageCount = 0;
+    
+    for (const script of scripts) {
+      const content = script.textContent;
+      if (!content) continue;
+      
+      // Extract all Tira CDN URLs from script content (match image extensions)
+      const cdnUrlPattern = /https:\/\/cdn\.tirabeauty\.com\/[^\s"'<>{}[\]()]+?\.(?:jpg|jpeg|png|webp)/gi;
+      const matches = content.match(cdnUrlPattern);
+      
+      if (matches) {
+        if (DEBUG) console.log(`  Found ${matches.length} CDN URLs in script tag`);
+        
+        for (const match of matches) {
+          try {
+            // Clean URL (remove any trailing punctuation/characters)
+            let cleanUrl = match.replace(/[,;}\]]+$/, '');
+            const urlObj = new URL(cleanUrl);
+            
+            // Skip if it's a loader/spinner/placeholder
+            const isLoader = ['/loader', '/spinner', '/loading', '/placeholder', '/icon'].some(
+              pattern => urlObj.pathname.toLowerCase().includes(pattern)
+            );
+            if (isLoader) {
+              if (DEBUG) console.log(`  ⏭️ Skipping loader: ${urlObj.pathname.slice(-50)}`);
+              continue;
+            }
+            
+            // Normalize to original/ if it contains resize-w:
+            let pathname = urlObj.pathname;
+            if (pathname.includes('/resize-w:')) {
+              pathname = pathname.replace(/\/resize-w:\d+\//, '/original/');
+              urlObj.pathname = pathname;
+              if (DEBUG) console.log(`  🔧 Normalized resize-w: to original/`);
+            }
+            
+            // Remove dpr parameter for highest quality
+            urlObj.searchParams.delete('dpr');
+            
+            const finalUrl = urlObj.toString();
+            
+            // TIRA PRODUCT IMAGE VALIDATION
+            // Only accept images from product item directories
+            const isProductImage = pathname.includes('/products/pictures/item/');
+            
+            // Exclude non-product images (logos, icons, platform assets)
+            const excludePatterns = [
+              '/application/pictures/',  // App icons
+              '/brands/pictures/',       // Brand logos
+              '/company/',               // Company assets
+              '/platform/extensions/',   // Extension widgets
+              '/free-logo/',            // Logos
+              '/square-logo/',          // Square logos
+              '/favicon/',              // Favicons
+            ];
+            
+            const isExcluded = excludePatterns.some(pattern => pathname.includes(pattern));
+            
+            // Only add if it's a product image and not excluded
+            if (isProductImage && !isExcluded) {
+              if (!scriptImages.has(finalUrl)) {
+                scriptImages.add(finalUrl);
+                scriptImageCount++;
+                if (DEBUG) console.log(`  ✅ Added product image: ${pathname.slice(-80)}`);
+              }
+            } else {
+              if (DEBUG) {
+                if (isExcluded) {
+                  console.log(`  ⏭️ Skipping non-product (excluded): ${pathname.slice(-60)}`);
+                } else if (!isProductImage) {
+                  console.log(`  ⏭️ Skipping non-product directory: ${pathname.slice(-60)}`);
+                }
+              }
+            }
+          } catch (e) {
+            // Invalid URL, skip silently
+          }
+        }
+      }
+    }
+    
+    // Add script images to main images array
+    scriptImages.forEach(url => {
+      if (!imageUrls.includes(url)) {
+        addImage(url, 'Script');
+      }
+    });
+    
+    if (scriptImageCount > 0) {
+      console.log(`✅ Layer 2.5 found: ${scriptImageCount} images from scripts`);
+    } else {
+      console.log(`⚠️ Layer 2.5: No images found in scripts`);
+    }
+  }
+
   // ===== LAYER 2: E-COMMERCE GALLERY SELECTORS (HIGH PRIORITY) =====
     console.log('🖼️ Layer 2: Checking product gallery selectors...');
     
@@ -639,6 +773,27 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       'img[data-lazy-src]',                               // Lazy-loaded images
       '[class*="product"] img[data-src]',                 // Product container with data-src
       '[class*="gallery"] img[data-src]',                 // Gallery container with data-src
+      
+      // PRIORITY 0.5: Lazy-loaded image selectors (Tira, Nykaa, etc.)
+      'img.lazyload[data-src]',                           // LazyLoad.js pattern
+      'img.product-detail-image[data-src]',               // Tira Beauty main image
+      '.product-image-images img[data-src]',              // Tira Beauty image container
+      'img[src^="data:image"][data-src]',                 // Images with placeholder + data-src
+      
+      // PRIORITY 0.6: Vue/React SPA patterns (Tira, modern SPAs)
+      'img[slot="image"]',                                // Vue slot-based images (Tira Beauty)
+      'img[slot="image"][srcset]',                        // Slot with srcset
+      'img[slot="image"][src]',                           // Slot with src fallback
+      'img.load-image[srcset]',                           // Tira's load-image class
+      '.pic-loader img',                                  // Tira's pic-loader wrapper
+      '[data-v-] img[srcset]',                            // Any Vue component with srcset
+      'img[srcset^="https://cdn.tirabeauty.com"]',        // Direct Tira CDN match
+      
+      // PRIORITY 0.7: Generic CDN patterns (broad e-commerce fallback)
+      'img[srcset*="cdn."]',                              // Any CDN in srcset (prioritizes srcset)
+      'img[src*="cdn."][srcset*="cdn."]',                 // CDN in both attributes (stricter)
+      'img[src*="/products/"][srcset]',                   // Product paths
+      'img[src*="/items/"][srcset]',                      // Item paths (Asian e-commerce)
       
       // PRIORITY 1: Goodreads book covers (HIGH PRIORITY for books)
       '[class*="BookCover"] img',
@@ -702,7 +857,12 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       // Sample first 3 images for inspection
       const sampleImages = Array.from(productContainer.querySelectorAll('img')).slice(0, 3);
       sampleImages.forEach((img, idx) => {
-        console.log(`  - Sample img[${idx}]: src="${img.getAttribute('src')}" data-src="${img.getAttribute('data-src')}" class="${img.className}"`);
+        console.log(`  - Sample img[${idx}]:`);
+        console.log(`      src="${img.getAttribute('src')?.slice(0, 80)}"`);
+        console.log(`      data-src="${img.getAttribute('data-src')?.slice(0, 80)}"`);
+        console.log(`      srcset="${img.getAttribute('srcset')?.slice(0, 80)}"`);
+        console.log(`      class="${img.className}"`);
+        console.log(`      slot="${img.getAttribute('slot')}"`);
       });
     }
 
@@ -715,11 +875,19 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         ? productContainer.querySelectorAll(selector)
         : doc.querySelectorAll(selector);
       
-      if (DEBUG && scopedSelector.length > 0) {
-        console.log(`Checking selector [${i}]: ${selector} (${scopedSelector.length} matches)`);
+      if (scopedSelector.length > 0) {
+        if (DEBUG) {
+          console.log(`Checking selector [${i}]: ${selector} (${scopedSelector.length} matches)`);
+        }
+      } else {
+        // ⬅️ NEW: Log selectors that didn't match (only for Vue/Tira selectors)
+        if (DEBUG && i >= 10 && i <= 20) { // Only log Priority 0.6-0.7 selectors
+          console.log(`⚠️ Selector [${i}] found 0 matches: ${selector}`);
+        }
       }
       
-      scopedSelector.forEach(img => {
+      if (scopedSelector.length > 0) {
+        scopedSelector.forEach(img => {
         // Check if image is in excluded section
         const isExcluded = excludeSelectors.some(excludeSelector => {
           const parent = img.closest(excludeSelector);
@@ -731,14 +899,56 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           return;
         }
         
-        let src = img.getAttribute('src') ||
-                     img.getAttribute('data-src') ||
-                     img.getAttribute('data-lazy-src') ||
-                     img.getAttribute('data-image') ||
-                     // Extract first URL from srcset (responsive images)
-                     img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
-                     img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0];
+        // Special handling for Tira Beauty (prioritize src, extract 2x from srcset)
+        const isTira = url.includes('tirabeauty.com');
+        const srcAttr = img.getAttribute('src');
+        const srcsetAttr = img.getAttribute('srcset');
+
+        let src: string | undefined;
+
+        if (isTira && srcAttr) {
+          // For Tira, prefer src (contains the active/high-res image)
+          src = srcAttr;
+          
+          // If srcset exists and src contains resize-w:, try to get 2x version from srcset
+          if (srcsetAttr && srcAttr.includes('resize-w:')) {
+            // Extract 2x URL from srcset (format: "url 1x, url 2x")
+            const srcsetParts = srcsetAttr.split(',').map(s => s.trim());
+            const highRes = srcsetParts.find(part => part.includes(' 2x'));
+            if (highRes) {
+              src = highRes.split(' ')[0]; // Get URL before the "2x" descriptor
+            }
+          }
+        } else {
+          // Standard extraction for other sites
+          src = img.getAttribute('data-src') ||
+                img.getAttribute('data-lazy-src') ||
+                img.getAttribute('data-image') ||
+                img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                img.getAttribute('src');
+        }
+        
         if (!src) return;
+        
+        // Filter out loader/spinner/placeholder images
+        const loaderPatterns = [
+          '/loader',
+          '/spinner',
+          '/loading',
+          '/placeholder',
+          '/assets/loader',
+          '/theme/assets/loader'
+        ];
+
+        const isLoader = loaderPatterns.some(pattern => 
+          src.toLowerCase().includes(pattern)
+        );
+
+        if (isLoader) {
+          if (DEBUG) console.log(`⏭️ Skipping loader/spinner: ${src}`);
+          return;
+        }
         
         // Normalize URL for better quality (Shopify/e-commerce CDNs)
         const normalizedSrc = normalizeImageUrl(src);
@@ -751,7 +961,8 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         } else if (DEBUG) {
           console.log(`⏭️ Skipping duplicate filename: ${filename}`);
         }
-      });
+        });
+      }
       
       // Early exit if we found main gallery (priority 0-5 selectors with 3+ images)
       if (i <= 5 && collectedGalleryImages.size >= 3) {
@@ -780,12 +991,13 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           const isExcluded = excludeSelectors.some(ex => img.closest(ex) !== null);
           if (isExcluded) return;
           
-          let src = img.getAttribute('src') ||
-                       img.getAttribute('data-src') ||
+          // Prioritize data-* attributes over src (for lazy-loaded images)
+          let src = img.getAttribute('data-src') ||
                        img.getAttribute('data-lazy-src') ||
                        img.getAttribute('data-image') ||
                        img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
-                       img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0];
+                       img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                       img.getAttribute('src');  // src is now LAST (fallback only)
           
           if (!src) return;
           
