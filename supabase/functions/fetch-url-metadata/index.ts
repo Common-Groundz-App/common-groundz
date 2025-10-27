@@ -780,6 +780,20 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       '.product-image-images img[data-src]',              // Tira Beauty image container
       'img[src^="data:image"][data-src]',                 // Images with placeholder + data-src
       
+      // PRIORITY 0.55: Nykaa-specific selectors
+      '[class*="ImageGallery"] img',                      // Nykaa gallery wrapper
+      '[class*="image-gallery"] img',                     // Nykaa lowercase variant
+      '[class*="product-image"] img[srcset]',             // Nykaa product images with srcset
+      'picture img[srcset]',                              // Modern <picture> elements (Nykaa)
+      '[data-testid*="image"] img',                       // React test ID patterns
+      '[data-testid*="gallery"] img',                     // Gallery test IDs
+      '[data-testid*="product"] img[srcset]',             // Product test IDs
+      'img[alt*="product"][srcset]',                      // Images with "product" in alt
+      'img[alt*="Product"][srcset]',                      // Images with "Product" in alt
+      '[role="img"] img',                                 // Semantic role="img"
+      '[class*="css-"][class*="image"] img',              // Emotion/styled-components patterns
+      '[class*="ProductPage"] img[srcset]',               // Product page components
+      
       // PRIORITY 0.6: Vue/React SPA patterns (Tira, modern SPAs)
       'img[slot="image"]',                                // Vue slot-based images (Tira Beauty)
       'img[slot="image"][srcset]',                        // Slot with srcset
