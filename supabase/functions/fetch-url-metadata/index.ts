@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const DEBUG = false; // ✅ Global debug toggle - set to true for verbose logs
+const DEBUG = true; // ⬅️ TEMPORARILY ENABLED for Tira troubleshooting
 
 // Main metadata extraction function - supports recursive retry
 const extractMetadata = async (url: string, stage: number = 0, forceJsRender: boolean = false): Promise<Response> => {
@@ -174,6 +174,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         const hostname = new URL(url).hostname;
         const needsJsRendering = [
           'nykaa.com',
+          'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
           'amazon.in', 'amazon.com', 'amazon.co.uk',
           'flipkart.com',
           'myntra.com'
@@ -207,6 +208,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           const hostname = new URL(url).hostname;
           const needsJsRendering = [
             'nykaa.com',
+            'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
             'amazon.in', 'amazon.com', 'amazon.co.uk',
             'flipkart.com',
             'myntra.com'
@@ -758,11 +760,19 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         ? productContainer.querySelectorAll(selector)
         : doc.querySelectorAll(selector);
       
-      if (DEBUG && scopedSelector.length > 0) {
-        console.log(`Checking selector [${i}]: ${selector} (${scopedSelector.length} matches)`);
+      if (scopedSelector.length > 0) {
+        if (DEBUG) {
+          console.log(`Checking selector [${i}]: ${selector} (${scopedSelector.length} matches)`);
+        }
+      } else {
+        // ⬅️ NEW: Log selectors that didn't match (only for Vue/Tira selectors)
+        if (DEBUG && i >= 10 && i <= 20) { // Only log Priority 0.6-0.7 selectors
+          console.log(`⚠️ Selector [${i}] found 0 matches: ${selector}`);
+        }
       }
       
-      scopedSelector.forEach(img => {
+      if (scopedSelector.length > 0) {
+        scopedSelector.forEach(img => {
         // Check if image is in excluded section
         const isExcluded = excludeSelectors.some(excludeSelector => {
           const parent = img.closest(excludeSelector);
@@ -795,7 +805,8 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         } else if (DEBUG) {
           console.log(`⏭️ Skipping duplicate filename: ${filename}`);
         }
-      });
+        });
+      }
       
       // Early exit if we found main gallery (priority 0-5 selectors with 3+ images)
       if (i <= 5 && collectedGalleryImages.size >= 3) {
