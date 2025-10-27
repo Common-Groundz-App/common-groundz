@@ -899,8 +899,9 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           return;
         }
         
-        // Special handling for Tira Beauty (prioritize src, extract 2x from srcset)
+        // Special handling for specific e-commerce sites
         const isTira = url.includes('tirabeauty.com');
+        const isNykaa = url.includes('nykaa.com');
         const srcAttr = img.getAttribute('src');
         const srcsetAttr = img.getAttribute('srcset');
 
@@ -919,8 +920,14 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
               src = highRes.split(' ')[0]; // Get URL before the "2x" descriptor
             }
           }
+        } else if (isNykaa) {
+          // For Nykaa, prioritize srcset, then src (original behavior)
+          src = img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                img.getAttribute('src') ||
+                img.getAttribute('data-src') ||
+                img.getAttribute('data-lazy-src');
         } else {
-          // Standard extraction for other sites
+          // Standard extraction for other sites (data-src first for lazy loading)
           src = img.getAttribute('data-src') ||
                 img.getAttribute('data-lazy-src') ||
                 img.getAttribute('data-image') ||
