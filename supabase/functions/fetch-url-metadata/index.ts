@@ -663,6 +663,21 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       '.product-image-images img[data-src]',              // Tira Beauty image container
       'img[src^="data:image"][data-src]',                 // Images with placeholder + data-src
       
+      // PRIORITY 0.6: Vue/React SPA patterns (Tira, modern SPAs)
+      'img[slot="image"]',                                // Vue slot-based images (Tira Beauty)
+      'img[slot="image"][srcset]',                        // Slot with srcset
+      'img[slot="image"][src]',                           // Slot with src fallback
+      'img.load-image[srcset]',                           // Tira's load-image class
+      '.pic-loader img',                                  // Tira's pic-loader wrapper
+      '[data-v-] img[srcset]',                            // Any Vue component with srcset
+      'img[srcset^="https://cdn.tirabeauty.com"]',        // Direct Tira CDN match
+      
+      // PRIORITY 0.7: Generic CDN patterns (broad e-commerce fallback)
+      'img[srcset*="cdn."]',                              // Any CDN in srcset (prioritizes srcset)
+      'img[src*="cdn."][srcset*="cdn."]',                 // CDN in both attributes (stricter)
+      'img[src*="/products/"][srcset]',                   // Product paths
+      'img[src*="/items/"][srcset]',                      // Item paths (Asian e-commerce)
+      
       // PRIORITY 1: Goodreads book covers (HIGH PRIORITY for books)
       '[class*="BookCover"] img',
       '[class*="book-cover"] img',
@@ -725,7 +740,12 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       // Sample first 3 images for inspection
       const sampleImages = Array.from(productContainer.querySelectorAll('img')).slice(0, 3);
       sampleImages.forEach((img, idx) => {
-        console.log(`  - Sample img[${idx}]: src="${img.getAttribute('src')}" data-src="${img.getAttribute('data-src')}" class="${img.className}"`);
+        console.log(`  - Sample img[${idx}]:`);
+        console.log(`      src="${img.getAttribute('src')?.slice(0, 80)}"`);
+        console.log(`      data-src="${img.getAttribute('data-src')?.slice(0, 80)}"`);
+        console.log(`      srcset="${img.getAttribute('srcset')?.slice(0, 80)}"`);
+        console.log(`      class="${img.className}"`);
+        console.log(`      slot="${img.getAttribute('slot')}"`);
       });
     }
 
