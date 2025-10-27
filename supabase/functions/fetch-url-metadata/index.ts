@@ -670,15 +670,38 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
             
             const finalUrl = urlObj.toString();
             
-            // Only add if it's an original or high-quality image (not thumbnails)
-            if (pathname.includes('/original/') || pathname.includes('/free/')) {
+            // TIRA PRODUCT IMAGE VALIDATION
+            // Only accept images from product item directories
+            const isProductImage = pathname.includes('/products/pictures/item/');
+            
+            // Exclude non-product images (logos, icons, platform assets)
+            const excludePatterns = [
+              '/application/pictures/',  // App icons
+              '/brands/pictures/',       // Brand logos
+              '/company/',               // Company assets
+              '/platform/extensions/',   // Extension widgets
+              '/free-logo/',            // Logos
+              '/square-logo/',          // Square logos
+              '/favicon/',              // Favicons
+            ];
+            
+            const isExcluded = excludePatterns.some(pattern => pathname.includes(pattern));
+            
+            // Only add if it's a product image and not excluded
+            if (isProductImage && !isExcluded) {
               if (!scriptImages.has(finalUrl)) {
                 scriptImages.add(finalUrl);
                 scriptImageCount++;
-                if (DEBUG) console.log(`  ✅ Added from script: ${pathname.slice(-80)}`);
+                if (DEBUG) console.log(`  ✅ Added product image: ${pathname.slice(-80)}`);
               }
             } else {
-              if (DEBUG) console.log(`  ⏭️ Skipping non-original path: ${pathname.slice(-50)}`);
+              if (DEBUG) {
+                if (isExcluded) {
+                  console.log(`  ⏭️ Skipping non-product (excluded): ${pathname.slice(-60)}`);
+                } else if (!isProductImage) {
+                  console.log(`  ⏭️ Skipping non-product directory: ${pathname.slice(-60)}`);
+                }
+              }
             }
           } catch (e) {
             // Invalid URL, skip silently
