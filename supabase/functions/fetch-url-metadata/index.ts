@@ -407,6 +407,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           'amazon.com': ['m.media-amazon.com', 'images-na.ssl-images-amazon.com'],
           'flipkart.com': ['rukminim1.flixcart.com', 'rukminim2.flixcart.com'],
           'nykaa.com': ['images-static.nykaa.com', 'adn-static1.nykaa.com', 'adn-static2.nykaa.com'],
+          'tirabeauty.com': ['cdn.tirabeauty.com'],
         };
         
         for (const [domain, cdns] of Object.entries(domainCdnMap)) {
