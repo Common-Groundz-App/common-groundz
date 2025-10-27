@@ -493,15 +493,28 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         return normalizeShopifyImageUrl(imgUrl, 1920);
       }
       
-      // Tira Beauty CDN normalization (remove dpr parameter for higher quality)
+      // Tira Beauty CDN normalization
       if (imgUrl.includes('cdn.tirabeauty.com')) {
         try {
           const urlObj = new URL(imgUrl);
-          // Tira uses ?dpr=1 or ?dpr=2 - remove to get original quality
+          
+          // Step 1: Remove dpr parameter for original quality
           urlObj.searchParams.delete('dpr');
+          
+          // Step 2: Replace resize-w:XX with original/ for full-size images
+          let pathname = urlObj.pathname;
+          if (pathname.includes('/resize-w:')) {
+            // Replace /resize-w:60/ or /resize-w:540/ with /original/
+            pathname = pathname.replace(/\/resize-w:\d+\//, '/original/');
+            urlObj.pathname = pathname;
+            if (DEBUG) {
+              console.log(`🔧 Tira URL: Replaced resize-w: with original/`);
+            }
+          }
+          
           const normalized = urlObj.toString();
           if (DEBUG && imgUrl !== normalized) {
-            console.log(`🔧 Normalized Tira URL: removed dpr parameter`);
+            console.log(`🔧 Normalized Tira URL: ${imgUrl.slice(-60)} → ${normalized.slice(-60)}`);
           }
           return normalized;
         } catch (e) {
@@ -785,15 +798,56 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           return;
         }
         
-        // Prioritize data-* attributes over src (for lazy-loaded images)
-        let src = img.getAttribute('data-src') ||
-                     img.getAttribute('data-lazy-src') ||
-                     img.getAttribute('data-image') ||
-                     // Extract first URL from srcset (responsive images)
-                     img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
-                     img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0] ||
-                     img.getAttribute('src');  // src is now LAST (fallback only)
+        // Special handling for Tira Beauty (prioritize src, extract 2x from srcset)
+        const isTira = url.includes('tirabeauty.com');
+        const srcAttr = img.getAttribute('src');
+        const srcsetAttr = img.getAttribute('srcset');
+
+        let src: string | undefined;
+
+        if (isTira && srcAttr) {
+          // For Tira, prefer src (contains the active/high-res image)
+          src = srcAttr;
+          
+          // If srcset exists and src contains resize-w:, try to get 2x version from srcset
+          if (srcsetAttr && srcAttr.includes('resize-w:')) {
+            // Extract 2x URL from srcset (format: "url 1x, url 2x")
+            const srcsetParts = srcsetAttr.split(',').map(s => s.trim());
+            const highRes = srcsetParts.find(part => part.includes(' 2x'));
+            if (highRes) {
+              src = highRes.split(' ')[0]; // Get URL before the "2x" descriptor
+            }
+          }
+        } else {
+          // Standard extraction for other sites
+          src = img.getAttribute('data-src') ||
+                img.getAttribute('data-lazy-src') ||
+                img.getAttribute('data-image') ||
+                img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                img.getAttribute('src');
+        }
+        
         if (!src) return;
+        
+        // Filter out loader/spinner/placeholder images
+        const loaderPatterns = [
+          '/loader',
+          '/spinner',
+          '/loading',
+          '/placeholder',
+          '/assets/loader',
+          '/theme/assets/loader'
+        ];
+
+        const isLoader = loaderPatterns.some(pattern => 
+          src.toLowerCase().includes(pattern)
+        );
+
+        if (isLoader) {
+          if (DEBUG) console.log(`⏭️ Skipping loader/spinner: ${src}`);
+          return;
+        }
         
         // Normalize URL for better quality (Shopify/e-commerce CDNs)
         const normalizedSrc = normalizeImageUrl(src);
