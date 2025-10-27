@@ -7,17 +7,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+const DEBUG = true; // ⬅️ TEMPORARILY ENABLED for Tira troubleshooting
+
+// Main metadata extraction function - supports recursive retry
+const extractMetadata = async (url: string, stage: number = 0, forceJsRender: boolean = false): Promise<Response> => {
+  // Prevent infinite retry loops
+  if (stage > 1) {
+    console.warn(`⚠️ Stage ${stage} exceeded retry limit, using current results`);
+    // Will continue with normal processing
   }
 
-  let url: string = ''; // ✅ Declare outside try block for proper scoping
-
   try {
-    const body = await req.json();
-    url = body.url; // ✅ Assign after declaration
     
     if (!url) {
       return new Response(
@@ -31,7 +31,7 @@ serve(async (req) => {
     let blockedReason: string | null = null;
     let httpStatus: number | undefined = undefined;
     let html: string = '';
-    let shouldUseScraper = false;
+    let shouldUseScraper = forceJsRender; // Force scraper if this is a retry
 
     // Array of real browser User-Agents for anti-bot evasion
     const userAgents = [
@@ -56,7 +56,16 @@ serve(async (req) => {
     ];
     
     // Check if this domain always needs ScraperAPI
-    const shouldSkipDirectFetch = alwaysUseScraper.some(domain => hostname.includes(domain));
+    const shouldSkipDirectFetch = alwaysUseScraper.some(domain => hostname.includes(domain)) || forceJsRender;
+    
+    if (shouldSkipDirectFetch) {
+      blockedReason = forceJsRender ? 'Retry with JS render' : 'Known problematic domain';
+      fetchMethod = 'scraper-api';
+      console.log(`ℹ️ ${forceJsRender ? 'Forcing JS render for retry' : `Skipping direct fetch for ${hostname}`}, proceeding to ScraperAPI.`);
+      shouldUseScraper = true;
+    } else {
+      console.log(`🔄 Stage ${stage}: Attempting direct fetch for ${hostname}...`);
+    }
     
     // ===== TIER 1: DIRECT FETCH (TRY FIRST) =====
 
@@ -151,13 +160,21 @@ serve(async (req) => {
       fetchMethod = 'scraper-api';
       let scraperSuccess = false;
       
-      // STAGE 1: Try static scraping first (faster, cheaper)
+      // STAGE 1: Try static scraping first (faster, cheaper) - unless forcing JS render
       try {
+        const shouldForceJsNow = forceJsRender || stage > 0;
+        
+        if (shouldForceJsNow) {
+          console.log(`📥 Forcing JS render (stage ${stage})...`);
+          throw new Error('Skip static, go straight to JS render');
+        }
+        
         console.log('📥 Stage 1: ScraperAPI static mode (premium)...');
         
         const hostname = new URL(url).hostname;
         const needsJsRendering = [
           'nykaa.com',
+          'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
           'amazon.in', 'amazon.com', 'amazon.co.uk',
           'flipkart.com',
           'myntra.com'
@@ -191,6 +208,7 @@ serve(async (req) => {
           const hostname = new URL(url).hostname;
           const needsJsRendering = [
             'nykaa.com',
+            'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
             'amazon.in', 'amazon.com', 'amazon.co.uk',
             'flipkart.com',
             'myntra.com'
@@ -389,6 +407,7 @@ serve(async (req) => {
           'amazon.com': ['m.media-amazon.com', 'images-na.ssl-images-amazon.com'],
           'flipkart.com': ['rukminim1.flixcart.com', 'rukminim2.flixcart.com'],
           'nykaa.com': ['images-static.nykaa.com', 'adn-static1.nykaa.com', 'adn-static2.nykaa.com'],
+          'tirabeauty.com': ['cdn.tirabeauty.com'],
         };
         
         for (const [domain, cdns] of Object.entries(domainCdnMap)) {
@@ -416,26 +435,151 @@ serve(async (req) => {
       }
     };
 
+    /**
+     * Normalize Shopify CDN image URLs to request high-resolution versions
+     * Strips size/crop parameters and replaces with targetWidth
+     */
+    const normalizeShopifyImageUrl = (imgUrl: string, targetWidth: number = 1920): string => {
+      try {
+        // Only process Shopify CDN URLs
+        if (!imgUrl.includes('cdn.shopify.com') && !imgUrl.includes('/cdn/shop/')) {
+          return imgUrl;
+        }
+        
+        // Protocol-relative URLs already fixed by normalizeImageUrl()
+        const urlObj = new URL(imgUrl);
+        const searchParams = urlObj.searchParams;
+        
+        // Remove size-limiting parameters
+        searchParams.delete('width');
+        searchParams.delete('height');
+        searchParams.delete('crop');
+        
+        // Add high-resolution width
+        searchParams.set('width', targetWidth.toString());
+        
+        // Reconstruct URL (keeps 'v=' version parameter for cache busting)
+        urlObj.search = searchParams.toString();
+        
+        const normalizedUrl = urlObj.toString();
+        
+        if (DEBUG && imgUrl !== normalizedUrl) {
+          console.log(`🔧 Normalized Shopify URL: ${imgUrl.split('?')[0].slice(-40)}... → width=${targetWidth}`);
+        }
+        
+        return normalizedUrl;
+      } catch (e) {
+        console.warn(`⚠️ Failed to normalize Shopify URL: ${imgUrl}`, e);
+        return imgUrl; // Return original if normalization fails
+      }
+    };
+
+    /**
+     * Normalize e-commerce image URLs for better quality
+     * Currently supports: Shopify, Tira Beauty
+     */
+    const normalizeImageUrl = (imgUrl: string): string => {
+      // Fix protocol-relative URLs universally (//domain.com → https://domain.com)
+      // This handles Shopify, Tira, Nykaa, Myntra, and any future CDN
+      if (imgUrl.startsWith('//')) {
+        imgUrl = 'https:' + imgUrl;
+        if (DEBUG) {
+          console.log(`🔧 Fixed protocol-relative URL globally: //${imgUrl.slice(8, 40)}...`);
+        }
+      }
+      
+      // Shopify CDN normalization
+      if (imgUrl.includes('cdn.shopify.com') || imgUrl.includes('/cdn/shop/')) {
+        return normalizeShopifyImageUrl(imgUrl, 1920);
+      }
+      
+      // Tira Beauty CDN normalization
+      if (imgUrl.includes('cdn.tirabeauty.com')) {
+        try {
+          const urlObj = new URL(imgUrl);
+          
+          // Step 1: Remove dpr parameter for original quality
+          urlObj.searchParams.delete('dpr');
+          
+          // Step 2: Replace resize-w:XX with original/ for full-size images
+          let pathname = urlObj.pathname;
+          if (pathname.includes('/resize-w:')) {
+            // Replace /resize-w:60/ or /resize-w:540/ with /original/
+            pathname = pathname.replace(/\/resize-w:\d+\//, '/original/');
+            urlObj.pathname = pathname;
+            if (DEBUG) {
+              console.log(`🔧 Tira URL: Replaced resize-w: with original/`);
+            }
+          }
+          
+          const normalized = urlObj.toString();
+          if (DEBUG && imgUrl !== normalized) {
+            console.log(`🔧 Normalized Tira URL: ${imgUrl.slice(-60)} → ${normalized.slice(-60)}`);
+          }
+          return normalized;
+        } catch (e) {
+          console.warn(`⚠️ Failed to normalize Tira URL: ${imgUrl}`, e);
+        }
+      }
+      
+      // Future: Add support for other platforms
+      // if (imgUrl.includes('images-na.ssl-images-amazon.com')) { ... }
+      // if (imgUrl.includes('images-static.nykaa.com')) { ... }
+      
+      return imgUrl;
+    };
+
     // Helper: Add image with duplicate checking
     const addImage = (imgUrl: string, source: string): boolean => {
-      if (!imgUrl || seenUrls.has(imgUrl)) return false;
-      
-      // Check filename duplication
-      const filename = getImageFilename(imgUrl);
-      if (filename && seenFilenames.has(filename)) {
-        console.log(`⚠️ Skipping duplicate filename: ${filename} from ${source}`);
+      // Check exact URL duplication first
+      if (!imgUrl || seenUrls.has(imgUrl)) {
+        if (DEBUG) console.log(`⏭️ Skipping exact URL duplicate: ${imgUrl}`);
         return false;
       }
       
-      // Domain filter
-      if (!isSameDomainOrCDN(imgUrl)) {
-        console.log(`⚠️ Skipping external domain: ${imgUrl} from ${source}`);
+      // Check duplicates by origin + filename (strip query params for CDN variants)
+      const filename = getImageFilename(imgUrl);
+      try {
+        // Strip query parameters (e.g., ?v=123, ?width=800) for smarter deduplication
+        const baseFilename = filename.split('?')[0];
+        const normalizedKey = `${new URL(imgUrl, url).origin}/${baseFilename}`;
+        
+        if (seenFilenames.has(normalizedKey)) {
+          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${baseFilename} (${normalizedKey}) from ${source}`);
+          return false;
+        }
+        seenFilenames.add(normalizedKey);
+      } catch (e) {
+        // If URL parsing fails, fall back to filename-only check
+        const baseFilename = filename.split('?')[0];
+        if (baseFilename && seenFilenames.has(baseFilename)) {
+          if (DEBUG) console.log(`⏭️ Skipping duplicate filename: ${baseFilename} from ${source}`);
+          return false;
+        }
+        if (baseFilename) seenFilenames.add(baseFilename);
+      }
+      
+      // Domain filter - accept same-host or known CDNs
+      try {
+        // Handle relative URLs
+        const absoluteUrl = imgUrl.startsWith('http') ? imgUrl : new URL(imgUrl, url).href;
+        const imgHost = new URL(absoluteUrl).hostname;
+        const pageHost = new URL(url).hostname;
+        
+        // Accept if:
+        // 1. Same hostname (e.g., cosmix.in/cdn/... and cosmix.in/products/...)
+        // 2. Known CDN (checked by isSameDomainOrCDN)
+        if (imgHost !== pageHost && !isSameDomainOrCDN(absoluteUrl)) {
+          if (DEBUG) console.log(`⚠️ Skipping external domain: ${imgHost} (page: ${pageHost}) from ${source}`);
+          return false;
+        }
+      } catch (e) {
+        console.warn(`⚠️ Failed to parse image URL: ${imgUrl}`, e);
         return false;
       }
       
       imageUrls.push(imgUrl);
       seenUrls.add(imgUrl);
-      if (filename) seenFilenames.add(filename);
       console.log(`✅ Added from ${source}: ${imgUrl}`);
       return true;
     };
@@ -452,7 +596,7 @@ serve(async (req) => {
             const productImages = Array.isArray(item.image) ? item.image : [item.image];
             productImages.forEach(img => {
               const imgUrl = typeof img === 'string' ? img : img.url || img.contentUrl;
-              if (imgUrl) addImage(imgUrl, 'JSON-LD Product');
+              if (imgUrl) addImage(normalizeImageUrl(imgUrl), 'JSON-LD Product');
             });
           }
           
@@ -479,24 +623,211 @@ serve(async (req) => {
   layer1Count = imageUrls.length;
   console.log(`📦 Layer 1 found: ${layer1Count} images`);
 
+  // ===== LAYER 2.5: SCRIPT/JSON-LD EXTRACTION (For Vue/React SPAs like Tira Beauty) =====
+  if (imageUrls.length < 5 && hostname.includes('tirabeauty.com')) {
+    console.log('📜 Layer 2.5: Extracting images from page scripts for Tira Beauty...');
+    
+    const scripts = doc.querySelectorAll('script[type="application/ld+json"], script:not([src])');
+    const scriptImages = new Set<string>();
+    let scriptImageCount = 0;
+    
+    for (const script of scripts) {
+      const content = script.textContent;
+      if (!content) continue;
+      
+      // Extract all Tira CDN URLs from script content (match image extensions)
+      const cdnUrlPattern = /https:\/\/cdn\.tirabeauty\.com\/[^\s"'<>{}[\]()]+?\.(?:jpg|jpeg|png|webp)/gi;
+      const matches = content.match(cdnUrlPattern);
+      
+      if (matches) {
+        if (DEBUG) console.log(`  Found ${matches.length} CDN URLs in script tag`);
+        
+        for (const match of matches) {
+          try {
+            // Clean URL (remove any trailing punctuation/characters)
+            let cleanUrl = match.replace(/[,;}\]]+$/, '');
+            const urlObj = new URL(cleanUrl);
+            
+            // Skip if it's a loader/spinner/placeholder
+            const isLoader = ['/loader', '/spinner', '/loading', '/placeholder', '/icon'].some(
+              pattern => urlObj.pathname.toLowerCase().includes(pattern)
+            );
+            if (isLoader) {
+              if (DEBUG) console.log(`  ⏭️ Skipping loader: ${urlObj.pathname.slice(-50)}`);
+              continue;
+            }
+            
+            // Normalize to original/ if it contains resize-w:
+            let pathname = urlObj.pathname;
+            if (pathname.includes('/resize-w:')) {
+              pathname = pathname.replace(/\/resize-w:\d+\//, '/original/');
+              urlObj.pathname = pathname;
+              if (DEBUG) console.log(`  🔧 Normalized resize-w: to original/`);
+            }
+            
+            // Remove dpr parameter for highest quality
+            urlObj.searchParams.delete('dpr');
+            
+            const finalUrl = urlObj.toString();
+            
+            // TIRA PRODUCT IMAGE VALIDATION
+            // Only accept images from product item directories
+            const isProductImage = pathname.includes('/products/pictures/item/');
+            
+            // Exclude non-product images (logos, icons, platform assets)
+            const excludePatterns = [
+              '/application/pictures/',  // App icons
+              '/brands/pictures/',       // Brand logos
+              '/company/',               // Company assets
+              '/platform/extensions/',   // Extension widgets
+              '/free-logo/',            // Logos
+              '/square-logo/',          // Square logos
+              '/favicon/',              // Favicons
+            ];
+            
+            const isExcluded = excludePatterns.some(pattern => pathname.includes(pattern));
+            
+            // Only add if it's a product image and not excluded
+            if (isProductImage && !isExcluded) {
+              if (!scriptImages.has(finalUrl)) {
+                scriptImages.add(finalUrl);
+                scriptImageCount++;
+                if (DEBUG) console.log(`  ✅ Added product image: ${pathname.slice(-80)}`);
+              }
+            } else {
+              if (DEBUG) {
+                if (isExcluded) {
+                  console.log(`  ⏭️ Skipping non-product (excluded): ${pathname.slice(-60)}`);
+                } else if (!isProductImage) {
+                  console.log(`  ⏭️ Skipping non-product directory: ${pathname.slice(-60)}`);
+                }
+              }
+            }
+          } catch (e) {
+            // Invalid URL, skip silently
+          }
+        }
+      }
+    }
+    
+    // Add script images to main images array
+    scriptImages.forEach(url => {
+      if (!imageUrls.includes(url)) {
+        addImage(url, 'Script');
+      }
+    });
+    
+    if (scriptImageCount > 0) {
+      console.log(`✅ Layer 2.5 found: ${scriptImageCount} images from scripts`);
+    } else {
+      console.log(`⚠️ Layer 2.5: No images found in scripts`);
+    }
+  }
+
   // ===== LAYER 2: E-COMMERCE GALLERY SELECTORS (HIGH PRIORITY) =====
     console.log('🖼️ Layer 2: Checking product gallery selectors...');
+    
+    // ===== FIND PRODUCT CONTAINER FIRST =====
+    const productContainer = doc.querySelector('[itemtype*="schema.org/Product"]') ||
+                             doc.querySelector('[data-product-id]') ||
+                             doc.querySelector('.product-single') ||
+                             doc.querySelector('.product-detail') ||
+                             doc.querySelector('[class*="product-main"]') ||
+                             doc.querySelector('[data-section-type="product"]') ||
+                             doc.querySelector('[class*="product-view"]') ||
+                             doc.querySelector('main');
+
+    if (productContainer) {
+      console.log('✅ Found product container, scanning images within it only');
+    } else if (DEBUG) {
+      console.warn('⚠️ No product container found, using page-wide scan');
+    }
+
+    // ===== EXCLUSION SELECTORS =====
+    const excludeSelectors = [
+      '[class*="recommended"]',
+      '[class*="related-products"]',
+      '[class*="cross-sell"]',
+      '[class*="upsell"]',
+      '[data-section-type="collection"]',
+      '[class*="product-recommendations"]',
+      '[class*="complementary"]',
+      '[class*="product-card"]',
+      '[class*="collection-grid"]',
+      '[class*="product-reviews"]',
+      '[class*="footer"]',
+      '[class*="header"]',
+      '[class*="banner"]',
+      '[class*="product-thumbs-nav"]',
+      '[class*="swiper-pagination"]',
+      '[class*="slider-nav"]',
+      '[class*="carousel-indicators"]'
+    ];
+
+    // ===== REFINED GALLERY SELECTORS (PRIORITY ORDER) =====
     const gallerySelectors = [
-      // Goodreads book covers (HIGH PRIORITY for books)
+      // PRIORITY 0: Broad attribute-based selectors (for JS-rendered galleries)
+      'img[data-src^="https://cosmix.in/cdn/shop"]',     // Cosmix CDN images with data-src
+      'img[data-src^="http"]',                            // Any external image with data-src
+      'img[data-srcset]',                                 // Responsive images
+      'img[data-lazy-src]',                               // Lazy-loaded images
+      '[class*="product"] img[data-src]',                 // Product container with data-src
+      '[class*="gallery"] img[data-src]',                 // Gallery container with data-src
+      
+      // PRIORITY 0.5: Lazy-loaded image selectors (Tira, Nykaa, etc.)
+      'img.lazyload[data-src]',                           // LazyLoad.js pattern
+      'img.product-detail-image[data-src]',               // Tira Beauty main image
+      '.product-image-images img[data-src]',              // Tira Beauty image container
+      'img[src^="data:image"][data-src]',                 // Images with placeholder + data-src
+      
+      // PRIORITY 0.6: Vue/React SPA patterns (Tira, modern SPAs)
+      'img[slot="image"]',                                // Vue slot-based images (Tira Beauty)
+      'img[slot="image"][srcset]',                        // Slot with srcset
+      'img[slot="image"][src]',                           // Slot with src fallback
+      'img.load-image[srcset]',                           // Tira's load-image class
+      '.pic-loader img',                                  // Tira's pic-loader wrapper
+      '[data-v-] img[srcset]',                            // Any Vue component with srcset
+      'img[srcset^="https://cdn.tirabeauty.com"]',        // Direct Tira CDN match
+      
+      // PRIORITY 0.7: Generic CDN patterns (broad e-commerce fallback)
+      'img[srcset*="cdn."]',                              // Any CDN in srcset (prioritizes srcset)
+      'img[src*="cdn."][srcset*="cdn."]',                 // CDN in both attributes (stricter)
+      'img[src*="/products/"][srcset]',                   // Product paths
+      'img[src*="/items/"][srcset]',                      // Item paths (Asian e-commerce)
+      
+      // PRIORITY 1: Goodreads book covers (HIGH PRIORITY for books)
       '[class*="BookCover"] img',
       '[class*="book-cover"] img',
       '.ResponsiveImage img',
       '[aria-label*="Book cover"] img',
       
-      // E-commerce product galleries
-      '[class*="product-gallery"] img',
-      '[class*="ProductGallery"] img',
+      // PRIORITY 2: Shopify/WooCommerce specific
+      '.product__media-list img',
+      '.product-single__photo img',
+      '#ProductPhotos img',
+      '.woocommerce-product-gallery img',
+      
+      // PRIORITY 3: Product-specific containers only
+      '[class*="product-gallery"]:not([class*="recommend"]) img',
+      '[class*="ProductGallery"]:not([class*="Related"]) img',
+      '[data-product-images] img',
       '[class*="product-images"] img',
       '[class*="product__media"] img',
       '[class*="product-media"] img',
-      '[class*="swiper-slide"] img',
-      '[class*="carousel"] img',
-      '[class*="thumbnail"] img',
+      '[class*="product-main-media"] img',
+      '[class*="main-product-image-wrapper"] img',
+      '[class*="image-container"] img',
+      
+      // PRIORITY 4: Swiper/carousel-based galleries (Cosmix, modern Shopify)
+      '.product-thumbs-wrapper .swiper-slide img',
+      '.swiper-container .swiper-slide img',
+      '[class*="product-slider"] .swiper-slide img',
+      '.product-gallery .swiper-slide img',
+      '.product [class*="swiper-slide"] img',
+      '[data-product-gallery] [class*="swiper"] img',
+      '[class*="product"] [class*="carousel"] img',
+      
+      // PRIORITY 5: Generic fallback
       '[data-gallery-image]',
       '[data-product-image]',
       '[class*="ImageGallery"] img',
@@ -505,86 +836,234 @@ serve(async (req) => {
       '.gallery img',
       '#product-photos img',
       '[id*="product-gallery"] img',
-      '[id*="ProductGallery"] img'
+      '[id*="ProductGallery"] img',
+      '[class*="thumbnail"] img'
     ];
 
-    for (const selector of gallerySelectors) {
-      const galleryImages = doc.querySelectorAll(selector);
-      if (galleryImages.length > 0) {
-        console.log(`Found ${galleryImages.length} images with selector: ${selector}`);
-        galleryImages.forEach(img => {
-          const src = img.getAttribute('src') || img.getAttribute('data-src') || img.getAttribute('data-lazy-src');
-      if (src) addImage(src, `Gallery (${selector})`);
+    // ===== BATCH COLLECTION WITH EARLY EXIT =====
+    const collectedGalleryImages = new Map<string, { url: string; source: string; priority: number }>();
+    let foundMainGallery = false;
+
+    // DEBUG: Log HTML structure for troubleshooting
+    if (DEBUG && productContainer) {
+      console.log(`🔍 Pre-extraction debug:`);
+      console.log(`  - Product container found: ${productContainer.tagName}.${productContainer.className}`);
+      console.log(`  - Total <img> tags in container: ${productContainer.querySelectorAll('img').length}`);
+      console.log(`  - Images with [data-src]: ${productContainer.querySelectorAll('img[data-src]').length}`);
+      console.log(`  - Images with [src]: ${productContainer.querySelectorAll('img[src]').length}`);
+      console.log(`  - Swiper slides: ${productContainer.querySelectorAll('.swiper-slide').length}`);
+      console.log(`  - Images in swiper slides: ${productContainer.querySelectorAll('.swiper-slide img').length}`);
+      
+      // Sample first 3 images for inspection
+      const sampleImages = Array.from(productContainer.querySelectorAll('img')).slice(0, 3);
+      sampleImages.forEach((img, idx) => {
+        console.log(`  - Sample img[${idx}]:`);
+        console.log(`      src="${img.getAttribute('src')?.slice(0, 80)}"`);
+        console.log(`      data-src="${img.getAttribute('data-src')?.slice(0, 80)}"`);
+        console.log(`      srcset="${img.getAttribute('srcset')?.slice(0, 80)}"`);
+        console.log(`      class="${img.className}"`);
+        console.log(`      slot="${img.getAttribute('slot')}"`);
+      });
+    }
+
+    for (let i = 0; i < gallerySelectors.length; i++) {
+      const selector = gallerySelectors[i];
+      const priority = i; // Lower index = higher priority
+      
+      // Scope selector to product container if found
+      const scopedSelector = productContainer 
+        ? productContainer.querySelectorAll(selector)
+        : doc.querySelectorAll(selector);
+      
+      if (scopedSelector.length > 0) {
+        if (DEBUG) {
+          console.log(`Checking selector [${i}]: ${selector} (${scopedSelector.length} matches)`);
+        }
+      } else {
+        // ⬅️ NEW: Log selectors that didn't match (only for Vue/Tira selectors)
+        if (DEBUG && i >= 10 && i <= 20) { // Only log Priority 0.6-0.7 selectors
+          console.log(`⚠️ Selector [${i}] found 0 matches: ${selector}`);
+        }
+      }
+      
+      if (scopedSelector.length > 0) {
+        scopedSelector.forEach(img => {
+        // Check if image is in excluded section
+        const isExcluded = excludeSelectors.some(excludeSelector => {
+          const parent = img.closest(excludeSelector);
+          return parent !== null;
+        });
+        
+        if (isExcluded) {
+          if (DEBUG) console.log(`⏭️ Skipping excluded: ${img.getAttribute('src')}`);
+          return;
+        }
+        
+        // Special handling for specific e-commerce sites
+        const isTira = url.includes('tirabeauty.com');
+        const isNykaa = url.includes('nykaa.com');
+        const srcAttr = img.getAttribute('src');
+        const srcsetAttr = img.getAttribute('srcset');
+
+        let src: string | undefined;
+
+        if (isTira && srcAttr) {
+          // For Tira, prefer src (contains the active/high-res image)
+          src = srcAttr;
+          
+          // If srcset exists and src contains resize-w:, try to get 2x version from srcset
+          if (srcsetAttr && srcAttr.includes('resize-w:')) {
+            // Extract 2x URL from srcset (format: "url 1x, url 2x")
+            const srcsetParts = srcsetAttr.split(',').map(s => s.trim());
+            const highRes = srcsetParts.find(part => part.includes(' 2x'));
+            if (highRes) {
+              src = highRes.split(' ')[0]; // Get URL before the "2x" descriptor
+            }
+          }
+        } else if (isNykaa) {
+          // For Nykaa, prioritize srcset, then src (original behavior)
+          src = img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                img.getAttribute('src') ||
+                img.getAttribute('data-src') ||
+                img.getAttribute('data-lazy-src');
+        } else {
+          // Standard extraction for other sites (data-src first for lazy loading)
+          src = img.getAttribute('data-src') ||
+                img.getAttribute('data-lazy-src') ||
+                img.getAttribute('data-image') ||
+                img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                img.getAttribute('src');
+        }
+        
+        if (!src) return;
+        
+        // Filter out loader/spinner/placeholder images
+        const loaderPatterns = [
+          '/loader',
+          '/spinner',
+          '/loading',
+          '/placeholder',
+          '/assets/loader',
+          '/theme/assets/loader'
+        ];
+
+        const isLoader = loaderPatterns.some(pattern => 
+          src.toLowerCase().includes(pattern)
+        );
+
+        if (isLoader) {
+          if (DEBUG) console.log(`⏭️ Skipping loader/spinner: ${src}`);
+          return;
+        }
+        
+        // Normalize URL for better quality (Shopify/e-commerce CDNs)
+        const normalizedSrc = normalizeImageUrl(src);
+        
+        const filename = getImageFilename(normalizedSrc);
+        
+        if (!seenFilenames.has(filename)) {
+          seenFilenames.add(filename);
+          collectedGalleryImages.set(normalizedSrc, { url: normalizedSrc, source: selector, priority });
+        } else if (DEBUG) {
+          console.log(`⏭️ Skipping duplicate filename: ${filename}`);
+        }
+        });
+      }
+      
+      // Early exit if we found main gallery (priority 0-5 selectors with 3+ images)
+      if (i <= 5 && collectedGalleryImages.size >= 3) {
+        console.log(`✅ Found main product gallery with ${collectedGalleryImages.size} images using high-priority selectors`);
+        foundMainGallery = true;
+        break;
+      }
+    }
+
+    if (!foundMainGallery && collectedGalleryImages.size > 0 && DEBUG) {
+      console.log(`⚠️ Main gallery not found with high-priority selectors, used ${collectedGalleryImages.size} images from fallback selectors`);
+    }
+
+    // FALLBACK: If scoped search found nothing, retry without container restriction
+    if (collectedGalleryImages.size === 0 && productContainer) {
+      console.warn(`⚠️ No images found in scoped search, retrying without container restriction...`);
+      
+      // Retry top priority selectors on full document
+      const retrySelectors = gallerySelectors.slice(0, 15); // Top 15 selectors only
+      
+      retrySelectors.forEach((selector, i) => {
+        const imgs = doc.querySelectorAll(selector);
+        
+        imgs.forEach(img => {
+          // Check exclusions
+          const isExcluded = excludeSelectors.some(ex => img.closest(ex) !== null);
+          if (isExcluded) return;
+          
+          // Prioritize data-* attributes over src (for lazy-loaded images)
+          let src = img.getAttribute('data-src') ||
+                       img.getAttribute('data-lazy-src') ||
+                       img.getAttribute('data-image') ||
+                       img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                       img.getAttribute('data-srcset')?.split(',')[0]?.trim().split(' ')[0] ||
+                       img.getAttribute('src');  // src is now LAST (fallback only)
+          
+          if (!src) return;
+          
+          // Normalize URL for better quality (Shopify/e-commerce CDNs)
+          const normalizedSrc = normalizeImageUrl(src);
+          
+          const filename = getImageFilename(normalizedSrc);
+          
+          if (!seenFilenames.has(filename)) {
+            seenFilenames.add(filename);
+            collectedGalleryImages.set(normalizedSrc, { url: normalizedSrc, source: `${selector} (full doc)`, priority: i });
+          }
+        });
+        
+        // Early exit if we found enough
+        if (collectedGalleryImages.size >= 5) {
+          console.log(`✅ Full document search found ${collectedGalleryImages.size} images`);
+          return;
+        }
+      });
+    }
+
+    // Log collected images (batch, not per-image)
+    console.log(`📸 Collected ${collectedGalleryImages.size} unique images from gallery selectors`);
+    
+    // Enhanced debug logging for gallery extraction
+    if (productContainer) {
+      const swiperSlides = productContainer.querySelectorAll('.swiper-slide');
+      const imagesInSlides = productContainer.querySelectorAll('.swiper-slide img');
+      
+      if (DEBUG) {
+        console.log(`🔍 Gallery extraction debug:`);
+        console.log(`  - Container: ${productContainer.className || 'main'}`);
+        console.log(`  - Swiper slides found: ${swiperSlides.length || 0}`);
+        console.log(`  - Images in slides: ${imagesInSlides.length || 0}`);
+        console.log(`  - Collected URLs: ${collectedGalleryImages.size}`);
+      }
+      
+      // Warn if Swiper exists but no images collected
+      if (swiperSlides.length > 0 && collectedGalleryImages.size === 0) {
+        console.warn(`⚠️ Swiper structure detected (${swiperSlides.length} slides) but no images collected — HTML may be incomplete`);
+      }
+    }
+
+    // Add top 7 gallery images sorted by priority
+    const topGalleryImages = Array.from(collectedGalleryImages.values())
+      .sort((a, b) => a.priority - b.priority)
+      .slice(0, 7);
+
+    topGalleryImages.forEach(({ url }) => {
+      addImage(url, 'Gallery');
     });
-  }
-}
+
+    console.log(`✅ Added ${topGalleryImages.length} gallery images (top 7 by priority)`);
 
 layer2Count = imageUrls.length - layer1Count;
 console.log(`🖼️ Layer 2 found: ${layer2Count} images`);
 
-// ===== PRODUCT-SPECIFIC FILTERING FOR E-COMMERCE =====
-if (isEcommercePage && imageUrls.length > 0 && productKeywords.length > 0) {
-  console.log('🎯 Applying product-specific image filtering...');
-  
-  // We need to re-extract images with metadata to check relevance
-  // Store images with their elements for filtering
-  const imageData: Array<{url: string, element: Element | null}> = [];
-  
-  // Re-scan gallery with element metadata
-  for (const selector of gallerySelectors) {
-    const galleryImages = doc.querySelectorAll(selector);
-    galleryImages.forEach(img => {
-      const src = img.getAttribute('src') || 
-                   img.getAttribute('data-src') || 
-                   img.getAttribute('data-lazy-src');
-      if (src) {
-        // Normalize to absolute URL
-        try {
-          const absoluteSrc = src.startsWith('http') 
-            ? src 
-            : new URL(src, url).href;
-          
-          // Check if this URL was collected in our imageUrls
-          if (imageUrls.includes(absoluteSrc)) {
-            imageData.push({ url: absoluteSrc, element: img });
-          }
-        } catch (e) {
-          // Skip malformed URLs
-        }
-      }
-    });
-  }
-  
-  // Filter images by product relevance
-  const beforeCount = imageUrls.length;
-  const filteredUrls: string[] = [];
-  
-  imageUrls.forEach(imgUrl => {
-    // Find the element metadata for this URL
-    const imgData = imageData.find(d => d.url === imgUrl);
-    
-    if (isImageRelevantToProduct(imgUrl, imgData?.element || null, productKeywords)) {
-      filteredUrls.push(imgUrl);
-    } else {
-      console.log(`🚫 Filtered out: ${imgUrl.substring(imgUrl.lastIndexOf('/') + 1)}`);
-    }
-  });
-  
-  imageUrls.length = 0;
-  imageUrls.push(...filteredUrls);
-  
-  const afterCount = imageUrls.length;
-  const removedCount = beforeCount - afterCount;
-  
-  if (removedCount > 0) {
-    console.log(`✂️ Removed ${removedCount} non-matching images`);
-  }
-  
-  console.log(`✅ Product filtering complete: ${imageUrls.length} relevant images retained`);
-  
-  // Update layer counts to reflect filtering
-  layer2Count = imageUrls.length - layer1Count;
-}
+// Product keyword filtering removed - trust gallery selectors instead
 
 const highConfidenceImages = layer1Count + layer2Count;
 
@@ -617,36 +1096,7 @@ if (shouldContinueToFallbacks && imageUrls.length < 3) {
       });
     }
 
-// ===== LAYER 5: BODY IMG TAGS (LAST RESORT) =====
-// Only if we still have fewer than 2 images AND we should continue
-if (shouldContinueToFallbacks && imageUrls.length < 2) {
-      console.log('🔍 Layer 5: Checking body <img> tags (last resort)...');
-      const bodyImages = doc.querySelectorAll('img');
-      
-      for (const img of bodyImages) {
-        const src = img.getAttribute('src');
-        if (!src) continue;
-        
-        // Skip tiny images, icons, SVGs, tracking pixels
-        const width = parseInt(img.getAttribute('width') || '0');
-        const height = parseInt(img.getAttribute('height') || '0');
-        const alt = img.getAttribute('alt') || '';
-        const className = img.getAttribute('class') || '';
-        
-        // Quality filters
-        const isTiny = (width > 0 && width < 200) || (height > 0 && height < 200);
-        const isIcon = src.includes('icon') || src.includes('logo') || alt.toLowerCase().includes('icon') || className.includes('icon');
-        const isSvg = src.endsWith('.svg');
-        const isTracking = src.includes('pixel') || src.includes('track') || src.includes('analytics');
-        
-        if (!isTiny && !isIcon && !isSvg && !isTracking) {
-          if (width > 200 || height > 200 || (!width && !height)) {
-            addImage(src, 'Body Image');
-            if (imageUrls.length >= 10) break;
-          }
-        }
-      }
-    }
+// Layer 5 body scan removed - prevents noise from unrelated product images
 
     // ===== NORMALIZE ALL URLS TO ABSOLUTE =====
     const normalizedImages: string[] = [];
@@ -736,6 +1186,33 @@ if (shouldContinueToFallbacks && imageUrls.length < 2) {
       imageCount: normalizedImages.length
     });
 
+    // --- RESULT-BASED JS RENDER FALLBACK ---
+    // Check if we should retry with JS rendering based on actual results
+    const hasSwiperStructure = html.includes('swiper-slide') || 
+                               html.includes('product-thumbs-wrapper') ||
+                               html.includes('data-section-type="product"');
+    
+    const extractedImageCount = normalizedImages.length;
+    
+    // Only retry if:
+    // 1. This is the first attempt (stage === 0)
+    // 2. Swiper/dynamic structure detected
+    // 3. We got very few images (< 3)
+    // 4. It's an e-commerce page
+    if (stage === 0 && hasSwiperStructure && extractedImageCount < 3 && isEcommercePage) {
+      console.warn(`⚠️ Only ${extractedImageCount} images extracted from e-commerce page with Swiper structure`);
+      console.log(`🔄 Retrying with JS render to load dynamic gallery...`);
+      
+      try {
+        // Recursive call with stage=1 and forceJsRender=true
+        return await extractMetadata(url, 1, true);
+      } catch (retryError) {
+        console.error(`❌ JS render retry failed:`, retryError);
+        // Fall through to return current results
+        console.log(`⚠️ Using partial results from static fetch (${extractedImageCount} images)`);
+      }
+    }
+
     return new Response(
       JSON.stringify(metadata),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -764,6 +1241,35 @@ if (shouldContinueToFallbacks && imageUrls.length < 2) {
         partialExtraction: true
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } } // 200, not 500
+    );
+  }
+};
+
+// Serve function that handles the request
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const body = await req.json();
+    const url = body.url;
+    
+    if (!url) {
+      return new Response(
+        JSON.stringify({ error: 'URL is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Call the extraction function (starts at stage 0)
+    return await extractMetadata(url, 0, false);
+  } catch (error) {
+    console.error('❌ Request handling error:', error);
+    return new Response(
+      JSON.stringify({ error: 'Invalid request', details: error.message }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
