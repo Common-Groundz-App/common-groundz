@@ -623,6 +623,84 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
   layer1Count = imageUrls.length;
   console.log(`📦 Layer 1 found: ${layer1Count} images`);
 
+  // ===== LAYER 2.5: SCRIPT/JSON-LD EXTRACTION (For Vue/React SPAs like Tira Beauty) =====
+  if (imageUrls.length < 5 && hostname.includes('tirabeauty.com')) {
+    console.log('📜 Layer 2.5: Extracting images from page scripts for Tira Beauty...');
+    
+    const scripts = doc.querySelectorAll('script[type="application/ld+json"], script:not([src])');
+    const scriptImages = new Set<string>();
+    let scriptImageCount = 0;
+    
+    for (const script of scripts) {
+      const content = script.textContent;
+      if (!content) continue;
+      
+      // Extract all Tira CDN URLs from script content (match image extensions)
+      const cdnUrlPattern = /https:\/\/cdn\.tirabeauty\.com\/[^\s"'<>{}[\]()]+?\.(?:jpg|jpeg|png|webp)/gi;
+      const matches = content.match(cdnUrlPattern);
+      
+      if (matches) {
+        if (DEBUG) console.log(`  Found ${matches.length} CDN URLs in script tag`);
+        
+        for (const match of matches) {
+          try {
+            // Clean URL (remove any trailing punctuation/characters)
+            let cleanUrl = match.replace(/[,;}\]]+$/, '');
+            const urlObj = new URL(cleanUrl);
+            
+            // Skip if it's a loader/spinner/placeholder
+            const isLoader = ['/loader', '/spinner', '/loading', '/placeholder', '/icon'].some(
+              pattern => urlObj.pathname.toLowerCase().includes(pattern)
+            );
+            if (isLoader) {
+              if (DEBUG) console.log(`  ⏭️ Skipping loader: ${urlObj.pathname.slice(-50)}`);
+              continue;
+            }
+            
+            // Normalize to original/ if it contains resize-w:
+            let pathname = urlObj.pathname;
+            if (pathname.includes('/resize-w:')) {
+              pathname = pathname.replace(/\/resize-w:\d+\//, '/original/');
+              urlObj.pathname = pathname;
+              if (DEBUG) console.log(`  🔧 Normalized resize-w: to original/`);
+            }
+            
+            // Remove dpr parameter for highest quality
+            urlObj.searchParams.delete('dpr');
+            
+            const finalUrl = urlObj.toString();
+            
+            // Only add if it's an original or high-quality image (not thumbnails)
+            if (pathname.includes('/original/') || pathname.includes('/free/')) {
+              if (!scriptImages.has(finalUrl)) {
+                scriptImages.add(finalUrl);
+                scriptImageCount++;
+                if (DEBUG) console.log(`  ✅ Added from script: ${pathname.slice(-80)}`);
+              }
+            } else {
+              if (DEBUG) console.log(`  ⏭️ Skipping non-original path: ${pathname.slice(-50)}`);
+            }
+          } catch (e) {
+            // Invalid URL, skip silently
+          }
+        }
+      }
+    }
+    
+    // Add script images to main images array
+    scriptImages.forEach(url => {
+      if (!imageUrls.includes(url)) {
+        addImage(url, 'Script');
+      }
+    });
+    
+    if (scriptImageCount > 0) {
+      console.log(`✅ Layer 2.5 found: ${scriptImageCount} images from scripts`);
+    } else {
+      console.log(`⚠️ Layer 2.5: No images found in scripts`);
+    }
+  }
+
   // ===== LAYER 2: E-COMMERCE GALLERY SELECTORS (HIGH PRIORITY) =====
     console.log('🖼️ Layer 2: Checking product gallery selectors...');
     
