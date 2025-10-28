@@ -774,27 +774,28 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       '[class*="product"] img[data-src]',                 // Product container with data-src
       '[class*="gallery"] img[data-src]',                 // Gallery container with data-src
       
-      // PRIORITY 0.5: Lazy-loaded image selectors (Tira, Nykaa, etc.)
+      // PRIORITY 0.5: Tira Beauty lazy-loaded selectors
       'img.lazyload[data-src]',                           // LazyLoad.js pattern
       'img.product-detail-image[data-src]',               // Tira Beauty main image
       '.product-image-images img[data-src]',              // Tira Beauty image container
       'img[src^="data:image"][data-src]',                 // Images with placeholder + data-src
       
-      // PRIORITY 0.55: Nykaa-specific selectors
+      // PRIORITY 0.55: Nykaa-specific selectors (NO [srcset] requirement)
       '[class*="ImageGallery"] img',                      // Nykaa gallery wrapper
       '[class*="image-gallery"] img',                     // Nykaa lowercase variant
-      '[class*="product-image"] img[srcset]',             // Nykaa product images with srcset
-      'picture img[srcset]',                              // Modern <picture> elements (Nykaa)
+      '[class*="product-image"] img',                     // Nykaa product images (no srcset required)
+      '[class*="productPage"] img',                       // Product page lowercase
+      '[class*="ProductPage"] img',                       // Product page capital P
+      '[class*="css-"] img[src*="nykaa"]',                // Emotion styled-components with Nykaa CDN
+      'main img[src*="nykaa"]',                           // Main content with Nykaa CDN
+      'img[alt*="product"]',                              // Product alt text (no srcset required)
+      'img[alt*="Product"]',                              // Product alt text capital P (no srcset required)
+      '[class*="product"] img[src*="nykaa"]',             // Product containers with Nykaa CDN
       '[data-testid*="image"] img',                       // React test ID patterns
       '[data-testid*="gallery"] img',                     // Gallery test IDs
-      '[data-testid*="product"] img[srcset]',             // Product test IDs
-      'img[alt*="product"][srcset]',                      // Images with "product" in alt
-      'img[alt*="Product"][srcset]',                      // Images with "Product" in alt
       '[role="img"] img',                                 // Semantic role="img"
-      '[class*="css-"][class*="image"] img',              // Emotion/styled-components patterns
-      '[class*="ProductPage"] img[srcset]',               // Product page components
       
-      // PRIORITY 0.6: Vue/React SPA patterns (Tira, modern SPAs)
+      // PRIORITY 0.6: Tira Beauty Vue/React SPA patterns (srcset-based)
       'img[slot="image"]',                                // Vue slot-based images (Tira Beauty)
       'img[slot="image"][srcset]',                        // Slot with srcset
       'img[slot="image"][src]',                           // Slot with src fallback
@@ -802,6 +803,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       '.pic-loader img',                                  // Tira's pic-loader wrapper
       '[data-v-] img[srcset]',                            // Any Vue component with srcset
       'img[srcset^="https://cdn.tirabeauty.com"]',        // Direct Tira CDN match
+      'picture img[srcset]',                              // Modern <picture> elements (Tira)
       
       // PRIORITY 0.7: Generic CDN patterns (broad e-commerce fallback)
       'img[srcset*="cdn."]',                              // Any CDN in srcset (prioritizes srcset)
@@ -935,11 +937,11 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
             }
           }
         } else if (isNykaa) {
-          // For Nykaa, prioritize srcset, then src (original behavior)
-          src = img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0] ||
-                img.getAttribute('src') ||
+          // For Nykaa, prioritize src first (Nykaa uses simple <img src> tags)
+          src = img.getAttribute('src') ||
                 img.getAttribute('data-src') ||
-                img.getAttribute('data-lazy-src');
+                img.getAttribute('data-lazy-src') ||
+                img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0];
         } else {
           // Standard extraction for other sites (data-src first for lazy loading)
           src = img.getAttribute('data-src') ||
