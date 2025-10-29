@@ -512,6 +512,122 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       }
     };
 
+    /**
+     * Extract size hints from image URLs across all CDN patterns
+     * Returns the larger dimension (width or height) for prioritization
+     */
+    const extractImageSizeHint = (imgUrl: string): { width?: number; height?: number; maxDimension: number } => {
+      try {
+        const urlObj = new URL(imgUrl.startsWith('//') ? `https:${imgUrl}` : imgUrl);
+        const pathname = urlObj.pathname;
+        const params = urlObj.searchParams;
+        
+        let width: number | undefined;
+        let height: number | undefined;
+        
+        // 1. Query parameters (wsrv.nl, imgix, generic CDNs)
+        const widthParams = ['width', 'w', 'max-w', 'maxwidth', 'imwidth'];
+        const heightParams = ['height', 'h', 'max-h', 'maxheight', 'imheight'];
+        
+        for (const param of widthParams) {
+          const value = params.get(param);
+          if (value) {
+            const parsed = parseInt(value);
+            if (!isNaN(parsed)) width = parsed;
+            break;
+          }
+        }
+        
+        for (const param of heightParams) {
+          const value = params.get(param);
+          if (value) {
+            const parsed = parseInt(value);
+            if (!isNaN(parsed)) height = parsed;
+            break;
+          }
+        }
+        
+        // 2. Shopify filename patterns: product_2048x.jpg, product_1024x1024.jpg
+        const shopifyMatch = pathname.match(/_(\d+)x(\d*)\.(jpg|jpeg|png|webp)/i);
+        if (shopifyMatch) {
+          width = parseInt(shopifyMatch[1]);
+          if (shopifyMatch[2]) height = parseInt(shopifyMatch[2]);
+        }
+        
+        // 3. Cloudinary path patterns: /w_2048/, /h_1080/, /c_scale/
+        const cloudinaryWidth = pathname.match(/\/w_(\d+)\//);
+        const cloudinaryHeight = pathname.match(/\/h_(\d+)\//);
+        if (cloudinaryWidth) width = parseInt(cloudinaryWidth[1]);
+        if (cloudinaryHeight) height = parseInt(cloudinaryHeight[1]);
+        
+        // 4. ImageKit.io patterns: /tr:w-2048/
+        const imagekitWidth = pathname.match(/\/tr:w-(\d+)/);
+        const imagekitHeight = pathname.match(/\/tr:h-(\d+)/);
+        if (imagekitWidth) width = parseInt(imagekitWidth[1]);
+        if (imagekitHeight) height = parseInt(imagekitHeight[1]);
+        
+        // 5. Nykaa patterns: .jpg?tr=w-2048
+        const nykaaWidth = params.get('tr')?.match(/w-(\d+)/);
+        if (nykaaWidth) width = parseInt(nykaaWidth[1]);
+        
+        // 6. Decoded proxy targets (wsrv.nl, weserv.nl with embedded URLs)
+        const embeddedUrl = params.get('url') || params.get('image');
+        if (embeddedUrl) {
+          try {
+            const decoded = decodeURIComponent(embeddedUrl);
+            const embeddedSize = extractImageSizeHint(decoded);
+            if (!width && embeddedSize.width) width = embeddedSize.width;
+            if (!height && embeddedSize.height) height = embeddedSize.height;
+          } catch {
+            // Ignore decoding errors
+          }
+        }
+        
+        // Return the larger dimension for prioritization
+        const maxDimension = Math.max(width || 0, height || 0);
+        
+        return { width, height, maxDimension };
+      } catch (e) {
+        return { maxDimension: 0 };
+      }
+    };
+
+    /**
+     * Build a canonical key for image deduplication WITHOUT size parameters
+     * This allows us to identify different size variants of the same image
+     * Reuses the existing buildImageDedupKey logic but strips size info
+     */
+    const buildCanonicalImageKey = (imgUrl: string, filename: string): string => {
+      try {
+        let urlObj: URL;
+        try {
+          if (imgUrl.startsWith('//')) {
+            urlObj = new URL(`https:${imgUrl}`);
+          } else if (imgUrl.startsWith('http')) {
+            urlObj = new URL(imgUrl);
+          } else {
+            urlObj = new URL(imgUrl, url);
+          }
+        } catch {
+          return filename;
+        }
+        
+        // Check if this is a proxy/CDN URL
+        const isProxy = PROXY_CDN_PATTERNS.some(pattern => urlObj.hostname.includes(pattern));
+        
+        if (isProxy) {
+          // For proxy URLs: Return just the filename WITHOUT size params
+          // This makes "product.jpg&width=256" and "product.jpg&width=1080" collapse to "product.jpg"
+          return filename;
+        } else {
+          // For normal URLs: Use origin + filename (same as buildImageDedupKey)
+          return `${urlObj.origin}/${filename}`;
+        }
+      } catch {
+        return filename;
+      }
+    };
+
     // Helper: Check if image is from same domain or trusted CDN
     const isSameDomainOrCDN = (imgUrl: string): boolean => {
       try {
@@ -662,7 +778,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     };
 
     // ===== TIER 3: ✅ REFINEMENT 1: PRIORITY SCORING (KEEP WHITELIST AS BOOSTER) =====
-    const calculateImagePriority = (imgUrl: string, source: string): number => {
+    const calculateImagePriority = (imgUrl: string, source: string, sizeHint: number = 0): number => {
       let priority = 0;
       
       // Base priority by source
@@ -688,6 +804,16 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       const productKeywords = ['product', 'item', 'media', 'gallery', 'catalog'];
       if (productKeywords.some(kw => imgUrl.toLowerCase().includes(kw))) {
         priority += 1;
+      }
+      
+      // Size-based bonus (larger images get higher priority)
+      // +0.5 for every 1000px (so 2048px gets +1, 4096px gets +2)
+      if (sizeHint > 0) {
+        const sizeBonus = Math.min(2, sizeHint / 1000 * 0.5);  // Cap at +2
+        priority += sizeBonus;
+        if (DEBUG && sizeBonus > 0) {
+          console.log(`📈 Priority boost (+${sizeBonus.toFixed(1)}): Size ${sizeHint}px`);
+        }
       }
       
       return priority;
@@ -804,19 +930,27 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         return false;
       }
       
+      let canonicalKey: string;
+      let sizeInfo: { width?: number; height?: number; maxDimension: number };
+      
       try {
         const baseFilename = filename.split('?')[0].split('#')[0].toLowerCase();
-        const dedupKey = buildImageDedupKey(imgUrl, baseFilename);  // ✅ Use shared helper
+        const dedupKeyWithSize = buildImageDedupKey(imgUrl, baseFilename);  // Includes size for exact duplicate check
+        canonicalKey = buildCanonicalImageKey(imgUrl, baseFilename);  // WITHOUT size for collapsing variants
+        sizeInfo = extractImageSizeHint(imgUrl);
         
-        if (seenFilenames.has(dedupKey)) {
-          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${dedupKey.slice(-60)} from ${source}`);
+        if (seenFilenames.has(dedupKeyWithSize)) {
+          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${dedupKeyWithSize.slice(-60)} from ${source}`);
           return false;
         }
-        seenFilenames.add(dedupKey);
-        if (DEBUG) console.log(`🆕 New image tracked: ${dedupKey.slice(-60)}`);
+        seenFilenames.add(dedupKeyWithSize);
+        if (DEBUG) console.log(`🆕 New image tracked: ${canonicalKey.slice(-40)} (${sizeInfo.maxDimension}px)`);
       } catch (e) {
         // Fallback to filename-only check
         const baseFilename = filename.split('?')[0].split('#')[0].toLowerCase();
+        canonicalKey = baseFilename;
+        sizeInfo = { maxDimension: 0 };
+        
         if (baseFilename && seenFilenames.has(baseFilename)) {
           if (DEBUG) console.log(`⏭️ Skipping duplicate filename: ${baseFilename} from ${source}`);
           return false;
@@ -841,12 +975,18 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         return false;
       }
       
-      // TIER 3: Calculate priority (no hard rejection)
-      const priority = calculateImagePriority(absoluteUrl, source);
+      // TIER 3: Calculate priority with size hint
+      const priority = calculateImagePriority(absoluteUrl, source, sizeInfo.maxDimension);
       
-      imageCollection.push({ url: absoluteUrl, priority, source });
+      imageCollection.push({ 
+        url: absoluteUrl, 
+        priority, 
+        source,
+        canonicalKey,
+        sizeHint: sizeInfo.maxDimension
+      });
       seenUrls.add(imgUrl);
-      console.log(`✅ Added from ${source} (priority: ${priority}): ${absoluteUrl}`);
+      console.log(`✅ Added from ${source} (priority: ${priority}, size: ${sizeInfo.maxDimension}px): ${absoluteUrl}`);
       return true;
     };
 
@@ -1451,6 +1591,39 @@ if (shouldContinueToFallbacks && imageCollection.length < 3) {
     }
 
 // Layer 5 body scan removed - prevents noise from unrelated product images
+
+    // ===== COLLAPSE DUPLICATES BY CANONICAL KEY (KEEP LARGEST) =====
+    console.log(`🔍 Collapsing ${imageCollection.length} images by canonical key...`);
+
+    const canonicalMap = new Map<string, typeof imageCollection[0]>();
+
+    imageCollection.forEach(item => {
+      const existing = canonicalMap.get(item.canonicalKey);
+      
+      if (!existing) {
+        // First time seeing this canonical image
+        canonicalMap.set(item.canonicalKey, item);
+        if (DEBUG) console.log(`🆕 Canonical: ${item.canonicalKey.slice(-40)} (${item.sizeHint}px)`);
+      } else {
+        // Duplicate found - keep the larger one
+        if (item.sizeHint > existing.sizeHint) {
+          if (DEBUG) {
+            console.log(`🔄 Replacing: ${existing.canonicalKey.slice(-40)} ${existing.sizeHint}px → ${item.sizeHint}px`);
+          }
+          canonicalMap.set(item.canonicalKey, item);
+        } else {
+          if (DEBUG) {
+            console.log(`⏭️ Keeping existing: ${existing.canonicalKey.slice(-40)} ${existing.sizeHint}px (skipping ${item.sizeHint}px)`);
+          }
+        }
+      }
+    });
+
+    // Replace imageCollection with collapsed results
+    imageCollection.length = 0;
+    imageCollection.push(...Array.from(canonicalMap.values()));
+
+    console.log(`✅ Collapsed to ${imageCollection.length} unique images`);
 
     // ===== SORT BY PRIORITY AND EXTRACT TOP 7 IMAGES =====
     console.log(`📊 Sorting ${imageCollection.length} images by priority...`);
