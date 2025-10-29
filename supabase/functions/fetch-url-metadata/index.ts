@@ -592,11 +592,45 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       const urlLower = imgUrl.toLowerCase();
       const alt = altText.toLowerCase();
       
-      // ✅ REFINEMENT 2: MIME-type / extension validation
-      if (!urlLower.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) {
-        if (DEBUG) console.log(`⏭️ Invalid extension: ${imgUrl.slice(-40)}`);
-        return false;
+      // ✅ REFINEMENT 2: MIME-type / extension validation (proxy-aware)
+      // Fast path: check for extension in URL path first (covers most CDNs)
+      const hasPathExtension = urlLower.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
+
+      if (!hasPathExtension) {
+        // No path extension - check if it's a proxy URL with format in query params
+        try {
+          const urlObj = new URL(imgUrl);
+          const isProxy = PROXY_CDN_PATTERNS.some(pattern => urlObj.hostname.includes(pattern));
+          
+          if (isProxy) {
+            // For proxy URLs, check output/format parameter OR embedded URL extension
+            const hasValidFormat = urlLower.includes('output=webp') || 
+                                  urlLower.includes('output=jpg') || 
+                                  urlLower.includes('output=jpeg') || 
+                                  urlLower.includes('output=png') ||
+                                  urlLower.includes('format=webp') ||
+                                  urlLower.includes('format=jpg') ||
+                                  urlLower.includes('format=jpeg') ||
+                                  urlLower.includes('format=png') ||
+                                  urlLower.match(/url=.*\.(jpg|jpeg|png|webp)/i);
+            
+            if (!hasValidFormat) {
+              if (DEBUG) console.log(`⏭️ Invalid proxy format: ${imgUrl.slice(-40)}`);
+              return false;
+            }
+            if (DEBUG) console.log(`✅ Valid proxy image: ${imgUrl.slice(-60)}`);
+          } else {
+            // Not a proxy and no extension in path = reject
+            if (DEBUG) console.log(`⏭️ Invalid extension: ${imgUrl.slice(-40)}`);
+            return false;
+          }
+        } catch {
+          // URL parsing failed and no path extension = reject
+          if (DEBUG) console.log(`⏭️ Invalid extension (fallback): ${imgUrl.slice(-40)}`);
+          return false;
+        }
       }
+      // If hasPathExtension is true, continue to next validation step
       
       // Size check: Reject URLs with explicit small dimensions
       const sizeMatch = urlLower.match(/(?:width|w|size)=(\d+)/);
@@ -1299,9 +1333,22 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           
           const filename = getImageFilename(normalizedSrc);
           
-          if (!seenFilenames.has(filename)) {
-            seenFilenames.add(filename);
-            collectedGalleryImages.set(normalizedSrc, { url: normalizedSrc, source: `${selector} (full doc)`, priority: i });
+          // Use proxy-aware deduplication (same as primary gallery loop)
+          try {
+            const dedupKey = buildImageDedupKey(normalizedSrc, filename);
+            if (!seenFilenames.has(dedupKey)) {
+              seenFilenames.add(dedupKey);
+              collectedGalleryImages.set(normalizedSrc, { url: normalizedSrc, source: `${selector} (full doc)`, priority: i });
+              if (DEBUG) console.log(`✅ Full doc image added: ${dedupKey.slice(-60)}`);
+            } else if (DEBUG) {
+              console.log(`⏭️ Skipping duplicate (full doc): ${dedupKey.slice(-60)}`);
+            }
+          } catch {
+            // Fallback to simple filename check if buildImageDedupKey throws
+            if (!seenFilenames.has(filename)) {
+              seenFilenames.add(filename);
+              collectedGalleryImages.set(normalizedSrc, { url: normalizedSrc, source: `${selector} (full doc)`, priority: i });
+            }
           }
         });
         
