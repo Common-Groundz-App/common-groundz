@@ -247,7 +247,12 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
                     doc.querySelector('link[rel="shortcut icon"]')?.getAttribute('href') || '';
 
     // ===== ENHANCED PRODUCT IMAGE EXTRACTION =====
-    const imageUrls: string[] = [];
+    interface ImageWithPriority {
+      url: string;
+      priority: number;
+      source: string;
+    }
+    const imageCollection: ImageWithPriority[] = [];
     const seenUrls = new Set<string>();
     const seenFilenames = new Set<string>(); // Track by filename to prevent duplicates
     const pageUrl = new URL(url);
@@ -435,6 +440,106 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       }
     };
 
+    // ===== TIER 1: BLACKLIST KNOWN BAD DOMAINS =====
+    const BLOCKED_IMAGE_DOMAINS = [
+      'doubleclick.net',
+      'google-analytics.com',
+      'googletagmanager.com',
+      'facebook.com',
+      'facebook.net',
+      'twitter.com',
+      'analytics',
+      'tracking',
+      'pixel',
+      'ads.',
+      'ad.',
+      'track.',
+      'beacon.',
+      'tag.',
+      'event.'
+    ];
+
+    const isBlockedDomain = (imgUrl: string): boolean => {
+      try {
+        const hostname = new URL(imgUrl, url).hostname.toLowerCase();
+        return BLOCKED_IMAGE_DOMAINS.some(pattern => hostname.includes(pattern));
+      } catch {
+        return true; // Block invalid URLs
+      }
+    };
+
+    // ===== TIER 2: SMART IMAGE QUALITY VALIDATION =====
+    const isLikelyProductImage = (imgUrl: string, altText: string = ''): boolean => {
+      const urlLower = imgUrl.toLowerCase();
+      const alt = altText.toLowerCase();
+      
+      // ✅ REFINEMENT 2: MIME-type / extension validation
+      if (!urlLower.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) {
+        if (DEBUG) console.log(`⏭️ Invalid extension: ${imgUrl.slice(-40)}`);
+        return false;
+      }
+      
+      // Size check: Reject URLs with explicit small dimensions
+      const sizeMatch = urlLower.match(/(?:width|w|size)=(\d+)/);
+      if (sizeMatch && parseInt(sizeMatch[1]) < 150) {
+        if (DEBUG) console.log(`⏭️ Too small (${sizeMatch[1]}px): ${imgUrl.slice(-40)}`);
+        return false;
+      }
+      
+      // Exclude by filename patterns
+      const excludePatterns = [
+        'logo', 'icon', 'banner', 'ad', 'promo',
+        'tracking', 'pixel', 'badge', 'rating',
+        'social', 'share', 'cart', 'wishlist',
+        'button', 'arrow', 'close', 'search'
+      ];
+      
+      if (excludePatterns.some(pattern => urlLower.includes(pattern))) {
+        if (DEBUG) console.log(`⏭️ Excluded pattern: ${imgUrl.slice(-40)}`);
+        return false;
+      }
+      
+      // Check alt text for obvious non-product images
+      if (alt.includes('logo') || alt.includes('icon') || alt.includes('banner')) {
+        if (DEBUG) console.log(`⏭️ Excluded by alt text: ${alt}`);
+        return false;
+      }
+      
+      return true;
+    };
+
+    // ===== TIER 3: ✅ REFINEMENT 1: PRIORITY SCORING (KEEP WHITELIST AS BOOSTER) =====
+    const calculateImagePriority = (imgUrl: string, source: string): number => {
+      let priority = 0;
+      
+      // Base priority by source
+      const sourcePriority: Record<string, number> = {
+        'JSON-LD Product': 10,
+        'JSON-LD Article': 8,
+        'JSON-LD ImageObject': 8,
+        'Script': 9,
+        'Gallery': 8,
+        'Open Graph': 5,
+        'Twitter Card': 4,
+        'Universal fallback': 2
+      };
+      priority += sourcePriority[source] || 0;
+      
+      // ✅ REFINEMENT 1: Bonus for whitelisted CDN (not filter, just boost)
+      if (isSameDomainOrCDN(imgUrl)) {
+        priority += 3;
+        if (DEBUG) console.log(`📈 Priority boost (+3): Trusted CDN`);
+      }
+      
+      // Bonus for product keywords in URL
+      const productKeywords = ['product', 'item', 'media', 'gallery', 'catalog'];
+      if (productKeywords.some(kw => imgUrl.toLowerCase().includes(kw))) {
+        priority += 1;
+      }
+      
+      return priority;
+    };
+
     /**
      * Normalize Shopify CDN image URLs to request high-resolution versions
      * Strips size/crop parameters and replaces with targetWidth
@@ -529,8 +634,8 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       return imgUrl;
     };
 
-    // Helper: Add image with duplicate checking
-    const addImage = (imgUrl: string, source: string): boolean => {
+    // Helper: Add image with smart filtering and priority
+    const addImage = (imgUrl: string, source: string, altText: string = ''): boolean => {
       // Check exact URL duplication first
       if (!imgUrl || seenUrls.has(imgUrl)) {
         if (DEBUG) console.log(`⏭️ Skipping exact URL duplicate: ${imgUrl}`);
@@ -545,7 +650,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         const normalizedKey = `${new URL(imgUrl, url).origin}/${baseFilename}`;
         
         if (seenFilenames.has(normalizedKey)) {
-          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${baseFilename} (${normalizedKey}) from ${source}`);
+          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${baseFilename} from ${source}`);
           return false;
         }
         seenFilenames.add(normalizedKey);
@@ -559,28 +664,26 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         if (baseFilename) seenFilenames.add(baseFilename);
       }
       
-      // Domain filter - accept same-host or known CDNs
-      try {
-        // Handle relative URLs
-        const absoluteUrl = imgUrl.startsWith('http') ? imgUrl : new URL(imgUrl, url).href;
-        const imgHost = new URL(absoluteUrl).hostname;
-        const pageHost = new URL(url).hostname;
-        
-        // Accept if:
-        // 1. Same hostname (e.g., cosmix.in/cdn/... and cosmix.in/products/...)
-        // 2. Known CDN (checked by isSameDomainOrCDN)
-        if (imgHost !== pageHost && !isSameDomainOrCDN(absoluteUrl)) {
-          if (DEBUG) console.log(`⚠️ Skipping external domain: ${imgHost} (page: ${pageHost}) from ${source}`);
-          return false;
-        }
-      } catch (e) {
-        console.warn(`⚠️ Failed to parse image URL: ${imgUrl}`, e);
+      // Handle relative URLs
+      const absoluteUrl = imgUrl.startsWith('http') ? imgUrl : new URL(imgUrl, url).href;
+      
+      // TIER 1: Block known bad domains
+      if (isBlockedDomain(absoluteUrl)) {
+        if (DEBUG) console.log(`🚫 Blocked domain: ${absoluteUrl.slice(-40)}`);
         return false;
       }
       
-      imageUrls.push(imgUrl);
+      // TIER 2: Smart quality filter
+      if (!isLikelyProductImage(absoluteUrl, altText)) {
+        return false;
+      }
+      
+      // TIER 3: Calculate priority (no hard rejection)
+      const priority = calculateImagePriority(absoluteUrl, source);
+      
+      imageCollection.push({ url: absoluteUrl, priority, source });
       seenUrls.add(imgUrl);
-      console.log(`✅ Added from ${source}: ${imgUrl}`);
+      console.log(`✅ Added from ${source} (priority: ${priority}): ${absoluteUrl}`);
       return true;
     };
 
@@ -620,11 +723,11 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     }
   });
 
-  layer1Count = imageUrls.length;
+  layer1Count = imageCollection.length;
   console.log(`📦 Layer 1 found: ${layer1Count} images`);
 
   // ===== LAYER 2.5: SCRIPT/JSON-LD EXTRACTION (For Vue/React SPAs like Tira Beauty) =====
-  if (imageUrls.length < 5 && hostname.includes('tirabeauty.com')) {
+  if (imageCollection.length < 5 && hostname.includes('tirabeauty.com')) {
     console.log('📜 Layer 2.5: Extracting images from page scripts for Tira Beauty...');
     
     const scripts = doc.querySelectorAll('script[type="application/ld+json"], script:not([src])');
@@ -712,7 +815,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     
     // Add script images to main images array
     scriptImages.forEach(url => {
-      if (!imageUrls.includes(url)) {
+      if (!imageCollection.some(img => img.url === url)) {
         addImage(url, 'Script');
       }
     });
@@ -854,6 +957,42 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       '[id*="product-gallery"] img',
       '[id*="ProductGallery"] img',
       '[class*="thumbnail"] img'
+    ];
+
+    // ===== ✅ REFINEMENT 3: UNIVERSAL FALLBACK SELECTORS (TRIGGER ONLY IF MAIN LAYERS FAIL) =====
+    const universalFallbackSelectors = [
+      // WooCommerce
+      'img.wp-post-image',
+      '.woocommerce-product-gallery__image img',
+      
+      // Generic structural hints
+      'main img[src*="/product"]',
+      'main img[src*="/media"]',
+      '[role="main"] img[src*="/images"]',
+      
+      // Semantic product markup
+      'img[itemprop="image"]',
+      '[itemprop="image"] img',
+      'figure.product img',
+      
+      // Generic product containers
+      '.product img[src*="cdn"]',
+      '.item-image img',
+      'img[data-zoom]',
+      
+      // Flipkart/Myntra patterns
+      'img[src*="rukmini"]',
+      'img[src*="flixcart"]',
+      'img[src*="assets.myntassets"]',
+      
+      // Generic CDN patterns
+      'img[src*="cdn."][alt*="product"]',
+      'img[src*="images."][alt*="product"]',
+      'img[src*="digitaloceanspaces"]',
+      
+      // Generic e-commerce patterns
+      'a img[src*="/product/"]',
+      'a img[src*="/p/"]'
     ];
 
     // ===== BATCH COLLECTION WITH EARLY EXIT =====
@@ -1076,12 +1215,33 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
 
     console.log(`✅ Added ${topGalleryImages.length} gallery images (top 7 by priority)`);
 
-layer2Count = imageUrls.length - layer1Count;
+layer2Count = imageCollection.length - layer1Count;
 console.log(`🖼️ Layer 2 found: ${layer2Count} images`);
 
 // Product keyword filtering removed - trust gallery selectors instead
 
 const highConfidenceImages = layer1Count + layer2Count;
+
+// ===== ✅ REFINEMENT 3: UNIVERSAL FALLBACK SELECTORS (ONLY IF COLLECTION IS EMPTY) =====
+if (imageCollection.length === 0) {
+  console.log('🔄 Layer 2.5: Running universal fallback selectors...');
+  
+  universalFallbackSelectors.forEach(selector => {
+    const images = doc.querySelectorAll(selector);
+    images.forEach(img => {
+      const src = img.getAttribute('data-src') ||
+                  img.getAttribute('src') ||
+                  img.getAttribute('srcset')?.split(',')[0]?.trim().split(' ')[0];
+      const altText = img.getAttribute('alt') || '';
+      
+      if (src) {
+        addImage(normalizeImageUrl(src), 'Universal fallback', altText);
+      }
+    });
+  });
+  
+  console.log(`🔄 Universal fallback found: ${imageCollection.length} images`);
+}
 
 // ===== PHASE 2: DECISION POINT - Should we continue to fallback layers? =====
 let shouldContinueToFallbacks = true;
@@ -1093,7 +1253,7 @@ if (isEcommercePage && highConfidenceImages >= MIN_PRODUCT_GALLERY_IMAGES) {
 
 // ===== LAYER 3: OPEN GRAPH IMAGES (FALLBACK) =====
 // Only if we have fewer than 3 images so far AND we should continue
-if (shouldContinueToFallbacks && imageUrls.length < 3) {
+if (shouldContinueToFallbacks && imageCollection.length < 3) {
       console.log('🌐 Layer 3: Checking Open Graph images...');
       const ogImages = doc.querySelectorAll('meta[property="og:image"], meta[property="og:image:secure_url"]');
       ogImages.forEach(tag => {
@@ -1103,7 +1263,7 @@ if (shouldContinueToFallbacks && imageUrls.length < 3) {
     }
 
 // ===== LAYER 4: TWITTER CARD IMAGES (FALLBACK) =====
-if (shouldContinueToFallbacks && imageUrls.length < 3) {
+if (shouldContinueToFallbacks && imageCollection.length < 3) {
       console.log('🐦 Layer 4: Checking Twitter card images...');
       const twitterImages = doc.querySelectorAll('meta[name="twitter:image"], meta[property="twitter:image"]');
       twitterImages.forEach(tag => {
@@ -1113,6 +1273,23 @@ if (shouldContinueToFallbacks && imageUrls.length < 3) {
     }
 
 // Layer 5 body scan removed - prevents noise from unrelated product images
+
+    // ===== SORT BY PRIORITY AND EXTRACT TOP 7 IMAGES =====
+    console.log(`📊 Sorting ${imageCollection.length} images by priority...`);
+    
+    // Sort by priority (highest first)
+    imageCollection.sort((a, b) => b.priority - a.priority);
+    
+    // Take top 7
+    const topImages = imageCollection.slice(0, 7);
+    
+    console.log(`📊 Final ranking (top ${topImages.length} of ${imageCollection.length}):`);
+    topImages.forEach((item, idx) => {
+      console.log(`  ${idx + 1}. [P${item.priority}] ${item.source}: ${item.url.slice(-60)}`);
+    });
+    
+    // Extract URLs for normalization
+    const imageUrls = topImages.map(item => item.url);
 
     // ===== NORMALIZE ALL URLS TO ABSOLUTE =====
     const normalizedImages: string[] = [];
