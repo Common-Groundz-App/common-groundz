@@ -489,13 +489,33 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       
       // Handle AI predictions
       if (aiResult.error) {
-        throw aiResult.error;
+        console.error('⚠️ AI analysis error:', aiResult.error);
+        // Don't throw - show warning but continue with metadata
+        toast({
+          title: "AI Analysis Unavailable",
+          description: "Using basic metadata only. You can still create the entity.",
+          variant: "default"
+        });
       }
       
-      console.log('🤖 AI Analysis:', aiResult.data);
+      if (aiResult.data) {
+        console.log('🤖 AI Analysis:', aiResult.data);
+        setAiPredictions(aiResult.data);
+        
+        // Show different toast based on success status
+        if (aiResult.data.success === false) {
+          toast({
+            title: "AI Suggestions Unavailable",
+            description: aiResult.data.message || "Using basic metadata. Images are still available.",
+            variant: "default"
+          });
+        }
+      }
       
-      setAiPredictions(aiResult.data);
-      setShowPreviewModal(true);
+      // Show preview modal if we have metadata OR AI predictions
+      if (metadataResult.data || aiResult.data) {
+        setShowPreviewModal(true);
+      }
       
     } catch (error: any) {
       console.error('❌ URL Analysis Error:', error);
@@ -511,32 +531,104 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
   // Apply AI predictions to form
   const applyAiPredictions = async () => {
-    if (!aiPredictions?.predictions) {
+    // Check if we have ANY data to apply (AI predictions OR metadata)
+    const hasPredictions = aiPredictions?.predictions;
+    const hasMetadata = urlMetadata?.images?.length > 0 || urlMetadata?.image || urlMetadata?.title;
+    
+    if (!hasPredictions && !hasMetadata) {
       toast({
-        title: "No Predictions",
-        description: "No predictions available to apply",
+        title: "No Data Available",
+        description: "No predictions or metadata available to apply",
         variant: "destructive"
       });
       return;
     }
     
-    const pred = aiPredictions.predictions;
-    
-    // Validate URL matches entity type if type is predicted
-    if (pred.type && analyzeUrl) {
-      const validation = validateUrlForType(analyzeUrl, pred.type);
-      if (!validation.isValid) {
-        const suggestedType = getSuggestedEntityType(analyzeUrl);
-        setUrlMismatchMessage(
-          validation.message + 
-          (suggestedType ? ` This URL appears to be for a ${suggestedType}.` : '')
-        );
-        setShowUrlMismatchDialog(true);
-        return;
+    // If we have predictions, validate URL type matching
+    if (hasPredictions) {
+      const pred = aiPredictions.predictions;
+      
+      if (pred.type && analyzeUrl) {
+        const validation = validateUrlForType(analyzeUrl, pred.type);
+        if (!validation.isValid) {
+          const suggestedType = getSuggestedEntityType(analyzeUrl);
+          setUrlMismatchMessage(
+            validation.message + 
+            (suggestedType ? ` This URL appears to be for a ${suggestedType}.` : '')
+          );
+          setShowUrlMismatchDialog(true);
+          return;
+        }
       }
+      
+      // Apply AI predictions
+      await applyPredictionsToForm(pred);
+    } else {
+      // Apply metadata only (no AI predictions available)
+      await applyMetadataOnly();
+    }
+  };
+
+  const applyMetadataOnly = async () => {
+    let appliedCount = 0;
+    let imagesApplied = 0;
+    
+    console.log('📄 Applying metadata without AI predictions');
+    
+    // Apply basic metadata fields
+    if (urlMetadata?.title) {
+      handleInputChange('name', urlMetadata.title);
+      appliedCount++;
     }
     
-    await applyPredictionsToForm(pred);
+    if (urlMetadata?.description) {
+      handleInputChange('description', urlMetadata.description);
+      appliedCount++;
+    }
+    
+    // Apply images from metadata
+    if (urlMetadata?.images && Array.isArray(urlMetadata.images) && urlMetadata.images.length > 0) {
+      console.log(`🖼️ Processing ${urlMetadata.images.length} metadata images`);
+      
+      urlMetadata.images.forEach((imageUrl: string) => {
+        addImageToMediaGallery(imageUrl, 'metadata');
+        imagesApplied++;
+      });
+      
+      // Set first image as primary
+      handleInputChange('image_url', urlMetadata.images[0]);
+      appliedCount++;
+      
+      console.log(`✅ Applied ${imagesApplied} metadata images to gallery`);
+    } else if (urlMetadata?.image) {
+      handleInputChange('image_url', urlMetadata.image);
+      addImageToMediaGallery(urlMetadata.image, 'metadata');
+      appliedCount++;
+      imagesApplied = 1;
+      console.log('🖼️ Applied single metadata image:', urlMetadata.image);
+    }
+    
+    // Apply website URL
+    if (analyzeUrl) {
+      handleInputChange('website_url', analyzeUrl);
+      appliedCount++;
+    }
+    
+    // Close modal
+    setShowPreviewModal(false);
+    
+    // Show success toast
+    const imageCount = imagesApplied || 0;
+    const mediaMessage = imageCount > 0 
+      ? ` (including ${imageCount} image${imageCount > 1 ? 's' : ''} added to gallery)` 
+      : '';
+
+    toast({
+      title: "Metadata Applied",
+      description: `Applied ${appliedCount} fields${mediaMessage}. AI suggestions were unavailable, but you can fill remaining fields manually.`,
+    });
+    
+    console.log('✅ Applied metadata-only (no AI predictions)');
   };
   
   const applyPredictionsToForm = async (pred: any) => {

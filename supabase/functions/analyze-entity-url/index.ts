@@ -86,7 +86,26 @@ serve(async (req) => {
     const aiText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
     
     if (!aiText) {
-      throw new Error('Gemini returned empty response');
+      console.warn('⚠️ Gemini returned empty text response');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          predictions: null,
+          raw_text: '',
+          message: 'Gemini returned empty text. Please apply metadata manually or try again.',
+          metadata: {
+            analyzed_url: url,
+            model: 'gemini-2.5-flash',
+            timestamp: new Date().toISOString(),
+            method: 'url_context_grounding',
+            gemini_empty: true
+          }
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     // Extract JSON from response
@@ -113,10 +132,34 @@ serve(async (req) => {
     } catch (parseError) {
       console.error('❌ Failed to parse AI response:', parseError);
       console.error('Raw AI text:', aiText);
+      
       // Final fallback: extract any JSON object
-      const jsonMatch = aiText.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? jsonMatch[0] : aiText;
-      aiPredictions = JSON.parse(jsonText);
+      try {
+        const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+        const jsonText = jsonMatch ? jsonMatch[0] : aiText;
+        aiPredictions = JSON.parse(jsonText);
+      } catch (finalError) {
+        console.error('❌ Final JSON parse failed:', finalError);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            predictions: null,
+            raw_text: aiText,
+            message: 'Failed to parse AI response. Please apply metadata manually.',
+            metadata: {
+              analyzed_url: url,
+              model: 'gemini-2.5-flash',
+              timestamp: new Date().toISOString(),
+              method: 'url_context_grounding',
+              parse_error: true
+            }
+          }),
+          { 
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
     }
 
     // Match category to existing categories in database with path-based scoring
