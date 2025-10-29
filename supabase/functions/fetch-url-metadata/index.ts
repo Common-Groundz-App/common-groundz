@@ -382,14 +382,89 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     let layer1Count = 0; // JSON-LD
     let layer2Count = 0; // Gallery selectors
 
-    // Helper: Extract filename without query params
+    // Helper: Extract filename without query params (with proxy/CDN support)
     const getImageFilename = (imgUrl: string): string => {
       try {
         const urlObj = new URL(imgUrl, url);
+        
+        // REFINEMENT 1: Extended proxy/CDN detection
+        const PROXY_CDN_PATTERNS = [
+          'wsrv.nl',
+          'weserv.nl',
+          'cdn.shopify.com',
+          'cloudfront.net',
+          'jsdelivr.net',
+          'imgix.net',
+          'cloudinary.com'
+        ];
+        
+        const isProxyCDN = PROXY_CDN_PATTERNS.some(pattern => 
+          urlObj.hostname.includes(pattern)
+        );
+        
+        // SPECIAL CASE 1: wsrv.nl/weserv.nl proxy with url parameter
+        if ((urlObj.hostname.includes('wsrv.nl') || urlObj.hostname.includes('weserv.nl'))) {
+          const actualUrl = urlObj.searchParams.get('url');
+          if (actualUrl) {
+            try {
+              const decodedUrl = decodeURIComponent(actualUrl);
+              const actualUrlObj = new URL(decodedUrl);
+              const actualPathname = actualUrlObj.pathname;
+              const actualFilename = actualPathname.split('/').pop()?.split('?')[0].split('#')[0] || '';
+              
+              // REFINEMENT 2: Normalize to lowercase
+              const normalized = actualFilename.toLowerCase();
+              
+              if (DEBUG) console.log(`📦 Extracted from proxy: ${normalized}`);
+              return normalized;
+            } catch {
+              // If proxy URL parsing fails, continue with normal extraction
+            }
+          }
+        }
+        
+        // SPECIAL CASE 2: CDN services (extract from path, not query params)
+        if (isProxyCDN) {
+          const pathname = urlObj.pathname;
+          // Extract the actual filename from CDN path structures like:
+          // /s/files/1/0123/4567/products/shoe.jpg
+          // /c_fill,w_800/product-image.jpg
+          const filename = pathname.split('/').pop()?.split('?')[0].split('#')[0] || '';
+          
+          // REFINEMENT 2: Normalize to lowercase
+          const normalized = filename.toLowerCase();
+          
+          if (DEBUG) console.log(`📦 Extracted from CDN: ${normalized}`);
+          return normalized;
+        }
+        
+        // NORMAL CASE: Extract from pathname
         const pathname = urlObj.pathname;
-        return pathname.split('/').pop()?.split('?')[0] || '';
+        const filename = pathname.split('/').pop()?.split('?')[0].split('#')[0] || '';
+        
+        // REFINEMENT 2: Normalize to lowercase
+        const normalized = filename.toLowerCase();
+        
+        // FALLBACK: If filename is empty (root path), use full URL as identifier
+        if (!normalized || normalized === '') {
+          // Use the full URL (without protocol) as unique identifier
+          const fallback = `${urlObj.hostname}${urlObj.pathname}${urlObj.search}`
+            .replace(/[^a-zA-Z0-9]/g, '-')
+            .toLowerCase(); // REFINEMENT 2: Also normalize fallback
+          
+          if (DEBUG) console.log(`⚠️ Using fallback identifier: ${fallback.slice(-40)}`);
+          return fallback;
+        }
+        
+        return normalized;
       } catch {
-        return '';
+        // ULTIMATE FALLBACK: Use a hash of the URL
+        const fallback = imgUrl.slice(-40)
+          .replace(/[^a-zA-Z0-9]/g, '-')
+          .toLowerCase(); // REFINEMENT 2: Normalize fallback
+        
+        if (DEBUG) console.log(`⚠️ Using ultimate fallback: ${fallback}`);
+        return fallback;
       }
     };
 
@@ -644,9 +719,16 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       
       // Check duplicates by origin + filename (strip query params for CDN variants)
       const filename = getImageFilename(imgUrl);
+      
+      // Skip if filename extraction failed completely
+      if (!filename) {
+        if (DEBUG) console.log(`⚠️ Could not extract filename from: ${imgUrl.slice(-60)}`);
+        return false;
+      }
+      
       try {
-        // Strip query parameters (e.g., ?v=123, ?width=800) for smarter deduplication
-        const baseFilename = filename.split('?')[0];
+        // REFINEMENT 2: Already normalized in getImageFilename, but ensure consistency
+        const baseFilename = filename.split('?')[0].split('#')[0].toLowerCase();
         const normalizedKey = `${new URL(imgUrl, url).origin}/${baseFilename}`;
         
         if (seenFilenames.has(normalizedKey)) {
@@ -654,14 +736,18 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           return false;
         }
         seenFilenames.add(normalizedKey);
+        if (DEBUG) console.log(`🆕 New image tracked: ${normalizedKey.slice(-60)}`);
       } catch (e) {
         // If URL parsing fails, fall back to filename-only check
-        const baseFilename = filename.split('?')[0];
+        const baseFilename = filename.split('?')[0].split('#')[0].toLowerCase();
         if (baseFilename && seenFilenames.has(baseFilename)) {
           if (DEBUG) console.log(`⏭️ Skipping duplicate filename: ${baseFilename} from ${source}`);
           return false;
         }
-        if (baseFilename) seenFilenames.add(baseFilename);
+        if (baseFilename) {
+          seenFilenames.add(baseFilename);
+          if (DEBUG) console.log(`🆕 New image tracked (fallback): ${baseFilename}`);
+        }
       }
       
       // Handle relative URLs
