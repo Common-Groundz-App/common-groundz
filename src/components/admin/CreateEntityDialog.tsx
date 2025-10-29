@@ -480,7 +480,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       if (metadataResult.error) {
         console.error('⚠️ Metadata fetch error:', metadataResult.error);
       } else if (metadataResult.data) {
-        console.log('📄 Metadata:', metadataResult.data);
+        console.log('📄 Metadata received:', {
+          url: analyzeUrl,
+          imageCount: metadataResult.data.images?.length || 0,
+          hasImages: !!metadataResult.data.images,
+          fromCache: !!cachedMetadata
+        });
         setUrlMetadata(metadataResult.data);
         if (!cachedMetadata) {
           setCachedMetadata(analyzeUrl, metadataResult.data);
@@ -536,10 +541,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       }
     }
     
-    await applyPredictionsToForm(pred);
+    // Pass metadata directly to avoid race condition
+    await applyPredictionsToForm(pred, urlMetadata);
   };
   
-  const applyPredictionsToForm = async (pred: any) => {
+  const applyPredictionsToForm = async (pred: any, metadata: any = null) => {
     let appliedCount = 0;
     const filledFields = new Set<string>();
     
@@ -652,30 +658,31 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     let imagesApplied = 0;
 
     // Priority 1: URL metadata images (from og:image, JSON-LD, etc.)
-    if (urlMetadata?.images && Array.isArray(urlMetadata.images) && urlMetadata.images.length > 0) {
-      console.log(`🖼️ Processing ${urlMetadata.images.length} metadata images`);
+    // Use passed metadata parameter to avoid race condition
+    if (metadata?.images && Array.isArray(metadata.images) && metadata.images.length > 0) {
+      console.log(`🖼️ Processing ${metadata.images.length} metadata images`);
       
-      urlMetadata.images.forEach((imageUrl: string) => {
+      metadata.images.forEach((imageUrl: string) => {
         addImageToMediaGallery(imageUrl, 'metadata');
         imagesApplied++;
       });
       
       // Set first image as primary
-      handleInputChange('image_url', urlMetadata.images[0]);
+      handleInputChange('image_url', metadata.images[0]);
       filledFields.add('image_url');
       appliedCount++;
       
       console.log(`✅ Applied ${imagesApplied} metadata images to gallery`);
     } 
     // Fallback 1: Single metadata image (backward compatibility)
-    else if (urlMetadata?.image) {
-      handleInputChange('image_url', urlMetadata.image);
-      addImageToMediaGallery(urlMetadata.image, 'metadata');
+    else if (metadata?.image) {
+      handleInputChange('image_url', metadata.image);
+      addImageToMediaGallery(metadata.image, 'metadata');
       filledFields.add('image_url');
       appliedCount++;
       imagesApplied = 1;
-      console.log('🖼️ Applied single metadata image:', urlMetadata.image);
-    } 
+      console.log('🖼️ Applied single metadata image:', metadata.image);
+    }
     // Fallback 2: AI-predicted images
     else if (pred.images && Array.isArray(pred.images) && pred.images.length > 0) {
       console.log(`🖼️ Processing ${pred.images.length} AI-predicted images`);
