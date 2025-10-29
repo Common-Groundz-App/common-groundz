@@ -468,6 +468,50 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       }
     };
 
+    /**
+     * Build a deduplication key for an image URL
+     * For proxy/CDN URLs: includes size parameters to allow different variants
+     * For normal URLs: uses origin + filename for robust deduplication
+     */
+    const buildImageDedupKey = (imgUrl: string, filename: string): string => {
+      try {
+        // Parse the URL to access query parameters
+        let urlObj: URL;
+        try {
+          if (imgUrl.startsWith('//')) {
+            urlObj = new URL(`https:${imgUrl}`);
+          } else if (imgUrl.startsWith('http')) {
+            urlObj = new URL(imgUrl);
+          } else {
+            urlObj = new URL(imgUrl, url);
+          }
+        } catch {
+          // If URL parsing fails, fall back to filename only
+          return filename;
+        }
+        
+        // Check if this is a proxy/CDN URL
+        const isProxy = PROXY_CDN_PATTERNS.some(pattern => urlObj.hostname.includes(pattern));
+        
+        if (isProxy) {
+          // For proxy URLs, include size parameters to allow different variants
+          const sizeParams = ['width', 'height', 'w', 'h', 'size'].map(param => {
+            const value = urlObj.searchParams.get(param);
+            return value ? `${param}${value}` : null;
+          }).filter(Boolean).join('-');
+          
+          // Return filename + size params (e.g., "myumhbbtf2-width1080-height500")
+          return sizeParams ? `${filename}-${sizeParams}` : filename;
+        } else {
+          // For normal URLs, use origin + filename for deduplication
+          return `${urlObj.origin}/${filename}`;
+        }
+      } catch {
+        // Ultimate fallback
+        return filename;
+      }
+    };
+
     // Helper: Check if image is from same domain or trusted CDN
     const isSameDomainOrCDN = (imgUrl: string): boolean => {
       try {
@@ -727,41 +771,17 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       }
       
       try {
-        // ✅ REFINEMENT 2: Already normalized in getImageFilename, but ensure consistency
         const baseFilename = filename.split('?')[0].split('#')[0].toLowerCase();
+        const dedupKey = buildImageDedupKey(imgUrl, baseFilename);  // ✅ Use shared helper
         
-        // Check if this is a proxy/CDN URL
-        const urlObj = new URL(imgUrl, url);
-        const isProxy = PROXY_CDN_PATTERNS.some(pattern => urlObj.hostname.includes(pattern));
-        
-        // For proxy URLs, include size parameters in the key to allow different variants
-        // For normal URLs, use origin + filename for better deduplication
-        let normalizedKey: string;
-        
-        if (isProxy) {
-          // Extract size-related query params for proxy URLs (width, height, etc.)
-          const sizeParams = ['width', 'height', 'w', 'h', 'size'].map(param => {
-            const value = urlObj.searchParams.get(param);
-            return value ? `${param}${value}` : null;
-          }).filter(Boolean).join('-');
-          
-          // Use filename + size params as key (e.g., "myumhbbtf2-width1080-height500")
-          normalizedKey = sizeParams ? `${baseFilename}-${sizeParams}` : baseFilename;
-          
-          if (DEBUG) console.log(`🔑 Proxy key with size params: ${normalizedKey}`);
-        } else {
-          // Normal URLs: use origin + filename
-          normalizedKey = `${urlObj.origin}/${baseFilename}`;
-        }
-        
-        if (seenFilenames.has(normalizedKey)) {
-          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${baseFilename} from ${source} (proxy: ${isProxy})`);
+        if (seenFilenames.has(dedupKey)) {
+          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${dedupKey.slice(-60)} from ${source}`);
           return false;
         }
-        seenFilenames.add(normalizedKey);
-        if (DEBUG) console.log(`🆕 New image tracked: ${normalizedKey.slice(-60)} (proxy: ${isProxy})`);
+        seenFilenames.add(dedupKey);
+        if (DEBUG) console.log(`🆕 New image tracked: ${dedupKey.slice(-60)}`);
       } catch (e) {
-        // If URL parsing fails, fall back to filename-only check
+        // Fallback to filename-only check
         const baseFilename = filename.split('?')[0].split('#')[0].toLowerCase();
         if (baseFilename && seenFilenames.has(baseFilename)) {
           if (DEBUG) console.log(`⏭️ Skipping duplicate filename: ${baseFilename} from ${source}`);
@@ -1225,12 +1245,14 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         const normalizedSrc = normalizeImageUrl(src);
         
         const filename = getImageFilename(normalizedSrc);
+        const dedupKey = buildImageDedupKey(normalizedSrc, filename);  // ✅ Use shared helper
         
-        if (!seenFilenames.has(filename)) {
-          seenFilenames.add(filename);
+        if (!seenFilenames.has(dedupKey)) {
+          seenFilenames.add(dedupKey);
           collectedGalleryImages.set(normalizedSrc, { url: normalizedSrc, source: selector, priority });
+          if (DEBUG) console.log(`✅ Gallery image added: ${dedupKey.slice(-60)}`);
         } else if (DEBUG) {
-          console.log(`⏭️ Skipping duplicate filename: ${filename}`);
+          console.log(`⏭️ Skipping duplicate: ${dedupKey.slice(-60)}`);
         }
         });
       }
