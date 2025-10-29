@@ -382,21 +382,21 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     let layer1Count = 0; // JSON-LD
     let layer2Count = 0; // Gallery selectors
 
+    // ✅ REFINEMENT 1: Extended proxy/CDN detection (moved to top level for reuse)
+    const PROXY_CDN_PATTERNS = [
+      'wsrv.nl',
+      'weserv.nl',
+      'cdn.shopify.com',
+      'cloudfront.net',
+      'jsdelivr.net',
+      'imgix.net',
+      'cloudinary.com'
+    ];
+
     // Helper: Extract filename without query params (with proxy/CDN support)
     const getImageFilename = (imgUrl: string): string => {
       try {
         const urlObj = new URL(imgUrl, url);
-        
-        // REFINEMENT 1: Extended proxy/CDN detection
-        const PROXY_CDN_PATTERNS = [
-          'wsrv.nl',
-          'weserv.nl',
-          'cdn.shopify.com',
-          'cloudfront.net',
-          'jsdelivr.net',
-          'imgix.net',
-          'cloudinary.com'
-        ];
         
         const isProxyCDN = PROXY_CDN_PATTERNS.some(pattern => 
           urlObj.hostname.includes(pattern)
@@ -727,16 +727,25 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       }
       
       try {
-        // REFINEMENT 2: Already normalized in getImageFilename, but ensure consistency
+        // ✅ REFINEMENT 2: Already normalized in getImageFilename, but ensure consistency
         const baseFilename = filename.split('?')[0].split('#')[0].toLowerCase();
-        const normalizedKey = `${new URL(imgUrl, url).origin}/${baseFilename}`;
+        
+        // Check if this is a proxy/CDN URL
+        const urlObj = new URL(imgUrl, url);
+        const isProxy = PROXY_CDN_PATTERNS.some(pattern => urlObj.hostname.includes(pattern));
+        
+        // For proxy URLs, use only filename as key (since origin is always the proxy domain)
+        // For normal URLs, use origin + filename for better deduplication
+        const normalizedKey = isProxy 
+          ? baseFilename  // Just the filename for proxy URLs
+          : `${urlObj.origin}/${baseFilename}`;  // Origin + filename for normal URLs
         
         if (seenFilenames.has(normalizedKey)) {
-          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${baseFilename} from ${source}`);
+          if (DEBUG) console.log(`⏭️ Skipping duplicate: ${baseFilename} from ${source} (proxy: ${isProxy})`);
           return false;
         }
         seenFilenames.add(normalizedKey);
-        if (DEBUG) console.log(`🆕 New image tracked: ${normalizedKey.slice(-60)}`);
+        if (DEBUG) console.log(`🆕 New image tracked: ${normalizedKey.slice(-60)} (proxy: ${isProxy})`);
       } catch (e) {
         // If URL parsing fails, fall back to filename-only check
         const baseFilename = filename.split('?')[0].split('#')[0].toLowerCase();
