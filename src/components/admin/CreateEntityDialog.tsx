@@ -415,32 +415,40 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
   };
 
-  // Helper to add images to media gallery
-  const addImageToMediaGallery = (imageUrl: string, source: 'metadata' | 'ai') => {
+  // Helper to create media item from image URL (returns MediaItem for batch adding)
+  const createMediaItemFromUrl = (imageUrl: string, source: 'metadata' | 'ai', order: number): MediaItem | null => {
     // Deduplicate - check if image already exists
     const exists = uploadedMedia.some(item => item.url === imageUrl);
     if (exists) {
       console.log('🖼️ Image already in gallery:', imageUrl);
-      return;
+      return null;
     }
     
     const newMediaItem: MediaItem = {
       id: crypto.randomUUID(),
       url: imageUrl,
       type: 'image',
-      order: uploadedMedia.length,
+      order: order,
       caption: source === 'metadata' ? 'From URL metadata' : 'AI-extracted',
       source: 'external', // Mark as external URL (not uploaded file)
     };
     
-    setUploadedMedia(prev => [...prev, newMediaItem]);
-    
-    // Set as primary if no primary exists
-    if (!primaryMediaUrl && uploadedMedia.length === 0) {
-      setPrimaryMediaUrl(imageUrl);
+    return newMediaItem;
+  };
+
+  // Helper to add single image to media gallery (for manual uploads)
+  const addSingleImageToMediaGallery = (imageUrl: string, source: 'metadata' | 'ai') => {
+    const mediaItem = createMediaItemFromUrl(imageUrl, source, uploadedMedia.length);
+    if (mediaItem) {
+      setUploadedMedia(prev => [...prev, mediaItem]);
+      
+      // Set as primary if no primary exists
+      if (!primaryMediaUrl) {
+        setPrimaryMediaUrl(imageUrl);
+      }
+      
+      console.log(`🖼️ Added ${source} image to gallery:`, imageUrl);
     }
-    
-    console.log(`🖼️ Added ${source} image to gallery:`, imageUrl);
   };
 
   // Call edge function to analyze URL
@@ -656,50 +664,84 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     
     // Apply images - prefer metadata images over AI prediction
     let imagesApplied = 0;
+    const newMediaItems: MediaItem[] = [];
 
     // Priority 1: URL metadata images (from og:image, JSON-LD, etc.)
     // Use passed metadata parameter to avoid race condition
     if (metadata?.images && Array.isArray(metadata.images) && metadata.images.length > 0) {
       console.log(`🖼️ Processing ${metadata.images.length} metadata images`);
       
-      metadata.images.forEach((imageUrl: string) => {
-        addImageToMediaGallery(imageUrl, 'metadata');
-        imagesApplied++;
+      metadata.images.forEach((imageUrl: string, index: number) => {
+        const mediaItem = createMediaItemFromUrl(imageUrl, 'metadata', uploadedMedia.length + index);
+        if (mediaItem) {
+          newMediaItems.push(mediaItem);
+          imagesApplied++;
+        }
       });
       
-      // Set first image as primary
-      handleInputChange('image_url', metadata.images[0]);
-      filledFields.add('image_url');
-      appliedCount++;
-      
-      console.log(`✅ Applied ${imagesApplied} metadata images to gallery`);
+      // Batch update state with all images
+      if (newMediaItems.length > 0) {
+        setUploadedMedia(prev => [...prev, ...newMediaItems]);
+        
+        // Set first image as primary if no primary exists
+        if (!primaryMediaUrl) {
+          setPrimaryMediaUrl(metadata.images[0]);
+        }
+        
+        // Set first image as form primary
+        handleInputChange('image_url', metadata.images[0]);
+        filledFields.add('image_url');
+        appliedCount++;
+        
+        console.log(`✅ Applied ${imagesApplied} metadata images to gallery`);
+      }
     } 
     // Fallback 1: Single metadata image (backward compatibility)
     else if (metadata?.image) {
-      handleInputChange('image_url', metadata.image);
-      addImageToMediaGallery(metadata.image, 'metadata');
-      filledFields.add('image_url');
-      appliedCount++;
-      imagesApplied = 1;
-      console.log('🖼️ Applied single metadata image:', metadata.image);
+      const mediaItem = createMediaItemFromUrl(metadata.image, 'metadata', uploadedMedia.length);
+      if (mediaItem) {
+        setUploadedMedia(prev => [...prev, mediaItem]);
+        
+        if (!primaryMediaUrl) {
+          setPrimaryMediaUrl(metadata.image);
+        }
+        
+        handleInputChange('image_url', metadata.image);
+        filledFields.add('image_url');
+        appliedCount++;
+        imagesApplied = 1;
+        console.log('🖼️ Applied single metadata image:', metadata.image);
+      }
     }
     // Fallback 2: AI-predicted images
     else if (pred.images && Array.isArray(pred.images) && pred.images.length > 0) {
       console.log(`🖼️ Processing ${pred.images.length} AI-predicted images`);
       
-      pred.images.forEach((imageObj: any) => {
+      pred.images.forEach((imageObj: any, index: number) => {
         const imageUrl = imageObj.url || imageObj;
-        addImageToMediaGallery(imageUrl, 'ai');
-        imagesApplied++;
+        const mediaItem = createMediaItemFromUrl(imageUrl, 'ai', uploadedMedia.length + index);
+        if (mediaItem) {
+          newMediaItems.push(mediaItem);
+          imagesApplied++;
+        }
       });
       
-      // Set first image as primary
-      const firstImageUrl = pred.images[0].url || pred.images[0];
-      handleInputChange('image_url', firstImageUrl);
-      filledFields.add('image_url');
-      appliedCount++;
-      
-      console.log(`✅ Applied ${imagesApplied} AI images to gallery`);
+      // Batch update state with all images
+      if (newMediaItems.length > 0) {
+        setUploadedMedia(prev => [...prev, ...newMediaItems]);
+        
+        // Set first image as primary if no primary exists
+        const firstImageUrl = pred.images[0].url || pred.images[0];
+        if (!primaryMediaUrl) {
+          setPrimaryMediaUrl(firstImageUrl);
+        }
+        
+        handleInputChange('image_url', firstImageUrl);
+        filledFields.add('image_url');
+        appliedCount++;
+        
+        console.log(`✅ Applied ${imagesApplied} AI images to gallery`);
+      }
     }
     
     // Apply website URL from analyzed URL
