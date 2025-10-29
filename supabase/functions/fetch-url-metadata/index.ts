@@ -734,11 +734,25 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         const urlObj = new URL(imgUrl, url);
         const isProxy = PROXY_CDN_PATTERNS.some(pattern => urlObj.hostname.includes(pattern));
         
-        // For proxy URLs, use only filename as key (since origin is always the proxy domain)
+        // For proxy URLs, include size parameters in the key to allow different variants
         // For normal URLs, use origin + filename for better deduplication
-        const normalizedKey = isProxy 
-          ? baseFilename  // Just the filename for proxy URLs
-          : `${urlObj.origin}/${baseFilename}`;  // Origin + filename for normal URLs
+        let normalizedKey: string;
+        
+        if (isProxy) {
+          // Extract size-related query params for proxy URLs (width, height, etc.)
+          const sizeParams = ['width', 'height', 'w', 'h', 'size'].map(param => {
+            const value = urlObj.searchParams.get(param);
+            return value ? `${param}${value}` : null;
+          }).filter(Boolean).join('-');
+          
+          // Use filename + size params as key (e.g., "myumhbbtf2-width1080-height500")
+          normalizedKey = sizeParams ? `${baseFilename}-${sizeParams}` : baseFilename;
+          
+          if (DEBUG) console.log(`🔑 Proxy key with size params: ${normalizedKey}`);
+        } else {
+          // Normal URLs: use origin + filename
+          normalizedKey = `${urlObj.origin}/${baseFilename}`;
+        }
         
         if (seenFilenames.has(normalizedKey)) {
           if (DEBUG) console.log(`⏭️ Skipping duplicate: ${baseFilename} from ${source} (proxy: ${isProxy})`);
