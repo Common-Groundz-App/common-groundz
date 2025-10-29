@@ -415,40 +415,32 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
   };
 
-  // Helper to create media item from image URL (returns MediaItem for batch adding)
-  const createMediaItemFromUrl = (imageUrl: string, source: 'metadata' | 'ai', order: number): MediaItem | null => {
+  // Helper to add images to media gallery
+  const addImageToMediaGallery = (imageUrl: string, source: 'metadata' | 'ai') => {
     // Deduplicate - check if image already exists
     const exists = uploadedMedia.some(item => item.url === imageUrl);
     if (exists) {
       console.log('🖼️ Image already in gallery:', imageUrl);
-      return null;
+      return;
     }
     
     const newMediaItem: MediaItem = {
       id: crypto.randomUUID(),
       url: imageUrl,
       type: 'image',
-      order: order,
+      order: uploadedMedia.length,
       caption: source === 'metadata' ? 'From URL metadata' : 'AI-extracted',
       source: 'external', // Mark as external URL (not uploaded file)
     };
     
-    return newMediaItem;
-  };
-
-  // Helper to add single image to media gallery (for manual uploads)
-  const addSingleImageToMediaGallery = (imageUrl: string, source: 'metadata' | 'ai') => {
-    const mediaItem = createMediaItemFromUrl(imageUrl, source, uploadedMedia.length);
-    if (mediaItem) {
-      setUploadedMedia(prev => [...prev, mediaItem]);
-      
-      // Set as primary if no primary exists
-      if (!primaryMediaUrl) {
-        setPrimaryMediaUrl(imageUrl);
-      }
-      
-      console.log(`🖼️ Added ${source} image to gallery:`, imageUrl);
+    setUploadedMedia(prev => [...prev, newMediaItem]);
+    
+    // Set as primary if no primary exists
+    if (!primaryMediaUrl && uploadedMedia.length === 0) {
+      setPrimaryMediaUrl(imageUrl);
     }
+    
+    console.log(`🖼️ Added ${source} image to gallery:`, imageUrl);
   };
 
   // Call edge function to analyze URL
@@ -488,12 +480,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       if (metadataResult.error) {
         console.error('⚠️ Metadata fetch error:', metadataResult.error);
       } else if (metadataResult.data) {
-        console.log('📄 Metadata received:', {
-          url: analyzeUrl,
-          imageCount: metadataResult.data.images?.length || 0,
-          hasImages: !!metadataResult.data.images,
-          fromCache: !!cachedMetadata
-        });
+        console.log('📄 Metadata:', metadataResult.data);
         setUrlMetadata(metadataResult.data);
         if (!cachedMetadata) {
           setCachedMetadata(analyzeUrl, metadataResult.data);
@@ -549,11 +536,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       }
     }
     
-    // Pass metadata directly to avoid race condition
-    await applyPredictionsToForm(pred, urlMetadata);
+    await applyPredictionsToForm(pred);
   };
   
-  const applyPredictionsToForm = async (pred: any, metadata: any = null) => {
+  const applyPredictionsToForm = async (pred: any) => {
     let appliedCount = 0;
     const filledFields = new Set<string>();
     
@@ -664,84 +650,49 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     
     // Apply images - prefer metadata images over AI prediction
     let imagesApplied = 0;
-    const newMediaItems: MediaItem[] = [];
 
     // Priority 1: URL metadata images (from og:image, JSON-LD, etc.)
-    // Use passed metadata parameter to avoid race condition
-    if (metadata?.images && Array.isArray(metadata.images) && metadata.images.length > 0) {
-      console.log(`🖼️ Processing ${metadata.images.length} metadata images`);
+    if (urlMetadata?.images && Array.isArray(urlMetadata.images) && urlMetadata.images.length > 0) {
+      console.log(`🖼️ Processing ${urlMetadata.images.length} metadata images`);
       
-      metadata.images.forEach((imageUrl: string, index: number) => {
-        const mediaItem = createMediaItemFromUrl(imageUrl, 'metadata', uploadedMedia.length + index);
-        if (mediaItem) {
-          newMediaItems.push(mediaItem);
-          imagesApplied++;
-        }
+      urlMetadata.images.forEach((imageUrl: string) => {
+        addImageToMediaGallery(imageUrl, 'metadata');
+        imagesApplied++;
       });
       
-      // Batch update state with all images
-      if (newMediaItems.length > 0) {
-        setUploadedMedia(prev => [...prev, ...newMediaItems]);
-        
-        // Set first image as primary if no primary exists
-        if (!primaryMediaUrl) {
-          setPrimaryMediaUrl(metadata.images[0]);
-        }
-        
-        // Set first image as form primary
-        handleInputChange('image_url', metadata.images[0]);
-        filledFields.add('image_url');
-        appliedCount++;
-        
-        console.log(`✅ Applied ${imagesApplied} metadata images to gallery`);
-      }
+      // Set first image as primary
+      handleInputChange('image_url', urlMetadata.images[0]);
+      filledFields.add('image_url');
+      appliedCount++;
+      
+      console.log(`✅ Applied ${imagesApplied} metadata images to gallery`);
     } 
     // Fallback 1: Single metadata image (backward compatibility)
-    else if (metadata?.image) {
-      const mediaItem = createMediaItemFromUrl(metadata.image, 'metadata', uploadedMedia.length);
-      if (mediaItem) {
-        setUploadedMedia(prev => [...prev, mediaItem]);
-        
-        if (!primaryMediaUrl) {
-          setPrimaryMediaUrl(metadata.image);
-        }
-        
-        handleInputChange('image_url', metadata.image);
-        filledFields.add('image_url');
-        appliedCount++;
-        imagesApplied = 1;
-        console.log('🖼️ Applied single metadata image:', metadata.image);
-      }
-    }
+    else if (urlMetadata?.image) {
+      handleInputChange('image_url', urlMetadata.image);
+      addImageToMediaGallery(urlMetadata.image, 'metadata');
+      filledFields.add('image_url');
+      appliedCount++;
+      imagesApplied = 1;
+      console.log('🖼️ Applied single metadata image:', urlMetadata.image);
+    } 
     // Fallback 2: AI-predicted images
     else if (pred.images && Array.isArray(pred.images) && pred.images.length > 0) {
       console.log(`🖼️ Processing ${pred.images.length} AI-predicted images`);
       
-      pred.images.forEach((imageObj: any, index: number) => {
+      pred.images.forEach((imageObj: any) => {
         const imageUrl = imageObj.url || imageObj;
-        const mediaItem = createMediaItemFromUrl(imageUrl, 'ai', uploadedMedia.length + index);
-        if (mediaItem) {
-          newMediaItems.push(mediaItem);
-          imagesApplied++;
-        }
+        addImageToMediaGallery(imageUrl, 'ai');
+        imagesApplied++;
       });
       
-      // Batch update state with all images
-      if (newMediaItems.length > 0) {
-        setUploadedMedia(prev => [...prev, ...newMediaItems]);
-        
-        // Set first image as primary if no primary exists
-        const firstImageUrl = pred.images[0].url || pred.images[0];
-        if (!primaryMediaUrl) {
-          setPrimaryMediaUrl(firstImageUrl);
-        }
-        
-        handleInputChange('image_url', firstImageUrl);
-        filledFields.add('image_url');
-        appliedCount++;
-        
-        console.log(`✅ Applied ${imagesApplied} AI images to gallery`);
-      }
+      // Set first image as primary
+      const firstImageUrl = pred.images[0].url || pred.images[0];
+      handleInputChange('image_url', firstImageUrl);
+      filledFields.add('image_url');
+      appliedCount++;
+      
+      console.log(`✅ Applied ${imagesApplied} AI images to gallery`);
     }
     
     // Apply website URL from analyzed URL
