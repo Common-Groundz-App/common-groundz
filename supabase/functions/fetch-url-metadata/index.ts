@@ -160,6 +160,16 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       fetchMethod = 'scraper-api';
       let scraperSuccess = false;
       
+      // Shared SPA domains list used by both Stage 1 and Stage 2
+      const spaDomainsShared = [
+        'nykaa.com',
+        'tirabeauty.com',
+        'amazon.in', 'amazon.com', 'amazon.co.uk',
+        'flipkart.com',
+        'myntra.com',
+        'maccaron.in'
+      ];
+      
       // STAGE 1: Try static scraping first (faster, cheaper) - unless forcing JS render
       try {
         const shouldForceJsNow = forceJsRender || stage > 0;
@@ -172,17 +182,6 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         console.log('📥 Stage 1: ScraperAPI static mode (premium)...');
         
         const hostname = new URL(url).hostname;
-        
-        // Shared SPA domains list used by both Stage 1 and Stage 2
-        const spaDomainsShared = [
-          'nykaa.com',
-          'tirabeauty.com',
-          'amazon.in', 'amazon.com', 'amazon.co.uk',
-          'flipkart.com',
-          'myntra.com',
-          'maccaron.in'
-        ];
-        
         const needsJsRendering = spaDomainsShared.some(domain => hostname.includes(domain));
         
         // Stage 1: Static scraping (no JS rendering)
@@ -308,6 +307,12 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     // and process them after addImage is defined
     const pendingJsonImages: Array<{ url: string; source: string; altText: string }> = [];
     
+    // Shared function for both JSON-LD scripts and inline state assignments
+    const tempAddImage = (url: string, source: string, altText: string): boolean => {
+      pendingJsonImages.push({ url, source, altText });
+      return true;
+    };
+    
     scripts.forEach((script, idx) => {
       try {
         const scriptId = script.getAttribute('id') || `script-${idx}`;
@@ -317,12 +322,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         
         const jsonData = JSON.parse(scriptContent);
         
-        // Store images for later processing
-        const tempAddImage = (url: string, source: string, altText: string): boolean => {
-          pendingJsonImages.push({ url, source, altText });
-          return true;
-        };
-        
+        // Use shared tempAddImage function
         extractImagesFromJson(jsonData, scriptId, tempAddImage);
         
       } catch (e) {
@@ -338,13 +338,47 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       try {
         const scriptText = script.textContent || '';
         
-        // Match patterns like: window.__INITIAL_STATE__ = {...};
-        const statePattern = /window\.__(?:INITIAL_STATE|INITIAL_DATA|PRELOADED_STATE)__\s*=\s*(\{[\s\S]*?\});?/;
-        const match = scriptText.match(statePattern);
+        // Find the assignment pattern
+        const assignmentPattern = /window\.__(?:INITIAL_STATE|INITIAL_DATA|PRELOADED_STATE)__\s*=\s*/;
+        const match = scriptText.match(assignmentPattern);
         
-        if (match && match[1]) {
-          const jsonPayload = match[1].trim();
-          console.log(`📋 Found inline state assignment (${jsonPayload.length} bytes)`);
+        if (match) {
+          const startIndex = match.index! + match[0].length;
+          
+          // Find the opening brace
+          let jsonStart = startIndex;
+          while (jsonStart < scriptText.length && scriptText[jsonStart] !== '{') {
+            jsonStart++;
+          }
+          
+          if (jsonStart >= scriptText.length) {
+            console.warn('⚠️ No opening brace found after state assignment');
+            return;
+          }
+          
+          // Use balanced-brace counter to find the complete JSON object
+          let braceCount = 0;
+          let jsonEnd = jsonStart;
+          let foundComplete = false;
+          
+          for (let i = jsonStart; i < scriptText.length; i++) {
+            if (scriptText[i] === '{') braceCount++;
+            if (scriptText[i] === '}') braceCount--;
+            
+            if (braceCount === 0) {
+              jsonEnd = i + 1;
+              foundComplete = true;
+              break;
+            }
+          }
+          
+          if (!foundComplete) {
+            console.warn('⚠️ Unbalanced braces in inline state assignment');
+            return;
+          }
+          
+          const jsonPayload = scriptText.substring(jsonStart, jsonEnd);
+          console.log(`📋 Found inline state assignment (${jsonPayload.length} bytes, braces balanced)`);
           
           try {
             const jsonData = JSON.parse(jsonPayload);
@@ -352,10 +386,11 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
             console.log(`✅ Successfully parsed inline state, found ${pendingJsonImages.length} images so far`);
           } catch (parseError) {
             console.warn(`⚠️ Failed to parse inline state JSON: ${parseError.message}`);
+            console.warn(`📄 First 200 chars: ${jsonPayload.substring(0, 200)}`);
           }
         }
       } catch (e) {
-        // Silently skip malformed inline scripts
+        console.warn(`⚠️ Error scanning inline script: ${e.message}`);
       }
     });
     
