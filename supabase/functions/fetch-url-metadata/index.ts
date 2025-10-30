@@ -174,10 +174,11 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         const hostname = new URL(url).hostname;
         const needsJsRendering = [
           'nykaa.com',
-          'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
+          'tirabeauty.com',
           'amazon.in', 'amazon.com', 'amazon.co.uk',
           'flipkart.com',
-          'myntra.com'
+          'myntra.com',
+          'maccaron.in'
         ].some(domain => hostname.includes(domain));
         
         // Stage 1: Static scraping (no JS rendering)
@@ -191,6 +192,12 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           html = await scraperResponse.text();
           
           if (html.length >= 300) {
+            // NEW CHECK: If this is a known SPA, reject static scrape and force Stage 2
+            if (needsJsRendering) {
+              console.warn(`⚠️ Static HTML from SPA domain ${hostname}, forcing Stage 2`);
+              throw new Error('SPA requires JS rendering');
+            }
+            
             console.log(`✅ ScraperAPI static succeeded (${html.length} bytes)`);
             console.log(`💰 ScraperAPI credit used (static, 1 credit) for: ${url}`);
             scraperSuccess = true;
@@ -242,6 +249,84 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
 
     const doc = parse(html);
 
+    // ===== LAYER 0: EXTRACT IMAGES FROM EMBEDDED JSON STATE =====
+    console.log('📦 Layer 0: Mining embedded JSON state blobs...');
+    
+    // Track how many images we found from JSON state
+    let jsonStateImageCount = 0;
+    
+    const scripts = doc.querySelectorAll('script[type="application/json"], script[id*="__NEXT"], script[id*="__NUXT"], script[id*="__APOLLO"]');
+    
+    // Recursively search for image URLs in the JSON blob
+    const extractImagesFromJson = (obj: any, path: string = '', addImageFn: (url: string, source: string, altText: string) => boolean): void => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      for (const [key, value] of Object.entries(obj)) {
+        const currentPath = path ? `${path}.${key}` : key;
+        
+        // Check if this looks like an image property
+        const imageKeys = ['image', 'images', 'media', 'gallery', 'photo', 'photos', 'thumbnail', 'src', 'url'];
+        const isImageKey = imageKeys.some(imgKey => key.toLowerCase().includes(imgKey));
+        
+        if (isImageKey) {
+          // Handle string URLs
+          if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('//'))) {
+            const normalizedUrl = normalizeImageUrl(value);
+            if (addImageFn(normalizedUrl, 'Script (JSON-LD)', currentPath)) {
+              jsonStateImageCount++;
+            }
+          }
+          
+          // Handle arrays of URLs
+          if (Array.isArray(value)) {
+            value.forEach((item, i) => {
+              if (typeof item === 'string' && (item.startsWith('http') || item.startsWith('//'))) {
+                const normalizedUrl = normalizeImageUrl(item);
+                if (addImageFn(normalizedUrl, 'Script (JSON-LD)', `${currentPath}[${i}]`)) {
+                  jsonStateImageCount++;
+                }
+              } else if (typeof item === 'object') {
+                extractImagesFromJson(item, `${currentPath}[${i}]`, addImageFn);
+              }
+            });
+          }
+        }
+        
+        // Recurse into nested objects/arrays
+        if (typeof value === 'object' && value !== null) {
+          extractImagesFromJson(value, currentPath, addImageFn);
+        }
+      }
+    };
+    
+    // We'll need to define addImage function first, so we'll temporarily store these
+    // and process them after addImage is defined
+    const pendingJsonImages: Array<{ url: string; source: string; altText: string }> = [];
+    
+    scripts.forEach((script, idx) => {
+      try {
+        const scriptId = script.getAttribute('id') || `script-${idx}`;
+        const scriptContent = script.textContent;
+        
+        if (!scriptContent || scriptContent.length < 50) return;
+        
+        const jsonData = JSON.parse(scriptContent);
+        
+        // Store images for later processing
+        const tempAddImage = (url: string, source: string, altText: string): boolean => {
+          pendingJsonImages.push({ url, source, altText });
+          return true;
+        };
+        
+        extractImagesFromJson(jsonData, scriptId, tempAddImage);
+        
+      } catch (e) {
+        // Silently skip non-JSON or malformed scripts
+      }
+    });
+    
+    console.log(`📦 Layer 0 parsing complete: Found ${pendingJsonImages.length} potential images in JSON state`);
+
     // Extract favicon
     const favicon = doc.querySelector('link[rel="icon"]')?.getAttribute('href') ||
                     doc.querySelector('link[rel="shortcut icon"]')?.getAttribute('href') || '';
@@ -251,6 +336,8 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       url: string;
       priority: number;
       source: string;
+      canonicalKey: string;
+      sizeHint: number;
     }
     const imageCollection: ImageWithPriority[] = [];
     const seenUrls = new Set<string>();
@@ -990,6 +1077,12 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       return true;
     };
 
+    // Process JSON state images that were found in Layer 0
+    console.log(`📦 Processing ${pendingJsonImages.length} images from JSON state...`);
+    pendingJsonImages.forEach(({ url, source, altText }) => {
+      addImage(url, source, altText);
+    });
+
     // ===== LAYER 1: JSON-LD PRODUCT SCHEMA (HIGHEST PRIORITY) =====
     console.log('📦 Layer 1: Checking JSON-LD Product schema...');
     jsonLdScripts.forEach(script => {
@@ -1536,6 +1629,61 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
 layer2Count = imageCollection.length - layer1Count;
 console.log(`🖼️ Layer 2 found: ${layer2Count} images`);
 
+// ===== LAYER 3: SIZE-AWARE MAIN CONTENT SWEEP (FALLBACK) =====
+if (imageCollection.length === 0) {
+  console.log('📦 Layer 3: No images found, sweeping main content...');
+  
+  // Find main content area
+  const mainContent = doc.querySelector('main') || 
+                      doc.querySelector('[role="main"]') || 
+                      doc.querySelector('body');
+  
+  if (mainContent) {
+    // Find all images in main content
+    const allImages = mainContent.querySelectorAll('img, source, picture');
+    
+    let scannedCount = 0;
+    let acceptedCount = 0;
+    
+    allImages.forEach(img => {
+      scannedCount++;
+      
+      // Skip header/footer/ads
+      const ancestor = img.closest('header, footer, nav, aside, .ad, .advertisement, [class*="advertisement"]');
+      if (ancestor) return;
+      
+      let imgUrl: string | null = null;
+      
+      // Extract URL from various sources
+      if (img instanceof HTMLImageElement) {
+        imgUrl = img.getAttribute('data-src') ||
+                 img.getAttribute('data-lazy-src') ||
+                 img.getAttribute('data-image') ||
+                 img.getAttribute('srcset')?.split(' ')[0] ||
+                 img.getAttribute('src');
+      } else if (img.hasAttribute('srcset')) {
+        imgUrl = img.getAttribute('srcset')?.split(' ')[0] || null;
+      } else if (img.hasAttribute('src')) {
+        imgUrl = img.getAttribute('src');
+      }
+      
+      if (imgUrl) {
+        const normalizedUrl = normalizeImageUrl(imgUrl);
+        const sizeInfo = extractImageSizeHint(normalizedUrl);
+        
+        // Only add images with reasonable size hints
+        if (sizeInfo.maxDimension >= 400 || sizeInfo.maxDimension === 0) {
+          const altText = img.getAttribute('alt') || '';
+          const added = addImage(normalizedUrl, 'Main Content', altText);
+          if (added) acceptedCount++;
+        }
+      }
+    });
+    
+    console.log(`📦 Layer 3 complete: Scanned ${scannedCount}, accepted ${acceptedCount} images`);
+  }
+}
+
 // Product keyword filtering removed - trust gallery selectors instead
 
 const highConfidenceImages = layer1Count + layer2Count;
@@ -1732,28 +1880,43 @@ if (shouldContinueToFallbacks && imageCollection.length < 3) {
 
     // --- RESULT-BASED JS RENDER FALLBACK ---
     // Check if we should retry with JS rendering based on actual results
-    const hasSwiperStructure = html.includes('swiper-slide') || 
-                               html.includes('product-thumbs-wrapper') ||
-                               html.includes('data-section-type="product"');
     
+    // NEW: Check for multiple SPA markers
+    const spaMarkers = [
+      '__NEXT_DATA__',      // Next.js
+      'window.__NUXT__',    // Nuxt.js
+      'data-reactroot',     // React
+      'data-hydration',     // Various frameworks
+      'ng-version',         // Angular
+      'v-cloak',            // Vue.js
+      'swiper-slide',       // Swiper galleries
+      'product-thumbs-wrapper'
+    ];
+    
+    const hasSpaMarkers = spaMarkers.some(marker => html.includes(marker));
     const extractedImageCount = normalizedImages.length;
     
-    // Only retry if:
-    // 1. This is the first attempt (stage === 0)
-    // 2. Swiper/dynamic structure detected
-    // 3. We got very few images (< 3)
-    // 4. It's an e-commerce page
-    if (stage === 0 && hasSwiperStructure && extractedImageCount < 3 && isEcommercePage) {
-      console.warn(`⚠️ Only ${extractedImageCount} images extracted from e-commerce page with Swiper structure`);
-      console.log(`🔄 Retrying with JS render to load dynamic gallery...`);
+    // Retry if:
+    // 1. First attempt (stage === 0)
+    // 2. SPA markers detected OR very few images found
+    // 3. It's an e-commerce page
+    const shouldRetryWithJs = (
+      stage === 0 && 
+      extractedImageCount < 3 && 
+      isEcommercePage &&
+      hasSpaMarkers
+    );
+    
+    if (shouldRetryWithJs) {
+      const trigger = hasSpaMarkers ? 'SPA markers detected' : 'Low image count';
+      console.warn(`⚠️ ${trigger}: Only ${extractedImageCount} images from e-commerce page`);
+      console.log(`🔄 Retrying with JS render... (Trigger: ${trigger})`);
       
       try {
-        // Recursive call with stage=1 and forceJsRender=true
         return await extractMetadata(url, 1, true);
       } catch (retryError) {
         console.error(`❌ JS render retry failed:`, retryError);
-        // Fall through to return current results
-        console.log(`⚠️ Using partial results from static fetch (${extractedImageCount} images)`);
+        console.log(`⚠️ Using partial results (${extractedImageCount} images)`);
       }
     }
 
