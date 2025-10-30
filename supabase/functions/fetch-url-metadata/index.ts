@@ -1962,6 +1962,8 @@ if (shouldContinueToFallbacks && imageCollection.length < 3) {
       fetchMethod: fetchMethod, // 'direct' or 'scraper-api'
       blocked: fetchMethod === 'scraper-api', // true if original fetch was blocked
       blockedReason: blockedReason || undefined,
+      // Clear partialExtraction flag if we successfully extracted images
+      partialExtraction: normalizedImages.length === 0,
       imageSourceBreakdown: {
         jsonLd: layer1Count,
         gallery: layer2Count,
