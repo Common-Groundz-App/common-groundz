@@ -172,14 +172,18 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         console.log('📥 Stage 1: ScraperAPI static mode (premium)...');
         
         const hostname = new URL(url).hostname;
-        const needsJsRendering = [
+        
+        // Shared SPA domains list used by both Stage 1 and Stage 2
+        const spaDomainsShared = [
           'nykaa.com',
           'tirabeauty.com',
           'amazon.in', 'amazon.com', 'amazon.co.uk',
           'flipkart.com',
           'myntra.com',
           'maccaron.in'
-        ].some(domain => hostname.includes(domain));
+        ];
+        
+        const needsJsRendering = spaDomainsShared.some(domain => hostname.includes(domain));
         
         // Stage 1: Static scraping (no JS rendering)
         const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&premium=true`;
@@ -213,15 +217,16 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           console.log('📥 Stage 2: ScraperAPI JS rendering mode...');
           
           const hostname = new URL(url).hostname;
-          const needsJsRendering = [
-            'nykaa.com',
-            'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
-            'amazon.in', 'amazon.com', 'amazon.co.uk',
-            'flipkart.com',
-            'myntra.com'
-          ].some(domain => hostname.includes(domain));
           
-          const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}${needsJsRendering ? '&render=true' : ''}&premium=true`;
+          // Use shared SPA domains list for consistency
+          const needsJsRendering = spaDomainsShared.some(domain => hostname.includes(domain));
+          
+          // Compute shouldRender: respect forceJsRender, stage, or domain-based detection
+          const shouldRender = forceJsRender || stage > 0 || needsJsRendering;
+          
+          console.log(`🔍 DEBUG: shouldRender=${shouldRender}, forceJsRender=${forceJsRender}, stage=${stage}, needsJsRendering=${needsJsRendering}`);
+          
+          const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}${shouldRender ? '&render=true' : ''}&premium=true`;
           
           const scraperResponse = await fetch(scraperUrl, {
             signal: AbortSignal.timeout(60000) // JS rendering takes longer
@@ -322,6 +327,35 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         
       } catch (e) {
         // Silently skip non-JSON or malformed scripts
+      }
+    });
+    
+    // Layer 0b: Parse inline window.__INITIAL_STATE__ assignments (Flipkart, etc.)
+    console.log('🔍 Layer 0b: Scanning inline state assignments...');
+    const inlineScripts = doc.querySelectorAll('script:not([src])');
+    
+    inlineScripts.forEach((script) => {
+      try {
+        const scriptText = script.textContent || '';
+        
+        // Match patterns like: window.__INITIAL_STATE__ = {...};
+        const statePattern = /window\.__(?:INITIAL_STATE|INITIAL_DATA|PRELOADED_STATE)__\s*=\s*(\{[\s\S]*?\});?/;
+        const match = scriptText.match(statePattern);
+        
+        if (match && match[1]) {
+          const jsonPayload = match[1].trim();
+          console.log(`📋 Found inline state assignment (${jsonPayload.length} bytes)`);
+          
+          try {
+            const jsonData = JSON.parse(jsonPayload);
+            extractImagesFromJson(jsonData, 'window.__INITIAL_STATE__', tempAddImage);
+            console.log(`✅ Successfully parsed inline state, found ${pendingJsonImages.length} images so far`);
+          } catch (parseError) {
+            console.warn(`⚠️ Failed to parse inline state JSON: ${parseError.message}`);
+          }
+        }
+      } catch (e) {
+        // Silently skip malformed inline scripts
       }
     });
     
