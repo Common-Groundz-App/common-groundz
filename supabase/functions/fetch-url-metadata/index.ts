@@ -1078,10 +1078,16 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     };
 
     // Process JSON state images that were found in Layer 0
-    console.log(`📦 Processing ${pendingJsonImages.length} images from JSON state...`);
-    pendingJsonImages.forEach(({ url, source, altText }) => {
-      addImage(url, source, altText);
-    });
+    if (pendingJsonImages.length > 0) {
+      console.log(`📦 Processing ${pendingJsonImages.length} images from JSON state...`);
+      pendingJsonImages.forEach(({ url, source, altText }) => {
+        const added = addImage(url, source, altText);
+        if (added) {
+          console.log(`  ✅ Added JSON state image: ${url.substring(0, 80)}...`);
+        }
+      });
+      console.log(`📦 Layer 0 complete: ${imageCollection.length} images after JSON processing`);
+    }
 
     // ===== LAYER 1: JSON-LD PRODUCT SCHEMA (HIGHEST PRIORITY) =====
     console.log('📦 Layer 1: Checking JSON-LD Product schema...');
@@ -1633,54 +1639,87 @@ console.log(`🖼️ Layer 2 found: ${layer2Count} images`);
 if (imageCollection.length === 0) {
   console.log('📦 Layer 3: No images found, sweeping main content...');
   
-  // Find main content area
-  const mainContent = doc.querySelector('main') || 
-                      doc.querySelector('[role="main"]') || 
-                      doc.querySelector('body');
-  
-  if (mainContent) {
-    // Find all images in main content
-    const allImages = mainContent.querySelectorAll('img, source, picture');
+  try {
+    // Find main content area
+    const mainContent = doc.querySelector('main') || 
+                        doc.querySelector('[role="main"]') || 
+                        doc.querySelector('body');
     
-    let scannedCount = 0;
-    let acceptedCount = 0;
-    
-    allImages.forEach(img => {
-      scannedCount++;
+    if (mainContent) {
+      // Find all images in main content
+      const allImages = mainContent.querySelectorAll('img, source, picture');
       
-      // Skip header/footer/ads
-      const ancestor = img.closest('header, footer, nav, aside, .ad, .advertisement, [class*="advertisement"]');
-      if (ancestor) return;
+      let scannedCount = 0;
+      let acceptedCount = 0;
       
-      let imgUrl: string | null = null;
-      
-      // Extract URL from various sources
-      if (img instanceof HTMLImageElement) {
-        imgUrl = img.getAttribute('data-src') ||
-                 img.getAttribute('data-lazy-src') ||
-                 img.getAttribute('data-image') ||
-                 img.getAttribute('srcset')?.split(' ')[0] ||
-                 img.getAttribute('src');
-      } else if (img.hasAttribute('srcset')) {
-        imgUrl = img.getAttribute('srcset')?.split(' ')[0] || null;
-      } else if (img.hasAttribute('src')) {
-        imgUrl = img.getAttribute('src');
-      }
-      
-      if (imgUrl) {
-        const normalizedUrl = normalizeImageUrl(imgUrl);
-        const sizeInfo = extractImageSizeHint(normalizedUrl);
-        
-        // Only add images with reasonable size hints
-        if (sizeInfo.maxDimension >= 400 || sizeInfo.maxDimension === 0) {
-          const altText = img.getAttribute('alt') || '';
-          const added = addImage(normalizedUrl, 'Main Content', altText);
-          if (added) acceptedCount++;
+      allImages.forEach(img => {
+        try {
+          scannedCount++;
+          
+          // Skip header/footer/ads
+          const ancestor = img.closest('header, footer, nav, aside, .ad, .advertisement, [class*="advertisement"]');
+          if (ancestor) return;
+          
+          let imgUrl: string | null = null;
+          const tagName = img.tagName?.toLowerCase();
+          
+          // Extract URL based on element type (Deno-compatible, no instanceof)
+          if (tagName === 'img') {
+            // Try various attributes where images might be stored
+            imgUrl = img.getAttribute('src') || 
+                     img.getAttribute('data-src') || 
+                     img.getAttribute('data-lazy-src') ||
+                     img.getAttribute('data-image') ||
+                     img.getAttribute('data-original');
+            
+            // Check srcset if no src found
+            if (!imgUrl) {
+              const srcset = img.getAttribute('srcset');
+              if (srcset) {
+                imgUrl = srcset.split(',')[0].trim().split(' ')[0];
+              }
+            }
+          } else if (tagName === 'source') {
+            imgUrl = img.getAttribute('srcset')?.split(' ')[0] || img.getAttribute('src');
+          } else if (tagName === 'picture') {
+            // For picture elements, look for source or img children
+            const sourceEl = img.querySelector('source');
+            const imgEl = img.querySelector('img');
+            if (sourceEl) {
+              imgUrl = sourceEl.getAttribute('srcset')?.split(' ')[0] || sourceEl.getAttribute('src');
+            } else if (imgEl) {
+              imgUrl = imgEl.getAttribute('src');
+            }
+          } else {
+            // Generic fallback for other elements
+            imgUrl = img.getAttribute('src') || img.getAttribute('srcset')?.split(' ')[0];
+          }
+          
+          if (imgUrl) {
+            const normalizedUrl = normalizeImageUrl(imgUrl);
+            const sizeInfo = extractImageSizeHint(normalizedUrl);
+            
+            // Only add images with reasonable size hints
+            if (sizeInfo.maxDimension >= 400 || sizeInfo.maxDimension === 0) {
+              const altText = img.getAttribute('alt') || '';
+              const added = addImage(normalizedUrl, 'Main Content', altText);
+              if (added) {
+                acceptedCount++;
+                console.log(`  ✅ Added main content image: ${normalizedUrl.substring(0, 80)}...`);
+              }
+            }
+          }
+        } catch (imgError) {
+          console.error(`⚠️ Error processing image in Layer 3:`, imgError);
+          // Continue with next image
         }
-      }
-    });
-    
-    console.log(`📦 Layer 3 complete: Scanned ${scannedCount}, accepted ${acceptedCount} images`);
+      });
+      
+      console.log(`📦 Layer 3 complete: Scanned ${scannedCount}, accepted ${acceptedCount} images`);
+    }
+  } catch (layer3Error) {
+    console.error(`❌ Layer 3 main content sweep failed:`, layer3Error);
+    console.log(`⚠️ Continuing with images from other layers`);
   }
 }
 
