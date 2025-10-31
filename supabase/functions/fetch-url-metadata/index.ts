@@ -859,6 +859,58 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       }
     };
 
+    // ===== TIER 2: TRUSTED PRODUCT IMAGE CDN WHITELIST =====
+    // Exact hostname matching to prevent false positives
+    const TRUSTED_PRODUCT_CDN_HOSTNAMES = [
+      // Flipkart CDNs
+      'rukminim1.flixcart.com',
+      'rukminim2.flixcart.com',
+      'static-assets-web.flixcart.com',
+      'img.flixcart.com',
+      
+      // Maccaron
+      'cdn.maccaron.in',
+      'static-assets-web.maccaron.in',
+      
+      // Amazon
+      'm.media-amazon.com',
+      'images-eu.ssl-images-amazon.com',
+      'images-na.ssl-images-amazon.com',
+      
+      // Nykaa
+      'images-static.nykaa.com',
+      'cdn.nykaa.com',
+      
+      // Shopify (generic)
+      'cdn.shopify.com',
+      
+      // Tira Beauty
+      'cdn.tirabeauty.com'
+    ];
+
+    /**
+     * Check if URL is from a trusted product CDN using exact hostname matching
+     * This prevents substring false positives (e.g., evil-site.com/flixcart.com/...)
+     */
+    const isTrustedProductCdn = (imgUrl: string): boolean => {
+      try {
+        const urlObj = new URL(imgUrl);
+        const hostname = urlObj.hostname.toLowerCase();
+        
+        // Exact match or subdomain match (e.g., rukminim3.flixcart.com)
+        return TRUSTED_PRODUCT_CDN_HOSTNAMES.some(trustedHost => {
+          return hostname === trustedHost || 
+                 hostname.endsWith('.' + trustedHost) ||
+                 // Handle numbered subdomains (rukminim1, rukminim2, etc.)
+                 (trustedHost.match(/^[a-z]+\d+\./) && 
+                  hostname.replace(/\d+/, '1') === trustedHost);
+        });
+      } catch {
+        // URL parsing failed - not a valid URL
+        return false;
+      }
+    };
+
     // ===== TIER 2: SMART IMAGE QUALITY VALIDATION =====
     const isLikelyProductImage = (imgUrl: string, altText: string = ''): boolean => {
       const urlLower = imgUrl.toLowerCase();
@@ -869,10 +921,11 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       const hasPathExtension = urlLower.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
 
       if (!hasPathExtension) {
-        // No path extension - check if it's a proxy URL with format in query params
+        // No path extension - check if it's a proxy URL, trusted CDN, or reject
         try {
           const urlObj = new URL(imgUrl);
           const isProxy = PROXY_CDN_PATTERNS.some(pattern => urlObj.hostname.includes(pattern));
+          const isTrustedCdn = isTrustedProductCdn(imgUrl);
           
           if (isProxy) {
             // For proxy URLs, check output/format parameter OR embedded URL extension
@@ -891,8 +944,13 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
               return false;
             }
             if (DEBUG) console.log(`✅ Valid proxy image: ${imgUrl.slice(-60)}`);
+          } else if (isTrustedCdn) {
+            // ✅ Trusted CDN - bypass extension check
+            // But STILL enforce size/pattern checks below
+            if (DEBUG) console.log(`✅ Trusted CDN bypass: ${imgUrl.slice(-60)}`);
+            // Don't return here - fall through to size/pattern validation
           } else {
-            // Not a proxy and no extension in path = reject
+            // Not a proxy, not a trusted CDN, no extension = reject
             if (DEBUG) console.log(`⏭️ Invalid extension: ${imgUrl.slice(-40)}`);
             return false;
           }
