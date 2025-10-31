@@ -765,7 +765,13 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         if (nykaaWidth) width = parseInt(nykaaWidth[1]);
         
         // 6. Flipkart/CDN path patterns: /image/832/832/, /img/400/400/
-        const pathSizeMatch = pathname.match(/\/(?:image|img)\/(\d+)\/(\d+)\//);
+        if (DEBUG && pathname.includes('/image/')) {
+          console.log(`🔍 Flipkart probe: pathname="${pathname}"`);
+        }
+        const pathSizeMatch = pathname.match(/\/(?:image|img)\/(\d{2,4})\/(\d{2,4})\//);
+        if (DEBUG && pathname.includes('/image/')) {
+          console.log(`  🎯 Pattern match result: ${pathSizeMatch ? `✅ ${pathSizeMatch[1]}x${pathSizeMatch[2]}` : '❌ no match'}`);
+        }
         if (pathSizeMatch) {
           width = parseInt(pathSizeMatch[1]);
           height = parseInt(pathSizeMatch[2]);
