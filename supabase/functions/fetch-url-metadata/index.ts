@@ -764,7 +764,15 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         const nykaaWidth = params.get('tr')?.match(/w-(\d+)/);
         if (nykaaWidth) width = parseInt(nykaaWidth[1]);
         
-        // 6. Decoded proxy targets (wsrv.nl, weserv.nl with embedded URLs)
+        // 6. Flipkart/CDN path patterns: /image/832/832/, /img/400/400/
+        const pathSizeMatch = pathname.match(/\/(?:image|img)\/(\d+)\/(\d+)\//);
+        if (pathSizeMatch) {
+          width = parseInt(pathSizeMatch[1]);
+          height = parseInt(pathSizeMatch[2]);
+          if (DEBUG) console.log(`  📐 Detected path-based size: ${width}x${height} from ${pathname.slice(0, 50)}...`);
+        }
+        
+        // 7. Decoded proxy targets (wsrv.nl, weserv.nl with embedded URLs)
         const embeddedUrl = params.get('url') || params.get('image');
         if (embeddedUrl) {
           try {
