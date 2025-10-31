@@ -969,18 +969,44 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         return false;
       }
       
-      // Exclude by filename patterns
+      // Exclude by filename/path patterns (domain-agnostic approach)
       const excludePatterns = [
         'logo', 'icon', 'banner', 'ad', 'promo',
         'tracking', 'pixel', 'badge', 'rating',
         'social', 'share', 'cart', 'wishlist',
-        'button', 'arrow', 'close', 'search'
+        'button', 'arrow', 'close', 'search',
+        'placeholder', 'sprite', 'sample', 'thumb'
       ];
       
-      if (excludePatterns.some(pattern => urlLower.includes(pattern))) {
-        if (DEBUG) console.log(`⏭️ Excluded pattern: ${imgUrl.slice(-40)}`);
+      // Parse URL to extract pathname and filename
+      let pathname = '';
+      let filename = '';
+      try {
+        const u = new URL(imgUrl);
+        pathname = u.pathname.toLowerCase();
+        filename = pathname.split('/').pop() ?? '';
+      } catch {
+        // Fallback for relative URLs
+        pathname = imgUrl.toLowerCase();
+        filename = pathname.split('/').pop() ?? '';
+      }
+      
+      // Check filename first (highest precision)
+      if (excludePatterns.some(pattern => filename.includes(pattern))) {
+        if (DEBUG) console.log(`⏭️ Excluded filename pattern: ${filename}`);
         return false;
       }
+      
+      // Check shallow paths only (≤3 segments, e.g., /images/logo.png)
+      const pathSegments = pathname.split('/').filter(s => s.length > 0);
+      const isShallowPath = pathSegments.length <= 3;
+      
+      if (isShallowPath && excludePatterns.some(pattern => pathname.includes(pattern))) {
+        if (DEBUG) console.log(`⏭️ Excluded shallow path pattern: ${pathname}`);
+        return false;
+      }
+      
+      if (DEBUG) console.log(`✅ Path check passed: ${pathname}`);
       
       // Check alt text for obvious non-product images
       if (alt.includes('logo') || alt.includes('icon') || alt.includes('banner')) {
