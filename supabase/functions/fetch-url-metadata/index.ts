@@ -433,6 +433,14 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     });
     
     console.log(`📦 Layer 0 parsing complete: Found ${pendingJsonImages.length} potential images in JSON state`);
+    
+    // DEBUG: Log all extracted URLs
+    if (DEBUG && pendingJsonImages.length > 0) {
+      console.log(`  📋 All ${pendingJsonImages.length} extracted URLs from JSON state:`);
+      pendingJsonImages.forEach((img, idx) => {
+        console.log(`    ${idx + 1}. ${img.url.slice(-100)}`);
+      });
+    }
 
     // Extract favicon
     const favicon = doc.querySelector('link[rel="icon"]')?.getAttribute('href') ||
@@ -1203,7 +1211,11 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
     const addImage = (imgUrl: string, source: string, altText: string = ''): boolean => {
       // Check exact URL duplication first
       if (!imgUrl || seenUrls.has(imgUrl)) {
-        if (DEBUG) console.log(`⏭️ Skipping exact URL duplicate: ${imgUrl}`);
+        if (DEBUG) {
+          console.log(`  ⏭️ Skipping exact URL duplicate (${seenUrls.size} unique so far)`);
+          console.log(`    Source: ${source}`);
+          console.log(`    URL: ${imgUrl.slice(-120)}`);
+        }
         return false;
       }
       
@@ -1980,36 +1992,43 @@ if (shouldContinueToFallbacks && imageCollection.length < 3) {
 
     // ===== COLLAPSE DUPLICATES BY CANONICAL KEY (KEEP LARGEST) =====
     console.log(`🔍 Collapsing ${imageCollection.length} images by canonical key...`);
+    
+    // DEBUG: Optional bypass for testing
+    const BYPASS_CANONICAL_COLLAPSE = false; // Set to true to disable canonical collapse for debugging
 
     const canonicalMap = new Map<string, typeof imageCollection[0]>();
 
-    imageCollection.forEach(item => {
-      const existing = canonicalMap.get(item.canonicalKey);
-      
-      if (!existing) {
-        // First time seeing this canonical image
-        canonicalMap.set(item.canonicalKey, item);
-        if (DEBUG) console.log(`🆕 Canonical: ${item.canonicalKey.slice(-40)} (${item.sizeHint}px)`);
-      } else {
-        // Duplicate found - keep the larger one
-        if (item.sizeHint > existing.sizeHint) {
-          if (DEBUG) {
-            console.log(`🔄 Replacing: ${existing.canonicalKey.slice(-40)} ${existing.sizeHint}px → ${item.sizeHint}px`);
-          }
+    if (!BYPASS_CANONICAL_COLLAPSE) {
+      imageCollection.forEach(item => {
+        const existing = canonicalMap.get(item.canonicalKey);
+        
+        if (!existing) {
+          // First time seeing this canonical image
           canonicalMap.set(item.canonicalKey, item);
+          if (DEBUG) console.log(`🆕 Canonical: ${item.canonicalKey.slice(-40)} (${item.sizeHint}px)`);
         } else {
-          if (DEBUG) {
-            console.log(`⏭️ Keeping existing: ${existing.canonicalKey.slice(-40)} ${existing.sizeHint}px (skipping ${item.sizeHint}px)`);
+          // Duplicate found - keep the larger one
+          if (item.sizeHint > existing.sizeHint) {
+            if (DEBUG) {
+              console.log(`🔄 Replacing: ${existing.canonicalKey.slice(-40)} ${existing.sizeHint}px → ${item.sizeHint}px`);
+            }
+            canonicalMap.set(item.canonicalKey, item);
+          } else {
+            if (DEBUG) {
+              console.log(`⏭️ Keeping existing: ${existing.canonicalKey.slice(-40)} ${existing.sizeHint}px (skipping ${item.sizeHint}px)`);
+            }
           }
         }
-      }
-    });
+      });
 
-    // Replace imageCollection with collapsed results
-    imageCollection.length = 0;
-    imageCollection.push(...Array.from(canonicalMap.values()));
+      // Replace imageCollection with collapsed results
+      imageCollection.length = 0;
+      imageCollection.push(...Array.from(canonicalMap.values()));
 
-    console.log(`✅ Collapsed to ${imageCollection.length} unique images`);
+      console.log(`✅ Collapsed to ${imageCollection.length} unique images`);
+    } else {
+      console.log(`⚠️ DEBUG: Canonical collapse BYPASSED - keeping all ${imageCollection.length} images`);
+    }
 
     // ===== SORT BY PRIORITY AND EXTRACT TOP 7 IMAGES =====
     console.log(`📊 Sorting ${imageCollection.length} images by priority...`);
