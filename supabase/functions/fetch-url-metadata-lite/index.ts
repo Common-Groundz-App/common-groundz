@@ -19,8 +19,8 @@ serve(async (req) => {
     
     console.log(`🔍 Processing URL: ${url}`);
     
-    // Step 1: Extract product name from URL
-    const productName = await extractProductName(url);
+    // Step 1: Extract product name from URL and get HTML for later use
+    const { name: productName, html: pageHtml } = await extractProductName(url);
     console.log(`📝 Extracted product name: "${productName}"`);
     
     // Step 2: Google Image Search
@@ -82,17 +82,20 @@ serve(async (req) => {
       }
     }
     
-    // Step 4: Extract description and favicon in parallel
-    console.log('📝 Extracting description and favicon...');
-    const [description, favicon] = await Promise.all([
-      extractDescription(url),
-      extractFavicon(url)
-    ]);
+    // Step 4: Extract description and favicon from already-fetched HTML (no extra requests)
+    console.log('📝 Extracting description and favicon from page HTML...');
+    const urlObj = new URL(url);
+    const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+    
+    const description = extractDescriptionFromHTML(pageHtml);
+    const favicon = extractFaviconFromHTML(pageHtml, baseUrl);
+    
+    console.log(`✅ Description: ${description ? description.slice(0, 50) + '...' : 'none'}`);
+    console.log(`✅ Favicon: ${favicon ? 'found' : 'default fallback'}`);
     
     // Step 5: Prepare response
     const hasImages = images.length > 0;
     const primaryImage = hasImages ? images[0].url : null;
-    const urlObj = new URL(url);
     const siteName = urlObj.hostname.replace('www.', '');
     
     // Step 6: Enhanced logging
@@ -146,9 +149,9 @@ serve(async (req) => {
 });
 
 /**
- * Extract product name from URL or page
+ * Extract product name from URL or page and return HTML for reuse
  */
-async function extractProductName(url: string): Promise<string> {
+async function extractProductName(url: string): Promise<{ name: string; html: string }> {
   try {
     // Try fetching the page (basic fetch, no rendering)
     const response = await fetch(url, {
@@ -177,20 +180,20 @@ async function extractProductName(url: string): Promise<string> {
         .slice(0, 100); // Limit length
       
       if (title.length > 5) {
-        return title;
+        return { name: title, html };
       }
     }
     
     // Try og:title
     const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
     if (ogTitleMatch) {
-      return ogTitleMatch[1].slice(0, 100);
+      return { name: ogTitleMatch[1].slice(0, 100), html };
     }
     
     // Try twitter:title
     const twitterTitleMatch = html.match(/<meta[^>]*name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i);
     if (twitterTitleMatch) {
-      return twitterTitleMatch[1].slice(0, 100);
+      return { name: twitterTitleMatch[1].slice(0, 100), html };
     }
     
     // Try h1 tag
@@ -202,7 +205,7 @@ async function extractProductName(url: string): Promise<string> {
         .slice(0, 100);
       
       if (h1Text.length > 5) {
-        return h1Text;
+        return { name: h1Text, html };
       }
     }
     
@@ -230,13 +233,60 @@ async function extractProductName(url: string): Promise<string> {
         .trim();
       
       if (lastSegment.length > 3) {
-        return lastSegment.slice(0, 100);
+        return { name: lastSegment.slice(0, 100), html: '' };
       }
     }
     
     // Absolute fallback: Use domain name
-    return urlObj.hostname.replace('www.', '').split('.')[0];
+    return { name: urlObj.hostname.replace('www.', '').split('.')[0], html: '' };
   }
+}
+
+/**
+ * Extract description from HTML (no network request)
+ */
+function extractDescriptionFromHTML(html: string): string | null {
+  if (!html) return null;
+  
+  // Try og:description first (usually best)
+  const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
+  if (ogDescMatch) {
+    return ogDescMatch[1].slice(0, 500);
+  }
+  
+  // Try twitter:description
+  const twitterDescMatch = html.match(/<meta[^>]*name=["']twitter:description["'][^>]*content=["']([^"']+)["']/i);
+  if (twitterDescMatch) {
+    return twitterDescMatch[1].slice(0, 500);
+  }
+  
+  // Try standard meta description
+  const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+  if (metaDescMatch) {
+    return metaDescMatch[1].slice(0, 500);
+  }
+  
+  return null;
+}
+
+/**
+ * Extract favicon from HTML (no network request)
+ */
+function extractFaviconFromHTML(html: string, baseUrl: string): string | null {
+  if (!html) return `${baseUrl}/favicon.ico`;
+  
+  // Try standard favicon link tags
+  const faviconMatch = html.match(/<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/i);
+  if (faviconMatch) {
+    const faviconPath = faviconMatch[1];
+    // Make absolute URL if relative
+    return faviconPath.startsWith('http') 
+      ? faviconPath 
+      : `${baseUrl}${faviconPath.startsWith('/') ? '' : '/'}${faviconPath}`;
+  }
+  
+  // Fallback to default /favicon.ico
+  return `${baseUrl}/favicon.ico`;
 }
 
 /**
@@ -276,94 +326,3 @@ async function extractOpenGraphImage(url: string): Promise<string | null> {
   }
 }
 
-/**
- * Extract page description from meta tags
- */
-async function extractDescription(url: string): Promise<string | null> {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-    
-    if (!response.ok) {
-      return null;
-    }
-    
-    const html = await response.text();
-    
-    // Try og:description first (usually best)
-    const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
-    if (ogDescMatch) {
-      return ogDescMatch[1].slice(0, 500);
-    }
-    
-    // Try twitter:description
-    const twitterDescMatch = html.match(/<meta[^>]*name=["']twitter:description["'][^>]*content=["']([^"']+)["']/i);
-    if (twitterDescMatch) {
-      return twitterDescMatch[1].slice(0, 500);
-    }
-    
-    // Try standard meta description
-    const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
-    if (metaDescMatch) {
-      return metaDescMatch[1].slice(0, 500);
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('⚠️ Failed to extract description:', error);
-    return null;
-  }
-}
-
-/**
- * Extract favicon URL from page
- */
-async function extractFavicon(url: string): Promise<string | null> {
-  try {
-    const urlObj = new URL(url);
-    const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
-    
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-    
-    if (!response.ok) {
-      return null;
-    }
-    
-    const html = await response.text();
-    
-    // Try standard favicon link tags
-    const faviconMatch = html.match(/<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/i);
-    if (faviconMatch) {
-      const faviconPath = faviconMatch[1];
-      // Make absolute URL if relative
-      return faviconPath.startsWith('http') 
-        ? faviconPath 
-        : `${baseUrl}${faviconPath.startsWith('/') ? '' : '/'}${faviconPath}`;
-    }
-    
-    // Fallback: Try default /favicon.ico
-    const defaultFavicon = `${baseUrl}/favicon.ico`;
-    const faviconResponse = await fetch(defaultFavicon, { 
-      method: 'HEAD',
-      signal: AbortSignal.timeout(5000) 
-    });
-    
-    if (faviconResponse.ok) {
-      return defaultFavicon;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('⚠️ Failed to extract favicon:', error);
-    return null;
-  }
-}
