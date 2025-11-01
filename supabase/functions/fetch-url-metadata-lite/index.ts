@@ -1,0 +1,244 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { url } = await req.json();
+    
+    if (!url) {
+      throw new Error('URL is required');
+    }
+    
+    console.log(`🔍 Processing URL: ${url}`);
+    
+    // Step 1: Extract product name from URL
+    const productName = await extractProductName(url);
+    console.log(`📝 Extracted product name: "${productName}"`);
+    
+    // Step 2: Google Image Search
+    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_CUSTOM_SEARCH_API_KEY');
+    const GOOGLE_CX = Deno.env.get('GOOGLE_CUSTOM_SEARCH_CX');
+    
+    if (!GOOGLE_API_KEY || !GOOGLE_CX) {
+      throw new Error('Google API credentials not configured');
+    }
+    
+    const searchUrl = `https://www.googleapis.com/customsearch/v1?` +
+      `key=${GOOGLE_API_KEY}&` +
+      `cx=${GOOGLE_CX}&` +
+      `q=${encodeURIComponent(productName)}&` +
+      `searchType=image&` +
+      `num=5&` +
+      `imgSize=large&` +
+      `safe=active`;
+    
+    console.log(`🔍 Searching Google Images...`);
+    const searchResponse = await fetch(searchUrl, {
+      signal: AbortSignal.timeout(15000),
+    });
+    
+    if (!searchResponse.ok) {
+      throw new Error(`Google API error: ${searchResponse.status} ${searchResponse.statusText}`);
+    }
+    
+    const searchData = await searchResponse.json();
+    
+    const images: string[] = [];
+    
+    // Extract image URLs from Google results
+    if (searchData.items && Array.isArray(searchData.items)) {
+      for (const item of searchData.items) {
+        if (item.link) {
+          images.push(item.link);
+        }
+      }
+    }
+    
+    console.log(`✅ Found ${images.length} images from Google`);
+    
+    // Step 3: Fallback to Open Graph if Google returns nothing
+    if (images.length === 0) {
+      console.log('⚠️ No Google results, trying Open Graph fallback...');
+      const ogImage = await extractOpenGraphImage(url);
+      if (ogImage) {
+        images.push(ogImage);
+        console.log(`✅ Found Open Graph image: ${ogImage.slice(0, 50)}...`);
+      }
+    }
+    
+    // Step 4: Return results
+    return new Response(
+      JSON.stringify({
+        title: productName,
+        description: null,
+        images: images.map(url => ({ 
+          url, 
+          source: 'Google Image Search',
+          size: 'large' 
+        })),
+        favicon: null,
+        metadata: {
+          method: 'google-search',
+          query: productName,
+          imageCount: images.length,
+          timestamp: new Date().toISOString(),
+        }
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+    
+  } catch (error) {
+    console.error('❌ Error:', error);
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+});
+
+/**
+ * Extract product name from URL or page
+ */
+async function extractProductName(url: string): Promise<string> {
+  try {
+    // Try fetching the page (basic fetch, no rendering)
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch page: ${response.status}`);
+    }
+    
+    const html = await response.text();
+    
+    // Try title tag first (most reliable)
+    const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch) {
+      // Clean up title: remove site name, common separators
+      const title = titleMatch[1]
+        .split(/[|–—-]/)[0] // Take first part before separator
+        .trim()
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .slice(0, 100); // Limit length
+      
+      if (title.length > 5) {
+        return title;
+      }
+    }
+    
+    // Try og:title
+    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+    if (ogTitleMatch) {
+      return ogTitleMatch[1].slice(0, 100);
+    }
+    
+    // Try twitter:title
+    const twitterTitleMatch = html.match(/<meta[^>]*name=["']twitter:title["'][^>]*content=["']([^"']+)["']/i);
+    if (twitterTitleMatch) {
+      return twitterTitleMatch[1].slice(0, 100);
+    }
+    
+    // Try h1 tag
+    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+    if (h1Match) {
+      const h1Text = h1Match[1]
+        .replace(/<[^>]*>/g, '') // Remove nested HTML tags
+        .trim()
+        .slice(0, 100);
+      
+      if (h1Text.length > 5) {
+        return h1Text;
+      }
+    }
+    
+    // Fallback: Extract from URL
+    throw new Error('Could not extract title from page');
+    
+  } catch (error) {
+    console.warn('⚠️ Failed to extract product name from page:', error.message);
+    
+    // Last resort: Parse from URL
+    const urlObj = new URL(url);
+    
+    // Get the last meaningful path segment
+    const pathSegments = urlObj.pathname
+      .split('/')
+      .filter(segment => segment.length > 2) // Skip short segments
+      .filter(segment => !segment.match(/^\d+$/)); // Skip numeric IDs
+    
+    if (pathSegments.length > 0) {
+      // Use last segment, clean it up
+      const lastSegment = pathSegments[pathSegments.length - 1]
+        .replace(/[-_]/g, ' ') // Replace hyphens/underscores with spaces
+        .replace(/\.[^.]+$/, '') // Remove file extension if present
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+      
+      if (lastSegment.length > 3) {
+        return lastSegment.slice(0, 100);
+      }
+    }
+    
+    // Absolute fallback: Use domain name
+    return urlObj.hostname.replace('www.', '').split('.')[0];
+  }
+}
+
+/**
+ * Extract Open Graph image as fallback
+ */
+async function extractOpenGraphImage(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const html = await response.text();
+    
+    // Try og:image
+    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+    if (ogImageMatch) {
+      return ogImageMatch[1];
+    }
+    
+    // Try twitter:image
+    const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
+    if (twitterImageMatch) {
+      return twitterImageMatch[1];
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('⚠️ Failed to extract Open Graph image:', error);
+    return null;
+  }
+}

@@ -54,8 +54,10 @@ verify_jwt = true
 
 [functions.unified-search-v2]
 verify_jwt = false
-
 [functions.cleanup-temp-photos]
+verify_jwt = false
+
+[functions.fetch-url-metadata-lite]
 verify_jwt = false
 
 [functions.analyze-entity-url]
