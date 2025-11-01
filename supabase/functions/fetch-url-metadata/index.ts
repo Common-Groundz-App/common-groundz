@@ -160,16 +160,6 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       fetchMethod = 'scraper-api';
       let scraperSuccess = false;
       
-      // Shared SPA domains list used by both Stage 1 and Stage 2
-      const spaDomainsShared = [
-        'nykaa.com',
-        'tirabeauty.com',
-        'amazon.in', 'amazon.com', 'amazon.co.uk',
-        'flipkart.com',
-        'myntra.com',
-        'maccaron.in'
-      ];
-      
       // STAGE 1: Try static scraping first (faster, cheaper) - unless forcing JS render
       try {
         const shouldForceJsNow = forceJsRender || stage > 0;
@@ -182,7 +172,13 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         console.log('📥 Stage 1: ScraperAPI static mode (premium)...');
         
         const hostname = new URL(url).hostname;
-        const needsJsRendering = spaDomainsShared.some(domain => hostname.includes(domain));
+        const needsJsRendering = [
+          'nykaa.com',
+          'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
+          'amazon.in', 'amazon.com', 'amazon.co.uk',
+          'flipkart.com',
+          'myntra.com'
+        ].some(domain => hostname.includes(domain));
         
         // Stage 1: Static scraping (no JS rendering)
         const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}&premium=true`;
@@ -195,12 +191,6 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           html = await scraperResponse.text();
           
           if (html.length >= 300) {
-            // NEW CHECK: If this is a known SPA, reject static scrape and force Stage 2
-            if (needsJsRendering) {
-              console.warn(`⚠️ Static HTML from SPA domain ${hostname}, forcing Stage 2`);
-              throw new Error('SPA requires JS rendering');
-            }
-            
             console.log(`✅ ScraperAPI static succeeded (${html.length} bytes)`);
             console.log(`💰 ScraperAPI credit used (static, 1 credit) for: ${url}`);
             scraperSuccess = true;
@@ -216,16 +206,15 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
           console.log('📥 Stage 2: ScraperAPI JS rendering mode...');
           
           const hostname = new URL(url).hostname;
+          const needsJsRendering = [
+            'nykaa.com',
+            'tirabeauty.com',                                  // ⬅️ NEW: Vue SPA requires JS rendering
+            'amazon.in', 'amazon.com', 'amazon.co.uk',
+            'flipkart.com',
+            'myntra.com'
+          ].some(domain => hostname.includes(domain));
           
-          // Use shared SPA domains list for consistency
-          const needsJsRendering = spaDomainsShared.some(domain => hostname.includes(domain));
-          
-          // Compute shouldRender: respect forceJsRender, stage, or domain-based detection
-          const shouldRender = forceJsRender || stage > 0 || needsJsRendering;
-          
-          console.log(`🔍 DEBUG: shouldRender=${shouldRender}, forceJsRender=${forceJsRender}, stage=${stage}, needsJsRendering=${needsJsRendering}`);
-          
-          const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}${shouldRender ? '&render=true' : ''}&premium=true`;
+          const scraperUrl = `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(url)}${needsJsRendering ? '&render=true' : ''}&premium=true`;
           
           const scraperResponse = await fetch(scraperUrl, {
             signal: AbortSignal.timeout(60000) // JS rendering takes longer
@@ -253,149 +242,6 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
 
     const doc = parse(html);
 
-    // ===== LAYER 0: EXTRACT IMAGES FROM EMBEDDED JSON STATE =====
-    console.log('📦 Layer 0: Mining embedded JSON state blobs...');
-    
-    // Track how many images we found from JSON state
-    let jsonStateImageCount = 0;
-    
-    const scripts = doc.querySelectorAll('script[type="application/json"], script[id*="__NEXT"], script[id*="__NUXT"], script[id*="__APOLLO"]');
-    
-    // Recursively search for image URLs in the JSON blob
-    const extractImagesFromJson = (obj: any, path: string = '', addImageFn: (url: string, source: string, altText: string) => boolean): void => {
-      if (!obj || typeof obj !== 'object') return;
-      
-      for (const [key, value] of Object.entries(obj)) {
-        const currentPath = path ? `${path}.${key}` : key;
-        
-        // Check if this looks like an image property
-        const imageKeys = ['image', 'images', 'media', 'gallery', 'photo', 'photos', 'thumbnail', 'src', 'url'];
-        const isImageKey = imageKeys.some(imgKey => key.toLowerCase().includes(imgKey));
-        
-        if (isImageKey) {
-          // Handle string URLs
-          if (typeof value === 'string' && (value.startsWith('http') || value.startsWith('//'))) {
-            const normalizedUrl = normalizeImageUrl(value);
-            if (addImageFn(normalizedUrl, 'Script (JSON-LD)', currentPath)) {
-              jsonStateImageCount++;
-            }
-          }
-          
-          // Handle arrays of URLs
-          if (Array.isArray(value)) {
-            value.forEach((item, i) => {
-              if (typeof item === 'string' && (item.startsWith('http') || item.startsWith('//'))) {
-                const normalizedUrl = normalizeImageUrl(item);
-                if (addImageFn(normalizedUrl, 'Script (JSON-LD)', `${currentPath}[${i}]`)) {
-                  jsonStateImageCount++;
-                }
-              } else if (typeof item === 'object') {
-                extractImagesFromJson(item, `${currentPath}[${i}]`, addImageFn);
-              }
-            });
-          }
-        }
-        
-        // Recurse into nested objects/arrays
-        if (typeof value === 'object' && value !== null) {
-          extractImagesFromJson(value, currentPath, addImageFn);
-        }
-      }
-    };
-    
-    // We'll need to define addImage function first, so we'll temporarily store these
-    // and process them after addImage is defined
-    const pendingJsonImages: Array<{ url: string; source: string; altText: string }> = [];
-    
-    // Shared function for both JSON-LD scripts and inline state assignments
-    const tempAddImage = (url: string, source: string, altText: string): boolean => {
-      pendingJsonImages.push({ url, source, altText });
-      return true;
-    };
-    
-    scripts.forEach((script, idx) => {
-      try {
-        const scriptId = script.getAttribute('id') || `script-${idx}`;
-        const scriptContent = script.textContent;
-        
-        if (!scriptContent || scriptContent.length < 50) return;
-        
-        const jsonData = JSON.parse(scriptContent);
-        
-        // Use shared tempAddImage function
-        extractImagesFromJson(jsonData, scriptId, tempAddImage);
-        
-      } catch (e) {
-        // Silently skip non-JSON or malformed scripts
-      }
-    });
-    
-    // Layer 0b: Parse inline window.__INITIAL_STATE__ assignments (Flipkart, etc.)
-    console.log('🔍 Layer 0b: Scanning inline state assignments...');
-    const inlineScripts = doc.querySelectorAll('script:not([src])');
-    
-    inlineScripts.forEach((script) => {
-      try {
-        const scriptText = script.textContent || '';
-        
-        // Find the assignment pattern
-        const assignmentPattern = /window\.__(?:INITIAL_STATE|INITIAL_DATA|PRELOADED_STATE)__\s*=\s*/;
-        const match = scriptText.match(assignmentPattern);
-        
-        if (match) {
-          const startIndex = match.index! + match[0].length;
-          
-          // Find the opening brace
-          let jsonStart = startIndex;
-          while (jsonStart < scriptText.length && scriptText[jsonStart] !== '{') {
-            jsonStart++;
-          }
-          
-          if (jsonStart >= scriptText.length) {
-            console.warn('⚠️ No opening brace found after state assignment');
-            return;
-          }
-          
-          // Use balanced-brace counter to find the complete JSON object
-          let braceCount = 0;
-          let jsonEnd = jsonStart;
-          let foundComplete = false;
-          
-          for (let i = jsonStart; i < scriptText.length; i++) {
-            if (scriptText[i] === '{') braceCount++;
-            if (scriptText[i] === '}') braceCount--;
-            
-            if (braceCount === 0) {
-              jsonEnd = i + 1;
-              foundComplete = true;
-              break;
-            }
-          }
-          
-          if (!foundComplete) {
-            console.warn('⚠️ Unbalanced braces in inline state assignment');
-            return;
-          }
-          
-          const jsonPayload = scriptText.substring(jsonStart, jsonEnd);
-          console.log(`📋 Found inline state assignment (${jsonPayload.length} bytes, braces balanced)`);
-          
-          try {
-            const jsonData = JSON.parse(jsonPayload);
-            extractImagesFromJson(jsonData, 'window.__INITIAL_STATE__', tempAddImage);
-            console.log(`✅ Successfully parsed inline state, found ${pendingJsonImages.length} images so far`);
-          } catch (parseError) {
-            console.warn(`⚠️ Failed to parse inline state JSON: ${parseError.message}`);
-            console.warn(`📄 First 200 chars: ${jsonPayload.substring(0, 200)}`);
-          }
-        }
-      } catch (e) {
-        console.warn(`⚠️ Error scanning inline script: ${e.message}`);
-      }
-    });
-    
-    console.log(`📦 Layer 0 parsing complete: Found ${pendingJsonImages.length} potential images in JSON state`);
-
     // Extract favicon
     const favicon = doc.querySelector('link[rel="icon"]')?.getAttribute('href') ||
                     doc.querySelector('link[rel="shortcut icon"]')?.getAttribute('href') || '';
@@ -405,8 +251,6 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       url: string;
       priority: number;
       source: string;
-      canonicalKey: string;
-      sizeHint: number;
     }
     const imageCollection: ImageWithPriority[] = [];
     const seenUrls = new Set<string>();
@@ -859,58 +703,6 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       }
     };
 
-    // ===== TIER 2: TRUSTED PRODUCT IMAGE CDN WHITELIST =====
-    // Exact hostname matching to prevent false positives
-    const TRUSTED_PRODUCT_CDN_HOSTNAMES = [
-      // Flipkart CDNs
-      'rukminim1.flixcart.com',
-      'rukminim2.flixcart.com',
-      'static-assets-web.flixcart.com',
-      'img.flixcart.com',
-      
-      // Maccaron
-      'cdn.maccaron.in',
-      'static-assets-web.maccaron.in',
-      
-      // Amazon
-      'm.media-amazon.com',
-      'images-eu.ssl-images-amazon.com',
-      'images-na.ssl-images-amazon.com',
-      
-      // Nykaa
-      'images-static.nykaa.com',
-      'cdn.nykaa.com',
-      
-      // Shopify (generic)
-      'cdn.shopify.com',
-      
-      // Tira Beauty
-      'cdn.tirabeauty.com'
-    ];
-
-    /**
-     * Check if URL is from a trusted product CDN using exact hostname matching
-     * This prevents substring false positives (e.g., evil-site.com/flixcart.com/...)
-     */
-    const isTrustedProductCdn = (imgUrl: string): boolean => {
-      try {
-        const urlObj = new URL(imgUrl);
-        const hostname = urlObj.hostname.toLowerCase();
-        
-        // Exact match or subdomain match (e.g., rukminim3.flixcart.com)
-        return TRUSTED_PRODUCT_CDN_HOSTNAMES.some(trustedHost => {
-          return hostname === trustedHost || 
-                 hostname.endsWith('.' + trustedHost) ||
-                 // Handle numbered subdomains (rukminim1, rukminim2, etc.)
-                 (trustedHost.match(/^[a-z]+\d+\./) && 
-                  hostname.replace(/\d+/, '1') === trustedHost);
-        });
-      } catch {
-        // URL parsing failed - not a valid URL
-        return false;
-      }
-    };
-
     // ===== TIER 2: SMART IMAGE QUALITY VALIDATION =====
     const isLikelyProductImage = (imgUrl: string, altText: string = ''): boolean => {
       const urlLower = imgUrl.toLowerCase();
@@ -921,11 +713,10 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       const hasPathExtension = urlLower.match(/\.(jpg|jpeg|png|webp)(\?|$)/i);
 
       if (!hasPathExtension) {
-        // No path extension - check if it's a proxy URL, trusted CDN, or reject
+        // No path extension - check if it's a proxy URL with format in query params
         try {
           const urlObj = new URL(imgUrl);
           const isProxy = PROXY_CDN_PATTERNS.some(pattern => urlObj.hostname.includes(pattern));
-          const isTrustedCdn = isTrustedProductCdn(imgUrl);
           
           if (isProxy) {
             // For proxy URLs, check output/format parameter OR embedded URL extension
@@ -944,13 +735,8 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
               return false;
             }
             if (DEBUG) console.log(`✅ Valid proxy image: ${imgUrl.slice(-60)}`);
-          } else if (isTrustedCdn) {
-            // ✅ Trusted CDN - bypass extension check
-            // But STILL enforce size/pattern checks below
-            if (DEBUG) console.log(`✅ Trusted CDN bypass: ${imgUrl.slice(-60)}`);
-            // Don't return here - fall through to size/pattern validation
           } else {
-            // Not a proxy, not a trusted CDN, no extension = reject
+            // Not a proxy and no extension in path = reject
             if (DEBUG) console.log(`⏭️ Invalid extension: ${imgUrl.slice(-40)}`);
             return false;
           }
@@ -969,44 +755,18 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         return false;
       }
       
-      // Exclude by filename/path patterns (domain-agnostic approach)
+      // Exclude by filename patterns
       const excludePatterns = [
         'logo', 'icon', 'banner', 'ad', 'promo',
         'tracking', 'pixel', 'badge', 'rating',
         'social', 'share', 'cart', 'wishlist',
-        'button', 'arrow', 'close', 'search',
-        'placeholder', 'sprite', 'sample', 'thumb'
+        'button', 'arrow', 'close', 'search'
       ];
       
-      // Parse URL to extract pathname and filename
-      let pathname = '';
-      let filename = '';
-      try {
-        const u = new URL(imgUrl);
-        pathname = u.pathname.toLowerCase();
-        filename = pathname.split('/').pop() ?? '';
-      } catch {
-        // Fallback for relative URLs
-        pathname = imgUrl.toLowerCase();
-        filename = pathname.split('/').pop() ?? '';
-      }
-      
-      // Check filename first (highest precision)
-      if (excludePatterns.some(pattern => filename.includes(pattern))) {
-        if (DEBUG) console.log(`⏭️ Excluded filename pattern: ${filename}`);
+      if (excludePatterns.some(pattern => urlLower.includes(pattern))) {
+        if (DEBUG) console.log(`⏭️ Excluded pattern: ${imgUrl.slice(-40)}`);
         return false;
       }
-      
-      // Check shallow paths only (≤3 segments, e.g., /images/logo.png)
-      const pathSegments = pathname.split('/').filter(s => s.length > 0);
-      const isShallowPath = pathSegments.length <= 3;
-      
-      if (isShallowPath && excludePatterns.some(pattern => pathname.includes(pattern))) {
-        if (DEBUG) console.log(`⏭️ Excluded shallow path pattern: ${pathname}`);
-        return false;
-      }
-      
-      if (DEBUG) console.log(`✅ Path check passed: ${pathname}`);
       
       // Check alt text for obvious non-product images
       if (alt.includes('logo') || alt.includes('icon') || alt.includes('banner')) {
@@ -1229,18 +989,6 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
       console.log(`✅ Added from ${source} (priority: ${priority}, size: ${sizeInfo.maxDimension}px): ${absoluteUrl}`);
       return true;
     };
-
-    // Process JSON state images that were found in Layer 0
-    if (pendingJsonImages.length > 0) {
-      console.log(`📦 Processing ${pendingJsonImages.length} images from JSON state...`);
-      pendingJsonImages.forEach(({ url, source, altText }) => {
-        const added = addImage(url, source, altText);
-        if (added) {
-          console.log(`  ✅ Added JSON state image: ${url.substring(0, 80)}...`);
-        }
-      });
-      console.log(`📦 Layer 0 complete: ${imageCollection.length} images after JSON processing`);
-    }
 
     // ===== LAYER 1: JSON-LD PRODUCT SCHEMA (HIGHEST PRIORITY) =====
     console.log('📦 Layer 1: Checking JSON-LD Product schema...');
@@ -1788,94 +1536,6 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
 layer2Count = imageCollection.length - layer1Count;
 console.log(`🖼️ Layer 2 found: ${layer2Count} images`);
 
-// ===== LAYER 3: SIZE-AWARE MAIN CONTENT SWEEP (FALLBACK) =====
-if (imageCollection.length === 0) {
-  console.log('📦 Layer 3: No images found, sweeping main content...');
-  
-  try {
-    // Find main content area
-    const mainContent = doc.querySelector('main') || 
-                        doc.querySelector('[role="main"]') || 
-                        doc.querySelector('body');
-    
-    if (mainContent) {
-      // Find all images in main content
-      const allImages = mainContent.querySelectorAll('img, source, picture');
-      
-      let scannedCount = 0;
-      let acceptedCount = 0;
-      
-      allImages.forEach(img => {
-        try {
-          scannedCount++;
-          
-          // Skip header/footer/ads
-          const ancestor = img.closest('header, footer, nav, aside, .ad, .advertisement, [class*="advertisement"]');
-          if (ancestor) return;
-          
-          let imgUrl: string | null = null;
-          const tagName = img.tagName?.toLowerCase();
-          
-          // Extract URL based on element type (Deno-compatible, no instanceof)
-          if (tagName === 'img') {
-            // Try various attributes where images might be stored
-            imgUrl = img.getAttribute('src') || 
-                     img.getAttribute('data-src') || 
-                     img.getAttribute('data-lazy-src') ||
-                     img.getAttribute('data-image') ||
-                     img.getAttribute('data-original');
-            
-            // Check srcset if no src found
-            if (!imgUrl) {
-              const srcset = img.getAttribute('srcset');
-              if (srcset) {
-                imgUrl = srcset.split(',')[0].trim().split(' ')[0];
-              }
-            }
-          } else if (tagName === 'source') {
-            imgUrl = img.getAttribute('srcset')?.split(' ')[0] || img.getAttribute('src');
-          } else if (tagName === 'picture') {
-            // For picture elements, look for source or img children
-            const sourceEl = img.querySelector('source');
-            const imgEl = img.querySelector('img');
-            if (sourceEl) {
-              imgUrl = sourceEl.getAttribute('srcset')?.split(' ')[0] || sourceEl.getAttribute('src');
-            } else if (imgEl) {
-              imgUrl = imgEl.getAttribute('src');
-            }
-          } else {
-            // Generic fallback for other elements
-            imgUrl = img.getAttribute('src') || img.getAttribute('srcset')?.split(' ')[0];
-          }
-          
-          if (imgUrl) {
-            const normalizedUrl = normalizeImageUrl(imgUrl);
-            const sizeInfo = extractImageSizeHint(normalizedUrl);
-            
-            // Only add images with reasonable size hints
-            if (sizeInfo.maxDimension >= 400 || sizeInfo.maxDimension === 0) {
-              const altText = img.getAttribute('alt') || '';
-              const added = addImage(normalizedUrl, 'Main Content', altText);
-              if (added) {
-                acceptedCount++;
-                console.log(`  ✅ Added main content image: ${normalizedUrl.substring(0, 80)}...`);
-              }
-            }
-          }
-        } catch (imgError) {
-          console.error(`⚠️ Error processing image in Layer 3:`, imgError);
-          // Continue with next image
-        }
-      });
-      
-      console.log(`📦 Layer 3 complete: Scanned ${scannedCount}, accepted ${acceptedCount} images`);
-    }
-  } catch (layer3Error) {
-    console.error(`❌ Layer 3 main content sweep failed:`, layer3Error);
-    console.log(`⚠️ Continuing with images from other layers`);
-  }
-}
-
 // Product keyword filtering removed - trust gallery selectors instead
 
 const highConfidenceImages = layer1Count + layer2Count;
@@ -2046,8 +1706,6 @@ if (shouldContinueToFallbacks && imageCollection.length < 3) {
       fetchMethod: fetchMethod, // 'direct' or 'scraper-api'
       blocked: fetchMethod === 'scraper-api', // true if original fetch was blocked
       blockedReason: blockedReason || undefined,
-      // Clear partialExtraction flag if we successfully extracted images
-      partialExtraction: normalizedImages.length === 0,
       imageSourceBreakdown: {
         jsonLd: layer1Count,
         gallery: layer2Count,
@@ -2074,43 +1732,28 @@ if (shouldContinueToFallbacks && imageCollection.length < 3) {
 
     // --- RESULT-BASED JS RENDER FALLBACK ---
     // Check if we should retry with JS rendering based on actual results
+    const hasSwiperStructure = html.includes('swiper-slide') || 
+                               html.includes('product-thumbs-wrapper') ||
+                               html.includes('data-section-type="product"');
     
-    // NEW: Check for multiple SPA markers
-    const spaMarkers = [
-      '__NEXT_DATA__',      // Next.js
-      'window.__NUXT__',    // Nuxt.js
-      'data-reactroot',     // React
-      'data-hydration',     // Various frameworks
-      'ng-version',         // Angular
-      'v-cloak',            // Vue.js
-      'swiper-slide',       // Swiper galleries
-      'product-thumbs-wrapper'
-    ];
-    
-    const hasSpaMarkers = spaMarkers.some(marker => html.includes(marker));
     const extractedImageCount = normalizedImages.length;
     
-    // Retry if:
-    // 1. First attempt (stage === 0)
-    // 2. SPA markers detected OR very few images found
-    // 3. It's an e-commerce page
-    const shouldRetryWithJs = (
-      stage === 0 && 
-      extractedImageCount < 3 && 
-      isEcommercePage &&
-      hasSpaMarkers
-    );
-    
-    if (shouldRetryWithJs) {
-      const trigger = hasSpaMarkers ? 'SPA markers detected' : 'Low image count';
-      console.warn(`⚠️ ${trigger}: Only ${extractedImageCount} images from e-commerce page`);
-      console.log(`🔄 Retrying with JS render... (Trigger: ${trigger})`);
+    // Only retry if:
+    // 1. This is the first attempt (stage === 0)
+    // 2. Swiper/dynamic structure detected
+    // 3. We got very few images (< 3)
+    // 4. It's an e-commerce page
+    if (stage === 0 && hasSwiperStructure && extractedImageCount < 3 && isEcommercePage) {
+      console.warn(`⚠️ Only ${extractedImageCount} images extracted from e-commerce page with Swiper structure`);
+      console.log(`🔄 Retrying with JS render to load dynamic gallery...`);
       
       try {
+        // Recursive call with stage=1 and forceJsRender=true
         return await extractMetadata(url, 1, true);
       } catch (retryError) {
         console.error(`❌ JS render retry failed:`, retryError);
-        console.log(`⚠️ Using partial results (${extractedImageCount} images)`);
+        // Fall through to return current results
+        console.log(`⚠️ Using partial results from static fetch (${extractedImageCount} images)`);
       }
     }
 

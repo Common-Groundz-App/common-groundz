@@ -456,12 +456,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
     setAnalyzing(true);
     
-    // Clear old state AND cached metadata before analyzing new URL
+    // Clear old state before analyzing new URL
     setUrlMetadata(null);
     setAiPredictions(null);
     setUploadedMedia([]);
     setPrimaryMediaUrl(null);
-    clearUrlMetadataFromStorage(); // Force fresh fetch
     
     try {
       console.log('🔍 Analyzing URL:', analyzeUrl);
@@ -1249,8 +1248,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 </a>
               )}
 
-              {/* Enhanced Extraction Badge - Only show if actually failed */}
-              {urlMetadata?.partialExtraction && (!urlMetadata.images || urlMetadata.images.length === 0) ? (
+              {/* Enhanced Extraction Badge */}
+              {urlMetadata?.partialExtraction ? (
                 <div className="mt-3 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 flex items-start gap-2">
                   <Info className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
                   <div className="flex-1 text-sm">
