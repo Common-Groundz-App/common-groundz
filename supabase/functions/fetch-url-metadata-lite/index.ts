@@ -51,13 +51,17 @@ serve(async (req) => {
     
     const searchData = await searchResponse.json();
     
-    const images: string[] = [];
+    const images: { url: string; source: string }[] = [];
+    let usedOpenGraphFallback = false;
     
     // Extract image URLs from Google results
     if (searchData.items && Array.isArray(searchData.items)) {
       for (const item of searchData.items) {
         if (item.link) {
-          images.push(item.link);
+          images.push({
+            url: item.link,
+            source: 'google-image-search'
+          });
         }
       }
     }
@@ -69,26 +73,46 @@ serve(async (req) => {
       console.log('⚠️ No Google results, trying Open Graph fallback...');
       const ogImage = await extractOpenGraphImage(url);
       if (ogImage) {
-        images.push(ogImage);
+        images.push({
+          url: ogImage,
+          source: 'open-graph'
+        });
+        usedOpenGraphFallback = true;
         console.log(`✅ Found Open Graph image: ${ogImage.slice(0, 50)}...`);
       }
     }
     
-    // Step 4: Return results
+    // Step 4: Extract description and favicon in parallel
+    console.log('📝 Extracting description and favicon...');
+    const [description, favicon] = await Promise.all([
+      extractDescription(url),
+      extractFavicon(url)
+    ]);
+    
+    // Step 5: Prepare response
+    const hasImages = images.length > 0;
+    const primaryImage = hasImages ? images[0].url : null;
+    
+    console.log(`📊 Stats: images=${images.length}, partialExtraction=${!hasImages}, sources=[${images.map(i => i.source).join(', ')}]`);
+    
+    // Step 6: Return results
     return new Response(
       JSON.stringify({
         title: productName,
-        description: null,
-        images: images.map(url => ({ 
-          url, 
-          source: 'Google Image Search',
+        description: description,
+        image: primaryImage,
+        images: images.map(img => ({ 
+          url: img.url, 
+          source: img.source,
           size: 'large' 
         })),
-        favicon: null,
+        favicon: favicon,
         metadata: {
           method: 'google-search',
           query: productName,
           imageCount: images.length,
+          partialExtraction: !hasImages,
+          usedOpenGraphFallback: usedOpenGraphFallback,
           timestamp: new Date().toISOString(),
         }
       }),
@@ -239,6 +263,98 @@ async function extractOpenGraphImage(url: string): Promise<string | null> {
     return null;
   } catch (error) {
     console.error('⚠️ Failed to extract Open Graph image:', error);
+    return null;
+  }
+}
+
+/**
+ * Extract page description from meta tags
+ */
+async function extractDescription(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const html = await response.text();
+    
+    // Try og:description first (usually best)
+    const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
+    if (ogDescMatch) {
+      return ogDescMatch[1].slice(0, 500);
+    }
+    
+    // Try twitter:description
+    const twitterDescMatch = html.match(/<meta[^>]*name=["']twitter:description["'][^>]*content=["']([^"']+)["']/i);
+    if (twitterDescMatch) {
+      return twitterDescMatch[1].slice(0, 500);
+    }
+    
+    // Try standard meta description
+    const metaDescMatch = html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+    if (metaDescMatch) {
+      return metaDescMatch[1].slice(0, 500);
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('⚠️ Failed to extract description:', error);
+    return null;
+  }
+}
+
+/**
+ * Extract favicon URL from page
+ */
+async function extractFavicon(url: string): Promise<string | null> {
+  try {
+    const urlObj = new URL(url);
+    const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (!response.ok) {
+      return null;
+    }
+    
+    const html = await response.text();
+    
+    // Try standard favicon link tags
+    const faviconMatch = html.match(/<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/i);
+    if (faviconMatch) {
+      const faviconPath = faviconMatch[1];
+      // Make absolute URL if relative
+      return faviconPath.startsWith('http') 
+        ? faviconPath 
+        : `${baseUrl}${faviconPath.startsWith('/') ? '' : '/'}${faviconPath}`;
+    }
+    
+    // Fallback: Try default /favicon.ico
+    const defaultFavicon = `${baseUrl}/favicon.ico`;
+    const faviconResponse = await fetch(defaultFavicon, { 
+      method: 'HEAD',
+      signal: AbortSignal.timeout(5000) 
+    });
+    
+    if (faviconResponse.ok) {
+      return defaultFavicon;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('⚠️ Failed to extract favicon:', error);
     return null;
   }
 }

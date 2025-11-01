@@ -472,7 +472,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       const [metadataResult, aiResult] = await Promise.all([
         cachedMetadata 
           ? Promise.resolve({ data: cachedMetadata, error: null })
-          : supabase.functions.invoke('fetch-url-metadata', { body: { url: analyzeUrl } }),
+          : supabase.functions.invoke('fetch-url-metadata-lite', { body: { url: analyzeUrl } }),
         supabase.functions.invoke('analyze-entity-url', { body: { url: analyzeUrl } })
       ]);
       

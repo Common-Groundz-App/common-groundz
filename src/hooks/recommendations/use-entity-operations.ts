@@ -18,7 +18,7 @@ export const useEntityOperations = () => {
 
   const fetchUrlMetadata = async (url: string): Promise<any> => {
     try {
-      const { data, error } = await supabase.functions.invoke('fetch-url-metadata', {
+      const { data, error } = await supabase.functions.invoke('fetch-url-metadata-lite', {
         body: { url }
       });
 
