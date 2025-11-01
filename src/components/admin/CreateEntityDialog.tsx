@@ -416,6 +416,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   };
 
   // Helper to add images to media gallery
+  // Helper to add a SINGLE image to media gallery
+  // Note: For multiple images, batch the state update instead of calling this in a loop
   const addImageToMediaGallery = (imageUrl: string, source: 'metadata' | 'ai') => {
     // Deduplicate - check if image already exists
     const exists = uploadedMedia.some(item => item.url === imageUrl);
@@ -598,17 +600,44 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     if (urlMetadata?.images && Array.isArray(urlMetadata.images) && urlMetadata.images.length > 0) {
       console.log(`🖼️ Processing ${urlMetadata.images.length} metadata images`);
       
+      // Collect all new media items first (batch state update to avoid race condition)
+      const newMediaItems: MediaItem[] = [];
+      
       urlMetadata.images.forEach((imageItem: any) => {
         const imageUrl = typeof imageItem === 'string' ? imageItem : imageItem.url;
-        addImageToMediaGallery(imageUrl, 'metadata');
-        imagesApplied++;
+        
+        // Check if image already exists
+        const exists = uploadedMedia.some(item => item.url === imageUrl);
+        if (!exists && !newMediaItems.some(item => item.url === imageUrl)) {
+          const newMediaItem: MediaItem = {
+            id: crypto.randomUUID(),
+            url: imageUrl,
+            type: 'image',
+            order: uploadedMedia.length + newMediaItems.length,
+            caption: 'From URL metadata',
+            source: 'external',
+          };
+          newMediaItems.push(newMediaItem);
+        }
       });
+      
+      // Batch update: Add all media items at once
+      if (newMediaItems.length > 0) {
+        setUploadedMedia(prev => [...prev, ...newMediaItems]);
+        imagesApplied = newMediaItems.length;
+        
+        // Set primary if no primary exists
+        if (!primaryMediaUrl) {
+          setPrimaryMediaUrl(newMediaItems[0].url);
+        }
+        
+        console.log(`✅ Batched ${imagesApplied} metadata images to gallery`);
+      }
       
       // Set first image as primary
       handleInputChange('image_url', urlMetadata.images[0]);
       appliedCount++;
       
-      console.log(`✅ Applied ${imagesApplied} metadata images to gallery`);
     } else if (urlMetadata?.image) {
       handleInputChange('image_url', urlMetadata.image);
       addImageToMediaGallery(urlMetadata.image, 'metadata');
@@ -756,18 +785,45 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     if (urlMetadata?.images && Array.isArray(urlMetadata.images) && urlMetadata.images.length > 0) {
       console.log(`🖼️ Processing ${urlMetadata.images.length} metadata images`);
       
+      // Collect all new media items first (batch state update to avoid race condition)
+      const newMediaItems: MediaItem[] = [];
+      
       urlMetadata.images.forEach((imageItem: any) => {
         const imageUrl = typeof imageItem === 'string' ? imageItem : imageItem.url;
-        addImageToMediaGallery(imageUrl, 'metadata');
-        imagesApplied++;
+        
+        // Check if image already exists
+        const exists = uploadedMedia.some(item => item.url === imageUrl);
+        if (!exists && !newMediaItems.some(item => item.url === imageUrl)) {
+          const newMediaItem: MediaItem = {
+            id: crypto.randomUUID(),
+            url: imageUrl,
+            type: 'image',
+            order: uploadedMedia.length + newMediaItems.length,
+            caption: 'From URL metadata',
+            source: 'external',
+          };
+          newMediaItems.push(newMediaItem);
+        }
       });
+      
+      // Batch update: Add all media items at once
+      if (newMediaItems.length > 0) {
+        setUploadedMedia(prev => [...prev, ...newMediaItems]);
+        imagesApplied = newMediaItems.length;
+        
+        // Set primary if no primary exists
+        if (!primaryMediaUrl) {
+          setPrimaryMediaUrl(newMediaItems[0].url);
+        }
+        
+        console.log(`✅ Batched ${imagesApplied} metadata images to gallery`);
+      }
       
       // Set first image as primary
       handleInputChange('image_url', urlMetadata.images[0]);
       filledFields.add('image_url');
       appliedCount++;
       
-      console.log(`✅ Applied ${imagesApplied} metadata images to gallery`);
     } 
     // Fallback 1: Single metadata image (backward compatibility)
     else if (urlMetadata?.image) {
@@ -782,11 +838,39 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     else if (pred.images && Array.isArray(pred.images) && pred.images.length > 0) {
       console.log(`🖼️ Processing ${pred.images.length} AI-predicted images`);
       
+      // Collect all new media items first (batch state update to avoid race condition)
+      const newMediaItems: MediaItem[] = [];
+      
       pred.images.forEach((imageObj: any) => {
         const imageUrl = imageObj.url || imageObj;
-        addImageToMediaGallery(imageUrl, 'ai');
-        imagesApplied++;
+        
+        // Check if image already exists
+        const exists = uploadedMedia.some(item => item.url === imageUrl);
+        if (!exists && !newMediaItems.some(item => item.url === imageUrl)) {
+          const newMediaItem: MediaItem = {
+            id: crypto.randomUUID(),
+            url: imageUrl,
+            type: 'image',
+            order: uploadedMedia.length + newMediaItems.length,
+            caption: 'AI-extracted',
+            source: 'external',
+          };
+          newMediaItems.push(newMediaItem);
+        }
       });
+      
+      // Batch update: Add all media items at once
+      if (newMediaItems.length > 0) {
+        setUploadedMedia(prev => [...prev, ...newMediaItems]);
+        imagesApplied = newMediaItems.length;
+        
+        // Set primary if no primary exists
+        if (!primaryMediaUrl) {
+          setPrimaryMediaUrl(newMediaItems[0].url);
+        }
+        
+        console.log(`✅ Batched ${imagesApplied} AI images to gallery`);
+      }
       
       // Set first image as primary
       const firstImageUrl = pred.images[0].url || pred.images[0];
@@ -794,7 +878,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       filledFields.add('image_url');
       appliedCount++;
       
-      console.log(`✅ Applied ${imagesApplied} AI images to gallery`);
     }
     
     // Apply website URL from analyzed URL
