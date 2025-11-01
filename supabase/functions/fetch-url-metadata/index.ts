@@ -269,19 +269,8 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         const currentPath = path ? `${path}.${key}` : key;
         
         // Check if this looks like an image property
-        const imageKeys = [
-          'image', 'images', 'media', 'gallery', 'photo', 'photos', 
-          'thumbnail', 'src', 'url',
-          // E-commerce resolution variants (Flipkart, Amazon, etc.)
-          'big', 'large', 'small', 'medium', 'xlarge', 'xxlarge',
-          'highResolution', 'highRes', 'lowRes',
-          'variants', 'sizes', 'resolutions'
-        ];
+        const imageKeys = ['image', 'images', 'media', 'gallery', 'photo', 'photos', 'thumbnail', 'src', 'url'];
         const isImageKey = imageKeys.some(imgKey => key.toLowerCase().includes(imgKey));
-        
-        if (DEBUG && isImageKey) {
-          console.log(`  🔍 Inspecting image key: ${currentPath} (type: ${typeof value})`);
-        }
         
         if (isImageKey) {
           // Handle string URLs
@@ -289,33 +278,6 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
             const normalizedUrl = normalizeImageUrl(value);
             if (addImageFn(normalizedUrl, 'Script (JSON-LD)', currentPath)) {
               jsonStateImageCount++;
-            }
-          }
-          
-          // Handle objects with URL variants (Flipkart gallery images)
-          if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
-            const variantKeys = ['big', 'large', 'xlarge', 'xxlarge', 'small', 'medium', 'highResolution', 'highRes'];
-            let foundVariants = false;
-            
-            variantKeys.forEach(variantKey => {
-              if (value[variantKey]) {
-                const variantValue = value[variantKey];
-                
-                // Handle string URLs
-                if (typeof variantValue === 'string' && (variantValue.startsWith('http') || variantValue.startsWith('//'))) {
-                  const normalizedUrl = normalizeImageUrl(variantValue);
-                  if (addImageFn(normalizedUrl, 'Script (JSON-LD)', `${currentPath}.${variantKey}`)) {
-                    jsonStateImageCount++;
-                    foundVariants = true;
-                    if (DEBUG) console.log(`  📸 Found variant: ${variantKey} → ${variantValue.slice(-60)}`);
-                  }
-                }
-              }
-            });
-            
-            // If we found variants, log success
-            if (foundVariants && DEBUG) {
-              console.log(`  ✅ Extracted ${variantKeys.filter(k => value[k]).length} resolution variants from ${currentPath}`);
             }
           }
           
@@ -764,15 +726,7 @@ const extractMetadata = async (url: string, stage: number = 0, forceJsRender: bo
         const nykaaWidth = params.get('tr')?.match(/w-(\d+)/);
         if (nykaaWidth) width = parseInt(nykaaWidth[1]);
         
-        // 6. Flipkart/CDN path patterns: /image/832/832/, /img/400/400/
-        const pathSizeMatch = pathname.match(/\/(?:image|img)\/(\d+)\/(\d+)\//);
-        if (pathSizeMatch) {
-          width = parseInt(pathSizeMatch[1]);
-          height = parseInt(pathSizeMatch[2]);
-          if (DEBUG) console.log(`  📐 Detected path-based size: ${width}x${height} from ${pathname.slice(0, 50)}...`);
-        }
-        
-        // 7. Decoded proxy targets (wsrv.nl, weserv.nl with embedded URLs)
+        // 6. Decoded proxy targets (wsrv.nl, weserv.nl with embedded URLs)
         const embeddedUrl = params.get('url') || params.get('image');
         if (embeddedUrl) {
           try {
