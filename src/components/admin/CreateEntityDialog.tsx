@@ -590,7 +590,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     if (urlMetadata?.images && Array.isArray(urlMetadata.images) && urlMetadata.images.length > 0) {
       console.log(`🖼️ Processing ${urlMetadata.images.length} metadata images`);
       
-      urlMetadata.images.forEach((imageUrl: string) => {
+      urlMetadata.images.forEach((imageItem: any) => {
+        const imageUrl = typeof imageItem === 'string' ? imageItem : imageItem.url;
         addImageToMediaGallery(imageUrl, 'metadata');
         imagesApplied++;
       });
@@ -747,7 +748,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     if (urlMetadata?.images && Array.isArray(urlMetadata.images) && urlMetadata.images.length > 0) {
       console.log(`🖼️ Processing ${urlMetadata.images.length} metadata images`);
       
-      urlMetadata.images.forEach((imageUrl: string) => {
+      urlMetadata.images.forEach((imageItem: any) => {
+        const imageUrl = typeof imageItem === 'string' ? imageItem : imageItem.url;
         addImageToMediaGallery(imageUrl, 'metadata');
         imagesApplied++;
       });

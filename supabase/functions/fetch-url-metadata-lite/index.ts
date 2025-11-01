@@ -92,26 +92,35 @@ serve(async (req) => {
     // Step 5: Prepare response
     const hasImages = images.length > 0;
     const primaryImage = hasImages ? images[0].url : null;
+    const urlObj = new URL(url);
+    const siteName = urlObj.hostname.replace('www.', '');
     
+    // Step 6: Enhanced logging
     console.log(`📊 Stats: images=${images.length}, partialExtraction=${!hasImages}, sources=[${images.map(i => i.source).join(', ')}]`);
+    console.log(`📦 Response structure:`, JSON.stringify({
+      hasTitle: !!productName,
+      hasDescription: !!description,
+      hasFavicon: !!favicon,
+      imageCount: images.length,
+      imageSources: images.map(i => i.source)
+    }, null, 2));
     
-    // Step 6: Return results
+    // Step 7: Return results with full compatibility
     return new Response(
       JSON.stringify({
+        url: url, // Original URL for preview card
+        siteName: siteName, // Site name for preview card
         title: productName,
         description: description,
-        image: primaryImage,
-        images: images.map(img => ({ 
-          url: img.url, 
-          source: img.source,
-          size: 'large' 
-        })),
+        image: primaryImage, // Single primary image field
+        images: images.map(img => img.url), // Just URL strings for frontend
         favicon: favicon,
+        partialExtraction: !hasImages, // Controls warning banner
         metadata: {
           method: 'google-search',
           query: productName,
           imageCount: images.length,
-          partialExtraction: !hasImages,
+          sources: images.map(img => img.source), // Source tracking for debugging
           usedOpenGraphFallback: usedOpenGraphFallback,
           timestamp: new Date().toISOString(),
         }
