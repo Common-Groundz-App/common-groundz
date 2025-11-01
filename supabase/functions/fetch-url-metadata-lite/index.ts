@@ -11,17 +11,32 @@ serve(async (req) => {
   }
 
   try {
-    const { url } = await req.json();
+    const { url, productName: providedProductName } = await req.json();
     
     if (!url) {
       throw new Error('URL is required');
     }
     
     console.log(`🔍 Processing URL: ${url}`);
+    console.log(`📦 Provided product name: ${providedProductName || 'none - will extract'}`);
     
-    // Step 1: Extract product name from URL and get HTML for later use
-    const { name: productName, html: pageHtml } = await extractProductName(url);
-    console.log(`📝 Extracted product name: "${productName}"`);
+    // Step 1: Get product name (use provided or extract)
+    let productName: string;
+    let pageHtml = '';
+    let extractionMethod: string;
+
+    if (providedProductName && providedProductName.trim().length > 3) {
+      productName = providedProductName.trim();
+      extractionMethod = 'provided-by-gemini';
+      console.log(`✅ Using provided product name: "${productName}"`);
+    } else {
+      console.log(`⚠️ No valid product name provided, extracting from page...`);
+      const extracted = await extractProductName(url);
+      productName = extracted.name;
+      pageHtml = extracted.html;
+      extractionMethod = 'scraped-from-html';
+      console.log(`📝 Extracted product name: "${productName}"`);
+    }
     
     // Step 2: Google Image Search
     const GOOGLE_API_KEY = Deno.env.get('GOOGLE_CUSTOM_SEARCH_API_KEY');
@@ -82,13 +97,20 @@ serve(async (req) => {
       }
     }
     
-    // Step 4: Extract description and favicon from already-fetched HTML (no extra requests)
-    console.log('📝 Extracting description and favicon from page HTML...');
+    // Step 4: Extract description and favicon (only if we have HTML from extraction)
     const urlObj = new URL(url);
     const baseUrl = `${urlObj.protocol}//${urlObj.hostname}`;
+    let description: string | null = null;
+    let favicon: string | null = null;
     
-    const description = extractDescriptionFromHTML(pageHtml);
-    const favicon = extractFaviconFromHTML(pageHtml, baseUrl);
+    if (pageHtml) {
+      console.log('📝 Extracting description and favicon from page HTML...');
+      description = extractDescriptionFromHTML(pageHtml);
+      favicon = extractFaviconFromHTML(pageHtml, baseUrl);
+    } else {
+      console.log('⚠️ No HTML available - skipping description/favicon extraction');
+      favicon = `${baseUrl}/favicon.ico`; // Default favicon fallback
+    }
     
     console.log(`✅ Description: ${description ? description.slice(0, 50) + '...' : 'none'}`);
     console.log(`✅ Favicon: ${favicon ? 'found' : 'default fallback'}`);
@@ -122,8 +144,9 @@ serve(async (req) => {
         metadata: {
           method: 'google-search',
           query: productName,
+          extractionMethod: extractionMethod,
           imageCount: images.length,
-          sources: images.map(img => img.source), // Source tracking for debugging
+          sources: images.map(img => img.source),
           usedOpenGraphFallback: usedOpenGraphFallback,
           timestamp: new Date().toISOString(),
         }
@@ -215,14 +238,15 @@ async function extractProductName(url: string): Promise<{ name: string; html: st
   } catch (error) {
     console.warn('⚠️ Failed to extract product name from page:', error.message);
     
-    // Last resort: Parse from URL
+    // Last resort: Parse from URL with better logic
     const urlObj = new URL(url);
     
     // Get the last meaningful path segment
     const pathSegments = urlObj.pathname
       .split('/')
       .filter(segment => segment.length > 2) // Skip short segments
-      .filter(segment => !segment.match(/^\d+$/)); // Skip numeric IDs
+      .filter(segment => !segment.match(/^\d+$/)) // Skip numeric IDs
+      .filter(segment => !['buy', 'product', 'p', 'dp', 'item'].includes(segment)); // Skip common e-commerce paths
     
     if (pathSegments.length > 0) {
       // Use last segment, clean it up
@@ -233,12 +257,15 @@ async function extractProductName(url: string): Promise<{ name: string; html: st
         .trim();
       
       if (lastSegment.length > 3) {
+        console.log(`📝 Extracted name from URL path: "${lastSegment}"`);
         return { name: lastSegment.slice(0, 100), html: '' };
       }
     }
     
     // Absolute fallback: Use domain name
-    return { name: urlObj.hostname.replace('www.', '').split('.')[0], html: '' };
+    const domainName = urlObj.hostname.replace('www.', '').split('.')[0];
+    console.log(`⚠️ Ultimate fallback: using domain name "${domainName}"`);
+    return { name: domainName, html: '' };
   }
 }
 

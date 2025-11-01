@@ -468,13 +468,21 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       // Check cache first
       const cachedMetadata = getCachedMetadata(analyzeUrl);
       
-      // Call both functions in parallel (skip metadata if cached)
-      const [metadataResult, aiResult] = await Promise.all([
-        cachedMetadata 
-          ? Promise.resolve({ data: cachedMetadata, error: null })
-          : supabase.functions.invoke('fetch-url-metadata-lite', { body: { url: analyzeUrl } }),
-        supabase.functions.invoke('analyze-entity-url', { body: { url: analyzeUrl } })
-      ]);
+      // Call AI analysis first to get product name
+      const aiResult = await supabase.functions.invoke('analyze-entity-url', { body: { url: analyzeUrl } });
+      
+      // Extract product name from AI analysis if available
+      const aiProductName = aiResult.data?.predictions?.name;
+      
+      // Then call metadata function with AI-extracted product name
+      const metadataResult = cachedMetadata 
+        ? { data: cachedMetadata, error: null }
+        : await supabase.functions.invoke('fetch-url-metadata-lite', { 
+            body: { 
+              url: analyzeUrl,
+              productName: aiProductName || null
+            } 
+          });
       
       // Handle metadata
       if (metadataResult.error) {
