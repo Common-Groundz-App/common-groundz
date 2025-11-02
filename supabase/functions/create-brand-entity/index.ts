@@ -56,39 +56,115 @@ serve(async (req) => {
       });
     }
 
-    // Step 2: Fetch brand logo from Google Images
-    const logoSearchQuery = `${brandName} logo brand`;
+    // Step 2: Find official brand website and enrich brand data
     const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
     const googleCxId = Deno.env.get('GOOGLE_CX_ID');
 
     let brandLogo: string | null = null;
-    let logoUrl: string | null = null;
+    let officialWebsite: string | null = null;
+    let brandDescription: string | null = null;
+    let officialDomain: string | null = null;
 
     if (googleApiKey && googleCxId) {
+      // Step 2A: Find official brand website
       try {
-        const searchUrl = `https://www.googleapis.com/customsearch/v1?` +
+        const websiteSearchQuery = `${brandName} official website`;
+        const websiteSearchUrl = `https://www.googleapis.com/customsearch/v1?` +
+          `key=${googleApiKey}&cx=${googleCxId}&` +
+          `q=${encodeURIComponent(websiteSearchQuery)}&num=3`;
+        
+        console.log(`🔍 Searching for official website: "${websiteSearchQuery}"`);
+        
+        const websiteResponse = await fetch(websiteSearchUrl);
+        const websiteData = await websiteResponse.json();
+        
+        if (websiteData.items && websiteData.items.length > 0) {
+          officialWebsite = websiteData.items[0].link;
+          try {
+            const urlObj = new URL(officialWebsite);
+            officialDomain = urlObj.hostname.replace('www.', '');
+            console.log(`🌐 Found official website: ${officialWebsite}`);
+          } catch (e) {
+            console.log('⚠️ Could not parse official website URL');
+          }
+        } else {
+          console.log(`⚠️ No official website found for "${brandName}"`);
+        }
+      } catch (error) {
+        console.error('⚠️ Failed to find official website:', error);
+      }
+
+      // Step 2B: Scrape brand description from official website
+      if (officialWebsite) {
+        try {
+          console.log(`📄 Scraping brand description from: ${officialWebsite}`);
+          
+          const pageResponse = await fetch(officialWebsite, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (compatible; BrandBot/1.0)'
+            }
+          });
+          
+          if (pageResponse.ok) {
+            const html = await pageResponse.text();
+            
+            // Try OG description first
+            const ogDescMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
+            if (ogDescMatch && ogDescMatch[1]) {
+              brandDescription = ogDescMatch[1].substring(0, 500); // Limit length
+              console.log(`📝 Found OG description: ${brandDescription.substring(0, 100)}...`);
+            } else {
+              // Fallback to meta description
+              const metaDescMatch = html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
+              if (metaDescMatch && metaDescMatch[1]) {
+                brandDescription = metaDescMatch[1].substring(0, 500);
+                console.log(`📝 Found meta description: ${brandDescription.substring(0, 100)}...`);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('⚠️ Failed to scrape brand description:', error);
+        }
+      }
+
+      // Step 2C: Enhanced logo search (prioritize official domain)
+      try {
+        const logoSearchQuery = `${brandName} official logo`;
+        const logoSearchUrl = `https://www.googleapis.com/customsearch/v1?` +
           `key=${googleApiKey}&cx=${googleCxId}&` +
           `q=${encodeURIComponent(logoSearchQuery)}&` +
-          `searchType=image&num=1&imgSize=medium&safe=active`;
+          `searchType=image&num=5&imgSize=large&safe=active`;
 
         console.log(`🔍 Searching for brand logo: "${logoSearchQuery}"`);
         
-        const logoResponse = await fetch(searchUrl);
+        const logoResponse = await fetch(logoSearchUrl);
         const logoData = await logoResponse.json();
         
         if (logoData.items && logoData.items.length > 0) {
-          logoUrl = logoData.items[0].link;
-          brandLogo = logoUrl;
-          console.log(`🖼️ Found brand logo: ${brandLogo}`);
+          // Prioritize images from official domain
+          if (officialDomain) {
+            const domainMatch = logoData.items.find((item: any) => 
+              item.image?.contextLink && new URL(item.image.contextLink).hostname.includes(officialDomain)
+            );
+            if (domainMatch) {
+              brandLogo = domainMatch.link;
+              console.log(`🎯 Found logo from official domain: ${brandLogo}`);
+            }
+          }
+          
+          // Fallback to first high-quality result
+          if (!brandLogo) {
+            brandLogo = logoData.items[0].link;
+            console.log(`🖼️ Found brand logo: ${brandLogo}`);
+          }
         } else {
           console.log(`⚠️ No logo found for "${brandName}"`);
         }
       } catch (error) {
         console.error('⚠️ Failed to fetch brand logo:', error);
-        // Continue without logo
       }
     } else {
-      console.log('⚠️ Google API credentials not configured, skipping logo fetch');
+      console.log('⚠️ Google API credentials not configured, skipping brand enrichment');
     }
 
     // Step 3: Generate slug from brand name
@@ -117,19 +193,17 @@ serve(async (req) => {
 
     console.log(`🔗 Generated slug: "${slug}"`);
 
-    // Step 4: Extract website origin from source URL if available
-    let websiteUrl: string | null = null;
-    if (sourceUrl) {
-      try {
-        const urlObj = new URL(sourceUrl);
-        websiteUrl = urlObj.origin;
-        console.log(`🌐 Extracted website: ${websiteUrl}`);
-      } catch (error) {
-        console.log('⚠️ Could not extract website from source URL');
-      }
+    // Step 4: Determine final website URL (prefer official website over source URL)
+    const websiteUrl = officialWebsite || null;
+    if (websiteUrl) {
+      console.log(`🌐 Using website URL: ${websiteUrl}`);
+    } else {
+      console.log('⚠️ No website URL available');
     }
 
-    // Step 5: Create brand entity
+    // Step 5: Create enriched brand entity
+    const finalDescription = brandDescription || `${brandName} brand`;
+    
     const { data: brandEntity, error } = await supabaseAdmin
       .from('entities')
       .insert({
@@ -137,7 +211,7 @@ serve(async (req) => {
         type: 'brand',
         image_url: brandLogo,
         website_url: websiteUrl,
-        description: `${brandName} brand`,
+        description: finalDescription,
         slug: slug,
         created_by: userId || null,
         user_created: true,
@@ -146,6 +220,10 @@ serve(async (req) => {
           auto_created: true,
           created_from_product_url: sourceUrl,
           creation_method: 'background-auto-create',
+          official_website_found: !!officialWebsite,
+          description_scraped: !!brandDescription,
+          logo_from_official_domain: !!officialDomain && brandLogo?.includes(officialDomain),
+          enrichment_quality: officialWebsite && brandDescription ? 'high' : (officialWebsite || brandDescription ? 'medium' : 'low'),
           created_at: new Date().toISOString()
         }
       })
