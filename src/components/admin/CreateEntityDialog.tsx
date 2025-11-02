@@ -470,19 +470,23 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       // Check cache first
       const cachedMetadata = getCachedMetadata(analyzeUrl);
       
-      // Call AI analysis first to get product name
+      // Call AI analysis first to get product name AND brand
       const aiResult = await supabase.functions.invoke('analyze-entity-url', { body: { url: analyzeUrl } });
       
-      // Extract product name from AI analysis if available
+      // Extract product name and brand from AI analysis if available
       const aiProductName = aiResult.data?.predictions?.name;
+      const aiBrandName = aiResult.data?.predictions?.brand;
       
-      // Then call metadata function with AI-extracted product name
+      console.log(`🤖 AI extracted: name="${aiProductName || 'none'}", brand="${aiBrandName || 'none'}"`);
+      
+      // Then call metadata function with AI-extracted product name AND brand
       const metadataResult = cachedMetadata 
         ? { data: cachedMetadata, error: null }
         : await supabase.functions.invoke('fetch-url-metadata-lite', { 
             body: { 
               url: analyzeUrl,
-              productName: aiProductName || null
+              productName: aiProductName || null,
+              brandName: aiBrandName || null
             } 
           });
       

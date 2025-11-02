@@ -5,37 +5,111 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/**
+ * Sanitize product/brand names - remove junk placeholders and whitespace
+ * Returns null if the value is useless junk
+ */
+function sanitizeEntityName(value: string | null | undefined): string | null {
+  if (!value || typeof value !== 'string') return null;
+  
+  // Trim whitespace
+  const trimmed = value.trim();
+  
+  // Check if empty or too short after trimming
+  if (trimmed.length < 3) return null;
+  
+  // List of junk patterns to reject (case-insensitive)
+  const junkPatterns = [
+    /^untitled/i,
+    /^site\s*maintenance/i,
+    /^loading/i,
+    /^please\s*wait/i,
+    /^error/i,
+    /^404/i,
+    /^403/i,
+    /^page\s*not\s*found/i,
+    /^coming\s*soon/i,
+    /^under\s*construction/i,
+    /^test/i,
+    /^example/i,
+    /^sample/i,
+    /^default/i,
+    /^new\s*page/i,
+    /^home\s*page/i,
+    /^index/i,
+  ];
+  
+  // Check against junk patterns
+  for (const pattern of junkPatterns) {
+    if (pattern.test(trimmed)) {
+      console.log(`⚠️ Rejected junk value: "${trimmed}"`);
+      return null;
+    }
+  }
+  
+  // Return sanitized value
+  return trimmed;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { url, productName: providedProductName } = await req.json();
+    const { url, productName: providedProductName, brandName: providedBrandName } = await req.json();
     
     if (!url) {
       throw new Error('URL is required');
     }
     
     console.log(`🔍 Processing URL: ${url}`);
-    console.log(`📦 Provided product name: ${providedProductName || 'none - will extract'}`);
+    console.log(`📦 Raw product name: ${providedProductName || 'none'}`);
+    console.log(`🏢 Raw brand name: ${providedBrandName || 'none'}`);
     
-    // Step 1: Get product name (use provided or extract)
+    // Step 1: Sanitize inputs
+    const sanitizedProductName = sanitizeEntityName(providedProductName);
+    const sanitizedBrandName = sanitizeEntityName(providedBrandName);
+    
+    console.log(`✨ Sanitized product name: ${sanitizedProductName || 'rejected as junk'}`);
+    console.log(`✨ Sanitized brand name: ${sanitizedBrandName || 'rejected as junk'}`);
+    
+    // Step 2: Get product name (use sanitized provided or extract)
     let productName: string;
+    let brandName: string | null = sanitizedBrandName;
     let pageHtml = '';
     let extractionMethod: string;
 
-    if (providedProductName && providedProductName.trim().length > 3) {
-      productName = providedProductName.trim();
+    if (sanitizedProductName && sanitizedProductName.length > 3) {
+      productName = sanitizedProductName;
       extractionMethod = 'provided-by-gemini';
-      console.log(`✅ Using provided product name: "${productName}"`);
+      console.log(`✅ Using sanitized product name: "${productName}"`);
     } else {
-      console.log(`⚠️ No valid product name provided, extracting from page...`);
+      console.log(`⚠️ No valid product name after sanitization, extracting from page...`);
       const extracted = await extractProductName(url);
       productName = extracted.name;
       pageHtml = extracted.html;
       extractionMethod = 'scraped-from-html';
       console.log(`📝 Extracted product name: "${productName}"`);
+    }
+    
+    // Step 3: Get brand name (use sanitized, extract from domain, or skip)
+    if (!brandName || brandName.length < 2) {
+      const urlObj = new URL(url);
+      const domain = urlObj.hostname.replace('www.', '').split('.')[0];
+      brandName = domain.charAt(0).toUpperCase() + domain.slice(1); // Capitalize
+      console.log(`🏢 Using domain as brand fallback: "${brandName}"`);
+    } else {
+      console.log(`✅ Using sanitized brand name: "${brandName}"`);
+    }
+    
+    // Step 4: Build enhanced search query with brand context
+    let searchQuery = productName;
+    if (brandName && !productName.toLowerCase().includes(brandName.toLowerCase())) {
+      searchQuery = `${brandName} ${productName}`;
+      console.log(`🔍 Enhanced search query with brand: "${searchQuery}"`);
+    } else {
+      console.log(`🔍 Search query (brand already in product name): "${searchQuery}"`);
     }
     
     // Step 2: Google Image Search
@@ -49,7 +123,7 @@ serve(async (req) => {
     const searchUrl = `https://www.googleapis.com/customsearch/v1?` +
       `key=${GOOGLE_API_KEY}&` +
       `cx=${GOOGLE_CX}&` +
-      `q=${encodeURIComponent(productName)}&` +
+      `q=${encodeURIComponent(searchQuery)}&` +
       `searchType=image&` +
       `num=5&` +
       `imgSize=large&` +
@@ -143,7 +217,9 @@ serve(async (req) => {
         partialExtraction: !hasImages, // Controls warning banner
         metadata: {
           method: 'google-search',
-          query: productName,
+          query: searchQuery,
+          productName: productName,
+          brandName: brandName,
           extractionMethod: extractionMethod,
           imageCount: images.length,
           sources: images.map(img => img.source),

@@ -16,12 +16,17 @@ export const useEntityOperations = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
 
-  const fetchUrlMetadata = async (url: string, productName?: string): Promise<any> => {
+  const fetchUrlMetadata = async (
+    url: string, 
+    productName?: string,
+    brandName?: string
+  ): Promise<any> => {
     try {
       const { data, error } = await supabase.functions.invoke('fetch-url-metadata-lite', {
         body: { 
           url,
-          productName: productName || null
+          productName: productName || null,
+          brandName: brandName || null
         }
       });
 
