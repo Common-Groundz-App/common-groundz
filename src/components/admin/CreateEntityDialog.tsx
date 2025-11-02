@@ -508,15 +508,37 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     // Show loading toast
     toast({
       title: "Creating Brand",
-      description: `Setting up ${brandName}...`,
+      description: `Enriching ${brandName} data...`,
     });
 
     try {
+      // Step 1: Enrich brand data first (logo, website, description)
+      console.log(`🔍 Enriching brand data for: "${brandName}"`);
+      const { data: enrichedData, error: enrichError } = await supabase.functions.invoke('enrich-brand-data', {
+        body: { brandName }
+      });
+
+      if (enrichError) {
+        console.warn('⚠️ Brand enrichment failed, creating with minimal data:', enrichError);
+      }
+
+      const enrichmentResult = enrichedData || { logo: null, website: null, description: null };
+      console.log(`✅ Brand enrichment complete:`, enrichmentResult);
+
+      // Step 2: Create brand with enriched data
+      toast({
+        title: "Creating Brand",
+        description: `Setting up ${brandName}...`,
+      });
+
       const { data, error } = await supabase.functions.invoke('create-brand-entity', {
         body: {
           brandName: brandName,
           sourceUrl: sourceUrl,
-          userId: user?.id || null
+          userId: user?.id || null,
+          logo: enrichmentResult.logo,
+          website: enrichmentResult.website,
+          description: enrichmentResult.description
         }
       });
 

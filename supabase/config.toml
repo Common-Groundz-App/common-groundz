@@ -66,3 +66,6 @@ verify_jwt = false
 [functions.create-brand-entity]
 verify_jwt = false
 
+[functions.enrich-brand-data]
+verify_jwt = false
+
