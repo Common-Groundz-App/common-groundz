@@ -106,12 +106,38 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     }
   };
 
+  // Helper function to determine if we should use CORS for this URL
+  const shouldUseCors = (url: string): boolean => {
+    if (!url) return false;
+    
+    try {
+      const urlObj = new URL(url);
+      const hostname = urlObj.hostname;
+      
+      // Our own domains that support CORS
+      const ourDomains = [
+        'supabase.co',           // Supabase storage & edge functions
+        'uyjtgybbktgapspodajy',  // Our Supabase project subdomain
+        'images.unsplash.com',   // Unsplash (used for fallbacks)
+        'localhost'              // Local development
+      ];
+      
+      // Check if URL is from our infrastructure
+      return ourDomains.some(domain => hostname.includes(domain));
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const finalImgSrc = imgSrc || actualFallback;
+  const corsMode = shouldUseCors(finalImgSrc) ? "anonymous" : undefined;
+
   return (
     <img
-      src={imgSrc || actualFallback}
+      src={finalImgSrc}
       alt={alt}
       onError={handleError}
-      crossOrigin="anonymous"
+      crossOrigin={corsMode}
       {...props}
     />
   );
