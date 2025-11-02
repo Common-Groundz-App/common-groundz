@@ -355,6 +355,237 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     return getVisibleTabs().includes(tabName as any);
   };
 
+  // Auto-search and select parent brand entity based on AI-extracted brand name
+  const autoSelectParentBrand = async (brandName: string) => {
+    if (!brandName || brandName.length < 2) {
+      console.log('⚠️ Brand name too short for auto-selection');
+      return null;
+    }
+
+    console.log(`🔍 Auto-searching for parent brand: "${brandName}"`);
+
+    try {
+      const { data: brandEntities, error } = await supabase
+        .from('entities')
+        .select('id, name, type, image_url, slug, description')
+        .eq('type', 'brand')
+        .eq('is_deleted', false)
+        .or(`name.ilike.%${brandName}%,slug.ilike.%${brandName.toLowerCase().replace(/\s+/g, '-')}%`)
+        .limit(5);
+
+      if (error) {
+        console.error('❌ Error searching for parent brand:', error);
+        return null;
+      }
+
+      if (!brandEntities || brandEntities.length === 0) {
+        console.log(`❌ No parent brand found for "${brandName}"`);
+        return null; // Will trigger Phase 2 auto-creation
+      }
+
+      // Try exact name match first (case-insensitive)
+      const exactMatch = brandEntities.find(
+        b => b.name.toLowerCase() === brandName.toLowerCase()
+      );
+
+      if (exactMatch) {
+        console.log(`✅ Found exact parent match: "${exactMatch.name}" (${exactMatch.id})`);
+        
+        // Convert to Entity type for ParentEntitySelector
+        const parentEntity: Entity = {
+          id: exactMatch.id,
+          name: exactMatch.name,
+          type: EntityType.Brand,
+          image_url: exactMatch.image_url,
+          slug: exactMatch.slug,
+          description: exactMatch.description,
+          api_ref: null,
+          api_source: null,
+          metadata: {},
+          venue: null,
+          website_url: null,
+          category_id: null,
+          popularity_score: null,
+          photo_reference: null,
+          created_at: null,
+          updated_at: null,
+          authors: null,
+          publication_year: null,
+          isbn: null,
+          languages: null,
+          external_ratings: null,
+          price_info: null,
+          specifications: null,
+          cast_crew: null,
+          ingredients: null,
+          nutritional_info: null,
+          last_enriched_at: null,
+          enrichment_source: null,
+          data_quality_score: null
+        };
+        
+        setSelectedParent(parentEntity);
+        
+        toast({
+          title: "Parent Brand Auto-Selected",
+          description: `Linked to ${exactMatch.name}`,
+        });
+        
+        return exactMatch;
+      }
+
+      // If only one result, auto-select it
+      if (brandEntities.length === 1) {
+        console.log(`✅ Found single parent match: "${brandEntities[0].name}"`);
+        
+        const parentEntity: Entity = {
+          id: brandEntities[0].id,
+          name: brandEntities[0].name,
+          type: EntityType.Brand,
+          image_url: brandEntities[0].image_url,
+          slug: brandEntities[0].slug,
+          description: brandEntities[0].description,
+          api_ref: null,
+          api_source: null,
+          metadata: {},
+          venue: null,
+          website_url: null,
+          category_id: null,
+          popularity_score: null,
+          photo_reference: null,
+          created_at: null,
+          updated_at: null,
+          authors: null,
+          publication_year: null,
+          isbn: null,
+          languages: null,
+          external_ratings: null,
+          price_info: null,
+          specifications: null,
+          cast_crew: null,
+          ingredients: null,
+          nutritional_info: null,
+          last_enriched_at: null,
+          enrichment_source: null,
+          data_quality_score: null
+        };
+        
+        setSelectedParent(parentEntity);
+        
+        toast({
+          title: "Parent Brand Auto-Selected",
+          description: `Linked to ${brandEntities[0].name}`,
+        });
+        
+        return brandEntities[0];
+      }
+
+      // Multiple matches - let user choose manually
+      console.log(`⚠️ Found ${brandEntities.length} potential parents for "${brandName}"`);
+      toast({
+        title: "Multiple Brands Found",
+        description: `Found ${brandEntities.length} similar brands. Please select the correct parent manually.`,
+        variant: "default"
+      });
+      
+      return null;
+      
+    } catch (error) {
+      console.error('❌ Error in autoSelectParentBrand:', error);
+      return null;
+    }
+  };
+
+  // Auto-create parent brand entity if it doesn't exist
+  const autoCreateParentBrand = async (brandName: string, sourceUrl: string) => {
+    if (!brandName || brandName.length < 2) {
+      console.log('⚠️ Brand name too short for auto-creation');
+      return null;
+    }
+
+    console.log(`🚀 Auto-creating brand entity: "${brandName}"`);
+    
+    // Show loading toast
+    toast({
+      title: "Creating Brand",
+      description: `Setting up ${brandName}...`,
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-brand-entity', {
+        body: {
+          brandName: brandName,
+          sourceUrl: sourceUrl,
+          userId: user?.id || null
+        }
+      });
+
+      if (error) throw error;
+
+      if (!data?.brandEntity) {
+        throw new Error('No brand entity returned from creation');
+      }
+
+      const createdBrand = data.brandEntity;
+      const alreadyExisted = data.alreadyExisted;
+
+      console.log(`✅ Brand entity ${alreadyExisted ? 'found' : 'created'}: ${createdBrand.id}`);
+
+      // Convert to Entity type and set as parent
+      const parentEntity: Entity = {
+        id: createdBrand.id,
+        name: createdBrand.name,
+        type: EntityType.Brand,
+        image_url: createdBrand.image_url,
+        slug: createdBrand.slug,
+        description: createdBrand.description,
+        api_ref: null,
+        api_source: null,
+        metadata: createdBrand.metadata || {},
+        venue: null,
+        website_url: createdBrand.website_url,
+        category_id: null,
+        popularity_score: null,
+        photo_reference: null,
+        created_at: createdBrand.created_at,
+        updated_at: createdBrand.updated_at,
+        authors: null,
+        publication_year: null,
+        isbn: null,
+        languages: null,
+        external_ratings: null,
+        price_info: null,
+        specifications: null,
+        cast_crew: null,
+        ingredients: null,
+        nutritional_info: null,
+        last_enriched_at: null,
+        enrichment_source: null,
+        data_quality_score: null
+      };
+
+      setSelectedParent(parentEntity);
+
+      toast({
+        title: alreadyExisted ? "Brand Linked" : "Brand Created",
+        description: alreadyExisted 
+          ? `Linked to existing ${createdBrand.name}` 
+          : `Created and linked ${createdBrand.name}`,
+      });
+
+      return createdBrand;
+
+    } catch (error: any) {
+      console.error('❌ Failed to auto-create brand:', error);
+      toast({
+        title: "Brand Creation Failed",
+        description: `Couldn't create ${brandName}. You can select parent manually.`,
+        variant: "destructive"
+      });
+      return null;
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
@@ -515,6 +746,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       if (aiResult.data) {
         console.log('🤖 AI Analysis:', aiResult.data);
         setAiPredictions(aiResult.data);
+        
+        // NEW: Auto-select parent brand if extracted by AI
+        const extractedBrand = aiResult.data?.predictions?.brand;
+        if (extractedBrand && extractedBrand.length >= 2) {
+          const foundParent = await autoSelectParentBrand(extractedBrand);
+          
+          // If no parent found, trigger Phase 2 (auto-creation)
+          if (!foundParent) {
+            console.log(`🚀 No parent found, will auto-create brand: "${extractedBrand}"`);
+            await autoCreateParentBrand(extractedBrand, analyzeUrl);
+          }
+        }
         
         // Show different toast based on success status
         if (aiResult.data.success === false) {
