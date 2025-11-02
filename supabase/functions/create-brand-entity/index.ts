@@ -41,8 +41,7 @@ serve(async (req) => {
       .eq('type', 'brand')
       .ilike('name', brandName)
       .is('deleted_at', null)
-      .limit(1)
-      .single();
+      .maybeSingle();
 
     if (existingBrand) {
       console.log(`✅ Brand already exists: ${existingBrand.id}`);
@@ -71,8 +70,7 @@ serve(async (req) => {
         .from('entities')
         .select('id')
         .eq('slug', slug)
-        .limit(1)
-        .single();
+        .maybeSingle();
 
       if (!existingSlug) break;
       
@@ -82,42 +80,64 @@ serve(async (req) => {
 
     console.log(`🔗 Generated slug: "${slug}"`);
 
-    // Step 3: Create brand entity with enriched data
+    // Step 3: Create brand entity with enriched data (with race condition protection)
     console.log(`✨ Creating brand entity with enriched data...`);
     console.log(`   → Logo: ${logo || 'none'}`);
     console.log(`   → Website: ${website || 'none'}`);
     console.log(`   → Description: ${description ? 'provided' : 'fallback'}`);
     
-    const { data: brandEntity, error } = await supabaseAdmin
-      .from('entities')
-      .insert({
-        name: brandName,
-        type: 'brand',
-        slug: slug,
-        image_url: logo || null,
-        website_url: website || null,
-        description: description || `${brandName} brand`,
-        created_by: userId || null,
-        user_created: true,
-        approval_status: 'approved',
-        metadata: {
-          auto_created: true,
-          created_from_product_url: sourceUrl,
-          creation_method: 'enriched-auto-create',
-          enriched: !!(logo || website || description),
-          enrichment_date: logo || website || description ? new Date().toISOString() : null,
-          created_at: new Date().toISOString()
-        }
-      })
-      .select()
-      .single();
+    let insertAttempts = 0;
+    const maxAttempts = 5;
+    let brandEntity;
 
-    if (error) {
+    while (insertAttempts < maxAttempts) {
+      const { data, error } = await supabaseAdmin
+        .from('entities')
+        .insert({
+          name: brandName,
+          type: 'brand',
+          slug: slug,
+          image_url: logo || null,
+          website_url: website || null,
+          description: description || `${brandName} brand`,
+          created_by: userId || null,
+          user_created: true,
+          approval_status: 'approved',
+          metadata: {
+            auto_created: true,
+            created_from_product_url: sourceUrl,
+            creation_method: 'enriched-auto-create',
+            enriched: !!(logo || website || description),
+            enrichment_date: logo || website || description ? new Date().toISOString() : null,
+            created_at: new Date().toISOString()
+          }
+        })
+        .select()
+        .single();
+
+      if (!error) {
+        brandEntity = data;
+        console.log(`✅ Created enriched brand entity: ${brandEntity.id} (${brandEntity.name})`);
+        break;
+      }
+
+      // Handle slug conflict (race condition)
+      if (error.code === '23505' && error.message.includes('slug')) {
+        slugCounter++;
+        slug = `${baseSlug}-${slugCounter}`;
+        console.log(`⚠️ Slug conflict detected, retrying with: "${slug}"`);
+        insertAttempts++;
+        continue;
+      }
+
+      // Other error, throw immediately
       console.error('❌ Error creating brand entity:', error);
       throw error;
     }
 
-    console.log(`✅ Created enriched brand entity: ${brandEntity.id} (${brandEntity.name})`);
+    if (!brandEntity) {
+      throw new Error('Failed to create brand after multiple slug conflict retries');
+    }
 
     // Return enriched brand entity
     return new Response(JSON.stringify({ 
