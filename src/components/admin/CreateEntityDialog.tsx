@@ -706,7 +706,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       
       // Extract product name and brand from AI analysis if available
       const aiProductName = aiResult.data?.predictions?.name;
-      const aiBrandName = aiResult.data?.predictions?.brand;
+      // AI returns brand in two possible locations depending on analysis type
+      const aiBrandName = 
+        aiResult.data?.predictions?.brand ?? 
+        aiResult.data?.predictions?.additional_data?.brand ?? 
+        null;
       
       console.log(`🤖 AI extracted: name="${aiProductName || 'none'}", brand="${aiBrandName || 'none'}"`);
       
