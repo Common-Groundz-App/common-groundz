@@ -751,15 +751,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         console.log('🤖 AI Analysis:', aiResult.data);
         setAiPredictions(aiResult.data);
         
-        // NEW: Auto-select parent brand if extracted by AI
-        const extractedBrand = aiResult.data?.predictions?.brand;
-        if (extractedBrand && extractedBrand.length >= 2) {
-          const foundParent = await autoSelectParentBrand(extractedBrand);
+        // NEW: Auto-select parent brand if extracted by AI (use already-extracted aiBrandName)
+        if (aiBrandName && aiBrandName.length >= 2) {
+          const foundParent = await autoSelectParentBrand(aiBrandName);
           
           // If no parent found, trigger Phase 2 (auto-creation)
           if (!foundParent) {
-            console.log(`🚀 No parent found, will auto-create brand: "${extractedBrand}"`);
-            await autoCreateParentBrand(extractedBrand, analyzeUrl);
+            console.log(`🚀 No parent found, will auto-create brand: "${aiBrandName}"`);
+            await autoCreateParentBrand(aiBrandName, analyzeUrl);
           }
         }
         
