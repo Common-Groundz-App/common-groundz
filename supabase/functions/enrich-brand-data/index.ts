@@ -20,8 +20,8 @@ serve(async (req) => {
 
     console.log(`🔍 Starting brand enrichment for: "${brandName}"`);
 
-    const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
-    const googleCxId = Deno.env.get('GOOGLE_CX_ID');
+  const googleApiKey = Deno.env.get('GOOGLE_CUSTOM_SEARCH_API_KEY');
+  const googleCxId = Deno.env.get('GOOGLE_CUSTOM_SEARCH_CX');
 
     if (!googleApiKey || !googleCxId) {
       console.warn('⚠️ Google API credentials missing, skipping enrichment');
