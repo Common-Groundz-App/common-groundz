@@ -64,12 +64,13 @@ serve(async (req) => {
     let slug = baseSlug;
     let slugCounter = 1;
 
-    // Ensure slug uniqueness
+    // Ensure slug uniqueness (excluding soft-deleted entities)
     while (true) {
       const { data: existingSlug } = await supabaseAdmin
         .from('entities')
         .select('id')
         .eq('slug', slug)
+        .is('deleted_at', null)
         .maybeSingle();
 
       if (!existingSlug) break;
