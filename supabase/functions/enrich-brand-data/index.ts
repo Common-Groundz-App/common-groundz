@@ -5,6 +5,56 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Domain configuration for filtering search results
+const DOMAIN_CONFIG = {
+  // Major marketplaces
+  MAJOR_MARKETPLACES: [
+    'amazon', 'ebay', 'alibaba', 'aliexpress', 'walmart', 'target',
+    'shopify', 'etsy', 'wish', 'temu', 'shein'
+  ],
+  
+  // Beauty-specific retailers
+  BEAUTY_RETAILERS: [
+    'sephora', 'ulta', 'beautybarn', 'nykaa', 'purplle', 
+    'oliveyoung', 'yesstyle', 'stylevana', 'maccaron', 'beautytap',
+    'cultbeauty', 'lookfantastic', 'spacenk'
+  ],
+  
+  // Social media
+  SOCIAL_MEDIA: [
+    'facebook', 'instagram', 'twitter', 'linkedin', 'tiktok',
+    'youtube', 'pinterest', 'reddit'
+  ],
+  
+  // Review/aggregator sites
+  REVIEW_SITES: [
+    'trustpilot', 'yelp', 'google', 'reddit', 'quora', 'wikipedia'
+  ],
+  
+  // Image CDNs and product image patterns
+  CDN_PATTERNS: [
+    'cdn-image', 'cloudinary', 'imgix', 'fastly', 
+    '/products/', '/prdtimg/', '/item/', '/product/'
+  ]
+};
+
+// Helper to check if URL matches any exclusion pattern
+function matchesExclusion(url: string, categories: string[][]): boolean {
+  const urlLower = url.toLowerCase();
+  return categories.some(list => 
+    list.some(pattern => urlLower.includes(pattern))
+  );
+}
+
+// Safe URL parsing helper
+function safeGetHostname(urlString: string): string | null {
+  try {
+    return new URL(urlString).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -85,14 +135,60 @@ serve(async (req) => {
   }
 });
 
+// Score website search result quality
+function scoreWebsiteResult(item: any, brandName: string): number {
+  // Guard against missing data
+  if (!item || !item.link || typeof item.link !== 'string') {
+    return -100;
+  }
+  
+  try {
+    let score = 0;
+    const link = item.link.toLowerCase();
+    const title = (item.title || '').toLowerCase();
+    const brandLower = brandName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    // Get domain safely
+    const domain = safeGetHostname(item.link);
+    if (!domain) return -100;
+    
+    // +10: Domain contains exact brand name
+    if (domain.includes(brandLower)) score += 10;
+    
+    // +5: Title contains "official" or "brand"
+    if (title.includes('official') || title.includes('brand')) score += 5;
+    
+    // +3: Title contains brand name
+    if (title.includes(brandLower)) score += 3;
+    
+    // -20: Known marketplace/retailer domains
+    if (matchesExclusion(link, [
+      DOMAIN_CONFIG.MAJOR_MARKETPLACES,
+      DOMAIN_CONFIG.BEAUTY_RETAILERS
+    ])) score -= 20;
+    
+    // -10: Social media or review sites
+    if (matchesExclusion(link, [
+      DOMAIN_CONFIG.SOCIAL_MEDIA,
+      DOMAIN_CONFIG.REVIEW_SITES
+    ])) score -= 10;
+    
+    return score;
+  } catch (error) {
+    console.warn(`⚠️ Error scoring website result: ${item.link}`, error);
+    return -100;
+  }
+}
+
 // Find official brand website using Google Custom Search
 async function findOfficialWebsite(brandName: string, apiKey: string, cxId: string): Promise<string | null> {
   try {
-    const searchQuery = `${brandName} official website`;
+    // Enhanced search query with exclusions
+    const searchQuery = `${brandName} brand official website -amazon -ebay -alibaba`;
     const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cxId}&q=${encodeURIComponent(searchQuery)}&num=5`;
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     
     const response = await fetch(searchUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
@@ -108,47 +204,75 @@ async function findOfficialWebsite(brandName: string, apiKey: string, cxId: stri
       return null;
     }
 
-    // Find the most likely official website
-    for (const item of data.items) {
-      const link = item.link.toLowerCase();
-      const title = item.title.toLowerCase();
-      const brandLower = brandName.toLowerCase();
+    // Score all results and sort by score
+    const scoredResults = data.items
+      .map((item: any) => ({
+        url: item.link,
+        score: scoreWebsiteResult(item, brandName)
+      }))
+      .sort((a: any, b: any) => b.score - a.score);
 
-      // Skip social media, marketplaces, reviews
-      if (
-        link.includes('facebook.com') ||
-        link.includes('instagram.com') ||
-        link.includes('twitter.com') ||
-        link.includes('amazon.com') ||
-        link.includes('ebay.com') ||
-        link.includes('alibaba.com') ||
-        link.includes('wikipedia.org')
-      ) {
-        continue;
-      }
+    console.log(`   Scored ${scoredResults.length} results, best score: ${scoredResults[0]?.score}`);
 
-      // Check if URL or title contains brand name
-      if (link.includes(brandLower) || title.includes(brandLower)) {
-        return item.link;
-      }
-    }
-
-    // Fallback: return first non-social media result
-    return data.items[0]?.link || null;
+    // Only return if best score is positive
+    return scoredResults[0]?.score > 0 ? scoredResults[0].url : null;
   } catch (error) {
     console.error('Website search error:', error);
     return null;
   }
 }
 
+// Score logo image quality
+function scoreLogoImage(item: any, brandName: string): number {
+  if (!item || !item.link || typeof item.link !== 'string') {
+    return -100;
+  }
+  
+  try {
+    let score = 0;
+    const link = item.link.toLowerCase();
+    const title = (item.title || '').toLowerCase();
+    
+    // +10: URL contains "logo"
+    if (link.includes('logo')) score += 10;
+    
+    // +5: PNG or SVG (better than JPG for logos)
+    if (link.includes('.png') || link.includes('.svg')) score += 5;
+    
+    // +3: Title contains "logo" or "brand"
+    if (title.includes('logo') || title.includes('brand')) score += 3;
+    
+    // -10: URL contains product indicators
+    if (matchesExclusion(link, [DOMAIN_CONFIG.CDN_PATTERNS])) score -= 10;
+    
+    // -5: Generic CDN domains (often product images)
+    const domain = safeGetHostname(item.link);
+    if (domain && (domain.includes('cdn') || domain.includes('cloudinary'))) {
+      score -= 5;
+    }
+    
+    return score;
+  } catch (error) {
+    console.warn(`⚠️ Error scoring logo image: ${item.link}`, error);
+    return -100;
+  }
+}
+
 // Search for brand logo using Google Custom Search Image API
 async function searchBrandLogo(brandName: string, officialWebsite: string | null, apiKey: string, cxId: string): Promise<string | null> {
   try {
-    const searchQuery = officialWebsite
-      ? `${brandName} logo site:${new URL(officialWebsite).hostname}`
-      : `${brandName} official logo`;
+    // Enhanced search query with specificity
+    let searchQuery: string;
+    if (officialWebsite) {
+      const hostname = safeGetHostname(officialWebsite);
+      searchQuery = hostname 
+        ? `${brandName} brand logo transparent png site:${hostname}`
+        : `${brandName} brand logo transparent png`;
+    } else {
+      searchQuery = `${brandName} official brand logo transparent png -product`;
+    }
     
-    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cxId}&q=${encodeURIComponent(searchQuery)}&searchType=image&num=3`;
+    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cxId}&q=${encodeURIComponent(searchQuery)}&searchType=image&num=5`;
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -167,18 +291,18 @@ async function searchBrandLogo(brandName: string, officialWebsite: string | null
       return null;
     }
 
-    // Prefer logos from official website
-    if (officialWebsite) {
-      const officialDomain = new URL(officialWebsite).hostname;
-      for (const item of data.items) {
-        if (item.link && item.link.includes(officialDomain)) {
-          return item.link;
-        }
-      }
-    }
+    // Score all images and sort by quality
+    const scoredImages = data.items
+      .map((item: any) => ({
+        url: item.link,
+        score: scoreLogoImage(item, brandName)
+      }))
+      .sort((a: any, b: any) => b.score - a.score);
 
-    // Fallback: return first result
-    return data.items[0]?.link || null;
+    console.log(`   Scored ${scoredImages.length} images, best score: ${scoredImages[0]?.score}`);
+
+    // Only return if best score is positive
+    return scoredImages[0]?.score > 0 ? scoredImages[0].url : null;
   } catch (error) {
     console.error('Logo search error:', error);
     return null;
@@ -223,8 +347,8 @@ async function scrapeDescription(websiteUrl: string, brandName: string): Promise
       return aboutDescription;
     }
 
-    // Fallback description
-    return null;
+    // Fallback: generic but accurate description
+    return `${brandName} is a beauty and skincare brand.`;
   } catch (error) {
     console.error('Scraping error:', error);
     return null;
