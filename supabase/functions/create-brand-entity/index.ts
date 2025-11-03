@@ -40,7 +40,7 @@ serve(async (req) => {
       .select('id, name, image_url, slug, description, website_url, created_at, updated_at, metadata')
       .eq('type', 'brand')
       .ilike('name', brandName)
-      .is('deleted_at', null)
+      .eq('is_deleted', false)
       .maybeSingle();
 
     if (existingBrand) {
@@ -70,7 +70,7 @@ serve(async (req) => {
         .from('entities')
         .select('id')
         .eq('slug', slug)
-        .is('deleted_at', null)
+        .eq('is_deleted', false)
         .maybeSingle();
 
       if (!existingSlug) break;
