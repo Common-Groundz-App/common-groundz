@@ -31,10 +31,14 @@ const DOMAIN_CONFIG = {
     'trustpilot', 'yelp', 'google', 'reddit', 'quora', 'wikipedia'
   ],
   
-  // Image CDNs and product image patterns
+  // CDN patterns (light penalty - tiebreaker)
   CDN_PATTERNS: [
-    'cdn-image', 'cloudinary', 'imgix', 'fastly', 
-    '/products/', '/prdtimg/', '/item/', '/product/'
+    'cdn-image', 'cloudinary', 'imgix', 'fastly'
+  ],
+  
+  // Product image indicators (light penalty - tiebreaker)
+  PRODUCT_INDICATORS: [
+    '/product-', '/item-', 'prdtimg', '/pd/', '/products/'
   ]
 };
 
@@ -222,7 +226,7 @@ async function findOfficialWebsite(brandName: string, apiKey: string, cxId: stri
   }
 }
 
-// Score logo image quality
+// Score logo image quality with graduated penalties
 function scoreLogoImage(item: any, brandName: string): number {
   if (!item || !item.link || typeof item.link !== 'string') {
     return -100;
@@ -232,23 +236,40 @@ function scoreLogoImage(item: any, brandName: string): number {
     let score = 0;
     const link = item.link.toLowerCase();
     const title = (item.title || '').toLowerCase();
+    const brandLower = brandName.toLowerCase().replace(/[^a-z0-9]/g, '');
     
-    // +10: URL contains "logo"
-    if (link.includes('logo')) score += 10;
+    // === POSITIVE SIGNALS (Strong) ===
+    // +15: URL contains "logo" (increased for stronger signal)
+    if (link.includes('logo')) score += 15;
     
-    // +5: PNG or SVG (better than JPG for logos)
-    if (link.includes('.png') || link.includes('.svg')) score += 5;
+    // +8: PNG or SVG (increased - high-quality formats)
+    if (link.includes('.png') || link.includes('.svg')) score += 8;
     
-    // +3: Title contains "logo" or "brand"
-    if (title.includes('logo') || title.includes('brand')) score += 3;
+    // +5: Title contains "logo" or "brand"
+    if (title.includes('logo') || title.includes('brand')) score += 5;
     
-    // -10: URL contains product indicators
-    if (matchesExclusion(link, [DOMAIN_CONFIG.CDN_PATTERNS])) score -= 10;
+    // +3: Title contains brand name
+    if (title.includes(brandLower)) score += 3;
     
-    // -5: Generic CDN domains (often product images)
-    const domain = safeGetHostname(item.link);
-    if (domain && (domain.includes('cdn') || domain.includes('cloudinary'))) {
-      score -= 5;
+    // === NEGATIVE SIGNALS (Graduated) ===
+    
+    // -2: Generic CDN patterns (light penalty - tiebreaker only)
+    if (DOMAIN_CONFIG.CDN_PATTERNS.some(p => link.includes(p))) {
+      score -= 2;
+    }
+    
+    // -3: Product indicators (light penalty unless it says "logo")
+    if (DOMAIN_CONFIG.PRODUCT_INDICATORS.some(p => link.includes(p)) && 
+        !link.includes('logo')) {
+      score -= 3;
+    }
+    
+    // -20: Known retailer/marketplace (heavy penalty - disqualifier)
+    if (matchesExclusion(link, [
+      DOMAIN_CONFIG.MAJOR_MARKETPLACES,
+      DOMAIN_CONFIG.BEAUTY_RETAILERS
+    ])) {
+      score -= 20;
     }
     
     return score;
@@ -265,8 +286,9 @@ async function searchBrandLogo(brandName: string, officialWebsite: string | null
     let searchQuery: string;
     if (officialWebsite) {
       const hostname = safeGetHostname(officialWebsite);
+      // Use exact brand match when searching official site
       searchQuery = hostname 
-        ? `${brandName} brand logo transparent png site:${hostname}`
+        ? `"${brandName}" logo site:${hostname}`
         : `${brandName} brand logo transparent png`;
     } else {
       searchQuery = `${brandName} official brand logo transparent png -product`;
@@ -301,8 +323,8 @@ async function searchBrandLogo(brandName: string, officialWebsite: string | null
 
     console.log(`   Scored ${scoredImages.length} images, best score: ${scoredImages[0]?.score}`);
 
-    // Only return if best score is positive
-    return scoredImages[0]?.score > 0 ? scoredImages[0].url : null;
+    // Accept if score >= -5 (more lenient threshold)
+    return scoredImages[0]?.score >= -5 ? scoredImages[0].url : null;
   } catch (error) {
     console.error('Logo search error:', error);
     return null;
