@@ -452,15 +452,15 @@ async function synthesizeBrandDescription(
   brandName: string,
   websiteUrl: string | null
 ): Promise<string | null> {
-  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+  const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
   
-  if (!lovableApiKey) {
-    console.log('   ⚠️ LOVABLE_API_KEY not found, skipping AI synthesis');
+  if (!geminiApiKey) {
+    console.log('   ⚠️ GEMINI_API_KEY not found, skipping AI synthesis');
     return null;
   }
   
   try {
-    console.log(`   🤖 Using AI to synthesize brand description...`);
+    console.log(`   🤖 Using Gemini AI to synthesize brand description...`);
     
     const searchContext = websiteUrl 
       ? `The brand's official website is ${websiteUrl}.`
@@ -484,36 +484,39 @@ Example BAD output (too product-focused):
 
 Write only the brand description, no additional commentary.`;
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${lovableApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3
-      })
-    });
+    // Use Google Gemini API directly (same as analyze-entity-url function)
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 200
+          }
+        })
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.warn(`   ⚠️ AI synthesis failed: ${response.status} - ${errorText}`);
+      console.warn(`   ⚠️ Gemini AI synthesis failed: ${response.status} - ${errorText}`);
       return null;
     }
 
     const data = await response.json();
-    const aiDescription = data.choices?.[0]?.message?.content?.trim();
+    const aiDescription = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     
     if (aiDescription && aiDescription.length > 30 && !isProductDescription(aiDescription)) {
       console.log(`   ✅ AI-synthesized description (${aiDescription.length} chars)`);
       return aiDescription;
     }
     
-    console.log(`   ⚠️ AI returned invalid/product description`);
+    console.log(`   ⚠️ Gemini returned invalid/product description`);
     return null;
   } catch (error) {
     console.error('   ❌ AI synthesis error:', error);
