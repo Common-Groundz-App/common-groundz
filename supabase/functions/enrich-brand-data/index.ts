@@ -325,54 +325,134 @@ function scoreLogoImage(item: any, brandName: string): number {
   }
 }
 
-// Search for brand logo using Google Custom Search Image API
-async function searchBrandLogo(brandName: string, officialWebsite: string | null, apiKey: string, cxId: string): Promise<string | null> {
+// Helper: Perform a single Google Image search query
+async function performImageSearch(
+  query: string,
+  apiKey: string,
+  cxId: string
+): Promise<any[]> {
   try {
-    // Enhanced search query with specificity
-    let searchQuery: string;
-    if (officialWebsite) {
-      const hostname = safeGetHostname(officialWebsite);
-      // Use exact brand match when searching official site
-      searchQuery = hostname 
-        ? `"${brandName}" logo site:${hostname}`
-        : `${brandName} brand logo transparent png`;
-    } else {
-      searchQuery = `${brandName} official brand logo transparent png -product`;
-    }
-    
-    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cxId}&q=${encodeURIComponent(searchQuery)}&searchType=image&num=5`;
+    const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${apiKey}&cx=${cxId}&q=${encodeURIComponent(query)}&searchType=image&num=5`;
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
     
     const response = await fetch(searchUrl, { signal: controller.signal });
     clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.warn(`⚠️ Google Image Search API failed: ${response.status}`);
-      return null;
-    }
-
-    const data = await response.json();
     
-    if (!data.items || data.items.length === 0) {
+    if (!response.ok) {
+      console.warn(`   ⚠️ Image search failed: ${response.status}`);
+      return [];
+    }
+    
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.warn(`   ⚠️ Image search error:`, error);
+    return [];
+  }
+}
+
+// Search for brand logo using two-phase approach with fallback
+async function searchBrandLogo(
+  brandName: string,
+  officialWebsite: string | null,
+  apiKey: string,
+  cxId: string
+): Promise<string | null> {
+  try {
+    const allResults: any[] = [];
+    const seenUrls = new Set<string>(); // Deduplication tracker
+    
+    // PHASE 1: Search official website (if available)
+    if (officialWebsite) {
+      const hostname = safeGetHostname(officialWebsite);
+      if (hostname) {
+        console.log(`   🔍 Phase 1: Searching official site (${hostname})...`);
+        const siteQuery = `"${brandName}" logo site:${hostname}`;
+        const siteResults = await performImageSearch(siteQuery, apiKey, cxId);
+        
+        // Add unique results
+        for (const item of siteResults) {
+          if (item.link && !seenUrls.has(item.link)) {
+            seenUrls.add(item.link);
+            allResults.push(item);
+          }
+        }
+        
+        // Score the site results to determine if we need Phase 2
+        const bestSiteScore = siteResults.length > 0
+          ? Math.max(...siteResults.map(item => scoreLogoImage(item, brandName)))
+          : -100;
+        
+        console.log(`   → Found ${siteResults.length} site images, best score: ${bestSiteScore}`);
+        
+        // PHASE 2: Broader search if site results are poor (threshold: 15)
+        if (bestSiteScore < 15) {
+          console.log(`   🔍 Phase 2: Site results weak, searching broader sources...`);
+          const broaderQuery = `"${brandName}" official brand logo -site:${hostname} -product -buy -shop`;
+          const broaderResults = await performImageSearch(broaderQuery, apiKey, cxId);
+          
+          // Add unique results from broader search
+          let addedCount = 0;
+          for (const item of broaderResults) {
+            if (item.link && !seenUrls.has(item.link)) {
+              seenUrls.add(item.link);
+              allResults.push(item);
+              addedCount++;
+            }
+          }
+          
+          console.log(`   → Added ${addedCount} unique images from broader search`);
+        } else {
+          console.log(`   ✅ Site results good enough, skipping Phase 2`);
+        }
+      }
+    } else {
+      // No official website - do broad search only
+      console.log(`   🔍 No official website, searching broadly...`);
+      const broadQuery = `"${brandName}" official brand logo transparent png -product -buy -shop`;
+      const broadResults = await performImageSearch(broadQuery, apiKey, cxId);
+      
+      for (const item of broadResults) {
+        if (item.link && !seenUrls.has(item.link)) {
+          seenUrls.add(item.link);
+          allResults.push(item);
+        }
+      }
+    }
+    
+    if (allResults.length === 0) {
+      console.log(`   ❌ No logo images found`);
       return null;
     }
-
-    // Score all images and sort by quality
-    const scoredImages = data.items
+    
+    // Score and rank ALL deduplicated results from both phases
+    const scoredImages = allResults
       .map((item: any) => ({
         url: item.link,
         score: scoreLogoImage(item, brandName)
       }))
-      .sort((a: any, b: any) => b.score - a.score);
-
-    console.log(`   Scored ${scoredImages.length} images, best score: ${scoredImages[0]?.score}`);
-
-    // Accept if score >= -5 (more lenient threshold)
-    return scoredImages[0]?.score >= -5 ? scoredImages[0].url : null;
+      .sort((a, b) => b.score - a.score);
+    
+    console.log(`   📊 Scored ${scoredImages.length} unique images:`);
+    scoredImages.slice(0, 3).forEach((img, i) => {
+      const domain = safeGetHostname(img.url);
+      console.log(`      ${i + 1}. Score ${img.score}: ${domain}`);
+    });
+    
+    const bestLogo = scoredImages[0];
+    
+    // Accept if score >= -5 (lenient threshold)
+    if (bestLogo && bestLogo.score >= -5) {
+      console.log(`   ✅ Selected logo with score: ${bestLogo.score}`);
+      return bestLogo.url;
+    }
+    
+    console.log(`   ❌ No logo met quality threshold (best: ${bestLogo?.score})`);
+    return null;
   } catch (error) {
-    console.error('Logo search error:', error);
+    console.error('❌ Logo search error:', error);
     return null;
   }
 }
@@ -423,10 +503,33 @@ async function scrapeDescription(websiteUrl: string, brandName: string): Promise
   }
 }
 
-// Detect if description is product/e-commerce focused
+// Detect if description is product/e-commerce focused or CMS placeholder
 function isProductDescription(text: string): boolean {
   if (!text || text.length < 20) return false;
   
+  const lowerText = text.toLowerCase();
+  
+  // Check for CMS placeholder patterns FIRST (high priority)
+  const cmsPlaceholders = [
+    'add a description',
+    'add description',
+    'default description',
+    'enter description',
+    'lorem ipsum',
+    'placeholder text',
+    'see how this collection',
+    'example text',
+    'sample description'
+  ];
+  
+  for (const placeholder of cmsPlaceholders) {
+    if (lowerText.includes(placeholder)) {
+      console.log(`   ⚠️ Detected CMS placeholder: "${placeholder}"`);
+      return true; // Treat as invalid
+    }
+  }
+  
+  // Check for product/e-commerce keywords
   const productKeywords = [
     'buy', 'shop', 'cart', 'add to', 'price', '₹', '$', '€', '£',
     'in stock', 'out of stock', 'free shipping', 'delivery',
@@ -434,9 +537,7 @@ function isProductDescription(text: string): boolean {
     'limited time', 'sale', 'discount', 'available now'
   ];
   
-  const lowerText = text.toLowerCase();
   let matchCount = 0;
-  
   for (const keyword of productKeywords) {
     if (lowerText.includes(keyword)) {
       matchCount++;
