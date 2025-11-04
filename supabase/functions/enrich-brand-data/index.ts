@@ -100,17 +100,56 @@ serve(async (req) => {
     const brandLogo = await searchBrandLogo(brandName, officialWebsite, googleApiKey, googleCxId);
     console.log(`   → Logo: ${brandLogo || 'not found'}`);
 
-    // Step 3: Scrape website for description
-    console.log(`📝 Scraping website description...`);
-    const description = officialWebsite 
-      ? await scrapeDescription(officialWebsite, brandName)
-      : null;
-    console.log(`   → Description: ${description ? 'found' : 'not found'}`);
+    // Step 3: Get brand description (smart cascade)
+    console.log(`📝 Getting brand description...`);
+    let description: string | null = null;
+    let descriptionSource = 'none';
+
+    if (officialWebsite) {
+      // Try scraping website first
+      const scrapedDescription = await scrapeDescription(officialWebsite, brandName);
+      
+      if (scrapedDescription && !isProductDescription(scrapedDescription)) {
+        // Scraped description is good (brand-focused)
+        description = scrapedDescription;
+        descriptionSource = 'scraped';
+        console.log(`   ✅ Using scraped description (brand-focused)`);
+      } else if (scrapedDescription) {
+        // Scraped description exists but is product-focused
+        console.log(`   ⚠️ Scraped description is product-focused, trying AI...`);
+        descriptionSource = 'scraped_rejected';
+        
+        // Try AI synthesis
+        const aiDescription = await synthesizeBrandDescription(brandName, officialWebsite);
+        if (aiDescription) {
+          description = aiDescription;
+          descriptionSource = 'ai_synthesized';
+        }
+      } else {
+        // Scraping failed completely
+        console.log(`   ⚠️ Scraping failed, trying AI...`);
+        const aiDescription = await synthesizeBrandDescription(brandName, officialWebsite);
+        if (aiDescription) {
+          description = aiDescription;
+          descriptionSource = 'ai_synthesized';
+        }
+      }
+    }
+
+    // Final fallback if all methods failed
+    if (!description) {
+      description = `${brandName} is a beauty and skincare brand.`;
+      descriptionSource = 'fallback';
+      console.log(`   ℹ️ Using generic fallback description`);
+    }
+
+    console.log(`   → Description: ${description.substring(0, 50)}... (source: ${descriptionSource})`);
 
     const enrichmentResult = {
       logo: brandLogo,
       website: officialWebsite,
       description: description,
+      descriptionSource: descriptionSource,
       enriched: !!(brandLogo || officialWebsite || description)
     };
 
@@ -251,6 +290,13 @@ function scoreLogoImage(item: any, brandName: string): number {
     // +3: Title contains brand name
     if (title.includes(brandLower)) score += 3;
     
+    // === NEW: SOCIAL MEDIA BONUS FOR LOGOS ===
+    // +5: LinkedIn, Instagram (official brand assets)
+    if (link.includes('linkedin.com') || link.includes('instagram.com')) {
+      score += 5;
+      console.log(`   📱 Social media logo bonus: +5 for ${link.includes('linkedin.com') ? 'LinkedIn' : 'Instagram'}`);
+    }
+    
     // === NEGATIVE SIGNALS (Graduated) ===
     
     // -2: Generic CDN patterns (light penalty - tiebreaker only)
@@ -373,6 +419,104 @@ async function scrapeDescription(websiteUrl: string, brandName: string): Promise
     return `${brandName} is a beauty and skincare brand.`;
   } catch (error) {
     console.error('Scraping error:', error);
+    return null;
+  }
+}
+
+// Detect if description is product/e-commerce focused
+function isProductDescription(text: string): boolean {
+  if (!text || text.length < 20) return false;
+  
+  const productKeywords = [
+    'buy', 'shop', 'cart', 'add to', 'price', '₹', '$', '€', '£',
+    'in stock', 'out of stock', 'free shipping', 'delivery',
+    'craving for', 'try them today', 'order now', 'get yours',
+    'limited time', 'sale', 'discount', 'available now'
+  ];
+  
+  const lowerText = text.toLowerCase();
+  let matchCount = 0;
+  
+  for (const keyword of productKeywords) {
+    if (lowerText.includes(keyword)) {
+      matchCount++;
+      if (matchCount >= 2) return true; // Early exit
+    }
+  }
+  
+  return false;
+}
+
+// Use AI to synthesize brand description from web search
+async function synthesizeBrandDescription(
+  brandName: string,
+  websiteUrl: string | null
+): Promise<string | null> {
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+  
+  if (!lovableApiKey) {
+    console.log('   ⚠️ LOVABLE_API_KEY not found, skipping AI synthesis');
+    return null;
+  }
+  
+  try {
+    console.log(`   🤖 Using AI to synthesize brand description...`);
+    
+    const searchContext = websiteUrl 
+      ? `The brand's official website is ${websiteUrl}.`
+      : '';
+    
+    const prompt = `You are a brand research assistant. Find information about "${brandName}" and write a 2-3 sentence brand description (NOT product description).
+
+${searchContext}
+
+Focus on:
+- Brand history/founding
+- Brand mission or values
+- What makes this brand unique
+- Main product categories
+
+Example GOOD output:
+"Beauty of Joseon is a Korean skincare brand inspired by the beauty secrets of the Joseon Dynasty. The brand combines traditional Korean ingredients like ginseng and rice with modern skincare science."
+
+Example BAD output (too product-focused):
+"Buy Beauty of Joseon products! Try our bestselling serum today with free shipping!"
+
+Write only the brand description, no additional commentary.`;
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${lovableApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.5-flash',
+        messages: [
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.3
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(`   ⚠️ AI synthesis failed: ${response.status} - ${errorText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    const aiDescription = data.choices?.[0]?.message?.content?.trim();
+    
+    if (aiDescription && aiDescription.length > 30 && !isProductDescription(aiDescription)) {
+      console.log(`   ✅ AI-synthesized description (${aiDescription.length} chars)`);
+      return aiDescription;
+    }
+    
+    console.log(`   ⚠️ AI returned invalid/product description`);
+    return null;
+  } catch (error) {
+    console.error('   ❌ AI synthesis error:', error);
     return null;
   }
 }
