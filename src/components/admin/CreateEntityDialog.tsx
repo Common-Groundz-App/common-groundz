@@ -98,6 +98,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [showUrlMismatchDialog, setShowUrlMismatchDialog] = useState(false);
   const [urlMismatchMessage, setUrlMismatchMessage] = useState('');
   const [urlMetadata, setUrlMetadata] = useState<any>(null);
+  const [selectedFunction, setSelectedFunction] = useState<'original' | 'hybrid'>('original');
   
   // Metadata cache with TTL
   const metadataCache = useRef(new Map<string, { data: any; timestamp: number }>());
@@ -718,10 +719,30 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setPrimaryMediaUrl(null);
     
     try {
-      console.log('🔍 Analyzing URL:', analyzeUrl);
+      console.log(`🔍 Analyzing URL with ${selectedFunction} function:`, analyzeUrl);
       
-      // Check cache first
-      const cachedMetadata = getCachedMetadata(analyzeUrl);
+      if (selectedFunction === 'hybrid') {
+        await handleHybridAnalysis();
+      } else {
+        await handleOriginalAnalysis();
+      }
+      
+    } catch (error: any) {
+      console.error('❌ URL Analysis Error:', error);
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to analyze URL. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // Original analysis logic
+  const handleOriginalAnalysis = async () => {
+    // Check cache first
+    const cachedMetadata = getCachedMetadata(analyzeUrl);
       
       // Call AI analysis first to get product name AND brand
       const aiResult = await supabase.functions.invoke('analyze-entity-url', { body: { url: analyzeUrl } });
@@ -798,17 +819,48 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       if (metadataResult.data || aiResult.data) {
         setShowPreviewModal(true);
       }
-      
-    } catch (error: any) {
-      console.error('❌ URL Analysis Error:', error);
-      toast({
-        title: "Analysis Failed",
-        description: error.message || "Failed to analyze URL. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setAnalyzing(false);
-    }
+  };
+
+  // Hybrid analysis logic
+  const handleHybridAnalysis = async () => {
+    const extractBrandFromUrl = (url: string): string => {
+      try {
+        const hostname = new URL(url).hostname.replace('www.', '');
+        return hostname.split('.')[0];
+      } catch {
+        return '';
+      }
+    };
+
+    const result = await supabase.functions.invoke('enrich-brand-data-hybrid', {
+      body: { 
+        brandName: extractBrandFromUrl(analyzeUrl),
+        url: analyzeUrl
+      }
+    });
+    
+    if (result.error) throw new Error(result.error.message);
+    
+    const data = result.data;
+    
+    setUrlMetadata({
+      url: analyzeUrl,
+      title: data.brandName,
+      description: data.description,
+      image: data.logoUrl,
+      siteName: data.brandName
+    });
+    
+    setAiPredictions({
+      predictions: {
+        name: data.brandName,
+        type: 'brand',
+        website: data.officialWebsite,
+        description: data.description
+      }
+    });
+    
+    setShowPreviewModal(true);
   };
 
   // Apply AI predictions to form
@@ -1503,11 +1555,21 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           <TabsContent value="basic" className="space-y-4">
             {/* Analyze URL Input - Placed first for quick access */}
             <div className="space-y-2 p-4 border-2 border-dashed border-primary/20 rounded-lg bg-primary/5">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="analyze_url" className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <span className="font-semibold">Auto-Fill from URL (Optional)</span>
                 </Label>
+                
+                <Select value={selectedFunction} onValueChange={(v) => setSelectedFunction(v as 'original' | 'hybrid')}>
+                  <SelectTrigger className="w-[140px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="original">Original</SelectItem>
+                    <SelectItem value="hybrid">Hybrid</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <p className="text-xs text-muted-foreground">
                 Paste any URL (Goodreads, IMDb, Amazon, App Store, etc.) to automatically extract entity details
