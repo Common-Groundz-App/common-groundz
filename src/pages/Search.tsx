@@ -523,44 +523,38 @@ const Search = () => {
 
             {/* Add Entity CTA */}
             {hasResults && (
-              <div className="bg-muted/30 border-t border-border/50 p-4 text-center">
-                <p className="text-sm text-muted-foreground mb-2">
-                  Couldn't find "{searchQuery}"?
+              <div className="p-3 text-center bg-muted/30 border-t">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Couldn't find "<span className="font-medium text-foreground">{searchQuery}</span>"?
                 </p>
-                <Button 
-                  variant="gradient"
-                  size="sm"
+                <button 
+                  className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
                   onClick={() => {
                     console.log('Create entity for:', searchQuery);
                     setShowDropdown(false);
                   }}
-                  className="gap-2"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3 h-3 mr-1" />
                   Add Entity
-                </Button>
+                </button>
               </div>
             )}
           </div>
         ) : (
-          <div className="p-2">
-            <div className="bg-muted/30 border border-border/50 rounded-lg p-4 text-center">
-              <p className="text-sm text-muted-foreground mb-2">
-                Couldn't find "{searchQuery}"?
-              </p>
-              <Button 
-                variant="gradient"
-                size="sm"
-                onClick={() => {
-                  console.log('Create entity for:', searchQuery);
-                  setShowDropdown(false);
-                }}
-                className="gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                Add Entity
-              </Button>
-            </div>
+          <div className="p-3 text-center bg-muted/30 border-t">
+            <p className="text-xs text-muted-foreground mb-2">
+              Couldn't find "<span className="font-medium text-foreground">{searchQuery}</span>"?
+            </p>
+            <button 
+              className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
+              onClick={() => {
+                console.log('Create entity for:', searchQuery);
+                setShowDropdown(false);
+              }}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add Entity
+            </button>
           </div>
         )}
       </div>
