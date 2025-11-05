@@ -1,10 +1,10 @@
-
-import React from 'react';
-import { Clock, MapPin, Mail, Phone, Globe, Users, Star, Award, ArrowRight } from "lucide-react";
+import React, { useState } from 'react';
+import { Clock, MapPin, Mail, Phone, Globe, Users, Star, Award, ArrowRight, ChevronDown, ChevronUp } from "lucide-react";
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionButton } from './EntitySuggestionButton';
 import { ClaimBusinessButton } from './ClaimBusinessButton';
@@ -50,6 +50,9 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
   const contactInfo = extractContactInfo(entity);
   const businessHours = extractBusinessHours(entity);
   const formattedHours = formatBusinessHours(businessHours);
+  
+  const [isAboutExpanded, setIsAboutExpanded] = useState(false);
+  const shouldTruncateAbout = entity.description && entity.description.length > 200;
   
   // Dynamic Related Entities
   const { relatedEntities, isLoading } = useRelatedEntities({
@@ -188,13 +191,42 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="text-sm text-gray-600 leading-relaxed">
-              {entity.description ? (
-                <RichTextDisplay content={entity.description} />
-              ) : (
-                <p>No description available for this entity. Help improve our database by suggesting an edit.</p>
-              )}
-            </div>
+            {entity.description ? (
+              <Collapsible open={isAboutExpanded} onOpenChange={setIsAboutExpanded}>
+                <div className="relative">
+                  <div className={`text-sm text-muted-foreground leading-relaxed ${!isAboutExpanded && shouldTruncateAbout ? 'line-clamp-5' : ''}`}>
+                    <RichTextDisplay content={entity.description} />
+                  </div>
+                  
+                  {/* Conditional Gradient Fade - Only when truncated */}
+                  {!isAboutExpanded && shouldTruncateAbout && (
+                    <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+                  )}
+                </div>
+                
+                {/* See more/Show less button */}
+                {shouldTruncateAbout && (
+                  <CollapsibleTrigger asChild>
+                    <button 
+                      className="text-brand-orange hover:text-brand-orange/80 text-sm font-medium mt-2 flex items-center gap-1 transition-colors"
+                      aria-label={isAboutExpanded ? "Show less description" : "Show more description"}
+                    >
+                      {isAboutExpanded ? (
+                        <>
+                          Show less <ChevronUp className="h-4 w-4" />
+                        </>
+                      ) : (
+                        <>
+                          See more <ChevronDown className="h-4 w-4" />
+                        </>
+                      )}
+                    </button>
+                  </CollapsibleTrigger>
+                )}
+              </Collapsible>
+            ) : (
+              <p className="text-sm text-muted-foreground">No description available for this entity. Help improve our database by suggesting an edit.</p>
+            )}
             
             {/* Attribution for Google-sourced descriptions */}
             {entity.description && (entity as any).about_source === 'google_editorial' && (

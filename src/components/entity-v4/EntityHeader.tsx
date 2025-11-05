@@ -10,7 +10,8 @@ import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTapDetection } from '@/hooks/use-tap-detection';
-import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal, RefreshCw } from "lucide-react";
+import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ConnectedRingsRating } from "@/components/ui/connected-rings";
@@ -66,6 +67,10 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
   
   // State for image refresh functionality
   const [isImageExpired, setIsImageExpired] = useState(false);
+  
+  // State for expandable description
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const shouldTruncateDescription = entityData.description && entityData.description.length > 200;
 
   // Reset expiration flag when entityImage prop changes (after successful refresh)
   useEffect(() => {
@@ -237,8 +242,40 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   </div>
                 </div>
 
-                <div className={`text-gray-600 mb-4 leading-relaxed ${isMobile ? 'text-sm' : ''}`}>
-                  <RichTextDisplay content={entityData.description} />
+                {/* Expandable Description */}
+                <div className="mb-4">
+                  <Collapsible open={isDescriptionExpanded} onOpenChange={setIsDescriptionExpanded}>
+                    <div className="relative">
+                      <div className={`text-muted-foreground leading-relaxed ${isMobile ? 'text-sm' : ''} ${!isDescriptionExpanded && shouldTruncateDescription ? 'line-clamp-3' : ''}`}>
+                        <RichTextDisplay content={entityData.description} />
+                      </div>
+                      
+                      {/* Conditional Gradient Fade - Only when truncated */}
+                      {!isDescriptionExpanded && shouldTruncateDescription && (
+                        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none" />
+                      )}
+                    </div>
+                    
+                    {/* See more/Show less button */}
+                    {shouldTruncateDescription && (
+                      <CollapsibleTrigger asChild>
+                        <button 
+                          className="text-brand-orange hover:text-brand-orange/80 text-sm font-medium mt-2 flex items-center gap-1 transition-colors"
+                          aria-label={isDescriptionExpanded ? "Show less description" : "Show more description"}
+                        >
+                          {isDescriptionExpanded ? (
+                            <>
+                              Show less <ChevronUp className="h-4 w-4" />
+                            </>
+                          ) : (
+                            <>
+                              See more <ChevronDown className="h-4 w-4" />
+                            </>
+                          )}
+                        </button>
+                      </CollapsibleTrigger>
+                    )}
+                  </Collapsible>
                 </div>
                 
                 {/* Ratings - Always stack on mobile, side-by-side on larger screens */}
