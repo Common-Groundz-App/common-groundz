@@ -440,19 +440,6 @@ const Explore = () => {
                   </button>
                 </div>
               )}
-
-                  {/* No Results State */}
-                  {!hasLocalResults && !hasExternalResults && !hasHashtagResults && !isLoading && (
-                    <div className="p-4 text-center bg-background">
-                      <p className="text-sm text-muted-foreground mb-2">No immediate results found</p>
-                      <button 
-                        className="text-sm text-primary hover:underline"
-                        onClick={handleComplexProductSearch}
-                      >
-                        Try searching in more sources
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

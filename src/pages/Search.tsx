@@ -719,25 +719,6 @@ const Search = () => {
                               </Button>
                             </div>
                           )}
-                          
-                          {/* No results message */}
-                          {!filteredResults.localResults.length && 
-                           !filteredResults.externalResults.length && 
-                           !results.users.length && (
-                            <div className="py-12 text-center">
-                              <p className="text-muted-foreground">No results found for "{query}"</p>
-                              {searchMode === 'quick' && (
-                                <Button 
-                                  onClick={handleDeepSearch} 
-                                  variant="outline" 
-                                  className="mt-4"
-                                  disabled={isDeepSearching}
-                                >
-                                  {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
-                                </Button>
-                              )}
-                            </div>
-                          )}
                         </>
                       )}
                       
@@ -897,7 +878,7 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) ? (
+                          {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) && (
                             <div className="space-y-6 min-w-0">
                               {filteredResults.localResults.length > 0 && (
                                 <div>
@@ -927,20 +908,6 @@ const Search = () => {
                                     ))}
                                   </div>
                                 </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="py-12 text-center">
-                              <p className="text-muted-foreground">No products found for "{query}"</p>
-                              {searchMode === 'quick' && (
-                                <Button 
-                                  onClick={handleDeepSearch} 
-                                  variant="outline" 
-                                  className="mt-4"
-                                  disabled={isDeepSearching}
-                                >
-                                  {isDeepSearching ? 'Searching deeply...' : 'Try Deep Search'}
-                                </Button>
                               )}
                             </div>
                           )}
