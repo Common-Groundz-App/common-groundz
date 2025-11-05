@@ -114,6 +114,29 @@ function getEntityTypeFallbackImage(entityType: string): string {
   return fallbacks[entityType as keyof typeof fallbacks] || fallbacks.default
 }
 
+// Normalize search query to handle special characters (dots, spaces, hyphens)
+function normalizeSearchQuery(query: string): string[] {
+  const variations = new Set<string>()
+  const normalized = query.toLowerCase().trim()
+  
+  // Add original query
+  variations.add(normalized)
+  
+  // Add version with spaces/dots/hyphens removed (snature)
+  variations.add(normalized.replace(/[\s.-]/g, ''))
+  
+  // Add version with spaces/dots converted to hyphens (s-nature)
+  variations.add(normalized.replace(/[\s.]/g, '-'))
+  
+  // Add version with hyphens/spaces converted to dots (s.nature)
+  variations.add(normalized.replace(/[\s-]/g, '.'))
+  
+  // Add version with hyphens/dots converted to spaces (s nature)
+  variations.add(normalized.replace(/[-.]/g, ' '))
+  
+  return Array.from(variations)
+}
+
 // Enhanced search functions with timeout and error handling
 async function searchBooks(query: string, maxResults: number = 8) {
   if (isCircuitOpen('books')) {
@@ -381,57 +404,58 @@ serve(async (req) => {
       
       // First: Search for exact and prefix slug matches (highest priority)
       // Also search parent slugs to find child products by brand name
-      const slugQuery = query.toLowerCase().trim()
-      console.log('🔍 Searching with slug query:', slugQuery)
+      const searchVariations = normalizeSearchQuery(query)
+      console.log('🔍 Search variations:', searchVariations)
       
-      // Execute separate queries to avoid PostgREST .or() string issues with spaces
-      const [exactSlugResult, prefixSlugResult] = await Promise.allSettled([
+      // Execute queries for all search variations
+      const slugSearchPromises = searchVariations.flatMap(variation => [
         // Exact slug match
         supabase
           .from('entities')
           .select('*, parent_id')
-          .eq('slug', slugQuery)
+          .eq('slug', variation)
           .eq('is_deleted', false)
           .limit(limit),
         // Prefix slug match
         supabase
           .from('entities')
           .select('*, parent_id')
-          .ilike('slug', `${slugQuery}%`)
+          .ilike('slug', `${variation}%`)
           .eq('is_deleted', false)
           .limit(limit)
       ])
       
-      // Parent-slug subquery approach: Find parent entities by exact slug AND prefix slug
-      console.log('🔍 Searching for parent entities by slug (exact + prefix):', slugQuery)
-      const [exactParentResult, prefixParentResult] = await Promise.allSettled([
+      const slugSearchResults = await Promise.allSettled(slugSearchPromises)
+      
+      // Parent-slug subquery approach: Find parent entities using all variations
+      console.log('🔍 Searching for parent entities using variations')
+      const parentSearchPromises = searchVariations.flatMap(variation => [
         // Exact parent slug match
         supabase
           .from('entities')
           .select('id')
-          .eq('slug', slugQuery)
+          .eq('slug', variation)
           .eq('is_deleted', false),
         // Prefix parent slug match (e.g., "skin" finds "skin1004")
         supabase
           .from('entities')
           .select('id')
-          .ilike('slug', `${slugQuery}%`)
+          .ilike('slug', `${variation}%`)
           .eq('is_deleted', false)
       ])
       
+      const parentSearchResults = await Promise.allSettled(parentSearchPromises)
+      
       const parentIds: string[] = []
-      
-      if (exactParentResult.status === 'fulfilled' && exactParentResult.value.data) {
-        parentIds.push(...exactParentResult.value.data.map((p: any) => p.id))
-      }
-      
-      if (prefixParentResult.status === 'fulfilled' && prefixParentResult.value.data) {
-        parentIds.push(...prefixParentResult.value.data.map((p: any) => p.id))
-      }
+      parentSearchResults.forEach(result => {
+        if (result.status === 'fulfilled' && result.value.data) {
+          parentIds.push(...result.value.data.map((p: any) => p.id))
+        }
+      })
       
       // Deduplicate parent IDs
       const uniqueParentIds = [...new Set(parentIds)]
-      console.log(`🔍 Found ${uniqueParentIds.length} parent entities for slug: ${slugQuery}`)
+      console.log(`🔍 Found ${uniqueParentIds.length} parent entities from variations`)
       
       // Then find children of those parents
       let childEntities: any[] = []
@@ -454,108 +478,100 @@ serve(async (req) => {
       // Combine all slug search results
       const slugEntities: any[] = []
       
-      if (exactSlugResult.status === 'fulfilled') {
-        if (exactSlugResult.value.error) {
-          console.error('❌ Exact slug search failed:', exactSlugResult.value.error)
-        } else if (exactSlugResult.value.data) {
-          slugEntities.push(...exactSlugResult.value.data)
+      slugSearchResults.forEach(result => {
+        if (result.status === 'fulfilled') {
+          if (result.value.error) {
+            console.error('❌ Slug search failed:', result.value.error)
+          } else if (result.value.data) {
+            slugEntities.push(...result.value.data)
+          }
         }
-      }
-      
-      if (prefixSlugResult.status === 'fulfilled') {
-        if (prefixSlugResult.value.error) {
-          console.error('❌ Prefix slug search failed:', prefixSlugResult.value.error)
-        } else if (prefixSlugResult.value.data) {
-          slugEntities.push(...prefixSlugResult.value.data)
-        }
-      }
+      })
       
       // Add child entities from parent-slug subquery
       slugEntities.push(...childEntities)
       
       // Log any rejected promises
-      const slugErrors = [exactSlugResult, prefixSlugResult]
+      const slugErrors = slugSearchResults
         .filter(r => r.status === 'rejected')
         .map(r => (r as PromiseRejectedResult).reason)
       if (slugErrors.length > 0) {
         console.error('❌ Slug search rejected promises:', slugErrors)
       }
       
-      console.log(`✅ Found ${slugEntities.length} slug-based entities`)
+      // Deduplicate slug entities by ID
+      const uniqueSlugEntities = Array.from(
+        new Map(slugEntities.map(entity => [entity.id, entity])).values()
+      )
       
-      // Second: Search for broader matches in name, description, slug, and parent slug
-      console.log('🔍 Searching with broad query:', query)
+      console.log(`✅ Found ${uniqueSlugEntities.length} unique slug-based entities (from ${slugEntities.length} total matches)`)
       
-      // Execute separate queries to avoid PostgREST .or() string issues with spaces
-      const [nameResult, descResult, slugResult] = await Promise.allSettled([
+      // Second: Search for broader matches in name, description, slug using all variations
+      console.log('🔍 Searching with broad queries using variations')
+      
+      // Execute queries for all search variations
+      const broadSearchPromises = searchVariations.flatMap(variation => [
         // Name match
         supabase
           .from('entities')
           .select('*, parent_id')
-          .ilike('name', `%${query}%`)
+          .ilike('name', `%${variation}%`)
           .eq('is_deleted', false)
           .limit(limit),
         // Description match
         supabase
           .from('entities')
           .select('*, parent_id')
-          .ilike('description', `%${query}%`)
+          .ilike('description', `%${variation}%`)
           .eq('is_deleted', false)
           .limit(limit),
         // Slug match
         supabase
           .from('entities')
           .select('*, parent_id')
-          .ilike('slug', `%${query}%`)
+          .ilike('slug', `%${variation}%`)
           .eq('is_deleted', false)
           .limit(limit)
       ])
       
+      const broadSearchResults = await Promise.allSettled(broadSearchPromises)
+      
       // Combine all broad search results with proper error checking
       const broadEntities: any[] = []
       
-      if (nameResult.status === 'fulfilled') {
-        if (nameResult.value.error) {
-          console.error('❌ Name search failed:', nameResult.value.error)
-        } else if (nameResult.value.data) {
-          broadEntities.push(...nameResult.value.data)
+      broadSearchResults.forEach(result => {
+        if (result.status === 'fulfilled') {
+          if (result.value.error) {
+            console.error('❌ Broad search failed:', result.value.error)
+          } else if (result.value.data) {
+            broadEntities.push(...result.value.data)
+          }
         }
-      }
-      
-      if (descResult.status === 'fulfilled') {
-        if (descResult.value.error) {
-          console.error('❌ Description search failed:', descResult.value.error)
-        } else if (descResult.value.data) {
-          broadEntities.push(...descResult.value.data)
-        }
-      }
-      
-      if (slugResult.status === 'fulfilled') {
-        if (slugResult.value.error) {
-          console.error('❌ Slug search failed:', slugResult.value.error)
-        } else if (slugResult.value.data) {
-          broadEntities.push(...slugResult.value.data)
-        }
-      }
+      })
       
       // Log any rejected promises
-      const broadErrors = [nameResult, descResult, slugResult]
+      const broadErrors = broadSearchResults
         .filter(r => r.status === 'rejected')
         .map(r => (r as PromiseRejectedResult).reason)
       if (broadErrors.length > 0) {
         console.error('❌ Broad search rejected promises:', broadErrors)
       }
       
-      console.log(`✅ Found ${broadEntities.length} broad-match entities`)
+      // Deduplicate broad entities by ID
+      const uniqueBroadEntities = Array.from(
+        new Map(broadEntities.map(entity => [entity.id, entity])).values()
+      )
+      
+      console.log(`✅ Found ${uniqueBroadEntities.length} unique broad-match entities (from ${broadEntities.length} total matches)`)
       
       // Merge results: slug matches first, then broad matches (deduplicated)
-      const slugEntityIds = new Set((slugEntities || []).map((e: any) => e.id))
+      const slugEntityIds = new Set(uniqueSlugEntities.map((e: any) => e.id))
       const mergedEntities = [
-        ...(slugEntities || []),
-        ...(broadEntities || []).filter((e: any) => !slugEntityIds.has(e.id))
+        ...uniqueSlugEntities,
+        ...uniqueBroadEntities.filter((e: any) => !slugEntityIds.has(e.id))
       ].slice(0, limit)
       
-      console.log(`🎯 Found ${slugEntities?.length || 0} slug matches, ${(broadEntities || []).length} broad matches`)
+      console.log(`🎯 Found ${uniqueSlugEntities.length} unique slug matches, ${uniqueBroadEntities.length} unique broad matches, ${mergedEntities.length} total merged`)
       
       // Hydrate parent slugs for entities with parent_id
       async function hydrateParents(entities: any[]) {
