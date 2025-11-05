@@ -138,9 +138,9 @@ serve(async (req) => {
 
     // Final fallback if all methods failed
     if (!description) {
-      description = `${brandName} is a beauty and skincare brand.`;
+      description = 'no description';
       descriptionSource = 'fallback';
-      console.log(`   ℹ️ Using generic fallback description`);
+      console.log(`   ℹ️ Using fallback: "no description"`);
     }
 
     console.log(`   → Description: ${description.substring(0, 50)}... (source: ${descriptionSource})`);
@@ -198,11 +198,29 @@ function scoreWebsiteResult(item: any, brandName: string): number {
     // +10: Domain contains exact brand name
     if (domain.includes(brandLower)) score += 10;
     
+    // +15: Domain is very similar to brand name (e.g., "yogabar" matches "yogabars.in")
+    const domainBase = domain.split('.')[0]; // Extract "yogabars" from "yogabars.in"
+    const brandSimplified = brandLower.replace(/\s+/g, ''); // "yogabar"
+    if (domainBase === brandSimplified || 
+        domainBase === brandSimplified + 's' || 
+        brandSimplified === domainBase + 's') {
+      score += 15;
+    }
+    
     // +5: Title contains "official" or "brand"
     if (title.includes('official') || title.includes('brand')) score += 5;
     
     // +3: Title contains brand name
     if (title.includes(brandLower)) score += 3;
+    
+    // -15: Design agencies and portfolio sites
+    const agencyPatterns = [
+      '/work/', '/portfolio/', '/case-study/', '/projects/',
+      'behance', 'dribbble', 'agency', 'studio', 'design'
+    ];
+    if (agencyPatterns.some(pattern => link.includes(pattern))) {
+      score -= 15;
+    }
     
     // -20: Known marketplace/retailer domains
     if (matchesExclusion(link, [
@@ -257,8 +275,13 @@ async function findOfficialWebsite(brandName: string, apiKey: string, cxId: stri
 
     console.log(`   Scored ${scoredResults.length} results, best score: ${scoredResults[0]?.score}`);
 
-    // Only return if best score is positive
-    return scoredResults[0]?.score > 0 ? scoredResults[0].url : null;
+    // GUARDRAIL: Only accept if score >= 10 (prevents portfolio/aggregator sites)
+    if (scoredResults[0]?.score >= 10) {
+      return scoredResults[0].url;
+    }
+    
+    console.log(`   ❌ No website met quality threshold (best: ${scoredResults[0]?.score})`);
+    return null;
   } catch (error) {
     console.error('Website search error:', error);
     return null;
@@ -443,8 +466,8 @@ async function searchBrandLogo(
     
     const bestLogo = scoredImages[0];
     
-    // Accept if score >= -5 (lenient threshold)
-    if (bestLogo && bestLogo.score >= -5) {
+    // GUARDRAIL: Only accept if score > 0 (prevents low-quality images)
+    if (bestLogo && bestLogo.score > 0) {
       console.log(`   ✅ Selected logo with score: ${bestLogo.score}`);
       return bestLogo.url;
     }
@@ -495,8 +518,8 @@ async function scrapeDescription(websiteUrl: string, brandName: string): Promise
       return aboutDescription;
     }
 
-    // Fallback: generic but accurate description
-    return `${brandName} is a beauty and skincare brand.`;
+    // Return null if scraping failed
+    return null;
   } catch (error) {
     console.error('Scraping error:', error);
     return null;
