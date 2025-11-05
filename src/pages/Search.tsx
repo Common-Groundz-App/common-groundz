@@ -14,7 +14,7 @@ import { ReviewResultItem } from '@/components/search/ReviewResultItem';
 import { RecommendationResultItem } from '@/components/search/RecommendationResultItem';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
-import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Clock, Star, Globe, ChevronDown, ChevronUp, Hash } from 'lucide-react';
+import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Star, Globe, ChevronDown, ChevronUp, Hash, Plus } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
@@ -697,32 +697,28 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Enhanced Deep Search CTA for all tabs when no results */}
+                          {/* Add Entity CTA - Replaces Deep Search */}
                           {searchMode === 'quick' && (
                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
-                              <h3 className="text-lg font-semibold mb-2">🔍 Want more comprehensive results?</h3>
-                              <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
-                                Deep Search analyzes multiple sources including specialized APIs for movies, books, places, and products
-                                <br />
-                                <span className="text-xs italic">(Enhanced search across all categories - may take up to 2 minutes)</span>
+                              <h3 className="text-lg font-semibold mb-2">
+                                ❓ Couldn't find what you're looking for?
+                              </h3>
+                              <p className="text-sm text-muted-foreground mb-1 max-w-lg mx-auto">
+                                Help us build the most comprehensive database by adding missing entities
+                              </p>
+                              <p className="text-xs text-muted-foreground/70 mb-4 max-w-lg mx-auto italic">
+                                Contribute books, movies, places, products, and more to help other users discover great content
                               </p>
                               <Button 
-                                onClick={handleDeepSearch}
+                                onClick={() => {
+                                  console.log('TODO: Open create entity dialog for:', query);
+                                  // Will be functional in next phase
+                                }}
                                 variant="default"
                                 className="bg-brand-orange hover:bg-brand-orange/90"
-                                disabled={isDeepSearching}
                               >
-                                {isDeepSearching ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Deep searching all categories...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock className="w-4 h-4 mr-2" />
-                                    Run Deep Search
-                                  </>
-                                )}
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Entity
                               </Button>
                             </div>
                           )}
@@ -881,32 +877,28 @@ const Search = () => {
                             <ShoppingBag className="h-5 w-5" /> Products
                           </h2>
                           
-                          {/* Deep Search CTA for products tab */}
+                          {/* Add Entity CTA for products tab - Replaces Deep Search */}
                           {searchMode === 'quick' && filteredResults.externalResults.length === 0 && (
-                            <div className="mb-8 p-4 border border-dashed rounded-lg text-center bg-muted/20 min-w-0">
-                              <h3 className="text-lg font-semibold mb-2">🔍 Didn't find what you're looking for?</h3>
-                              <p className="text-sm text-muted-foreground mb-4 max-w-lg mx-auto">
-                                Try Deep Search to find comprehensive results from across the web
-                                <br />
-                                <span className="text-xs italic">(May take up to 2 minutes for in-depth results)</span>
+                            <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
+                              <h3 className="text-lg font-semibold mb-2">
+                                ❓ Couldn't find what you're looking for?
+                              </h3>
+                              <p className="text-sm text-muted-foreground mb-1 max-w-lg mx-auto">
+                                Help us build the most comprehensive database by adding missing entities
+                              </p>
+                              <p className="text-xs text-muted-foreground/70 mb-4 max-w-lg mx-auto italic">
+                                Contribute books, movies, places, products, and more to help other users discover great content
                               </p>
                               <Button 
-                                onClick={handleDeepSearch}
+                                onClick={() => {
+                                  console.log('TODO: Open create entity dialog for:', query);
+                                  // Will be functional in next phase
+                                }}
                                 variant="default"
                                 className="bg-brand-orange hover:bg-brand-orange/90"
-                                disabled={isDeepSearching}
                               >
-                                {isDeepSearching ? (
-                                  <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Searching deeply...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Clock className="w-4 h-4 mr-2" />
-                                    Run Deep Search
-                                  </>
-                                )}
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Entity
                               </Button>
                             </div>
                           )}
