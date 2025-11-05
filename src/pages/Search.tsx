@@ -371,10 +371,9 @@ const Search = () => {
             {/* Already on Groundz section */}
             {allLocalResults.length > 0 && (
               <div className="mb-4">
-                <div className="flex items-center justify-between px-2 py-1">
+                <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-md">
                   <h3 className="text-sm font-medium flex items-center gap-2">
-                    <Star className="w-4 h-4 text-yellow-500" />
-                    Already on Groundz
+                    ✨ Already on Groundz
                   </h3>
                   {allLocalResults.length > 3 && (
                     <Button
@@ -391,12 +390,12 @@ const Search = () => {
                     </Button>
                   )}
                 </div>
-                <div className="space-y-1">
-                  {(dropdownShowAll.localResults ? allLocalResults : allLocalResults.slice(0, 3)).map((item) => (
+                <div className="space-y-0">
+                  {(dropdownShowAll.localResults ? allLocalResults : allLocalResults.slice(0, 3)).map((item, index, arr) => (
                     <div
                       key={item.id}
                       onClick={() => handleDropdownItemClick(getResultDisplayName(item))}
-                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                      className={`cursor-pointer hover:bg-muted rounded p-2 transition-colors ${index < arr.length - 1 ? 'border-b border-border/50' : ''}`}
                     >
                       {renderLocalResultItem(item)}
                     </div>
@@ -408,10 +407,9 @@ const Search = () => {
             {/* Books section */}
             {dropdownResults.categorized?.books?.length > 0 && (
               <div className="mb-4">
-                <div className="flex items-center justify-between px-2 py-1">
+                <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-md">
                   <h3 className="text-sm font-medium flex items-center gap-2">
-                    <Book className="w-4 h-4" />
-                    Books
+                    📚 Books
                   </h3>
                   {dropdownResults.categorized.books.length > 3 && (
                     <Button
@@ -428,12 +426,12 @@ const Search = () => {
                     </Button>
                   )}
                 </div>
-                <div className="space-y-1">
-                  {(dropdownShowAll.books ? dropdownResults.categorized.books : dropdownResults.categorized.books.slice(0, 3)).map((book, index) => (
+                <div className="space-y-0">
+                  {(dropdownShowAll.books ? dropdownResults.categorized.books : dropdownResults.categorized.books.slice(0, 3)).map((book, index, arr) => (
                     <div
                       key={`${book.api_source}-${book.api_ref || index}`}
                       onClick={() => handleDropdownItemClick(book.name)}
-                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                      className={`cursor-pointer hover:bg-muted rounded p-2 transition-colors ${index < arr.length - 1 ? 'border-b border-border/50' : ''}`}
                     >
                       <SearchResultHandler
                         result={book}
@@ -448,10 +446,9 @@ const Search = () => {
             {/* Movies section */}
             {dropdownResults.categorized?.movies?.length > 0 && (
               <div className="mb-4">
-                <div className="flex items-center justify-between px-2 py-1">
+                <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-md">
                   <h3 className="text-sm font-medium flex items-center gap-2">
-                    <Film className="w-4 h-4" />
-                    Movies
+                    🎬 Movies
                   </h3>
                   {dropdownResults.categorized.movies.length > 3 && (
                     <Button
@@ -468,12 +465,12 @@ const Search = () => {
                     </Button>
                   )}
                 </div>
-                <div className="space-y-1">
-                  {(dropdownShowAll.movies ? dropdownResults.categorized.movies : dropdownResults.categorized.movies.slice(0, 3)).map((movie, index) => (
+                <div className="space-y-0">
+                  {(dropdownShowAll.movies ? dropdownResults.categorized.movies : dropdownResults.categorized.movies.slice(0, 3)).map((movie, index, arr) => (
                     <div
                       key={`${movie.api_source}-${movie.api_ref || index}`}
                       onClick={() => handleDropdownItemClick(movie.name)}
-                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                      className={`cursor-pointer hover:bg-muted rounded p-2 transition-colors ${index < arr.length - 1 ? 'border-b border-border/50' : ''}`}
                     >
                       <SearchResultHandler
                         result={movie}
@@ -488,10 +485,9 @@ const Search = () => {
             {/* Places section */}
             {dropdownResults.categorized?.places?.length > 0 && (
               <div className="mb-2">
-                <div className="flex items-center justify-between px-2 py-1">
+                <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-md">
                   <h3 className="text-sm font-medium flex items-center gap-2">
-                    <MapPin className="w-4 h-4" />
-                    Places
+                    📍 Places
                   </h3>
                   {dropdownResults.categorized.places.length > 3 && (
                     <Button
@@ -508,12 +504,12 @@ const Search = () => {
                     </Button>
                   )}
                 </div>
-                <div className="space-y-1">
-                  {(dropdownShowAll.places ? dropdownResults.categorized.places : dropdownResults.categorized.places.slice(0, 3)).map((place, index) => (
+                <div className="space-y-0">
+                  {(dropdownShowAll.places ? dropdownResults.categorized.places : dropdownResults.categorized.places.slice(0, 3)).map((place, index, arr) => (
                     <div
                       key={`${place.api_source}-${place.api_ref || index}`}
                       onClick={() => handleDropdownItemClick(place.name)}
-                      className="cursor-pointer hover:bg-muted rounded p-2 transition-colors"
+                      className={`cursor-pointer hover:bg-muted rounded p-2 transition-colors ${index < arr.length - 1 ? 'border-b border-border/50' : ''}`}
                     >
                       <SearchResultHandler
                         result={place}
@@ -524,10 +520,47 @@ const Search = () => {
                 </div>
               </div>
             )}
+
+            {/* Add Entity CTA */}
+            {hasResults && (
+              <div className="bg-muted/30 border-t border-border/50 p-4 text-center">
+                <p className="text-sm text-muted-foreground mb-2">
+                  Couldn't find "{searchQuery}"?
+                </p>
+                <Button 
+                  variant="gradient"
+                  size="sm"
+                  onClick={() => {
+                    console.log('Create entity for:', searchQuery);
+                    setShowDropdown(false);
+                  }}
+                  className="gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Entity
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="p-4 text-center text-sm text-muted-foreground">
-            No results found for "{searchQuery}"
+          <div className="p-2">
+            <div className="bg-muted/30 border border-border/50 rounded-lg p-4 text-center">
+              <p className="text-sm text-muted-foreground mb-2">
+                Couldn't find "{searchQuery}"?
+              </p>
+              <Button 
+                variant="gradient"
+                size="sm"
+                onClick={() => {
+                  console.log('Create entity for:', searchQuery);
+                  setShowDropdown(false);
+                }}
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Entity
+              </Button>
+            </div>
           </div>
         )}
       </div>
