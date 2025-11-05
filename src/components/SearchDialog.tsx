@@ -5,7 +5,7 @@ import {
   DialogContent,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Search, X, Loader2, ChevronDown, ChevronUp, AlertCircle, Hash } from 'lucide-react';
+import { Search, X, Loader2, ChevronDown, ChevronUp, AlertCircle, Hash, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { UserResultItem } from './search/UserResultItem';
 import { EntityResultItem } from './search/EntityResultItem';
@@ -292,18 +292,20 @@ export function SearchDialog({ open, onOpenChange }: SearchDialogProps) {
               </div>
             )}
 
-            {/* Search More Option */}
+            {/* Add Entity CTA */}
             {shouldShowDropdown && (
-              <div className="p-3 text-center border-t">
+              <div className="p-3 text-center bg-muted/30 border-t">
+                <p className="text-xs text-muted-foreground mb-2">
+                  Couldn't find "<span className="font-medium text-foreground">{query}</span>"?
+                </p>
                 <button 
-                  className="text-sm text-primary hover:underline flex items-center justify-center w-full"
+                  className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
                   onClick={() => {
-                    navigate(`/search?q=${encodeURIComponent(query)}&mode=quick`);
-                    onOpenChange(false);
+                    console.log('Create entity for:', query);
                   }}
                 >
-                  <Search className="w-3 h-3 mr-1" />
-                  Search More
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Entity
                 </button>
               </div>
             )}
