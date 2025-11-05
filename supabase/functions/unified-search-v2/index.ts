@@ -134,6 +134,18 @@ function normalizeSearchQuery(query: string): string[] {
   // Add version with hyphens/dots converted to spaces (s nature)
   variations.add(normalized.replace(/[-.]/g, ' '))
   
+  // Handle single-letter prefixes (e.g., "snature" → "s-nature", "s.nature")
+  if (normalized.length > 1 && !/[\s.-]/.test(normalized)) {
+    // If query has no separators, try adding them after first character
+    // This handles brands like "S.NATURE", "L'OREAL", etc.
+    const firstChar = normalized.charAt(0)
+    const rest = normalized.slice(1)
+    
+    variations.add(`${firstChar}-${rest}`)  // "s-nature"
+    variations.add(`${firstChar}.${rest}`)  // "s.nature"
+    variations.add(`${firstChar} ${rest}`)  // "s nature"
+  }
+  
   return Array.from(variations)
 }
 
