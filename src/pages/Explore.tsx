@@ -9,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { PillTabs } from '@/components/ui/pill-tabs';
 import { UserDirectoryList } from '@/components/explore/UserDirectoryList';
-import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils, Menu as MenuIcon, X, AlertCircle } from 'lucide-react';
+import { Filter, Users, Search, Film, BookOpen, MapPin, ShoppingBag, Loader2, ChevronDown, ChevronUp, Star, Utensils, Menu as MenuIcon, X, AlertCircle, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -423,18 +423,23 @@ const Explore = () => {
                     </div>
                   )}
 
-                  {/* Complex Product Search Option */}
-                  {searchQuery.length >= 2 && (
-                    <div className="p-3 text-center border-t bg-background">
-                      <button 
-                        className="text-sm text-primary hover:underline flex items-center justify-center w-full"
-                        onClick={handleComplexProductSearch}
-                      >
-                        <Search className="w-3 h-3 mr-1" />
-                        Search for "{searchQuery}" in more sources
-                      </button>
-                    </div>
-                  )}
+              {/* Add Entity CTA */}
+              {searchQuery.length >= 1 && (
+                <div className="p-3 text-center bg-muted/30 border-t">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Couldn't find "<span className="font-medium text-foreground">{searchQuery}</span>"?
+                  </p>
+                  <button 
+                    className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
+                    onClick={() => {
+                      console.log('Create entity for:', searchQuery);
+                    }}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Entity
+                  </button>
+                </div>
+              )}
 
                   {/* No Results State */}
                   {!hasLocalResults && !hasExternalResults && !hasHashtagResults && !isLoading && (
