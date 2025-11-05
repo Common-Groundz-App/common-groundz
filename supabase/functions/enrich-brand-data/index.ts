@@ -222,6 +222,15 @@ function scoreWebsiteResult(item: any, brandName: string): number {
       score -= 15;
     }
     
+    // -20: Aggregator/hosting platform domains
+    if (matchesExclusion(link, [
+      'lovable.me', 'vercel.app', 'netlify.app', 'github.io',
+      'herokuapp.com', 'replit.dev', 'glitch.me', 'cloudflare.pages.dev',
+      'surge.sh', 'render.com', 'railway.app'
+    ])) {
+      score -= 20;
+    }
+    
     // -20: Known marketplace/retailer domains
     if (matchesExclusion(link, [
       DOMAIN_CONFIG.MAJOR_MARKETPLACES,
