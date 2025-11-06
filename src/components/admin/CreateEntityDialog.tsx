@@ -1793,6 +1793,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 filterByEntityType={formData.type}
                 disabled={loading}
                 mode="drill-down"
+                required={true}
               />
             )}
 

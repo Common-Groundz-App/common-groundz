@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +38,7 @@ export const TagInput: React.FC<TagInputProps> = ({
   const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debouncedInput = useDebounce(input, 300);
+  const containerRef = useRef<HTMLDivElement>(null);
   
   // Load tag suggestions based on debounced input
   useEffect(() => {
@@ -163,7 +164,7 @@ export const TagInput: React.FC<TagInputProps> = ({
   const isInputDisabled = disabled || loading || isMaxReached;
   
   return (
-    <div className={`space-y-2 ${className}`}>
+    <div ref={containerRef} className={`space-y-2 ${className}`}>
       {/* Label with tag count and clear button */}
       <div className="flex items-center justify-between">
         <Label htmlFor="tag-input">
@@ -221,7 +222,13 @@ export const TagInput: React.FC<TagInputProps> = ({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => setShowSuggestions(true)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+          onBlur={() => {
+            setTimeout(() => {
+              if (containerRef.current && !containerRef.current.contains(document.activeElement)) {
+                setShowSuggestions(false);
+              }
+            }, 0);
+          }}
           disabled={isInputDisabled}
           aria-autocomplete="list"
           aria-controls="tag-suggestions"

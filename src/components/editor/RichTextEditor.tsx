@@ -149,10 +149,26 @@ export function RichTextEditor({
   }, [editor, value]);
 
   return (
-    <div className={cn('border rounded-md', className)}>
+    <div className={cn(
+      'border rounded-md overflow-hidden',
+      editable && 'resize-y min-h-[180px] max-h-[500px]',
+      className
+    )}>
       {editable && !minimal && <MenuBar editor={editor} />}
-      <div className="p-3">
-        <EditorContent editor={editor} className="prose prose-sm max-w-none" />
+      <div className={cn(
+        'p-3 overflow-y-auto cursor-text',
+        editable && 'min-h-[100px]'
+      )}>
+        <EditorContent 
+          editor={editor} 
+          className={cn(
+            'prose prose-sm max-w-none',
+            '[&_.ProseMirror]:outline-none',
+            '[&_.ProseMirror:focus]:outline-none',
+            '[&_.ProseMirror]:cursor-text',
+            '[&_.ProseMirror]:min-h-[60px]'
+          )}
+        />
       </div>
     </div>
   );
