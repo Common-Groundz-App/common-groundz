@@ -276,14 +276,29 @@ const Explore = () => {
                 <div className="pl-3 text-muted-foreground shrink-0">
                   <Search size={18} />
                 </div>
-                <Input
-                  type="text"
-                  placeholder="Search for people, places, food, products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0"
-                />
+                <div className="relative flex-1 min-w-0">
+                  <Input
+                    type="text"
+                    placeholder="Search for people, places, food, products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0 pr-10"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        handleCancelProcessing();
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
+                      type="button"
+                      aria-label="Clear search query"
+                    >
+                      <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  )}
+                </div>
                 {searchQuery && (
                   <Button 
                     variant="default" 
