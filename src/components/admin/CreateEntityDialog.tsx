@@ -1668,12 +1668,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       {/* Site Name with External Link */}
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-xs text-muted-foreground truncate">
+                      <a 
+                        href={urlMetadata.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 mb-1 hover:opacity-80 transition-opacity group"
+                      >
+                        <span className="text-xs text-muted-foreground truncate group-hover:text-foreground transition-colors">
                           {urlMetadata.siteName || getSafeDomain(urlMetadata.url)}
                         </span>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                      </div>
+                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />
+                      </a>
                       
                       {/* Product Title */}
                       {urlMetadata.title && (

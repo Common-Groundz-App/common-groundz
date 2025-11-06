@@ -148,13 +148,13 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
             {pred.additional_data && Object.keys(pred.additional_data).length > 0 && (
               <div className="space-y-2 pt-2 border-t">
                 <Label className="text-xs text-muted-foreground">Additional Information</Label>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid gap-2 text-xs">
                   {Object.entries(pred.additional_data).map(([key, value]) => (
-                    <div key={key} className="flex justify-between">
-                      <span className="text-muted-foreground capitalize">
+                    <div key={key} className="flex flex-col gap-0.5">
+                      <span className="text-muted-foreground capitalize font-medium">
                         {key.replace(/_/g, ' ')}:
                       </span>
-                      <span className="font-medium">{String(value)}</span>
+                      <span className="text-foreground">{String(value)}</span>
                     </div>
                   ))}
                 </div>
