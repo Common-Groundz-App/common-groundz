@@ -130,6 +130,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     metadataCache.current.set(url, { data, timestamp: Date.now() });
   };
 
+  // Safe domain extraction helper
+  const getSafeDomain = (url: string | undefined): string => {
+    if (!url) return 'Unknown source';
+    try {
+      return new URL(url).hostname;
+    } catch (error) {
+      console.warn('Invalid URL for domain extraction:', url);
+      return 'Unknown source';
+    }
+  };
+
   // URL metadata persistence constants (variant-aware)
   const METADATA_STORAGE_KEY = `entity_url_metadata_preview-${variant}`;
   const METADATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
@@ -1570,9 +1581,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        {/* URL Hero Section - User variant only */}
-        {variant === 'user' && (
-          <div className="space-y-4 animate-fade-in">
+        {/* URL Hero Section - Available for both variants */}
+        <div className="space-y-4 animate-fade-in">
             {/* URL Auto-Fill Hero Card */}
             <div className="relative overflow-hidden rounded-lg border-2 border-brand-orange/30 bg-gradient-to-br from-brand-orange/5 to-transparent p-6 shadow-sm">
               <div className="flex items-start gap-3 mb-4">
@@ -1639,21 +1649,58 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 </Button>
               </div>
               
-              {/* Show URL preview if metadata exists */}
+              {/* Rich URL Preview */}
               {urlMetadata && (
-                <div className="mt-3 p-3 bg-background/60 rounded border border-border/50">
-                  <div className="flex items-center gap-2 text-sm">
-                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-muted-foreground truncate flex-1">
-                      {urlMetadata.title || urlMetadata.url}
-                    </span>
+                <div className="mt-3 p-3 bg-background/80 rounded-lg border border-border shadow-sm">
+                  <div className="flex items-center gap-3">
+                    {/* Favicon */}
+                    {urlMetadata.favicon && (
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                        <img 
+                          src={urlMetadata.favicon} 
+                          alt="Site icon"
+                          className="w-6 h-6 object-contain"
+                          onError={(e) => e.currentTarget.style.display = 'none'}
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      {/* Site Name with External Link */}
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className="text-xs text-muted-foreground truncate">
+                          {urlMetadata.siteName || getSafeDomain(urlMetadata.url)}
+                        </span>
+                        <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                      </div>
+                      
+                      {/* Product Title */}
+                      {urlMetadata.title && (
+                        <p className="text-sm font-medium text-foreground line-clamp-2">
+                          {urlMetadata.title}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Thumbnail Image */}
+                    {urlMetadata.image && (
+                      <div className="flex-shrink-0 w-12 h-12 rounded overflow-hidden bg-muted">
+                        <img 
+                          src={urlMetadata.image}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => e.currentTarget.style.display = 'none'}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
             
-            {/* Manual Entry Button - Only show when form is collapsed */}
-            {!isFormExpanded && !urlAnalysisComplete && (
+            {/* Manual Entry Button - Only show for user variant when form is collapsed */}
+            {variant === 'user' && !isFormExpanded && !urlAnalysisComplete && (
               <div className="flex items-center justify-center py-2">
                 <button
                   onClick={() => setIsFormExpanded(true)}
@@ -1664,8 +1711,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 </button>
               </div>
             )}
-          </div>
-        )}
+        </div>
 
         {/* Show tabs immediately for admin, or after expansion/analysis for users */}
         {(variant === 'admin' || isFormExpanded || urlAnalysisComplete) && (
