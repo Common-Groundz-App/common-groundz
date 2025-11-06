@@ -39,6 +39,7 @@ export const TagInput: React.FC<TagInputProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const debouncedInput = useDebounce(input, 300);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   
   // Load tag suggestions based on debounced input
   useEffect(() => {
@@ -69,6 +70,28 @@ export const TagInput: React.FC<TagInputProps> = ({
     
     loadSuggestions();
   }, [debouncedInput, value]);
+  
+  // Click-away handler to close suggestions
+  useEffect(() => {
+    const handleClickAway = (event: MouseEvent) => {
+      // Only hide suggestions if click is outside container AND suggestions are showing
+      if (
+        showSuggestions &&
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+
+    // Add listener when suggestions are visible
+    if (showSuggestions) {
+      document.addEventListener('mousedown', handleClickAway);
+      return () => {
+        document.removeEventListener('mousedown', handleClickAway);
+      };
+    }
+  }, [showSuggestions]);
   
   // Add existing tag from suggestions
   const handleAddTag = (tag: Tag) => {
@@ -156,6 +179,10 @@ export const TagInput: React.FC<TagInputProps> = ({
       setInput('');
       setSuggestions([]);
       setShowSuggestions(false);
+    } else if (e.key === 'Tab') {
+      // Close suggestions when tabbing away for clean keyboard navigation
+      setShowSuggestions(false);
+      // Don't preventDefault - let Tab work normally
     }
   };
   
@@ -212,6 +239,7 @@ export const TagInput: React.FC<TagInputProps> = ({
       {/* Tag input with autocomplete */}
       <div className="relative">
         <Input
+          ref={inputRef}
           id="tag-input"
           placeholder={
             isMaxReached 
@@ -222,13 +250,6 @@ export const TagInput: React.FC<TagInputProps> = ({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => setShowSuggestions(true)}
-          onBlur={() => {
-            setTimeout(() => {
-              if (containerRef.current && !containerRef.current.contains(document.activeElement)) {
-                setShowSuggestions(false);
-              }
-            }, 0);
-          }}
           disabled={isInputDisabled}
           aria-autocomplete="list"
           aria-controls="tag-suggestions"
@@ -254,7 +275,10 @@ export const TagInput: React.FC<TagInputProps> = ({
               <div
                 key={tag.id}
                 className="px-3 py-2 hover:bg-accent cursor-pointer flex justify-between items-center transition-colors"
-                onClick={() => handleAddTag(tag)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleAddTag(tag);
+                }}
                 role="option"
                 aria-selected={false}
               >
