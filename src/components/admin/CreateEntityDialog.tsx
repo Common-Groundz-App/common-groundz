@@ -108,6 +108,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [urlMismatchMessage, setUrlMismatchMessage] = useState('');
   const [urlMetadata, setUrlMetadata] = useState<any>(null);
   
+  // Progressive disclosure state (user variant only)
+  const [isFormExpanded, setIsFormExpanded] = useState(variant === 'admin'); // Admin always expanded
+  const [urlAnalysisComplete, setUrlAnalysisComplete] = useState(false);
+  
   // Metadata cache with TTL
   const metadataCache = useRef(new Map<string, { data: any; timestamp: number }>());
   
@@ -218,6 +222,15 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       loadDraft();
     }
   }, [open]);
+
+  // Auto-expand form when draft is restored (user variant only)
+  useEffect(() => {
+    if (draftRestored && variant === 'user') {
+      setIsFormExpanded(true);
+      setUrlAnalysisComplete(true); // Mark URL workflow as complete
+      console.log('📝 Auto-expanding form - draft restored');
+    }
+  }, [draftRestored, variant]);
 
   // Prefill name field when opening in user mode with search query
   useEffect(() => {
@@ -682,6 +695,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setFieldErrors({});
     setAiFilledFields(new Set());
     
+    // Reset progressive disclosure state (user variant only)
+    if (variant === 'user') {
+      setIsFormExpanded(false);
+      setUrlAnalysisComplete(false);
+    }
+    
     // Clear draft from sessionStorage
     try {
       sessionStorage.removeItem(DRAFT_KEY);
@@ -835,6 +854,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         setShowPreviewModal(true);
       }
       
+      // Auto-expand form after URL analysis (user variant)
+      if (variant === 'user') {
+        setUrlAnalysisComplete(true);
+        setIsFormExpanded(true);
+      }
+      
     } catch (error: any) {
       console.error('❌ URL Analysis Error:', error);
       toast({
@@ -842,6 +867,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         description: error.message || "Failed to analyze URL. Please try again.",
         variant: "destructive"
       });
+      
+      // Expand form even on error so user can proceed manually
+      if (variant === 'user') {
+        setIsFormExpanded(true);
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -1540,8 +1570,92 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="basic" className="space-y-4">
-          <TabsList className="relative flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px]">
+        {/* URL Hero Section - User variant only */}
+        {variant === 'user' && (
+          <div className="space-y-4 animate-fade-in">
+            {/* URL Auto-Fill Hero Card */}
+            <div className="relative overflow-hidden rounded-lg border-2 border-brand-orange/30 bg-gradient-to-br from-brand-orange/5 to-transparent p-6 shadow-sm">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-brand-orange/10 flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-brand-orange" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-base font-semibold text-foreground mb-1">
+                    ✨ Quick Add from URL
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Paste a link from Goodreads, IMDb, Amazon, App Store, or any website to instantly fill details
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Input
+                  id="analyze_url_hero"
+                  value={analyzeUrl}
+                  onChange={(e) => {
+                    const newUrl = e.target.value;
+                    setAnalyzeUrl(newUrl);
+                    setShowAnalyzeButton(isValidUrl(newUrl));
+                    if (urlMetadata && newUrl !== urlMetadata.url) {
+                      setUrlMetadata(null);
+                    }
+                  }}
+                  placeholder="https://www.goodreads.com/book/show/..."
+                  disabled={loading || analyzing}
+                  className="flex-1 bg-background"
+                />
+                <Button
+                  onClick={handleAnalyzeUrl}
+                  disabled={!showAnalyzeButton || analyzing || loading}
+                  className="gap-2 min-w-[100px]"
+                >
+                  {analyzing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      Analyze
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {/* Show URL preview if metadata exists */}
+              {urlMetadata && (
+                <div className="mt-3 p-3 bg-background/60 rounded border border-border/50">
+                  <div className="flex items-center gap-2 text-sm">
+                    <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-muted-foreground truncate flex-1">
+                      {urlMetadata.title || urlMetadata.url}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Manual Entry Button - Only show when form is collapsed */}
+            {!isFormExpanded && !urlAnalysisComplete && (
+              <div className="flex items-center justify-center py-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsFormExpanded(true)}
+                  className="gap-2 text-muted-foreground hover:text-foreground"
+                >
+                  <span className="text-sm">or enter details manually</span>
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Show tabs immediately for admin, or after expansion/analysis for users */}
+        {(variant === 'admin' || isFormExpanded || urlAnalysisComplete) && (
+          <Tabs defaultValue="basic" className="space-y-4 animate-fade-in">
+            <TabsList className="relative flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px]">
             {shouldShowTab('basic') && (
               <TabsTrigger value="basic" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center">
                 Basic Info
@@ -1570,308 +1684,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           </TabsList>
 
           <TabsContent value="basic" className="space-y-4">
-            {/* Analyze URL Input - Collapsible for users, expanded for admin */}
-            {variant === 'user' ? (
-              <Collapsible defaultOpen={false}>
-                <div className="space-y-2 p-4 border-2 border-dashed border-primary/20 rounded-lg bg-primary/5">
-                  <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-left">
-                    <Sparkles className="w-4 h-4" />
-                    <span>Auto-Fill from URL (Optional)</span>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 space-y-2">
-                    <p className="text-xs text-muted-foreground">
-                      Paste any URL (Goodreads, IMDb, Amazon, App Store, etc.) to automatically extract entity details
-                    </p>
-                    <div className="flex gap-2">
-                      <Input
-                        id="analyze_url"
-                        value={analyzeUrl}
-                        onChange={(e) => {
-                          const newUrl = e.target.value;
-                          setAnalyzeUrl(newUrl);
-                          setShowAnalyzeButton(isValidUrl(newUrl));
-                          
-                          // Clear preview only if URL is different from current metadata URL
-                          if (urlMetadata && newUrl !== urlMetadata.url) {
-                            setUrlMetadata(null);
-                          }
-                        }}
-                        placeholder="https://www.goodreads.com/book/show/5907..."
-                        disabled={loading || analyzing}
-                        className="flex-1"
-                      />
-                      {showAnalyzeButton && (
-                        <Button
-                          type="button"
-                          variant="default"
-                          onClick={handleAnalyzeUrl}
-                          disabled={loading || analyzing}
-                          className="shrink-0"
-                        >
-                          {analyzing ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Analyzing...
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="h-4 w-4 mr-2" />
-                              Analyze
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                    
-                    {/* URL Preview Card */}
-                    {urlMetadata && (
-                      <a 
-                        href={urlMetadata.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="block mt-3 border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 transition-colors group relative"
-                      >
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setUrlMetadata(null);
-                            setAnalyzeUrl('');
-                            setShowAnalyzeButton(false);
-                            clearUrlMetadataFromStorage();
-                          }}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                        <div className="flex items-start gap-3">
-                          {urlMetadata.favicon && (
-                            <img 
-                              src={urlMetadata.favicon} 
-                              alt="Site icon"
-                              className="w-6 h-6 rounded flex-shrink-0"
-                              onError={(e) => e.currentTarget.style.display = 'none'}
-                            />
-                          )}
-                          <div className="flex-1 min-w-0 pr-8">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-xs text-muted-foreground">{urlMetadata.siteName}</span>
-                              <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                            </div>
-                            <h4 className="font-medium text-sm mb-1 line-clamp-1">{urlMetadata.title}</h4>
-                            <p className="text-xs text-muted-foreground line-clamp-2">{urlMetadata.description}</p>
-                          </div>
-                          {urlMetadata.image && (
-                            <div className="relative flex-shrink-0">
-                              <img 
-                                src={urlMetadata.image} 
-                                alt="Preview"
-                                className="w-20 h-20 object-cover rounded"
-                                onError={(e) => e.currentTarget.style.display = 'none'}
-                              />
-                              {/* Image count badge */}
-                              {urlMetadata.images && urlMetadata.images.length > 1 && (
-                                <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                                  +{urlMetadata.images.length - 1}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </a>
-                    )}
-
-                    {/* Enhanced Extraction Badge */}
-                    {urlMetadata?.partialExtraction ? (
-                      <div className="mt-3 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 flex items-start gap-2">
-                        <Info className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 text-sm">
-                          <p className="font-medium text-orange-900 dark:text-orange-100 mb-1">
-                            ⚠️ Image Extraction Failed
-                          </p>
-                          <p className="text-orange-700 dark:text-orange-300 text-xs">
-                            Unable to extract images from this source. You can manually upload images below.
-                            {urlMetadata.blockedReason && (
-                              <span className="block text-orange-600 dark:text-orange-400 mt-1">
-                                Reason: {urlMetadata.blockedReason}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    ) : urlMetadata?.blocked && (
-                      <div className="mt-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2">
-                        <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1 text-sm">
-                          <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
-                            Enhanced Extraction Used
-                          </p>
-                          <p className="text-blue-700 dark:text-blue-300 text-xs">
-                            This site blocks standard requests. We used ScraperAPI to fetch authentic product images directly from the source.
-                            {urlMetadata.blockedReason && (
-                              <span className="block text-blue-600 dark:text-blue-400 mt-1">
-                                Reason: {urlMetadata.blockedReason}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </CollapsibleContent>
-                </div>
-              </Collapsible>
-            ) : (
-              <div className="space-y-2 p-4 border-2 border-dashed border-primary/20 rounded-lg bg-primary/5">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="analyze_url" className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span className="font-semibold">Auto-Fill from URL (Optional)</span>
-                  </Label>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Paste any URL (Goodreads, IMDb, Amazon, App Store, etc.) to automatically extract entity details
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    id="analyze_url"
-                    value={analyzeUrl}
-                    onChange={(e) => {
-                      const newUrl = e.target.value;
-                      setAnalyzeUrl(newUrl);
-                      setShowAnalyzeButton(isValidUrl(newUrl));
-                      
-                      // Clear preview only if URL is different from current metadata URL
-                      if (urlMetadata && newUrl !== urlMetadata.url) {
-                        setUrlMetadata(null);
-                      }
-                    }}
-                    placeholder="https://www.goodreads.com/book/show/5907..."
-                    disabled={loading || analyzing}
-                    className="flex-1"
-                  />
-                  {showAnalyzeButton && (
-                    <Button
-                      type="button"
-                      variant="default"
-                      onClick={handleAnalyzeUrl}
-                      disabled={loading || analyzing}
-                      className="shrink-0"
-                    >
-                      {analyzing ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-2" />
-                          Analyze
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-                
-                {/* URL Preview Card */}
-                {urlMetadata && (
-                  <a 
-                    href={urlMetadata.url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="block mt-3 border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 transition-colors group relative"
-                  >
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setUrlMetadata(null);
-                        setAnalyzeUrl('');
-                        setShowAnalyzeButton(false);
-                        clearUrlMetadataFromStorage();
-                      }}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                    <div className="flex items-start gap-3">
-                      {urlMetadata.favicon && (
-                        <img 
-                          src={urlMetadata.favicon} 
-                          alt="Site icon"
-                          className="w-6 h-6 rounded flex-shrink-0"
-                          onError={(e) => e.currentTarget.style.display = 'none'}
-                        />
-                      )}
-                      <div className="flex-1 min-w-0 pr-8">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs text-muted-foreground">{urlMetadata.siteName}</span>
-                          <ExternalLink className="h-3 w-3 text-muted-foreground" />
-                        </div>
-                        <h4 className="font-medium text-sm mb-1 line-clamp-1">{urlMetadata.title}</h4>
-                        <p className="text-xs text-muted-foreground line-clamp-2">{urlMetadata.description}</p>
-                      </div>
-                      {urlMetadata.image && (
-                        <div className="relative flex-shrink-0">
-                          <img 
-                            src={urlMetadata.image} 
-                            alt="Preview"
-                            className="w-20 h-20 object-cover rounded"
-                            onError={(e) => e.currentTarget.style.display = 'none'}
-                          />
-                          {/* Image count badge */}
-                          {urlMetadata.images && urlMetadata.images.length > 1 && (
-                            <div className="absolute bottom-1 right-1 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded">
-                              +{urlMetadata.images.length - 1}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </a>
-                )}
-
-                {/* Enhanced Extraction Badge */}
-                {urlMetadata?.partialExtraction ? (
-                  <div className="mt-3 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-lg p-3 flex items-start gap-2">
-                    <Info className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 text-sm">
-                      <p className="font-medium text-orange-900 dark:text-orange-100 mb-1">
-                        ⚠️ Image Extraction Failed
-                      </p>
-                      <p className="text-orange-700 dark:text-orange-300 text-xs">
-                        Unable to extract images from this source. You can manually upload images below.
-                        {urlMetadata.blockedReason && (
-                          <span className="block text-orange-600 dark:text-orange-400 mt-1">
-                            Reason: {urlMetadata.blockedReason}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                ) : urlMetadata?.blocked && (
-                  <div className="mt-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 flex items-start gap-2">
-                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 text-sm">
-                      <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
-                        Enhanced Extraction Used
-                      </p>
-                      <p className="text-blue-700 dark:text-blue-300 text-xs">
-                        This site blocks standard requests. We used ScraperAPI to fetch authentic product images directly from the source.
-                        {urlMetadata.blockedReason && (
-                          <span className="block text-blue-600 dark:text-blue-400 mt-1">
-                            Reason: {urlMetadata.blockedReason}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -2145,6 +1957,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             </div>
           </TabsContent>
         </Tabs>
+        )}
 
         <div className="flex justify-end gap-2 pt-4 border-t">
           <Button variant="outline" onClick={() => {
