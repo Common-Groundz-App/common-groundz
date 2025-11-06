@@ -52,6 +52,9 @@ const Explore = () => {
   const [processingEntityName, setProcessingEntityName] = useState('');
   const [processingMessage, setProcessingMessage] = useState('');
   
+  // Dropdown state for search
+  const [showDropdown, setShowDropdown] = useState(true); // Always show when shouldShowDropdown is true
+  
   // Trending hashtags state
   const [trendingHashtags, setTrendingHashtags] = useState<HashtagWithCount[]>([]);
   const [trendingLoading, setTrendingLoading] = useState(true);
@@ -446,12 +449,6 @@ const Explore = () => {
                       setCreateEntityQuery(searchQuery);
                       setShowCreateEntityDialog(true);
                       setShowDropdown(false);
-                    }}
-                  >
-                    <Plus className="w-3 h-3 mr-1" />
-                    Add Entity
-                  </button>
-                      console.log('Create entity for:', searchQuery);
                     }}
                   >
                     <Plus className="w-3 h-3 mr-1" />
