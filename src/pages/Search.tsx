@@ -18,6 +18,8 @@ import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCirc
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
+import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
+import { useToast } from '@/hooks/use-toast';
 
 const Search = () => {
   const isMobile = useIsMobile();
@@ -37,6 +39,10 @@ const Search = () => {
     users: false
   });
 
+  // Create entity dialog state
+  const [showCreateEntityDialog, setShowCreateEntityDialog] = useState(false);
+  const [createEntityQuery, setCreateEntityQuery] = useState('');
+
   // Dropdown state for search suggestions
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownShowAll, setDropdownShowAll] = useState({
@@ -45,6 +51,8 @@ const Search = () => {
     movies: false,
     places: false
   });
+
+  const { toast } = useToast();
 
   // Tab items configuration matching Explore page
   const tabItems = [
@@ -75,7 +83,8 @@ const Search = () => {
     error,
     showAllResults,
     toggleShowAll,
-    searchMode
+    searchMode,
+    refetch
   } = useEnhancedRealtimeSearch(query, { mode: mode as 'quick' | 'deep' });
 
   // Separate hook for dropdown search suggestions
@@ -530,7 +539,8 @@ const Search = () => {
                 <button 
                   className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
                   onClick={() => {
-                    console.log('Create entity for:', searchQuery);
+                    setCreateEntityQuery(searchQuery);
+                    setShowCreateEntityDialog(true);
                     setShowDropdown(false);
                   }}
                 >
@@ -548,7 +558,8 @@ const Search = () => {
             <button 
               className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
               onClick={() => {
-                console.log('Create entity for:', searchQuery);
+                setCreateEntityQuery(searchQuery);
+                setShowCreateEntityDialog(true);
                 setShowDropdown(false);
               }}
             >
@@ -1006,6 +1017,22 @@ const Search = () => {
           </div>
         </div>
       </div>
+      
+      {/* Create Entity Dialog */}
+      <CreateEntityDialog
+        open={showCreateEntityDialog}
+        onOpenChange={setShowCreateEntityDialog}
+        onEntityCreated={() => {
+          refetch();
+          toast({
+            title: "Entity created",
+            description: "Your entity has been added successfully!",
+          });
+        }}
+        variant="user"
+        prefillName={createEntityQuery}
+        showPreviewTab={false}
+      />
       
       {/* Mobile Bottom Navigation - only show on screens smaller than xl */}
       <div className="xl:hidden">

@@ -29,6 +29,9 @@ import { TrendingHashtags } from '@/components/hashtag/TrendingHashtags';
 import { enhancedExploreService } from '@/services/enhancedExploreService';
 import { getTrendingHashtags, HashtagWithCount } from '@/services/hashtagService';
 
+import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
+import { useToast } from '@/hooks/use-toast';
+
 const Explore = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -37,6 +40,12 @@ const Explore = () => {
   const [activeTab, setActiveTab] = useState('featured');
   const [isDropdownClosing, setIsDropdownClosing] = useState(false);
   const navigate = useNavigate();
+
+  // Create entity dialog state
+  const [showCreateEntityDialog, setShowCreateEntityDialog] = useState(false);
+  const [createEntityQuery, setCreateEntityQuery] = useState('');
+  
+  const { toast } = useToast();
 
   // Page-level loading state for entities
   const [isProcessingEntity, setIsProcessingEntity] = useState(false);
@@ -71,7 +80,9 @@ const Explore = () => {
     loadingStates, 
     error,
     showAllResults,
-    toggleShowAll
+    toggleShowAll,
+    searchMode,
+    refetch
   } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
 
   const handleResultClick = async (entityId?: string, entityType?: string) => {
@@ -432,6 +443,14 @@ const Explore = () => {
                   <button 
                     className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
                     onClick={() => {
+                      setCreateEntityQuery(searchQuery);
+                      setShowCreateEntityDialog(true);
+                      setShowDropdown(false);
+                    }}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Add Entity
+                  </button>
                       console.log('Create entity for:', searchQuery);
                     }}
                   >
@@ -560,6 +579,22 @@ const Explore = () => {
           </div>
         </div>
       )}
+      
+      {/* Create Entity Dialog */}
+      <CreateEntityDialog
+        open={showCreateEntityDialog}
+        onOpenChange={setShowCreateEntityDialog}
+        onEntityCreated={() => {
+          refetch();
+          toast({
+            title: "Entity created",
+            description: "Your entity has been added successfully!",
+          });
+        }}
+        variant="user"
+        prefillName={createEntityQuery}
+        showPreviewTab={false}
+      />
     </div>
   );
 };

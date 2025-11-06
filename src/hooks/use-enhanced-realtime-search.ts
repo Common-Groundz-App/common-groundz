@@ -9,6 +9,7 @@ export interface SearchLoading {
   external: boolean;
 }
 
+
 export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'quick' | 'deep' }) => {
   const [results, setResults] = useState<UnifiedSearchResults & { categorized: Record<string, any[]>; hashtags?: any[] }>({
     users: [],
@@ -37,6 +38,7 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
     places: false,
     hashtags: false
   });
+  const [refetchToken, setRefetchToken] = useState(0);
   
   // Default to quick mode if not specified
   const searchMode = options?.mode || 'quick';
@@ -144,7 +146,13 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
     // Reduced debounce for faster response
     const debounceTimer = setTimeout(performSearch, 200);
     return () => clearTimeout(debounceTimer);
-  }, [query, searchMode]);
+  }, [query, searchMode, refetchToken]);
+
+  // Add refetch helper
+  const refetch = () => {
+    console.log('🔄 Manual refetch triggered');
+    setRefetchToken(prev => prev + 1);
+  };
 
   return { 
     results, 
@@ -153,6 +161,7 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
     error,
     showAllResults,
     toggleShowAll,
-    searchMode
+    searchMode,
+    refetch
   };
 };

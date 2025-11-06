@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -41,21 +42,29 @@ interface CreateEntityDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEntityCreated: () => void;
+  variant?: 'admin' | 'user';        // Default: 'admin' (backward compatible)
+  showPreviewTab?: boolean;           // Default: true (backward compatible)
+  prefillName?: string;               // Optional: search query to prefill
 }
 
 export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   open,
   onOpenChange,
-  onEntityCreated
+  onEntityCreated,
+  variant = 'admin',           // ✅ Admin default keeps existing behavior
+  showPreviewTab = true,       // ✅ Preview tab shown by default
+  prefillName                  // ✅ Optional prefill for user mode
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [draftCheckComplete, setDraftCheckComplete] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
   
-  const DRAFT_KEY = 'create-entity-draft';
+  // Variant-aware storage keys for isolated drafts
+  const DRAFT_KEY = `create-entity-draft-${variant}`;
   
   const [formData, setFormData] = useState({
     name: '',
@@ -117,8 +126,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     metadataCache.current.set(url, { data, timestamp: Date.now() });
   };
 
-  // URL metadata persistence constants
-  const METADATA_STORAGE_KEY = 'entity_url_metadata_preview';
+  // URL metadata persistence constants (variant-aware)
+  const METADATA_STORAGE_KEY = `entity_url_metadata_preview-${variant}`;
   const METADATA_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
   // Save URL metadata to localStorage with expiration
@@ -198,13 +207,38 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         }
       } catch (error) {
         console.error('Failed to load draft:', error);
+      } finally {
+        // ✅ Always mark draft check as complete (whether draft found or not)
+        setDraftCheckComplete(true);
       }
     };
 
     if (open) {
+      setDraftCheckComplete(false); // Reset when dialog opens
       loadDraft();
     }
   }, [open]);
+
+  // Prefill name field when opening in user mode with search query
+  useEffect(() => {
+    // Only proceed in user mode with prefillName provided
+    if (variant !== 'user' || !prefillName) return;
+    
+    // Wait for draft check to complete
+    if (!draftCheckComplete) return;
+    
+    // ✅ Only prefill if NO draft was restored (fresh dialog)
+    if (draftRestored) {
+      console.log('📝 Skipping prefill - draft was restored');
+      return;
+    }
+    
+    // Only prefill if name field is still empty
+    if (!formData.name || formData.name.trim() === '') {
+      console.log('📝 Pre-filling entity name from search:', prefillName);
+      setFormData(prev => ({ ...prev, name: prefillName }));
+    }
+  }, [variant, prefillName, draftCheckComplete, draftRestored, formData.name]);
 
   // Tag autocomplete
 
@@ -347,8 +381,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const getVisibleTabs = () => {
     const typeConfig = entityTypeConfig[formData.type];
     const baseTabs = typeConfig ? typeConfig.showTabs : ['basic'];
-    // Always add preview tab at the end
-    return [...baseTabs, 'preview'];
+    
+    // Only add preview tab if explicitly allowed
+    return showPreviewTab ? [...baseTabs, 'preview'] : baseTabs;
   };
   
   const shouldShowTab = (tabName: string) => {
@@ -635,6 +670,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setUploadedMedia([]);
     setShowMediaUploadModal(false);
     setDraftRestored(false);
+    setDraftCheckComplete(false);
     setOtherTypeReason('');
     setPrimaryMediaUrl(null);
     setSelectedTags([]);
@@ -1199,6 +1235,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
 
   const handleSubmit = async () => {
+    // Gate submission for user variant
+    if (variant === 'user' && !user) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please sign in to create entities',
+        variant: 'destructive'
+      });
+      return;
+    }
+
     if (!formData.name.trim() || !formData.type) {
       toast({
         title: 'Validation Error',
@@ -1481,11 +1527,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Create New Entity
+            {variant === 'user' ? 'Add to CommonGroundz' : 'Create New Entity'}
             {draftRestored && <span className="text-sm text-muted-foreground ml-2">(Draft restored)</span>}
           </DialogTitle>
           <DialogDescription>
-            Add a new entity with business hours and contact information
+            {variant === 'user' 
+              ? 'Share what you love with the community'
+              : 'Add a new entity with business hours and contact information'
+            }
           </DialogDescription>
         </DialogHeader>
 
