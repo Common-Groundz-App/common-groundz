@@ -448,7 +448,8 @@ const Explore = () => {
                     onClick={() => {
                       setCreateEntityQuery(searchQuery);
                       setShowCreateEntityDialog(true);
-                      setShowDropdown(false);
+                      setIsDropdownClosing(true);
+                      setTimeout(() => setIsDropdownClosing(false), 300);
                     }}
                   >
                     <Plus className="w-3 h-3 mr-1" />

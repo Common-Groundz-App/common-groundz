@@ -747,7 +747,8 @@ const Search = () => {
                               </p>
                               <Button 
                                 onClick={() => {
-                                  console.log('Create entity from search:', query);
+                                  setCreateEntityQuery(query);
+                                  setShowCreateEntityDialog(true);
                                 }}
                                 variant="default"
                                 className="bg-brand-orange hover:bg-brand-orange/90"
@@ -905,7 +906,8 @@ const Search = () => {
                               </p>
                               <Button 
                                 onClick={() => {
-                                  console.log('Create entity from search:', query);
+                                  setCreateEntityQuery(query);
+                                  setShowCreateEntityDialog(true);
                                 }}
                                 variant="default"
                                 className="bg-brand-orange hover:bg-brand-orange/90"
