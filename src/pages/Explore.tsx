@@ -229,7 +229,7 @@ const Explore = () => {
   );
 
   // Show dropdown when user has typed at least 1 character and not closing
-  const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1 && !isDropdownClosing;
+  const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1 && !isDropdownClosing && showDropdown;
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
@@ -448,6 +448,7 @@ const Explore = () => {
                     onClick={() => {
                       setCreateEntityQuery(searchQuery);
                       setShowCreateEntityDialog(true);
+                      setShowDropdown(false);
                       setIsDropdownClosing(true);
                       setTimeout(() => setIsDropdownClosing(false), 300);
                     }}
@@ -581,7 +582,12 @@ const Explore = () => {
       {/* Create Entity Dialog */}
       <CreateEntityDialog
         open={showCreateEntityDialog}
-        onOpenChange={setShowCreateEntityDialog}
+        onOpenChange={(open) => {
+          setShowCreateEntityDialog(open);
+          if (!open) {
+            setShowDropdown(true);
+          }
+        }}
         onEntityCreated={() => {
           refetch();
           toast({
