@@ -1527,7 +1527,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {variant === 'user' ? 'Add to CommonGroundz' : 'Create New Entity'}
+            <span className="bg-gradient-to-r from-brand-orange to-brand-orange/80 bg-clip-text text-transparent">
+              {variant === 'user' ? 'Add to CommonGroundz' : 'Create New Entity'}
+            </span>
             {draftRestored && <span className="text-sm text-muted-foreground ml-2">(Draft restored)</span>}
           </DialogTitle>
           <DialogDescription>
@@ -1539,14 +1541,32 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="space-y-4">
-          <TabsList className={`grid w-full grid-cols-${Math.min(getVisibleTabs().length, 5)}`}>
-            {shouldShowTab('basic') && <TabsTrigger value="basic">Basic Info</TabsTrigger>}
-            {shouldShowTab('contact') && <TabsTrigger value="contact">Contact</TabsTrigger>}
-            {shouldShowTab('businessHours') && <TabsTrigger value="hours">Business Hours</TabsTrigger>}
-            {shouldShowTab('details') && formData.type && formData.type !== 'others' && (
-              <TabsTrigger value="details">{getEntityTypeLabel(formData.type)} Details</TabsTrigger>
+          <TabsList className="relative flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border">
+            {shouldShowTab('basic') && (
+              <TabsTrigger value="basic" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none">
+                Basic Info
+              </TabsTrigger>
             )}
-            {shouldShowTab('preview') && <TabsTrigger value="preview">Preview</TabsTrigger>}
+            {shouldShowTab('contact') && (
+              <TabsTrigger value="contact" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none">
+                Contact
+              </TabsTrigger>
+            )}
+            {shouldShowTab('businessHours') && (
+              <TabsTrigger value="hours" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none">
+                Business Hours
+              </TabsTrigger>
+            )}
+            {shouldShowTab('details') && formData.type && formData.type !== 'others' && (
+              <TabsTrigger value="details" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none">
+                {getEntityTypeLabel(formData.type)} Details
+              </TabsTrigger>
+            )}
+            {shouldShowTab('preview') && (
+              <TabsTrigger value="preview" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none">
+                Preview
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="basic" className="space-y-4">
