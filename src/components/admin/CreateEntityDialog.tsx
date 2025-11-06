@@ -1590,21 +1590,36 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               </div>
               
               <div className="flex gap-2">
-                <Input
-                  id="analyze_url_hero"
-                  value={analyzeUrl}
-                  onChange={(e) => {
-                    const newUrl = e.target.value;
-                    setAnalyzeUrl(newUrl);
-                    setShowAnalyzeButton(isValidUrl(newUrl));
-                    if (urlMetadata && newUrl !== urlMetadata.url) {
-                      setUrlMetadata(null);
-                    }
-                  }}
-                  placeholder="https://www.goodreads.com/book/show/..."
-                  disabled={loading || analyzing}
-                  className="flex-1 bg-background"
-                />
+                <div className="relative flex-1">
+                  <Input
+                    id="analyze_url_hero"
+                    value={analyzeUrl}
+                    onChange={(e) => {
+                      const newUrl = e.target.value;
+                      setAnalyzeUrl(newUrl);
+                      setShowAnalyzeButton(isValidUrl(newUrl));
+                      if (urlMetadata && newUrl !== urlMetadata.url) {
+                        setUrlMetadata(null);
+                      }
+                    }}
+                    placeholder="https://www.goodreads.com/book/show/..."
+                    disabled={loading || analyzing}
+                    className="bg-background pr-10"
+                  />
+                  {analyzeUrl && (
+                    <button
+                      onClick={() => {
+                        setAnalyzeUrl('');
+                        setShowAnalyzeButton(false);
+                        setUrlMetadata(null);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
+                      type="button"
+                    >
+                      <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  )}
+                </div>
                 <Button
                   onClick={handleAnalyzeUrl}
                   disabled={!showAnalyzeButton || analyzing || loading}
@@ -1640,13 +1655,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             {/* Manual Entry Button - Only show when form is collapsed */}
             {!isFormExpanded && !urlAnalysisComplete && (
               <div className="flex items-center justify-center py-2">
-                <Button
-                  variant="ghost"
+                <button
                   onClick={() => setIsFormExpanded(true)}
-                  className="gap-2 text-muted-foreground hover:text-foreground"
+                  className="text-sm text-brand-orange hover:text-brand-orange/80 transition-colors relative after:content-[''] after:absolute after:left-0 after:right-0 after:-bottom-0.5 after:h-px after:bg-brand-orange after:scale-x-0 after:transition-transform after:duration-200 hover:after:scale-x-100"
+                  type="button"
                 >
-                  <span className="text-sm">or enter details manually</span>
-                </Button>
+                  Or Enter Details Manually
+                </button>
               </div>
             )}
           </div>
