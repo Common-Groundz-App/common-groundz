@@ -26,7 +26,7 @@ import { validateUrlForType, getSuggestedEntityType } from '@/config/urlPatterns
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const MAX_MEDIA_ITEMS = 4;
-import { Plus, Sparkles, Loader2, AlertTriangle, ExternalLink, X, Info } from 'lucide-react';
+import { Plus, Sparkles, Loader2, AlertTriangle, ExternalLink, X, Info, FileText, Phone, Clock, ListTree, Eye } from 'lucide-react';
 import { getOrCreateTag } from '@/services/tagService';
 
 import { EntityType } from '@/services/recommendation/types';
@@ -1523,37 +1523,103 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {variant === 'user' ? 'Add to CommonGroundz' : 'Create New Entity'}
-            {draftRestored && <span className="text-sm text-muted-foreground ml-2">(Draft restored)</span>}
-          </DialogTitle>
-          <DialogDescription>
-            {variant === 'user' 
-              ? 'Share what you love with the community'
-              : 'Add a new entity with business hours and contact information'
-            }
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <style>{`
+        @keyframes glow-pulse {
+          0%, 100% { box-shadow: 0 0 20px rgba(251, 146, 60, 0.2); }
+          50% { box-shadow: 0 0 30px rgba(251, 146, 60, 0.4); }
+        }
+        .animate-glow-pulse:hover {
+          animation: glow-pulse 2s ease-in-out infinite;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+      
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-6 md:p-8">
+          <DialogHeader className="bg-gradient-to-br from-background via-background to-primary/5 pb-4 mb-6 border-b">
+            <DialogTitle className="text-2xl md:text-3xl font-bold tracking-tight">
+              {variant === 'user' ? (
+                <span className="bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+                  Add to CommonGroundz
+                </span>
+              ) : (
+                <span className="bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+                  Create New Entity
+                </span>
+              )}
+              {draftRestored && <span className="text-sm text-muted-foreground ml-2 font-normal">(Draft restored)</span>}
+            </DialogTitle>
+            <DialogDescription className="text-base text-muted-foreground mt-2">
+              {variant === 'user' 
+                ? 'Share what you love with the community'
+                : 'Add a new entity with business hours and contact information'
+              }
+            </DialogDescription>
+          </DialogHeader>
 
-        <Tabs defaultValue="basic" className="space-y-4">
-          <TabsList className={`grid w-full grid-cols-${Math.min(getVisibleTabs().length, 5)}`}>
-            {shouldShowTab('basic') && <TabsTrigger value="basic">Basic Info</TabsTrigger>}
-            {shouldShowTab('contact') && <TabsTrigger value="contact">Contact</TabsTrigger>}
-            {shouldShowTab('businessHours') && <TabsTrigger value="hours">Business Hours</TabsTrigger>}
-            {shouldShowTab('details') && formData.type && formData.type !== 'others' && (
-              <TabsTrigger value="details">{getEntityTypeLabel(formData.type)} Details</TabsTrigger>
-            )}
-            {shouldShowTab('preview') && <TabsTrigger value="preview">Preview</TabsTrigger>}
-          </TabsList>
+        <Tabs defaultValue="basic" className="space-y-6">
+          <div className="overflow-x-auto scrollbar-hide -mx-6 px-6 md:mx-0 md:px-0">
+            <TabsList className={`grid w-full grid-cols-${Math.min(getVisibleTabs().length, 5)} bg-muted/50 backdrop-blur-sm border border-border/50 rounded-xl p-1.5 shadow-sm`}>
+              {shouldShowTab('basic') && (
+                <TabsTrigger 
+                  value="basic"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-300 flex items-center gap-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  Basic Info
+                </TabsTrigger>
+              )}
+              {shouldShowTab('contact') && (
+                <TabsTrigger 
+                  value="contact"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-300 flex items-center gap-2"
+                >
+                  <Phone className="h-4 w-4" />
+                  Contact
+                </TabsTrigger>
+              )}
+              {shouldShowTab('businessHours') && (
+                <TabsTrigger 
+                  value="hours"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-300 flex items-center gap-2"
+                >
+                  <Clock className="h-4 w-4" />
+                  Business Hours
+                </TabsTrigger>
+              )}
+              {shouldShowTab('details') && formData.type && formData.type !== 'others' && (
+                <TabsTrigger 
+                  value="details"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-300 flex items-center gap-2"
+                >
+                  <ListTree className="h-4 w-4" />
+                  {getEntityTypeLabel(formData.type)} Details
+                </TabsTrigger>
+              )}
+              {shouldShowTab('preview') && (
+                <TabsTrigger 
+                  value="preview"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-primary/80 data-[state=active]:text-primary-foreground data-[state=active]:shadow-md transition-all duration-300 flex items-center gap-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  Preview
+                </TabsTrigger>
+              )}
+            </TabsList>
+          </div>
 
-          <TabsContent value="basic" className="space-y-4">
+          <TabsContent value="basic" className="space-y-6 focus-within:ring-2 focus-within:ring-primary/10 rounded-lg p-1">
             {/* Analyze URL Input - Collapsible for users, expanded for admin */}
             {variant === 'user' ? (
               <Collapsible defaultOpen={false}>
-                <div className="space-y-2 p-4 border-2 border-dashed border-primary/20 rounded-lg bg-primary/5">
+                <div className="space-y-2 p-4 border-2 border-primary/30 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur-sm hover:border-primary/40 transition-all duration-300">
                   <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-left">
                     <Sparkles className="w-4 h-4" />
                     <span>Auto-Fill from URL (Optional)</span>
@@ -1586,7 +1652,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                           variant="default"
                           onClick={handleAnalyzeUrl}
                           disabled={loading || analyzing}
-                          className="shrink-0"
+                          className="shrink-0 bg-gradient-to-r from-primary to-orange-600 hover:shadow-lg hover:shadow-primary/30 active:scale-95 transition-all duration-200 animate-glow-pulse"
                         >
                           {analyzing ? (
                             <>
@@ -1609,7 +1675,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                         href={urlMetadata.url} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="block mt-3 border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 transition-colors group relative"
+                        className="block mt-3 border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200 group relative"
                       >
                         <Button
                           variant="ghost"
@@ -1703,7 +1769,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 </div>
               </Collapsible>
             ) : (
-              <div className="space-y-2 p-4 border-2 border-dashed border-primary/20 rounded-lg bg-primary/5">
+              <div className="space-y-2 p-4 border-2 border-primary/30 rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 backdrop-blur-sm">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="analyze_url" className="flex items-center gap-2">
                     <Sparkles className="h-4 w-4 text-primary" />
@@ -1737,7 +1803,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                       variant="default"
                       onClick={handleAnalyzeUrl}
                       disabled={loading || analyzing}
-                      className="shrink-0"
+                      className="shrink-0 bg-gradient-to-r from-primary to-orange-600 hover:shadow-lg hover:shadow-primary/30 active:scale-95 transition-all duration-200 animate-glow-pulse"
                     >
                       {analyzing ? (
                         <>
@@ -1760,7 +1826,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                     href={urlMetadata.url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="block mt-3 border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 transition-colors group relative"
+                    className="block mt-3 border rounded-lg p-4 bg-muted/30 hover:bg-muted/50 hover:shadow-md hover:scale-[1.01] transition-all duration-200 group relative"
                   >
                     <Button
                       variant="ghost"
@@ -1853,9 +1919,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               </div>
             )}
             
+            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent my-6" />
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
+                <Label htmlFor="name" className="text-sm font-medium">Name <span className="text-orange-500">*</span></Label>
                 <Input
                   id="name"
                   value={formData.name}
@@ -1866,7 +1934,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="type">Type *</Label>
+                <Label htmlFor="type" className="text-sm font-medium">Type <span className="text-orange-500">*</span></Label>
                 <Select 
                   value={formData.type} 
                   onValueChange={(value) => handleInputChange('type', value)}
@@ -1886,30 +1954,34 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               </div>
             </div>
 
-            {/* Category Selector */}
-            {formData.type && (
-              <CategorySelector
-                entityType={formData.type as EntityType}
-                value={formData.category_id}
-                onChange={(id) => handleInputChange('category_id', id)}
-                filterByEntityType={formData.type}
-                disabled={loading}
-                mode="drill-down"
-              />
-            )}
+            <div className="rounded-lg border border-border/50 p-4 bg-muted/20 space-y-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Organization</h3>
+              
+              {/* Category Selector */}
+              {formData.type && (
+                <CategorySelector
+                  entityType={formData.type as EntityType}
+                  value={formData.category_id}
+                  onChange={(id) => handleInputChange('category_id', id)}
+                  filterByEntityType={formData.type}
+                  disabled={loading}
+                  mode="drill-down"
+                />
+              )}
 
-            {/* Tag Input */}
-            <TagInput
-              value={selectedTags}
-              onChange={setSelectedTags}
-              disabled={loading}
-              onClearAll={() => setSelectedTags([])}
-            />
+              {/* Tag Input */}
+              <TagInput
+                value={selectedTags}
+                onChange={setSelectedTags}
+                disabled={loading}
+                onClearAll={() => setSelectedTags([])}
+              />
+            </div>
 
             {formData.type === 'others' && (
               <div className="space-y-2 col-span-2">
-                <Label htmlFor="otherTypeReason">
-                  Explain why this entity doesn't fit existing types *
+                <Label htmlFor="otherTypeReason" className="text-sm font-medium">
+                  Explain why this entity doesn't fit existing types <span className="text-orange-500">*</span>
                 </Label>
                 <Textarea
                   id="otherTypeReason"
@@ -1924,7 +1996,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description" className="text-sm font-medium">Description</Label>
               <RichTextEditor
                 value={formData.description}
                 onChange={(json, html) => handleInputChange('description', html)}
@@ -1933,8 +2005,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Entity Media</Label>
+            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent my-6" />
+            
+            <div className="space-y-3 p-4 rounded-lg border border-border/50 bg-muted/20">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Media</h3>
+                <span className="text-xs text-muted-foreground">{uploadedMedia.length}/4</span>
+              </div>
               
               {uploadedMedia.length > 0 && (
                 <CompactMediaGrid
@@ -1982,21 +2059,21 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 variant="outline"
                 onClick={() => setShowMediaUploadModal(true)}
                 disabled={loading || uploadedMedia.length >= 4}
-                className="w-full"
+                className="w-full hover:bg-primary/10 hover:border-primary/30 transition-all duration-200"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 {uploadedMedia.length === 0 ? 'Add Photos & Videos' : `Add More Media (${uploadedMedia.length}/4)`}
               </Button>
               
               {uploadedMedia.length === 0 && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground leading-relaxed">
                   Add up to 4 photos or videos for this entity
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="website_url">Website URL</Label>
+              <Label htmlFor="website_url" className="text-sm font-medium">Website URL</Label>
               <Input
                 id="website_url"
                 value={formData.website_url}
@@ -2004,12 +2081,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 placeholder="https://example.com"
                 disabled={loading}
               />
-              <p className="text-sm text-muted-foreground">Official website (visible to all users)</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Official website (visible to all users)</p>
             </div>
 
             {shouldShowTab('businessHours') && (
               <div className="space-y-2">
-                <Label htmlFor="venue">Venue</Label>
+                <Label htmlFor="venue" className="text-sm font-medium">Venue</Label>
                 <Input
                   id="venue"
                   value={formData.venue}
@@ -2020,14 +2097,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               </div>
             )}
 
+            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent my-6" />
+
             <ParentEntitySelector
               selectedParent={selectedParent}
               onParentChange={setSelectedParent}
-              className="pt-4 border-t"
+              className="pt-4"
             />
           </TabsContent>
 
-          <TabsContent value="contact" className="space-y-4">
+          <TabsContent value="contact" className="space-y-6 focus-within:ring-2 focus-within:ring-primary/10 rounded-lg p-1">
             <ContactInfoEditor
               value={contactInfo}
               onChange={setContactInfo}
@@ -2035,7 +2114,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             />
           </TabsContent>
 
-          <TabsContent value="hours" className="space-y-4">
+          <TabsContent value="hours" className="space-y-6 focus-within:ring-2 focus-within:ring-primary/10 rounded-lg p-1">
             <BusinessHoursEditor
               value={businessHours}
               onChange={setBusinessHours}
@@ -2045,7 +2124,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
           {/* Dynamic Details Tab */}
           {formData.type && formData.type !== 'others' && (
-            <TabsContent value="details" className="space-y-4">
+            <TabsContent value="details" className="space-y-6 focus-within:ring-2 focus-within:ring-primary/10 rounded-lg p-1">
               {(() => {
                 const typeConfig = entityTypeConfig[formData.type];
                 if (!typeConfig || !typeConfig.fieldGroups) return null;
@@ -2074,10 +2153,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           )}
           
           {/* Preview JSON Tab */}
-          <TabsContent value="preview" className="space-y-4">
+          <TabsContent value="preview" className="space-y-6 focus-within:ring-2 focus-within:ring-primary/10 rounded-lg p-1">
             <div className="space-y-2">
               <Label className="text-base font-semibold">Final Data Structure</Label>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Review the data that will be saved to the database. Check for any missing or incorrect values.
               </p>
             </div>
@@ -2126,15 +2205,31 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           </TabsContent>
         </Tabs>
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => {
-            resetForm();
-            onOpenChange(false);
-          }} disabled={loading}>
+        <div className="flex justify-end gap-3 pt-6 mt-6 border-t bg-gradient-to-r from-muted/30 to-background -mx-6 px-6 -mb-6 pb-6 md:-mx-8 md:px-8">
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              resetForm();
+              onOpenChange(false);
+            }} 
+            disabled={loading}
+            className="hover:bg-muted transition-colors"
+          >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Creating...' : 'Create Entity'}
+          <Button 
+            onClick={handleSubmit} 
+            disabled={loading}
+            className="bg-gradient-to-r from-primary via-primary to-orange-600 hover:shadow-lg hover:shadow-primary/30 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 transition-all duration-200"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              'Create Entity'
+            )}
           </Button>
         </div>
       </DialogContent>
@@ -2204,6 +2299,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+      </Dialog>
+    </>
   );
 };
