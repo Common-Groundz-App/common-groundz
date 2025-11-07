@@ -33,10 +33,8 @@ import { EntityType } from '@/services/recommendation/types';
 import { getEntityTypeLabel, getActiveEntityTypes } from '@/services/entityTypeHelpers';
 import { Database } from '@/integrations/supabase/types';
 import { CategorySelector } from './CategorySelector';
-import { TagInput } from './TagInput';
+import { SimpleTagInput } from './SimpleTagInput';
 import { AutoFillPreviewModal } from './AutoFillPreviewModal';
-
-type Tag = Database['public']['Tables']['tags']['Row'];
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -95,8 +93,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [otherTypeReason, setOtherTypeReason] = useState('');
   const [primaryMediaUrl, setPrimaryMediaUrl] = useState<string | null>(null);
   
-  // Tag input state
-  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  // Tag input state (string-based for simplicity)
+  const [selectedTagNames, setSelectedTagNames] = useState<string[]>([]);
   
   // URL analysis state
   const [analyzeUrl, setAnalyzeUrl] = useState('');
@@ -208,7 +206,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           setUploadedMedia(draft.uploadedMedia || []);
           setOtherTypeReason(draft.otherTypeReason || '');
           setPrimaryMediaUrl(draft.primaryMediaUrl || null);
-          setSelectedTags(draft.selectedTags || []);
+          setSelectedTagNames(draft.selectedTagNames || []);
           setDraftRestored(true);
         }
         
@@ -280,7 +278,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           uploadedMedia,
           otherTypeReason,
           primaryMediaUrl,
-          selectedTags
+          selectedTagNames
         };
         sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       } catch (error) {
@@ -697,7 +695,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setDraftCheckComplete(false);
     setOtherTypeReason('');
     setPrimaryMediaUrl(null);
-    setSelectedTags([]);
+    setSelectedTagNames([]);
     setAnalyzeUrl('');
     setShowAnalyzeButton(false);
     setAiPredictions(null);
@@ -1101,29 +1099,23 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         console.log('🏷️ Creating/fetching tags:', pred.tags);
         
         try {
-          // Fetch or create all tags in parallel
-          const tagPromises = pred.tags.map((tagName: string) => 
-            getOrCreateTag(tagName)
-          );
-          
-          const realTags = await Promise.all(tagPromises);
-          
-          setSelectedTags(realTags); // Set with real database IDs
+          // Just use tag names directly - no need to fetch Tag objects
+          setSelectedTagNames(pred.tags); // Set tag names
           filledFields.add('tags');
           appliedCount++;
           
-          console.log('✅ Tags ready with real IDs:', realTags.map(t => t.id));
+          console.log('✅ Tags ready:', pred.tags);
         } catch (tagError) {
-          console.error('❌ Failed to create/fetch tags:', tagError);
+          console.error('❌ Failed to set tags:', tagError);
           toast({
-            title: "Tag Creation Failed",
-            description: "Some tags couldn't be created. You can add them manually.",
+            title: "Tag Application Failed",
+            description: "Some tags couldn't be applied. You can add them manually.",
             variant: "default"
           });
           // Continue without tags rather than failing entirely
         }
       } else {
-        setSelectedTags([]); // Clear when empty array
+        setSelectedTagNames([]); // Clear when empty array
       }
     }
     
@@ -1420,20 +1412,31 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
       if (error) throw error;
 
-      // Save tags
-      if (newEntity && selectedTags.length > 0) {
-        const tagAssignments = selectedTags.map(tag => ({
-          entity_id: newEntity.id,
-          tag_id: tag.id,
-          created_by: user?.id
-        }));
-        
-        const { error: tagsError } = await supabase
-          .from('entity_tags')
-          .insert(tagAssignments);
-        
-        if (tagsError) {
-          console.error('Error saving tags:', tagsError);
+      // Convert tag names to Tag objects and save
+      if (newEntity && selectedTagNames.length > 0) {
+        try {
+          // Convert all tag names to Tag objects (creates if needed)
+          const tagObjects = await Promise.all(
+            selectedTagNames.map(name => getOrCreateTag(name))
+          );
+          
+          // Create tag assignments
+          const tagAssignments = tagObjects.map(tag => ({
+            entity_id: newEntity.id,
+            tag_id: tag.id,
+            created_by: user?.id
+          }));
+          
+          const { error: tagsError } = await supabase
+            .from('entity_tags')
+            .insert(tagAssignments);
+          
+          if (tagsError) {
+            console.error('Error saving tags:', tagsError);
+          }
+        } catch (tagError) {
+          console.error('Error creating tags:', tagError);
+          // Non-fatal - entity already created, just log the error
         }
       }
 
@@ -1798,11 +1801,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             )}
 
             {/* Tag Input */}
-            <TagInput
-              value={selectedTags}
-              onChange={setSelectedTags}
+            <SimpleTagInput
+              value={selectedTagNames}
+              onChange={setSelectedTagNames}
               disabled={loading}
-              onClearAll={() => setSelectedTags([])}
+              onClearAll={() => setSelectedTagNames([])}
+              label="Tags"
+              placeholder="Type a tag and press Enter"
+              maxTags={10}
             />
 
             {formData.type === 'others' && (
@@ -2015,7 +2021,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   ...(selectedParent && { parent_id: selectedParent.id, parent_name: selectedParent.name }),
                   
                   // Tags
-                  ...(selectedTags.length > 0 && { tags: selectedTags.map(t => t.name) }),
+                  ...(selectedTagNames.length > 0 && { tags: selectedTagNames }),
                   
                   // Media
                   ...(uploadedMedia.length > 0 && { uploaded_media_count: uploadedMedia.length }),
