@@ -38,8 +38,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'format', label: 'Format', type: 'select', storageColumn: 'metadata', options: ['Hardcover', 'Paperback', 'eBook', 'Audiobook'] },
     ],
     fieldGroups: [
-      { title: '📚 Book Details', icon: '📚', fields: ['authors', 'isbn', 'publication_year', 'languages'] },
-      { title: '📖 Publishing Info', icon: '📖', fields: ['publisher', 'page_count', 'format'] },
+      { title: 'Book Details', icon: '📚', fields: ['authors', 'isbn', 'publication_year', 'languages'] },
+      { title: 'Publishing Info', icon: '📖', fields: ['publisher', 'page_count', 'format'] },
     ]
   },
 
@@ -57,8 +57,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'imdb_id', label: 'IMDb ID', type: 'text', storageColumn: 'metadata', placeholder: 'tt1234567' },
     ],
     fieldGroups: [
-      { title: '🎬 Cast & Crew', icon: '🎬', fields: ['director', 'cast', 'runtime'] },
-      { title: '📊 Movie Details', icon: '📊', fields: ['release_year', 'genres', 'content_rating', 'imdb_id'] },
+      { title: 'Cast & Crew', icon: '🎬', fields: ['director', 'cast', 'runtime'] },
+      { title: 'Movie Details', icon: '📊', fields: ['release_year', 'genres', 'content_rating', 'imdb_id'] },
     ]
   },
 
@@ -77,8 +77,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'status', label: 'Status', type: 'select', storageColumn: 'metadata', options: ['Ongoing', 'Ended', 'Cancelled', 'Upcoming'] },
     ],
     fieldGroups: [
-      { title: '📺 Show Details', icon: '📺', fields: ['release_year', 'network', 'seasons', 'episodes', 'status'] },
-      { title: '🎭 Cast & Info', icon: '🎭', fields: ['cast', 'genres', 'content_rating'] },
+      { title: 'Show Details', icon: '📺', fields: ['release_year', 'network', 'seasons', 'episodes', 'status'] },
+      { title: 'Cast & Info', icon: '🎭', fields: ['cast', 'genres', 'content_rating'] },
     ]
   },
 
@@ -93,8 +93,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'atmosphere', label: 'Atmosphere', type: 'multi-select', storageColumn: 'metadata', options: ['Casual', 'Formal', 'Family-Friendly', 'Romantic', 'Lively', 'Quiet'] },
     ],
     fieldGroups: [
-      { title: '📍 Place Details', icon: '📍', fields: ['location_type', 'price_range', 'atmosphere'] },
-      { title: '♿ Accessibility', icon: '♿', fields: ['accessibility'] },
+      { title: 'Place Details', icon: '📍', fields: ['location_type', 'price_range', 'atmosphere'] },
+      { title: 'Accessibility', icon: '♿', fields: ['accessibility'] },
     ]
   },
 
@@ -110,8 +110,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'meal_type', label: 'Meal Type', type: 'multi-select', storageColumn: 'metadata', options: ['Breakfast', 'Brunch', 'Lunch', 'Dinner', 'Snack', 'Dessert'] },
     ],
     fieldGroups: [
-      { title: '🍽️ Food Details', icon: '🍽️', fields: ['cuisines', 'meal_type', 'price_range'] },
-      { title: '🥗 Dietary Info', icon: '🥗', fields: ['dietary_tags', 'ingredients'] },
+      { title: 'Food Details', icon: '🍽️', fields: ['cuisines', 'meal_type', 'price_range'] },
+      { title: 'Dietary Info', icon: '🥗', fields: ['dietary_tags', 'ingredients'] },
     ]
   },
 
@@ -129,8 +129,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'material', label: 'Material', type: 'text', storageColumn: 'specifications', placeholder: 'e.g., Cotton' },
     ],
     fieldGroups: [
-      { title: '🏷️ Product Info', icon: '🏷️', fields: ['brand', 'price', 'currency', 'characteristics'] },
-      { title: '📏 Specifications', icon: '📏', fields: ['color', 'size', 'material'] },
+      { title: 'Product Info', icon: '🏷️', fields: ['brand', 'price', 'currency', 'characteristics'] },
+      { title: 'Specifications', icon: '📏', fields: ['color', 'size', 'material'] },
     ]
   },
 
@@ -148,8 +148,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'size', label: 'App Size', type: 'text', storageColumn: 'specifications', placeholder: 'e.g., 50 MB' },
     ],
     fieldGroups: [
-      { title: '📱 App Info', icon: '📱', fields: ['platform', 'developer', 'version', 'pricing_model'] },
-      { title: '🔗 Links & Details', icon: '🔗', fields: ['app_store_link', 'play_store_link', 'size'] },
+      { title: 'App Info', icon: '📱', fields: ['platform', 'developer', 'version', 'pricing_model'] },
+      { title: 'Links & Details', icon: '🔗', fields: ['app_store_link', 'play_store_link', 'size'] },
     ]
   },
 
@@ -167,8 +167,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'multiplayer', label: 'Multiplayer', type: 'select', storageColumn: 'specifications', options: ['Single-player', 'Multiplayer', 'Co-op', 'Both'] },
     ],
     fieldGroups: [
-      { title: '🎮 Game Details', icon: '🎮', fields: ['platform', 'genre', 'release_year', 'esrb_rating'] },
-      { title: '🏢 Developer Info', icon: '🏢', fields: ['developer', 'publisher', 'multiplayer'] },
+      { title: 'Game Details', icon: '🎮', fields: ['platform', 'genre', 'release_year', 'esrb_rating'] },
+      { title: 'Developer Info', icon: '🏢', fields: ['developer', 'publisher', 'multiplayer'] },
     ]
   },
 
@@ -186,8 +186,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'pricing', label: 'Pricing', type: 'select', storageColumn: 'price_info', options: ['Free', 'Paid', 'Subscription', 'Audit Available'] },
     ],
     fieldGroups: [
-      { title: '🎓 Course Details', icon: '🎓', fields: ['instructor', 'platform', 'duration', 'language'] },
-      { title: '📚 Course Info', icon: '📚', fields: ['level', 'certificate', 'pricing'] },
+      { title: 'Course Details', icon: '🎓', fields: ['instructor', 'platform', 'duration', 'language'] },
+      { title: 'Course Info', icon: '📚', fields: ['level', 'certificate', 'pricing'] },
     ]
   },
 
@@ -204,8 +204,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'whats_included', label: "What's Included", type: 'tags', storageColumn: 'specifications', placeholder: 'e.g., Equipment, Guide' },
     ],
     fieldGroups: [
-      { title: '🎪 Experience Details', icon: '🎪', fields: ['duration', 'location_type', 'group_size', 'price_range'] },
-      { title: '✨ Additional Info', icon: '✨', fields: ['accessibility', 'whats_included'] },
+      { title: 'Experience Details', icon: '🎪', fields: ['duration', 'location_type', 'group_size', 'price_range'] },
+      { title: 'Additional Info', icon: '✨', fields: ['accessibility', 'whats_included'] },
     ]
   },
 
@@ -225,8 +225,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'target_audience', label: 'Target Audience', type: 'tags', storageColumn: 'metadata', placeholder: 'e.g., Students, Professionals, Families', helpText: 'Who is this brand primarily for?' },
     ],
     fieldGroups: [
-      { title: '🏢 Brand Info', icon: '🏢', fields: ['industry', 'founded_year', 'headquarters', 'parent_company'] },
-      { title: '💎 Brand Identity', icon: '💎', fields: ['brand_values', 'product_categories', 'tagline', 'social_links', 'target_audience'] },
+      { title: 'Brand Info', icon: '🏢', fields: ['industry', 'founded_year', 'headquarters', 'parent_company'] },
+      { title: 'Brand Identity', icon: '💎', fields: ['brand_values', 'product_categories', 'tagline', 'social_links', 'target_audience'] },
     ]
   },
 
@@ -246,8 +246,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'age_restriction', label: 'Age Restriction', type: 'select', storageColumn: 'metadata', options: ['All Ages', '18+', '21+', 'Kids Only', 'Family-Friendly'] },
     ],
     fieldGroups: [
-      { title: '🎟️ Event Details', icon: '🎟️', fields: ['event_type', 'start_date', 'end_date', 'venue', 'format'] },
-      { title: '📋 Event Info', icon: '📋', fields: ['organizer', 'ticket_price', 'capacity', 'age_restriction'] },
+      { title: 'Event Details', icon: '🎟️', fields: ['event_type', 'start_date', 'end_date', 'venue', 'format'] },
+      { title: 'Event Info', icon: '📋', fields: ['organizer', 'ticket_price', 'capacity', 'age_restriction'] },
     ]
   },
 
@@ -265,8 +265,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'insurance', label: 'Insurance', type: 'select', storageColumn: 'metadata', options: ['Licensed & Insured', 'Licensed', 'Bonded', 'N/A'] },
     ],
     fieldGroups: [
-      { title: '💼 Service Info', icon: '💼', fields: ['service_category', 'provider_name', 'service_areas', 'pricing_model'] },
-      { title: '✅ Credentials', icon: '✅', fields: ['years_in_business', 'certifications', 'insurance'] },
+      { title: 'Service Info', icon: '💼', fields: ['service_category', 'provider_name', 'service_areas', 'pricing_model'] },
+      { title: 'Credentials', icon: '✅', fields: ['years_in_business', 'certifications', 'insurance'] },
     ]
   },
 
@@ -285,8 +285,8 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
       { key: 'availability', label: 'Availability', type: 'text', storageColumn: 'metadata', placeholder: 'e.g., Weekdays, Evenings' },
     ],
     fieldGroups: [
-      { title: '👔 Professional Info', icon: '👔', fields: ['profession', 'specialty', 'years_experience', 'languages_spoken'] },
-      { title: '🎓 Credentials', icon: '🎓', fields: ['education', 'certifications', 'consultation_fee', 'availability'] },
+      { title: 'Professional Info', icon: '👔', fields: ['profession', 'specialty', 'years_experience', 'languages_spoken'] },
+      { title: 'Credentials', icon: '🎓', fields: ['education', 'certifications', 'consultation_fee', 'availability'] },
     ]
   },
 

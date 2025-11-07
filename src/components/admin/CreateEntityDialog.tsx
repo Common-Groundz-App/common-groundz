@@ -1870,17 +1870,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             <TabsList className="relative flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px]">
             {shouldShowTab('basic') && (
               <TabsTrigger value="basic" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center">
-                Basic Info
+                ℹ️ Basic Info
               </TabsTrigger>
             )}
             {shouldShowTab('contact') && (
               <TabsTrigger value="contact" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center">
-                Contact
+                📞 Contact
               </TabsTrigger>
             )}
             {shouldShowTab('hours') && (
               <TabsTrigger value="hours" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center">
-                Business Hours
+                🕐 Business Hours
               </TabsTrigger>
             )}
             {shouldShowTab('details') && formData.type && formData.type !== 'others' && (
@@ -1890,7 +1890,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             )}
             {shouldShowTab('preview') && (
               <TabsTrigger value="preview" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center">
-                Preview
+                👁️ Preview
               </TabsTrigger>
             )}
           </TabsList>

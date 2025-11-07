@@ -84,15 +84,14 @@ export const SimpleTagInput: React.FC<SimpleTagInputProps> = ({
           {value.map((tag) => (
             <Badge
               key={tag}
-              variant="secondary"
-              className="gap-1"
+              className="gap-1 bg-brand-orange text-white hover:bg-brand-orange/90 border-transparent"
             >
               {tag}
               <button
                 type="button"
                 onClick={() => handleRemoveTag(tag)}
                 disabled={disabled}
-                className="ml-1 hover:bg-muted rounded-full p-0.5"
+                className="ml-1 hover:bg-white/20 rounded-full p-0.5"
                 aria-label={`Remove ${tag}`}
               >
                 <X className="h-3 w-3" />
@@ -117,7 +116,7 @@ export const SimpleTagInput: React.FC<SimpleTagInputProps> = ({
           type="button"
           onClick={handleAddTag}
           disabled={disabled || !inputValue.trim() || value.length >= maxTags}
-          variant="outline"
+          className="bg-brand-orange text-white hover:bg-brand-orange/90"
         >
           Add
         </Button>
