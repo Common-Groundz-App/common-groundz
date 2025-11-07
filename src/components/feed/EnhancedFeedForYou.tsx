@@ -8,6 +8,7 @@ import { useMemoryOptimization } from '@/hooks/useMemoryOptimization';
 import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
 import FeedEmptyState from './FeedEmptyState';
+import FeedEndState from './FeedEndState';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -18,7 +19,7 @@ interface EnhancedFeedForYouProps {
 }
 
 const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = false }) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const { startRender, endRender } = usePerformanceMonitor('FeedForYou');
   
@@ -29,21 +30,7 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
     maxMemoryUsage: 100 // 100MB
   });
 
-  // Don't render until auth is ready
-  if (isLoading) {
-    return <FeedSkeleton />;
-  }
-
-  if (!user) {
-    return (
-      <div className="space-y-6">
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Authentication required</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Call hooks unconditionally
   const { 
     items, 
     isLoading: feedLoading, 
@@ -64,7 +51,7 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
     loadMore,
     threshold: 300,
     rootMargin: '100px',
-    enabled: !feedLoading && !error
+    enabled: !feedLoading && !error && !!user
   });
 
   useEffect(() => {
@@ -96,9 +83,19 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
     }
   }, [refreshing, refreshFeed]);
 
-  // Show loading skeleton only for initial load
-  if (feedLoading && items.length === 0) {
+  // Handle auth and loading states in render logic
+  if (authLoading || (feedLoading && items.length === 0)) {
     return <FeedSkeleton />;
+  }
+
+  if (!user) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Authentication required</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -151,10 +148,11 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
           <div ref={loadMoreRef} className="py-4">
             {isLoadingMore && (
               <div className="flex justify-center items-center gap-2">
-                <Loader className="h-4 w-4 animate-spin" />
+                <Loader className="h-4 w-4 animate-spin text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">Loading more...</span>
               </div>
             )}
+            {!hasMore && items.length > 0 && !isLoadingMore && <FeedEndState />}
           </div>
         </>
       )}
