@@ -92,6 +92,12 @@ const TagInput: React.FC<TagInputProps> = ({
     onChange(newTags);
   };
 
+  const handleBlur = () => {
+    if (inputValue.trim()) {
+      addTag(inputValue);
+    }
+  };
+
   return (
     <div className="border rounded-md p-2 bg-background">
       <div className="flex flex-wrap gap-2">
@@ -116,6 +122,7 @@ const TagInput: React.FC<TagInputProps> = ({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onFocus={() => setShowSuggestions(true)}
+            onBlur={handleBlur}
             placeholder={tags.length === 0 ? placeholder : ""}
             className="outline-none bg-transparent w-full text-sm"
             disabled={tags.length >= maxTags}
