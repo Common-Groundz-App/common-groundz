@@ -40,6 +40,7 @@ export const TagInput: React.FC<TagInputProps> = ({
   const debouncedInput = useDebounce(input, 300);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionRef = useRef<HTMLDivElement>(null);
   
   // Load tag suggestions based on debounced input
   useEffect(() => {
@@ -71,27 +72,24 @@ export const TagInput: React.FC<TagInputProps> = ({
     loadSuggestions();
   }, [debouncedInput, value]);
   
-  // Click-away handler to close suggestions
+  // Click-away handler to close suggestions (matches working preferences TagInput)
   useEffect(() => {
-    const handleClickAway = (event: MouseEvent) => {
-      // Only hide suggestions if click is outside container AND suggestions are showing
+    const handleClickOutside = (event: MouseEvent) => {
       if (
-        showSuggestions &&
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
+        suggestionRef.current && 
+        !suggestionRef.current.contains(event.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(event.target as Node)
       ) {
         setShowSuggestions(false);
       }
     };
-
-    // Add listener when suggestions are visible
-    if (showSuggestions) {
-      document.addEventListener('mousedown', handleClickAway);
-      return () => {
-        document.removeEventListener('mousedown', handleClickAway);
-      };
-    }
-  }, [showSuggestions]);
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   
   // Add existing tag from suggestions
   const handleAddTag = (tag: Tag) => {
@@ -180,9 +178,8 @@ export const TagInput: React.FC<TagInputProps> = ({
       setSuggestions([]);
       setShowSuggestions(false);
     } else if (e.key === 'Tab') {
-      // Close suggestions when tabbing away for clean keyboard navigation
+      // Close suggestions when tabbing away
       setShowSuggestions(false);
-      // Don't preventDefault - let Tab work normally
     }
   };
   
@@ -267,6 +264,7 @@ export const TagInput: React.FC<TagInputProps> = ({
         {/* Autocomplete suggestions dropdown */}
         {showSuggestions && suggestions.length > 0 && (
           <div 
+            ref={suggestionRef}
             id="tag-suggestions"
             className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-60 overflow-auto"
             role="listbox"
@@ -275,10 +273,7 @@ export const TagInput: React.FC<TagInputProps> = ({
               <div
                 key={tag.id}
                 className="px-3 py-2 hover:bg-accent cursor-pointer flex justify-between items-center transition-colors"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  handleAddTag(tag);
-                }}
+                onClick={() => handleAddTag(tag)}
                 role="option"
                 aria-selected={false}
               >
