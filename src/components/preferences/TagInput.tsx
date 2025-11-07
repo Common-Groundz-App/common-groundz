@@ -107,30 +107,38 @@ const TagInput: React.FC<TagInputProps> = ({
 
   return (
     <div className="border rounded-md p-2 bg-background">
-      <div className="flex flex-wrap gap-2">
-        {tags.map((tag, index) => (
-          <div 
-            key={index} 
-            className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-sm flex items-center"
-          >
-            {tag}
-            <button 
-              onClick={() => removeTag(index)}
-              className="ml-1 p-0.5 rounded-full hover:bg-brand-orange/30"
+      {/* Tags section - appears above */}
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2">
+          {tags.map((tag, index) => (
+            <div 
+              key={index} 
+              className="bg-brand-orange text-white rounded-full py-1 px-3 text-sm flex items-center"
             >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        ))}
-        <div className="relative flex-1 min-w-[120px]">
-          {showAddButton ? (
+              {tag}
+              <button 
+                onClick={() => removeTag(index)}
+                className="ml-1 p-0.5 rounded-full hover:bg-brand-orange/90"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {/* Input section - appears below tags */}
+      <div className="relative">
+        {showAddButton ? (
+          <>
             <div className="flex gap-2">
               <input
                 ref={inputRef}
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={tags.length === 0 ? placeholder : ""}
+                onFocus={() => setShowSuggestions(true)}
+                placeholder={placeholder}
                 className="outline-none bg-transparent flex-1 text-sm"
                 disabled={tags.length >= maxTags}
               />
@@ -143,42 +151,63 @@ const TagInput: React.FC<TagInputProps> = ({
                 Add
               </button>
             </div>
-          ) : (
-            <>
-              <input
-                ref={inputRef}
-                value={inputValue}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={handleBlur}
-                placeholder={tags.length === 0 ? placeholder : ""}
-                className="outline-none bg-transparent w-full text-sm"
-                disabled={tags.length >= maxTags}
-              />
-              {showSuggestions && filteredSuggestions.length > 0 && (
-                <div 
-                  ref={suggestionRef}
-                  className="absolute top-full left-0 mt-1 w-full bg-background border rounded-md shadow-md z-10"
-                >
-                  {filteredSuggestions.map((suggestion, index) => (
-                    <div 
-                      key={index}
-                      className={cn(
-                        "px-3 py-2 cursor-pointer hover:bg-accent/50 text-sm",
-                        index + 1 < filteredSuggestions.length && "border-b border-border/40"
-                      )}
-                      onClick={() => addTag(suggestion)}
-                    >
-                      {suggestion}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-        </div>
+            {/* Suggestions dropdown - now works with Add button too */}
+            {showSuggestions && filteredSuggestions.length > 0 && (
+              <div 
+                ref={suggestionRef}
+                className="absolute top-full left-0 mt-1 w-full bg-background border rounded-md shadow-md z-10"
+              >
+                {filteredSuggestions.map((suggestion, index) => (
+                  <div 
+                    key={index}
+                    className={cn(
+                      "px-3 py-2 cursor-pointer hover:bg-accent/50 text-sm",
+                      index + 1 < filteredSuggestions.length && "border-b border-border/40"
+                    )}
+                    onClick={() => addTag(suggestion)}
+                  >
+                    {suggestion}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <input
+              ref={inputRef}
+              value={inputValue}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setShowSuggestions(true)}
+              onBlur={handleBlur}
+              placeholder={placeholder}
+              className="outline-none bg-transparent w-full text-sm"
+              disabled={tags.length >= maxTags}
+            />
+            {showSuggestions && filteredSuggestions.length > 0 && (
+              <div 
+                ref={suggestionRef}
+                className="absolute top-full left-0 mt-1 w-full bg-background border rounded-md shadow-md z-10"
+              >
+                {filteredSuggestions.map((suggestion, index) => (
+                  <div 
+                    key={index}
+                    className={cn(
+                      "px-3 py-2 cursor-pointer hover:bg-accent/50 text-sm",
+                      index + 1 < filteredSuggestions.length && "border-b border-border/40"
+                    )}
+                    onClick={() => addTag(suggestion)}
+                  >
+                    {suggestion}
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
+      
       {tags.length >= maxTags && (
         <p className="text-xs text-muted-foreground mt-2">
           Maximum {maxTags} tags allowed.

@@ -546,13 +546,15 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       console.log(`⚠️ Tab "${activeTab}" no longer visible, resetting to "${visibleTabs[0]}"`);
       setActiveTab(visibleTabs[0]);
     }
-    
-    // Reset category when type changes to prevent mismatches
+  }, [formData.type, activeTab]);
+
+  // Reset category ONLY when entity type changes (not on tab changes)
+  useEffect(() => {
     setFormData(prev => ({
       ...prev,
       category_id: null
     }));
-  }, [formData.type, activeTab]);
+  }, [formData.type]);
 
   // Auto-search and select parent brand entity based on AI-extracted brand name
   const autoSelectParentBrand = async (brandName: string) => {
@@ -1885,7 +1887,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             )}
             {shouldShowTab('details') && formData.type && formData.type !== 'others' && (
               <TabsTrigger value="details" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center">
-                {getEntityTypeLabel(formData.type)} Details
+                {(() => {
+                  const typeConfig = entityTypeConfig[formData.type];
+                  const icon = typeConfig?.fieldGroups?.[0]?.icon || '📋';
+                  return `${icon} ${getEntityTypeLabel(formData.type)} Details`;
+                })()}
               </TabsTrigger>
             )}
             {shouldShowTab('preview') && (
