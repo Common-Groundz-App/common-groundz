@@ -9,6 +9,7 @@ interface TagInputProps {
   suggestions?: string[];
   placeholder?: string;
   maxTags?: number;
+  showAddButton?: boolean;
 }
 
 const TagInput: React.FC<TagInputProps> = ({
@@ -16,7 +17,8 @@ const TagInput: React.FC<TagInputProps> = ({
   onChange,
   suggestions = [],
   placeholder = 'Add a tag...',
-  maxTags = 10
+  maxTags = 10,
+  showAddButton = false
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -92,8 +94,13 @@ const TagInput: React.FC<TagInputProps> = ({
     onChange(newTags);
   };
 
+  const handleAddClick = () => {
+    if (inputValue.trim().length === 0) return;
+    addTag(inputValue);
+  };
+
   const handleBlur = () => {
-    if (inputValue.trim()) {
+    if (!showAddButton && inputValue.trim()) {
       addTag(inputValue);
     }
   };
@@ -116,35 +123,59 @@ const TagInput: React.FC<TagInputProps> = ({
           </div>
         ))}
         <div className="relative flex-1 min-w-[120px]">
-          <input
-            ref={inputRef}
-            value={inputValue}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={handleBlur}
-            placeholder={tags.length === 0 ? placeholder : ""}
-            className="outline-none bg-transparent w-full text-sm"
-            disabled={tags.length >= maxTags}
-          />
-          {showSuggestions && filteredSuggestions.length > 0 && (
-            <div 
-              ref={suggestionRef}
-              className="absolute top-full left-0 mt-1 w-full bg-background border rounded-md shadow-md z-10"
-            >
-              {filteredSuggestions.map((suggestion, index) => (
-                <div 
-                  key={index}
-                  className={cn(
-                    "px-3 py-2 cursor-pointer hover:bg-accent/50 text-sm",
-                    index + 1 < filteredSuggestions.length && "border-b border-border/40"
-                  )}
-                  onClick={() => addTag(suggestion)}
-                >
-                  {suggestion}
-                </div>
-              ))}
+          {showAddButton ? (
+            <div className="flex gap-2">
+              <input
+                ref={inputRef}
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder={tags.length === 0 ? placeholder : ""}
+                className="outline-none bg-transparent flex-1 text-sm"
+                disabled={tags.length >= maxTags}
+              />
+              <button
+                type="button"
+                onClick={handleAddClick}
+                disabled={tags.length >= maxTags || inputValue.trim().length === 0}
+                className="px-3 py-1 bg-brand-orange text-white text-sm rounded hover:bg-brand-orange/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Add
+              </button>
             </div>
+          ) : (
+            <>
+              <input
+                ref={inputRef}
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={handleBlur}
+                placeholder={tags.length === 0 ? placeholder : ""}
+                className="outline-none bg-transparent w-full text-sm"
+                disabled={tags.length >= maxTags}
+              />
+              {showSuggestions && filteredSuggestions.length > 0 && (
+                <div 
+                  ref={suggestionRef}
+                  className="absolute top-full left-0 mt-1 w-full bg-background border rounded-md shadow-md z-10"
+                >
+                  {filteredSuggestions.map((suggestion, index) => (
+                    <div 
+                      key={index}
+                      className={cn(
+                        "px-3 py-2 cursor-pointer hover:bg-accent/50 text-sm",
+                        index + 1 < filteredSuggestions.length && "border-b border-border/40"
+                      )}
+                      onClick={() => addTag(suggestion)}
+                    >
+                      {suggestion}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

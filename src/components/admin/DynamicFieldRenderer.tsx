@@ -79,6 +79,7 @@ export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
             tags={Array.isArray(value) ? value : []}
             onChange={onChange}
             placeholder={field.placeholder}
+            showAddButton={true}
           />
         );
 
