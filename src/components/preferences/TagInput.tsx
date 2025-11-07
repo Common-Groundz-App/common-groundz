@@ -106,7 +106,7 @@ const TagInput: React.FC<TagInputProps> = ({
   };
 
   return (
-    <div className="border rounded-md p-2 bg-background">
+    <div className="space-y-2">
       {/* Tags section - appears above */}
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-2">
@@ -128,7 +128,8 @@ const TagInput: React.FC<TagInputProps> = ({
       )}
       
       {/* Input section - appears below tags */}
-      <div className="relative">
+      <div className="border rounded-md p-2 bg-background">
+        <div className="relative">
         {showAddButton ? (
           <>
             <div className="flex gap-2">
@@ -206,6 +207,7 @@ const TagInput: React.FC<TagInputProps> = ({
             )}
           </>
         )}
+        </div>
       </div>
       
       {tags.length >= maxTags && (
