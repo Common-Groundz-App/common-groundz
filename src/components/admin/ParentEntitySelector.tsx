@@ -129,9 +129,9 @@ export function ParentEntitySelector({
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Parent Entity</label>
+        <label className="text-sm font-medium">Part of</label>
         <p className="text-xs text-muted-foreground">
-          Select a parent entity to create a hierarchical relationship
+          Select the brand, collection, or group this is part of.
         </p>
         
         {/* Current parent display */}
@@ -169,7 +169,7 @@ export function ParentEntitySelector({
               ref={inputRef}
               value={searchQuery}
               onChange={handleInputChange}
-              placeholder="Search for entities..."
+              placeholder="Search existing items..."
               className="pl-10"
               onFocus={() => {
                 if (searchQuery.length >= 2) {

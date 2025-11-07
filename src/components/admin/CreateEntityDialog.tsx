@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +26,7 @@ import { validateUrlForType, getSuggestedEntityType } from '@/config/urlPatterns
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 const MAX_MEDIA_ITEMS = 4;
-import { Plus, Sparkles, Loader2, AlertTriangle, ExternalLink, X, Info } from 'lucide-react';
+import { Plus, Sparkles, Loader2, AlertTriangle, ExternalLink, X, Info, ArrowLeft, ArrowRight } from 'lucide-react';
 import { getOrCreateTag } from '@/services/tagService';
 
 import { EntityType } from '@/services/recommendation/types';
@@ -95,6 +95,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   
   // Tag input state (string-based for simplicity)
   const [selectedTagNames, setSelectedTagNames] = useState<string[]>([]);
+  
+  // Active tab tracking for step-by-step navigation
+  const [activeTab, setActiveTab] = useState<string>('basic');
   
   // URL analysis state
   const [analyzeUrl, setAnalyzeUrl] = useState('');
@@ -412,6 +415,139 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     return getVisibleTabs().includes(tabName as any);
   };
 
+  // ============= TAB NAVIGATION HELPERS =============
+
+  // Get the ordered list of visible tabs
+  const getTabOrder = () => {
+    return getVisibleTabs();
+  };
+
+  // Get the index of current active tab
+  const getCurrentTabIndex = () => {
+    const order = getTabOrder();
+    return order.indexOf(activeTab);
+  };
+
+  // Check if current tab is the last one
+  const isLastTab = () => {
+    const order = getTabOrder();
+    return getCurrentTabIndex() === order.length - 1;
+  };
+
+  // Get the next tab in sequence
+  const getNextTab = () => {
+    const order = getTabOrder();
+    const currentIndex = getCurrentTabIndex();
+    return currentIndex < order.length - 1 ? order[currentIndex + 1] : null;
+  };
+
+  // Handle Next button click
+  const handleNextTab = () => {
+    const nextTab = getNextTab();
+    if (nextTab) {
+      setActiveTab(nextTab);
+    }
+  };
+
+  // Handle Previous button click
+  const handlePreviousTab = () => {
+    const order = getTabOrder();
+    const currentIndex = getCurrentTabIndex();
+    if (currentIndex > 0) {
+      setActiveTab(order[currentIndex - 1]);
+    }
+  };
+
+  // ============= REAL-TIME VALIDATION STATE =============
+
+  // Check if current tab has all required fields filled (no toasts)
+  const isCurrentStepValid = useMemo(() => {
+    switch (activeTab) {
+      case 'basic':
+        // Name is required
+        if (!formData.name.trim()) return false;
+        
+        // Type is required
+        if (!formData.type) return false;
+        
+        // Category is required
+        if (!formData.category_id) return false;
+        
+        // "Others" type requires explanation
+        if (formData.type === 'others' && !otherTypeReason.trim()) return false;
+        
+        return true;
+        
+      case 'details':
+        // Validate type-specific required fields
+        const typeConfig = entityTypeConfig[formData.type];
+        if (!typeConfig?.requiredFields) return true;
+        
+        for (const fieldKey of typeConfig.requiredFields) {
+          const fieldConfig = typeConfig.fields.find(f => f.key === fieldKey);
+          if (!fieldConfig) continue;
+          
+          const storageColumn = fieldConfig.storageColumn || 'metadata';
+          let value;
+          
+          switch (storageColumn) {
+            case 'metadata':
+              value = formData.metadata?.[fieldKey];
+              break;
+            case 'cast_crew':
+              value = formData.cast_crew?.[fieldKey];
+              break;
+            case 'specifications':
+              value = formData.specifications?.[fieldKey];
+              break;
+            case 'price_info':
+              value = formData.price_info?.[fieldKey];
+              break;
+            case 'nutritional_info':
+              value = formData.nutritional_info?.[fieldKey];
+              break;
+            case 'external_ratings':
+              value = formData.external_ratings?.[fieldKey];
+              break;
+            default:
+              value = formData[storageColumn as keyof typeof formData];
+          }
+          
+          // Check if value is empty
+          const isEmpty = !value || 
+                         (Array.isArray(value) && value.length === 0) || 
+                         value === '' ||
+                         (typeof value === 'string' && value.trim() === '');
+          
+          if (isEmpty) return false;
+        }
+        
+        return true;
+        
+      // Contact, hours, and preview tabs have no required fields
+      case 'contact':
+      case 'hours':
+      case 'preview':
+        return true;
+        
+      default:
+        return true;
+    }
+  }, [activeTab, formData, otherTypeReason]);
+
+  // ============= AUTO-RESET TAB ON TYPE CHANGE =============
+
+  // Reset active tab if it becomes invalid when entity type changes
+  useEffect(() => {
+    const visibleTabs = getVisibleTabs();
+    
+    // If current tab is no longer in the visible tabs list, reset to first tab
+    if (!visibleTabs.includes(activeTab as any)) {
+      console.log(`⚠️ Tab "${activeTab}" no longer visible, resetting to "${visibleTabs[0]}"`);
+      setActiveTab(visibleTabs[0]);
+    }
+  }, [formData.type, activeTab]);
+
   // Auto-search and select parent brand entity based on AI-extracted brand name
   const autoSelectParentBrand = async (brandName: string) => {
     if (!brandName || brandName.length < 2) {
@@ -703,6 +839,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setUrlMetadata(null);
     setFieldErrors({});
     setAiFilledFields(new Set());
+    setActiveTab('basic');
     
     // Reset progressive disclosure state (user variant only)
     if (variant === 'user') {
@@ -1723,7 +1860,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
         {/* Show tabs immediately for admin, or after expansion/analysis for users */}
         {(variant === 'admin' || isFormExpanded || urlAnalysisComplete) && (
-          <Tabs defaultValue="basic" className="space-y-4 animate-fade-in">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 animate-fade-in">
             <TabsList className="relative flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px]">
             {shouldShowTab('basic') && (
               <TabsTrigger value="basic" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center">
@@ -1887,9 +2024,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 variant="outline"
                 onClick={() => setShowMediaUploadModal(true)}
                 disabled={loading || uploadedMedia.length >= 4}
-                className="w-full"
+                className="w-full border-2 border-dashed border-brand-orange/40 bg-brand-orange/5 hover:bg-brand-orange/10 hover:border-brand-orange/60 text-brand-orange hover:text-brand-orange transition-all duration-200"
               >
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="h-5 w-5 mr-2" />
                 {uploadedMedia.length === 0 ? 'Add Photos & Videos' : `Add More Media (${uploadedMedia.length}/4)`}
               </Button>
               
@@ -2032,16 +2169,65 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         </Tabs>
         )}
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => {
-            resetForm();
-            onOpenChange(false);
-          }} disabled={loading}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Creating...' : 'Create Entity'}
-          </Button>
+        <div className="flex justify-between items-center gap-4 pt-4 border-t">
+          {/* Left side: Cancel or Back */}
+          <div>
+            {getCurrentTabIndex() === 0 ? (
+              <Button 
+                variant="outline" 
+                onClick={() => { 
+                  resetForm(); 
+                  onOpenChange(false); 
+                }} 
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+            ) : (
+              <Button 
+                variant="outline" 
+                onClick={handlePreviousTab} 
+                disabled={loading}
+                className="border-brand-orange/30 hover:bg-brand-orange/5 hover:text-brand-orange transition-all duration-200"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+            )}
+          </div>
+          
+          {/* Right side: Next or Create Entity (DISABLED WHEN INVALID) */}
+          <div className="flex gap-2">
+            {isLastTab() ? (
+              <Button 
+                onClick={handleSubmit} 
+                disabled={loading || !isCurrentStepValid}
+                className={`bg-gradient-to-r from-brand-orange to-brand-orange/90 hover:from-brand-orange/90 hover:to-brand-orange text-white shadow-md hover:shadow-lg transition-all duration-300 ${
+                  !isCurrentStepValid && "opacity-50 cursor-not-allowed"
+                }`}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Entity'
+                )}
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleNextTab}
+                disabled={loading || !isCurrentStepValid}
+                className={`bg-gradient-to-r from-brand-orange to-brand-orange/90 hover:from-brand-orange/90 hover:to-brand-orange text-white shadow-md hover:shadow-lg transition-all duration-300 ${
+                  !isCurrentStepValid && "opacity-50 cursor-not-allowed"
+                }`}
+              >
+                Next
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
       
