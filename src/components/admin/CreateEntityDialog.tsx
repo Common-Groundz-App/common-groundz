@@ -925,6 +925,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setAiPredictions(null);
     setUploadedMedia([]);
     setPrimaryMediaUrl(null);
+    setSelectedParent(null);
     
     try {
       console.log('🔍 Analyzing URL:', analyzeUrl);
