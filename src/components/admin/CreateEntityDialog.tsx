@@ -10,6 +10,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/component
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { ContactInfoEditor } from './ContactInfoEditor';
 import { BusinessHoursEditor } from './BusinessHoursEditor';
 import { RichTextEditor } from '@/components/editor/RichTextEditor';
@@ -55,6 +56,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   const [draftCheckComplete, setDraftCheckComplete] = useState(false);
@@ -1679,6 +1681,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       resetForm();
       onOpenChange(false);
       onEntityCreated();
+      
+      // Navigate to the newly created entity
+      if (newEntity) {
+        navigate(`/entity/${newEntity.slug}`);
+      }
     } catch (error: any) {
       console.error('Error creating entity:', error);
       
