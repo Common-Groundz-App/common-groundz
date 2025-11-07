@@ -6,6 +6,7 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import FeedItem from './FeedItem';
 import { FeedItemSkeleton } from '@/components/ui/enhanced-skeleton';
 import FeedEmptyState from './FeedEmptyState';
+import FeedEndState from './FeedEndState';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -151,11 +152,12 @@ const InfiniteFeedForYou: React.FC<InfiniteFeedForYouProps> = ({ refreshing = fa
           {/* Infinite scroll trigger */}
           <div ref={loadMoreRef} className="py-4">
             {isLoadingMore && (
-              <div className="flex justify-center items-center gap-2">
+              <div className="flex justify-center items-center gap-2 text-muted-foreground">
                 <Loader className="h-4 w-4 animate-spin" />
-                <span className="text-sm text-muted-foreground">Loading more...</span>
+                <span className="text-sm">Loading more...</span>
               </div>
             )}
+            {!hasMore && items.length > 0 && !isLoadingMore && <FeedEndState />}
           </div>
         </>
       )}

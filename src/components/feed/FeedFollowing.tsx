@@ -1,9 +1,11 @@
 
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useFeed } from '@/hooks/feed/use-feed';
+import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import FeedItem from './FeedItem';
-import FeedSkeleton from './FeedSkeleton';
+import { FeedItemSkeleton } from '@/components/ui/enhanced-skeleton';
+import FeedEndState from './FeedEndState';
 import { Button } from '@/components/ui/button';
 import { UserPlus, AlertCircle, Loader } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -22,7 +24,13 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
 
   // CRITICAL: Don't render feed logic until auth is ready
   if (isLoading) {
-    return <FeedSkeleton />;
+    return (
+      <div className="space-y-6">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <FeedItemSkeleton key={i} />
+        ))}
+      </div>
+    );
   }
 
   // Don't render if no user
@@ -45,8 +53,16 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
     isLoadingMore,
     refreshFeed,
     handleLike,
-    handleSave
-  } = useFeed('following');
+    handleSave,
+    handleDelete
+  } = useInfiniteFeed('following');
+
+  const { loadMoreRef } = useInfiniteScroll({
+    hasMore,
+    isLoading: isLoadingMore,
+    loadMore,
+    threshold: 300
+  });
 
   useEffect(() => {
     if (error) {
@@ -76,7 +92,13 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
 
   // Show loading skeleton only for initial load or when explicitly refreshing
   if (feedLoading && items.length === 0) {
-    return <FeedSkeleton />;
+    return (
+      <div className="space-y-6">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <FeedItemSkeleton key={i} />
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -137,35 +159,35 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
             animate={{ opacity: refreshing ? 0.7 : 1 }}
             transition={{ duration: 0.2 }}
           >
-            {items.map(item => (
-              <FeedItem 
-                key={item.id} 
-                item={item} 
-                onLike={handleLike}
-                onSave={handleSave}
-              />
+            {items.map((item, index) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <FeedItem 
+                  item={item} 
+                  onLike={handleLike}
+                  onSave={handleSave}
+                  onComment={(id) => console.log('Comment on', id)}
+                  onDelete={handleDelete}
+                  refreshFeed={refreshFeed}
+                />
+              </motion.div>
             ))}
           </motion.div>
           
-          {hasMore && (
-            <div className="pt-6 flex justify-center">
-              <Button 
-                variant="outline" 
-                onClick={loadMore} 
-                disabled={isLoadingMore}
-                className="flex items-center gap-2"
-              >
-                {isLoadingMore ? (
-                  <>
-                    <Loader className="h-4 w-4 animate-spin" />
-                    <span>Loading...</span>
-                  </>
-                ) : (
-                  'Load more'
-                )}
-              </Button>
-            </div>
-          )}
+          {/* Infinite scroll trigger */}
+          <div ref={loadMoreRef} className="py-4">
+            {isLoadingMore && (
+              <div className="flex justify-center items-center gap-2 text-muted-foreground">
+                <Loader className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Loading more...</span>
+              </div>
+            )}
+            {!hasMore && items.length > 0 && !isLoadingMore && <FeedEndState />}
+          </div>
         </>
       )}
     </div>
