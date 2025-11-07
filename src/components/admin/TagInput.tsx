@@ -93,6 +93,38 @@ export const TagInput: React.FC<TagInputProps> = ({
     }
   }, [showSuggestions]);
   
+  // Container-level focus management to prevent focus jumping
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const handleFocusOut = (event: FocusEvent) => {
+      // Use requestAnimationFrame to check where focus actually landed
+      requestAnimationFrame(() => {
+        const activeElement = document.activeElement;
+        
+        // Check if new focus is outside our container
+        if (!container.contains(activeElement)) {
+          // Focus left the container completely
+          
+          // If it went to something meaningful (a button, another input), hide suggestions
+          if (activeElement && activeElement !== document.body) {
+            setShowSuggestions(false);
+          } else {
+            // Focus went nowhere (body/dialog) - keep it in the input
+            inputRef.current?.focus();
+          }
+        }
+        // If focus is still inside container (e.g., clicked a suggestion), do nothing
+      });
+    };
+    
+    container.addEventListener('focusout', handleFocusOut);
+    return () => {
+      container.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
+  
   // Add existing tag from suggestions
   const handleAddTag = (tag: Tag) => {
     if (value.length >= maxTags) {
