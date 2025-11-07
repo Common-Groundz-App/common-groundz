@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { useFeed } from '@/hooks/feed/use-feed';
+import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
 import { useEnhancedInfiniteScroll } from '@/hooks/useEnhancedInfiniteScroll';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useMemoryOptimization } from '@/hooks/useMemoryOptimization';
@@ -42,7 +42,7 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
     handleLike,
     handleSave,
     handleDelete
-  } = useFeed('for_you');
+  } = useInfiniteFeed('for_you');
 
   // Enhanced infinite scroll with performance monitoring
   const { loadMoreRef } = useEnhancedInfiniteScroll({
