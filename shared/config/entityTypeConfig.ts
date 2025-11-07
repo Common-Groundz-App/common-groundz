@@ -12,8 +12,8 @@ export interface EntityFieldConfig {
 }
 
 export interface EntityTypeConfig {
-  showTabs: ('basic' | 'contact' | 'businessHours' | 'details')[];
-  hideTabs: ('basic' | 'contact' | 'businessHours' | 'details')[];
+  showTabs: ('basic' | 'contact' | 'hours' | 'details')[];
+  hideTabs: ('basic' | 'contact' | 'hours' | 'details')[];
   requiredFields: string[];
   fields: EntityFieldConfig[];
   fieldGroups?: {
@@ -26,7 +26,7 @@ export interface EntityTypeConfig {
 export const entityTypeConfig: Record<string, EntityTypeConfig> = {
   book: {
     showTabs: ['basic', 'details'],
-    hideTabs: ['contact', 'businessHours'],
+    hideTabs: ['contact', 'hours'],
     requiredFields: ['authors', 'publication_year'],
     fields: [
       { key: 'authors', label: 'Authors', type: 'tags', storageColumn: 'authors', required: true, placeholder: 'Add author names' },
@@ -45,7 +45,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
 
   movie: {
     showTabs: ['basic', 'details'],
-    hideTabs: ['contact', 'businessHours'],
+    hideTabs: ['contact', 'hours'],
     requiredFields: ['release_year'],
     fields: [
       { key: 'release_year', label: 'Release Year', type: 'number', storageColumn: 'publication_year', required: true },
@@ -64,7 +64,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
 
   tv_show: {
     showTabs: ['basic', 'details'],
-    hideTabs: ['contact', 'businessHours'],
+    hideTabs: ['contact', 'hours'],
     requiredFields: ['release_year'],
     fields: [
       { key: 'release_year', label: 'Release Year', type: 'number', storageColumn: 'publication_year', required: true },
@@ -83,7 +83,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
   },
 
   place: {
-    showTabs: ['basic', 'contact', 'businessHours', 'details'],
+    showTabs: ['basic', 'contact', 'hours', 'details'],
     hideTabs: [],
     requiredFields: [],
     fields: [
@@ -99,7 +99,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
   },
 
   food: {
-    showTabs: ['basic', 'contact', 'businessHours', 'details'],
+    showTabs: ['basic', 'contact', 'hours', 'details'],
     hideTabs: [],
     requiredFields: [],
     fields: [
@@ -117,7 +117,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
 
   product: {
     showTabs: ['basic', 'details'],
-    hideTabs: ['contact', 'businessHours'],
+    hideTabs: ['contact', 'hours'],
     requiredFields: [],
     fields: [
       { key: 'brand', label: 'Brand', type: 'text', storageColumn: 'metadata', placeholder: 'Brand name' },
@@ -136,7 +136,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
 
   app: {
     showTabs: ['basic', 'details'],
-    hideTabs: ['contact', 'businessHours'],
+    hideTabs: ['contact', 'hours'],
     requiredFields: ['platform'],
     fields: [
       { key: 'platform', label: 'Platform', type: 'multi-select', storageColumn: 'specifications', required: true, options: ['iOS', 'Android', 'Web', 'Windows', 'macOS', 'Linux'] },
@@ -155,7 +155,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
 
   game: {
     showTabs: ['basic', 'details'],
-    hideTabs: ['contact', 'businessHours'],
+    hideTabs: ['contact', 'hours'],
     requiredFields: ['platform'],
     fields: [
       { key: 'platform', label: 'Platform', type: 'multi-select', storageColumn: 'specifications', required: true, options: ['PC', 'PlayStation', 'Xbox', 'Nintendo Switch', 'Mobile', 'VR'] },
@@ -174,7 +174,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
 
   course: {
     showTabs: ['basic', 'details'],
-    hideTabs: ['contact', 'businessHours'],
+    hideTabs: ['contact', 'hours'],
     requiredFields: ['instructor', 'level'],
     fields: [
       { key: 'instructor', label: 'Instructor', type: 'text', storageColumn: 'metadata', required: true, placeholder: 'Instructor name' },
@@ -192,7 +192,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
   },
 
   experience: {
-    showTabs: ['basic', 'contact', 'businessHours', 'details'],
+    showTabs: ['basic', 'contact', 'hours', 'details'],
     hideTabs: [],
     requiredFields: [],
     fields: [
@@ -211,7 +211,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
 
   brand: {
     showTabs: ['basic', 'contact', 'details'],
-    hideTabs: ['businessHours'],
+    hideTabs: ['hours'],
     requiredFields: ['industry'],
     fields: [
       { key: 'industry', label: 'Industry', type: 'select', storageColumn: 'metadata', required: true, options: ['Fashion', 'Technology', 'Food & Beverage', 'Beauty', 'Automotive', 'Entertainment', 'Health & Wellness', 'Finance', 'Retail', 'Sports', 'Media', 'Education', 'Travel', 'Other'] },
@@ -232,7 +232,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
 
   event: {
     showTabs: ['basic', 'contact', 'details'],
-    hideTabs: ['businessHours'],
+    hideTabs: ['hours'],
     requiredFields: ['event_type', 'start_date'],
     fields: [
       { key: 'event_type', label: 'Event Type', type: 'select', storageColumn: 'metadata', required: true, options: ['Conference', 'Concert', 'Festival', 'Workshop', 'Sports', 'Exhibition', 'Networking', 'Webinar', 'Meetup', 'Competition', 'Other'] },
@@ -252,7 +252,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
   },
 
   service: {
-    showTabs: ['basic', 'contact', 'businessHours', 'details'],
+    showTabs: ['basic', 'contact', 'hours', 'details'],
     hideTabs: [],
     requiredFields: ['service_category'],
     fields: [
@@ -272,7 +272,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
 
   professional: {
     showTabs: ['basic', 'contact', 'details'],
-    hideTabs: ['businessHours'],
+    hideTabs: ['hours'],
     requiredFields: ['profession'],
     fields: [
       { key: 'profession', label: 'Profession', type: 'text', storageColumn: 'metadata', required: true, placeholder: 'e.g., Therapist, Lawyer, Doctor' },
@@ -291,7 +291,7 @@ export const entityTypeConfig: Record<string, EntityTypeConfig> = {
   },
 
   others: {
-    showTabs: ['basic', 'contact', 'businessHours', 'details'],
+    showTabs: ['basic', 'contact', 'hours', 'details'],
     hideTabs: [],
     requiredFields: [],
     fields: [],

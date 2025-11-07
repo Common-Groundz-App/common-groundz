@@ -546,6 +546,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       console.log(`⚠️ Tab "${activeTab}" no longer visible, resetting to "${visibleTabs[0]}"`);
       setActiveTab(visibleTabs[0]);
     }
+    
+    // Reset category when type changes to prevent mismatches
+    setFormData(prev => ({
+      ...prev,
+      category_id: null
+    }));
   }, [formData.type, activeTab]);
 
   // Auto-search and select parent brand entity based on AI-extracted brand name
@@ -1872,7 +1878,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 Contact
               </TabsTrigger>
             )}
-            {shouldShowTab('businessHours') && (
+            {shouldShowTab('hours') && (
               <TabsTrigger value="hours" className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center">
                 Business Hours
               </TabsTrigger>

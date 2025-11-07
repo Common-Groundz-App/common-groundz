@@ -56,7 +56,7 @@ export const DynamicFieldRenderer: React.FC<DynamicFieldRendererProps> = ({
           <Input
             type="number"
             value={value || ''}
-            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : '')}
+            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
             placeholder={field.placeholder}
             disabled={disabled}
           />
