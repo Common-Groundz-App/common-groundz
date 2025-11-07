@@ -1905,7 +1905,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name *</Label>
+                <Label htmlFor="name">
+                  Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="name"
                   value={formData.name}
@@ -1916,7 +1918,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="type">Type *</Label>
+                <Label htmlFor="type">
+                  Type <span className="text-destructive">*</span>
+                </Label>
                 <Select 
                   value={formData.type} 
                   onValueChange={(value) => handleInputChange('type', value)}
@@ -1963,7 +1967,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             {formData.type === 'others' && (
               <div className="space-y-2 col-span-2">
                 <Label htmlFor="otherTypeReason">
-                  Explain why this entity doesn't fit existing types *
+                  Explain why this entity doesn't fit existing types <span className="text-destructive">*</span>
                 </Label>
                 <Textarea
                   id="otherTypeReason"
