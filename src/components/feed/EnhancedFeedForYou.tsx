@@ -9,6 +9,7 @@ import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
 import FeedEmptyState from './FeedEmptyState';
 import FeedEndState from './FeedEndState';
+import FeedLoadingMore from './FeedLoadingMore';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
@@ -50,7 +51,7 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
     isLoading: isLoadingMore,
     loadMore,
     threshold: 300,
-    rootMargin: '100px',
+    rootMargin: '600px',
     enabled: !feedLoading && !error && !!user
   });
 
@@ -146,12 +147,7 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
           
           {/* Infinite scroll trigger */}
           <div ref={loadMoreRef} className="py-4">
-            {isLoadingMore && (
-              <div className="flex justify-center items-center gap-2">
-                <Loader className="h-4 w-4 animate-spin text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Loading more...</span>
-              </div>
-            )}
+            {isLoadingMore && <FeedLoadingMore />}
             {!hasMore && items.length > 0 && !isLoadingMore && <FeedEndState />}
           </div>
         </>
