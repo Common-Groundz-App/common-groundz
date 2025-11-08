@@ -463,7 +463,7 @@ const Feed = React.memo(() => {
   }, [refreshing, isActive, startY, pullIntent, pullProgress]);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
       {/* Mobile Header - Only show on mobile screens */}
       <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
         <div className="container p-3 mx-auto flex justify-between items-center">
