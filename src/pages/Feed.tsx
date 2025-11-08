@@ -652,13 +652,11 @@ const Feed = React.memo(() => {
                 </AnimatePresence>
                 
                 {/* Feed Content - No overflow or height constraints */}
-                <div className="px-4">
-                  {activeTab === "for-you" ? (
-                    <EnhancedFeedForYou refreshing={refreshing} />
-                  ) : (
-                    <FeedFollowing refreshing={refreshing} />
-                  )}
-                </div>
+                {activeTab === "for-you" ? (
+                  <EnhancedFeedForYou refreshing={refreshing} />
+                ) : (
+                  <FeedFollowing refreshing={refreshing} />
+                )}
               </div>
             </div>
             
