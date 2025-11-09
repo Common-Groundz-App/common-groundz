@@ -557,7 +557,7 @@ const Feed = React.memo(() => {
             {/* Middle Column - Feed Content */}
             <div className="col-span-1 xl:col-span-4 max-w-2xl w-full mx-auto px-0 xl:px-4">
               {/* Feed Header - Part of normal document flow */}
-              <div className="px-4 py-6 md:py-4 mb-2">
+              <div className="py-6 md:py-4 mb-2">
                 <div className="flex justify-between items-center">
                   <div>
                     <h1 className="text-2xl font-bold">Home</h1>
