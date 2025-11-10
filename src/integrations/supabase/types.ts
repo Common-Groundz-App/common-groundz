@@ -3636,6 +3636,88 @@ export type Database = {
         Args: { notification_ids: string[] }
         Returns: string[]
       }
+      match_product_relationships: {
+        Args: {
+          filter_entity_id?: string
+          filter_relationship_type?: string
+          match_count?: number
+          match_threshold?: number
+          min_confidence?: number
+          query_embedding: string
+        }
+        Returns: {
+          confidence_score: number
+          confirmation_count: number
+          entity_a_id: string
+          entity_b_id: string
+          evidence_text: string
+          id: string
+          related_entity_id: string
+          relationship_type: string
+          similarity: number
+        }[]
+      }
+      match_profiles: {
+        Args: {
+          exclude_user_id?: string
+          filter_location?: string
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          avatar_url: string
+          bio: string
+          first_name: string
+          id: string
+          last_name: string
+          location: string
+          similarity: number
+          username: string
+        }[]
+      }
+      match_reviews: {
+        Args: {
+          filter_category?: string
+          filter_entity_id?: string
+          filter_user_id?: string
+          match_count?: number
+          match_threshold?: number
+          min_rating?: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          created_at: string
+          description: string
+          entity_id: string
+          id: string
+          rating: number
+          similarity: number
+          title: string
+          user_id: string
+        }[]
+      }
+      match_user_memories: {
+        Args: {
+          filter_memory_type?: string
+          match_count?: number
+          match_threshold?: number
+          min_importance?: number
+          p_user_id: string
+          query_embedding: string
+        }
+        Returns: {
+          access_count: number
+          content: string
+          created_at: string
+          id: string
+          importance_score: number
+          last_accessed_at: string
+          memory_type: string
+          similarity: number
+        }[]
+      }
       migrate_to_hierarchical_slugs: {
         Args: { batch_size?: number }
         Returns: {
