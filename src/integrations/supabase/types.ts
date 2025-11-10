@@ -2006,6 +2006,90 @@ export type Database = {
           },
         ]
       }
+      product_relationships: {
+        Row: {
+          confidence_score: number | null
+          confirmation_count: number | null
+          created_at: string | null
+          discovered_from_user_id: string | null
+          embedding: string | null
+          entity_a_id: string
+          entity_b_id: string
+          evidence_text: string | null
+          id: string
+          last_confirmed_at: string | null
+          metadata: Json | null
+          rejection_count: number | null
+          relationship_type: string
+        }
+        Insert: {
+          confidence_score?: number | null
+          confirmation_count?: number | null
+          created_at?: string | null
+          discovered_from_user_id?: string | null
+          embedding?: string | null
+          entity_a_id: string
+          entity_b_id: string
+          evidence_text?: string | null
+          id?: string
+          last_confirmed_at?: string | null
+          metadata?: Json | null
+          rejection_count?: number | null
+          relationship_type: string
+        }
+        Update: {
+          confidence_score?: number | null
+          confirmation_count?: number | null
+          created_at?: string | null
+          discovered_from_user_id?: string | null
+          embedding?: string | null
+          entity_a_id?: string
+          entity_b_id?: string
+          evidence_text?: string | null
+          id?: string
+          last_confirmed_at?: string | null
+          metadata?: Json | null
+          rejection_count?: number | null
+          relationship_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_relationships_discovered_from_user_id_fkey"
+            columns: ["discovered_from_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_relationships_entity_a_id_fkey"
+            columns: ["entity_a_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_relationships_entity_a_id_fkey"
+            columns: ["entity_a_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_view"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "product_relationships_entity_b_id_fkey"
+            columns: ["entity_b_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_relationships_entity_b_id_fkey"
+            columns: ["entity_b_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_view"
+            referencedColumns: ["entity_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2813,6 +2897,63 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_conversation_memory: {
+        Row: {
+          access_count: number | null
+          content: string
+          created_at: string | null
+          embedding: string | null
+          id: string
+          importance_score: number | null
+          last_accessed_at: string | null
+          memory_type: string
+          metadata: Json | null
+          source_conversation_id: string | null
+          user_id: string
+        }
+        Insert: {
+          access_count?: number | null
+          content: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          importance_score?: number | null
+          last_accessed_at?: string | null
+          memory_type: string
+          metadata?: Json | null
+          source_conversation_id?: string | null
+          user_id: string
+        }
+        Update: {
+          access_count?: number | null
+          content?: string
+          created_at?: string | null
+          embedding?: string | null
+          id?: string
+          importance_score?: number | null
+          last_accessed_at?: string | null
+          memory_type?: string
+          metadata?: Json | null
+          source_conversation_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_conversation_memory_source_conversation_id_fkey"
+            columns: ["source_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_conversation_memory_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_interests: {
         Row: {
