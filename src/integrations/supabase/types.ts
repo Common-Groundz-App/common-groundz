@@ -485,6 +485,39 @@ export type Database = {
         }
         Relationships: []
       }
+      embedding_trigger_log: {
+        Row: {
+          content_length: number | null
+          content_type: string
+          created_at: string | null
+          id: string
+          record_id: string
+          skip_reason: string | null
+          skipped: boolean | null
+          table_name: string
+        }
+        Insert: {
+          content_length?: number | null
+          content_type: string
+          created_at?: string | null
+          id?: string
+          record_id: string
+          skip_reason?: string | null
+          skipped?: boolean | null
+          table_name: string
+        }
+        Update: {
+          content_length?: number | null
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          record_id?: string
+          skip_reason?: string | null
+          skipped?: boolean | null
+          table_name?: string
+        }
+        Relationships: []
+      }
       entities: {
         Row: {
           about_source: string | null
@@ -3179,6 +3212,10 @@ export type Database = {
             }[]
           }
       fix_duplicate_slugs: { Args: never; Returns: number }
+      generate_embedding_async: {
+        Args: { content_text: string; content_type: string }
+        Returns: undefined
+      }
       generate_entity_slug:
         | { Args: { name: string }; Returns: string }
         | { Args: { entity_id?: string; name: string }; Returns: string }
