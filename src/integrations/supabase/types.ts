@@ -3212,10 +3212,19 @@ export type Database = {
             }[]
           }
       fix_duplicate_slugs: { Args: never; Returns: number }
-      generate_embedding_async: {
-        Args: { content_text: string; content_type: string }
-        Returns: undefined
-      }
+      generate_embedding_async:
+        | {
+            Args: { content_text: string; content_type: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              content_text: string
+              content_type: string
+              record_id: string
+            }
+            Returns: undefined
+          }
       generate_entity_slug:
         | { Args: { name: string }; Returns: string }
         | { Args: { entity_id?: string; name: string }; Returns: string }
