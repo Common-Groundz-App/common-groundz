@@ -2012,6 +2012,8 @@ export type Database = {
           bio: string | null
           cover_url: string | null
           created_at: string
+          embedding: string | null
+          embedding_updated_at: string | null
           first_name: string | null
           id: string
           last_name: string | null
@@ -2025,6 +2027,8 @@ export type Database = {
           bio?: string | null
           cover_url?: string | null
           created_at?: string
+          embedding?: string | null
+          embedding_updated_at?: string | null
           first_name?: string | null
           id: string
           last_name?: string | null
@@ -2038,6 +2042,8 @@ export type Database = {
           bio?: string | null
           cover_url?: string | null
           created_at?: string
+          embedding?: string | null
+          embedding_updated_at?: string | null
           first_name?: string | null
           id?: string
           last_name?: string | null
@@ -2464,6 +2470,8 @@ export type Database = {
           category: string
           created_at: string
           description: string | null
+          embedding: string | null
+          embedding_updated_at: string | null
           entity_id: string | null
           experience_date: string | null
           has_timeline: boolean | null
@@ -2494,6 +2502,8 @@ export type Database = {
           category: string
           created_at?: string
           description?: string | null
+          embedding?: string | null
+          embedding_updated_at?: string | null
           entity_id?: string | null
           experience_date?: string | null
           has_timeline?: boolean | null
@@ -2524,6 +2534,8 @@ export type Database = {
           category?: string
           created_at?: string
           description?: string | null
+          embedding?: string | null
+          embedding_updated_at?: string | null
           entity_id?: string | null
           experience_date?: string | null
           has_timeline?: boolean | null
