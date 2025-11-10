@@ -146,7 +146,16 @@ export const storeEnhancedMetadata = async (
   metadata: any
 ): Promise<boolean> => {
   try {
-    const fileName = `${entityId}/enhanced-metadata.json`;
+    // Get current user ID for secure path structure
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user?.id) {
+      console.error('User must be authenticated to store enhanced metadata');
+      return false;
+    }
+    
+    // Use user-scoped path: {user_id}/{entity_id}.json
+    const fileName = `${session.user.id}/${entityId}.json`;
     const metadataBlob = new Blob([JSON.stringify(metadata, null, 2)], { 
       type: 'application/json' 
     });
@@ -176,7 +185,16 @@ export const storeEnhancedMetadata = async (
  */
 export const retrieveEnhancedMetadata = async (entityId: string): Promise<any | null> => {
   try {
-    const fileName = `${entityId}/enhanced-metadata.json`;
+    // Get current user ID for secure path structure
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user?.id) {
+      console.error('User must be authenticated to retrieve enhanced metadata');
+      return null;
+    }
+    
+    // Use user-scoped path: {user_id}/{entity_id}.json
+    const fileName = `${session.user.id}/${entityId}.json`;
     
     const { data, error } = await supabase.storage
       .from('enhanced-entity-data')

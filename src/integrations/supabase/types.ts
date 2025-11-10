@@ -3179,13 +3179,8 @@ export type Database = {
       }
       cleanup_expired_cached_photos: { Args: never; Returns: number }
       cleanup_spaced_hashtags: { Args: never; Returns: Json }
-      create_storage_helper_functions: { Args: never; Returns: undefined }
       create_storage_open_policy: {
         Args: { bucket_id: string }
-        Returns: boolean
-      }
-      create_storage_policy: {
-        Args: { bucket_name: string; definition: string; policy_name: string }
         Returns: boolean
       }
       delete_comment: {
