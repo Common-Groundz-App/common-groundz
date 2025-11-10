@@ -3348,6 +3348,16 @@ export type Database = {
         }[]
       }
       get_dynamic_rating: { Args: { p_entity_id: string }; Returns: number }
+      get_embedding_stats: {
+        Args: never
+        Returns: {
+          avg_embedding_age_hours: number
+          embedding_coverage_percent: number
+          rows_with_embeddings: number
+          table_name: string
+          total_rows: number
+        }[]
+      }
       get_entity_follower_names: {
         Args: { follower_limit?: number; input_entity_id: string }
         Returns: {
@@ -3743,6 +3753,22 @@ export type Database = {
         Returns: {
           duplicates_found: number
           duplicates_inserted: number
+        }[]
+      }
+      search_all_content: {
+        Args: {
+          match_threshold?: number
+          p_user_id?: string
+          query_embedding: string
+          results_per_type?: number
+        }
+        Returns: {
+          content_id: string
+          content_type: string
+          description: string
+          metadata: Json
+          similarity: number
+          title: string
         }[]
       }
       search_categories: {
