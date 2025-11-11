@@ -12,13 +12,12 @@ export const initializeStorageService = async (): Promise<void> => {
       return;
     }
     
-    // Ensure required buckets exist and have proper policies
-    await Promise.all([
-      ensureBucketPolicies('entity-images'),
-      ensureBucketPolicies('post_media'),
-      ensureBucketPolicies('recommendation_images'),
-      ensureBucketPolicies('enhanced-entity-data') // New bucket for enhanced data
-    ]);
+    // NOTE: Storage bucket policies are managed via database migrations
+    // See: supabase/migrations/20251110171042_ac826449-0576-4ef0-af2d-11bc2e715755.sql
+    // This ensures policies are created with proper ownership and prevents runtime warnings
+    
+    // Future bucket initialization logic can go here if needed
+    // For now, all policies are pre-configured via migrations
 
   } catch (error) {
     // Silently handle errors for unauthenticated users
