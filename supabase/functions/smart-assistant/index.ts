@@ -746,43 +746,75 @@ Always prioritize user experience and provide actionable insights.`;
       }
     ];
 
-    // 8. Call Lovable AI Gateway (Google Gemini 2.5 Flash)
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY not configured');
+    // 8. Call Google Gemini API directly
+    const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY not configured');
     }
 
-    console.log('[smart-assistant] Calling AI with', conversationHistory.length, 'history messages');
+    console.log('[smart-assistant] Calling Gemini AI with', conversationHistory.length, 'history messages');
 
-    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    // Convert tools to Gemini format
+    const geminiTools = [{
+      function_declarations: tools.map(t => ({
+        name: t.function.name,
+        description: t.function.description,
+        parameters: t.function.parameters
+      }))
+    }];
+
+    // Convert conversation history to Gemini format
+    const geminiMessages = [
+      { role: 'user', parts: [{ text: systemPrompt }] },
+      { role: 'model', parts: [{ text: 'Understood. I will help users with their questions using the available tools.' }] },
+      ...conversationHistory.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.content }]
+      })),
+      { role: 'user', parts: [{ text: message }] }
+    ];
+
+    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...conversationHistory,
-          { role: 'user', content: message }
-        ],
-        tools: tools,
-        tool_choice: 'auto',
-        temperature: 0.7,
-        max_tokens: 1000
+        contents: geminiMessages,
+        tools: geminiTools,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1000
+        }
       }),
     });
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('[smart-assistant] AI API error:', aiResponse.status, errorText);
-      throw new Error(`AI API error: ${aiResponse.statusText}`);
+      console.error('[smart-assistant] Gemini API error:', aiResponse.status, errorText);
+      throw new Error(`Gemini API error: ${aiResponse.statusText}`);
     }
 
     const aiData = await aiResponse.json();
-    const assistantMessage = aiData.choices[0].message.content;
-    const toolCalls = aiData.choices[0].message.tool_calls;
+    console.log('[smart-assistant] Gemini response:', JSON.stringify(aiData, null, 2));
+
+    const candidate = aiData.candidates?.[0];
+    if (!candidate) {
+      throw new Error('No response from Gemini');
+    }
+
+    const assistantMessage = candidate.content?.parts?.find((p: any) => p.text)?.text || '';
+    const functionCalls = candidate.content?.parts?.filter((p: any) => p.functionCall) || [];
+    
+    // Convert Gemini function calls to OpenAI-style tool calls
+    const toolCalls = functionCalls.map((fc: any, idx: number) => ({
+      id: `call_${Date.now()}_${idx}`,
+      type: 'function',
+      function: {
+        name: fc.functionCall.name,
+        arguments: JSON.stringify(fc.functionCall.args)
+      }
+    }));
 
     console.log('[smart-assistant] AI response received, tool_calls:', toolCalls?.length || 0);
 
@@ -864,41 +896,57 @@ Always prioritize user experience and provide actionable insights.`;
         });
       }
 
-      // 9b. Make a second AI call with tool results to generate final response
-      console.log('[smart-assistant] Making follow-up AI call with tool results');
+      // 9b. Make a second Gemini call with tool results to generate final response
+      console.log('[smart-assistant] Making follow-up Gemini call with tool results');
 
-      const followUpResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      // Convert tool results to Gemini format
+      const geminiFollowUpMessages = [
+        { role: 'user', parts: [{ text: systemPrompt }] },
+        { role: 'model', parts: [{ text: 'Understood. I will help users with their questions using the available tools.' }] },
+        ...conversationHistory.map(msg => ({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.content }]
+        })),
+        { role: 'user', parts: [{ text: message }] },
+        { 
+          role: 'model', 
+          parts: functionCalls.map((fc: any) => ({ functionCall: fc.functionCall }))
+        },
+        {
+          role: 'user',
+          parts: toolResults.map((tr: any) => ({
+            functionResponse: {
+              name: tr.name,
+              response: JSON.parse(tr.content)
+            }
+          }))
+        }
+      ];
+
+      const followUpResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.5-flash',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            ...conversationHistory,
-            { role: 'user', content: message },
-            { 
-              role: 'assistant', 
-              content: assistantMessage || null,
-              tool_calls: toolCalls 
-            },
-            ...toolResults
-          ],
-          temperature: 0.7,
-          max_tokens: 1000
+          contents: geminiFollowUpMessages,
+          tools: geminiTools,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000
+          }
         }),
       });
 
       if (!followUpResponse.ok) {
         const errorText = await followUpResponse.text();
-        console.error('[smart-assistant] Follow-up AI call failed:', errorText);
+        console.error('[smart-assistant] Follow-up Gemini call failed:', errorText);
         // Fall back to original message if follow-up fails
         finalMessage = assistantMessage + '\n\n_Note: I retrieved the data but had trouble processing it. Please try asking again._';
       } else {
         const followUpData = await followUpResponse.json();
-        finalMessage = followUpData.choices[0].message.content;
+        const followUpCandidate = followUpData.candidates?.[0];
+        finalMessage = followUpCandidate?.content?.parts?.find((p: any) => p.text)?.text || assistantMessage;
         console.log('[smart-assistant] Follow-up response received');
       }
     }
@@ -913,8 +961,8 @@ Always prioritize user experience and provide actionable insights.`;
         metadata: {
           tool_calls: toolCalls || [],
           tools_executed: toolCalls?.length || 0,
-          model: 'google/gemini-2.5-flash',
-          tokens_used: aiData.usage
+          model: 'gemini-2.0-flash-exp',
+          tokens_used: aiData.usageMetadata
         }
       });
 
@@ -938,7 +986,7 @@ Always prioritize user experience and provide actionable insights.`;
       toolCalls: toolCalls || [],
       metadata: {
         responseTime,
-        tokensUsed: aiData.usage
+        tokensUsed: aiData.usageMetadata
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
