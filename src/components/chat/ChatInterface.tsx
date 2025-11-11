@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface Message {
   id: string;
@@ -21,8 +23,10 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -41,20 +45,63 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     };
 
     setMessages(prev => [...prev, userMessage]);
+    const messageText = input;
     setInput('');
     setIsLoading(true);
 
-    // TODO: Implement actual API call to assistant
-    setTimeout(() => {
+    try {
+      // Call the smart-assistant edge function
+      const { data, error } = await supabase.functions.invoke('smart-assistant', {
+        body: {
+          conversationId: conversationId,
+          message: messageText,
+          context: {
+            // Add any relevant context here (e.g., entity ID if viewing product page)
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Error calling assistant:', error);
+        throw error;
+      }
+
+      // Update conversation ID if this was a new conversation
+      if (!conversationId && data.conversationId) {
+        setConversationId(data.conversationId);
+      }
+
+      // Add assistant's response to messages
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: 'This is a placeholder response. The AI integration will be implemented in the next phase.',
+        content: data.message,
         createdAt: new Date(),
       };
+
       setMessages(prev => [...prev, assistantMessage]);
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Show error message to user
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
+
+      // Add error message to chat
+      const errorMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Sorry, I encountered an error processing your message. Please try again.',
+        createdAt: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
