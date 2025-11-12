@@ -3736,47 +3736,28 @@ export type Database = {
           username: string
         }[]
       }
-      match_reviews:
-        | {
-            Args: {
-              filter_entity_id?: string
-              match_count: number
-              match_threshold: number
-              query_embedding: string
-            }
-            Returns: {
-              content: string
-              created_at: string
-              entity_id: string
-              id: string
-              rating: number
-              similarity: number
-              title: string
-              user_id: string
-            }[]
-          }
-        | {
-            Args: {
-              filter_category?: string
-              filter_entity_id?: string
-              filter_user_id?: string
-              match_count?: number
-              match_threshold?: number
-              min_rating?: number
-              query_embedding: string
-            }
-            Returns: {
-              category: string
-              created_at: string
-              description: string
-              entity_id: string
-              id: string
-              rating: number
-              similarity: number
-              title: string
-              user_id: string
-            }[]
-          }
+      match_reviews: {
+        Args: {
+          filter_category?: string
+          filter_entity_id?: string
+          filter_user_id?: string
+          match_count?: number
+          match_threshold?: number
+          min_rating?: number
+          query_embedding: string
+        }
+        Returns: {
+          category: string
+          created_at: string
+          description: string
+          entity_id: string
+          id: string
+          rating: number
+          similarity: number
+          title: string
+          user_id: string
+        }[]
+      }
       match_user_memories: {
         Args: {
           filter_memory_type?: string
