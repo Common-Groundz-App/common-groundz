@@ -1,10 +1,21 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+function getTableName(type: string): string | null {
+  switch(type) {
+    case 'review': return 'reviews';
+    case 'profile': return 'profiles';
+    case 'memory': return 'user_conversation_memory';
+    case 'relationship': return 'product_relationships';
+    default: return null;
+  }
+}
 
 interface TextInput {
   id: string;
@@ -158,10 +169,53 @@ serve(async (req) => {
     const duration = Date.now() - startTime;
     console.log(`Successfully generated ${embeddings.length} embeddings in ${duration}ms`);
 
-    const responseData: any = { embeddings };
+    // Save embeddings back to the database
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+
+    const saveResults = [];
+    for (const embedding of embeddings) {
+      try {
+        const tableName = getTableName(embedding.type);
+        if (tableName) {
+          console.log(`Saving embedding to ${tableName} for ID: ${embedding.id}`);
+          const { error: updateError } = await supabaseClient
+            .from(tableName)
+            .update({
+              embedding: JSON.stringify(embedding.embedding),
+              embedding_updated_at: new Date().toISOString()
+            })
+            .eq('id', embedding.id);
+
+          if (updateError) {
+            console.error(`Failed to save embedding for ${embedding.id}:`, updateError);
+            saveResults.push({ id: embedding.id, saved: false, error: updateError.message });
+          } else {
+            console.log(`Successfully saved embedding for ${embedding.id}`);
+            saveResults.push({ id: embedding.id, saved: true });
+          }
+        } else {
+          console.error(`Unknown table type: ${embedding.type}`);
+          saveResults.push({ id: embedding.id, saved: false, error: 'Unknown table type' });
+        }
+      } catch (err) {
+        console.error(`Exception saving embedding for ${embedding.id}:`, err);
+        saveResults.push({ id: embedding.id, saved: false, error: err instanceof Error ? err.message : 'Unknown error' });
+      }
+    }
+
+    const responseData: any = { 
+      embeddings,
+      saveResults,
+      savedCount: saveResults.filter(r => r.saved).length,
+      totalCount: embeddings.length
+    };
     if (errors.length > 0) {
       responseData.errors = errors;
     }
+
+    console.log(`Saved ${responseData.savedCount}/${responseData.totalCount} embeddings to database`);
 
     return new Response(
       JSON.stringify(responseData),
