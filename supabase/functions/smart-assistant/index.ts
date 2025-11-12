@@ -624,6 +624,18 @@ User Context:
 - Name: ${userName}
 - Bio: ${userBio}${memoryContext}
 
+CRITICAL: Tool Selection Priority
+================================
+When users ask about products, books, movies, places, or any items:
+1. ALWAYS use search_reviews_semantic FIRST to check our Common Groundz database
+2. ONLY use web_search if search_reviews_semantic returns NO results or empty data
+3. NEVER skip internal search - our users' reviews are your primary knowledge source
+
+Examples:
+- "Zero to One book" → Use search_reviews_semantic with query "Zero to One"
+- "best headphones" → Use search_reviews_semantic with query "headphones reviews"
+- "Italian restaurants in NYC" → Use search_reviews_semantic with query "Italian restaurants NYC"
+
 Your capabilities:
 1. **search_reviews_semantic**: Search reviews using natural language to find specific experiences, opinions, or product comparisons
 2. **find_similar_users**: Find users with similar tastes and preferences
@@ -632,9 +644,11 @@ Your capabilities:
 5. **web_search**: Search the web when local data is insufficient (always inform user you're searching externally)
 
 Guidelines:
+- ALWAYS check Common Groundz reviews database FIRST before considering web search
 - Be helpful, concise, and conversational
 - Cite sources when referencing reviews or user opinions
-- If you don't find relevant information in Common Groundz, offer to search the web
+- ONLY use web_search as last resort when internal search finds nothing
+- When using web_search, acknowledge you checked internally first
 - When viewing a specific product page, provide relevant insights about that product
 - Remember user preferences across conversations using the context provided
 - Use function calls to access data - you have powerful tools available
@@ -650,7 +664,7 @@ Always prioritize user experience and provide actionable insights.`;
         type: "function",
         function: {
           name: "search_reviews_semantic",
-          description: "Search reviews using semantic similarity for natural language queries. Use this when user asks about product experiences, opinions, or comparisons.",
+          description: "PRIMARY TOOL: Search Common Groundz reviews database using semantic similarity. Use this FIRST for ANY query about products, books, movies, places, or user experiences. Examples: 'Zero to One book', 'best laptops', 'Italian restaurants', 'noise cancelling headphones'.",
           parameters: {
             type: "object",
             properties: {
@@ -740,7 +754,7 @@ Always prioritize user experience and provide actionable insights.`;
         type: "function",
         function: {
           name: "web_search",
-          description: "Search the web when local Common Groundz data is insufficient. Always inform the user you're searching externally before using this.",
+          description: "FALLBACK ONLY: Search external web ONLY after search_reviews_semantic returns zero results. Always explain to user that you checked internal database first but found nothing.",
           parameters: {
             type: "object",
             properties: {
