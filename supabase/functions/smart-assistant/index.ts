@@ -19,20 +19,29 @@ async function searchReviewsSemantic(
     console.log('[searchReviewsSemantic] Query:', query, 'EntityId:', entityId, 'Limit:', limit);
     
     // Generate embedding for the search query
-    const embeddingResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-embeddings`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-      },
-      body: JSON.stringify({ text: query, type: 'review' })
-    });
+  const embeddingResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-embeddings`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+    },
+    body: JSON.stringify({ 
+      texts: [{ 
+        id: 'search_query', 
+        content: query, 
+        type: 'review' 
+      }] 
+    })
+  });
 
-    if (!embeddingResponse.ok) {
-      throw new Error('Failed to generate embedding for search query');
-    }
+  if (!embeddingResponse.ok) {
+    const errorText = await embeddingResponse.text();
+    console.error('[searchReviewsSemantic] Embedding API error:', errorText);
+    throw new Error('Failed to generate embedding for search query');
+  }
 
-    const { embedding } = await embeddingResponse.json();
+  const { embeddings } = await embeddingResponse.json();
+  const embedding = embeddings[0].embedding;
 
     // Use match_reviews RPC for vector similarity search
     const { data, error } = await supabaseClient.rpc('match_reviews', {

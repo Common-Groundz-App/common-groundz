@@ -344,6 +344,7 @@ export type Database = {
           created_at: string
           id: string
           is_deleted: boolean
+          metadata: Json | null
           role: string
         }
         Insert: {
@@ -352,6 +353,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_deleted?: boolean
+          metadata?: Json | null
           role: string
         }
         Update: {
@@ -360,6 +362,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_deleted?: boolean
+          metadata?: Json | null
           role?: string
         }
         Relationships: [
