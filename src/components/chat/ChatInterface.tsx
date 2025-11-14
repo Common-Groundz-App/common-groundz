@@ -23,6 +23,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingState, setLoadingState] = useState<'typing' | 'searching' | 'thinking'>('typing');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -48,6 +49,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     const messageText = input;
     setInput('');
     setIsLoading(true);
+    setLoadingState('thinking');
 
     try {
       // Call the smart-assistant edge function
@@ -104,6 +106,85 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     }
   };
 
+  const handleNewConversation = () => {
+    setMessages([]);
+    setConversationId(null);
+    setInput('');
+    toast({
+      title: "New conversation started",
+      description: "Previous conversation saved",
+    });
+  };
+
+  const handleDeleteConversation = async () => {
+    if (!conversationId) {
+      // Just clear local state
+      setMessages([]);
+      setInput('');
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('conversations')
+        .delete()
+        .eq('id', conversationId);
+      
+      if (error) throw error;
+      
+      setMessages([]);
+      setConversationId(null);
+      setInput('');
+      
+      toast({
+        title: "Conversation deleted",
+        description: "Messages have been removed",
+      });
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete conversation",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleResetMemory = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to reset your memory? This will delete all learned preferences and cannot be undone.'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+      
+      const { error } = await supabase
+        .from('user_conversation_memory')
+        .delete()
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Memory reset",
+        description: "All learned preferences have been cleared",
+      });
+    } catch (error) {
+      console.error('Error resetting memory:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reset memory",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -121,21 +202,70 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
           <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
           <h3 className="font-semibold text-foreground">Assistant</h3>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-8 w-8 p-0"
-        >
-          ✕
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleNewConversation}
+            className="text-xs h-auto py-1.5 px-2"
+          >
+            New Chat
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleDeleteConversation}
+            className="text-xs text-destructive h-auto py-1.5 px-2"
+          >
+            Delete
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleResetMemory}
+            className="text-xs text-amber-500 h-auto py-1.5 px-2"
+          >
+            Reset Memory
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-8 w-8 p-0"
+          >
+            ✕
+          </Button>
+        </div>
       </div>
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            Start a conversation with your assistant
+          <div className="space-y-4">
+            <div className="text-center text-muted-foreground text-sm mb-4">
+              Start a conversation or try a quick action:
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {[
+                "Get personalized recommendations",
+                "What do you know about my preferences?",
+                "Find products for sensitive skin",
+                "Show me my favorite genres"
+              ].map((action) => (
+                <Button
+                  key={action}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setInput(action);
+                    textareaRef.current?.focus();
+                  }}
+                  className="text-left justify-start h-auto py-2 px-3"
+                >
+                  {action}
+                </Button>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -161,8 +291,13 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-muted text-foreground rounded-lg px-4 py-2">
+                <div className="bg-muted text-foreground rounded-lg px-4 py-2 flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">
+                    {loadingState === 'typing' && 'AI is typing...'}
+                    {loadingState === 'searching' && 'Searching reviews...'}
+                    {loadingState === 'thinking' && 'Thinking...'}
+                  </span>
                 </div>
               </div>
             )}
