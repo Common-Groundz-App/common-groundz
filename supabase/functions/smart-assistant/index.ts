@@ -476,6 +476,79 @@ async function webSearch(query: string): Promise<any> {
   }
 }
 
+async function searchUserMemory(
+  supabaseClient: any,
+  userId: string,
+  query: string,
+  scope?: string
+): Promise<any> {
+  try {
+    console.log('[searchUserMemory] Query:', query, 'Scope:', scope, 'User:', userId);
+    
+    const { data: userMemory } = await supabaseClient
+      .from('user_conversation_memory')
+      .select('memory_summary, metadata')
+      .eq('user_id', userId)
+      .single();
+    
+    if (!userMemory) {
+      return {
+        success: false,
+        message: 'No memory found for this user yet.'
+      };
+    }
+    
+    const scopes = userMemory.metadata?.scopes || {};
+    
+    // Filter by scope if specified
+    if (scope && scope !== 'all') {
+      return {
+        success: true,
+        scope: scope,
+        data: scopes[scope] || {},
+        summary: userMemory.memory_summary
+      };
+    }
+    
+    // Return all scopes
+    return {
+      success: true,
+      data: scopes,
+      summary: userMemory.memory_summary
+    };
+    
+  } catch (error) {
+    console.error('[searchUserMemory] Error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+function detectMemoryUpdateTrigger(
+  userMessage: string,
+  assistantMessage: string
+): { trigger: boolean; reason?: string } {
+  const lowerMsg = userMessage.toLowerCase();
+  
+  // Conversation ending phrases
+  const endPhrases = ['thanks', 'thank you', 'bye', 'goodbye', "that's all", 'perfect', 'great thanks'];
+  if (endPhrases.some(p => lowerMsg.includes(p))) {
+    return { trigger: true, reason: 'conversation-end' };
+  }
+  
+  // AI needs context (mentions not knowing preferences)
+  const lowerAssistant = assistantMessage.toLowerCase();
+  if (lowerAssistant.includes("don't know") || 
+      lowerAssistant.includes("tell me more about") ||
+      lowerAssistant.includes("what are your preferences")) {
+    return { trigger: true, reason: 'context-needed' };
+  }
+  
+  return { trigger: false };
+}
+
 // ========== MAIN HANDLER ==========
 
 serve(async (req) => {
@@ -590,32 +663,36 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
 
-    // 5. Load relevant user memories (top 3-5 using vector similarity)
-    let relevantMemories = [];
-    try {
-      const { data: memoriesData } = await supabaseClient
-        .rpc('match_user_memories', {
-          query_user_id: user.id,
-          query_text: message,
-          match_threshold: 0.7,
-          match_count: 5
-        });
-      
-      if (memoriesData) {
-        relevantMemories = memoriesData;
-      }
-    } catch (memoryError) {
-      console.log('[smart-assistant] No memories found or error:', memoryError);
-    }
+    // 5. Load user conversation memory directly from table
+    const { data: userMemory } = await supabaseClient
+      .from('user_conversation_memory')
+      .select('memory_summary, metadata, last_accessed_at')
+      .eq('user_id', user.id)
+      .single();
 
     // 6. Build dynamic system prompt with user context
     const userName = profile?.first_name || profile?.username || 'User';
     const userBio = profile?.bio || 'No bio yet';
     
     let memoryContext = '';
-    if (relevantMemories.length > 0) {
-      memoryContext = '\nKnown preferences and context:\n' + 
-        relevantMemories.map((m: any) => `- ${m.memory_summary}`).join('\n');
+    if (userMemory) {
+      const scopes = userMemory.metadata?.scopes || {};
+      const scopeTexts = [];
+      
+      if (scopes.skincare) scopeTexts.push(`Skincare: ${JSON.stringify(scopes.skincare)}`);
+      if (scopes.food) scopeTexts.push(`Food: ${JSON.stringify(scopes.food)}`);
+      if (scopes.movies) scopeTexts.push(`Movies: ${JSON.stringify(scopes.movies)}`);
+      if (scopes.routines) scopeTexts.push(`Routines: ${JSON.stringify(scopes.routines)}`);
+      
+      if (scopeTexts.length > 0) {
+        memoryContext = '\n\nWhat I know about you:\n' + scopeTexts.join('\n');
+      }
+      
+      // Update last_accessed_at timestamp
+      await supabaseClient
+        .from('user_conversation_memory')
+        .update({ last_accessed_at: new Date().toISOString() })
+        .eq('user_id', user.id);
     }
 
     const systemPrompt = `You are the Common Groundz AI Assistant. You help users discover products, analyze reviews, and get personalized recommendations based on real user experiences.
@@ -766,6 +843,28 @@ Always prioritize user experience and provide actionable insights.`;
             required: ["query"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "search_user_memory",
+          description: "Search user's long-term memory for preferences, past context, and learned patterns. Use when you need to recall what you know about the user.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: {
+                type: "string",
+                description: "What to search for (e.g., 'skincare preferences', 'food dislikes', 'workout routine')"
+              },
+              scope: {
+                type: "string",
+                enum: ["skincare", "food", "movies", "routines", "all"],
+                description: "Optional: limit search to specific scope"
+              }
+            },
+            required: ["query"]
+          }
+        }
       }
     ];
 
@@ -897,6 +996,15 @@ Always prioritize user experience and provide actionable insights.`;
               result = await webSearch(functionArgs.query);
               break;
 
+            case 'search_user_memory':
+              result = await searchUserMemory(
+                supabaseClient,
+                user.id,
+                functionArgs.query,
+                functionArgs.scope
+              );
+              break;
+
             default:
               result = {
                 success: false,
@@ -998,6 +1106,26 @@ Always prioritize user experience and provide actionable insights.`;
       .from('conversations')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', conversation.id);
+
+    // 12. Check if memory should be updated
+    const memoryTrigger = detectMemoryUpdateTrigger(message, finalMessage);
+
+    if (memoryTrigger.trigger) {
+      console.log('[smart-assistant] Triggering memory update:', memoryTrigger.reason);
+      
+      // Async call to update-user-memory (don't block response)
+      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/update-user-memory`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': req.headers.get('Authorization') || ''
+        },
+        body: JSON.stringify({
+          conversationId: conversation.id,
+          trigger: memoryTrigger.reason
+        })
+      }).catch(err => console.error('[smart-assistant] Memory update failed:', err));
+    }
 
     const responseTime = Date.now() - startTime;
     console.log('[smart-assistant] Request completed in', responseTime, 'ms');
