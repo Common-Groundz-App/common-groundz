@@ -1,4 +1,3 @@
-
 project_id = "uyjtgybbktgapspodajy"
 
 [api]
@@ -73,5 +72,8 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.smart-assistant]
+verify_jwt = true
+
+[functions.update-user-memory]
 verify_jwt = true
 
