@@ -310,7 +310,7 @@ Use the extract_scoped_memories function to structure your response.`;
         },
         { onConflict: "user_id" }
       )
-      .select("id")
+      .select("id, last_accessed_at")
       .single();
 
     if (memoryError) {
@@ -353,7 +353,7 @@ Use the extract_scoped_memories function to structure your response.`;
         memoryId: memoryRecord.id,
         trigger,
         scopesUpdated,
-        updatedAt: memoryRecord.updated_at,
+        updatedAt: memoryRecord.last_accessed_at,
       }),
       {
         status: 200,
