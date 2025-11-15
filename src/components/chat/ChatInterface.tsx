@@ -86,21 +86,24 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Show error message to user
+      // Extract user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : "Failed to send message. Please try again.";
+      
+      // Show error toast
       toast({
         title: "Error",
-        description: "Failed to send message. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
 
       // Add error message to chat
-      const errorMessage: Message = {
+      const assistantErrorMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error processing your message. Please try again.',
+        content: `Sorry, ${errorMessage}`,
         createdAt: new Date(),
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, assistantErrorMessage]);
     } finally {
       setIsLoading(false);
     }

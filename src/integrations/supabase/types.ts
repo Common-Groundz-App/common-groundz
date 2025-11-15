@@ -2943,47 +2943,50 @@ export type Database = {
       user_conversation_memory: {
         Row: {
           access_count: number | null
-          content: string
           created_at: string | null
           embedding: string | null
           id: string
           importance_score: number | null
           last_accessed_at: string | null
+          last_conversation_id: string | null
+          last_update_trigger: string | null
+          memory_summary: string
           memory_type: string
           metadata: Json | null
-          source_conversation_id: string | null
           user_id: string
         }
         Insert: {
           access_count?: number | null
-          content: string
           created_at?: string | null
           embedding?: string | null
           id?: string
           importance_score?: number | null
           last_accessed_at?: string | null
+          last_conversation_id?: string | null
+          last_update_trigger?: string | null
+          memory_summary: string
           memory_type: string
           metadata?: Json | null
-          source_conversation_id?: string | null
           user_id: string
         }
         Update: {
           access_count?: number | null
-          content?: string
           created_at?: string | null
           embedding?: string | null
           id?: string
           importance_score?: number | null
           last_accessed_at?: string | null
+          last_conversation_id?: string | null
+          last_update_trigger?: string | null
+          memory_summary?: string
           memory_type?: string
           metadata?: Json | null
-          source_conversation_id?: string | null
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "user_conversation_memory_source_conversation_id_fkey"
-            columns: ["source_conversation_id"]
+            columns: ["last_conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["id"]
@@ -2991,7 +2994,7 @@ export type Database = {
           {
             foreignKeyName: "user_conversation_memory_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
