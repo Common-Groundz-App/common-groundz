@@ -715,7 +715,7 @@ serve(async (req) => {
     // 4. Load user profile
     const { data: profile } = await supabaseClient
       .from('profiles')
-      .select('username, first_name, last_name, bio')
+      .select('username, first_name, last_name, bio, preferences')
       .eq('id', user.id)
       .single();
 
@@ -729,6 +729,24 @@ serve(async (req) => {
     // 6. Build dynamic system prompt with user context
     const userName = profile?.first_name || profile?.username || 'User';
     const userBio = profile?.bio || 'No bio yet';
+    
+    // Extract profile preferences
+    let profilePreferences = '';
+    if (profile?.preferences && Object.keys(profile.preferences).length > 0) {
+      const prefs = profile.preferences as any;
+      const prefTexts = [];
+      
+      if (prefs.skinType) prefTexts.push(`Skin Type: ${prefs.skinType}`);
+      if (prefs.hairType) prefTexts.push(`Hair Type: ${Array.isArray(prefs.hairType) ? prefs.hairType.join(', ') : prefs.hairType}`);
+      if (prefs.foodPreferences) prefTexts.push(`Food Preferences: ${Array.isArray(prefs.foodPreferences) ? prefs.foodPreferences.join(', ') : prefs.foodPreferences}`);
+      if (prefs.lifestyle) prefTexts.push(`Lifestyle: ${Array.isArray(prefs.lifestyle) ? prefs.lifestyle.join(', ') : prefs.lifestyle}`);
+      if (prefs.genrePreferences) prefTexts.push(`Genre Preferences: ${Array.isArray(prefs.genrePreferences) ? prefs.genrePreferences.join(', ') : prefs.genrePreferences}`);
+      if (prefs.goals) prefTexts.push(`Goals: ${Array.isArray(prefs.goals) ? prefs.goals.join(', ') : prefs.goals}`);
+      
+      if (prefTexts.length > 0) {
+        profilePreferences = '\n\nProfile Preferences:\n' + prefTexts.join('\n');
+      }
+    }
     
     let memoryContext = '';
     if (userMemory) {
@@ -755,7 +773,7 @@ serve(async (req) => {
 
 User Context:
 - Name: ${userName}
-- Bio: ${userBio}${memoryContext}
+- Bio: ${userBio}${profilePreferences}${memoryContext}
 
 CRITICAL: Tool Selection Priority
 ================================
