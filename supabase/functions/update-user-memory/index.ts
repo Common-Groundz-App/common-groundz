@@ -302,15 +302,15 @@ Use the extract_scoped_memories function to structure your response.`;
       .upsert(
         {
           user_id: user.id,
+          memory_type: 'scoped_preferences',
           memory_summary: memorySummary,
           metadata: { scopes: mergedScopes },
           last_update_trigger: trigger,
           last_conversation_id: conversationId,
-          updated_at: new Date().toISOString(),
         },
         { onConflict: "user_id" }
       )
-      .select("id, updated_at")
+      .select("id")
       .single();
 
     if (memoryError) {
