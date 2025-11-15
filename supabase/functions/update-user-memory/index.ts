@@ -302,7 +302,7 @@ Use the extract_scoped_memories function to structure your response.`;
       .upsert(
         {
           user_id: user.id,
-          memory_type: 'scoped_preferences',
+          memory_type: 'preference',
           memory_summary: memorySummary,
           metadata: { scopes: mergedScopes },
           last_update_trigger: trigger,
