@@ -7,6 +7,62 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ========== HELPER FUNCTIONS ==========
+
+/**
+ * Timeout wrapper to prevent hanging requests
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  const timeout = new Promise<T>((_, reject) =>
+    setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
+/**
+ * Fetch with exponential backoff retry logic for 503 and 429 errors
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+  initialDelay = 1000
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Wrap fetch in timeout (8 seconds)
+      const response = await withTimeout(fetch(url, options), 8000);
+      
+      // If 503 (Service Unavailable) or 429 (Rate Limit), retry with backoff
+      if (response.status === 503 || response.status === 429) {
+        if (attempt < maxRetries - 1) {
+          const delay = initialDelay * Math.pow(2, attempt); // Exponential backoff
+          console.log(`[fetchWithRetry] Received ${response.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      const isTimeout = error instanceof Error && error.message.includes('timed out');
+      lastError = error as Error;
+      
+      if (attempt < maxRetries - 1) {
+        const delay = initialDelay * Math.pow(2, attempt);
+        console.log(`[fetchWithRetry] ${isTimeout ? 'Timeout' : 'Network error'}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries}):`, error);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+    }
+  }
+  
+  // User-friendly fallback message
+  throw new Error("I'm having trouble reaching the AI service right now. Please try again in 10–15 seconds.");
+}
+
 // ========== TOOL EXECUTION FUNCTIONS ==========
 
 async function searchReviewsSemantic(
@@ -896,25 +952,38 @@ Always prioritize user experience and provide actionable insights.`;
       { role: 'user', parts: [{ text: message }] }
     ];
 
-    const aiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const aiResponse = await fetchWithRetry(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: geminiMessages,
+          tools: geminiTools,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000
+          }
+        }),
       },
-      body: JSON.stringify({
-        contents: geminiMessages,
-        tools: geminiTools,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1000
-        }
-      }),
-    });
+      3, // maxRetries
+      1000 // initialDelay (1 second)
+    );
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
       console.error('[smart-assistant] Gemini API error:', aiResponse.status, errorText);
-      throw new Error(`Gemini API error: ${aiResponse.statusText}`);
+      
+      // User-friendly error messages
+      if (aiResponse.status === 503) {
+        throw new Error('AI service is temporarily overloaded. Please try again in a moment.');
+      } else if (aiResponse.status === 429) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      } else {
+        throw new Error(`Gemini API error: ${aiResponse.statusText}`);
+      }
     }
 
     const aiData = await aiResponse.json();
@@ -1054,20 +1123,25 @@ Always prioritize user experience and provide actionable insights.`;
         }
       ];
 
-      const followUpResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const followUpResponse = await fetchWithRetry(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: geminiFollowUpMessages,
+            tools: geminiTools,
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1000
+            }
+          }),
         },
-        body: JSON.stringify({
-          contents: geminiFollowUpMessages,
-          tools: geminiTools,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000
-          }
-        }),
-      });
+        3,
+        1000
+      );
 
       if (!followUpResponse.ok) {
         const errorText = await followUpResponse.text();
