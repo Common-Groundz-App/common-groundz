@@ -1187,18 +1187,20 @@ Always prioritize user experience and provide actionable insights.`;
     if (memoryTrigger.trigger) {
       console.log('[smart-assistant] Triggering memory update:', memoryTrigger.reason);
       
-      // Async call to update-user-memory (don't block response)
-      fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/update-user-memory`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': req.headers.get('Authorization') || ''
-        },
-        body: JSON.stringify({
-          conversationId: conversation.id,
-          trigger: memoryTrigger.reason
-        })
-      }).catch(err => console.error('[smart-assistant] Memory update failed:', err));
+      // Add 3-second delay to avoid back-to-back Gemini API calls (rate limiting)
+      setTimeout(() => {
+        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/update-user-memory`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': req.headers.get('Authorization') || ''
+          },
+          body: JSON.stringify({
+            conversationId: conversation.id,
+            trigger: memoryTrigger.reason
+          })
+        }).catch(err => console.error('[smart-assistant] Memory update failed:', err));
+      }, 3000); // 3-second delay
     }
 
     const responseTime = Date.now() - startTime;

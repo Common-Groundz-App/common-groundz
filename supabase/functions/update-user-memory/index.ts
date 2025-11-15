@@ -6,6 +6,52 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper function to add timeout to promises
+function withTimeout(promise: Promise<any>, ms: number) {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms)
+  );
+  return Promise.race([promise, timeout]);
+}
+
+// Helper function with retry logic for rate limits and service errors
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 3,
+  initialDelay = 2000 // 2 seconds for memory updates
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await withTimeout(fetch(url, options), 8000);
+      
+      if (response.status === 503 || response.status === 429) {
+        if (attempt < maxRetries - 1) {
+          const delay = initialDelay * Math.pow(2, attempt);
+          console.log(`[update-user-memory] Received ${response.status}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      lastError = error as Error;
+      if (attempt < maxRetries - 1) {
+        const delay = initialDelay * Math.pow(2, attempt);
+        const errorType = error instanceof Error && error.message.includes('timeout') ? 'Timeout' : 'Network error';
+        console.log(`[update-user-memory] ${errorType}, retrying in ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+    }
+  }
+  
+  throw lastError || new Error("Memory update failed after retries. Will retry on next conversation.");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -159,18 +205,37 @@ Use the extract_scoped_memories function to structure your response.`;
 
     console.log("[update-user-memory] Calling Gemini API for memory extraction");
 
-    const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+    const geminiResponse = await fetchWithRetry(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(geminiPayload),
-      }
+      },
+      3, // maxRetries
+      2000 // 2-second initial delay
     );
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
       console.error("[update-user-memory] Gemini API error:", errorText);
+      
+      // Graceful degradation for rate limits - don't fail the request
+      if (geminiResponse.status === 429 || geminiResponse.status === 503) {
+        console.warn("[update-user-memory] AI service temporarily unavailable, skipping memory update");
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            message: "Memory update skipped due to rate limits. Will retry on next conversation." 
+          }), 
+          {
+            status: 200, // Don't fail the request
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+      
+      // Other errors
       return new Response(JSON.stringify({ error: "AI extraction failed" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
