@@ -15,6 +15,7 @@ import { AdminDebugPanel } from '@/components/admin/AdminDebugPanel';
 import { AdminPhotoModerationPanel } from '@/components/admin/AdminPhotoModerationPanel';
 import { AdminSuggestionsPanel } from '@/components/admin/AdminSuggestionsPanel';
 import { AdminClaimsPanel } from '@/components/admin/AdminClaimsPanel';
+import { AdminProductRelationshipsPanel } from '@/components/admin/AdminProductRelationshipsPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -111,6 +112,13 @@ const AdminPortal = () => {
     </div>
   );
 
+  const renderProductRelationshipsContent = () => (
+    <div className="space-y-6">
+      {/* Product Relationships Section */}
+      <AdminProductRelationshipsPanel />
+    </div>
+  );
+
   const renderActiveContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -123,6 +131,8 @@ const AdminPortal = () => {
         return renderSuggestionsManagementContent();
       case 'brand-claims':
         return renderBrandClaimsContent();
+      case 'product-relationships':
+        return renderProductRelationshipsContent();
       default:
         return renderOverviewContent();
     }

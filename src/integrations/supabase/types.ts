@@ -3219,6 +3219,15 @@ export type Database = {
             }[]
           }
       fix_duplicate_slugs: { Args: never; Returns: number }
+      fuzzy_match_entity: {
+        Args: { target_name: string; threshold?: number }
+        Returns: {
+          id: string
+          name: string
+          similarity_score: number
+          type: Database["public"]["Enums"]["entity_type"]
+        }[]
+      }
       generate_embedding_async: {
         Args: { content_text: string; content_type: string; record_id: string }
         Returns: undefined
