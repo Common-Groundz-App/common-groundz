@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface ProductRelationship {
   target_product_name: string;
-  relationship_type: 'upgrade' | 'alternative' | 'complement';
+  relationship_type: 'upgrade' | 'alternative' | 'complementary';
   confidence: number;
   evidence_quote: string;
 }
@@ -117,8 +117,8 @@ serve(async (req) => {
           });
         }
 
-        // Apply 50-character minimum threshold
-        if (combinedText.length < 50) {
+        // Apply 20-character minimum threshold (to capture short timeline updates like "switched to Y")
+        if (combinedText.length < 20) {
           console.log(`[extract-relationships] Skipping review ${review.id} - too short (${combinedText.length} chars)`);
           skippedCount++;
           continue;
@@ -145,7 +145,7 @@ ${combinedText}
 Look for:
 1. **Upgrades**: User switched from one product to another (e.g., "I upgraded from X to Y", "This replaced my old X", "Switched from X")
 2. **Alternatives**: User compared products (e.g., "This is better than X", "X vs Y", "Instead of X I use Y", "Better than X")
-3. **Complements**: Products used together (e.g., "I use this with X", "Pair with Y for best results", "Works great with X", "Use alongside X")
+3. **Complementary**: Products used together (e.g., "I use this with X", "Pair with Y for best results", "Works great with X", "Use alongside X")
 
 IMPORTANT:
 - Only extract relationships where the user explicitly mentions another product by name
@@ -157,7 +157,7 @@ Return JSON array:
 [
   {
     "target_product_name": "Full product name as mentioned in review",
-    "relationship_type": "upgrade" | "alternative" | "complement",
+    "relationship_type": "upgrade" | "alternative" | "complementary",
     "confidence": 0.0-1.0,
     "evidence_quote": "Exact quote from review showing the relationship"
   }
@@ -226,8 +226,21 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
             }
           }
 
+          // Guard against hallucinated product names
+          if (!matchingEntities || matchingEntities.length === 0) {
+            console.log(`⚠️ No entity match found for "${rel.target_product_name}" — skipping (possible AI hallucination)`);
+            continue;
+          }
+
+          const targetEntity = matchingEntities[0];
+
+          // Prevent self-references (entity referring to itself)
+          if (targetEntity.id === review.entity_id) {
+            console.log(`⚠️ Skipping self-reference for entity: ${targetEntity.name}`);
+            continue;
+          }
+
           if (matchingEntities && matchingEntities.length > 0) {
-            const targetEntity = matchingEntities[0];
 
             // DRY RUN MODE - Return preview only
             if (dryRun) {
