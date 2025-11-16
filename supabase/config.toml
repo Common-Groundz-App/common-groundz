@@ -1,5 +1,8 @@
 project_id = "uyjtgybbktgapspodajy"
 
+[functions.extract-product-relationships]
+verify_jwt = true
+
 [api]
 enabled = true
 port = 54321
