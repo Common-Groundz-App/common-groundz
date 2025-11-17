@@ -222,7 +222,33 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
           cleanedResponse = cleanedResponse.replace(/```\n?/g, '');
         }
 
-        const relationships: ProductRelationship[] = JSON.parse(cleanedResponse);
+        // Try to parse JSON with error handling
+        let relationships: ProductRelationship[] = [];
+        try {
+          relationships = JSON.parse(cleanedResponse);
+        } catch (parseError) {
+          console.error(`[extract-relationships] JSON parse error for review ${review.id}:`);
+          console.error(`[extract-relationships] Raw Gemini response:`);
+          console.error(responseText);  // ✅ Log FULL raw response (not truncated)
+          console.error(`[extract-relationships] Cleaned response:`);
+          console.error(cleanedResponse);
+          console.error(`[extract-relationships] Parse error: ${parseError.message}`);
+          
+          // Try to extract JSON array from text (fallback)
+          const jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            try {
+              relationships = JSON.parse(jsonMatch[0]);
+              console.log(`[extract-relationships] ✅ Recovered ${relationships.length} relationships using fallback parser`);
+            } catch (fallbackError) {
+              console.error(`[extract-relationships] Fallback parse also failed, skipping review`);
+              continue; // Skip this review and continue with others
+            }
+          } else {
+            console.error(`[extract-relationships] No JSON array found in response, skipping review`);
+            continue;
+          }
+        }
 
         console.log(`[extract-relationships] Found ${relationships.length} potential relationships`);
 
