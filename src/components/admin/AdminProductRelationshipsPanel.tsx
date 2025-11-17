@@ -222,6 +222,11 @@ export const AdminProductRelationshipsPanel = () => {
                   <h4 className="font-semibold">
                     {extractionStats.dryRun ? 'Preview Results (not saved):' : 'Extracted Relationships:'}
                   </h4>
+                  {extractionStats.relationships[0]?.source_entity_name && (
+                    <p className="text-sm text-muted-foreground mb-3 pb-2 border-b">
+                      <strong>Extracting relationships from:</strong> {extractionStats.relationships[0].source_entity_name}
+                    </p>
+                  )}
                   {extractionStats.relationships.map((rel: any, idx: number) => (
                     <div key={idx} className="border rounded p-3 bg-background">
                       <div className="flex items-center gap-2 mb-2">

@@ -91,6 +91,17 @@ serve(async (req) => {
 
     for (const review of reviewsToProcess) {
       try {
+        // Fetch source entity details for display
+        const { data: sourceEntity } = await supabaseClient
+          .from('entities')
+          .select('name, brand_name')
+          .eq('id', review.entity_id)
+          .single();
+
+        const sourceEntityName = sourceEntity 
+          ? `${sourceEntity.name}${sourceEntity.brand_name ? ` by ${sourceEntity.brand_name}` : ''}`
+          : 'Unknown Entity';
+
         // Combine initial review + all timeline updates
         let combinedText = '';
 
@@ -247,6 +258,7 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
               extractedRelationships.push({
                 preview: true,
                 source_entity_id: review.entity_id,
+                source_entity_name: sourceEntityName,
                 target_entity_id: targetEntity.id,
                 target_entity_name: targetEntity.name,
                 relationship_type: rel.relationship_type,
@@ -300,6 +312,7 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
             } else {
               extractedRelationships.push({
                 source_entity_id: review.entity_id,
+                source_entity_name: sourceEntityName,
                 target_entity_id: targetEntity.id,
                 target_entity_name: targetEntity.name,
                 relationship_type: rel.relationship_type,
