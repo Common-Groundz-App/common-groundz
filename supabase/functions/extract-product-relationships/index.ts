@@ -13,6 +13,24 @@ interface ProductRelationship {
   evidence_quote: string;
 }
 
+// Helper function to build entity display names with fallback logic
+function buildEntityDisplayName(entity: any): string {
+  if (!entity) return 'Unknown Entity';
+  
+  // Books: Try authors array first (most reliable)
+  if (entity.authors && Array.isArray(entity.authors) && entity.authors.length > 0) {
+    return `${entity.name} by ${entity.authors.join(', ')}`;
+  }
+  
+  // Fallback to venue field (used for authors in some older entities)
+  if (entity.venue) {
+    return `${entity.name} by ${entity.venue}`;
+  }
+  
+  // Default: just the name (for places, products without brands, etc.)
+  return entity.name;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -92,15 +110,17 @@ serve(async (req) => {
     for (const review of reviewsToProcess) {
       try {
         // Fetch source entity details for display
-        const { data: sourceEntity } = await supabaseClient
+        const { data: sourceEntity, error: entityError } = await supabaseClient
           .from('entities')
-          .select('name, brand_name')
+          .select('name, authors, venue')
           .eq('id', review.entity_id)
           .single();
 
-        const sourceEntityName = sourceEntity 
-          ? `${sourceEntity.name}${sourceEntity.brand_name ? ` by ${sourceEntity.brand_name}` : ''}`
-          : 'Unknown Entity';
+        if (entityError) {
+          console.error(`[extract-relationships] Error fetching source entity:`, entityError);
+        }
+
+        const sourceEntityName = buildEntityDisplayName(sourceEntity);
 
         // Combine initial review + all timeline updates
         let combinedText = '';
@@ -216,7 +236,7 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
           // Try exact match first
           let { data: matchingEntities } = await supabaseClient
             .from('entities')
-            .select('id, name, type')
+            .select('id, name, type, authors, venue')
             .ilike('name', `%${rel.target_product_name}%`)
             .eq('is_deleted', false)
             .limit(3);
@@ -260,7 +280,7 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
                 source_entity_id: review.entity_id,
                 source_entity_name: sourceEntityName,
                 target_entity_id: targetEntity.id,
-                target_entity_name: targetEntity.name,
+                target_entity_name: buildEntityDisplayName(targetEntity),
                 relationship_type: rel.relationship_type,
                 confidence: rel.confidence,
                 evidence: rel.evidence_quote,
@@ -314,7 +334,7 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
                 source_entity_id: review.entity_id,
                 source_entity_name: sourceEntityName,
                 target_entity_id: targetEntity.id,
-                target_entity_name: targetEntity.name,
+                target_entity_name: buildEntityDisplayName(targetEntity),
                 relationship_type: rel.relationship_type,
                 confidence: rel.confidence,
                 evidence: rel.evidence_quote
