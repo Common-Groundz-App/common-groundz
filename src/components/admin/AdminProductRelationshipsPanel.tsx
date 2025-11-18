@@ -228,13 +228,13 @@ export const AdminProductRelationshipsPanel = () => {
                     </p>
                   )}
                   {extractionStats.relationships.map((rel: any, idx: number) => (
-                    <div key={idx} className="border rounded p-3 bg-background">
-                      <div className="flex items-center gap-2 mb-2">
+                    <div key={idx} className="border rounded p-3 bg-background space-y-2">
+                      {/* Relationship type badge and metadata */}
+                      <div className="flex items-center gap-2">
                         <Badge className={getRelationshipColor(rel.relationship_type)}>
                           {getRelationshipIcon(rel.relationship_type)}
                           <span className="ml-1">{rel.relationship_type}</span>
                         </Badge>
-                        <span className="font-medium">{rel.target_entity_name}</span>
                         <Badge variant="outline">{(rel.confidence * 100).toFixed(0)}%</Badge>
                         {rel.preview && rel.matched_via && (
                           <Badge variant="secondary" className="text-xs">
@@ -242,8 +242,22 @@ export const AdminProductRelationshipsPanel = () => {
                           </Badge>
                         )}
                       </div>
+                      
+                      {/* Show explicit source → target */}
+                      <div className="text-sm space-y-1">
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground font-medium min-w-[50px]">From:</span>
+                          <span className="text-foreground">{rel.source_entity_name}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-muted-foreground font-medium min-w-[50px]">To:</span>
+                          <span className="text-foreground font-medium">{rel.target_entity_name}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Evidence quote */}
                       {rel.evidence && (
-                        <p className="text-sm text-muted-foreground italic">"{rel.evidence}"</p>
+                        <p className="text-sm text-muted-foreground italic border-t pt-2">"{rel.evidence}"</p>
                       )}
                     </div>
                   ))}
