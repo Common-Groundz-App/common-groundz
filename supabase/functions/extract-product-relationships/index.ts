@@ -265,7 +265,7 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
             .select('id, name, type, authors, venue')
             .ilike('name', `%${rel.target_product_name}%`)
             .eq('is_deleted', false)
-            .limit(3);
+            .limit(10);
 
           // Fuzzy matching fallback
           if (!matchingEntities || matchingEntities.length === 0) {
@@ -278,7 +278,7 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
               });
 
             if (!fuzzyError && fuzzyMatches && fuzzyMatches.length > 0) {
-              matchingEntities = fuzzyMatches.slice(0, 3);
+              matchingEntities = fuzzyMatches.slice(0, 10);
               console.log(`[extract-relationships] Fuzzy match found: ${matchingEntities[0].name} (score: ${fuzzyMatches[0].similarity_score})`);
             }
           }
@@ -287,6 +287,38 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
           if (!matchingEntities || matchingEntities.length === 0) {
             console.log(`⚠️ No entity match found for "${rel.target_product_name}" — skipping (possible AI hallucination)`);
             continue;
+          }
+
+          // Sort matching entities to prefer original books over summaries/derivatives
+          if (matchingEntities && matchingEntities.length > 1) {
+            matchingEntities.sort((a, b) => {
+              // Primary: Prefer entities WITHOUT "Summary of" or "Summary:" prefix
+              const aIsSummary = a.name.toLowerCase().startsWith('summary of') || 
+                                 a.name.toLowerCase().startsWith('summary:');
+              const bIsSummary = b.name.toLowerCase().startsWith('summary of') || 
+                                 b.name.toLowerCase().startsWith('summary:');
+              
+              if (aIsSummary && !bIsSummary) return 1;  // b wins (not a summary)
+              if (!aIsSummary && bIsSummary) return -1; // a wins (not a summary)
+              
+              // Secondary: Prefer shorter names (usually the original)
+              const lengthDiff = a.name.length - b.name.length;
+              if (lengthDiff !== 0) return lengthDiff;
+              
+              // Tertiary: Prefer exact matches to extracted name
+              const extractedLower = rel.target_product_name.toLowerCase();
+              const aExact = a.name.toLowerCase() === extractedLower;
+              const bExact = b.name.toLowerCase() === extractedLower;
+              if (aExact && !bExact) return -1;
+              if (!aExact && bExact) return 1;
+              
+              return 0;
+            });
+            
+            console.log(`[extract-relationships] Multiple matches for "${rel.target_product_name}": found ${matchingEntities.length} candidates, selected "${matchingEntities[0].name}"`);
+            if (matchingEntities.length > 1) {
+              console.log(`[extract-relationships] Alternatives considered: ${matchingEntities.slice(1).map(e => e.name).join(', ')}`);
+            }
           }
 
           const targetEntity = matchingEntities[0];
