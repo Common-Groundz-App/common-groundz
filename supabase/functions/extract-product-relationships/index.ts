@@ -259,47 +259,13 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
             continue;
           }
 
-          // ============================================
-          // NORMALIZE SUMMARY ENTITY NAMES
-          // ============================================
-          // Rule: ALWAYS strip "Summary of..." prefixes, regardless of review text
-          // We NEVER want derivative/summary books as recommendation targets
-          const extractedLower = rel.target_product_name.toLowerCase();
-
-          if (extractedLower.startsWith('summary of') || extractedLower.startsWith('summary:')) {
-            const originalName = rel.target_product_name;
-            
-            // Strip the summary prefix
-            let normalized = rel.target_product_name
-              .replace(/^summary of\s+/i, '')
-              .replace(/^summary:\s*/i, '');
-            
-            // Extract core title (before " by author" if present)
-            const byIndex = normalized.toLowerCase().indexOf(' by ');
-            if (byIndex > 0) {
-              normalized = normalized.substring(0, byIndex).trim();
-            }
-            
-            // Remove known derivative author suffixes
-            normalized = normalized
-              .replace(/\s+by\s+quickread.*$/i, '')
-              .replace(/\s+by\s+lea schullery.*$/i, '')
-              .trim();
-            
-            rel.target_product_name = normalized;
-            
-            console.log(`[extract-relationships] 🧹 Normalized hallucinated entity name`);
-            console.log(`[extract-relationships]   RAW: "${originalName}"`);
-            console.log(`[extract-relationships]   CLEAN: "${rel.target_product_name}"`);
-          }
-
           // Try exact match first
           let { data: matchingEntities } = await supabaseClient
             .from('entities')
             .select('id, name, type, authors, venue')
             .ilike('name', `%${rel.target_product_name}%`)
             .eq('is_deleted', false)
-            .limit(10);
+            .limit(3);
 
           // Fuzzy matching fallback
           if (!matchingEntities || matchingEntities.length === 0) {
@@ -312,7 +278,7 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
               });
 
             if (!fuzzyError && fuzzyMatches && fuzzyMatches.length > 0) {
-              matchingEntities = fuzzyMatches.slice(0, 10);
+              matchingEntities = fuzzyMatches.slice(0, 3);
               console.log(`[extract-relationships] Fuzzy match found: ${matchingEntities[0].name} (score: ${fuzzyMatches[0].similarity_score})`);
             }
           }
@@ -323,46 +289,7 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
             continue;
           }
 
-          // Sort matching entities to prefer original books over summaries/derivatives
-          if (matchingEntities && matchingEntities.length > 1) {
-            matchingEntities.sort((a, b) => {
-              // Primary: Prefer entities WITHOUT "Summary of" or "Summary:" prefix
-              const aIsSummary = a.name.toLowerCase().startsWith('summary of') || 
-                                 a.name.toLowerCase().startsWith('summary:');
-              const bIsSummary = b.name.toLowerCase().startsWith('summary of') || 
-                                 b.name.toLowerCase().startsWith('summary:');
-              
-              if (aIsSummary && !bIsSummary) return 1;  // b wins (not a summary)
-              if (!aIsSummary && bIsSummary) return -1; // a wins (not a summary)
-              
-              // Secondary: Prefer shorter names (usually the original)
-              const lengthDiff = a.name.length - b.name.length;
-              if (lengthDiff !== 0) return lengthDiff;
-              
-              // Tertiary: Prefer exact matches to extracted name
-              const extractedLower = rel.target_product_name.toLowerCase();
-              const aExact = a.name.toLowerCase() === extractedLower;
-              const bExact = b.name.toLowerCase() === extractedLower;
-              if (aExact && !bExact) return -1;
-              if (!aExact && bExact) return 1;
-              
-              return 0;
-            });
-            
-            console.log(`[extract-relationships] Multiple matches for "${rel.target_product_name}": found ${matchingEntities.length} candidates, selected "${matchingEntities[0].name}"`);
-            if (matchingEntities.length > 1) {
-              console.log(`[extract-relationships] Alternatives considered: ${matchingEntities.slice(1).map(e => e.name).join(', ')}`);
-            }
-          }
-
           const targetEntity = matchingEntities[0];
-
-          // Verify we didn't accidentally select a summary entity
-          if (targetEntity.name.toLowerCase().startsWith('summary of') || 
-              targetEntity.name.toLowerCase().startsWith('summary:')) {
-            console.log(`[extract-relationships] ⚠️ WARNING: Selected entity is still a summary: "${targetEntity.name}"`);
-            console.log(`[extract-relationships] This may indicate a data quality issue in the entities table`);
-          }
 
           // Prevent self-references (entity referring to itself)
           if (targetEntity.id === review.entity_id) {
