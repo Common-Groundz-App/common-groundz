@@ -259,6 +259,40 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
             continue;
           }
 
+          // ============================================
+          // NORMALIZE SUMMARY ENTITY NAMES
+          // ============================================
+          // Rule: ALWAYS strip "Summary of..." prefixes, regardless of review text
+          // We NEVER want derivative/summary books as recommendation targets
+          const extractedLower = rel.target_product_name.toLowerCase();
+
+          if (extractedLower.startsWith('summary of') || extractedLower.startsWith('summary:')) {
+            const originalName = rel.target_product_name;
+            
+            // Strip the summary prefix
+            let normalized = rel.target_product_name
+              .replace(/^summary of\s+/i, '')
+              .replace(/^summary:\s*/i, '');
+            
+            // Extract core title (before " by author" if present)
+            const byIndex = normalized.toLowerCase().indexOf(' by ');
+            if (byIndex > 0) {
+              normalized = normalized.substring(0, byIndex).trim();
+            }
+            
+            // Remove known derivative author suffixes
+            normalized = normalized
+              .replace(/\s+by\s+quickread.*$/i, '')
+              .replace(/\s+by\s+lea schullery.*$/i, '')
+              .trim();
+            
+            rel.target_product_name = normalized;
+            
+            console.log(`[extract-relationships] 🧹 Normalized hallucinated entity name`);
+            console.log(`[extract-relationships]   RAW: "${originalName}"`);
+            console.log(`[extract-relationships]   CLEAN: "${rel.target_product_name}"`);
+          }
+
           // Try exact match first
           let { data: matchingEntities } = await supabaseClient
             .from('entities')
@@ -322,6 +356,13 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
           }
 
           const targetEntity = matchingEntities[0];
+
+          // Verify we didn't accidentally select a summary entity
+          if (targetEntity.name.toLowerCase().startsWith('summary of') || 
+              targetEntity.name.toLowerCase().startsWith('summary:')) {
+            console.log(`[extract-relationships] ⚠️ WARNING: Selected entity is still a summary: "${targetEntity.name}"`);
+            console.log(`[extract-relationships] This may indicate a data quality issue in the entities table`);
+          }
 
           // Prevent self-references (entity referring to itself)
           if (targetEntity.id === review.entity_id) {
