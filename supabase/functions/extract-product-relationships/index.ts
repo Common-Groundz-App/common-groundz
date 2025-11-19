@@ -7,7 +7,8 @@ const corsHeaders = {
 };
 
 interface ProductRelationship {
-  target_product_name: string;
+  target_entity_id: string; // UUID from database
+  target_entity_name: string; // For logging only
   relationship_type: 'upgrade' | 'alternative' | 'complementary';
   confidence: number;
   evidence_quote: string;
@@ -29,6 +30,22 @@ function buildEntityDisplayName(entity: any): string {
   
   // Default: just the name (for places, products without brands, etc.)
   return entity.name;
+}
+
+/**
+ * Get candidate entity types based on source entity type
+ * Prevents cross-category pollution while allowing logical relationships
+ */
+function getCandidateTypes(sourceType: string): string[] {
+  const typeMap: Record<string, string[]> = {
+    'book': ['book'],
+    'movie': ['movie'],
+    'place': ['place'],
+    'product': ['product', 'brand'], // Products can relate to brands
+    'brand': ['brand', 'product'], // Brands can relate to products
+  };
+  
+  return typeMap[sourceType] || [sourceType];
 }
 
 serve(async (req) => {
@@ -109,18 +126,53 @@ serve(async (req) => {
 
     for (const review of reviewsToProcess) {
       try {
-        // Fetch source entity details for display
+        // Fetch source entity details
         const { data: sourceEntity, error: entityError } = await supabaseClient
           .from('entities')
-          .select('name, authors, venue')
+          .select('id, name, type, authors, venue')
           .eq('id', review.entity_id)
           .single();
 
-        if (entityError) {
-          console.error(`[extract-relationships] Error fetching source entity:`, entityError);
+        if (entityError || !sourceEntity) {
+          console.error(`[extract-relationships] Source entity not found: ${review.entity_id}`);
+          continue;
         }
 
         const sourceEntityName = buildEntityDisplayName(sourceEntity);
+
+        // Get allowed candidate types for this source entity
+        const allowedTypes = getCandidateTypes(sourceEntity.type);
+        console.log(`[extract-relationships] Fetching candidates of types: ${allowedTypes.join(', ')}`);
+
+        // Fetch type-filtered candidate entities
+        const { data: candidateEntities, error: candidatesError } = await supabaseClient
+          .from('entities')
+          .select('id, name, type, authors, venue, description, popularity_score')
+          .eq('is_deleted', false)
+          .neq('id', review.entity_id) // Exclude source entity
+          .in('type', allowedTypes) // CRITICAL: Only fetch relevant types
+          .order('popularity_score', { ascending: false })
+          .limit(300);
+
+        if (candidatesError) {
+          console.error(`[extract-relationships] Error fetching candidates:`, candidatesError);
+          continue;
+        }
+
+        // Format candidates for Gemini (compact representation)
+        const candidatesList = candidateEntities.map(e => {
+          const authorInfo = e.authors?.join(', ') || e.venue || '';
+          return {
+            id: e.id,
+            name: e.name,
+            type: e.type,
+            author: authorInfo,
+            description: e.description?.substring(0, 100)
+          };
+        });
+
+        console.log(`[extract-relationships] Loaded ${candidatesList.length} candidates (types: ${allowedTypes.join(', ')})`);
+
 
         // Combine initial review + all timeline updates
         let combinedText = '';
@@ -157,7 +209,7 @@ serve(async (req) => {
 
         console.log(`[extract-relationships] Analyzing review ${review.id} (${combinedText.length} chars, ${review.review_updates?.length || 0} updates)`);
 
-        // Call Gemini API
+        // Call Gemini API with candidates list
         const geminiResponse = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
           {
@@ -173,35 +225,45 @@ Review Timeline:
 ${combinedText}
 """
 
-Look for:
-1. **Upgrades**: User switched from one product to another (e.g., "I upgraded from X to Y", "This replaced my old X", "Switched from X")
-2. **Alternatives**: User compared products (e.g., "This is better than X", "X vs Y", "Instead of X I use Y", "Better than X")
-3. **Complementary**: Products used together (e.g., "I use this with X", "Pair with Y for best results", "Works great with X", "Use alongside X")
+Available Entities in System:
+"""
+${JSON.stringify(candidatesList, null, 2)}
+"""
 
-IMPORTANT:
-- Only extract relationships where the user explicitly mentions another product by name
-- Do not infer products that aren't explicitly mentioned
-- Confidence should be 0.8+ if the relationship is very clear, 0.5-0.7 if somewhat implied
-- Maximum 5 relationships per review
+CRITICAL RULES:
+1. You MUST select target entities ONLY from the "Available Entities" list above
+2. NEVER hallucinate or invent new entity names
+3. Use the entity's ID, name, author, and description to disambiguate
+4. ALWAYS prefer original works over summaries/study guides unless explicitly mentioned
+5. If a review mentions a product and you see both the original and a "Summary of..." version, choose the ORIGINAL
 
-Return JSON array:
+Relationship Types:
+- **upgrade**: User switched from one product to another
+- **alternative**: User compared products as alternatives
+- **complementary**: Products used together
+
+Return JSON array with this EXACT schema:
 [
   {
-    "target_product_name": "Full product name as mentioned in review",
+    "target_entity_id": "UUID from Available Entities list",
+    "target_entity_name": "Name for logging purposes",
     "relationship_type": "upgrade" | "alternative" | "complementary",
     "confidence": 0.0-1.0,
-    "evidence_quote": "Exact quote from review showing the relationship"
+    "evidence_quote": "Exact quote from review"
   }
 ]
 
-If no relationships found, return: []
-
-CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
+Requirements:
+- Confidence 0.8+ if relationship is very clear
+- Confidence 0.5-0.7 if somewhat implied
+- Maximum 5 relationships per review
+- If no relationships found, return: []
+- RETURN ONLY JSON, no markdown, no explanation`
                 }]
               }],
               generationConfig: {
                 temperature: 0.3,
-                maxOutputTokens: 1000
+                maxOutputTokens: 1500
               }
             })
           }
@@ -253,195 +315,109 @@ CRITICAL: Return ONLY the JSON array, no markdown code blocks, no explanation.`
         console.log(`[extract-relationships] Found ${relationships.length} potential relationships`);
 
         for (const rel of relationships) {
-          // Filter by confidence threshold (minimum 0.5)
+          // Filter by confidence threshold
           if (rel.confidence < 0.5) {
-            console.log(`[extract-relationships] Skipping low confidence: ${rel.confidence} for ${rel.target_product_name}`);
+            console.log(`[extract-relationships] Skipping low confidence: ${rel.confidence} for ${rel.target_entity_name}`);
             continue;
           }
 
-          // ============================================
-          // NORMALIZE SUMMARY ENTITY NAMES
-          // ============================================
-          // Rule: ALWAYS strip "Summary of..." prefixes, regardless of review text
-          // We NEVER want derivative/summary books as recommendation targets
-          const extractedLower = rel.target_product_name.toLowerCase();
+          // Validate that Gemini returned a valid entity ID from our candidates
+          const candidateMatch = candidatesList.find(e => e.id === rel.target_entity_id);
 
-          if (extractedLower.startsWith('summary of') || extractedLower.startsWith('summary:')) {
-            const originalName = rel.target_product_name;
-            
-            // Strip the summary prefix
-            let normalized = rel.target_product_name
-              .replace(/^summary of\s+/i, '')
-              .replace(/^summary:\s*/i, '');
-            
-            // Extract core title (before " by author" if present)
-            const byIndex = normalized.toLowerCase().indexOf(' by ');
-            if (byIndex > 0) {
-              normalized = normalized.substring(0, byIndex).trim();
-            }
-            
-            // Remove known derivative author suffixes
-            normalized = normalized
-              .replace(/\s+by\s+quickread.*$/i, '')
-              .replace(/\s+by\s+lea schullery.*$/i, '')
-              .trim();
-            
-            rel.target_product_name = normalized;
-            
-            console.log(`[extract-relationships] 🧹 Normalized hallucinated entity name`);
-            console.log(`[extract-relationships]   RAW: "${originalName}"`);
-            console.log(`[extract-relationships]   CLEAN: "${rel.target_product_name}"`);
+          if (!candidateMatch) {
+            console.log(`[extract-relationships] ⚠️ Invalid entity ID: ${rel.target_entity_id} for "${rel.target_entity_name}"`);
+            console.log(`[extract-relationships] Gemini should only return IDs from the provided list`);
+            continue;
           }
 
-          // Try exact match first
-          let { data: matchingEntities } = await supabaseClient
+          // Fetch full entity details for display
+          const { data: fullTargetEntity, error: targetError } = await supabaseClient
             .from('entities')
-            .select('id, name, type, authors, venue')
-            .ilike('name', `%${rel.target_product_name}%`)
-            .eq('is_deleted', false)
-            .limit(10);
+            .select('id, name, authors, venue, type')
+            .eq('id', rel.target_entity_id)
+            .single();
 
-          // Fuzzy matching fallback
-          if (!matchingEntities || matchingEntities.length === 0) {
-            console.log(`[extract-relationships] No exact match for "${rel.target_product_name}", trying fuzzy match`);
-            
-            const { data: fuzzyMatches, error: fuzzyError } = await supabaseClient
-              .rpc('fuzzy_match_entity', {
-                target_name: rel.target_product_name,
-                threshold: 0.3
-              });
-
-            if (!fuzzyError && fuzzyMatches && fuzzyMatches.length > 0) {
-              matchingEntities = fuzzyMatches.slice(0, 10);
-              console.log(`[extract-relationships] Fuzzy match found: ${matchingEntities[0].name} (score: ${fuzzyMatches[0].similarity_score})`);
-            }
-          }
-
-          // Guard against hallucinated product names
-          if (!matchingEntities || matchingEntities.length === 0) {
-            console.log(`⚠️ No entity match found for "${rel.target_product_name}" — skipping (possible AI hallucination)`);
+          if (targetError || !fullTargetEntity) {
+            console.error(`[extract-relationships] Error fetching target entity:`, targetError);
             continue;
           }
 
-          // Sort matching entities to prefer original books over summaries/derivatives
-          if (matchingEntities && matchingEntities.length > 1) {
-            matchingEntities.sort((a, b) => {
-              // Primary: Prefer entities WITHOUT "Summary of" or "Summary:" prefix
-              const aIsSummary = a.name.toLowerCase().startsWith('summary of') || 
-                                 a.name.toLowerCase().startsWith('summary:');
-              const bIsSummary = b.name.toLowerCase().startsWith('summary of') || 
-                                 b.name.toLowerCase().startsWith('summary:');
-              
-              if (aIsSummary && !bIsSummary) return 1;  // b wins (not a summary)
-              if (!aIsSummary && bIsSummary) return -1; // a wins (not a summary)
-              
-              // Secondary: Prefer shorter names (usually the original)
-              const lengthDiff = a.name.length - b.name.length;
-              if (lengthDiff !== 0) return lengthDiff;
-              
-              // Tertiary: Prefer exact matches to extracted name
-              const extractedLower = rel.target_product_name.toLowerCase();
-              const aExact = a.name.toLowerCase() === extractedLower;
-              const bExact = b.name.toLowerCase() === extractedLower;
-              if (aExact && !bExact) return -1;
-              if (!aExact && bExact) return 1;
-              
-              return 0;
+          // Prevent self-references (double-check)
+          if (fullTargetEntity.id === review.entity_id) {
+            console.log(`[extract-relationships] ⚠️ Skipping self-reference: ${fullTargetEntity.name}`);
+            continue;
+          }
+
+          const targetEntityName = buildEntityDisplayName(fullTargetEntity);
+
+          console.log(`[extract-relationships] ✅ Matched: ${targetEntityName} (confidence: ${rel.confidence})`);
+
+          // DRY RUN MODE
+          if (dryRun) {
+            extractedRelationships.push({
+              preview: true,
+              source_entity_id: review.entity_id,
+              source_entity_name: sourceEntityName,
+              target_entity_id: fullTargetEntity.id,
+              target_entity_name: targetEntityName,
+              relationship_type: rel.relationship_type,
+              confidence: rel.confidence,
+              evidence: rel.evidence_quote,
+              matched_via: 'entity_id'
             });
-            
-            console.log(`[extract-relationships] Multiple matches for "${rel.target_product_name}": found ${matchingEntities.length} candidates, selected "${matchingEntities[0].name}"`);
-            if (matchingEntities.length > 1) {
-              console.log(`[extract-relationships] Alternatives considered: ${matchingEntities.slice(1).map(e => e.name).join(', ')}`);
-            }
-          }
-
-          const targetEntity = matchingEntities[0];
-
-          // Verify we didn't accidentally select a summary entity
-          if (targetEntity.name.toLowerCase().startsWith('summary of') || 
-              targetEntity.name.toLowerCase().startsWith('summary:')) {
-            console.log(`[extract-relationships] ⚠️ WARNING: Selected entity is still a summary: "${targetEntity.name}"`);
-            console.log(`[extract-relationships] This may indicate a data quality issue in the entities table`);
-          }
-
-          // Prevent self-references (entity referring to itself)
-          if (targetEntity.id === review.entity_id) {
-            console.log(`⚠️ Skipping self-reference for entity: ${targetEntity.name}`);
             continue;
           }
 
-          if (matchingEntities && matchingEntities.length > 0) {
+          // LIVE MODE - Check for duplicates
+          const { data: existingRel } = await supabaseClient
+            .from('product_relationships')
+            .select('id')
+            .eq('entity_a_id', review.entity_id)
+            .eq('entity_b_id', fullTargetEntity.id)
+            .single();
 
-            // DRY RUN MODE - Return preview only
-            if (dryRun) {
-              extractedRelationships.push({
-                preview: true,
-                source_entity_id: review.entity_id,
-                source_entity_name: sourceEntityName,
-                target_entity_id: targetEntity.id,
-                target_entity_name: buildEntityDisplayName(targetEntity),
-                relationship_type: rel.relationship_type,
-                confidence: rel.confidence,
-                evidence: rel.evidence_quote,
-                matched_via: matchingEntities.length > 0 && matchingEntities[0].name !== rel.target_product_name ? 'fuzzy' : 'exact'
-              });
-              continue;
-            }
+          if (existingRel) {
+            console.log(`[extract-relationships] Relationship already exists, skipping`);
+            continue;
+          }
 
-            // LIVE MODE - Check for existing relationship
-            const { data: existingRel } = await supabaseClient
-              .from('product_relationships')
-              .select('id')
-              .eq('entity_a_id', review.entity_id)
-              .eq('entity_b_id', targetEntity.id)
-              .eq('relationship_type', rel.relationship_type)
-              .single();
-
-            if (existingRel) {
-              console.log(`[extract-relationships] Relationship already exists, skipping`);
-              continue;
-            }
-
-            // Insert new relationship
-            const { error: insertError } = await supabaseClient
-              .from('product_relationships')
-              .insert({
-                entity_a_id: review.entity_id,
-                entity_b_id: targetEntity.id,
-                relationship_type: rel.relationship_type,
-                confidence_score: rel.confidence,
-                evidence_text: rel.evidence_quote,
-                discovered_from_user_id: review.user_id,
-                metadata: {
-                  review_id: review.id,
-                  extracted_at: new Date().toISOString(),
-                  processing_mode: batchMode ? 'batch' : 'single',
-                  combined_text_length: combinedText.length,
-                  update_count: review.review_updates?.length || 0
-                }
-              });
-
-            if (insertError) {
-              if (insertError.code === '23505') {
-                console.log(`[extract-relationships] Duplicate (unique constraint), skipping`);
-              } else {
-                console.error(`[extract-relationships] Insert error:`, insertError);
-                errorCount++;
+          // Insert new relationship
+          const { error: insertError } = await supabaseClient
+            .from('product_relationships')
+            .insert({
+              entity_a_id: review.entity_id,
+              entity_b_id: fullTargetEntity.id,
+              relationship_type: rel.relationship_type,
+              confidence_score: rel.confidence,
+              evidence_text: rel.evidence_quote,
+              discovered_from_user_id: review.user_id,
+              metadata: {
+                review_id: review.id,
+                extracted_at: new Date().toISOString(),
+                processing_mode: batchMode ? 'batch' : 'single',
+                combined_text_length: combinedText.length,
+                update_count: review.review_updates?.length || 0
               }
+            });
+
+          if (insertError) {
+            if (insertError.code === '23505') {
+              console.log(`[extract-relationships] Duplicate (unique constraint), skipping`);
             } else {
-              extractedRelationships.push({
-                source_entity_id: review.entity_id,
-                source_entity_name: sourceEntityName,
-                target_entity_id: targetEntity.id,
-                target_entity_name: buildEntityDisplayName(targetEntity),
-                relationship_type: rel.relationship_type,
-                confidence: rel.confidence,
-                evidence: rel.evidence_quote
-              });
-              console.log(`[extract-relationships] ✅ Inserted: ${rel.relationship_type} → ${targetEntity.name}`);
+              console.error(`[extract-relationships] Insert error:`, insertError);
+              errorCount++;
             }
           } else {
-            console.log(`[extract-relationships] No matching entity found for: "${rel.target_product_name}"`);
+            extractedRelationships.push({
+              source_entity_id: review.entity_id,
+              source_entity_name: sourceEntityName,
+              target_entity_id: fullTargetEntity.id,
+              target_entity_name: targetEntityName,
+              relationship_type: rel.relationship_type,
+              confidence: rel.confidence,
+              evidence: rel.evidence_quote
+            });
+            console.log(`[extract-relationships] ✅ Inserted: ${rel.relationship_type} → ${fullTargetEntity.name}`);
           }
         }
 
