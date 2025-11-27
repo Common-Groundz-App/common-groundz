@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Version tag for identifying new entity-ID-based matching in logs
+const MATCHING_MODE = 'entity_id_v1';
+
 interface ProductRelationship {
   target_entity_id: string; // UUID from database
   target_entity_name: string; // For logging only
@@ -53,6 +56,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Generate unique run ID for log correlation
+  const runId = crypto.randomUUID().substring(0, 8);
+
   try {
     const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
     if (!geminiApiKey) {
@@ -66,7 +72,7 @@ serve(async (req) => {
 
     const { reviewId, batchMode = false, limit = 50, skipProcessed = true, dryRun = false } = await req.json();
 
-    console.log(`[extract-relationships] Starting - mode: ${dryRun ? 'DRY RUN' : 'LIVE'}, batch: ${batchMode}, limit: ${limit}`);
+    console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Starting - mode: ${dryRun ? 'DRY RUN' : 'LIVE'}, batch: ${batchMode}, limit: ${limit}`);
 
     let reviewsToProcess = [];
 
@@ -103,7 +109,7 @@ serve(async (req) => {
         );
 
         if (processedReviewIds.size > 0) {
-          console.log(`[extract-relationships] Skipping ${processedReviewIds.size} already processed reviews`);
+          console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Skipping ${processedReviewIds.size} already processed reviews`);
           query = query.not('id', 'in', `(${Array.from(processedReviewIds).join(',')})`);
         }
       }
@@ -117,7 +123,7 @@ serve(async (req) => {
       throw new Error('Either reviewId or batchMode must be specified');
     }
 
-    console.log(`[extract-relationships] Processing ${reviewsToProcess.length} reviews`);
+    console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Processing ${reviewsToProcess.length} reviews`);
 
     const extractedRelationships: any[] = [];
     let processedCount = 0;
@@ -134,7 +140,7 @@ serve(async (req) => {
           .single();
 
         if (entityError || !sourceEntity) {
-          console.error(`[extract-relationships] Source entity not found: ${review.entity_id}`);
+          console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Source entity not found: ${review.entity_id}`);
           continue;
         }
 
@@ -142,7 +148,7 @@ serve(async (req) => {
 
         // Get allowed candidate types for this source entity
         const allowedTypes = getCandidateTypes(sourceEntity.type);
-        console.log(`[extract-relationships] Fetching candidates of types: ${allowedTypes.join(', ')}`);
+        console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Fetching candidates of types: ${allowedTypes.join(', ')}`);
 
         // Fetch type-filtered candidate entities
         const { data: candidateEntities, error: candidatesError } = await supabaseClient
@@ -155,7 +161,7 @@ serve(async (req) => {
           .limit(300);
 
         if (candidatesError) {
-          console.error(`[extract-relationships] Error fetching candidates:`, candidatesError);
+          console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Error fetching candidates:`, candidatesError);
           continue;
         }
 
@@ -171,7 +177,7 @@ serve(async (req) => {
           };
         });
 
-        console.log(`[extract-relationships] Loaded ${candidatesList.length} candidates (types: ${allowedTypes.join(', ')})`);
+        console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Loaded ${candidatesList.length} candidates (types: ${allowedTypes.join(', ')})`);
 
 
         // Combine initial review + all timeline updates
@@ -202,12 +208,12 @@ serve(async (req) => {
 
         // Apply 20-character minimum threshold (to capture short timeline updates like "switched to Y")
         if (combinedText.length < 20) {
-          console.log(`[extract-relationships] Skipping review ${review.id} - too short (${combinedText.length} chars)`);
+          console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Skipping review ${review.id} - too short (${combinedText.length} chars)`);
           skippedCount++;
           continue;
         }
 
-        console.log(`[extract-relationships] Analyzing review ${review.id} (${combinedText.length} chars, ${review.review_updates?.length || 0} updates)`);
+        console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Analyzing review ${review.id} (${combinedText.length} chars, ${review.review_updates?.length || 0} updates)`);
 
         // Call Gemini API with candidates list
         const geminiResponse = await fetch(
@@ -231,11 +237,13 @@ ${JSON.stringify(candidatesList, null, 2)}
 """
 
 CRITICAL RULES:
-1. You MUST select target entities ONLY from the "Available Entities" list above
-2. NEVER hallucinate or invent new entity names
-3. Use the entity's ID, name, author, and description to disambiguate
-4. ALWAYS prefer original works over summaries/study guides unless explicitly mentioned
-5. If a review mentions a product and you see both the original and a "Summary of..." version, choose the ORIGINAL
+1. You MUST select target entities ONLY from the "Available Entities" list above using their exact "id" values
+2. NEVER invent, hallucinate, or return entity IDs that are not in the list
+3. If you cannot confidently match an entity from the list, return an empty array []
+4. Use the entity's ID, name, author, and description to disambiguate
+5. ALWAYS prefer original works over summaries/study guides unless explicitly mentioned
+6. If a review mentions a product and you see both the original and a "Summary of..." version, choose the ORIGINAL
+7. Return ONLY valid JSON with entity IDs from the list - no free text names allowed
 
 Relationship Types:
 - **upgrade**: User switched from one product to another
@@ -289,35 +297,39 @@ Requirements:
         try {
           relationships = JSON.parse(cleanedResponse);
         } catch (parseError) {
-          console.error(`[extract-relationships] JSON parse error for review ${review.id}:`);
-          console.error(`[extract-relationships] Raw Gemini response:`);
-          console.error(responseText);  // ✅ Log FULL raw response (not truncated)
-          console.error(`[extract-relationships] Cleaned response:`);
-          console.error(cleanedResponse);
-          console.error(`[extract-relationships] Parse error: ${parseError.message}`);
+          console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] JSON parse error for review ${review.id}:`);
+          console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Raw Gemini response:`, responseText);
+          console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Cleaned response:`, cleanedResponse);
+          console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Parse error: ${parseError.message}`);
           
           // Try to extract JSON array from text (fallback)
           const jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/);
           if (jsonMatch) {
             try {
               relationships = JSON.parse(jsonMatch[0]);
-              console.log(`[extract-relationships] ✅ Recovered ${relationships.length} relationships using fallback parser`);
+              console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ✅ Recovered ${relationships.length} relationships using fallback parser`);
             } catch (fallbackError) {
-              console.error(`[extract-relationships] Fallback parse also failed, skipping review`);
-              continue; // Skip this review and continue with others
+              console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Fallback parse also failed, skipping review`);
+              continue;
             }
           } else {
-            console.error(`[extract-relationships] No JSON array found in response, skipping review`);
+            console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] No JSON array found in response, skipping review`);
             continue;
           }
         }
 
-        console.log(`[extract-relationships] Found ${relationships.length} potential relationships`);
+        console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Found ${relationships.length} potential relationships`);
 
         for (const rel of relationships) {
+          // Validate required fields
+          if (!rel.target_entity_id || typeof rel.target_entity_id !== 'string') {
+            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ⚠️ Invalid or missing target_entity_id from model - skipping relationship`);
+            continue;
+          }
+
           // Filter by confidence threshold
           if (rel.confidence < 0.5) {
-            console.log(`[extract-relationships] Skipping low confidence: ${rel.confidence} for ${rel.target_entity_name}`);
+            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Skipping low confidence: ${rel.confidence} for ${rel.target_entity_name}`);
             continue;
           }
 
@@ -325,8 +337,7 @@ Requirements:
           const candidateMatch = candidatesList.find(e => e.id === rel.target_entity_id);
 
           if (!candidateMatch) {
-            console.log(`[extract-relationships] ⚠️ Invalid entity ID: ${rel.target_entity_id} for "${rel.target_entity_name}"`);
-            console.log(`[extract-relationships] Gemini should only return IDs from the provided list`);
+            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ⚠️ Invalid entity_id returned by model: ${rel.target_entity_id} - ID not in candidate list, skipping`);
             continue;
           }
 
@@ -338,19 +349,19 @@ Requirements:
             .single();
 
           if (targetError || !fullTargetEntity) {
-            console.error(`[extract-relationships] Error fetching target entity:`, targetError);
+            console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Error fetching target entity:`, targetError);
             continue;
           }
 
-          // Prevent self-references (double-check)
+          // Prevent self-references (defensive check - model should never return source entity ID)
           if (fullTargetEntity.id === review.entity_id) {
-            console.log(`[extract-relationships] ⚠️ Skipping self-reference: ${fullTargetEntity.name}`);
+            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ⚠️ Model returned source entity ID as target - skipping self-reference: ${fullTargetEntity.name}`);
             continue;
           }
 
           const targetEntityName = buildEntityDisplayName(fullTargetEntity);
 
-          console.log(`[extract-relationships] ✅ Matched: ${targetEntityName} (confidence: ${rel.confidence})`);
+          console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ✅ Matched: ${targetEntityName} (confidence: ${rel.confidence})`);
 
           // DRY RUN MODE
           if (dryRun) {
@@ -377,7 +388,7 @@ Requirements:
             .single();
 
           if (existingRel) {
-            console.log(`[extract-relationships] Relationship already exists, skipping`);
+            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Relationship already exists, skipping`);
             continue;
           }
 
@@ -396,15 +407,17 @@ Requirements:
                 extracted_at: new Date().toISOString(),
                 processing_mode: batchMode ? 'batch' : 'single',
                 combined_text_length: combinedText.length,
-                update_count: review.review_updates?.length || 0
+                update_count: review.review_updates?.length || 0,
+                matching_mode: MATCHING_MODE,
+                run_id: runId
               }
             });
 
           if (insertError) {
             if (insertError.code === '23505') {
-              console.log(`[extract-relationships] Duplicate (unique constraint), skipping`);
+              console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Duplicate (unique constraint), skipping`);
             } else {
-              console.error(`[extract-relationships] Insert error:`, insertError);
+              console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Insert error:`, insertError);
               errorCount++;
             }
           } else {
@@ -417,14 +430,14 @@ Requirements:
               confidence: rel.confidence,
               evidence: rel.evidence_quote
             });
-            console.log(`[extract-relationships] ✅ Inserted: ${rel.relationship_type} → ${fullTargetEntity.name}`);
+            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ✅ Inserted: ${rel.relationship_type} → ${fullTargetEntity.name}`);
           }
         }
 
         processedCount++;
 
       } catch (error) {
-        console.error(`[extract-relationships] Error processing review ${review.id}:`, error);
+        console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Error processing review ${review.id}:`, error);
         errorCount++;
       }
 
@@ -439,17 +452,18 @@ Requirements:
       skippedReviews: skippedCount,
       extractedRelationships: extractedRelationships.length,
       relationships: extractedRelationships,
-      errors: errorCount
+      errors: errorCount,
+      runId
     };
 
-    console.log(`[extract-relationships] Completed:`, result);
+    console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Completed:`, result);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    console.error('[extract-relationships] Fatal error:', error);
+    console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Fatal error:`, error);
     return new Response(JSON.stringify({ 
       success: false,
       error: error.message 
