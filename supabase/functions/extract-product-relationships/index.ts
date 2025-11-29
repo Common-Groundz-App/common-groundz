@@ -215,6 +215,41 @@ serve(async (req) => {
 
         console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Analyzing review ${review.id} (${combinedText.length} chars, ${review.review_updates?.length || 0} updates)`);
 
+        // Generate deterministic seed from review ID for reproducibility
+        const reviewSeed = parseInt(review.id.replace(/-/g, '').substring(0, 8), 16) % 2147483647;
+
+        // Define strict response schema for structured output
+        const responseSchema = {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              target_entity_id: {
+                type: "string",
+                description: "UUID of the target entity from the Available Entities list"
+              },
+              target_entity_name: {
+                type: "string",
+                description: "Name of the target entity for logging"
+              },
+              relationship_type: {
+                type: "string",
+                enum: ["upgrade", "alternative", "complementary"]
+              },
+              confidence: {
+                type: "number",
+                minimum: 0,
+                maximum: 1
+              },
+              evidence_quote: {
+                type: "string",
+                description: "Exact quote from the review supporting this relationship"
+              }
+            },
+            required: ["target_entity_id", "target_entity_name", "relationship_type", "confidence", "evidence_quote"]
+          }
+        };
+
         // Call Gemini API with candidates list
         const geminiResponse = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -245,6 +280,14 @@ CRITICAL RULES:
 6. If a review mentions a product and you see both the original and a "Summary of..." version, choose the ORIGINAL
 7. Return ONLY valid JSON with entity IDs from the list - no free text names allowed
 
+EXTRACTION RULES (BE CONSISTENT):
+1. If a review says "X is better than Y" or "I prefer X over Y" → ALWAYS extract as "alternative"
+2. If a review says "read X after Y" or "X complements Y" → ALWAYS extract as "complementary"
+3. If a review says "switched from X to Y" or "replaced X with Y" → ALWAYS extract as "upgrade"
+4. If relationship type is ambiguous, default to "complementary"
+5. For confidence: clear explicit mentions = 0.9, implied mentions = 0.7, weak signals = 0.5
+6. Extract ALL relationships that match these criteria - do not randomly skip some
+
 Relationship Types:
 - **upgrade**: User switched from one product to another
 - **alternative**: User compared products as alternatives
@@ -270,8 +313,11 @@ Requirements:
                 }]
               }],
               generationConfig: {
-                temperature: 0.3,
-                maxOutputTokens: 1500
+                temperature: 0,
+                seed: reviewSeed,
+                maxOutputTokens: 1500,
+                responseMimeType: 'application/json',
+                responseSchema: responseSchema
               }
             })
           }
@@ -284,6 +330,8 @@ Requirements:
 
         const geminiData = await geminiResponse.json();
         const responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
+
+        console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Gemini raw response:`, responseText.substring(0, 500));
 
         let cleanedResponse = responseText.trim();
         if (cleanedResponse.startsWith('```json')) {
