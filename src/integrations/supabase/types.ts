@@ -2050,8 +2050,11 @@ export type Database = {
       }
       product_relationships: {
         Row: {
+          avg_confidence: number | null
+          category: string | null
           confidence_score: number | null
           confirmation_count: number | null
+          consensus_count: number | null
           created_at: string | null
           discovered_from_user_id: string | null
           embedding: string | null
@@ -2065,8 +2068,11 @@ export type Database = {
           relationship_type: string
         }
         Insert: {
+          avg_confidence?: number | null
+          category?: string | null
           confidence_score?: number | null
           confirmation_count?: number | null
+          consensus_count?: number | null
           created_at?: string | null
           discovered_from_user_id?: string | null
           embedding?: string | null
@@ -2080,8 +2086,11 @@ export type Database = {
           relationship_type: string
         }
         Update: {
+          avg_confidence?: number | null
+          category?: string | null
           confidence_score?: number | null
           confirmation_count?: number | null
+          consensus_count?: number | null
           created_at?: string | null
           discovered_from_user_id?: string | null
           embedding?: string | null
@@ -3000,6 +3009,103 @@ export type Database = {
           },
         ]
       }
+      user_entity_journeys: {
+        Row: {
+          confidence: number | null
+          created_at: string | null
+          evidence_text: string | null
+          from_category: string
+          from_entity_id: string
+          from_entity_type: string | null
+          from_sentiment: number | null
+          id: string
+          source_review_id: string | null
+          to_category: string
+          to_entity_id: string
+          to_entity_type: string | null
+          to_sentiment: number | null
+          transition_type: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string | null
+          evidence_text?: string | null
+          from_category: string
+          from_entity_id: string
+          from_entity_type?: string | null
+          from_sentiment?: number | null
+          id?: string
+          source_review_id?: string | null
+          to_category: string
+          to_entity_id: string
+          to_entity_type?: string | null
+          to_sentiment?: number | null
+          transition_type: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string | null
+          evidence_text?: string | null
+          from_category?: string
+          from_entity_id?: string
+          from_entity_type?: string | null
+          from_sentiment?: number | null
+          id?: string
+          source_review_id?: string | null
+          to_category?: string
+          to_entity_id?: string
+          to_entity_type?: string | null
+          to_sentiment?: number | null
+          transition_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_entity_journeys_from_entity_id_fkey"
+            columns: ["from_entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_entity_journeys_from_entity_id_fkey"
+            columns: ["from_entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_view"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "user_entity_journeys_source_review_id_fkey"
+            columns: ["source_review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_entity_journeys_to_entity_id_fkey"
+            columns: ["to_entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_entity_journeys_to_entity_id_fkey"
+            columns: ["to_entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_view"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "user_entity_journeys_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_interests: {
         Row: {
           category: string
@@ -3078,35 +3184,176 @@ export type Database = {
         }
         Relationships: []
       }
+      user_routines: {
+        Row: {
+          category: string
+          created_at: string | null
+          description: string | null
+          frequency: string | null
+          id: string
+          is_active: boolean | null
+          routine_name: string
+          steps: Json | null
+          time_of_day: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          description?: string | null
+          frequency?: string | null
+          id?: string
+          is_active?: boolean | null
+          routine_name: string
+          steps?: Json | null
+          time_of_day?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          description?: string | null
+          frequency?: string | null
+          id?: string
+          is_active?: boolean | null
+          routine_name?: string
+          steps?: Json | null
+          time_of_day?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_routines_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_similarities: {
         Row: {
+          category_overlap: number | null
           created_at: string
           id: string
+          journey_alignment: number | null
           last_calculated: string
+          lifestyle_score: number | null
+          overall_score: number | null
+          routines_similarity: Json | null
           similarity_score: number
           similarity_type: string
+          stuff_overlap: Json | null
           user_a_id: string
           user_b_id: string
         }
         Insert: {
+          category_overlap?: number | null
           created_at?: string
           id?: string
+          journey_alignment?: number | null
           last_calculated?: string
+          lifestyle_score?: number | null
+          overall_score?: number | null
+          routines_similarity?: Json | null
           similarity_score?: number
           similarity_type?: string
+          stuff_overlap?: Json | null
           user_a_id: string
           user_b_id: string
         }
         Update: {
+          category_overlap?: number | null
           created_at?: string
           id?: string
+          journey_alignment?: number | null
           last_calculated?: string
+          lifestyle_score?: number | null
+          overall_score?: number | null
+          routines_similarity?: Json | null
           similarity_score?: number
           similarity_type?: string
+          stuff_overlap?: Json | null
           user_a_id?: string
           user_b_id?: string
         }
         Relationships: []
+      }
+      user_stuff: {
+        Row: {
+          category: string | null
+          context: Json | null
+          created_at: string | null
+          entity_id: string
+          entity_type: string | null
+          id: string
+          sentiment_score: number | null
+          source: string
+          source_reference_id: string | null
+          started_using_at: string | null
+          status: string
+          stopped_using_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          context?: Json | null
+          created_at?: string | null
+          entity_id: string
+          entity_type?: string | null
+          id?: string
+          sentiment_score?: number | null
+          source?: string
+          source_reference_id?: string | null
+          started_using_at?: string | null
+          status?: string
+          stopped_using_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          context?: Json | null
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string | null
+          id?: string
+          sentiment_score?: number | null
+          source?: string
+          source_reference_id?: string | null
+          started_using_at?: string | null
+          status?: string
+          stopped_using_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_stuff_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_stuff_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_view"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "user_stuff_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
