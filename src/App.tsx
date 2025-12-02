@@ -15,6 +15,7 @@ import Auth from '@/pages/Auth';
 import Profile from '@/pages/Profile';
 import Explore from '@/pages/Explore';
 import Settings from '@/pages/Settings';
+import MyStuffPage from '@/pages/MyStuffPage';
 import Search from '@/pages/Search';
 import EntityDetail from '@/pages/EntityDetail';
 import PostView from '@/pages/PostView';
@@ -92,6 +93,11 @@ function App() {
                   <Route path="/settings" element={
                     <ProtectedRoute>
                       <Settings />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/my-stuff" element={
+                    <ProtectedRoute>
+                      <MyStuffPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/search" element={
