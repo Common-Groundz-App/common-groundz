@@ -14,6 +14,7 @@ import EditMyStuffModal from './EditMyStuffModal';
 
 interface MyStuffItemCardProps {
   item: any;
+  readOnly?: boolean;
 }
 
 const statusColors = {
@@ -32,7 +33,7 @@ const statusLabels = {
   stopped: 'Stopped',
 };
 
-const MyStuffItemCard = ({ item }: MyStuffItemCardProps) => {
+const MyStuffItemCard = ({ item, readOnly = false }: MyStuffItemCardProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
 
   return (
@@ -52,27 +53,29 @@ const MyStuffItemCard = ({ item }: MyStuffItemCardProps) => {
         <div className="p-4">
           {/* Header with status and actions */}
           <div className="flex items-start justify-between mb-2">
-            <Badge className={statusColors[item.status as keyof typeof statusColors]}>
+          <Badge className={statusColors[item.status as keyof typeof statusColors]}>
               {statusLabels[item.status as keyof typeof statusLabels]}
             </Badge>
             
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setShowEditModal(true)}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Remove
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {!readOnly && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setShowEditModal(true)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {/* Entity Name */}

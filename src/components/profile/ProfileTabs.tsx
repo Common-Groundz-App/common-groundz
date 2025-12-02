@@ -1,10 +1,11 @@
 
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
-import { BookOpen, Star, Users, User } from 'lucide-react';
+import { BookOpen, Star, Users, User, Package } from 'lucide-react';
 import ProfilePosts from './ProfilePosts';
 import ProfileRecommendations from './ProfileRecommendations';
 import ProfileReviews from './ProfileReviews';
 import ProfileCircles from './ProfileCircles';
+import ProfileStuff from './ProfileStuff';
 
 interface ProfileTabsProps {
   activeTab: string;
@@ -21,7 +22,8 @@ const ProfileTabs = ({
   profileUserId,
   username
 }: ProfileTabsProps) => {
-  const tabItems = [
+  // Base tabs that always show
+  const baseTabs = [
     {
       value: "posts",
       label: "Posts",
@@ -43,6 +45,11 @@ const ProfileTabs = ({
       icon: User
     }
   ];
+
+  // Add "Stuff" tab only for other users' profiles (not own profile)
+  const tabItems = !isOwnProfile 
+    ? [...baseTabs, { value: "stuff", label: "Stuff", icon: Package }]
+    : baseTabs;
 
   return (
     <TubelightTabs 
@@ -78,6 +85,16 @@ const ProfileTabs = ({
           isOwnProfile={isOwnProfile}
         />
       </TabsContent>
+
+      {/* Stuff tab - only shown for other users' profiles */}
+      {!isOwnProfile && (
+        <TabsContent value="stuff">
+          <ProfileStuff 
+            profileUserId={profileUserId}
+            isOwnProfile={isOwnProfile}
+          />
+        </TabsContent>
+      )}
     </TubelightTabs>
   );
 };
