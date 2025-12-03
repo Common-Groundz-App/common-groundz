@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { LucideIcon, MoreHorizontal, Settings, Home, Star, Search, User, Bell, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Logo from "@/components/Logo";
@@ -67,15 +67,31 @@ export function VerticalTubelightNavbar({
   const [activeTab, setActiveTab] = useState(initialActiveTab || items[0].name);
   const { user, signOut } = useAuth();
   const { toast } = useToast();
+  const location = useLocation();
   
   // Use enhanced profile service
   const { data: profile, isLoading } = useProfile(user?.id);
 
+  // Map routes to tab names - only real routes, not # URLs
+  const getTabNameFromPath = (pathname: string): string | null => {
+    const routeMap: Record<string, string> = {
+      '/home': 'Home',
+      '/feed': 'Home',
+      '/explore': 'Explore',
+      '/my-stuff': 'My Stuff',
+      '/profile': 'Profile',
+      '/settings': 'Settings'
+    };
+    return routeMap[pathname] || null;
+  };
+
+  // Sync active tab with route (preserves manual clicks for non-route items like Notifications)
   useEffect(() => {
-    if (initialActiveTab) {
-      setActiveTab(initialActiveTab);
+    const tabFromPath = getTabNameFromPath(location.pathname);
+    if (tabFromPath) {
+      setActiveTab(tabFromPath);
     }
-  }, [initialActiveTab]);
+  }, [location.pathname]);
 
   const handleNavItemClick = (item: NavItem) => {
     setActiveTab(item.name);
