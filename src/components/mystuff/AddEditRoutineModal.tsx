@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -19,21 +19,53 @@ import {
 } from '@/components/ui/select';
 import { Plus, X } from 'lucide-react';
 
+interface RoutineStep {
+  step_name: string;
+  notes: string;
+  entity_id?: string;
+}
+
 interface AddEditRoutineModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   routine?: any;
+  onSave?: (data: {
+    id?: string;
+    name: string;
+    description?: string;
+    category: string;
+    frequency: string;
+    time_of_day?: string;
+    steps: RoutineStep[];
+  }) => void;
 }
 
-const AddEditRoutineModal = ({ open, onOpenChange, routine }: AddEditRoutineModalProps) => {
-  const [name, setName] = useState(routine?.routine_name || '');
-  const [description, setDescription] = useState(routine?.description || '');
-  const [category, setCategory] = useState(routine?.category || 'custom');
-  const [frequency, setFrequency] = useState(routine?.frequency || 'daily');
-  const [timeOfDay, setTimeOfDay] = useState(routine?.time_of_day || '');
-  const [steps, setSteps] = useState<Array<{ step_name: string; notes: string }>>(
-    routine?.steps || []
-  );
+const AddEditRoutineModal = ({ open, onOpenChange, routine, onSave }: AddEditRoutineModalProps) => {
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('custom');
+  const [frequency, setFrequency] = useState('daily');
+  const [timeOfDay, setTimeOfDay] = useState('');
+  const [steps, setSteps] = useState<RoutineStep[]>([]);
+
+  // Reset form when routine changes or modal opens
+  useEffect(() => {
+    if (routine) {
+      setName(routine.routine_name || '');
+      setDescription(routine.description || '');
+      setCategory(routine.category || 'custom');
+      setFrequency(routine.frequency || 'daily');
+      setTimeOfDay(routine.time_of_day || '');
+      setSteps(routine.steps || []);
+    } else {
+      setName('');
+      setDescription('');
+      setCategory('custom');
+      setFrequency('daily');
+      setTimeOfDay('');
+      setSteps([]);
+    }
+  }, [routine, open]);
 
   const handleAddStep = () => {
     setSteps([...steps, { step_name: '', notes: '' }]);
@@ -50,13 +82,37 @@ const AddEditRoutineModal = ({ open, onOpenChange, routine }: AddEditRoutineModa
   };
 
   const handleSubmit = () => {
-    // TODO: Implement save logic
-    console.log({ name, description, category, frequency, timeOfDay, steps });
+    if (!name.trim()) return;
+
+    if (onSave) {
+      onSave({
+        id: routine?.id,
+        name: name.trim(),
+        description: description.trim() || undefined,
+        category,
+        frequency,
+        time_of_day: timeOfDay || undefined,
+        steps: steps.filter(s => s.step_name.trim()),
+      });
+    }
     onOpenChange(false);
   };
 
+  const handleClose = (open: boolean) => {
+    if (!open) {
+      // Reset form on close
+      setName('');
+      setDescription('');
+      setCategory('custom');
+      setFrequency('daily');
+      setTimeOfDay('');
+      setSteps([]);
+    }
+    onOpenChange(open);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{routine ? 'Edit Routine' : 'Create New Routine'}</DialogTitle>
@@ -189,10 +245,10 @@ const AddEditRoutineModal = ({ open, onOpenChange, routine }: AddEditRoutineModa
         </div>
 
         <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleClose(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button onClick={handleSubmit} disabled={!name.trim()}>
             {routine ? 'Save Changes' : 'Create Routine'}
           </Button>
         </div>

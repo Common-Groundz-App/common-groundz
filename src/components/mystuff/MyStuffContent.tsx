@@ -7,6 +7,8 @@ import MyStuffRoutinesSection from './MyStuffRoutinesSection';
 
 const MyStuffContent = () => {
   const [activeTab, setActiveTab] = useState('items');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('recent');
 
   const tabItems = [
     {
@@ -22,7 +24,7 @@ const MyStuffContent = () => {
   ];
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-6 pb-20 xl:pb-6">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold mb-2">My Stuff</h1>
@@ -37,8 +39,16 @@ const MyStuffContent = () => {
         className="w-full"
       >
         <TabsContent value="items" className="mt-6">
-          <MyStuffFilters />
-          <MyStuffItemsGrid />
+          <MyStuffFilters 
+            statusFilter={statusFilter}
+            sortBy={sortBy}
+            onStatusFilterChange={setStatusFilter}
+            onSortByChange={setSortBy}
+          />
+          <MyStuffItemsGrid 
+            statusFilter={statusFilter}
+            sortBy={sortBy}
+          />
         </TabsContent>
 
         <TabsContent value="routines" className="mt-6">

@@ -7,8 +7,35 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import AddEditRoutineModal from './AddEditRoutineModal';
 
 const MyStuffRoutinesSection = () => {
-  const { routines, isLoading } = useUserRoutines();
+  const { routines, isLoading, createRoutine, updateRoutine, deleteRoutine } = useUserRoutines();
   const [showAddModal, setShowAddModal] = useState(false);
+
+  const handleCreateRoutine = (data: {
+    name: string;
+    description?: string;
+    category: string;
+    frequency: string;
+    time_of_day?: string;
+    steps: any[];
+  }) => {
+    createRoutine(data);
+  };
+
+  const handleUpdateRoutine = (data: {
+    id: string;
+    name?: string;
+    description?: string;
+    category?: string;
+    frequency?: string;
+    time_of_day?: string;
+    steps?: any[];
+  }) => {
+    updateRoutine(data);
+  };
+
+  const handleDeleteRoutine = (id: string) => {
+    deleteRoutine(id);
+  };
 
   if (isLoading) {
     return (
@@ -38,12 +65,21 @@ const MyStuffRoutinesSection = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {routines.map((routine) => (
-            <RoutineCard key={routine.id} routine={routine} />
+            <RoutineCard 
+              key={routine.id} 
+              routine={routine}
+              onUpdate={handleUpdateRoutine}
+              onDelete={handleDeleteRoutine}
+            />
           ))}
         </div>
       )}
 
-      <AddEditRoutineModal open={showAddModal} onOpenChange={setShowAddModal} />
+      <AddEditRoutineModal 
+        open={showAddModal} 
+        onOpenChange={setShowAddModal}
+        onSave={handleCreateRoutine}
+      />
     </>
   );
 };

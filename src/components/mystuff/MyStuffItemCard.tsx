@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Edit, Trash2, ExternalLink } from 'lucide-react';
+import { MoreVertical, Edit, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,8 @@ import EditMyStuffModal from './EditMyStuffModal';
 interface MyStuffItemCardProps {
   item: any;
   readOnly?: boolean;
+  onUpdate?: (data: { id: string; status: string; sentiment_score: number }) => void;
+  onDelete?: (id: string) => void;
 }
 
 const statusColors = {
@@ -33,8 +35,14 @@ const statusLabels = {
   stopped: 'Stopped',
 };
 
-const MyStuffItemCard = ({ item, readOnly = false }: MyStuffItemCardProps) => {
+const MyStuffItemCard = ({ item, readOnly = false, onUpdate, onDelete }: MyStuffItemCardProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
+
+  const handleDelete = () => {
+    if (onDelete) {
+      onDelete(item.id);
+    }
+  };
 
   return (
     <>
@@ -69,7 +77,7 @@ const MyStuffItemCard = ({ item, readOnly = false }: MyStuffItemCardProps) => {
                     <Edit className="mr-2 h-4 w-4" />
                     Edit
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive">
+                  <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
                     <Trash2 className="mr-2 h-4 w-4" />
                     Remove
                   </DropdownMenuItem>
@@ -120,6 +128,7 @@ const MyStuffItemCard = ({ item, readOnly = false }: MyStuffItemCardProps) => {
         open={showEditModal} 
         onOpenChange={setShowEditModal}
         item={item}
+        onUpdate={onUpdate}
       />
     </>
   );

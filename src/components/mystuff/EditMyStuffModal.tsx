@@ -21,9 +21,10 @@ interface EditMyStuffModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: any;
+  onUpdate?: (data: { id: string; status: string; sentiment_score: number }) => void;
 }
 
-const EditMyStuffModal = ({ open, onOpenChange, item }: EditMyStuffModalProps) => {
+const EditMyStuffModal = ({ open, onOpenChange, item, onUpdate }: EditMyStuffModalProps) => {
   const [status, setStatus] = useState(item?.status || 'currently_using');
   const [sentiment, setSentiment] = useState([item?.sentiment_score || 0]);
 
@@ -35,8 +36,13 @@ const EditMyStuffModal = ({ open, onOpenChange, item }: EditMyStuffModalProps) =
   }, [item]);
 
   const handleSubmit = () => {
-    // TODO: Implement update logic
-    console.log({ status, sentiment: sentiment[0] });
+    if (onUpdate && item) {
+      onUpdate({
+        id: item.id,
+        status,
+        sentiment_score: sentiment[0],
+      });
+    }
     onOpenChange(false);
   };
 
