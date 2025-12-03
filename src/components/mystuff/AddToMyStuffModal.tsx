@@ -16,6 +16,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { EntitySearch } from '@/components/recommendations/EntitySearch';
+import { EntityAdapter } from '@/components/profile/circles/types';
+import { useMyStuff } from '@/hooks/use-my-stuff';
 
 interface AddToMyStuffModalProps {
   open: boolean;
@@ -25,16 +28,45 @@ interface AddToMyStuffModalProps {
 const AddToMyStuffModal = ({ open, onOpenChange }: AddToMyStuffModalProps) => {
   const [status, setStatus] = useState('currently_using');
   const [sentiment, setSentiment] = useState([0]);
+  const [selectedEntity, setSelectedEntity] = useState<EntityAdapter | null>(null);
+  const [entityType, setEntityType] = useState<'product' | 'book' | 'movie' | 'place' | 'food'>('product');
+  
+  const { addToMyStuff } = useMyStuff();
+
+  const handleEntitySelect = (entity: EntityAdapter) => {
+    setSelectedEntity(entity);
+  };
 
   const handleSubmit = () => {
-    // TODO: Implement add to my stuff logic
-    console.log({ status, sentiment: sentiment[0] });
+    if (!selectedEntity || !selectedEntity.id || selectedEntity.id.startsWith('temp-')) {
+      return;
+    }
+    
+    addToMyStuff({
+      entity_id: selectedEntity.id,
+      status,
+      sentiment_score: sentiment[0],
+    });
+    
+    // Reset form and close
+    setSelectedEntity(null);
+    setStatus('currently_using');
+    setSentiment([0]);
     onOpenChange(false);
   };
 
+  const handleClose = (open: boolean) => {
+    if (!open) {
+      setSelectedEntity(null);
+      setStatus('currently_using');
+      setSentiment([0]);
+    }
+    onOpenChange(open);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add to My Stuff</DialogTitle>
           <DialogDescription>
@@ -43,12 +75,58 @@ const AddToMyStuffModal = ({ open, onOpenChange }: AddToMyStuffModalProps) => {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Entity Search - TODO: Integrate EntitySearch component */}
+          {/* Entity Type Selector */}
+          <div className="space-y-2">
+            <Label>What type of item?</Label>
+            <Select value={entityType} onValueChange={(value: any) => {
+              setEntityType(value);
+              setSelectedEntity(null);
+            }}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="product">Product</SelectItem>
+                <SelectItem value="book">Book</SelectItem>
+                <SelectItem value="movie">Movie</SelectItem>
+                <SelectItem value="place">Place</SelectItem>
+                <SelectItem value="food">Restaurant/Cafe</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Entity Search */}
           <div className="space-y-2">
             <Label>Search for item</Label>
-            <div className="p-4 border rounded-md bg-muted/50 text-center text-sm text-muted-foreground">
-              Entity search will be integrated here
-            </div>
+            {selectedEntity ? (
+              <div className="p-3 border rounded-md bg-muted/50">
+                <div className="flex items-center gap-3">
+                  {selectedEntity.image_url && (
+                    <img 
+                      src={selectedEntity.image_url} 
+                      alt={selectedEntity.name}
+                      className="w-12 h-12 rounded object-cover"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{selectedEntity.name}</p>
+                    <p className="text-sm text-muted-foreground capitalize">{selectedEntity.type}</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setSelectedEntity(null)}
+                  >
+                    Change
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <EntitySearch 
+                type={entityType}
+                onSelect={handleEntitySelect}
+              />
+            )}
           </div>
 
           {/* Status Selector */}
@@ -90,10 +168,13 @@ const AddToMyStuffModal = ({ open, onOpenChange }: AddToMyStuffModalProps) => {
         </div>
 
         <div className="flex justify-end gap-3">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleClose(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>
+          <Button 
+            onClick={handleSubmit}
+            disabled={!selectedEntity || !selectedEntity.id || selectedEntity.id.startsWith('temp-')}
+          >
             Add to My Stuff
           </Button>
         </div>

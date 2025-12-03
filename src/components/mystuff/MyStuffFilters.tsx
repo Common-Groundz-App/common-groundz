@@ -10,10 +10,20 @@ import {
 } from '@/components/ui/select';
 import AddToMyStuffModal from './AddToMyStuffModal';
 
-const MyStuffFilters = () => {
+interface MyStuffFiltersProps {
+  statusFilter: string;
+  sortBy: string;
+  onStatusFilterChange: (value: string) => void;
+  onSortByChange: (value: string) => void;
+}
+
+const MyStuffFilters = ({ 
+  statusFilter, 
+  sortBy, 
+  onStatusFilterChange, 
+  onSortByChange 
+}: MyStuffFiltersProps) => {
   const [showAddModal, setShowAddModal] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('recent');
 
   return (
     <>
@@ -23,7 +33,7 @@ const MyStuffFilters = () => {
           Add Item
         </Button>
 
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={onStatusFilterChange}>
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
@@ -37,7 +47,7 @@ const MyStuffFilters = () => {
           </SelectContent>
         </Select>
 
-        <Select value={sortBy} onValueChange={setSortBy}>
+        <Select value={sortBy} onValueChange={onSortByChange}>
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
@@ -48,7 +58,7 @@ const MyStuffFilters = () => {
           </SelectContent>
         </Select>
 
-        <Button variant="outline" size="icon" className="ml-auto">
+        <Button variant="outline" size="icon" className="ml-auto hidden sm:flex">
           <SlidersHorizontal className="h-4 w-4" />
         </Button>
       </div>
