@@ -3,6 +3,9 @@ project_id = "uyjtgybbktgapspodajy"
 [functions.extract-product-relationships]
 verify_jwt = true
 
+[functions.calculate-lifestyle-similarity]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321
@@ -79,4 +82,3 @@ verify_jwt = true
 
 [functions.update-user-memory]
 verify_jwt = true
-
