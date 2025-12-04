@@ -6,12 +6,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Version tag for identifying new entity-ID-based matching in logs
+// Version tag for identifying Phase 3 journey tracking in logs
 const MATCHING_MODE = 'entity_id_v1';
+const PHASE_TAG = '[Phase3]';
 
 interface ProductRelationship {
-  target_entity_id: string; // UUID from database
-  target_entity_name: string; // For logging only
+  target_entity_id: string;
+  target_entity_name: string;
   relationship_type: 'upgrade' | 'alternative' | 'complementary';
   confidence: number;
   evidence_quote: string;
@@ -21,34 +22,46 @@ interface ProductRelationship {
 function buildEntityDisplayName(entity: any): string {
   if (!entity) return 'Unknown Entity';
   
-  // Books: Try authors array first (most reliable)
   if (entity.authors && Array.isArray(entity.authors) && entity.authors.length > 0) {
     return `${entity.name} by ${entity.authors.join(', ')}`;
   }
   
-  // Fallback to venue field (used for authors in some older entities)
   if (entity.venue) {
     return `${entity.name} by ${entity.venue}`;
   }
   
-  // Default: just the name (for places, products without brands, etc.)
   return entity.name;
 }
 
 /**
  * Get candidate entity types based on source entity type
- * Prevents cross-category pollution while allowing logical relationships
  */
 function getCandidateTypes(sourceType: string): string[] {
   const typeMap: Record<string, string[]> = {
     'book': ['book'],
     'movie': ['movie'],
     'place': ['place'],
-    'product': ['product', 'brand'], // Products can relate to brands
-    'brand': ['brand', 'product'], // Brands can relate to products
+    'product': ['product', 'brand'],
+    'brand': ['brand', 'product'],
   };
   
   return typeMap[sourceType] || [sourceType];
+}
+
+/**
+ * Convert rating (1-5) to sentiment score (-5 to +5)
+ */
+function ratingToSentiment(rating: number): number {
+  return Math.round((rating - 3) * 2.5);
+}
+
+/**
+ * Infer user_stuff status from rating
+ */
+function inferStatusFromRating(rating: number): string {
+  if (rating >= 4) return 'currently_using';
+  if (rating >= 3) return 'used_before';
+  return 'stopped';
 }
 
 serve(async (req) => {
@@ -56,7 +69,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Generate unique run ID for log correlation
   const runId = crypto.randomUUID().substring(0, 8);
 
   try {
@@ -72,7 +84,7 @@ serve(async (req) => {
 
     const { reviewId, batchMode = false, limit = 50, skipProcessed = true, dryRun = false } = await req.json();
 
-    console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Starting - mode: ${dryRun ? 'DRY RUN' : 'LIVE'}, batch: ${batchMode}, limit: ${limit}`);
+    console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ${PHASE_TAG} Starting - mode: ${dryRun ? 'DRY RUN' : 'LIVE'}, batch: ${batchMode}, limit: ${limit}`);
 
     let reviewsToProcess = [];
 
@@ -129,6 +141,9 @@ serve(async (req) => {
     let processedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
+    let stuffPopulated = 0;
+    let journeysCreated = 0;
+    let consensusUpdated = 0;
 
     for (const review of reviewsToProcess) {
       try {
@@ -146,6 +161,45 @@ serve(async (req) => {
 
         const sourceEntityName = buildEntityDisplayName(sourceEntity);
 
+        // ========================================
+        // PHASE 3.1: Auto-populate user_stuff
+        // ========================================
+        if (!dryRun && review.user_id) {
+          const stuffStatus = inferStatusFromRating(review.rating || 3);
+          const sentimentScore = ratingToSentiment(review.rating || 3);
+
+          // Check if already exists in user_stuff
+          const { data: existingStuff } = await supabaseClient
+            .from('user_stuff')
+            .select('id')
+            .eq('user_id', review.user_id)
+            .eq('entity_id', review.entity_id)
+            .maybeSingle();
+
+          if (!existingStuff) {
+            const { error: stuffError } = await supabaseClient
+              .from('user_stuff')
+              .insert({
+                user_id: review.user_id,
+                entity_id: review.entity_id,
+                status: stuffStatus,
+                sentiment_score: sentimentScore,
+                entity_type: sourceEntity.type,
+                category: sourceEntity.type,
+                source: 'auto_review',
+                source_reference_id: review.id,
+                started_using_at: new Date().toISOString()
+              });
+
+            if (stuffError) {
+              console.error(`${PHASE_TAG}[runId=${runId}] Error populating user_stuff:`, stuffError);
+            } else {
+              stuffPopulated++;
+              console.log(`${PHASE_TAG}[runId=${runId}] Auto-populated user_stuff: ${sourceEntityName} (status: ${stuffStatus}, sentiment: ${sentimentScore})`);
+            }
+          }
+        }
+
         // Get allowed candidate types for this source entity
         const allowedTypes = getCandidateTypes(sourceEntity.type);
         console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Fetching candidates of types: ${allowedTypes.join(', ')}`);
@@ -155,8 +209,8 @@ serve(async (req) => {
           .from('entities')
           .select('id, name, type, authors, venue, description, popularity_score')
           .eq('is_deleted', false)
-          .neq('id', review.entity_id) // Exclude source entity
-          .in('type', allowedTypes) // CRITICAL: Only fetch relevant types
+          .neq('id', review.entity_id)
+          .in('type', allowedTypes)
           .order('popularity_score', { ascending: false })
           .limit(300);
 
@@ -165,7 +219,7 @@ serve(async (req) => {
           continue;
         }
 
-        // Format candidates for Gemini (compact representation)
+        // Format candidates for Gemini
         const candidatesList = candidateEntities.map(e => {
           const authorInfo = e.authors?.join(', ') || e.venue || '';
           return {
@@ -178,7 +232,6 @@ serve(async (req) => {
         });
 
         console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Loaded ${candidatesList.length} candidates (types: ${allowedTypes.join(', ')})`);
-
 
         // Combine initial review + all timeline updates
         let combinedText = '';
@@ -206,7 +259,7 @@ serve(async (req) => {
           });
         }
 
-        // Apply 20-character minimum threshold (to capture short timeline updates like "switched to Y")
+        // Apply 20-character minimum threshold
         if (combinedText.length < 20) {
           console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Skipping review ${review.id} - too short (${combinedText.length} chars)`);
           skippedCount++;
@@ -215,10 +268,10 @@ serve(async (req) => {
 
         console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Analyzing review ${review.id} (${combinedText.length} chars, ${review.review_updates?.length || 0} updates)`);
 
-        // Generate deterministic seed from review ID for reproducibility
+        // Generate deterministic seed from review ID
         const reviewSeed = parseInt(review.id.replace(/-/g, '').substring(0, 8), 16) % 2147483647;
 
-        // Define strict response schema for structured output
+        // Define strict response schema
         const responseSchema = {
           type: "array",
           items: {
@@ -250,7 +303,7 @@ serve(async (req) => {
           }
         };
 
-        // Call Gemini API with candidates list
+        // Call Gemini API
         const geminiResponse = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
           {
@@ -340,7 +393,7 @@ Requirements:
           cleanedResponse = cleanedResponse.replace(/```\n?/g, '');
         }
 
-        // Try to parse JSON with error handling
+        // Parse JSON with error handling
         let relationships: ProductRelationship[] = [];
         try {
           relationships = JSON.parse(cleanedResponse);
@@ -348,9 +401,7 @@ Requirements:
           console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] JSON parse error for review ${review.id}:`);
           console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Raw Gemini response:`, responseText);
           console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Cleaned response:`, cleanedResponse);
-          console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Parse error: ${parseError.message}`);
           
-          // Try to extract JSON array from text (fallback)
           const jsonMatch = cleanedResponse.match(/\[[\s\S]*\]/);
           if (jsonMatch) {
             try {
@@ -381,7 +432,7 @@ Requirements:
             continue;
           }
 
-          // Validate that Gemini returned a valid entity ID from our candidates
+          // Validate entity ID from candidates
           const candidateMatch = candidatesList.find(e => e.id === rel.target_entity_id);
 
           if (!candidateMatch) {
@@ -389,7 +440,7 @@ Requirements:
             continue;
           }
 
-          // Fetch full entity details for display
+          // Fetch full entity details
           const { data: fullTargetEntity, error: targetError } = await supabaseClient
             .from('entities')
             .select('id, name, authors, venue, type')
@@ -401,9 +452,9 @@ Requirements:
             continue;
           }
 
-          // Prevent self-references (defensive check - model should never return source entity ID)
+          // Prevent self-references
           if (fullTargetEntity.id === review.entity_id) {
-            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ⚠️ Model returned source entity ID as target - skipping self-reference: ${fullTargetEntity.name}`);
+            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ⚠️ Model returned source entity ID as target - skipping self-reference`);
             continue;
           }
 
@@ -427,48 +478,87 @@ Requirements:
             continue;
           }
 
-          // LIVE MODE - Check for duplicates
-          const { data: existingRel } = await supabaseClient
-            .from('product_relationships')
-            .select('id')
-            .eq('entity_a_id', review.entity_id)
-            .eq('entity_b_id', fullTargetEntity.id)
-            .single();
+          // ========================================
+          // PHASE 3.2: Write to user_entity_journeys
+          // ========================================
+          const fromSentiment = ratingToSentiment(review.rating || 3);
+          // For upgrades, assume improved sentiment; for alternatives, keep same
+          const toSentiment = rel.relationship_type === 'upgrade' 
+            ? Math.min(fromSentiment + 2, 5) 
+            : fromSentiment;
 
-          if (existingRel) {
-            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Relationship already exists, skipping`);
-            continue;
+          // Check if journey already exists for this user
+          const { data: existingJourney } = await supabaseClient
+            .from('user_entity_journeys')
+            .select('id')
+            .eq('user_id', review.user_id)
+            .eq('from_entity_id', review.entity_id)
+            .eq('to_entity_id', fullTargetEntity.id)
+            .maybeSingle();
+
+          if (!existingJourney) {
+            const { error: journeyError } = await supabaseClient
+              .from('user_entity_journeys')
+              .insert({
+                user_id: review.user_id,
+                from_entity_id: review.entity_id,
+                to_entity_id: fullTargetEntity.id,
+                from_category: sourceEntity.type,
+                to_category: fullTargetEntity.type,
+                from_entity_type: sourceEntity.type,
+                to_entity_type: fullTargetEntity.type,
+                transition_type: rel.relationship_type,
+                from_sentiment: fromSentiment,
+                to_sentiment: toSentiment,
+                evidence_text: rel.evidence_quote,
+                source_review_id: review.id,
+                confidence: rel.confidence
+              });
+
+            if (journeyError) {
+              console.error(`${PHASE_TAG}[runId=${runId}] Error creating journey:`, journeyError);
+            } else {
+              journeysCreated++;
+              console.log(`${PHASE_TAG}[runId=${runId}] Created journey: ${sourceEntityName} → ${targetEntityName} (${rel.relationship_type})`);
+            }
           }
 
-          // Insert new relationship
-          const { error: insertError } = await supabaseClient
+          // ========================================
+          // PHASE 3.3: Consensus tracking in product_relationships
+          // ========================================
+          const { data: existingRel } = await supabaseClient
             .from('product_relationships')
-            .insert({
-              entity_a_id: review.entity_id,
-              entity_b_id: fullTargetEntity.id,
-              relationship_type: rel.relationship_type,
-              confidence_score: rel.confidence,
-              evidence_text: rel.evidence_quote,
-              discovered_from_user_id: review.user_id,
-              metadata: {
-                review_id: review.id,
-                extracted_at: new Date().toISOString(),
-                processing_mode: batchMode ? 'batch' : 'single',
-                combined_text_length: combinedText.length,
-                update_count: review.review_updates?.length || 0,
-                matching_mode: MATCHING_MODE,
-                run_id: runId
-              }
-            });
+            .select('id, consensus_count, avg_confidence, confidence_score')
+            .eq('entity_a_id', review.entity_id)
+            .eq('entity_b_id', fullTargetEntity.id)
+            .eq('relationship_type', rel.relationship_type)
+            .maybeSingle();
 
-          if (insertError) {
-            if (insertError.code === '23505') {
-              console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Duplicate (unique constraint), skipping`);
+          if (existingRel) {
+            // Relationship exists - update consensus
+            const currentConsensus = existingRel.consensus_count || 1;
+            const currentAvgConfidence = existingRel.avg_confidence || existingRel.confidence_score || 0.5;
+            
+            const newCount = currentConsensus + 1;
+            const newAvgConfidence = ((currentAvgConfidence * currentConsensus) + rel.confidence) / newCount;
+
+            const { error: updateError } = await supabaseClient
+              .from('product_relationships')
+              .update({
+                consensus_count: newCount,
+                avg_confidence: newAvgConfidence,
+                last_confirmed_at: new Date().toISOString(),
+                confirmation_count: (existingRel.confirmation_count || 0) + 1
+              })
+              .eq('id', existingRel.id);
+
+            if (updateError) {
+              console.error(`${PHASE_TAG}[runId=${runId}] Error updating consensus:`, updateError);
             } else {
-              console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Insert error:`, insertError);
-              errorCount++;
+              consensusUpdated++;
+              console.log(`${PHASE_TAG}[runId=${runId}] Updated consensus: ${newCount} users, avg confidence: ${newAvgConfidence.toFixed(2)}`);
             }
-          } else {
+
             extractedRelationships.push({
               source_entity_id: review.entity_id,
               source_entity_name: sourceEntityName,
@@ -476,9 +566,55 @@ Requirements:
               target_entity_name: targetEntityName,
               relationship_type: rel.relationship_type,
               confidence: rel.confidence,
-              evidence: rel.evidence_quote
+              evidence: rel.evidence_quote,
+              consensus_updated: true,
+              new_consensus_count: newCount
             });
-            console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ✅ Inserted: ${rel.relationship_type} → ${fullTargetEntity.name}`);
+          } else {
+            // New relationship - insert with initial consensus
+            const { error: insertError } = await supabaseClient
+              .from('product_relationships')
+              .insert({
+                entity_a_id: review.entity_id,
+                entity_b_id: fullTargetEntity.id,
+                relationship_type: rel.relationship_type,
+                confidence_score: rel.confidence,
+                evidence_text: rel.evidence_quote,
+                discovered_from_user_id: review.user_id,
+                consensus_count: 1,
+                avg_confidence: rel.confidence,
+                category: sourceEntity.type,
+                metadata: {
+                  review_id: review.id,
+                  extracted_at: new Date().toISOString(),
+                  processing_mode: batchMode ? 'batch' : 'single',
+                  combined_text_length: combinedText.length,
+                  update_count: review.review_updates?.length || 0,
+                  matching_mode: MATCHING_MODE,
+                  run_id: runId
+                }
+              });
+
+            if (insertError) {
+              if (insertError.code === '23505') {
+                console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Duplicate (unique constraint), skipping`);
+              } else {
+                console.error(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Insert error:`, insertError);
+                errorCount++;
+              }
+            } else {
+              extractedRelationships.push({
+                source_entity_id: review.entity_id,
+                source_entity_name: sourceEntityName,
+                target_entity_id: fullTargetEntity.id,
+                target_entity_name: targetEntityName,
+                relationship_type: rel.relationship_type,
+                confidence: rel.confidence,
+                evidence: rel.evidence_quote,
+                new_relationship: true
+              });
+              console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ✅ Inserted new relationship: ${rel.relationship_type} → ${fullTargetEntity.name}`);
+            }
           }
         }
 
@@ -501,10 +637,16 @@ Requirements:
       extractedRelationships: extractedRelationships.length,
       relationships: extractedRelationships,
       errors: errorCount,
-      runId
+      runId,
+      // Phase 3 metrics
+      phase3: {
+        stuffPopulated,
+        journeysCreated,
+        consensusUpdated
+      }
     };
 
-    console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] Completed:`, result);
+    console.log(`[extract-relationships][${MATCHING_MODE}][runId=${runId}] ${PHASE_TAG} Completed:`, JSON.stringify(result, null, 2));
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
