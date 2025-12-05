@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
-import { Package, ListChecks } from 'lucide-react';
+import { Package, ListChecks, Sparkles } from 'lucide-react';
 import MyStuffFilters from './MyStuffFilters';
 import MyStuffItemsGrid from './MyStuffItemsGrid';
 import MyStuffRoutinesSection from './MyStuffRoutinesSection';
+import JourneyRecommendationsSection from './JourneyRecommendationsSection';
 
 const MyStuffContent = () => {
   const [activeTab, setActiveTab] = useState('items');
@@ -20,6 +21,11 @@ const MyStuffContent = () => {
       value: 'routines',
       label: 'Routines',
       icon: ListChecks
+    },
+    {
+      value: 'suggestions',
+      label: 'Suggestions',
+      icon: Sparkles
     }
   ];
 
@@ -53,6 +59,10 @@ const MyStuffContent = () => {
 
         <TabsContent value="routines" className="mt-6">
           <MyStuffRoutinesSection />
+        </TabsContent>
+
+        <TabsContent value="suggestions" className="mt-6">
+          <JourneyRecommendationsSection />
         </TabsContent>
       </TubelightTabs>
     </div>
