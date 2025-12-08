@@ -2,20 +2,23 @@ import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreVertical, Edit, Trash2 } from 'lucide-react';
+import { MoreVertical, Edit, Trash2, Bell, BellOff, Repeat } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Link } from 'react-router-dom';
 import EditMyStuffModal from './EditMyStuffModal';
+import AlternativesDrawer from './AlternativesDrawer';
+import { cn } from '@/lib/utils';
 
 interface MyStuffItemCardProps {
   item: any;
   readOnly?: boolean;
-  onUpdate?: (data: { id: string; status: string; sentiment_score: number }) => void;
+  onUpdate?: (data: { id: string; status: string; sentiment_score: number; watch_for_upgrades?: boolean }) => void;
   onDelete?: (id: string) => void;
 }
 
@@ -37,10 +40,25 @@ const statusLabels = {
 
 const MyStuffItemCard = ({ item, readOnly = false, onUpdate, onDelete }: MyStuffItemCardProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAlternatives, setShowAlternatives] = useState(false);
+  const [isWatching, setIsWatching] = useState(item.watch_for_upgrades || false);
 
   const handleDelete = () => {
     if (onDelete) {
       onDelete(item.id);
+    }
+  };
+
+  const handleToggleWatch = () => {
+    const newWatchState = !isWatching;
+    setIsWatching(newWatchState);
+    if (onUpdate) {
+      onUpdate({
+        id: item.id,
+        status: item.status,
+        sentiment_score: item.sentiment_score,
+        watch_for_upgrades: newWatchState,
+      });
     }
   };
 
@@ -55,34 +73,68 @@ const MyStuffItemCard = ({ item, readOnly = false, onUpdate, onDelete }: MyStuff
               alt={item.entity.name}
               className="w-full h-full object-cover"
             />
+            {/* Watch indicator */}
+            {isWatching && (
+              <div className="absolute top-2 right-2">
+                <Badge className="bg-primary/90 text-primary-foreground flex items-center gap-1">
+                  <Bell className="h-3 w-3" />
+                  Watching
+                </Badge>
+              </div>
+            )}
           </div>
         )}
 
         <div className="p-4">
           {/* Header with status and actions */}
           <div className="flex items-start justify-between mb-2">
-          <Badge className={statusColors[item.status as keyof typeof statusColors]}>
+            <Badge className={statusColors[item.status as keyof typeof statusColors]}>
               {statusLabels[item.status as keyof typeof statusLabels]}
             </Badge>
             
             {!readOnly && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowEditModal(true)}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center gap-1">
+                {/* Watch toggle button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "h-8 w-8",
+                    isWatching && "text-primary"
+                  )}
+                  onClick={handleToggleWatch}
+                  title={isWatching ? "Stop watching for upgrades" : "Watch for upgrades"}
+                >
+                  {isWatching ? (
+                    <Bell className="h-4 w-4 fill-current" />
+                  ) : (
+                    <BellOff className="h-4 w-4" />
+                  )}
+                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setShowAlternatives(true)}>
+                      <Repeat className="mr-2 h-4 w-4" />
+                      Find alternatives
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setShowEditModal(true)}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Remove
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             )}
           </div>
 
@@ -129,6 +181,13 @@ const MyStuffItemCard = ({ item, readOnly = false, onUpdate, onDelete }: MyStuff
         onOpenChange={setShowEditModal}
         item={item}
         onUpdate={onUpdate}
+      />
+
+      <AlternativesDrawer
+        open={showAlternatives}
+        onOpenChange={setShowAlternatives}
+        entityId={item.entity?.id}
+        entityName={item.entity?.name}
       />
     </>
   );

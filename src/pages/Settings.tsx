@@ -6,7 +6,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Bell, User, Shield, Palette, Globe, MapPin, Info, AlertTriangle } from 'lucide-react';
+import { Bell, User, Shield, Palette, Globe, MapPin, Info, AlertTriangle, Mail, Route } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { locationEventBus } from '@/hooks/use-geolocation';
 import PreferencesSection from '@/components/preferences/PreferencesSection';
+import { useNotificationPreferences } from '@/hooks/use-notification-preferences';
 
 const Settings = () => {
   const { user } = useAuth();
@@ -33,6 +34,12 @@ const Settings = () => {
   } = useLocation();
   const isMobile = useIsMobile();
   const { toast } = useToast();
+  const { 
+    preferences: notifPrefs, 
+    isLoading: notifLoading, 
+    toggleWeeklyDigest,
+    toggleJourneyNotifications 
+  } = useNotificationPreferences();
   
   // Subscribe to location events to keep UI in sync
   useEffect(() => {
@@ -157,13 +164,74 @@ const Settings = () => {
               </TabsContent>
               
               <TabsContent value="notifications">
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Route className="h-5 w-5" />
+                      Journey Notifications
+                    </CardTitle>
+                    <CardDescription>
+                      Get notified when similar users make relevant journeys
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label htmlFor="journey-toggle" className="font-medium">
+                          Enable Journey Notifications
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Get notified for items you're watching
+                        </p>
+                      </div>
+                      <Switch
+                        id="journey-toggle"
+                        checked={notifPrefs?.journey_notifications_enabled ?? true}
+                        onCheckedChange={toggleJourneyNotifications}
+                        disabled={notifLoading}
+                      />
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Label htmlFor="digest-toggle" className="font-medium flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          Weekly Digest
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Receive a weekly summary of journey insights
+                        </p>
+                      </div>
+                      <Switch
+                        id="digest-toggle"
+                        checked={notifPrefs?.weekly_digest_enabled ?? false}
+                        onCheckedChange={toggleWeeklyDigest}
+                        disabled={notifLoading}
+                      />
+                    </div>
+                    
+                    <div className="bg-accent/30 rounded-md p-4 flex items-start space-x-3">
+                      <Info className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">How journey notifications work</p>
+                        <p className="text-xs text-muted-foreground">
+                          To get notified about specific items, tap the bell icon on any item in My Stuff. 
+                          You'll only receive notifications for watched items when similar users make relevant journeys.
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader>
-                    <CardTitle>Notification Preferences</CardTitle>
+                    <CardTitle>Other Notifications</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-muted-foreground">
-                      Configure your notification preferences here. This feature will be available soon.
+                      Additional notification settings will be available soon.
                     </p>
                   </CardContent>
                 </Card>

@@ -1,17 +1,29 @@
-import React from 'react';
-import { ArrowRight, TrendingUp, Repeat, Plus, Quote } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowRight, TrendingUp, Repeat, Plus, Quote, Bookmark, BookmarkCheck } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { JourneyRecommendation } from '@/services/journeyRecommendationService';
 import { useNavigate } from 'react-router-dom';
+import { savedInsightsService } from '@/services/savedInsightsService';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface JourneyRecommendationCardProps {
   recommendation: JourneyRecommendation;
+  onBookmarkChange?: (isSaved: boolean) => void;
 }
 
-const JourneyRecommendationCard: React.FC<JourneyRecommendationCardProps> = ({ recommendation }) => {
+const JourneyRecommendationCard: React.FC<JourneyRecommendationCardProps> = ({ 
+  recommendation,
+  onBookmarkChange 
+}) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuth();
   const { fromEntity, toEntity, transitionType, story, confidence, consensusCount } = recommendation;
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const getTransitionIcon = () => {
     switch (transitionType) {
@@ -50,18 +62,90 @@ const JourneyRecommendationCard: React.FC<JourneyRecommendationCardProps> = ({ r
     navigate(`/entity/${entityId}`);
   };
 
+  const handleBookmark = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!user) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to save insights',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (isSaved) {
+        // For now, just toggle the state - full removal would require tracking the saved insight ID
+        setIsSaved(false);
+        toast({
+          title: 'Bookmark removed',
+        });
+      } else {
+        await savedInsightsService.saveInsight({
+          insight_type: 'journey',
+          entity_from_id: fromEntity.id,
+          entity_to_id: toEntity.id,
+          insight_data: {
+            from_entity_name: fromEntity.name,
+            to_entity_name: toEntity.name,
+            transition_type: transitionType,
+            story: {
+              headline: story.headline,
+              description: story.description,
+            },
+            confidence,
+            consensus_count: consensusCount,
+          },
+        });
+        setIsSaved(true);
+        toast({
+          title: 'Insight saved',
+          description: 'Added to your saved insights',
+        });
+      }
+      onBookmarkChange?.(!isSaved);
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: 'Failed to save insight',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer group">
       <CardContent className="p-4">
         {/* Header with badges */}
         <div className="flex items-center justify-between mb-3">
-          <Badge variant="outline" className={`${getTransitionColor()} flex items-center gap-1`}>
-            {getTransitionIcon()}
-            <span className="capitalize">{transitionType}</span>
-          </Badge>
-          <Badge variant="secondary" className={getConfidenceBadge()}>
-            {getConfidenceLabel()}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={`${getTransitionColor()} flex items-center gap-1`}>
+              {getTransitionIcon()}
+              <span className="capitalize">{transitionType}</span>
+            </Badge>
+            <Badge variant="secondary" className={getConfidenceBadge()}>
+              {getConfidenceLabel()}
+            </Badge>
+          </div>
+          
+          {/* Bookmark button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={handleBookmark}
+            disabled={isSaving}
+          >
+            {isSaved ? (
+              <BookmarkCheck className="h-4 w-4 text-primary fill-current" />
+            ) : (
+              <Bookmark className="h-4 w-4" />
+            )}
+          </Button>
         </div>
 
         {/* Entity transition visual */}

@@ -1541,6 +1541,33 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          journey_notifications_enabled: boolean
+          updated_at: string
+          user_id: string
+          weekly_digest_enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          journey_notifications_enabled?: boolean
+          updated_at?: string
+          user_id: string
+          weekly_digest_enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          journey_notifications_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+          weekly_digest_enabled?: boolean
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_url: string | null
@@ -2790,6 +2817,71 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_insights: {
+        Row: {
+          created_at: string
+          entity_from_id: string | null
+          entity_to_id: string | null
+          id: string
+          insight_data: Json
+          insight_type: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_from_id?: string | null
+          entity_to_id?: string | null
+          id?: string
+          insight_data?: Json
+          insight_type: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_from_id?: string | null
+          entity_to_id?: string | null
+          id?: string
+          insight_data?: Json
+          insight_type?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_insights_entity_from_id_fkey"
+            columns: ["entity_from_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_insights_entity_from_id_fkey"
+            columns: ["entity_from_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_view"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "saved_insights_entity_to_id_fkey"
+            columns: ["entity_to_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_insights_entity_to_id_fkey"
+            columns: ["entity_to_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_view"
+            referencedColumns: ["entity_id"]
+          },
+        ]
+      }
       social_influence_scores: {
         Row: {
           category: string
@@ -3298,6 +3390,7 @@ export type Database = {
           stopped_using_at: string | null
           updated_at: string | null
           user_id: string
+          watch_for_upgrades: boolean
         }
         Insert: {
           category?: string | null
@@ -3314,6 +3407,7 @@ export type Database = {
           stopped_using_at?: string | null
           updated_at?: string | null
           user_id: string
+          watch_for_upgrades?: boolean
         }
         Update: {
           category?: string | null
@@ -3330,6 +3424,7 @@ export type Database = {
           stopped_using_at?: string | null
           updated_at?: string | null
           user_id?: string
+          watch_for_upgrades?: boolean
         }
         Relationships: [
           {
