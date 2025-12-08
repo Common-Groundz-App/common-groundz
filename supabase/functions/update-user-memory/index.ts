@@ -146,10 +146,12 @@ serve(async (req) => {
     }
 
     const systemPrompt = `You are a memory extraction assistant. Analyze the conversation and extract relevant information into 4 scopes:
-- skincare: products, routines, skin type, concerns, goals
-- food: preferences, allergies, cuisines, restrictions, dietary habits
-- movies: genres, actors, viewing habits, favorites
-- routines: daily schedules, habits, goals, lifestyle patterns
+- skincare: products, routines, skin type, concerns, goals (what user wants to achieve with skincare, e.g., "reduce acne", "anti-aging", "glow")
+- food: preferences, allergies, cuisines, restrictions, dietary habits, goals (e.g., "lose weight", "build muscle", "eat healthier")
+- movies: genres, actors, viewing habits, favorites, goals (e.g., "watch more classics", "explore foreign films")
+- routines: daily schedules, habits, fitness routines, lifestyle patterns, goals (e.g., "wake up earlier", "exercise 5x/week", "meditate daily")
+
+IMPORTANT: Extract user GOALS whenever mentioned. Goals are things the user wants to achieve, improve, or change.
 
 Only include scopes with meaningful information. Return empty object {} for scopes with no relevant data.
 Use the extract_scoped_memories function to structure your response.`;
@@ -159,25 +161,51 @@ Use the extract_scoped_memories function to structure your response.`;
         function_declarations: [
           {
             name: "extract_scoped_memories",
-            description: "Extract categorized memories from conversation",
+            description: "Extract categorized memories from conversation including goals",
             parameters: {
               type: "object",
               properties: {
                 skincare: {
                   type: "object",
-                  description: "Skincare routines, products, skin type, concerns",
+                  description: "Skincare routines, products, skin type, concerns, and GOALS",
+                  properties: {
+                    skin_type: { type: "string" },
+                    concerns: { type: "array", items: { type: "string" } },
+                    products_mentioned: { type: "array", items: { type: "string" } },
+                    goals: { type: "array", items: { type: "string" }, description: "What user wants to achieve (e.g., reduce acne, anti-aging)" }
+                  }
                 },
                 food: {
                   type: "object",
-                  description: "Dietary preferences, allergies, favorite cuisines, restrictions",
+                  description: "Dietary preferences, allergies, favorite cuisines, restrictions, and GOALS",
+                  properties: {
+                    preferences: { type: "array", items: { type: "string" } },
+                    allergies: { type: "array", items: { type: "string" } },
+                    cuisines: { type: "array", items: { type: "string" } },
+                    restrictions: { type: "array", items: { type: "string" } },
+                    goals: { type: "array", items: { type: "string" }, description: "Dietary goals (e.g., lose weight, eat healthier)" }
+                  }
                 },
                 movies: {
                   type: "object",
-                  description: "Genre preferences, favorite actors, viewing habits",
+                  description: "Genre preferences, favorite actors, viewing habits, and GOALS",
+                  properties: {
+                    genres: { type: "array", items: { type: "string" } },
+                    actors: { type: "array", items: { type: "string" } },
+                    viewing_habits: { type: "string" },
+                    favorites: { type: "array", items: { type: "string" } },
+                    goals: { type: "array", items: { type: "string" }, description: "Viewing goals (e.g., watch more classics)" }
+                  }
                 },
                 routines: {
                   type: "object",
-                  description: "Daily routines, schedules, habits, goals",
+                  description: "Daily routines, schedules, habits, lifestyle, and GOALS",
+                  properties: {
+                    daily_schedule: { type: "string" },
+                    habits: { type: "array", items: { type: "string" } },
+                    fitness: { type: "string" },
+                    goals: { type: "array", items: { type: "string" }, description: "Lifestyle goals (e.g., exercise more, sleep better)" }
+                  }
                 },
               },
             },
