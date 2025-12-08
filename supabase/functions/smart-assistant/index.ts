@@ -944,11 +944,6 @@ serve(async (req) => {
     const constraintsContext = constraints.length > 0 ? constraints.join('\n') : '- No specific constraints';
 
     const systemPrompt = `You are the Common Groundz AI Assistant. You help users discover products, analyze reviews, and get personalized recommendations based on real user experiences.
-        .update({ last_accessed_at: new Date().toISOString() })
-        .eq('user_id', user.id);
-    }
-
-    const systemPrompt = `You are the Common Groundz AI Assistant. You help users discover products, analyze reviews, and get personalized recommendations based on real user experiences.
 
 === INTENT DETECTION ===
 Before responding, classify the user's intent:
