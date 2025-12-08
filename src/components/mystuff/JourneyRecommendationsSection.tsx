@@ -1,11 +1,13 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Sparkles, TrendingUp, Repeat, Plus, Info } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Sparkles, TrendingUp, Repeat, Plus, Info, Bookmark } from 'lucide-react';
 import { journeyRecommendationService, JourneyRecommendation } from '@/services/journeyRecommendationService';
 import { useAuth } from '@/contexts/AuthContext';
 import JourneyRecommendationCard from './JourneyRecommendationCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const JourneyRecommendationsSection: React.FC = () => {
@@ -118,11 +120,19 @@ const JourneyRecommendationsSection: React.FC = () => {
           </TooltipProvider>
         </div>
         
-        {metadata && (
-          <Badge variant="outline" className="text-xs">
-            {getModeDescription(metadata.richness_mode)}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {metadata && (
+            <Badge variant="outline" className="text-xs hidden sm:inline-flex">
+              {getModeDescription(metadata.richness_mode)}
+            </Badge>
+          )}
+          <Link to="/saved-insights">
+            <Button variant="ghost" size="sm" className="text-xs gap-1">
+              <Bookmark className="h-3 w-3" />
+              <span className="hidden sm:inline">Saved</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Recommendation sections */}

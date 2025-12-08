@@ -63,6 +63,172 @@ async function fetchWithRetry(
   throw new Error("I'm having trouble reaching the AI service right now. Please try again in 10–15 seconds.");
 }
 
+// ========== NEW PHASE 6 TOOL FUNCTIONS ==========
+
+async function getUserStuff(
+  supabaseClient: any,
+  userId: string,
+  category?: string,
+  status?: string,
+  limit: number = 20
+): Promise<any> {
+  try {
+    console.log('[getUserStuff] UserId:', userId, 'Category:', category, 'Status:', status, 'Limit:', limit);
+
+    let query = supabaseClient
+      .from('user_stuff')
+      .select(`
+        id,
+        entity_id,
+        status,
+        sentiment_score,
+        category,
+        started_using_at,
+        stopped_using_at,
+        entity:entity_id(id, name, type, slug, image_url)
+      `)
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+
+    if (category) {
+      query = query.eq('category', category);
+    }
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[getUserStuff] Error:', error);
+      throw error;
+    }
+
+    // Format as compact inventory for system prompt
+    const compactInventory = data?.reduce((acc: any, item: any) => {
+      const cat = item.category || item.entity?.type || 'other';
+      if (!acc[cat]) acc[cat] = [];
+      const sentiment = item.sentiment_score !== null ? ` (${item.sentiment_score > 0 ? '+' : ''}${item.sentiment_score})` : '';
+      acc[cat].push({
+        name: item.entity?.name || 'Unknown',
+        status: item.status,
+        sentiment: item.sentiment_score,
+        displayText: `${item.entity?.name}${sentiment}`
+      });
+      return acc;
+    }, {});
+
+    return {
+      success: true,
+      items: data || [],
+      compact_inventory: compactInventory,
+      total_count: data?.length || 0
+    };
+
+  } catch (error) {
+    console.error('[getUserStuff] Error:', error);
+    return {
+      success: false,
+      error: error.message,
+      items: []
+    };
+  }
+}
+
+async function getPersonalizedTransitions(
+  supabaseClient: any,
+  userId: string,
+  entityId?: string,
+  transitionType?: string,
+  limit: number = 5
+): Promise<any> {
+  try {
+    console.log('[getPersonalizedTransitions] UserId:', userId, 'EntityId:', entityId, 'Type:', transitionType, 'Limit:', limit);
+
+    // Call the get-personalized-transitions edge function
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-personalized-transitions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+      },
+      body: JSON.stringify({
+        userId,
+        entityId,
+        transitionType,
+        limit
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[getPersonalizedTransitions] Error:', errorText);
+      throw new Error('Failed to get personalized transitions');
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      recommendations: data.recommendations || [],
+      metadata: data.metadata,
+      total_count: data.recommendations?.length || 0
+    };
+
+  } catch (error) {
+    console.error('[getPersonalizedTransitions] Error:', error);
+    return {
+      success: false,
+      error: error.message,
+      recommendations: []
+    };
+  }
+}
+
+async function saveInsightFromChat(
+  supabaseClient: any,
+  userId: string,
+  insightType: string,
+  entityFromId: string,
+  entityToId: string,
+  insightData: any
+): Promise<any> {
+  try {
+    console.log('[saveInsightFromChat] UserId:', userId, 'Type:', insightType, 'From:', entityFromId, 'To:', entityToId);
+
+    const { data, error } = await supabaseClient
+      .from('saved_insights')
+      .insert({
+        user_id: userId,
+        insight_type: insightType,
+        entity_from_id: entityFromId,
+        entity_to_id: entityToId,
+        insight_data: insightData
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[saveInsightFromChat] Error:', error);
+      throw error;
+    }
+
+    return {
+      success: true,
+      message: 'Insight saved successfully! You can find it in your Saved Insights.',
+      saved_insight_id: data.id
+    };
+
+  } catch (error) {
+    console.error('[saveInsightFromChat] Error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
 // ========== TOOL EXECUTION FUNCTIONS ==========
 
 async function searchReviewsSemantic(
@@ -759,55 +925,70 @@ serve(async (req) => {
       if (scopes.routines) scopeTexts.push(`Routines: ${JSON.stringify(scopes.routines)}`);
       
       if (scopeTexts.length > 0) {
-        memoryContext = '\n\nWhat I know about you:\n' + scopeTexts.join('\n');
+        memoryContext = '\n' + scopeTexts.join('\n');
       }
-      
-      // Update last_accessed_at timestamp
-      await supabaseClient
-        .from('user_conversation_memory')
+    }
+
+    // Extract constraints from preferences
+    const prefs = profile?.preferences as any;
+    const constraints: string[] = [];
+    if (prefs?.constraints?.avoidIngredients?.length) {
+      constraints.push(`- Avoid ingredients: ${prefs.constraints.avoidIngredients.join(', ')}`);
+    }
+    if (prefs?.constraints?.avoidBrands?.length) {
+      constraints.push(`- Avoid brands: ${prefs.constraints.avoidBrands.join(', ')}`);
+    }
+    if (prefs?.constraints?.budget) {
+      constraints.push(`- Budget: ${prefs.constraints.budget}`);
+    }
+    const constraintsContext = constraints.length > 0 ? constraints.join('\n') : '- No specific constraints';
+
+    const systemPrompt = `You are the Common Groundz AI Assistant. You help users discover products, analyze reviews, and get personalized recommendations based on real user experiences.
         .update({ last_accessed_at: new Date().toISOString() })
         .eq('user_id', user.id);
     }
 
     const systemPrompt = `You are the Common Groundz AI Assistant. You help users discover products, analyze reviews, and get personalized recommendations based on real user experiences.
 
-User Context:
+=== INTENT DETECTION ===
+Before responding, classify the user's intent:
+- upgrade_intent: User wants to find something better than what they have
+- alternative_intent: User wants similar options to consider
+- comparison_intent: User wants to compare two or more items
+- dissatisfaction_intent: User expresses unhappiness with a product
+- discovery_intent: User is researching new options
+- general_query: General question or conversation
+
+Use this intent to decide which tools to call and how detailed to respond.
+
+=== USER CONTEXT (STRATIFIED MEMORY) ===
+
+[LONG-TERM IDENTITY]
 - Name: ${userName}
-- Bio: ${userBio}${profilePreferences}${memoryContext}
+- Bio: ${userBio}${profilePreferences}
 
-CRITICAL: Tool Selection Priority
-================================
-When users ask about products, books, movies, places, or any items:
-1. ALWAYS use search_reviews_semantic FIRST to check our Common Groundz database
-2. ONLY use web_search if search_reviews_semantic returns NO results or empty data
-3. NEVER skip internal search - our users' reviews are your primary knowledge source
+[LEARNED PREFERENCES]${memoryContext || '\n- No learned preferences yet'}
 
-Examples:
-- "Zero to One book" → Use search_reviews_semantic with query "Zero to One"
-- "best headphones" → Use search_reviews_semantic with query "headphones reviews"
-- "Italian restaurants in NYC" → Use search_reviews_semantic with query "Italian restaurants NYC"
+[CONSTRAINTS]
+${constraintsContext}
 
-Your capabilities:
-1. **search_reviews_semantic**: Search reviews using natural language to find specific experiences, opinions, or product comparisons
-2. **find_similar_users**: Find users with similar tastes and preferences
-3. **get_product_relationships**: Discover product upgrades, alternatives, downgrades, or complements
-4. **get_user_context**: Retrieve user's preferences, history, or goals
-5. **web_search**: Search the web when local data is insufficient (always inform user you're searching externally)
+=== TOOL PRIORITY ===
+1. ALWAYS use search_reviews_semantic FIRST for product queries
+2. Use get_user_stuff to check what user owns before recommending
+3. Use get_personalized_transitions for upgrade/alternative suggestions
+4. Use save_insight when user wants to bookmark a recommendation
+5. ONLY use web_search if internal search returns no results
 
-Guidelines:
-- ALWAYS check Common Groundz reviews database FIRST before considering web search
-- Be helpful, concise, and conversational
-- Cite sources when referencing reviews or user opinions
-- ONLY use web_search as last resort when internal search finds nothing
-- When using web_search, acknowledge you checked internally first
-- When viewing a specific product page, provide relevant insights about that product
-- Remember user preferences across conversations using the context provided
-- Use function calls to access data - you have powerful tools available
+=== REASONING VISIBILITY ===
+When recommending, ALWAYS explain WHY:
+- "Based on your goal to reduce acne, I suggest..."
+- "3 users with similar skincare routines upgraded to..."
+- "Since you mentioned avoiding fragrance, this option..."
 
 Current Context:
 ${context?.entityId ? `- User is viewing entity: ${context.entityId}` : '- General conversation'}
 
-Always prioritize user experience and provide actionable insights.`;
+Be helpful, concise, and always prioritize user experience.`;
 
     // 7. Define function calling tools (Phase 3 will implement execution)
     const tools = [
@@ -937,6 +1118,88 @@ Always prioritize user experience and provide actionable insights.`;
               }
             },
             required: ["query"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_user_stuff",
+          description: "Get user's personal inventory - items they own, use, or want to try. Use to understand what products/items the user has.",
+          parameters: {
+            type: "object",
+            properties: {
+              category: {
+                type: "string",
+                description: "Optional: filter by category (e.g., 'skincare', 'books', 'electronics')"
+              },
+              status: {
+                type: "string",
+                enum: ["currently_using", "used_before", "want_to_try", "wishlist", "stopped"],
+                description: "Optional: filter by usage status"
+              },
+              limit: {
+                type: "number",
+                description: "Number of items to return (default 20)"
+              }
+            },
+            required: []
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_personalized_transitions",
+          description: "Get personalized journey recommendations - upgrades, alternatives, and complementary items based on similar users' experiences.",
+          parameters: {
+            type: "object",
+            properties: {
+              entity_id: {
+                type: "string",
+                description: "Optional: specific product to get transitions for"
+              },
+              transition_type: {
+                type: "string",
+                enum: ["upgrade", "alternative", "complementary"],
+                description: "Optional: filter by transition type"
+              },
+              limit: {
+                type: "number",
+                description: "Number of recommendations (default 5)"
+              }
+            },
+            required: []
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "save_insight",
+          description: "Save a journey insight/recommendation for the user to reference later.",
+          parameters: {
+            type: "object",
+            properties: {
+              insight_type: {
+                type: "string",
+                enum: ["upgrade", "alternative", "complementary"],
+                description: "Type of insight"
+              },
+              entity_from_id: {
+                type: "string",
+                description: "Source entity UUID"
+              },
+              entity_to_id: {
+                type: "string",
+                description: "Target entity UUID"
+              },
+              insight_data: {
+                type: "object",
+                description: "Insight details (headline, description, etc.)"
+              }
+            },
+            required: ["insight_type", "entity_from_id", "entity_to_id", "insight_data"]
           }
         }
       }
@@ -1089,6 +1352,37 @@ Always prioritize user experience and provide actionable insights.`;
                 user.id,
                 functionArgs.query,
                 functionArgs.scope
+              );
+              break;
+
+            case 'get_user_stuff':
+              result = await getUserStuff(
+                supabaseClient,
+                user.id,
+                functionArgs.category,
+                functionArgs.status,
+                functionArgs.limit || 20
+              );
+              break;
+
+            case 'get_personalized_transitions':
+              result = await getPersonalizedTransitions(
+                supabaseClient,
+                user.id,
+                functionArgs.entity_id,
+                functionArgs.transition_type,
+                functionArgs.limit || 5
+              );
+              break;
+
+            case 'save_insight':
+              result = await saveInsightFromChat(
+                supabaseClient,
+                user.id,
+                functionArgs.insight_type,
+                functionArgs.entity_from_id,
+                functionArgs.entity_to_id,
+                functionArgs.insight_data
               );
               break;
 

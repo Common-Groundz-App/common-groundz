@@ -38,8 +38,64 @@ interface TransitionRecommendation {
     sentiment_change: string | null;
     evidence_quote: string | null;
   };
+  relevance_score: number;
   confidence: 'high' | 'medium' | 'low';
   consensus_count: number;
+}
+
+interface UserStuffItem {
+  entity_id: string;
+  status: string;
+  sentiment_score: number | null;
+  category: string | null;
+}
+
+// Compute relevance score for a journey recommendation
+function computeRelevanceScore(
+  journey: {
+    from_entity_id: string;
+    to_entity_id: string;
+    transition_type: string;
+    from_sentiment: number | null;
+    created_at: string;
+    category?: string;
+  },
+  userStuff: UserStuffItem[],
+  similarityScore: number,
+  queryContext: { entityId?: string; category?: string }
+): number {
+  let score = 0;
+
+  // 1. Status match: user has the from_entity in their stuff (+0.3)
+  const userItem = userStuff.find(s => s.entity_id === journey.from_entity_id);
+  if (userItem) {
+    score += 0.3;
+    
+    // 2. Sentiment alignment: user is unhappy with from_entity (+0.2)
+    if (userItem.sentiment_score !== null && userItem.sentiment_score <= 0) {
+      score += 0.2;
+    }
+  }
+
+  // 3. Category match (+0.2)
+  if (queryContext.category && journey.category === queryContext.category) {
+    score += 0.2;
+  } else if (userItem?.category && journey.category === userItem.category) {
+    score += 0.15;
+  }
+
+  // 4. Similarity score contribution (+0.2 max)
+  score += (similarityScore || 0) * 0.2;
+
+  // 5. Recency: journeys within last 30 days get boost (+0.1)
+  const daysSinceTransition = (Date.now() - new Date(journey.created_at).getTime()) / (1000 * 60 * 60 * 24);
+  if (daysSinceTransition < 30) {
+    score += 0.1;
+  } else if (daysSinceTransition < 90) {
+    score += 0.05;
+  }
+
+  return score;
 }
 
 // Classify journey data richness
@@ -206,18 +262,22 @@ serve(async (req) => {
     const similarUserIds = similarUsers?.map(u => u.user_b_id) || [];
     console.log(`[Phase5][${runId}] Found ${similarUserIds.length} similar users`);
 
-    // Step 2: Get user's current stuff
+    // Step 2: Get user's current stuff with sentiment and category
     const { data: userStuff, error: stuffError } = await supabase
       .from('user_stuff')
-      .select('entity_id')
+      .select('entity_id, status, sentiment_score, category')
       .eq('user_id', userId);
 
     if (stuffError) {
       console.error(`[Phase5][${runId}] Error fetching user stuff:`, stuffError);
     }
 
-    const userEntityIds = userStuff?.map(s => s.entity_id) || [];
+    const userStuffItems: UserStuffItem[] = userStuff || [];
+    const userEntityIds = userStuffItems.map(s => s.entity_id);
     console.log(`[Phase5][${runId}] User has ${userEntityIds.length} items in stuff`);
+
+    // Query context for relevance scoring
+    const queryContext = { entityId, category: undefined as string | undefined };
 
     // Step 3: Fetch journeys from similar users
     let journeyQuery = supabase
@@ -232,7 +292,8 @@ serve(async (req) => {
         to_sentiment,
         confidence,
         evidence_text,
-        created_at
+        created_at,
+        category
       `)
       .order('confidence', { ascending: false })
       .limit(100);
@@ -351,6 +412,7 @@ serve(async (req) => {
         avgSentimentAfter: number;
         transitionType: string;
         lifestyleFactors: string[];
+        relevanceScore: number;
       }>();
 
       for (const journey of journeys || []) {
@@ -359,12 +421,21 @@ serve(async (req) => {
         const similarityScore = similarUser?.overall_score || 0.1;
         const journeyConfidence = journey.confidence || 0.5;
         
-        const weightedScore = similarityScore * journeyConfidence;
+        // Compute relevance score for this journey
+        const relevanceScore = computeRelevanceScore(
+          journey,
+          userStuffItems,
+          similarityScore,
+          queryContext
+        );
+        
+        const weightedScore = similarityScore * journeyConfidence * (1 + relevanceScore);
 
         if (journeyGroups.has(key)) {
           const group = journeyGroups.get(key)!;
           group.totalScore += weightedScore;
           group.journeyCount += 1;
+          group.relevanceScore = Math.max(group.relevanceScore, relevanceScore);
           if (journey.from_sentiment) group.avgSentimentBefore += journey.from_sentiment;
           if (journey.to_sentiment) group.avgSentimentAfter += journey.to_sentiment;
           if (!group.bestEvidence && journey.evidence_text) {
@@ -380,7 +451,8 @@ serve(async (req) => {
             avgSentimentBefore: journey.from_sentiment || 0,
             avgSentimentAfter: journey.to_sentiment || 0,
             transitionType: journey.transition_type,
-            lifestyleFactors: extractLifestyleFactors(similarUser)
+            lifestyleFactors: extractLifestyleFactors(similarUser),
+            relevanceScore: relevanceScore
           });
         }
       }
@@ -396,9 +468,15 @@ serve(async (req) => {
         }
       }
 
-      // Sort and build recommendations
+      // Sort by relevance score first, then by weighted score
       const sortedGroups = Array.from(journeyGroups.entries())
-        .sort((a, b) => b[1].totalScore - a[1].totalScore)
+        .sort((a, b) => {
+          // Primary: relevance score
+          const relevanceDiff = b[1].relevanceScore - a[1].relevanceScore;
+          if (Math.abs(relevanceDiff) > 0.1) return relevanceDiff;
+          // Secondary: total weighted score
+          return b[1].totalScore - a[1].totalScore;
+        })
         .slice(0, limit);
 
       for (const [key, group] of sortedGroups) {
@@ -422,6 +500,7 @@ serve(async (req) => {
           to_entity: { id: group.toEntityId, ...toEntity },
           transition_type: group.transitionType as 'upgrade' | 'alternative' | 'complementary',
           weighted_score: group.totalScore,
+          relevance_score: group.relevanceScore,
           story: generateStory(
             richness.mode,
             fromEntity.name,
@@ -458,6 +537,7 @@ serve(async (req) => {
           to_entity: { id: rel.entity_b_id, ...toEntity },
           transition_type: rel.relationship_type as 'upgrade' | 'alternative' | 'complementary',
           weighted_score: (rel.avg_confidence || 0.5) * Math.sqrt(rel.consensus_count || 1),
+          relevance_score: 0, // Global fallback has no personal relevance
           story: generateStory(
             'SPARSE',
             fromEntity.name,

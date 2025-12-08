@@ -16,6 +16,7 @@ import Profile from '@/pages/Profile';
 import Explore from '@/pages/Explore';
 import Settings from '@/pages/Settings';
 import MyStuffPage from '@/pages/MyStuffPage';
+import SavedInsights from '@/pages/SavedInsights';
 import Search from '@/pages/Search';
 import EntityDetail from '@/pages/EntityDetail';
 import PostView from '@/pages/PostView';
@@ -98,6 +99,11 @@ function App() {
                   <Route path="/my-stuff" element={
                     <ProtectedRoute>
                       <MyStuffPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/saved-insights" element={
+                    <ProtectedRoute>
+                      <SavedInsights />
                     </ProtectedRoute>
                   } />
                   <Route path="/search" element={
