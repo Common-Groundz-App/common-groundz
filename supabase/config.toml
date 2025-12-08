@@ -9,6 +9,12 @@ verify_jwt = false
 [functions.get-personalized-transitions]
 verify_jwt = false
 
+[functions.generate-smart-notifications]
+verify_jwt = false
+
+[functions.send-weekly-digest]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321

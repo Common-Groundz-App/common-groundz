@@ -1,8 +1,8 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-export type NotificationType = 'like' | 'comment' | 'follow' | 'system';
-export type EntityType = 'post' | 'recommendation' | 'review' | 'profile' | 'system';
+export type NotificationType = 'like' | 'comment' | 'follow' | 'system' | 'journey_watched' | 'journey_digest';
+export type EntityType = 'post' | 'recommendation' | 'review' | 'profile' | 'system' | 'journey';
 
 export interface Notification {
   id: string;
@@ -20,6 +20,9 @@ export interface Notification {
   updated_at: string;
   metadata?: {
     comment_id?: string;
+    from_entity_id?: string;
+    to_entity_id?: string;
+    transition_type?: string;
     [key: string]: any;
   };
 }
@@ -62,6 +65,9 @@ export const getContentUrl = (type: EntityType, id: string, commentId?: string):
     case 'profile':
       url = `/profile/${id}`;
       break;
+    case 'journey':
+      url = `/my-stuff`;
+      break;
     default:
       url = '#';
   }
@@ -72,4 +78,9 @@ export const getContentUrl = (type: EntityType, id: string, commentId?: string):
   }
   
   return url;
+};
+
+// Helper to check if notification is a journey type
+export const isJourneyNotification = (type: NotificationType): boolean => {
+  return type === 'journey_watched' || type === 'journey_digest';
 };
