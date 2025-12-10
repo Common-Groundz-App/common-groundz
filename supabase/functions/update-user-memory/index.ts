@@ -145,15 +145,39 @@ serve(async (req) => {
       });
     }
 
-    const systemPrompt = `You are a memory extraction assistant. Analyze the conversation and extract relevant information into 4 scopes:
-- skincare: products, routines, skin type, concerns, goals (what user wants to achieve with skincare, e.g., "reduce acne", "anti-aging", "glow")
-- food: preferences, allergies, cuisines, restrictions, dietary habits, goals (e.g., "lose weight", "build muscle", "eat healthier")
-- movies: genres, actors, viewing habits, favorites, goals (e.g., "watch more classics", "explore foreign films")
-- routines: daily schedules, habits, fitness routines, lifestyle patterns, goals (e.g., "wake up earlier", "exercise 5x/week", "meditate daily")
+    const systemPrompt = `You are a memory extraction assistant. Analyze the conversation and extract relevant information into scopes AND detect constraints/preferences.
 
-IMPORTANT: Extract user GOALS whenever mentioned. Goals are things the user wants to achieve, improve, or change.
+=== SCOPE EXTRACTION ===
+Extract into these scopes:
+- skincare: products, routines, skin type, concerns, goals
+- food: preferences, allergies, cuisines, restrictions, goals
+- movies: genres, actors, viewing habits, favorites, goals
+- routines: daily schedules, habits, fitness routines, goals
 
-Only include scopes with meaningful information. Return empty object {} for scopes with no relevant data.
+=== CONSTRAINT DETECTION (Phase 6.0) ===
+Detect CONSTRAINTS from user statements. Use confidence scoring:
+
+Intent Classification:
+- strictly_avoid (confidence 0.9-1.0): "I never use X", "I'm allergic to X", "I can't have X"
+- avoid (confidence 0.7-0.9): "I really avoid X", "I hate X", "I stay away from X"
+- limit (confidence 0.4-0.7): "I don't usually like X", "I prefer to avoid X when possible"
+- prefer (confidence varies): "I like X", "I prefer X", "I love X"
+
+Examples:
+- "I'm allergic to shellfish" → strictly_avoid, confidence 1.0, category: food
+- "I really hate horror movies" → avoid, confidence 0.85, category: movies
+- "I don't usually use retinol" → limit, confidence 0.6, category: skincare
+- "I prefer organic products" → prefer, confidence 0.8, category: skincare
+
+=== PREFERENCE DETECTION ===
+Detect custom preferences with confidence:
+- Explicit statements → confidence 0.9-1.0
+- Strong preferences → confidence 0.7-0.9
+- Casual mentions → confidence 0.4-0.7
+- Context-inferred → confidence 0.3-0.5
+
+Always include evidence quotes from the conversation!
+
 Use the extract_scoped_memories function to structure your response.`;
 
     const geminiTools = [
@@ -161,57 +185,122 @@ Use the extract_scoped_memories function to structure your response.`;
         function_declarations: [
           {
             name: "extract_scoped_memories",
-            description: "Extract categorized memories from conversation including goals",
+            description: "Extract categorized memories, constraints, and preferences from conversation",
             parameters: {
               type: "object",
               properties: {
                 skincare: {
                   type: "object",
-                  description: "Skincare routines, products, skin type, concerns, and GOALS",
+                  description: "Skincare routines, products, skin type, concerns, and goals",
                   properties: {
                     skin_type: { type: "string" },
                     concerns: { type: "array", items: { type: "string" } },
                     products_mentioned: { type: "array", items: { type: "string" } },
-                    goals: { type: "array", items: { type: "string" }, description: "What user wants to achieve (e.g., reduce acne, anti-aging)" }
+                    goals: { type: "array", items: { type: "string" } }
                   }
                 },
                 food: {
                   type: "object",
-                  description: "Dietary preferences, allergies, favorite cuisines, restrictions, and GOALS",
+                  description: "Dietary preferences, allergies, cuisines, restrictions, and goals",
                   properties: {
                     preferences: { type: "array", items: { type: "string" } },
                     allergies: { type: "array", items: { type: "string" } },
                     cuisines: { type: "array", items: { type: "string" } },
                     restrictions: { type: "array", items: { type: "string" } },
-                    goals: { type: "array", items: { type: "string" }, description: "Dietary goals (e.g., lose weight, eat healthier)" }
+                    goals: { type: "array", items: { type: "string" } }
                   }
                 },
                 movies: {
                   type: "object",
-                  description: "Genre preferences, favorite actors, viewing habits, and GOALS",
+                  description: "Genre preferences, favorite actors, viewing habits, and goals",
                   properties: {
                     genres: { type: "array", items: { type: "string" } },
                     actors: { type: "array", items: { type: "string" } },
                     viewing_habits: { type: "string" },
                     favorites: { type: "array", items: { type: "string" } },
-                    goals: { type: "array", items: { type: "string" }, description: "Viewing goals (e.g., watch more classics)" }
+                    goals: { type: "array", items: { type: "string" } }
                   }
                 },
                 routines: {
                   type: "object",
-                  description: "Daily routines, schedules, habits, lifestyle, and GOALS",
+                  description: "Daily routines, schedules, habits, and goals",
                   properties: {
                     daily_schedule: { type: "string" },
                     habits: { type: "array", items: { type: "string" } },
                     fitness: { type: "string" },
-                    goals: { type: "array", items: { type: "string" }, description: "Lifestyle goals (e.g., exercise more, sleep better)" }
+                    goals: { type: "array", items: { type: "string" } }
                   }
                 },
-              },
-            },
-          },
-        ],
-      },
+                detected_constraints: {
+                  type: "array",
+                  description: "Constraints detected from conversation with intent and confidence",
+                  items: {
+                    type: "object",
+                    properties: {
+                      category: { 
+                        type: "string", 
+                        description: "Domain: skincare, food, movies, books, fitness, places, lifestyle" 
+                      },
+                      rule: { 
+                        type: "string", 
+                        description: "Type of constraint: Avoid ingredient, Avoid genre, Avoid brand, Prefer texture, etc." 
+                      },
+                      value: { 
+                        type: "string", 
+                        description: "The specific thing to avoid/prefer" 
+                      },
+                      intent: { 
+                        type: "string", 
+                        enum: ["strictly_avoid", "avoid", "limit", "prefer"],
+                        description: "How strictly to enforce: strictly_avoid (never), avoid (strongly), limit (when possible), prefer (prioritize)"
+                      },
+                      confidence: { 
+                        type: "number", 
+                        description: "0.0-1.0 confidence score based on statement strength" 
+                      },
+                      evidence: { 
+                        type: "string", 
+                        description: "Direct quote from conversation supporting this constraint" 
+                      }
+                    },
+                    required: ["category", "rule", "value", "intent", "confidence"]
+                  }
+                },
+                detected_preferences: {
+                  type: "array",
+                  description: "Custom preferences detected from conversation",
+                  items: {
+                    type: "object",
+                    properties: {
+                      category: { 
+                        type: "string", 
+                        description: "Domain: skincare, food, movies, books, fitness, lifestyle" 
+                      },
+                      key: { 
+                        type: "string", 
+                        description: "Preference label like texture_preference, reading_time, workout_style" 
+                      },
+                      value: { 
+                        type: "string", 
+                        description: "The preference value" 
+                      },
+                      confidence: { 
+                        type: "number", 
+                        description: "0.0-1.0 confidence score" 
+                      },
+                      evidence: { 
+                        type: "string", 
+                        description: "Quote from conversation supporting this preference" 
+                      }
+                    },
+                    required: ["category", "key", "value", "confidence"]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
     ];
 
     const geminiPayload = {
@@ -231,7 +320,7 @@ Use the extract_scoped_memories function to structure your response.`;
       },
     };
 
-    console.log("[update-user-memory] Calling Gemini API for memory extraction");
+    console.log("[update-user-memory] Calling Gemini API for memory extraction (Phase 6.0)");
 
     const geminiResponse = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -240,15 +329,14 @@ Use the extract_scoped_memories function to structure your response.`;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(geminiPayload),
       },
-      3, // maxRetries
-      2000 // 2-second initial delay
+      3,
+      2000
     );
 
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text();
       console.error("[update-user-memory] Gemini API error:", errorText);
       
-      // Graceful degradation for rate limits - don't fail the request
       if (geminiResponse.status === 429 || geminiResponse.status === 503) {
         console.warn("[update-user-memory] AI service temporarily unavailable, skipping memory update");
         return new Response(
@@ -257,13 +345,12 @@ Use the extract_scoped_memories function to structure your response.`;
             message: "Memory update skipped due to rate limits. Will retry on next conversation." 
           }), 
           {
-            status: 200, // Don't fail the request
+            status: 200,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           }
         );
       }
       
-      // Other errors
       return new Response(JSON.stringify({ error: "AI extraction failed" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -275,12 +362,27 @@ Use the extract_scoped_memories function to structure your response.`;
 
     // Extract function call result
     let newScopes: any = {};
+    let detectedConstraints: any[] = [];
+    let detectedPreferences: any[] = [];
+    
     const functionCall = geminiResult.candidates?.[0]?.content?.parts?.find(
       (part: any) => part.functionCall
     );
 
     if (functionCall) {
-      newScopes = functionCall.functionCall.args || {};
+      const args = functionCall.functionCall.args || {};
+      
+      // Extract scopes (existing behavior)
+      newScopes = { ...args };
+      delete newScopes.detected_constraints;
+      delete newScopes.detected_preferences;
+      
+      // Extract Phase 6.0 data
+      detectedConstraints = args.detected_constraints || [];
+      detectedPreferences = args.detected_preferences || [];
+      
+      console.log("[update-user-memory] Detected constraints:", detectedConstraints.length);
+      console.log("[update-user-memory] Detected preferences:", detectedPreferences.length);
     } else {
       console.warn("[update-user-memory] No function call in Gemini response");
     }
@@ -306,6 +408,9 @@ Use the extract_scoped_memories function to structure your response.`;
 
     // Merge scopes
     const existingScopes = existingMemory?.metadata?.scopes || {};
+    const existingConstraints = existingMemory?.metadata?.detected_constraints || [];
+    const existingPreferences = existingMemory?.metadata?.detected_preferences || [];
+    
     const mergedScopes = { ...existingScopes };
 
     scopesUpdated.forEach((scope) => {
@@ -314,6 +419,46 @@ Use the extract_scoped_memories function to structure your response.`;
         ...newScopes[scope],
       };
     });
+
+    // Merge detected constraints (avoid duplicates by value+category)
+    const mergedConstraints = [...existingConstraints];
+    for (const newConstraint of detectedConstraints) {
+      const exists = mergedConstraints.some(
+        c => c.category === newConstraint.category && 
+             c.value?.toLowerCase() === newConstraint.value?.toLowerCase()
+      );
+      if (!exists) {
+        mergedConstraints.push({
+          ...newConstraint,
+          extractedAt: new Date().toISOString(),
+          source: 'chatbot'
+        });
+      }
+    }
+
+    // Merge detected preferences (avoid duplicates by key+category)
+    const mergedPreferences = [...existingPreferences];
+    for (const newPref of detectedPreferences) {
+      const existingIdx = mergedPreferences.findIndex(
+        p => p.category === newPref.category && p.key === newPref.key
+      );
+      if (existingIdx >= 0) {
+        // Update if new confidence is higher
+        if (newPref.confidence > mergedPreferences[existingIdx].confidence) {
+          mergedPreferences[existingIdx] = {
+            ...newPref,
+            extractedAt: new Date().toISOString(),
+            source: 'chatbot'
+          };
+        }
+      } else {
+        mergedPreferences.push({
+          ...newPref,
+          extractedAt: new Date().toISOString(),
+          source: 'chatbot'
+        });
+      }
+    }
 
     // Generate memory summary text
     const memorySummary = Object.entries(mergedScopes)
@@ -324,7 +469,7 @@ Use the extract_scoped_memories function to structure your response.`;
       })
       .join("\n\n");
 
-    // UPSERT memory record
+    // UPSERT memory record with Phase 6.0 data
     const { data: memoryRecord, error: memoryError } = await supabaseClient
       .from("user_conversation_memory")
       .upsert(
@@ -332,7 +477,11 @@ Use the extract_scoped_memories function to structure your response.`;
           user_id: user.id,
           memory_type: 'preference',
           memory_summary: memorySummary,
-          metadata: { scopes: mergedScopes },
+          metadata: { 
+            scopes: mergedScopes,
+            detected_constraints: mergedConstraints,
+            detected_preferences: mergedPreferences
+          },
           last_update_trigger: trigger,
           last_conversation_id: conversationId,
         },
@@ -350,6 +499,8 @@ Use the extract_scoped_memories function to structure your response.`;
     }
 
     console.log("[update-user-memory] Memory saved:", memoryRecord.id);
+    console.log("[update-user-memory] Total constraints:", mergedConstraints.length);
+    console.log("[update-user-memory] Total preferences:", mergedPreferences.length);
 
     // Generate embeddings (non-blocking, best effort)
     try {
@@ -381,6 +532,8 @@ Use the extract_scoped_memories function to structure your response.`;
         memoryId: memoryRecord.id,
         trigger,
         scopesUpdated,
+        constraintsDetected: detectedConstraints.length,
+        preferencesDetected: detectedPreferences.length,
         updatedAt: memoryRecord.last_accessed_at,
       }),
       {

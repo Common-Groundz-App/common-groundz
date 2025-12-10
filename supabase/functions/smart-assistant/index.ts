@@ -929,19 +929,53 @@ serve(async (req) => {
       }
     }
 
-    // Extract constraints from preferences
+    // Extract constraints from preferences (Phase 6.0 - with JSON block for deterministic parsing)
     const prefs = profile?.preferences as any;
-    const constraints: string[] = [];
-    if (prefs?.constraints?.avoidIngredients?.length) {
-      constraints.push(`- Avoid ingredients: ${prefs.constraints.avoidIngredients.join(', ')}`);
+    const hardcodedConstraints = {
+      avoidIngredients: prefs?.constraints?.avoidIngredients || [],
+      avoidBrands: prefs?.constraints?.avoidBrands || [],
+      avoidProductForms: prefs?.constraints?.avoidProductForms || [],
+      budget: prefs?.constraints?.budget || 'no_preference'
+    };
+    
+    // Get custom constraints with intent levels
+    const customConstraints = (prefs?.constraints?.custom || []).map((c: any) => ({
+      category: c.category,
+      rule: c.rule,
+      value: c.value,
+      intent: c.intent,
+      confidence: c.confidence || 1.0
+    }));
+    
+    // Build human-readable summary
+    const constraintsSummary: string[] = [];
+    if (hardcodedConstraints.avoidIngredients.length) {
+      constraintsSummary.push(`- Avoid ingredients: ${hardcodedConstraints.avoidIngredients.join(', ')}`);
     }
-    if (prefs?.constraints?.avoidBrands?.length) {
-      constraints.push(`- Avoid brands: ${prefs.constraints.avoidBrands.join(', ')}`);
+    if (hardcodedConstraints.avoidBrands.length) {
+      constraintsSummary.push(`- Avoid brands: ${hardcodedConstraints.avoidBrands.join(', ')}`);
     }
-    if (prefs?.constraints?.budget) {
-      constraints.push(`- Budget: ${prefs.constraints.budget}`);
+    if (hardcodedConstraints.avoidProductForms.length) {
+      constraintsSummary.push(`- Avoid product forms: ${hardcodedConstraints.avoidProductForms.join(', ')}`);
     }
-    const constraintsContext = constraints.length > 0 ? constraints.join('\n') : '- No specific constraints';
+    if (hardcodedConstraints.budget !== 'no_preference') {
+      constraintsSummary.push(`- Budget: ${hardcodedConstraints.budget}`);
+    }
+    if (customConstraints.length > 0) {
+      constraintsSummary.push(`- Custom constraints: ${customConstraints.length} rules`);
+    }
+    
+    const constraintsSummaryText = constraintsSummary.length > 0 
+      ? constraintsSummary.join('\n') 
+      : '- No specific constraints';
+    
+    // Build JSON block for deterministic LLM parsing
+    const constraintsJsonBlock = JSON.stringify({
+      constraints: {
+        hardcoded: hardcodedConstraints,
+        custom: customConstraints
+      }
+    }, null, 2);
 
     const systemPrompt = `You are the Common Groundz AI Assistant. You help users discover products, analyze reviews, and get personalized recommendations based on real user experiences.
 
@@ -964,8 +998,47 @@ Use this intent to decide which tools to call and how detailed to respond.
 
 [LEARNED PREFERENCES]${memoryContext || '\n- No learned preferences yet'}
 
-[CONSTRAINTS]
-${constraintsContext}
+=== USER CONSTRAINTS (CRITICAL - NEVER VIOLATE) ===
+
+Summary:
+${constraintsSummaryText}
+
+Structured data for precise parsing:
+\`\`\`json
+${constraintsJsonBlock}
+\`\`\`
+
+=== PREFERENCE PRIORITY RULES (PHASE 6.0) ===
+
+When preferences conflict, follow this STRICT order:
+
+1. CONSTRAINTS (highest priority - NEVER violate)
+   - All items in the constraints JSON above
+   - These are absolute rules the user has set
+   - Hardcoded constraints: ingredients, brands, product forms, budget
+   - Custom constraints: user-defined rules with intent levels
+
+2. USER-EDITED PREFERENCES (high priority, confidence = 1.0)
+   - Any preference manually set or approved by user
+   - These override chatbot-learned preferences
+
+3. CHATBOT-LEARNED PREFERENCES (lower priority)
+   - Use these to personalize, but don't contradict #1 or #2
+   - If confidence < 0.7, treat as suggestion not fact
+
+=== CONSTRAINT INTENT RULES ===
+
+Parse the "intent" field in each custom constraint and behave accordingly:
+
+- strictly_avoid: NEVER recommend under ANY circumstance, even if user explicitly asks
+- avoid: Strongly avoid unless user specifically requests it
+- limit: Only recommend when there's good justification or context requires it
+- prefer: Prioritize this when relevant, but it's not mandatory
+
+When you detect a potential conflict between a recommendation and a constraint:
+1. Explain the conflict clearly to the user
+2. Ask which preference they want to keep
+3. NEVER assume chatbot-learned data overrides user-set constraints
 
 === TOOL PRIORITY ===
 1. ALWAYS use search_reviews_semantic FIRST for product queries
@@ -979,11 +1052,12 @@ When recommending, ALWAYS explain WHY:
 - "Based on your goal to reduce acne, I suggest..."
 - "3 users with similar skincare routines upgraded to..."
 - "Since you mentioned avoiding fragrance, this option..."
+- "I noticed you have 'retinol' as strictly_avoid, so I excluded products with retinol"
 
 Current Context:
 ${context?.entityId ? `- User is viewing entity: ${context.entityId}` : '- General conversation'}
 
-Be helpful, concise, and always prioritize user experience.`;
+Be helpful, concise, and always prioritize user experience. ALWAYS respect user constraints.`;
 
     // 7. Define function calling tools (Phase 3 will implement execution)
     const tools = [
