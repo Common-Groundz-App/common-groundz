@@ -3,21 +3,41 @@ import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { updateUserPreferences } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  UserPreferences, 
+  ConstraintsType, 
+  CustomConstraint, 
+  CustomPreference,
+  LearnedPreference 
+} from '@/types/preferences';
 
 interface PreferencesContextType {
-  preferences: any;
+  preferences: UserPreferences;
   isLoading: boolean;
   hasPreferences: boolean;
-  updatePreferences: (preferences: any) => Promise<boolean>;
+  learnedPreferences: LearnedPreference[];
+  updatePreferences: (preferences: UserPreferences) => Promise<boolean>;
   resetPreferences: () => Promise<boolean>;
   shouldShowOnboarding: boolean;
   setShouldShowOnboarding: (show: boolean) => void;
+  // Constraint management
+  updateConstraints: (constraints: ConstraintsType) => Promise<boolean>;
+  addCustomConstraint: (constraint: Omit<CustomConstraint, 'id' | 'createdAt'>) => Promise<boolean>;
+  removeCustomConstraint: (id: string) => Promise<boolean>;
+  // Custom preference management
+  addCustomPreference: (pref: Omit<CustomPreference, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
+  removeCustomPreference: (id: string) => Promise<boolean>;
+  // Learned preferences management
+  fetchLearnedPreferences: () => Promise<void>;
+  approveLearnedPreference: (scope: string, key: string, value: any) => Promise<boolean>;
+  dismissLearnedPreference: (scope: string, key: string) => Promise<boolean>;
 }
 
 const PreferencesContext = createContext<PreferencesContextType | undefined>(undefined);
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
-  const [preferences, setPreferences] = useState<any>({});
+  const [preferences, setPreferences] = useState<UserPreferences>({});
+  const [learnedPreferences, setLearnedPreferences] = useState<LearnedPreference[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [shouldShowOnboarding, setShouldShowOnboarding] = useState(false);
   const [authReady, setAuthReady] = useState(false);
@@ -33,7 +53,6 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     authIsLoading = auth.isLoading;
   } catch (error) {
     console.warn('⚠️ [PreferencesProvider] Auth context not ready yet, will retry...', error);
-    // Auth context not ready yet, keep defaults
   }
 
   // Calculate if the user has any meaningful preferences set
@@ -48,7 +67,6 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     const fetchPreferences = async () => {
-      // Only proceed if auth is ready and we have a user
       if (!authReady || !user) {
         setIsLoading(false);
         return;
@@ -69,13 +87,15 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
           return;
         }
 
-        const userPrefs = data?.preferences || {};
+        const userPrefs = (data?.preferences as UserPreferences) || {};
         setPreferences(userPrefs);
         
-        // Check if we should show the onboarding modal
         if (Object.keys(userPrefs).length === 0) {
           setShouldShowOnboarding(true);
         }
+        
+        // Also fetch learned preferences
+        await fetchLearnedPreferencesInternal(user.id);
       } catch (err) {
         console.error('❌ [PreferencesProvider] Error in fetchPreferences:', err);
       } finally {
@@ -84,9 +104,81 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     };
 
     fetchPreferences();
-  }, [authReady, user?.id]); // Only depend on authReady and user.id
+  }, [authReady, user?.id]);
 
-  const updatePreferences = async (newPreferences: any) => {
+  const fetchLearnedPreferencesInternal = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_conversation_memory')
+        .select('metadata')
+        .eq('user_id', userId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('❌ [PreferencesProvider] Error fetching learned preferences:', error);
+        return;
+      }
+
+      if (data?.metadata) {
+        const metadata = data.metadata as any;
+        const scopes = metadata.scopes || {};
+        const detectedConstraints = metadata.detected_constraints || [];
+        const detectedPreferences = metadata.detected_preferences || [];
+        
+        // Convert scopes to LearnedPreference format
+        const learned: LearnedPreference[] = [];
+        
+        Object.entries(scopes).forEach(([scope, scopeData]: [string, any]) => {
+          if (scopeData && typeof scopeData === 'object') {
+            Object.entries(scopeData).forEach(([key, value]) => {
+              learned.push({
+                scope,
+                key,
+                value,
+                confidence: 0.7, // Default confidence for existing data
+                extractedAt: new Date().toISOString(),
+              });
+            });
+          }
+        });
+        
+        // Add detected constraints as learned
+        detectedConstraints.forEach((c: any) => {
+          learned.push({
+            scope: c.category,
+            key: `constraint: ${c.rule}`,
+            value: c.value,
+            confidence: c.confidence || 0.7,
+            evidence: c.evidence,
+            extractedAt: new Date().toISOString(),
+          });
+        });
+        
+        // Add detected preferences as learned
+        detectedPreferences.forEach((p: any) => {
+          learned.push({
+            scope: p.category,
+            key: p.key,
+            value: p.value,
+            confidence: p.confidence || 0.7,
+            evidence: p.evidence,
+            extractedAt: new Date().toISOString(),
+          });
+        });
+        
+        setLearnedPreferences(learned);
+      }
+    } catch (err) {
+      console.error('❌ [PreferencesProvider] Error fetching learned preferences:', err);
+    }
+  };
+
+  const fetchLearnedPreferences = async () => {
+    if (!user) return;
+    await fetchLearnedPreferencesInternal(user.id);
+  };
+
+  const updatePreferences = async (newPreferences: UserPreferences) => {
     if (!user) return false;
 
     try {
@@ -122,14 +214,108 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  // Constraint management
+  const updateConstraints = async (constraints: ConstraintsType) => {
+    const newPrefs = { ...preferences, constraints };
+    return updatePreferences(newPrefs);
+  };
+
+  const addCustomConstraint = async (constraint: Omit<CustomConstraint, 'id' | 'createdAt'>) => {
+    const newConstraint: CustomConstraint = {
+      ...constraint,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString()
+    };
+    const currentConstraints = preferences.constraints || {};
+    const newConstraints = {
+      ...currentConstraints,
+      custom: [...(currentConstraints.custom || []), newConstraint]
+    };
+    return updateConstraints(newConstraints);
+  };
+
+  const removeCustomConstraint = async (id: string) => {
+    const currentConstraints = preferences.constraints || {};
+    const newConstraints = {
+      ...currentConstraints,
+      custom: (currentConstraints.custom || []).filter(c => c.id !== id)
+    };
+    return updateConstraints(newConstraints);
+  };
+
+  // Custom preference management
+  const addCustomPreference = async (pref: Omit<CustomPreference, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const newPref: CustomPreference = {
+      ...pref,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    const currentCustom = preferences.custom_preferences || [];
+    const newPrefs = { ...preferences, custom_preferences: [...currentCustom, newPref] };
+    return updatePreferences(newPrefs);
+  };
+
+  const removeCustomPreference = async (id: string) => {
+    const currentCustom = preferences.custom_preferences || [];
+    const newPrefs = { ...preferences, custom_preferences: currentCustom.filter(p => p.id !== id) };
+    return updatePreferences(newPrefs);
+  };
+
+  // Learned preferences management
+  const approveLearnedPreference = async (scope: string, key: string, value: any) => {
+    // Add to custom preferences with user priority
+    const success = await addCustomPreference({
+      category: scope,
+      key,
+      value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+      source: 'chatbot',
+      confidence: 1.0,
+      priority: 'user',
+    });
+    
+    if (success) {
+      // Mark as approved in local state
+      setLearnedPreferences(prev => 
+        prev.map(p => 
+          p.scope === scope && p.key === key 
+            ? { ...p, approvedAt: new Date().toISOString() }
+            : p
+        )
+      );
+    }
+    return success;
+  };
+
+  const dismissLearnedPreference = async (scope: string, key: string) => {
+    // Mark as dismissed in local state
+    setLearnedPreferences(prev => 
+      prev.map(p => 
+        p.scope === scope && p.key === key 
+          ? { ...p, dismissed: true }
+          : p
+      )
+    );
+    return true;
+  };
+
   const value = {
     preferences,
     isLoading,
     hasPreferences,
+    learnedPreferences,
     updatePreferences,
     resetPreferences,
     shouldShowOnboarding,
-    setShouldShowOnboarding
+    setShouldShowOnboarding,
+    updateConstraints,
+    addCustomConstraint,
+    removeCustomConstraint,
+    addCustomPreference,
+    removeCustomPreference,
+    fetchLearnedPreferences,
+    approveLearnedPreference,
+    dismissLearnedPreference,
   };
 
   return <PreferencesContext.Provider value={value}>{children}</PreferencesContext.Provider>;

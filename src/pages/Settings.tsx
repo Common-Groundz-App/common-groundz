@@ -344,12 +344,24 @@ const Settings = () => {
                       Control how your personal data is used and accessed
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="space-y-4">
                     <div className="bg-accent/30 rounded-md p-4">
                       <p className="text-sm text-muted-foreground">
                         Additional privacy controls will be available in future updates. 
                         You can always contact our support team if you have any privacy concerns.
                       </p>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div>
+                      <h3 className="text-lg font-medium mb-2">Your Data</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        View everything the AI knows about you and export your data.
+                      </p>
+                      <Button variant="outline" asChild>
+                        <a href="/your-data">View Your Data</a>
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
