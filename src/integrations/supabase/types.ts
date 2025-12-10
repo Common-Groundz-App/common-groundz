@@ -3482,6 +3482,16 @@ export type Database = {
       }
       calculate_trending_hashtags:
         | {
+            Args: { p_limit?: number }
+            Returns: {
+              created_at: string
+              id: string
+              name_norm: string
+              name_original: string
+              post_count: number
+            }[]
+          }
+        | {
             Args: { result_limit?: number; time_window_hours?: number }
             Returns: {
               created_at: string
@@ -3490,16 +3500,6 @@ export type Database = {
               name_original: string
               post_count: number
               trending_score: number
-            }[]
-          }
-        | {
-            Args: { p_limit?: number }
-            Returns: {
-              created_at: string
-              id: string
-              name_norm: string
-              name_original: string
-              post_count: number
             }[]
           }
       calculate_trending_score: {
@@ -3550,7 +3550,6 @@ export type Database = {
         Returns: undefined
       }
       detect_potential_duplicates:
-        | { Args: { similarity_threshold?: number }; Returns: number }
         | {
             Args: never
             Returns: {
@@ -3560,6 +3559,7 @@ export type Database = {
               similarity_score: number
             }[]
           }
+        | { Args: { similarity_threshold?: number }; Returns: number }
       fix_duplicate_slugs: { Args: never; Returns: number }
       fuzzy_match_entity: {
         Args: { target_name: string; threshold?: number }
@@ -3589,22 +3589,19 @@ export type Database = {
       }
       get_aggregated_network_recommendations_discovery:
         | {
-            Args: { p_limit?: number; p_user_id: string }
+            Args: { p_entity_id: string; p_limit?: number; p_user_id: string }
             Returns: {
               average_rating: number
               entity_id: string
               entity_image_url: string
               entity_name: string
               entity_slug: string
-              entity_type: Database["public"]["Enums"]["entity_type"]
-              latest_recommendation_date: string
-              network_score: number
-              parent_id: string
+              entity_type: string
               parent_slug: string
               recommendation_count: number
               recommender_avatars: string[]
-              recommender_ids: string[]
-              recommender_names: string[]
+              recommender_user_ids: string[]
+              recommender_usernames: string[]
             }[]
           }
         | {
@@ -3628,19 +3625,22 @@ export type Database = {
             }[]
           }
         | {
-            Args: { p_entity_id: string; p_limit?: number; p_user_id: string }
+            Args: { p_limit?: number; p_user_id: string }
             Returns: {
               average_rating: number
               entity_id: string
               entity_image_url: string
               entity_name: string
               entity_slug: string
-              entity_type: string
+              entity_type: Database["public"]["Enums"]["entity_type"]
+              latest_recommendation_date: string
+              network_score: number
+              parent_id: string
               parent_slug: string
               recommendation_count: number
               recommender_avatars: string[]
-              recommender_user_ids: string[]
-              recommender_usernames: string[]
+              recommender_ids: string[]
+              recommender_names: string[]
             }[]
           }
       get_cached_products: {
@@ -3983,18 +3983,18 @@ export type Database = {
       has_network_recommendations:
         | {
             Args: {
+              p_current_user_id: string
               p_entity_id: string
-              p_min_count?: number
-              p_user_id: string
+              p_min_following?: number
+              p_min_recommendations?: number
             }
             Returns: boolean
           }
         | {
             Args: {
-              p_current_user_id: string
               p_entity_id: string
-              p_min_following?: number
-              p_min_recommendations?: number
+              p_min_count?: number
+              p_user_id: string
             }
             Returns: boolean
           }

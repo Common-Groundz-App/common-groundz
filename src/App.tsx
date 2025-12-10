@@ -30,6 +30,7 @@ import MoviesPage from '@/pages/MoviesPage';
 import FoodPage from '@/pages/FoodPage';
 import AdminPortal from '@/pages/AdminPortal';
 import AdminEntityEdit from '@/pages/admin/AdminEntityEdit';
+import YourData from '@/pages/YourData';
 import NotFound from '@/pages/NotFound';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
@@ -180,6 +181,11 @@ function App() {
                     <AdminRoute>
                       <AdminEntityEdit />
                     </AdminRoute>
+                  } />
+                  <Route path="/your-data" element={
+                    <ProtectedRoute>
+                      <YourData />
+                    </ProtectedRoute>
                   } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
