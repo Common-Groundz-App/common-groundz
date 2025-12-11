@@ -42,6 +42,13 @@ const goalOptions = [
   { label: "Reduce anxiety", value: "Reduce anxiety", emoji: "🧘" }
 ];
 
+// Helper to ensure value is always an array (handles string values from DB)
+const ensureArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string' && value.trim()) return [value];
+  return [];
+};
+
 const PreferencesForm: React.FC<PreferencesFormProps> = ({
   initialPreferences = {},
   onSaveSuccess,
@@ -52,22 +59,22 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
-    skin_type: initialPreferences.skin_type || [],
-    other_skin_type: initialPreferences.other_skin_type || [],
-    hair_type: initialPreferences.hair_type || [],
-    other_hair_type: initialPreferences.other_hair_type || [],
-    food_preferences: initialPreferences.food_preferences || [],
-    other_food_preferences: initialPreferences.other_food_preferences || [],
-    lifestyle: initialPreferences.lifestyle || [],
-    other_lifestyle: initialPreferences.other_lifestyle || [],
-    genre_preferences: initialPreferences.genre_preferences || [],
-    other_genre_preferences: initialPreferences.other_genre_preferences || [],
-    goals: initialPreferences.goals ? initialPreferences.goals.filter(goal => 
+    skin_type: ensureArray(initialPreferences.skin_type),
+    other_skin_type: ensureArray(initialPreferences.other_skin_type),
+    hair_type: ensureArray(initialPreferences.hair_type),
+    other_hair_type: ensureArray(initialPreferences.other_hair_type),
+    food_preferences: ensureArray(initialPreferences.food_preferences),
+    other_food_preferences: ensureArray(initialPreferences.other_food_preferences),
+    lifestyle: ensureArray(initialPreferences.lifestyle),
+    other_lifestyle: ensureArray(initialPreferences.other_lifestyle),
+    genre_preferences: ensureArray(initialPreferences.genre_preferences),
+    other_genre_preferences: ensureArray(initialPreferences.other_genre_preferences),
+    goals: ensureArray(initialPreferences.goals).filter(goal => 
       goalOptions.some(option => option.value === goal)
-    ) : [],
-    other_goals: initialPreferences.goals ? initialPreferences.goals.filter(goal => 
+    ),
+    other_goals: ensureArray(initialPreferences.goals).filter(goal => 
       !goalOptions.some(option => option.value === goal)
-    ) : [],
+    ),
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
@@ -94,14 +101,21 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
       // Combine goals and other_goals back into a single array for saving
       const combinedGoals = [...goals, ...other_goals];
       
-      // Create a new object instead of modifying the original
+      // Convert arrays back to the expected format for database
+      // other_* fields are stored as strings (comma-separated or single value)
       const dataToSubmit = {
-        ...formData,
-        goals: combinedGoals
+        skin_type: formData.skin_type,
+        other_skin_type: formData.other_skin_type.join(', '),
+        hair_type: formData.hair_type,
+        other_hair_type: formData.other_hair_type.join(', '),
+        food_preferences: formData.food_preferences,
+        other_food_preferences: formData.other_food_preferences.join(', '),
+        lifestyle: formData.lifestyle,
+        other_lifestyle: formData.other_lifestyle.join(', '),
+        genre_preferences: formData.genre_preferences,
+        other_genre_preferences: formData.other_genre_preferences.join(', '),
+        goals: combinedGoals,
       };
-      
-      // Remove the other_goals field as it's not needed in the final data
-      delete dataToSubmit.other_goals;
       
       await updatePreferences(dataToSubmit);
       toast({
