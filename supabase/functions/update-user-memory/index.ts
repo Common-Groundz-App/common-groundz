@@ -83,10 +83,17 @@ serve(async (req) => {
 
     const { conversationId, trigger } = await req.json();
 
-    // Validate trigger
-    if (!["conversation-end", "context-needed"].includes(trigger)) {
+    // Validate trigger (Phase 6.0: added personal-info-shared and assistant-identified-preference)
+    const validTriggers = [
+      "conversation-end",
+      "context-needed", 
+      "personal-info-shared",
+      "assistant-identified-preference"
+    ];
+    
+    if (!validTriggers.includes(trigger)) {
       return new Response(
-        JSON.stringify({ error: "Invalid trigger. Must be 'conversation-end' or 'context-needed'" }),
+        JSON.stringify({ error: `Invalid trigger. Must be one of: ${validTriggers.join(', ')}` }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
