@@ -752,17 +752,57 @@ function detectMemoryUpdateTrigger(
   userMessage: string,
   assistantMessage: string
 ): { trigger: boolean; reason?: string } {
-  const lowerMsg = userMessage.toLowerCase();
+  const lowerUser = userMessage.toLowerCase();
+  const lowerAssistant = assistantMessage.toLowerCase();
+  
+  // === USER MESSAGE TRIGGERS ===
   
   // Conversation ending phrases
   const endPhrases = ['thanks', 'thank you', 'bye', 'goodbye', "that's all", 'perfect', 'great thanks'];
-  if (endPhrases.some(p => lowerMsg.includes(p))) {
+  if (endPhrases.some(p => lowerUser.includes(p))) {
     return { trigger: true, reason: 'conversation-end' };
   }
   
-  // AI needs context (mentions not knowing preferences)
-  const lowerAssistant = assistantMessage.toLowerCase();
-  if (lowerAssistant.includes("don't know") || 
+  // Personal information patterns (Phase 6.0 enhancement)
+  const personalInfoPatterns = [
+    /\bi(?:'m| am) allergic to\b/i,
+    /\bi(?:'m| am) sensitive to\b/i,
+    /\bi have (?:a )?\w+ allergy\b/i,
+    /\bi (?:never|always|usually|prefer to|hate|love|avoid)\b/i,
+    /\bmy skin (?:type )?is\b/i,
+    /\bmy hair (?:type )?is\b/i,
+    /\bi(?:'m| am) (?:vegan|vegetarian|pescatarian|gluten-free)\b/i,
+    /\bi can(?:'t|not) (?:eat|use|have|stand|watch)\b/i,
+    /\bi(?:'ve| have) (?:oily|dry|sensitive|combination) skin\b/i,
+    /\bmy budget is\b/i,
+    /\bi(?:'m| am) on a \w+ budget\b/i,
+    /\bi(?:'m| am) looking for\b/i,
+    /\bi don't like\b/i,
+  ];
+  
+  if (personalInfoPatterns.some(pattern => pattern.test(userMessage))) {
+    return { trigger: true, reason: 'personal-info-shared' };
+  }
+  
+  // === ASSISTANT MESSAGE TRIGGERS ===
+  
+  // Assistant acknowledged understanding something important
+  const assistantAcknowledgmentPatterns = [
+    /based on your (?:constraints|preferences|allergies|requirements)/i,
+    /(?:i'll|i will) (?:avoid|remember|note|keep in mind)/i,
+    /you (?:mentioned|said|told me|indicated|are|have).+(?:allerg|sensitiv|avoid|prefer)/i,
+    /avoiding .+ (?:as you requested|per your|based on)/i,
+    /noted.+(?:allergy|preference|constraint|sensitivity)/i,
+    /since you (?:can't|cannot|don't|prefer not to)/i,
+    /given your (?:allergy|sensitivity|preference|constraint)/i,
+  ];
+  
+  if (assistantAcknowledgmentPatterns.some(pattern => pattern.test(assistantMessage))) {
+    return { trigger: true, reason: 'assistant-identified-preference' };
+  }
+  
+  // AI needs more context
+  if (lowerAssistant.includes("don't know your") || 
       lowerAssistant.includes("tell me more about") ||
       lowerAssistant.includes("what are your preferences")) {
     return { trigger: true, reason: 'context-needed' };
@@ -1562,26 +1602,37 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       .update({ updated_at: new Date().toISOString() })
       .eq('id', conversation.id);
 
-    // 12. Check if memory should be updated
+    // 12. Check if memory should be updated (Phase 6.0 enhanced triggers)
     const memoryTrigger = detectMemoryUpdateTrigger(message, finalMessage);
 
     if (memoryTrigger.trigger) {
-      console.log('[smart-assistant] Triggering memory update:', memoryTrigger.reason);
+      console.log('[smart-assistant] Triggering background memory update:', memoryTrigger.reason);
       
-      // Add 3-second delay to avoid back-to-back Gemini API calls (rate limiting)
-      setTimeout(() => {
-        fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/update-user-memory`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': req.headers.get('Authorization') || ''
-          },
-          body: JSON.stringify({
-            conversationId: conversation.id,
-            trigger: memoryTrigger.reason
-          })
-        }).catch(err => console.error('[smart-assistant] Memory update failed:', err));
-      }, 3000); // 3-second delay
+      // Use EdgeRuntime.waitUntil for reliable fire-and-forget background task
+      // This ensures the memory update completes even after response is sent
+      EdgeRuntime.waitUntil(
+        (async () => {
+          // Small delay to avoid back-to-back Gemini API calls (rate limiting)
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          try {
+            const memoryResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/update-user-memory`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': req.headers.get('Authorization') || ''
+              },
+              body: JSON.stringify({
+                conversationId: conversation.id,
+                trigger: memoryTrigger.reason
+              })
+            });
+            console.log('[smart-assistant] Memory update completed:', memoryResponse.status);
+          } catch (err) {
+            console.error('[smart-assistant] Memory update failed:', err);
+          }
+        })()
+      );
     }
 
     const responseTime = Date.now() - startTime;
