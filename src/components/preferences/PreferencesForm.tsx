@@ -43,10 +43,22 @@ const goalOptions = [
 ];
 
 // Helper to ensure value is always an array (handles string values from DB)
-const ensureArray = (value: unknown): string[] => {
-  if (Array.isArray(value)) return value;
-  if (typeof value === 'string' && value.trim()) return [value];
-  return [];
+// normalizeCase: true for predefined options (to match lowercase form values), false for custom "other" values
+const ensureArray = (value: unknown, normalizeCase: boolean = false): string[] => {
+  let result: string[] = [];
+  
+  if (Array.isArray(value)) {
+    result = value.filter(v => typeof v === 'string');
+  } else if (typeof value === 'string' && value.trim()) {
+    result = [value];
+  }
+  
+  // Normalize to lowercase if requested (for matching with form option values)
+  if (normalizeCase) {
+    result = result.map(v => v.toLowerCase());
+  }
+  
+  return result;
 };
 
 const PreferencesForm: React.FC<PreferencesFormProps> = ({
@@ -59,21 +71,21 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
-    skin_type: ensureArray(initialPreferences.skin_type),
-    other_skin_type: ensureArray(initialPreferences.other_skin_type),
-    hair_type: ensureArray(initialPreferences.hair_type),
-    other_hair_type: ensureArray(initialPreferences.other_hair_type),
-    food_preferences: ensureArray(initialPreferences.food_preferences),
-    other_food_preferences: ensureArray(initialPreferences.other_food_preferences),
-    lifestyle: ensureArray(initialPreferences.lifestyle),
-    other_lifestyle: ensureArray(initialPreferences.other_lifestyle),
-    genre_preferences: ensureArray(initialPreferences.genre_preferences),
-    other_genre_preferences: ensureArray(initialPreferences.other_genre_preferences),
-    goals: ensureArray(initialPreferences.goals).filter(goal => 
-      goalOptions.some(option => option.value === goal)
+    skin_type: ensureArray(initialPreferences.skin_type, true),
+    other_skin_type: ensureArray(initialPreferences.other_skin_type, false),
+    hair_type: ensureArray(initialPreferences.hair_type, true),
+    other_hair_type: ensureArray(initialPreferences.other_hair_type, false),
+    food_preferences: ensureArray(initialPreferences.food_preferences, true),
+    other_food_preferences: ensureArray(initialPreferences.other_food_preferences, false),
+    lifestyle: ensureArray(initialPreferences.lifestyle, true),
+    other_lifestyle: ensureArray(initialPreferences.other_lifestyle, false),
+    genre_preferences: ensureArray(initialPreferences.genre_preferences, true),
+    other_genre_preferences: ensureArray(initialPreferences.other_genre_preferences, false),
+    goals: ensureArray(initialPreferences.goals, false).filter(goal => 
+      goalOptions.some(option => option.value.toLowerCase() === goal.toLowerCase())
     ),
-    other_goals: ensureArray(initialPreferences.goals).filter(goal => 
-      !goalOptions.some(option => option.value === goal)
+    other_goals: ensureArray(initialPreferences.goals, false).filter(goal => 
+      !goalOptions.some(option => option.value.toLowerCase() === goal.toLowerCase())
     ),
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
