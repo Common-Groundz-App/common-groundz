@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocation, setLocationStatus } from '@/contexts/LocationContext';
+import { usePreferences } from '@/contexts/PreferencesContext';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Bell, User, Shield, Palette, Globe, MapPin, Info, AlertTriangle, Mail, Route } from 'lucide-react';
+import { Bell, User, Shield, Palette, MapPin, Info, AlertTriangle, Mail, Route, Sparkles, Download } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -32,6 +33,7 @@ const Settings = () => {
     timestamp,
     isLoading: locationLoading
   } = useLocation();
+  const { preferences, learnedPreferences } = usePreferences();
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const { 
@@ -75,11 +77,30 @@ const Settings = () => {
     }
   };
 
+  // Export data handler
+  const handleExportData = () => {
+    const exportData = {
+      preferences,
+      learnedPreferences,
+      exportedAt: new Date().toISOString(),
+    };
+    
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `common-groundz-data-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const tabItems = [
     {
-      value: "account",
-      label: "Account",
-      icon: User
+      value: "personalization",
+      label: "Personalization",
+      icon: Sparkles
     },
     {
       value: "notifications",
@@ -97,9 +118,9 @@ const Settings = () => {
       icon: Palette
     },
     {
-      value: "language",
-      label: "Language",
-      icon: Globe
+      value: "account",
+      label: "Account",
+      icon: User
     }
   ];
 
@@ -125,44 +146,13 @@ const Settings = () => {
           <div className="container max-w-4xl mx-auto p-4 md:p-8">
             <h1 className="text-3xl font-bold mb-6">Settings</h1>
             
-            <TubelightTabs defaultValue="account" items={tabItems}>
-              <TabsContent value="account">
-                <Card className="mb-6">
-                  <CardHeader>
-                    <CardTitle>Account Settings</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div>
-                      <h3 className="text-lg font-medium">Email</h3>
-                      <p className="text-muted-foreground mb-2">{user.email}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Your email is used for notifications and account recovery.
-                      </p>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div>
-                      <h3 className="text-lg font-medium">Profile Information</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Update your profile information in the Profile page.
-                      </p>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div>
-                      <h3 className="text-lg font-medium text-red-600">Danger Zone</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Once you delete your account, there is no going back. Please be certain.
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-                
+            <TubelightTabs defaultValue="personalization" items={tabItems}>
+              {/* Personalization Tab - First Tab */}
+              <TabsContent value="personalization">
                 <PreferencesSection />
               </TabsContent>
               
+              {/* Notifications Tab */}
               <TabsContent value="notifications">
                 <Card className="mb-6">
                   <CardHeader>
@@ -237,6 +227,7 @@ const Settings = () => {
                 </Card>
               </TabsContent>
               
+              {/* Privacy Tab */}
               <TabsContent value="privacy">
                 <Card className="mb-6">
                   <CardHeader>
@@ -337,36 +328,47 @@ const Settings = () => {
                   </CardContent>
                 </Card>
                 
-                <Card>
+                {/* Data Transparency & Export */}
+                <Card className="mb-6">
                   <CardHeader>
-                    <CardTitle>Privacy Settings</CardTitle>
+                    <CardTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      Your Data & Transparency
+                    </CardTitle>
                     <CardDescription>
-                      Control how your personal data is used and accessed
+                      See everything the AI knows about you
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="bg-accent/30 rounded-md p-4">
-                      <p className="text-sm text-muted-foreground">
-                        Additional privacy controls will be available in future updates. 
-                        You can always contact our support team if you have any privacy concerns.
-                      </p>
-                    </div>
-                    
-                    <Separator />
-                    
-                    <div>
-                      <h3 className="text-lg font-medium mb-2">Your Data</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        View everything the AI knows about you and export your data.
-                      </p>
+                    <p className="text-sm text-muted-foreground">
+                      View a complete, read-only report of all your preferences, constraints, and AI-learned data.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
                       <Button variant="outline" asChild>
-                        <a href="/your-data">View Your Data</a>
+                        <a href="/your-data">View Full Data Report</a>
+                      </Button>
+                      <Button variant="outline" onClick={handleExportData} className="gap-2">
+                        <Download className="h-4 w-4" />
+                        Export as JSON
                       </Button>
                     </div>
                   </CardContent>
                 </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Privacy Policy</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Your data is encrypted and stored securely. Your preferences power personalized recommendations, 
+                      and you have full control over what data is collected and how it's used.
+                    </p>
+                  </CardContent>
+                </Card>
               </TabsContent>
               
+              {/* Appearance Tab */}
               <TabsContent value="appearance">
                 <Card>
                   <CardHeader>
@@ -384,15 +386,47 @@ const Settings = () => {
                 </Card>
               </TabsContent>
               
-              <TabsContent value="language">
-                <Card>
+              {/* Account Tab - Last Tab */}
+              <TabsContent value="account">
+                <Card className="mb-6">
                   <CardHeader>
-                    <CardTitle>Language Settings</CardTitle>
+                    <CardTitle>Account Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-medium">Email</h3>
+                      <p className="text-muted-foreground mb-2">{user.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Your email is used for notifications and account recovery.
+                      </p>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div>
+                      <h3 className="text-lg font-medium">Profile Information</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Update your profile information in the Profile page.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                {/* Danger Zone */}
+                <Card className="border-red-200 dark:border-red-800">
+                  <CardHeader>
+                    <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+                    <CardDescription>
+                      Irreversible actions
+                    </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground">
-                      Change your language preferences here. This feature will be available soon.
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Once you delete your account, there is no going back. Please be certain.
                     </p>
+                    <Button variant="destructive" size="sm">
+                      Delete Account
+                    </Button>
                   </CardContent>
                 </Card>
               </TabsContent>
