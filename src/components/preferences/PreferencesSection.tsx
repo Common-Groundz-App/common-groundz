@@ -10,10 +10,24 @@ import { Badge } from '@/components/ui/badge';
 import PreferencesForm from './PreferencesForm';
 import ConstraintsSection from './ConstraintsSection';
 import LearnedPreferencesSection from './LearnedPreferencesSection';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Trash2, Shield, Brain, Settings2, ExternalLink } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Shield, Brain, Settings2, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConstraintsType, LearnedPreference } from '@/types/preferences';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+// Helper function to format summary with max items + overflow
+const formatSummary = (items: string[], max = 4): string => {
+  if (items.length === 0) return '';
+  if (items.length <= max) return items.join(' • ');
+  return items.slice(0, max).join(' • ') + ` • +${items.length - max} more`;
+};
 
 // Helper function to safely render array items as tags
 const renderPreferenceTags = (items: any, otherItems?: any) => {
@@ -28,17 +42,20 @@ const renderPreferenceTags = (items: any, otherItems?: any) => {
 };
 
 const PreferencesSection = () => {
-  const { preferences, updatePreferences, isLoading } = usePreferences();
-  const [isEditing, setIsEditing] = useState(false);
+  const { preferences, updatePreferences, isLoading, learnedPreferences, dismissLearnedPreference } = usePreferences();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const { toast } = useToast();
+
+  // Confirmation dialog states
+  const [resetPreferencesDialogOpen, setResetPreferencesDialogOpen] = useState(false);
+  const [clearConstraintsDialogOpen, setClearConstraintsDialogOpen] = useState(false);
+  const [clearLearnedDialogOpen, setClearLearnedDialogOpen] = useState(false);
 
   const handleEditClick = () => {
     setEditModalOpen(true);
   };
 
   const handleSaveSuccess = () => {
-    setIsEditing(false);
     setEditModalOpen(false);
     toast({
       title: "Preferences updated",
@@ -47,21 +64,83 @@ const PreferencesSection = () => {
   };
 
   const handleCancel = () => {
-    setIsEditing(false);
     setEditModalOpen(false);
   };
 
-  const handleResetPreferences = async () => {
+  // Reset only form preferences (KEEP constraints intact)
+  const handleResetPreferencesOnly = async () => {
     try {
-      await updatePreferences({});
+      await updatePreferences({
+        skin_type: [],
+        hair_type: [],
+        food_preferences: [],
+        lifestyle: [],
+        genre_preferences: [],
+        goals: [],
+        other_skin_type: '',
+        other_hair_type: '',
+        other_food_preferences: '',
+        other_lifestyle: '',
+        other_genre_preferences: '',
+        constraints: preferences?.constraints, // Preserve constraints!
+      });
       toast({
         title: "Preferences reset",
-        description: "All your preferences have been cleared."
+        description: "Your preferences have been cleared. Constraints remain unchanged."
       });
+      setResetPreferencesDialogOpen(false);
     } catch (error) {
       toast({
         title: "Error",
         description: "Could not reset preferences. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Clear only constraints (KEEP form preferences intact)
+  const handleClearConstraints = async () => {
+    try {
+      await updatePreferences({
+        ...preferences,
+        constraints: {
+          avoidIngredients: [],
+          avoidBrands: [],
+          avoidProductForms: [],
+          budget: 'no_preference',
+          custom: [],
+        },
+      });
+      toast({
+        title: "Constraints cleared",
+        description: "All constraints have been removed."
+      });
+      setClearConstraintsDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Could not clear constraints. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Clear all learned preferences
+  const handleClearAllLearned = async () => {
+    try {
+      const activeLearned = learnedPreferences.filter(p => !p.dismissed);
+      for (const lp of activeLearned) {
+        await dismissLearnedPreference(lp.scope, lp.key);
+      }
+      toast({
+        title: "Learned data cleared",
+        description: "All AI-learned preferences have been dismissed."
+      });
+      setClearLearnedDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Could not clear learned data. Please try again.",
         variant: "destructive"
       });
     }
@@ -83,11 +162,7 @@ const PreferencesSection = () => {
     }
   };
 
-  // Mock learned preferences (TODO: integrate with user_conversation_memory)
-  const learnedPreferences: LearnedPreference[] = [];
-
   const handleApproveLearned = (scope: string, key: string, value: any) => {
-    // TODO: Mark preference as approved in database
     toast({
       title: "Preference approved",
       description: `"${key}" has been added to your preferences.`
@@ -95,7 +170,7 @@ const PreferencesSection = () => {
   };
 
   const handleDismissLearned = (scope: string, key: string) => {
-    // TODO: Mark preference as dismissed in database
+    dismissLearnedPreference(scope, key);
     toast({
       title: "Preference dismissed",
       description: "This preference won't be suggested again."
@@ -111,7 +186,60 @@ const PreferencesSection = () => {
     (constraints.custom?.length || 0) +
     (constraints.budget && constraints.budget !== 'no_preference' ? 1 : 0);
 
-  const pendingLearnedCount = learnedPreferences.filter(p => !p.approvedAt && !p.dismissed).length;
+  const activeLearned = learnedPreferences.filter(p => !p.dismissed);
+  const pendingLearnedCount = activeLearned.filter(p => !p.approvedAt).length;
+  const approvedLearnedCount = activeLearned.filter(p => p.approvedAt).length;
+
+  // Check if each section has content (for disabling destructive actions)
+  const hasFormPreferences = Object.keys(preferences || {}).some(key => 
+    !['constraints', 'custom_preferences', 'last_updated', 'onboarding_completed'].includes(key) &&
+    preferences[key] !== undefined &&
+    preferences[key] !== null &&
+    (Array.isArray(preferences[key]) ? preferences[key].length > 0 : 
+      typeof preferences[key] === 'string' ? preferences[key].length > 0 : false)
+  );
+  const hasConstraints = constraintCount > 0;
+  const hasLearnedData = activeLearned.length > 0;
+
+  // Generate summary for Your Preferences
+  const getPreferencesSummary = (): string => {
+    const items: string[] = [];
+    if (preferences?.skin_type?.length) items.push(...preferences.skin_type);
+    if (preferences?.other_skin_type) items.push(preferences.other_skin_type);
+    if (preferences?.hair_type?.length) items.push(...preferences.hair_type);
+    if (preferences?.other_hair_type) items.push(preferences.other_hair_type);
+    if (preferences?.food_preferences?.length) items.push(...preferences.food_preferences);
+    if (preferences?.other_food_preferences) items.push(preferences.other_food_preferences);
+    if (preferences?.lifestyle?.length) items.push(...preferences.lifestyle);
+    if (preferences?.other_lifestyle) items.push(preferences.other_lifestyle);
+    if (preferences?.genre_preferences?.length) items.push(...preferences.genre_preferences);
+    if (preferences?.other_genre_preferences) items.push(preferences.other_genre_preferences);
+    if (preferences?.goals?.length) items.push(`${preferences.goals.length} goal${preferences.goals.length > 1 ? 's' : ''}`);
+    
+    return formatSummary(items) || 'No preferences set';
+  };
+
+  // Generate summary for Constraints
+  const getConstraintsSummary = (): string => {
+    const parts: string[] = [];
+    const c = constraints;
+    
+    if (c.avoidIngredients?.length) parts.push(`${c.avoidIngredients.length} ingredient${c.avoidIngredients.length > 1 ? 's' : ''}`);
+    if (c.avoidBrands?.length) parts.push(`${c.avoidBrands.length} brand${c.avoidBrands.length > 1 ? 's' : ''}`);
+    if (c.avoidProductForms?.length) parts.push(`${c.avoidProductForms.length} form${c.avoidProductForms.length > 1 ? 's' : ''}`);
+    if (c.budget && c.budget !== 'no_preference') parts.push(c.budget);
+    if (c.custom?.length) parts.push(`${c.custom.length} custom rule${c.custom.length > 1 ? 's' : ''}`);
+    
+    return parts.join(' • ') || 'No constraints set';
+  };
+
+  // Generate summary for Learned Preferences
+  const getLearnedSummary = (): string => {
+    const parts: string[] = [];
+    if (approvedLearnedCount) parts.push(`${approvedLearnedCount} approved`);
+    if (pendingLearnedCount) parts.push(`${pendingLearnedCount} pending review`);
+    return parts.join(' • ') || 'No learned data';
+  };
 
   if (isLoading) {
     return (
@@ -120,13 +248,6 @@ const PreferencesSection = () => {
       </div>
     );
   }
-
-  const hasFormPreferences = Object.keys(preferences || {}).some(key => 
-    !['constraints', 'custom_preferences', 'last_updated', 'onboarding_completed'].includes(key) &&
-    preferences[key] !== undefined &&
-    preferences[key] !== null &&
-    (Array.isArray(preferences[key]) ? preferences[key].length > 0 : true)
-  );
 
   return (
     <>
@@ -139,50 +260,59 @@ const PreferencesSection = () => {
                 Customize your product and content recommendations
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="text-red-600 focus-visible:ring-0 focus-visible:ring-offset-0">
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Reset
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Reset Preferences</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will clear all your personalization preferences. This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="focus-visible:ring-0 focus-visible:ring-offset-0">Cancel</AlertDialogCancel>
-                    <AlertDialogAction 
-                      onClick={handleResetPreferences}
-                      className="bg-red-600 hover:bg-red-700 focus-visible:ring-0 focus-visible:ring-offset-0"
-                    >
-                      Reset All
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
           </div>
         </CardHeader>
         <CardContent>
           <Accordion type="multiple" defaultValue={["preferences"]} className="w-full">
             {/* Section 1: Your Preferences */}
             <AccordionItem value="preferences" className="border-b">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-2">
-                  <Settings2 className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium">Your Preferences</span>
-                  {hasFormPreferences && (
-                    <Badge variant="secondary" className="ml-2 text-xs">
-                      Set
-                    </Badge>
-                  )}
-                </div>
-              </AccordionTrigger>
+              <div className="flex items-center justify-between">
+                <AccordionTrigger className="flex-1 hover:no-underline py-4">
+                  <div className="flex flex-col items-start">
+                    <div className="flex items-center gap-2">
+                      <Settings2 className="h-5 w-5 text-muted-foreground" />
+                      <span className="font-medium">Your Preferences</span>
+                      {hasFormPreferences && (
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          Set
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground mt-1 text-left">
+                      {getPreferencesSummary()}
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                
+                {/* 3-dots menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-background">
+                    <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit preferences
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => setResetPreferencesDialogOpen(true)}
+                      className="text-destructive focus:text-destructive"
+                      disabled={!hasFormPreferences}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reset preferences
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <AccordionContent className="pt-4">
                 {hasFormPreferences ? (
                   <div className="space-y-4">
@@ -268,17 +398,48 @@ const PreferencesSection = () => {
 
             {/* Section 2: Things to Avoid (Constraints) */}
             <AccordionItem value="constraints" className="border-b">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-red-500" />
-                  <span className="font-medium">Things to Avoid</span>
-                  {constraintCount > 0 && (
-                    <Badge variant="destructive" className="ml-2 text-xs">
-                      {constraintCount}
-                    </Badge>
-                  )}
-                </div>
-              </AccordionTrigger>
+              <div className="flex items-center justify-between">
+                <AccordionTrigger className="flex-1 hover:no-underline py-4">
+                  <div className="flex flex-col items-start">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-red-500" />
+                      <span className="font-medium">Things to Avoid</span>
+                      {constraintCount > 0 && (
+                        <Badge variant="destructive" className="ml-2 text-xs">
+                          {constraintCount}
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground mt-1 text-left">
+                      {getConstraintsSummary()}
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                
+                {/* 3-dots menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-background">
+                    <DropdownMenuItem 
+                      onClick={() => setClearConstraintsDialogOpen(true)}
+                      className="text-destructive focus:text-destructive"
+                      disabled={!hasConstraints}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Clear all constraints
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <AccordionContent className="pt-4">
                 <ConstraintsSection
                   constraints={constraints}
@@ -289,17 +450,48 @@ const PreferencesSection = () => {
 
             {/* Section 3: Learned from Conversations */}
             <AccordionItem value="learned" className="border-0">
-              <AccordionTrigger className="hover:no-underline">
-                <div className="flex items-center gap-2">
-                  <Brain className="h-5 w-5 text-purple-500" />
-                  <span className="font-medium">Learned from Conversations</span>
-                  {pendingLearnedCount > 0 && (
-                    <Badge className="ml-2 text-xs bg-yellow-500">
-                      {pendingLearnedCount} pending
-                    </Badge>
-                  )}
-                </div>
-              </AccordionTrigger>
+              <div className="flex items-center justify-between">
+                <AccordionTrigger className="flex-1 hover:no-underline py-4">
+                  <div className="flex flex-col items-start">
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-purple-500" />
+                      <span className="font-medium">Learned from Conversations</span>
+                      {pendingLearnedCount > 0 && (
+                        <Badge className="ml-2 text-xs bg-yellow-500">
+                          {pendingLearnedCount} pending
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground mt-1 text-left">
+                      {getLearnedSummary()}
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                
+                {/* 3-dots menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 shrink-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-background">
+                    <DropdownMenuItem 
+                      onClick={() => setClearLearnedDialogOpen(true)}
+                      className="text-destructive focus:text-destructive"
+                      disabled={!hasLearnedData}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Clear all learned data
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <AccordionContent className="pt-4">
                 <LearnedPreferencesSection
                   learnedPreferences={learnedPreferences}
@@ -321,6 +513,72 @@ const PreferencesSection = () => {
           </Accordion>
         </CardContent>
       </Card>
+
+      {/* Reset Preferences Confirmation */}
+      <AlertDialog open={resetPreferencesDialogOpen} onOpenChange={setResetPreferencesDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Your Preferences?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all preferences you have set (skin type, hair type, food, lifestyle, genres, goals). 
+              Your constraints will NOT be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="focus-visible:ring-0 focus-visible:ring-offset-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleResetPreferencesOnly} 
+              className="bg-destructive hover:bg-destructive/90 focus-visible:ring-0 focus-visible:ring-offset-0"
+            >
+              Reset Preferences
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear Constraints Confirmation */}
+      <AlertDialog open={clearConstraintsDialogOpen} onOpenChange={setClearConstraintsDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear All Constraints?</AlertDialogTitle>
+            <AlertDialogDescription className="text-yellow-600">
+              ⚠️ Warning: This will remove ALL ingredients, brands, product forms, budget settings, and custom rules you've added.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="focus-visible:ring-0 focus-visible:ring-offset-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleClearConstraints} 
+              className="bg-destructive hover:bg-destructive/90 focus-visible:ring-0 focus-visible:ring-offset-0"
+            >
+              Clear All Constraints
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Clear Learned Data Confirmation */}
+      <AlertDialog open={clearLearnedDialogOpen} onOpenChange={setClearLearnedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear AI-Learned Data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all insights the AI has learned from your conversations.
+              You can always rebuild them by chatting more.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="focus-visible:ring-0 focus-visible:ring-offset-0">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleClearAllLearned} 
+              className="bg-destructive hover:bg-destructive/90 focus-visible:ring-0 focus-visible:ring-offset-0"
+            >
+              Clear Learned Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
         <DialogContent className="sm:max-w-md">
