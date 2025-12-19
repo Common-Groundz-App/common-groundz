@@ -11,7 +11,7 @@ import PreferencesForm from './PreferencesForm';
 import ConstraintsSection from './ConstraintsSection';
 import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Shield, Brain, Settings2, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConstraintsType, LearnedPreference } from '@/types/preferences';
 import {
@@ -190,6 +190,21 @@ const PreferencesSection = () => {
   const pendingLearnedCount = activeLearned.filter(p => !p.approvedAt).length;
   const approvedLearnedCount = activeLearned.filter(p => p.approvedAt).length;
 
+  // Count total preferences for badge
+  const preferencesCount = [
+    preferences?.skin_type?.length || 0,
+    preferences?.other_skin_type ? 1 : 0,
+    preferences?.hair_type?.length || 0,
+    preferences?.other_hair_type ? 1 : 0,
+    preferences?.food_preferences?.length || 0,
+    preferences?.other_food_preferences ? 1 : 0,
+    preferences?.lifestyle?.length || 0,
+    preferences?.other_lifestyle ? 1 : 0,
+    preferences?.genre_preferences?.length || 0,
+    preferences?.other_genre_preferences ? 1 : 0,
+    preferences?.goals?.length || 0,
+  ].reduce((a, b) => a + b, 0);
+
   // Check if each section has content (for disabling destructive actions)
   const hasFormPreferences = Object.keys(preferences || {}).some(key => 
     !['constraints', 'custom_preferences', 'last_updated', 'onboarding_completed'].includes(key) &&
@@ -267,14 +282,14 @@ const PreferencesSection = () => {
             {/* Section 1: Your Preferences */}
             <AccordionItem value="preferences" className="border-b">
               <div className="flex items-center justify-between">
-                <AccordionTrigger className="flex-1 hover:no-underline py-4">
+                <AccordionTrigger className="flex-1 hover:no-underline py-4 [&>svg:last-child]:hidden">
                   <div className="flex flex-col items-start">
                     <div className="flex items-center gap-2">
-                      <Settings2 className="h-5 w-5 text-muted-foreground" />
+                      <Sparkles className="h-5 w-5 text-orange-500" />
                       <span className="font-medium">Your Preferences</span>
-                      {hasFormPreferences && (
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          Set
+                      {preferencesCount > 0 && (
+                        <Badge className="ml-2 text-xs bg-orange-100 text-orange-700">
+                          {preferencesCount}
                         </Badge>
                       )}
                     </div>
@@ -370,14 +385,6 @@ const PreferencesSection = () => {
                       </div>
                     )}
 
-                    <Button 
-                      onClick={handleEditClick} 
-                      variant="outline"
-                      size="sm"
-                      className="mt-4 focus-visible:ring-0 focus-visible:ring-offset-0"
-                    >
-                      Edit Preferences
-                    </Button>
                   </div>
                 ) : (
                   <div className="text-center py-4">
@@ -399,7 +406,7 @@ const PreferencesSection = () => {
             {/* Section 2: Things to Avoid (Constraints) */}
             <AccordionItem value="constraints" className="border-b">
               <div className="flex items-center justify-between">
-                <AccordionTrigger className="flex-1 hover:no-underline py-4">
+                <AccordionTrigger className="flex-1 hover:no-underline py-4 [&>svg:last-child]:hidden">
                   <div className="flex flex-col items-start">
                     <div className="flex items-center gap-2">
                       <Shield className="h-5 w-5 text-red-500" />
@@ -451,7 +458,7 @@ const PreferencesSection = () => {
             {/* Section 3: Learned from Conversations */}
             <AccordionItem value="learned" className="border-0">
               <div className="flex items-center justify-between">
-                <AccordionTrigger className="flex-1 hover:no-underline py-4">
+                <AccordionTrigger className="flex-1 hover:no-underline py-4 [&>svg:last-child]:hidden">
                   <div className="flex flex-col items-start">
                     <div className="flex items-center gap-2">
                       <Brain className="h-5 w-5 text-purple-500" />
