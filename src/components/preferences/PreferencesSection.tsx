@@ -49,7 +49,7 @@ const renderPreferenceTags = (items: any, otherItems?: any) => {
 };
 
 const PreferencesSection = () => {
-  const { preferences, updatePreferences, isLoading, learnedPreferences, dismissLearnedPreference } = usePreferences();
+  const { preferences, updatePreferences, isLoading, learnedPreferences, approveLearnedPreference, dismissLearnedPreference } = usePreferences();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>(['preferences']);
   const { toast } = useToast();
@@ -170,11 +170,20 @@ const PreferencesSection = () => {
     }
   };
 
-  const handleApproveLearned = (scope: string, key: string, value: any) => {
-    toast({
-      title: "Preference approved",
-      description: `"${key}" has been added to your preferences.`
-    });
+  const handleApproveLearned = async (scope: string, key: string, value: any) => {
+    const success = await approveLearnedPreference(scope, key, value);
+    if (success) {
+      toast({
+        title: "Preference approved",
+        description: `"${key}" has been added to your preferences.`
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to approve preference. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDismissLearned = (scope: string, key: string) => {
