@@ -11,9 +11,10 @@ import PreferencesForm from './PreferencesForm';
 import ConstraintsSection from './ConstraintsSection';
 import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2 } from 'lucide-react';
+import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConstraintsType, LearnedPreference } from '@/types/preferences';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,11 +23,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// Helper function to format summary with max items + overflow
+// Helper function to format summary with max items + overflow (with capitalization)
 const formatSummary = (items: string[], max = 4): string => {
   if (items.length === 0) return '';
-  if (items.length <= max) return items.join(' • ');
-  return items.slice(0, max).join(' • ') + ` • +${items.length - max} more`;
+  
+  // Capitalize each item
+  const capitalizedItems = items.map(item => 
+    item.charAt(0).toUpperCase() + item.slice(1)
+  );
+  
+  if (capitalizedItems.length <= max) return capitalizedItems.join(' • ');
+  return capitalizedItems.slice(0, max).join(' • ') + ` • +${capitalizedItems.length - max} more`;
 };
 
 // Helper function to safely render array items as tags
@@ -44,6 +51,7 @@ const renderPreferenceTags = (items: any, otherItems?: any) => {
 const PreferencesSection = () => {
   const { preferences, updatePreferences, isLoading, learnedPreferences, dismissLearnedPreference } = usePreferences();
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [openSections, setOpenSections] = useState<string[]>(['preferences']);
   const { toast } = useToast();
 
   // Confirmation dialog states
@@ -216,19 +224,29 @@ const PreferencesSection = () => {
   const hasConstraints = constraintCount > 0;
   const hasLearnedData = activeLearned.length > 0;
 
-  // Generate summary for Your Preferences
+  // Generate summary for Your Preferences (filter out meaningless "Other" entries)
   const getPreferencesSummary = (): string => {
     const items: string[] = [];
     if (preferences?.skin_type?.length) items.push(...preferences.skin_type);
-    if (preferences?.other_skin_type) items.push(preferences.other_skin_type);
+    if (preferences?.other_skin_type && preferences.other_skin_type.toLowerCase() !== 'other') {
+      items.push(preferences.other_skin_type);
+    }
     if (preferences?.hair_type?.length) items.push(...preferences.hair_type);
-    if (preferences?.other_hair_type) items.push(preferences.other_hair_type);
+    if (preferences?.other_hair_type && preferences.other_hair_type.toLowerCase() !== 'other') {
+      items.push(preferences.other_hair_type);
+    }
     if (preferences?.food_preferences?.length) items.push(...preferences.food_preferences);
-    if (preferences?.other_food_preferences) items.push(preferences.other_food_preferences);
+    if (preferences?.other_food_preferences && preferences.other_food_preferences.toLowerCase() !== 'other') {
+      items.push(preferences.other_food_preferences);
+    }
     if (preferences?.lifestyle?.length) items.push(...preferences.lifestyle);
-    if (preferences?.other_lifestyle) items.push(preferences.other_lifestyle);
+    if (preferences?.other_lifestyle && preferences.other_lifestyle.toLowerCase() !== 'other') {
+      items.push(preferences.other_lifestyle);
+    }
     if (preferences?.genre_preferences?.length) items.push(...preferences.genre_preferences);
-    if (preferences?.other_genre_preferences) items.push(preferences.other_genre_preferences);
+    if (preferences?.other_genre_preferences && preferences.other_genre_preferences.toLowerCase() !== 'other') {
+      items.push(preferences.other_genre_preferences);
+    }
     if (preferences?.goals?.length) items.push(`${preferences.goals.length} goal${preferences.goals.length > 1 ? 's' : ''}`);
     
     return formatSummary(items) || 'No preferences set';
@@ -278,11 +296,11 @@ const PreferencesSection = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <Accordion type="multiple" defaultValue={["preferences"]} className="w-full">
+          <Accordion type="multiple" defaultValue={["preferences"]} onValueChange={setOpenSections} className="w-full">
             {/* Section 1: Your Preferences */}
             <AccordionItem value="preferences" className="border-b">
-              <div className="flex items-center justify-between">
-                <AccordionTrigger className="flex-1 hover:no-underline py-4 [&>svg:last-child]:hidden">
+              <div className="flex items-center gap-2 group">
+                <AccordionTrigger className="flex-1 hover:no-underline py-4 hover:bg-muted/30 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden">
                   <div className="flex flex-col items-start">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-5 w-5 text-orange-500" />
@@ -298,6 +316,14 @@ const PreferencesSection = () => {
                     </span>
                   </div>
                 </AccordionTrigger>
+                
+                {/* Subtle chevron - visual affordance only, brightens on hover */}
+                <ChevronDown 
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground/40 transition-all duration-200 pointer-events-none group-hover:text-muted-foreground/70",
+                    openSections.includes('preferences') && "rotate-180"
+                  )}
+                />
                 
                 {/* 3-dots menu */}
                 <DropdownMenu>
@@ -405,8 +431,8 @@ const PreferencesSection = () => {
 
             {/* Section 2: Things to Avoid (Constraints) */}
             <AccordionItem value="constraints" className="border-b">
-              <div className="flex items-center justify-between">
-                <AccordionTrigger className="flex-1 hover:no-underline py-4 [&>svg:last-child]:hidden">
+              <div className="flex items-center gap-2 group">
+                <AccordionTrigger className="flex-1 hover:no-underline py-4 hover:bg-muted/30 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden">
                   <div className="flex flex-col items-start">
                     <div className="flex items-center gap-2">
                       <Shield className="h-5 w-5 text-red-500" />
@@ -422,6 +448,14 @@ const PreferencesSection = () => {
                     </span>
                   </div>
                 </AccordionTrigger>
+                
+                {/* Subtle chevron - visual affordance only, brightens on hover */}
+                <ChevronDown 
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground/40 transition-all duration-200 pointer-events-none group-hover:text-muted-foreground/70",
+                    openSections.includes('constraints') && "rotate-180"
+                  )}
+                />
                 
                 {/* 3-dots menu */}
                 <DropdownMenu>
@@ -457,14 +491,14 @@ const PreferencesSection = () => {
 
             {/* Section 3: Learned from Conversations */}
             <AccordionItem value="learned" className="border-0">
-              <div className="flex items-center justify-between">
-                <AccordionTrigger className="flex-1 hover:no-underline py-4 [&>svg:last-child]:hidden">
+              <div className="flex items-center gap-2 group">
+                <AccordionTrigger className="flex-1 hover:no-underline py-4 hover:bg-muted/30 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden">
                   <div className="flex flex-col items-start">
                     <div className="flex items-center gap-2">
                       <Brain className="h-5 w-5 text-purple-500" />
                       <span className="font-medium">Learned from Conversations</span>
                       {pendingLearnedCount > 0 && (
-                        <Badge className="ml-2 text-xs bg-yellow-500">
+                        <Badge className="ml-2 text-xs bg-purple-100 text-purple-700">
                           {pendingLearnedCount} pending
                         </Badge>
                       )}
@@ -474,6 +508,14 @@ const PreferencesSection = () => {
                     </span>
                   </div>
                 </AccordionTrigger>
+                
+                {/* Subtle chevron - visual affordance only, brightens on hover */}
+                <ChevronDown 
+                  className={cn(
+                    "h-4 w-4 shrink-0 text-muted-foreground/40 transition-all duration-200 pointer-events-none group-hover:text-muted-foreground/70",
+                    openSections.includes('learned') && "rotate-180"
+                  )}
+                />
                 
                 {/* 3-dots menu */}
                 <DropdownMenu>
