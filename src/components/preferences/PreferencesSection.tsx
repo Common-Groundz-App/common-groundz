@@ -301,29 +301,31 @@ const PreferencesSection = () => {
             <AccordionItem value="preferences" className="border-b">
               <div className="flex items-center gap-2 group">
                 <AccordionTrigger className="flex-1 hover:no-underline py-4 hover:bg-muted/30 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden">
-                  <div className="flex flex-col items-start">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-orange-500" />
-                      <span className="font-medium">Your Preferences</span>
-                      {preferencesCount > 0 && (
-                        <Badge className="ml-2 text-xs bg-orange-100 text-orange-700">
-                          {preferencesCount}
-                        </Badge>
-                      )}
+                  <div className="flex items-center w-full">
+                    <div className="flex flex-col items-start flex-1">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-5 w-5 text-orange-500" />
+                        <span className="font-medium">Your Preferences</span>
+                        {preferencesCount > 0 && (
+                          <Badge className="ml-2 text-xs bg-orange-100 text-orange-700">
+                            {preferencesCount}
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground mt-1 text-left">
+                        {getPreferencesSummary()}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground mt-1 text-left">
-                      {getPreferencesSummary()}
-                    </span>
+                    
+                    {/* Chevron inside trigger - clickable */}
+                    <ChevronDown 
+                      className={cn(
+                        "h-5 w-5 shrink-0 text-muted-foreground/50 transition-all duration-200 mr-2 group-hover:text-muted-foreground/80",
+                        openSections.includes('preferences') && "rotate-180"
+                      )}
+                    />
                   </div>
                 </AccordionTrigger>
-                
-                {/* Subtle chevron - visual affordance only, brightens on hover */}
-                <ChevronDown 
-                  className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground/40 transition-all duration-200 pointer-events-none group-hover:text-muted-foreground/70",
-                    openSections.includes('preferences') && "rotate-180"
-                  )}
-                />
                 
                 {/* 3-dots menu */}
                 <DropdownMenu>
@@ -433,29 +435,31 @@ const PreferencesSection = () => {
             <AccordionItem value="constraints" className="border-b">
               <div className="flex items-center gap-2 group">
                 <AccordionTrigger className="flex-1 hover:no-underline py-4 hover:bg-muted/30 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden">
-                  <div className="flex flex-col items-start">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-red-500" />
-                      <span className="font-medium">Things to Avoid</span>
-                      {constraintCount > 0 && (
-                        <Badge variant="destructive" className="ml-2 text-xs">
-                          {constraintCount}
-                        </Badge>
-                      )}
+                  <div className="flex items-center w-full">
+                    <div className="flex flex-col items-start flex-1">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-red-500" />
+                        <span className="font-medium">Things to Avoid</span>
+                        {constraintCount > 0 && (
+                          <Badge variant="destructive" className="ml-2 text-xs">
+                            {constraintCount}
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground mt-1 text-left">
+                        {getConstraintsSummary()}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground mt-1 text-left">
-                      {getConstraintsSummary()}
-                    </span>
+                    
+                    {/* Chevron inside trigger - clickable */}
+                    <ChevronDown 
+                      className={cn(
+                        "h-5 w-5 shrink-0 text-muted-foreground/50 transition-all duration-200 mr-2 group-hover:text-muted-foreground/80",
+                        openSections.includes('constraints') && "rotate-180"
+                      )}
+                    />
                   </div>
                 </AccordionTrigger>
-                
-                {/* Subtle chevron - visual affordance only, brightens on hover */}
-                <ChevronDown 
-                  className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground/40 transition-all duration-200 pointer-events-none group-hover:text-muted-foreground/70",
-                    openSections.includes('constraints') && "rotate-180"
-                  )}
-                />
                 
                 {/* 3-dots menu */}
                 <DropdownMenu>
@@ -493,29 +497,31 @@ const PreferencesSection = () => {
             <AccordionItem value="learned" className="border-0">
               <div className="flex items-center gap-2 group">
                 <AccordionTrigger className="flex-1 hover:no-underline py-4 hover:bg-muted/30 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden">
-                  <div className="flex flex-col items-start">
-                    <div className="flex items-center gap-2">
-                      <Brain className="h-5 w-5 text-purple-500" />
-                      <span className="font-medium">Learned from Conversations</span>
-                      {pendingLearnedCount > 0 && (
-                        <Badge className="ml-2 text-xs bg-purple-100 text-purple-700">
-                          {pendingLearnedCount} pending
-                        </Badge>
-                      )}
+                  <div className="flex items-center w-full">
+                    <div className="flex flex-col items-start flex-1">
+                      <div className="flex items-center gap-2">
+                        <Brain className="h-5 w-5 text-purple-500" />
+                        <span className="font-medium">Learned from Conversations</span>
+                        {pendingLearnedCount > 0 && (
+                          <Badge className="ml-2 text-xs bg-purple-100 text-purple-700">
+                            {pendingLearnedCount} pending
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground mt-1 text-left">
+                        {getLearnedSummary()}
+                      </span>
                     </div>
-                    <span className="text-xs text-muted-foreground mt-1 text-left">
-                      {getLearnedSummary()}
-                    </span>
+                    
+                    {/* Chevron inside trigger - clickable */}
+                    <ChevronDown 
+                      className={cn(
+                        "h-5 w-5 shrink-0 text-muted-foreground/50 transition-all duration-200 mr-2 group-hover:text-muted-foreground/80",
+                        openSections.includes('learned') && "rotate-180"
+                      )}
+                    />
                   </div>
                 </AccordionTrigger>
-                
-                {/* Subtle chevron - visual affordance only, brightens on hover */}
-                <ChevronDown 
-                  className={cn(
-                    "h-4 w-4 shrink-0 text-muted-foreground/40 transition-all duration-200 pointer-events-none group-hover:text-muted-foreground/70",
-                    openSections.includes('learned') && "rotate-180"
-                  )}
-                />
                 
                 {/* 3-dots menu */}
                 <DropdownMenu>
