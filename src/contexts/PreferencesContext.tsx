@@ -135,14 +135,14 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
                 scope,
                 key,
                 value,
-                confidence: 0.7, // Default confidence for existing data
+                confidence: 0.7,
                 extractedAt: new Date().toISOString(),
               });
             });
           }
         });
         
-        // Add detected constraints as learned
+        // Add detected constraints as learned (read approvedAt and dismissed from DB)
         detectedConstraints.forEach((c: any) => {
           learned.push({
             scope: c.category,
@@ -150,11 +150,13 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
             value: c.value,
             confidence: c.confidence || 0.7,
             evidence: c.evidence,
-            extractedAt: new Date().toISOString(),
+            extractedAt: c.extractedAt || new Date().toISOString(),
+            approvedAt: c.approvedAt,
+            dismissed: c.dismissed,
           });
         });
         
-        // Add detected preferences as learned
+        // Add detected preferences as learned (read approvedAt and dismissed from DB)
         detectedPreferences.forEach((p: any) => {
           learned.push({
             scope: p.category,
@@ -162,11 +164,15 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
             value: p.value,
             confidence: p.confidence || 0.7,
             evidence: p.evidence,
-            extractedAt: new Date().toISOString(),
+            extractedAt: p.extractedAt || new Date().toISOString(),
+            approvedAt: p.approvedAt,
+            dismissed: p.dismissed,
           });
         });
         
-        setLearnedPreferences(learned);
+        // Explicitly filter out already-processed items (defensive)
+        const activeLearned = learned.filter(p => !p.approvedAt && !p.dismissed);
+        setLearnedPreferences(activeLearned);
       }
     } catch (err) {
       console.error('❌ [PreferencesProvider] Error fetching learned preferences:', err);
@@ -264,6 +270,14 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
 
   // Learned preferences management
   const approveLearnedPreference = async (scope: string, key: string, value: any) => {
+    if (!user) return false;
+    
+    // Guard against double-approval
+    const existingPref = learnedPreferences.find(p => p.scope === scope && p.key === key);
+    if (existingPref?.approvedAt || existingPref?.dismissed) {
+      return true; // Already processed, no-op
+    }
+    
     // Add to custom preferences with user priority
     const success = await addCustomPreference({
       category: scope,
@@ -275,27 +289,100 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     });
     
     if (success) {
-      // Mark as approved in local state
-      setLearnedPreferences(prev => 
-        prev.map(p => 
-          p.scope === scope && p.key === key 
-            ? { ...p, approvedAt: new Date().toISOString() }
-            : p
-        )
-      );
+      // TODO: Consider using jsonb_set or RPC for atomic updates to prevent race conditions
+      // TODO: Future refactor - standardize on reviewStatus: 'pending' | 'approved' | 'dismissed'
+      try {
+        const { data: memoryData } = await supabase
+          .from('user_conversation_memory')
+          .select('metadata')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        if (memoryData?.metadata) {
+          const metadata = memoryData.metadata as any;
+          const updatedConstraints = (metadata.detected_constraints || []).map((c: any) => {
+            if (c.category === scope && `constraint: ${c.rule}` === key) {
+              return { ...c, approvedAt: new Date().toISOString() };
+            }
+            return c;
+          });
+          const updatedPreferences = (metadata.detected_preferences || []).map((p: any) => {
+            if (p.category === scope && p.key === key) {
+              return { ...p, approvedAt: new Date().toISOString() };
+            }
+            return p;
+          });
+          
+          await supabase
+            .from('user_conversation_memory')
+            .update({
+              metadata: {
+                ...metadata,
+                detected_constraints: updatedConstraints,
+                detected_preferences: updatedPreferences,
+              }
+            })
+            .eq('user_id', user.id);
+        }
+      } catch (err) {
+        console.error('Error updating memory metadata:', err);
+      }
+      
+      // Update local state - remove from list since it's now approved
+      setLearnedPreferences(prev => prev.filter(p => !(p.scope === scope && p.key === key)));
     }
     return success;
   };
 
   const dismissLearnedPreference = async (scope: string, key: string) => {
-    // Mark as dismissed in local state
-    setLearnedPreferences(prev => 
-      prev.map(p => 
-        p.scope === scope && p.key === key 
-          ? { ...p, dismissed: true }
-          : p
-      )
-    );
+    if (!user) return false;
+    
+    // Guard against double-dismissal
+    const existingPref = learnedPreferences.find(p => p.scope === scope && p.key === key);
+    if (existingPref?.approvedAt || existingPref?.dismissed) {
+      return true; // Already processed, no-op
+    }
+    
+    // TODO: Consider using jsonb_set or RPC for atomic updates to prevent race conditions
+    try {
+      const { data: memoryData } = await supabase
+        .from('user_conversation_memory')
+        .select('metadata')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (memoryData?.metadata) {
+        const metadata = memoryData.metadata as any;
+        const updatedConstraints = (metadata.detected_constraints || []).map((c: any) => {
+          if (c.category === scope && `constraint: ${c.rule}` === key) {
+            return { ...c, dismissed: true, dismissedAt: new Date().toISOString() };
+          }
+          return c;
+        });
+        const updatedPreferences = (metadata.detected_preferences || []).map((p: any) => {
+          if (p.category === scope && p.key === key) {
+            return { ...p, dismissed: true, dismissedAt: new Date().toISOString() };
+          }
+          return p;
+        });
+        
+        await supabase
+          .from('user_conversation_memory')
+          .update({
+            metadata: {
+              ...metadata,
+              detected_constraints: updatedConstraints,
+              detected_preferences: updatedPreferences,
+            }
+          })
+          .eq('user_id', user.id);
+      }
+    } catch (err) {
+      console.error('Error updating memory metadata:', err);
+    }
+    
+    // Update local state - remove from list since it's now dismissed
+    setLearnedPreferences(prev => prev.filter(p => !(p.scope === scope && p.key === key)));
     return true;
   };
 
