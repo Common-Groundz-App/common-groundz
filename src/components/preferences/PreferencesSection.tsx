@@ -422,6 +422,30 @@ const PreferencesSection = () => {
                       </div>
                     )}
 
+                    {/* AI-Learned Preferences Section */}
+                    {preferences.custom_preferences?.filter(p => p.source === 'chatbot').length > 0 && (
+                      <div className="space-y-2 border-t pt-4 mt-4">
+                        <h4 className="font-medium text-sm flex items-center gap-2">
+                          <Brain className="h-4 w-4 text-purple-500" />
+                          Learned from Conversations
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {preferences.custom_preferences
+                            ?.filter(p => p.source === 'chatbot')
+                            .map(pref => (
+                              <Badge 
+                                key={pref.id} 
+                                variant="outline" 
+                                className="bg-purple-50 dark:bg-purple-500/10 border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-300"
+                              >
+                                {pref.key}: {pref.value}
+                                <span className="ml-1.5 text-purple-500 text-xs">✓ AI</span>
+                              </Badge>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 ) : (
                   <div className="text-center py-4">
