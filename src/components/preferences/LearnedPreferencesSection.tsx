@@ -38,10 +38,10 @@ const LearnedPreferencesSection: React.FC<LearnedPreferencesSectionProps> = ({
   onEdit,
   isLoading = false
 }) => {
-  // Filter out dismissed preferences
-  const activePrefences = learnedPreferences.filter(p => !p.dismissed);
-  const groupedPreferences = groupByScope(activePrefences);
-  const pendingCount = activePrefences.filter(p => !p.approvedAt).length;
+  // Filter out dismissed AND approved preferences - only show pending items
+  const pendingPreferences = learnedPreferences.filter(p => !p.dismissed && !p.approvedAt);
+  const groupedPreferences = groupByScope(pendingPreferences);
+  const pendingCount = pendingPreferences.length;
 
   if (isLoading) {
     return (
@@ -51,13 +51,17 @@ const LearnedPreferencesSection: React.FC<LearnedPreferencesSectionProps> = ({
     );
   }
 
-  if (activePrefences.length === 0) {
+  // Empty state - all caught up!
+  if (pendingPreferences.length === 0) {
     return (
       <div className="text-center py-8 bg-accent/20 rounded-lg">
-        <Brain className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-        <p className="text-sm text-muted-foreground mb-1">No learned preferences yet</p>
+        <div className="flex items-center justify-center gap-2 mb-3">
+          <Check className="h-6 w-6 text-green-500" />
+          <Brain className="h-8 w-8 text-muted-foreground" />
+        </div>
+        <p className="text-sm text-muted-foreground mb-1">You're all caught up!</p>
         <p className="text-xs text-muted-foreground">
-          Chat with the AI assistant to discover preferences from your conversations.
+          Approved preferences are now active in "Your Preferences" and "Things to Avoid" sections.
         </p>
       </div>
     );
@@ -86,17 +90,11 @@ const LearnedPreferencesSection: React.FC<LearnedPreferencesSectionProps> = ({
           <div className="space-y-2">
             {preferences.map((pref, index) => {
               const confidence = getConfidenceLevel(pref.confidence);
-              const isPending = !pref.approvedAt;
               
               return (
                 <div 
                   key={`${pref.scope}-${pref.key}-${index}`}
-                  className={cn(
-                    'p-3 rounded-lg border transition-all',
-                    isPending 
-                      ? 'bg-yellow-500/5 border-yellow-500/20' 
-                      : 'bg-accent/30 border-transparent'
-                  )}
+                  className="p-3 rounded-lg border transition-all bg-yellow-500/5 border-yellow-500/20"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -114,12 +112,6 @@ const LearnedPreferencesSection: React.FC<LearnedPreferencesSectionProps> = ({
                         <Badge variant="outline" className={cn('text-xs', confidence.color)}>
                           {confidence.label} confidence ({Math.round(pref.confidence * 100)}%)
                         </Badge>
-                        {pref.approvedAt && (
-                          <Badge variant="outline" className="text-xs text-green-600">
-                            <Check className="h-3 w-3 mr-1" />
-                            Approved
-                          </Badge>
-                        )}
                       </div>
                       
                       {/* Evidence quote */}
@@ -133,40 +125,38 @@ const LearnedPreferencesSection: React.FC<LearnedPreferencesSectionProps> = ({
                       )}
                     </div>
                     
-                    {/* Actions */}
-                    {isPending && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Actions - always show since we only have pending items */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onApprove(pref.scope, pref.key, pref.value)}
+                        className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-500/10"
+                        title="Approve"
+                      >
+                        <Check className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onDismiss(pref.scope, pref.key)}
+                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10"
+                        title="Dismiss"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                      {onEdit && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => onApprove(pref.scope, pref.key, pref.value)}
-                          className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-500/10"
-                          title="Approve"
+                          onClick={() => onEdit(pref)}
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                          title="Edit"
                         >
-                          <Check className="h-4 w-4" />
+                          <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onDismiss(pref.scope, pref.key)}
-                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-500/10"
-                          title="Dismiss"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                        {onEdit && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onEdit(pref)}
-                            className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
-                            title="Edit"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               );

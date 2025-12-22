@@ -223,13 +223,21 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
                         key={constraint.id}
                         className="flex items-center justify-between p-3 bg-accent/30 rounded-lg"
                       >
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
                           <Badge 
                             variant="outline" 
                             className={cn(intentStyle.bg, intentStyle.text, 'text-xs')}
                           >
                             {intentStyle.label}
                           </Badge>
+                          {constraint.source === 'chatbot' && (
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-500/20"
+                            >
+                              AI
+                            </Badge>
+                          )}
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">
                               {constraint.rule}: {constraint.value}
