@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import SelectablePills from './SelectablePills';
-import TagInput from './TagInput';
 import { Button } from '@/components/ui/button';
 import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  createPreferenceValue, 
+  createPreferenceValues,
+  getCategoryValues,
+  mergeValuesIntoCategory
+} from '@/utils/preferenceRouting';
+import { PreferenceCategory, UserPreferences } from '@/types/preferences';
 
 // Define the step interface
 interface Step {
@@ -15,7 +21,7 @@ interface Step {
 }
 
 interface PreferencesFormProps {
-  initialPreferences?: any;
+  initialPreferences?: UserPreferences;
   onSaveSuccess?: () => void;
   onCancel?: () => void;
   isModal?: boolean;
@@ -28,7 +34,7 @@ const CONFLICT_GROUPS = {
   diet_type: ['vegetarian', 'vegan', 'non-vegetarian']
 };
 
-// Define suggested goals for the pills component - MOVED UP HERE to prevent the reference error
+// Define suggested goals for the pills component
 const goalOptions = [
   { label: "Improve sleep", value: "Improve sleep", emoji: "😴" },
   { label: "Improve skin", value: "Improve skin", emoji: "✨" },
@@ -42,15 +48,22 @@ const goalOptions = [
   { label: "Reduce anxiety", value: "Reduce anxiety", emoji: "🧘" }
 ];
 
-// Helper to ensure value is always an array (handles string values from DB)
-// normalizeCase: true for predefined options (to match lowercase form values), false for custom "other" values
-const ensureArray = (value: unknown, normalizeCase: boolean = false): string[] => {
+// Helper to extract values from PreferenceCategory or legacy array
+const extractValues = (value: unknown, normalizeCase: boolean = false): string[] => {
   let result: string[] = [];
   
-  if (Array.isArray(value)) {
+  // Handle new PreferenceCategory format
+  if (value && typeof value === 'object' && 'values' in value) {
+    const category = value as PreferenceCategory;
+    result = category.values?.map(v => v.value) || [];
+  }
+  // Handle legacy array format
+  else if (Array.isArray(value)) {
     result = value.filter(v => typeof v === 'string');
-  } else if (typeof value === 'string' && value.trim()) {
-    result = [value];
+  }
+  // Handle legacy string format
+  else if (typeof value === 'string' && value.trim()) {
+    result = value.split(',').map(v => v.trim()).filter(Boolean);
   }
   
   // Normalize to lowercase if requested (for matching with form option values)
@@ -70,24 +83,45 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
   const { updatePreferences } = usePreferences();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(0);
-  const [formData, setFormData] = useState({
-    skin_type: ensureArray(initialPreferences.skin_type, true),
-    other_skin_type: ensureArray(initialPreferences.other_skin_type, false),
-    hair_type: ensureArray(initialPreferences.hair_type, true),
-    other_hair_type: ensureArray(initialPreferences.other_hair_type, false),
-    food_preferences: ensureArray(initialPreferences.food_preferences, true),
-    other_food_preferences: ensureArray(initialPreferences.other_food_preferences, false),
-    lifestyle: ensureArray(initialPreferences.lifestyle, true),
-    other_lifestyle: ensureArray(initialPreferences.other_lifestyle, false),
-    genre_preferences: ensureArray(initialPreferences.genre_preferences, true),
-    other_genre_preferences: ensureArray(initialPreferences.other_genre_preferences, false),
-    goals: ensureArray(initialPreferences.goals, false).filter(goal => 
-      goalOptions.some(option => option.value.toLowerCase() === goal.toLowerCase())
-    ),
-    other_goals: ensureArray(initialPreferences.goals, false).filter(goal => 
-      !goalOptions.some(option => option.value.toLowerCase() === goal.toLowerCase())
-    ),
+  
+  // Extract values from canonical or legacy format
+  const [formData, setFormData] = useState(() => {
+    const skinValues = extractValues(initialPreferences.skin_type, true);
+    const hairValues = extractValues(initialPreferences.hair_type, true);
+    const foodValues = extractValues(initialPreferences.food_preferences, true);
+    const lifestyleValues = extractValues(initialPreferences.lifestyle, true);
+    const genreValues = extractValues(initialPreferences.genre_preferences, true);
+    const goalValues = extractValues(initialPreferences.goals, false);
+    
+    // Separate predefined from custom values
+    const predefinedOptions = {
+      skin: ['dry', 'oily', 'combination', 'sensitive', 'normal'],
+      hair: ['straight', 'wavy', 'curly', 'frizzy', 'oily', 'dry'],
+      food: ['vegetarian', 'vegan', 'non-vegetarian', 'no-onion-garlic', 'gluten-free'],
+      lifestyle: ['minimalist', 'active', 'busy', 'tech-savvy', 'mindful'],
+      genre: ['action', 'sci-fi', 'romcom', 'thriller', 'drama', 'anime'],
+    };
+    
+    return {
+      skin_type: skinValues.filter(v => predefinedOptions.skin.includes(v)),
+      other_skin_type: skinValues.filter(v => !predefinedOptions.skin.includes(v)),
+      hair_type: hairValues.filter(v => predefinedOptions.hair.includes(v)),
+      other_hair_type: hairValues.filter(v => !predefinedOptions.hair.includes(v)),
+      food_preferences: foodValues.filter(v => predefinedOptions.food.includes(v)),
+      other_food_preferences: foodValues.filter(v => !predefinedOptions.food.includes(v)),
+      lifestyle: lifestyleValues.filter(v => predefinedOptions.lifestyle.includes(v)),
+      other_lifestyle: lifestyleValues.filter(v => !predefinedOptions.lifestyle.includes(v)),
+      genre_preferences: genreValues.filter(v => predefinedOptions.genre.includes(v)),
+      other_genre_preferences: genreValues.filter(v => !predefinedOptions.genre.includes(v)),
+      goals: goalValues.filter(goal => 
+        goalOptions.some(option => option.value.toLowerCase() === goal.toLowerCase())
+      ),
+      other_goals: goalValues.filter(goal => 
+        !goalOptions.some(option => option.value.toLowerCase() === goal.toLowerCase())
+      ),
+    };
   });
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -106,27 +140,61 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
     setFormError(null);
     
     try {
-      // Declare variables before using them - Fixed order to prevent ReferenceError
-      const goals = formData.goals || [];
-      const other_goals = formData.other_goals || [];
+      // Build canonical PreferenceCategory for each field
+      const buildCategory = (predefined: string[], custom: string[]): PreferenceCategory | undefined => {
+        const allValues = [...predefined, ...custom].filter(Boolean);
+        if (allValues.length === 0) return undefined;
+        return {
+          values: createPreferenceValues(allValues, 'form', 'like')
+        };
+      };
       
-      // Combine goals and other_goals back into a single array for saving
-      const combinedGoals = [...goals, ...other_goals];
+      // Preserve existing AI-sourced values when rebuilding categories
+      const preserveAIValues = (
+        existing: PreferenceCategory | undefined,
+        newCategory: PreferenceCategory | undefined
+      ): PreferenceCategory | undefined => {
+        if (!existing?.values) return newCategory;
+        if (!newCategory) {
+          // Keep only AI values if user cleared all form values
+          const aiValues = existing.values.filter(v => v.source === 'chatbot');
+          return aiValues.length > 0 ? { values: aiValues } : undefined;
+        }
+        
+        // Merge: new form values + existing AI values (avoiding duplicates)
+        const aiValues = existing.values.filter(v => v.source === 'chatbot');
+        return mergeValuesIntoCategory(newCategory, aiValues);
+      };
       
-      // Convert arrays back to the expected format for database
-      // other_* fields are stored as strings (comma-separated or single value)
-      const dataToSubmit = {
-        skin_type: formData.skin_type,
-        other_skin_type: formData.other_skin_type.join(', '),
-        hair_type: formData.hair_type,
-        other_hair_type: formData.other_hair_type.join(', '),
-        food_preferences: formData.food_preferences,
-        other_food_preferences: formData.other_food_preferences.join(', '),
-        lifestyle: formData.lifestyle,
-        other_lifestyle: formData.other_lifestyle.join(', '),
-        genre_preferences: formData.genre_preferences,
-        other_genre_preferences: formData.other_genre_preferences.join(', '),
-        goals: combinedGoals,
+      const dataToSubmit: UserPreferences = {
+        skin_type: preserveAIValues(
+          initialPreferences.skin_type as PreferenceCategory,
+          buildCategory(formData.skin_type, formData.other_skin_type)
+        ),
+        hair_type: preserveAIValues(
+          initialPreferences.hair_type as PreferenceCategory,
+          buildCategory(formData.hair_type, formData.other_hair_type)
+        ),
+        food_preferences: preserveAIValues(
+          initialPreferences.food_preferences as PreferenceCategory,
+          buildCategory(formData.food_preferences, formData.other_food_preferences)
+        ),
+        lifestyle: preserveAIValues(
+          initialPreferences.lifestyle as PreferenceCategory,
+          buildCategory(formData.lifestyle, formData.other_lifestyle)
+        ),
+        genre_preferences: preserveAIValues(
+          initialPreferences.genre_preferences as PreferenceCategory,
+          buildCategory(formData.genre_preferences, formData.other_genre_preferences)
+        ),
+        goals: preserveAIValues(
+          initialPreferences.goals as PreferenceCategory,
+          buildCategory(formData.goals, formData.other_goals)
+        ),
+        // Preserve constraints and custom_categories
+        constraints: initialPreferences.constraints,
+        custom_categories: initialPreferences.custom_categories,
+        onboarding_completed: true,
       };
       
       await updatePreferences(dataToSubmit);
@@ -158,21 +226,20 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
         return formData.hair_type.length > 0 || formData.other_hair_type.length > 0;
       case 2: // Food Preferences
         if (formData.food_preferences.includes('other') && formData.other_food_preferences.length === 0) {
-          return false; // Can't proceed if "other" is selected but no custom values added
+          return false;
         }
         return formData.food_preferences.length > 0 || formData.other_food_preferences.length > 0;
       case 3: // Lifestyle
         if (formData.lifestyle.includes('other') && formData.other_lifestyle.length === 0) {
-          return false; // Can't proceed if "other" is selected but no custom values added
+          return false;
         }
         return formData.lifestyle.length > 0 || formData.other_lifestyle.length > 0;
       case 4: // Genre Preferences
         if (formData.genre_preferences.includes('other') && formData.other_genre_preferences.length === 0) {
-          return false; // Can't proceed if "other" is selected but no custom values added
+          return false;
         }
         return formData.genre_preferences.length > 0 || formData.other_genre_preferences.length > 0;
       case 5: // Goals
-        // Check both goals and other_goals arrays
         return formData.goals.length > 0 || formData.other_goals.length > 0;
       default:
         return true;
@@ -180,9 +247,7 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
   };
   
   const handleCancel = () => {
-    // Only show confirmation if there are changes to discard
-    if (isSubmitting) return; // Don't allow cancelling during submission
-    
+    if (isSubmitting) return;
     setShowExitConfirmation(true);
   };
   

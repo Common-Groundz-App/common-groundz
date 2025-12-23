@@ -1,11 +1,39 @@
-// Phase 6.0: Unified Dynamic Preferences Types
+// Phase 6.0: Unified Dynamic Preferences Types - Canonical Schema
 
+// ============= Intent Types =============
 export type ConstraintIntent = 'strictly_avoid' | 'avoid' | 'limit' | 'prefer';
+export type PreferenceIntent = 'like' | 'dislike' | 'neutral';
 
+// ============= Source & Priority Types =============
 export type PreferencePriority = 'constraint' | 'user' | 'chatbot';
+export type PreferenceSource = 'form' | 'chatbot' | 'manual';
 
-export type PreferenceSource = 'manual' | 'chatbot' | 'form';
+// ============= Canonical Category Type =============
+export type CanonicalCategory =
+  | 'skin_type'
+  | 'hair_type'
+  | 'food_preferences'
+  | 'lifestyle'
+  | 'genre_preferences'
+  | 'goals';
 
+// ============= Core Preference Value (Canonical Shape) =============
+export interface PreferenceValue {
+  value: string;           // Display value (original casing)
+  normalizedValue: string; // Lowercase, trimmed (for deduplication)
+  source: PreferenceSource;
+  intent?: PreferenceIntent; // Default: 'like' for preferences
+  confidence?: number;     // AI confidence at approval time (0-1)
+  evidence?: string;       // AI evidence/context
+  addedAt: string;         // ISO timestamp
+}
+
+// ============= Preference Category Container =============
+export interface PreferenceCategory {
+  values: PreferenceValue[];
+}
+
+// ============= Constraint Types (unchanged) =============
 export interface CustomConstraint {
   id: string;
   category: string;
@@ -26,6 +54,7 @@ export interface ConstraintsType {
   custom?: CustomConstraint[];
 }
 
+// ============= Legacy Types (for migration) =============
 export interface CustomPreference {
   id: string;
   category: string;
@@ -67,24 +96,34 @@ export interface DetectedPreference {
   evidence?: string;
 }
 
+// ============= User Preferences (Canonical Shape) =============
 export interface UserPreferences {
-  // Form-based preferences (existing)
-  skin_type?: string[];
-  other_skin_type?: string;
-  hair_type?: string[];
-  other_hair_type?: string;
-  food_preferences?: string[];
-  other_food_preferences?: string;
-  lifestyle?: string[];
-  other_lifestyle?: string;
-  genre_preferences?: string[];
-  other_genre_preferences?: string;
-  goals?: string[];
+  // Canonical preference categories (new shape)
+  skin_type?: PreferenceCategory;
+  hair_type?: PreferenceCategory;
+  food_preferences?: PreferenceCategory;
+  lifestyle?: PreferenceCategory;
+  genre_preferences?: PreferenceCategory;
+  goals?: PreferenceCategory;
   
-  // Constraints (Phase 6.0)
+  // Dynamic custom categories for AI-discovered categories
+  custom_categories?: Record<string, PreferenceCategory>;
+  
+  // Constraints (unchanged - already well-structured)
   constraints?: ConstraintsType;
   
-  // Custom preferences (Phase 6.0)
+  // Legacy fields (deprecated, for migration only)
+  /** @deprecated Use canonical PreferenceCategory shape instead */
+  other_skin_type?: string;
+  /** @deprecated Use canonical PreferenceCategory shape instead */
+  other_hair_type?: string;
+  /** @deprecated Use canonical PreferenceCategory shape instead */
+  other_food_preferences?: string;
+  /** @deprecated Use canonical PreferenceCategory shape instead */
+  other_lifestyle?: string;
+  /** @deprecated Use canonical PreferenceCategory shape instead */
+  other_genre_preferences?: string;
+  /** @deprecated Use custom_categories instead */
   custom_preferences?: CustomPreference[];
   
   // Metadata
@@ -92,7 +131,7 @@ export interface UserPreferences {
   onboarding_completed?: boolean;
 }
 
-// Intent badge colors for UI
+// ============= Intent Badge Colors for UI =============
 export const INTENT_COLORS: Record<ConstraintIntent, { bg: string; text: string; label: string }> = {
   strictly_avoid: { bg: 'bg-red-500/20', text: 'text-red-600 dark:text-red-400', label: 'Never' },
   avoid: { bg: 'bg-orange-500/20', text: 'text-orange-600 dark:text-orange-400', label: 'Avoid' },
@@ -100,14 +139,14 @@ export const INTENT_COLORS: Record<ConstraintIntent, { bg: string; text: string;
   prefer: { bg: 'bg-green-500/20', text: 'text-green-600 dark:text-green-400', label: 'Prefer' },
 };
 
-// Confidence level helpers
+// ============= Confidence Level Helpers =============
 export const getConfidenceLevel = (confidence: number): { label: string; color: string } => {
   if (confidence >= 0.8) return { label: 'High', color: 'text-green-600' };
   if (confidence >= 0.5) return { label: 'Medium', color: 'text-yellow-600' };
   return { label: 'Low', color: 'text-red-600' };
 };
 
-// Category options for custom constraints/preferences
+// ============= Category Options for UI =============
 export const PREFERENCE_CATEGORIES = [
   'skincare',
   'haircare',
@@ -121,4 +160,14 @@ export const PREFERENCE_CATEGORIES = [
   'other'
 ] as const;
 
-export type PreferenceCategory = typeof PREFERENCE_CATEGORIES[number];
+export type PreferenceCategoryOption = typeof PREFERENCE_CATEGORIES[number];
+
+// ============= Canonical Categories List =============
+export const CANONICAL_CATEGORIES: CanonicalCategory[] = [
+  'skin_type',
+  'hair_type',
+  'food_preferences',
+  'lifestyle',
+  'genre_preferences',
+  'goals',
+];
