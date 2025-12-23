@@ -1,35 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { 
   Shield, 
   User, 
   Brain, 
   Download, 
-  AlertTriangle,
   ArrowLeft,
-  Info
+  Info,
+  Bot
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Logo from '@/components/Logo';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { INTENT_COLORS, getConfidenceLevel } from '@/types/preferences';
+import { INTENT_COLORS, getConfidenceLevel, PreferenceCategory, PreferenceValue } from '@/types/preferences';
 import { cn } from '@/lib/utils';
 
 const YourData = () => {
   const { user } = useAuth();
   const { preferences, learnedPreferences, isLoading } = usePreferences();
-  const isMobile = useIsMobile();
   
   const constraints = preferences?.constraints || {};
-  const customPreferences = preferences?.custom_preferences || [];
 
   if (!user) {
     return <div>Loading...</div>;
@@ -53,6 +49,31 @@ const YourData = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // Helper to render preference values with source indicator
+  const renderPreferenceValues = (category: PreferenceCategory | undefined) => {
+    if (!category?.values || category.values.length === 0) return null;
+    
+    return (
+      <div className="flex flex-wrap gap-2">
+        {category.values.map((pref: PreferenceValue, index: number) => (
+          <Badge 
+            key={`${pref.normalizedValue}-${index}`}
+            variant="secondary"
+            className={cn(
+              "flex items-center gap-1",
+              pref.source === 'chatbot' && "bg-purple-100 dark:bg-purple-500/20"
+            )}
+          >
+            {pref.value}
+            {pref.source === 'chatbot' && (
+              <Bot className="h-3 w-3 opacity-70" />
+            )}
+          </Badge>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -159,6 +180,9 @@ const YourData = () => {
                                     {style?.label || c.intent}
                                   </Badge>
                                   <span className="text-sm">{c.category}: {c.rule} - {c.value}</span>
+                                  {c.source === 'chatbot' && (
+                                    <Bot className="h-3 w-3 text-purple-500 ml-auto" />
+                                  )}
                                 </div>
                               );
                             })}
@@ -185,79 +209,84 @@ const YourData = () => {
                       </div>
                       <div className="text-left">
                         <h3 className="font-semibold">Your Preferences</h3>
-                        <p className="text-sm text-muted-foreground">Form and custom preferences</p>
+                        <p className="text-sm text-muted-foreground">Form and AI-learned preferences</p>
                       </div>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-4">
                     <div className="space-y-4">
-                      {/* Form preferences */}
-                      {preferences?.skin_type && (
+                      {/* Canonical preference categories */}
+                      {preferences?.skin_type?.values && preferences.skin_type.values.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium mb-2">Skin Type</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {(Array.isArray(preferences.skin_type) ? preferences.skin_type : [preferences.skin_type]).map((item: string) => (
-                              <Badge key={item} variant="secondary">{item}</Badge>
-                            ))}
-                          </div>
+                          {renderPreferenceValues(preferences.skin_type)}
                         </div>
                       )}
                       
-                      {preferences?.hair_type && (
+                      {preferences?.hair_type?.values && preferences.hair_type.values.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium mb-2">Hair Type</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {(Array.isArray(preferences.hair_type) ? preferences.hair_type : [preferences.hair_type]).map((item: string) => (
-                              <Badge key={item} variant="secondary">{item}</Badge>
-                            ))}
-                          </div>
+                          {renderPreferenceValues(preferences.hair_type)}
                         </div>
                       )}
                       
-                      {preferences?.food_preferences && (
+                      {preferences?.food_preferences?.values && preferences.food_preferences.values.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium mb-2">Food Preferences</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {(Array.isArray(preferences.food_preferences) ? preferences.food_preferences : [preferences.food_preferences]).map((item: string) => (
-                              <Badge key={item} variant="secondary">{item}</Badge>
-                            ))}
-                          </div>
+                          {renderPreferenceValues(preferences.food_preferences)}
                         </div>
                       )}
                       
-                      {preferences?.goals && (
+                      {preferences?.lifestyle?.values && preferences.lifestyle.values.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-2">Lifestyle</h4>
+                          {renderPreferenceValues(preferences.lifestyle)}
+                        </div>
+                      )}
+                      
+                      {preferences?.genre_preferences?.values && preferences.genre_preferences.values.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-2">Genre Preferences</h4>
+                          {renderPreferenceValues(preferences.genre_preferences)}
+                        </div>
+                      )}
+                      
+                      {preferences?.goals?.values && preferences.goals.values.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium mb-2">Goals</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {(Array.isArray(preferences.goals) ? preferences.goals : [preferences.goals]).map((item: string) => (
-                              <Badge key={item} variant="secondary">{item}</Badge>
-                            ))}
-                          </div>
+                          {renderPreferenceValues(preferences.goals)}
                         </div>
                       )}
                       
-                      {/* Custom preferences */}
-                      {customPreferences.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium mb-2">Custom Preferences</h4>
-                          <div className="space-y-2">
-                            {customPreferences.map((p: any) => (
-                              <div key={p.id} className="flex items-center gap-2 p-2 bg-accent/30 rounded">
-                                <Badge variant="outline">{p.category}</Badge>
-                                <span className="text-sm">{p.key}: {p.value}</span>
-                                <Badge variant="outline" className="text-xs ml-auto">
-                                  {p.source === 'manual' ? 'Added by you' : 'From chatbot'}
-                                </Badge>
-                              </div>
-                            ))}
+                      {/* Custom categories */}
+                      {preferences?.custom_categories && Object.entries(preferences.custom_categories).map(([categoryName, category]) => {
+                        if (!category?.values || category.values.length === 0) return null;
+                        return (
+                          <div key={categoryName}>
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <Bot className="h-4 w-4 text-purple-500" />
+                              {categoryName.charAt(0).toUpperCase() + categoryName.slice(1)}
+                            </h4>
+                            {renderPreferenceValues(category)}
                           </div>
-                        </div>
+                        );
+                      })}
+                      
+                      {/* Show empty state if no preferences */}
+                      {!preferences?.skin_type?.values?.length &&
+                       !preferences?.hair_type?.values?.length &&
+                       !preferences?.food_preferences?.values?.length &&
+                       !preferences?.lifestyle?.values?.length &&
+                       !preferences?.genre_preferences?.values?.length &&
+                       !preferences?.goals?.values?.length &&
+                       !Object.keys(preferences?.custom_categories || {}).length && (
+                        <p className="text-sm text-muted-foreground">No preferences set yet.</p>
                       )}
                     </div>
                   </AccordionContent>
                 </AccordionItem>
 
-                {/* Learned Data Section */}
+                {/* Learned Data Section (Pending Review) */}
                 <AccordionItem value="learned" className="border rounded-lg">
                   <AccordionTrigger className="px-4 hover:no-underline">
                     <div className="flex items-center gap-3">
@@ -265,8 +294,8 @@ const YourData = () => {
                         <Brain className="h-5 w-5 text-purple-600" />
                       </div>
                       <div className="text-left">
-                        <h3 className="font-semibold">AI-Learned Data</h3>
-                        <p className="text-sm text-muted-foreground">What the chatbot has learned about you</p>
+                        <h3 className="font-semibold">Pending Review</h3>
+                        <p className="text-sm text-muted-foreground">AI-detected preferences awaiting your approval</p>
                       </div>
                     </div>
                   </AccordionTrigger>
@@ -297,7 +326,7 @@ const YourData = () => {
                         })
                       ) : (
                         <p className="text-sm text-muted-foreground">
-                          No learned data yet. Chat with the AI assistant to start learning your preferences.
+                          No pending items. Approved preferences appear in their respective sections above.
                         </p>
                       )}
                     </div>
@@ -328,8 +357,8 @@ const YourData = () => {
                           <span className="text-xs font-bold text-blue-600">2</span>
                         </div>
                         <div>
-                          <p className="font-medium text-sm">User Preferences</p>
-                          <p className="text-xs text-muted-foreground">What you've set manually or approved from suggestions</p>
+                          <p className="font-medium text-sm">Your Preferences</p>
+                          <p className="text-xs text-muted-foreground">What you've set manually or approved from AI suggestions</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
@@ -337,8 +366,8 @@ const YourData = () => {
                           <span className="text-xs font-bold text-purple-600">3</span>
                         </div>
                         <div>
-                          <p className="font-medium text-sm">AI-Learned (Lowest)</p>
-                          <p className="text-xs text-muted-foreground">Inferred from conversations - used as suggestions, never overrides your settings</p>
+                          <p className="font-medium text-sm">Pending Review (Lowest)</p>
+                          <p className="text-xs text-muted-foreground">AI-detected preferences that need your approval before they're used</p>
                         </div>
                       </div>
                     </div>

@@ -7,9 +7,20 @@ import {
   UserPreferences, 
   ConstraintsType, 
   CustomConstraint, 
-  CustomPreference,
-  LearnedPreference 
+  LearnedPreference,
+  PreferenceCategory,
+  PreferenceValue,
+  CanonicalCategory
 } from '@/types/preferences';
+import {
+  migratePreferencesToCanonical,
+  isLegacyFormat,
+  createPreferenceValue,
+  addValueToCategory,
+  routePreference,
+  MIN_AUTO_ROUTE_CONFIDENCE,
+  countTotalPreferences
+} from '@/utils/preferenceRouting';
 
 interface PreferencesContextType {
   preferences: UserPreferences;
@@ -24,12 +35,12 @@ interface PreferencesContextType {
   updateConstraints: (constraints: ConstraintsType) => Promise<boolean>;
   addCustomConstraint: (constraint: Omit<CustomConstraint, 'id' | 'createdAt'>) => Promise<boolean>;
   removeCustomConstraint: (id: string) => Promise<boolean>;
-  // Custom preference management
-  addCustomPreference: (pref: Omit<CustomPreference, 'id' | 'createdAt' | 'updatedAt'>) => Promise<boolean>;
-  removeCustomPreference: (id: string) => Promise<boolean>;
+  // Preference value management (new canonical API)
+  addPreferenceValue: (field: CanonicalCategory | string, value: PreferenceValue) => Promise<boolean>;
+  removePreferenceValue: (field: CanonicalCategory | string, normalizedValue: string) => Promise<boolean>;
   // Learned preferences management
   fetchLearnedPreferences: () => Promise<void>;
-  approveLearnedPreference: (scope: string, key: string, value: any) => Promise<boolean>;
+  approveLearnedPreference: (scope: string, key: string, value: any, confidence?: number, evidence?: string) => Promise<boolean>;
   dismissLearnedPreference: (scope: string, key: string) => Promise<boolean>;
 }
 
@@ -56,7 +67,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
   }
 
   // Calculate if the user has any meaningful preferences set
-  const hasPreferences = Object.keys(preferences || {}).length > 0;
+  const hasPreferences = countTotalPreferences(preferences) > 0;
 
   // Track when auth is ready
   useEffect(() => {
@@ -87,10 +98,19 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
           return;
         }
 
-        const userPrefs = (data?.preferences as UserPreferences) || {};
+        let userPrefs = (data?.preferences as any) || {};
+        
+        // Migrate legacy format to canonical if needed
+        if (isLegacyFormat(userPrefs)) {
+          console.log('🔄 [PreferencesProvider] Migrating legacy preferences to canonical format');
+          userPrefs = migratePreferencesToCanonical(userPrefs);
+          // Save migrated preferences back
+          await updateUserPreferences(user.id, userPrefs);
+        }
+        
         setPreferences(userPrefs);
         
-        if (Object.keys(userPrefs).length === 0) {
+        if (countTotalPreferences(userPrefs) === 0) {
           setShouldShowOnboarding(true);
         }
         
@@ -249,27 +269,75 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     return updateConstraints(newConstraints);
   };
 
-  // Custom preference management
-  const addCustomPreference = async (pref: Omit<CustomPreference, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const newPref: CustomPreference = {
-      ...pref,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    const currentCustom = preferences.custom_preferences || [];
-    const newPrefs = { ...preferences, custom_preferences: [...currentCustom, newPref] };
-    return updatePreferences(newPrefs);
+  // New canonical preference value management
+  const addPreferenceValue = async (field: CanonicalCategory | string, value: PreferenceValue) => {
+    const canonicalFields: CanonicalCategory[] = ['skin_type', 'hair_type', 'food_preferences', 'lifestyle', 'genre_preferences', 'goals'];
+    
+    if (canonicalFields.includes(field as CanonicalCategory)) {
+      // Add to canonical field
+      const currentCategory = preferences[field as CanonicalCategory] as PreferenceCategory | undefined;
+      const updatedCategory = addValueToCategory(currentCategory, value);
+      const newPrefs = { ...preferences, [field]: updatedCategory };
+      return updatePreferences(newPrefs);
+    } else {
+      // Add to custom_categories
+      const customCategories = preferences.custom_categories || {};
+      const currentCategory = customCategories[field];
+      const updatedCategory = addValueToCategory(currentCategory, value);
+      const newPrefs = {
+        ...preferences,
+        custom_categories: {
+          ...customCategories,
+          [field]: updatedCategory
+        }
+      };
+      return updatePreferences(newPrefs);
+    }
   };
 
-  const removeCustomPreference = async (id: string) => {
-    const currentCustom = preferences.custom_preferences || [];
-    const newPrefs = { ...preferences, custom_preferences: currentCustom.filter(p => p.id !== id) };
-    return updatePreferences(newPrefs);
+  const removePreferenceValue = async (field: CanonicalCategory | string, normalizedValue: string) => {
+    const canonicalFields: CanonicalCategory[] = ['skin_type', 'hair_type', 'food_preferences', 'lifestyle', 'genre_preferences', 'goals'];
+    
+    if (canonicalFields.includes(field as CanonicalCategory)) {
+      const currentCategory = preferences[field as CanonicalCategory] as PreferenceCategory | undefined;
+      if (!currentCategory?.values) return true;
+      
+      const updatedValues = currentCategory.values.filter(v => v.normalizedValue !== normalizedValue);
+      const newPrefs = { 
+        ...preferences, 
+        [field]: updatedValues.length > 0 ? { values: updatedValues } : undefined 
+      };
+      return updatePreferences(newPrefs);
+    } else {
+      const customCategories = preferences.custom_categories || {};
+      const currentCategory = customCategories[field];
+      if (!currentCategory?.values) return true;
+      
+      const updatedValues = currentCategory.values.filter(v => v.normalizedValue !== normalizedValue);
+      const newCustomCategories = { ...customCategories };
+      
+      if (updatedValues.length > 0) {
+        newCustomCategories[field] = { values: updatedValues };
+      } else {
+        delete newCustomCategories[field];
+      }
+      
+      const newPrefs = {
+        ...preferences,
+        custom_categories: Object.keys(newCustomCategories).length > 0 ? newCustomCategories : undefined
+      };
+      return updatePreferences(newPrefs);
+    }
   };
 
-  // Learned preferences management
-  const approveLearnedPreference = async (scope: string, key: string, value: any) => {
+  // Smart approval with routing
+  const approveLearnedPreference = async (
+    scope: string, 
+    key: string, 
+    value: any,
+    confidence: number = 0.7,
+    evidence?: string
+  ) => {
     if (!user) return false;
     
     // Guard against double-approval
@@ -278,19 +346,53 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       return true; // Already processed, no-op
     }
     
-    // Add to custom preferences with user priority
-    const success = await addCustomPreference({
-      category: scope,
-      key,
-      value: typeof value === 'object' ? JSON.stringify(value) : String(value),
-      source: 'chatbot',
-      confidence: 1.0,
-      priority: 'user',
-    });
+    // Check if this is a constraint
+    const isConstraint = key.startsWith('constraint:');
+    
+    let success = false;
+    
+    if (isConstraint) {
+      // Route to constraints.custom
+      const rule = key.replace('constraint: ', '');
+      success = await addCustomConstraint({
+        category: scope,
+        rule,
+        value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+        intent: 'avoid',
+        source: 'chatbot',
+        confidence,
+        evidence,
+      });
+    } else {
+      // Check confidence threshold
+      if (confidence < MIN_AUTO_ROUTE_CONFIDENCE) {
+        console.log(`⚠️ Low confidence (${confidence}) for preference, keeping in review`);
+        // Still mark as processed but don't add to preferences
+        // Could show a different UI for low-confidence items
+      }
+      
+      // Route to canonical field or custom_categories
+      const targetField = routePreference(scope);
+      const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
+      
+      const newValue = createPreferenceValue(
+        valueStr,
+        'chatbot',
+        'like',
+        confidence,
+        evidence
+      );
+      
+      if (targetField) {
+        success = await addPreferenceValue(targetField, newValue);
+      } else {
+        // Route to custom_categories
+        success = await addPreferenceValue(scope, newValue);
+      }
+    }
     
     if (success) {
-      // TODO: Consider using jsonb_set or RPC for atomic updates to prevent race conditions
-      // TODO: Future refactor - standardize on reviewStatus: 'pending' | 'approved' | 'dismissed'
+      // Mark as approved in user_conversation_memory
       try {
         const { data: memoryData } = await supabase
           .from('user_conversation_memory')
@@ -343,7 +445,6 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       return true; // Already processed, no-op
     }
     
-    // TODO: Consider using jsonb_set or RPC for atomic updates to prevent race conditions
     try {
       const { data: memoryData } = await supabase
         .from('user_conversation_memory')
@@ -398,8 +499,8 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     updateConstraints,
     addCustomConstraint,
     removeCustomConstraint,
-    addCustomPreference,
-    removeCustomPreference,
+    addPreferenceValue,
+    removePreferenceValue,
     fetchLearnedPreferences,
     approveLearnedPreference,
     dismissLearnedPreference,

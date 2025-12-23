@@ -11,10 +11,11 @@ import PreferencesForm from './PreferencesForm';
 import ConstraintsSection from './ConstraintsSection';
 import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown } from 'lucide-react';
+import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, Bot } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ConstraintsType, LearnedPreference } from '@/types/preferences';
+import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences } from '@/types/preferences';
 import { cn } from '@/lib/utils';
+import { countTotalPreferences, getCategoryValues, hasAnyPreferences } from '@/utils/preferenceRouting';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,14 +37,24 @@ const formatSummary = (items: string[], max = 4): string => {
   return capitalizedItems.slice(0, max).join(' • ') + ` • +${capitalizedItems.length - max} more`;
 };
 
-// Helper function to safely render array items as tags
-const renderPreferenceTags = (items: any, otherItems?: any) => {
-  const safeItems = Array.isArray(items) ? items : (typeof items === 'string' ? [items] : []);
-  const safeOtherItems = Array.isArray(otherItems) ? otherItems : (typeof otherItems === 'string' ? [otherItems] : []);
+// Helper function to safely render preference values as tags
+const renderPreferenceTags = (category: PreferenceCategory | undefined) => {
+  if (!category?.values || category.values.length === 0) return null;
   
-  return [...safeItems, ...safeOtherItems].map((item: string, index: number) => (
-    <div key={`${item}-${index}`} className="bg-brand-orange/20 text-brand-orange rounded-full py-1 px-3 text-xs">
-      {item}
+  return category.values.map((pref: PreferenceValue, index: number) => (
+    <div 
+      key={`${pref.normalizedValue}-${index}`} 
+      className={cn(
+        "rounded-full py-1 px-3 text-xs flex items-center gap-1",
+        pref.source === 'chatbot' 
+          ? "bg-purple-500/20 text-purple-700 dark:text-purple-300" 
+          : "bg-brand-orange/20 text-brand-orange"
+      )}
+    >
+      {pref.value}
+      {pref.source === 'chatbot' && (
+        <Bot className="h-3 w-3 opacity-70" />
+      )}
     </div>
   ));
 };
@@ -79,17 +90,13 @@ const PreferencesSection = () => {
   const handleResetPreferencesOnly = async () => {
     try {
       await updatePreferences({
-        skin_type: [],
-        hair_type: [],
-        food_preferences: [],
-        lifestyle: [],
-        genre_preferences: [],
-        goals: [],
-        other_skin_type: '',
-        other_hair_type: '',
-        other_food_preferences: '',
-        other_lifestyle: '',
-        other_genre_preferences: '',
+        skin_type: undefined,
+        hair_type: undefined,
+        food_preferences: undefined,
+        lifestyle: undefined,
+        genre_preferences: undefined,
+        goals: undefined,
+        custom_categories: undefined,
         constraints: preferences?.constraints, // Preserve constraints!
       });
       toast({
@@ -171,7 +178,9 @@ const PreferencesSection = () => {
   };
 
   const handleApproveLearned = async (scope: string, key: string, value: any) => {
-    const success = await approveLearnedPreference(scope, key, value);
+    // Find the preference to get confidence and evidence
+    const pref = learnedPreferences.find(p => p.scope === scope && p.key === key);
+    const success = await approveLearnedPreference(scope, key, value, pref?.confidence, pref?.evidence);
     if (success) {
       toast({
         title: "Preference approved",
@@ -205,58 +214,48 @@ const PreferencesSection = () => {
 
   const activeLearned = learnedPreferences.filter(p => !p.dismissed);
   const pendingLearnedCount = activeLearned.filter(p => !p.approvedAt).length;
-  const approvedLearnedCount = activeLearned.filter(p => p.approvedAt).length;
 
-  // Count total preferences for badge
-  const preferencesCount = [
-    preferences?.skin_type?.length || 0,
-    preferences?.other_skin_type ? 1 : 0,
-    preferences?.hair_type?.length || 0,
-    preferences?.other_hair_type ? 1 : 0,
-    preferences?.food_preferences?.length || 0,
-    preferences?.other_food_preferences ? 1 : 0,
-    preferences?.lifestyle?.length || 0,
-    preferences?.other_lifestyle ? 1 : 0,
-    preferences?.genre_preferences?.length || 0,
-    preferences?.other_genre_preferences ? 1 : 0,
-    preferences?.goals?.length || 0,
-  ].reduce((a, b) => a + b, 0);
+  // Count total preferences for badge (new canonical format)
+  const preferencesCount = countTotalPreferences(preferences);
 
-  // Check if each section has content (for disabling destructive actions)
-  const hasFormPreferences = Object.keys(preferences || {}).some(key => 
-    !['constraints', 'custom_preferences', 'last_updated', 'onboarding_completed'].includes(key) &&
-    preferences[key] !== undefined &&
-    preferences[key] !== null &&
-    (Array.isArray(preferences[key]) ? preferences[key].length > 0 : 
-      typeof preferences[key] === 'string' ? preferences[key].length > 0 : false)
-  );
+  // Check if each section has content
+  const hasFormPreferences = hasAnyPreferences(preferences);
   const hasConstraints = constraintCount > 0;
   const hasLearnedData = activeLearned.length > 0;
 
-  // Generate summary for Your Preferences (filter out meaningless "Other" entries)
+  // Generate summary for Your Preferences
   const getPreferencesSummary = (): string => {
     const items: string[] = [];
-    if (preferences?.skin_type?.length) items.push(...preferences.skin_type);
-    if (preferences?.other_skin_type && preferences.other_skin_type.toLowerCase() !== 'other') {
-      items.push(preferences.other_skin_type);
+    
+    if (preferences?.skin_type?.values) {
+      items.push(...preferences.skin_type.values.map(v => v.value));
     }
-    if (preferences?.hair_type?.length) items.push(...preferences.hair_type);
-    if (preferences?.other_hair_type && preferences.other_hair_type.toLowerCase() !== 'other') {
-      items.push(preferences.other_hair_type);
+    if (preferences?.hair_type?.values) {
+      items.push(...preferences.hair_type.values.map(v => v.value));
     }
-    if (preferences?.food_preferences?.length) items.push(...preferences.food_preferences);
-    if (preferences?.other_food_preferences && preferences.other_food_preferences.toLowerCase() !== 'other') {
-      items.push(preferences.other_food_preferences);
+    if (preferences?.food_preferences?.values) {
+      items.push(...preferences.food_preferences.values.map(v => v.value));
     }
-    if (preferences?.lifestyle?.length) items.push(...preferences.lifestyle);
-    if (preferences?.other_lifestyle && preferences.other_lifestyle.toLowerCase() !== 'other') {
-      items.push(preferences.other_lifestyle);
+    if (preferences?.lifestyle?.values) {
+      items.push(...preferences.lifestyle.values.map(v => v.value));
     }
-    if (preferences?.genre_preferences?.length) items.push(...preferences.genre_preferences);
-    if (preferences?.other_genre_preferences && preferences.other_genre_preferences.toLowerCase() !== 'other') {
-      items.push(preferences.other_genre_preferences);
+    if (preferences?.genre_preferences?.values) {
+      items.push(...preferences.genre_preferences.values.map(v => v.value));
     }
-    if (preferences?.goals?.length) items.push(`${preferences.goals.length} goal${preferences.goals.length > 1 ? 's' : ''}`);
+    if (preferences?.goals?.values) {
+      const goalCount = preferences.goals.values.length;
+      items.push(`${goalCount} goal${goalCount > 1 ? 's' : ''}`);
+    }
+    
+    // Add custom categories count
+    if (preferences?.custom_categories) {
+      const customCount = Object.values(preferences.custom_categories).reduce(
+        (sum, cat) => sum + (cat?.values?.length || 0), 0
+      );
+      if (customCount > 0) {
+        items.push(`${customCount} custom`);
+      }
+    }
     
     return formatSummary(items) || 'No preferences set';
   };
@@ -278,9 +277,8 @@ const PreferencesSection = () => {
   // Generate summary for Learned Preferences
   const getLearnedSummary = (): string => {
     const parts: string[] = [];
-    if (approvedLearnedCount) parts.push(`${approvedLearnedCount} approved`);
     if (pendingLearnedCount) parts.push(`${pendingLearnedCount} pending review`);
-    return parts.join(' • ') || 'No learned data';
+    return parts.join(' • ') || 'No pending items';
   };
 
   if (isLoading) {
@@ -368,52 +366,52 @@ const PreferencesSection = () => {
               <AccordionContent className="pt-4">
                 {hasFormPreferences ? (
                   <div className="space-y-4">
-                    {preferences.skin_type && (
+                    {preferences.skin_type?.values && preferences.skin_type.values.length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🧴 Skin Type</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.skin_type, preferences.other_skin_type)}
+                          {renderPreferenceTags(preferences.skin_type)}
                         </div>
                       </div>
                     )}
 
-                    {preferences.hair_type && (
+                    {preferences.hair_type?.values && preferences.hair_type.values.length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">💇 Hair Type</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.hair_type, preferences.other_hair_type)}
+                          {renderPreferenceTags(preferences.hair_type)}
                         </div>
                       </div>
                     )}
 
-                    {preferences.food_preferences && (
+                    {preferences.food_preferences?.values && preferences.food_preferences.values.length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🍱 Food Preferences</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.food_preferences, preferences.other_food_preferences)}
+                          {renderPreferenceTags(preferences.food_preferences)}
                         </div>
                       </div>
                     )}
 
-                    {preferences.lifestyle && (
+                    {preferences.lifestyle?.values && preferences.lifestyle.values.length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🧘 Lifestyle</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.lifestyle, preferences.other_lifestyle)}
+                          {renderPreferenceTags(preferences.lifestyle)}
                         </div>
                       </div>
                     )}
 
-                    {preferences.genre_preferences && (
+                    {preferences.genre_preferences?.values && preferences.genre_preferences.values.length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🎬 Genre Preferences</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.genre_preferences, preferences.other_genre_preferences)}
+                          {renderPreferenceTags(preferences.genre_preferences)}
                         </div>
                       </div>
                     )}
 
-                    {preferences.goals && (
+                    {preferences.goals?.values && preferences.goals.values.length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🎯 Goals</h4>
                         <div className="flex flex-wrap gap-1">
@@ -422,29 +420,21 @@ const PreferencesSection = () => {
                       </div>
                     )}
 
-                    {/* AI-Learned Preferences Section */}
-                    {preferences.custom_preferences?.filter(p => p.source === 'chatbot').length > 0 && (
-                      <div className="space-y-2 border-t pt-4 mt-4">
-                        <h4 className="font-medium text-sm flex items-center gap-2">
-                          <Brain className="h-4 w-4 text-purple-500" />
-                          Learned from Conversations
-                        </h4>
-                        <div className="flex flex-wrap gap-2">
-                          {preferences.custom_preferences
-                            ?.filter(p => p.source === 'chatbot')
-                            .map(pref => (
-                              <Badge 
-                                key={pref.id} 
-                                variant="outline" 
-                                className="bg-purple-50 dark:bg-purple-500/10 border-purple-200 dark:border-purple-500/20 text-purple-700 dark:text-purple-300"
-                              >
-                                {pref.key}: {pref.value}
-                                <span className="ml-1.5 text-purple-500 text-xs">✓ AI</span>
-                              </Badge>
-                            ))}
+                    {/* Custom Categories */}
+                    {preferences.custom_categories && Object.entries(preferences.custom_categories).map(([categoryName, category]) => {
+                      if (!category?.values || category.values.length === 0) return null;
+                      return (
+                        <div key={categoryName} className="space-y-1">
+                          <h4 className="font-medium text-sm flex items-center gap-2">
+                            <Bot className="h-4 w-4 text-purple-500" />
+                            {categoryName.charAt(0).toUpperCase() + categoryName.slice(1)}
+                          </h4>
+                          <div className="flex flex-wrap gap-1">
+                            {renderPreferenceTags(category)}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })}
 
                   </div>
                 ) : (
