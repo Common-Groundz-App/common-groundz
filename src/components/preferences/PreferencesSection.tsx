@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,12 +11,13 @@ import PreferencesForm from './PreferencesForm';
 import ConstraintsSection from './ConstraintsSection';
 import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, X, Plus } from 'lucide-react';
+import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, X, Plus, Undo2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, CanonicalCategory } from '@/types/preferences';
 import { cn } from '@/lib/utils';
 import { countTotalPreferences, getCategoryValues, hasAnyPreferences, createPreferenceValue } from '@/utils/preferenceRouting';
 import AddCustomPreferenceModal from './AddCustomPreferenceModal';
+import { ToastAction } from '@/components/ui/toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -123,13 +124,79 @@ const PreferencesSection = () => {
   const [clearConstraintsDialogOpen, setClearConstraintsDialogOpen] = useState(false);
   const [clearLearnedDialogOpen, setClearLearnedDialogOpen] = useState(false);
 
-  // Handle removing a preference
-  const handleRemovePreference = async (field: string, normalizedValue: string) => {
-    const success = await removePreferenceValue(field, normalizedValue);
+  // Undo state for preference removal
+  const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup undo timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Handle undoing a preference removal
+  const handleUndo = async (field: string, value: PreferenceValue) => {
+    // Clear the timeout
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+      undoTimeoutRef.current = null;
+    }
+    
+    // Re-add the preference
+    const success = await addPreferenceValue(field, value);
     if (success) {
       toast({
+        title: "Preference restored",
+        description: `"${value.value}" has been restored.`
+      });
+    }
+  };
+
+  // Handle removing a preference with undo capability
+  const handleRemovePreference = async (field: string, normalizedValue: string) => {
+    // Find the preference value before removing (to enable undo)
+    const canonicalFields: CanonicalCategory[] = ['skin_type', 'hair_type', 'food_preferences', 'lifestyle', 'genre_preferences', 'goals'];
+    let removedPref: PreferenceValue | undefined;
+    
+    if (canonicalFields.includes(field as CanonicalCategory)) {
+      const category = preferences[field as CanonicalCategory] as PreferenceCategory | undefined;
+      removedPref = category?.values?.find(v => v.normalizedValue === normalizedValue);
+    } else {
+      const customCategory = preferences.custom_categories?.[field];
+      removedPref = customCategory?.values?.find(v => v.normalizedValue === normalizedValue);
+    }
+    
+    if (!removedPref) return;
+    
+    // Clear any existing timeout
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+    }
+    
+    // Remove the preference
+    const success = await removePreferenceValue(field, normalizedValue);
+    
+    if (success) {
+      // Set timeout to clear undo option after 5 seconds
+      undoTimeoutRef.current = setTimeout(() => {
+        undoTimeoutRef.current = null;
+      }, 5000);
+      
+      // Store for undo - capture field and removedPref in closure
+      const capturedField = field;
+      const capturedPref = removedPref;
+      
+      toast({
         title: "Preference removed",
-        description: "The preference has been removed."
+        description: `"${removedPref.value}" has been removed.`,
+        action: (
+          <ToastAction altText="Undo" onClick={() => handleUndo(capturedField, capturedPref)}>
+            <Undo2 className="h-3 w-3 mr-1" />
+            Undo
+          </ToastAction>
+        )
       });
     }
   };
