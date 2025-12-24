@@ -11,11 +11,12 @@ import PreferencesForm from './PreferencesForm';
 import ConstraintsSection from './ConstraintsSection';
 import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, Bot } from 'lucide-react';
+import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, Bot, X, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences } from '@/types/preferences';
+import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, CanonicalCategory } from '@/types/preferences';
 import { cn } from '@/lib/utils';
-import { countTotalPreferences, getCategoryValues, hasAnyPreferences } from '@/utils/preferenceRouting';
+import { countTotalPreferences, getCategoryValues, hasAnyPreferences, createPreferenceValue } from '@/utils/preferenceRouting';
+import AddCustomPreferenceModal from './AddCustomPreferenceModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,31 +38,45 @@ const formatSummary = (items: string[], max = 4): string => {
   return capitalizedItems.slice(0, max).join(' • ') + ` • +${capitalizedItems.length - max} more`;
 };
 
-// Helper function to safely render preference values as tags
-const renderPreferenceTags = (category: PreferenceCategory | undefined) => {
-  if (!category?.values || category.values.length === 0) return null;
-  
-  return category.values.map((pref: PreferenceValue, index: number) => (
-    <div 
-      key={`${pref.normalizedValue}-${index}`} 
-      className={cn(
-        "rounded-full py-1 px-3 text-xs flex items-center gap-1",
-        pref.source === 'chatbot' 
-          ? "bg-purple-500/20 text-purple-700 dark:text-purple-300" 
-          : "bg-brand-orange/20 text-brand-orange"
-      )}
+// Helper component to render preference tags with remove button
+const PreferenceChip = ({ 
+  pref, 
+  field, 
+  onRemove 
+}: { 
+  pref: PreferenceValue; 
+  field: string; 
+  onRemove: (field: string, normalizedValue: string) => void;
+}) => (
+  <div 
+    className={cn(
+      "rounded-full py-1 px-3 text-xs flex items-center gap-1 group",
+      pref.source === 'chatbot' 
+        ? "bg-purple-500/20 text-purple-700 dark:text-purple-300" 
+        : "bg-brand-orange/20 text-brand-orange"
+    )}
+  >
+    {pref.value}
+    {pref.source === 'chatbot' && (
+      <Bot className="h-3 w-3 opacity-70" />
+    )}
+    <button 
+      onClick={(e) => {
+        e.stopPropagation();
+        onRemove(field, pref.normalizedValue);
+      }}
+      className="opacity-0 group-hover:opacity-100 ml-0.5 hover:text-destructive transition-opacity"
+      title="Remove preference"
     >
-      {pref.value}
-      {pref.source === 'chatbot' && (
-        <Bot className="h-3 w-3 opacity-70" />
-      )}
-    </div>
-  ));
-};
+      <X className="h-3 w-3" />
+    </button>
+  </div>
+);
 
 const PreferencesSection = () => {
-  const { preferences, updatePreferences, isLoading, learnedPreferences, approveLearnedPreference, dismissLearnedPreference } = usePreferences();
+  const { preferences, updatePreferences, isLoading, learnedPreferences, approveLearnedPreference, dismissLearnedPreference, addPreferenceValue, removePreferenceValue } = usePreferences();
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [addModalOpen, setAddModalOpen] = useState(false);
   const [openSections, setOpenSections] = useState<string[]>(['preferences']);
   const { toast } = useToast();
 
@@ -69,6 +84,29 @@ const PreferencesSection = () => {
   const [resetPreferencesDialogOpen, setResetPreferencesDialogOpen] = useState(false);
   const [clearConstraintsDialogOpen, setClearConstraintsDialogOpen] = useState(false);
   const [clearLearnedDialogOpen, setClearLearnedDialogOpen] = useState(false);
+
+  // Handle removing a preference
+  const handleRemovePreference = async (field: string, normalizedValue: string) => {
+    const success = await removePreferenceValue(field, normalizedValue);
+    if (success) {
+      toast({
+        title: "Preference removed",
+        description: "The preference has been removed."
+      });
+    }
+  };
+
+  // Handle adding a new preference from modal
+  const handleAddPreference = async (field: CanonicalCategory | string, value: PreferenceValue) => {
+    const success = await addPreferenceValue(field, value);
+    if (success) {
+      toast({
+        title: "Preference added",
+        description: "Your new preference has been saved."
+      });
+    }
+    setAddModalOpen(false);
+  };
 
   const handleEditClick = () => {
     setEditModalOpen(true);
@@ -370,7 +408,9 @@ const PreferencesSection = () => {
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🧴 Skin Type</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.skin_type)}
+                          {preferences.skin_type.values.map((pref, idx) => (
+                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="skin_type" onRemove={handleRemovePreference} />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -379,7 +419,9 @@ const PreferencesSection = () => {
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">💇 Hair Type</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.hair_type)}
+                          {preferences.hair_type.values.map((pref, idx) => (
+                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="hair_type" onRemove={handleRemovePreference} />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -388,7 +430,9 @@ const PreferencesSection = () => {
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🍱 Food Preferences</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.food_preferences)}
+                          {preferences.food_preferences.values.map((pref, idx) => (
+                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="food_preferences" onRemove={handleRemovePreference} />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -397,7 +441,9 @@ const PreferencesSection = () => {
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🧘 Lifestyle</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.lifestyle)}
+                          {preferences.lifestyle.values.map((pref, idx) => (
+                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="lifestyle" onRemove={handleRemovePreference} />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -406,7 +452,9 @@ const PreferencesSection = () => {
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🎬 Genre Preferences</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.genre_preferences)}
+                          {preferences.genre_preferences.values.map((pref, idx) => (
+                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="genre_preferences" onRemove={handleRemovePreference} />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -415,7 +463,9 @@ const PreferencesSection = () => {
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🎯 Goals</h4>
                         <div className="flex flex-wrap gap-1">
-                          {renderPreferenceTags(preferences.goals)}
+                          {preferences.goals.values.map((pref, idx) => (
+                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="goals" onRemove={handleRemovePreference} />
+                          ))}
                         </div>
                       </div>
                     )}
@@ -430,11 +480,24 @@ const PreferencesSection = () => {
                             {categoryName.charAt(0).toUpperCase() + categoryName.slice(1)}
                           </h4>
                           <div className="flex flex-wrap gap-1">
-                            {renderPreferenceTags(category)}
+                            {category.values.map((pref, idx) => (
+                              <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field={categoryName} onRemove={handleRemovePreference} />
+                            ))}
                           </div>
                         </div>
                       );
                     })}
+
+                    {/* Add Preference Button */}
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setAddModalOpen(true)}
+                      className="mt-2"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add preference
+                    </Button>
 
                   </div>
                 ) : (
@@ -668,6 +731,13 @@ const PreferencesSection = () => {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Add Preference Modal */}
+      <AddCustomPreferenceModal
+        isOpen={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onSave={handleAddPreference}
+      />
     </>
   );
 };
