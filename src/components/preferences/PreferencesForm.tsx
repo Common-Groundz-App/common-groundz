@@ -142,7 +142,10 @@ const PreferencesForm: React.FC<PreferencesFormProps> = ({
     try {
       // Build canonical PreferenceCategory for each field
       const buildCategory = (predefined: string[], custom: string[]): PreferenceCategory | undefined => {
-        const allValues = [...predefined, ...custom].filter(Boolean);
+        // Filter out "other" - it's a UI affordance, not a preference
+        const allValues = [...predefined, ...custom]
+          .filter(Boolean)
+          .filter(v => v.toLowerCase() !== 'other');
         if (allValues.length === 0) return undefined;
         return {
           values: createPreferenceValues(allValues, 'form', 'like')

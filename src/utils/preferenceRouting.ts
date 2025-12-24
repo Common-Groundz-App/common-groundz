@@ -107,13 +107,16 @@ export function createPreferenceValue(
 
 /**
  * Create multiple PreferenceValues from an array of strings.
+ * Filters out "other" values - they are UI affordances, not preferences.
  */
 export function createPreferenceValues(
   values: string[],
   source: PreferenceSource,
   intent: PreferenceIntent = 'like'
 ): PreferenceValue[] {
-  return values.map(v => createPreferenceValue(v, source, intent));
+  return values
+    .filter(v => v.trim().toLowerCase() !== 'other')
+    .map(v => createPreferenceValue(v, source, intent));
 }
 
 // ============= Deduplication =============
@@ -228,9 +231,9 @@ export function migratePreferencesToCanonical(oldPrefs: any): UserPreferences {
     const mainValue = oldPrefs[fieldName];
     if (mainValue) {
       if (Array.isArray(mainValue)) {
-        // Legacy array format
+        // Legacy array format - filter out "other"
         for (const v of mainValue) {
-          if (typeof v === 'string' && v.trim()) {
+          if (typeof v === 'string' && v.trim() && v.trim().toLowerCase() !== 'other') {
             values.push(createPreferenceValue(v, 'form', 'like'));
           }
         }
@@ -240,12 +243,15 @@ export function migratePreferencesToCanonical(oldPrefs: any): UserPreferences {
       }
     }
     
-    // Handle other_* field (legacy)
+    // Handle other_* field (legacy) - filter out "other"
     if (otherFieldName && oldPrefs[otherFieldName]) {
       const otherValue = oldPrefs[otherFieldName];
       if (typeof otherValue === 'string' && otherValue.trim()) {
-        // Split by comma if multiple values
-        const otherValues = otherValue.split(',').map((v: string) => v.trim()).filter(Boolean);
+        // Split by comma if multiple values, filter out "other"
+        const otherValues = otherValue.split(',')
+          .map((v: string) => v.trim())
+          .filter(Boolean)
+          .filter(v => v.toLowerCase() !== 'other');
         for (const v of otherValues) {
           if (!values.some(existing => existing.normalizedValue === normalizePreferenceValue(v))) {
             values.push(createPreferenceValue(v, 'form', 'like'));
@@ -331,21 +337,28 @@ export function isAISource(pref: PreferenceValue): boolean {
 
 /**
  * Count total preferences across all canonical categories.
+ * Excludes "other" values as they are UI affordances, not real preferences.
  */
 export function countTotalPreferences(prefs: UserPreferences): number {
+  // Helper to count values excluding "other"
+  const countValues = (values: PreferenceValue[] | undefined): number => {
+    if (!values) return 0;
+    return values.filter(v => v.normalizedValue !== 'other').length;
+  };
+  
   let count = 0;
   
-  if (prefs.skin_type?.values) count += prefs.skin_type.values.length;
-  if (prefs.hair_type?.values) count += prefs.hair_type.values.length;
-  if (prefs.food_preferences?.values) count += prefs.food_preferences.values.length;
-  if (prefs.lifestyle?.values) count += prefs.lifestyle.values.length;
-  if (prefs.genre_preferences?.values) count += prefs.genre_preferences.values.length;
-  if (prefs.goals?.values) count += prefs.goals.values.length;
+  count += countValues(prefs.skin_type?.values);
+  count += countValues(prefs.hair_type?.values);
+  count += countValues(prefs.food_preferences?.values);
+  count += countValues(prefs.lifestyle?.values);
+  count += countValues(prefs.genre_preferences?.values);
+  count += countValues(prefs.goals?.values);
   
   // Count custom categories
   if (prefs.custom_categories) {
     for (const cat of Object.values(prefs.custom_categories)) {
-      if (cat?.values) count += cat.values.length;
+      count += countValues(cat?.values);
     }
   }
   
