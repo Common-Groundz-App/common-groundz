@@ -11,7 +11,7 @@ import PreferencesForm from './PreferencesForm';
 import ConstraintsSection from './ConstraintsSection';
 import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, Bot, X, Plus } from 'lucide-react';
+import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, X, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, CanonicalCategory } from '@/types/preferences';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,44 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
+// Auto-icon mapping for custom categories
+const CUSTOM_CATEGORY_ICONS: Record<string, string> = {
+  books: '📚',
+  music: '🎵',
+  travel: '✈️',
+  fitness: '💪',
+  cooking: '👨‍🍳',
+  technology: '💻',
+  movies: '🎬',
+  art: '🎨',
+  gaming: '🎮',
+  sports: '⚽',
+  health: '💊',
+  fashion: '👗',
+  pets: '🐾',
+  photography: '📷',
+  reading: '📖',
+  writing: '✍️',
+  education: '🎓',
+  finance: '💰',
+  nature: '🌿',
+  food: '🍽️',
+};
+
+const DEFAULT_CATEGORY_ICON = '📌'; // Neutral fallback
+
+// Get icon for a custom category
+const getCategoryIcon = (categoryName: string): string => {
+  const normalized = categoryName.toLowerCase().trim();
+  return CUSTOM_CATEGORY_ICONS[normalized] || DEFAULT_CATEGORY_ICON;
+};
+
+// Helper to filter out "other" values (safety net for display)
+const filterOtherValues = (values: PreferenceValue[] | undefined): PreferenceValue[] => {
+  if (!values) return [];
+  return values.filter(v => v.normalizedValue !== 'other');
+};
 
 // Helper function to format summary with max items + overflow (with capitalization)
 const formatSummary = (items: string[], max = 4): string => {
@@ -58,7 +96,7 @@ const PreferenceChip = ({
   >
     {pref.value}
     {pref.source === 'chatbot' && (
-      <Bot className="h-3 w-3 opacity-70" />
+      <span className="opacity-70 text-[10px]">🤖</span>
     )}
     <button 
       onClick={(e) => {
@@ -261,34 +299,25 @@ const PreferencesSection = () => {
   const hasConstraints = constraintCount > 0;
   const hasLearnedData = activeLearned.length > 0;
 
-  // Generate summary for Your Preferences
+  // Generate summary for Your Preferences (excluding "other" values)
   const getPreferencesSummary = (): string => {
     const items: string[] = [];
     
-    if (preferences?.skin_type?.values) {
-      items.push(...preferences.skin_type.values.map(v => v.value));
-    }
-    if (preferences?.hair_type?.values) {
-      items.push(...preferences.hair_type.values.map(v => v.value));
-    }
-    if (preferences?.food_preferences?.values) {
-      items.push(...preferences.food_preferences.values.map(v => v.value));
-    }
-    if (preferences?.lifestyle?.values) {
-      items.push(...preferences.lifestyle.values.map(v => v.value));
-    }
-    if (preferences?.genre_preferences?.values) {
-      items.push(...preferences.genre_preferences.values.map(v => v.value));
-    }
-    if (preferences?.goals?.values) {
-      const goalCount = preferences.goals.values.length;
-      items.push(`${goalCount} goal${goalCount > 1 ? 's' : ''}`);
+    items.push(...filterOtherValues(preferences?.skin_type?.values).map(v => v.value));
+    items.push(...filterOtherValues(preferences?.hair_type?.values).map(v => v.value));
+    items.push(...filterOtherValues(preferences?.food_preferences?.values).map(v => v.value));
+    items.push(...filterOtherValues(preferences?.lifestyle?.values).map(v => v.value));
+    items.push(...filterOtherValues(preferences?.genre_preferences?.values).map(v => v.value));
+    
+    const goalValues = filterOtherValues(preferences?.goals?.values);
+    if (goalValues.length > 0) {
+      items.push(`${goalValues.length} goal${goalValues.length > 1 ? 's' : ''}`);
     }
     
-    // Add custom categories count
+    // Add custom categories count (excluding "other")
     if (preferences?.custom_categories) {
       const customCount = Object.values(preferences.custom_categories).reduce(
-        (sum, cat) => sum + (cat?.values?.length || 0), 0
+        (sum, cat) => sum + filterOtherValues(cat?.values).length, 0
       );
       if (customCount > 0) {
         items.push(`${customCount} custom`);
@@ -385,6 +414,10 @@ const PreferencesSection = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-background">
+                    <DropdownMenuItem onClick={() => setAddModalOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add preference
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
                       <Pencil className="h-4 w-4 mr-2" />
                       Edit preferences
@@ -404,66 +437,66 @@ const PreferencesSection = () => {
               <AccordionContent className="pt-4">
                 {hasFormPreferences ? (
                   <div className="space-y-4">
-                    {preferences.skin_type?.values && preferences.skin_type.values.length > 0 && (
+                    {filterOtherValues(preferences.skin_type?.values).length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🧴 Skin Type</h4>
                         <div className="flex flex-wrap gap-1">
-                          {preferences.skin_type.values.map((pref, idx) => (
+                          {filterOtherValues(preferences.skin_type?.values).map((pref, idx) => (
                             <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="skin_type" onRemove={handleRemovePreference} />
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {preferences.hair_type?.values && preferences.hair_type.values.length > 0 && (
+                    {filterOtherValues(preferences.hair_type?.values).length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">💇 Hair Type</h4>
                         <div className="flex flex-wrap gap-1">
-                          {preferences.hair_type.values.map((pref, idx) => (
+                          {filterOtherValues(preferences.hair_type?.values).map((pref, idx) => (
                             <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="hair_type" onRemove={handleRemovePreference} />
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {preferences.food_preferences?.values && preferences.food_preferences.values.length > 0 && (
+                    {filterOtherValues(preferences.food_preferences?.values).length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🍱 Food Preferences</h4>
                         <div className="flex flex-wrap gap-1">
-                          {preferences.food_preferences.values.map((pref, idx) => (
+                          {filterOtherValues(preferences.food_preferences?.values).map((pref, idx) => (
                             <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="food_preferences" onRemove={handleRemovePreference} />
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {preferences.lifestyle?.values && preferences.lifestyle.values.length > 0 && (
+                    {filterOtherValues(preferences.lifestyle?.values).length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🧘 Lifestyle</h4>
                         <div className="flex flex-wrap gap-1">
-                          {preferences.lifestyle.values.map((pref, idx) => (
+                          {filterOtherValues(preferences.lifestyle?.values).map((pref, idx) => (
                             <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="lifestyle" onRemove={handleRemovePreference} />
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {preferences.genre_preferences?.values && preferences.genre_preferences.values.length > 0 && (
+                    {filterOtherValues(preferences.genre_preferences?.values).length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🎬 Genre Preferences</h4>
                         <div className="flex flex-wrap gap-1">
-                          {preferences.genre_preferences.values.map((pref, idx) => (
+                          {filterOtherValues(preferences.genre_preferences?.values).map((pref, idx) => (
                             <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="genre_preferences" onRemove={handleRemovePreference} />
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {preferences.goals?.values && preferences.goals.values.length > 0 && (
+                    {filterOtherValues(preferences.goals?.values).length > 0 && (
                       <div className="space-y-1">
                         <h4 className="font-medium text-sm">🎯 Goals</h4>
                         <div className="flex flex-wrap gap-1">
-                          {preferences.goals.values.map((pref, idx) => (
+                          {filterOtherValues(preferences.goals?.values).map((pref, idx) => (
                             <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="goals" onRemove={handleRemovePreference} />
                           ))}
                         </div>
@@ -472,15 +505,16 @@ const PreferencesSection = () => {
 
                     {/* Custom Categories */}
                     {preferences.custom_categories && Object.entries(preferences.custom_categories).map(([categoryName, category]) => {
-                      if (!category?.values || category.values.length === 0) return null;
+                      const filteredValues = filterOtherValues(category?.values);
+                      if (filteredValues.length === 0) return null;
                       return (
                         <div key={categoryName} className="space-y-1">
                           <h4 className="font-medium text-sm flex items-center gap-2">
-                            <Bot className="h-4 w-4 text-purple-500" />
+                            <span>{getCategoryIcon(categoryName)}</span>
                             {categoryName.charAt(0).toUpperCase() + categoryName.slice(1)}
                           </h4>
                           <div className="flex flex-wrap gap-1">
-                            {category.values.map((pref, idx) => (
+                            {filteredValues.map((pref, idx) => (
                               <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field={categoryName} onRemove={handleRemovePreference} />
                             ))}
                           </div>
@@ -488,16 +522,6 @@ const PreferencesSection = () => {
                       );
                     })}
 
-                    {/* Add Preference Button */}
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setAddModalOpen(true)}
-                      className="mt-2"
-                    >
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add preference
-                    </Button>
 
                   </div>
                 ) : (
