@@ -4,76 +4,69 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CustomPreference, PREFERENCE_CATEGORIES } from '@/types/preferences';
+import { CanonicalCategory, PreferenceValue, CANONICAL_CATEGORIES } from '@/types/preferences';
+import { createPreferenceValue } from '@/utils/preferenceRouting';
 
 interface AddCustomPreferenceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (preference: Omit<CustomPreference, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  initialPreference?: CustomPreference | null;
+  onSave: (field: CanonicalCategory | string, value: PreferenceValue) => void;
 }
 
-const EXAMPLE_KEYS = [
-  'Texture preference',
-  'Reading time',
-  'Workout duration',
-  'Spice level',
-  'Viewing mood',
-  'Learning style',
+// Category display names and emojis
+const CATEGORY_OPTIONS: { value: CanonicalCategory | 'custom'; label: string; emoji: string }[] = [
+  { value: 'skin_type', label: 'Skin Type', emoji: '🧴' },
+  { value: 'hair_type', label: 'Hair Type', emoji: '💇' },
+  { value: 'food_preferences', label: 'Food Preferences', emoji: '🍱' },
+  { value: 'lifestyle', label: 'Lifestyle', emoji: '🧘' },
+  { value: 'genre_preferences', label: 'Genre Preferences', emoji: '🎬' },
+  { value: 'goals', label: 'Goals', emoji: '🎯' },
+  { value: 'custom', label: 'Custom Category', emoji: '➕' },
 ];
 
 const AddCustomPreferenceModal: React.FC<AddCustomPreferenceModalProps> = ({
   isOpen,
   onClose,
   onSave,
-  initialPreference
 }) => {
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState<CanonicalCategory | 'custom' | ''>('');
   const [customCategory, setCustomCategory] = useState('');
-  const [key, setKey] = useState('');
   const [value, setValue] = useState('');
 
+  // Reset form when modal opens/closes
   useEffect(() => {
-    if (initialPreference) {
-      setCategory(initialPreference.category);
-      setKey(initialPreference.key);
-      setValue(initialPreference.value);
-    } else {
+    if (!isOpen) {
       setCategory('');
       setCustomCategory('');
-      setKey('');
       setValue('');
     }
-  }, [initialPreference, isOpen]);
+  }, [isOpen]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const finalCategory = category === 'other' ? customCategory : category;
+    const targetField = category === 'custom' ? customCategory.trim().toLowerCase() : category;
     
-    if (!finalCategory || !key || !value) return;
+    if (!targetField || !value.trim()) return;
 
-    onSave({
-      category: finalCategory,
-      key,
-      value,
-      source: 'manual',
-      confidence: 1.0,
-      priority: 'user',
-    });
+    const preferenceValue = createPreferenceValue(value.trim(), 'manual', 'like');
     
+    onSave(targetField as CanonicalCategory | string, preferenceValue);
     onClose();
   };
+
+  const isValid = value.trim() && (
+    (category && category !== 'custom') || 
+    (category === 'custom' && customCategory.trim())
+  );
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {initialPreference ? 'Edit Preference' : 'Add Custom Preference'}
-          </DialogTitle>
+          <DialogTitle>Add Preference</DialogTitle>
           <DialogDescription>
-            Add a personal preference that helps the AI personalize recommendations.
+            Add a personal preference to help personalize your recommendations.
           </DialogDescription>
         </DialogHeader>
 
@@ -81,21 +74,25 @@ const AddCustomPreferenceModal: React.FC<AddCustomPreferenceModalProps> = ({
           {/* Category */}
           <div className="space-y-2">
             <Label htmlFor="category">Category</Label>
-            <Select value={category} onValueChange={setCategory}>
+            <Select 
+              value={category} 
+              onValueChange={(val) => setCategory(val as CanonicalCategory | 'custom')}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {PREFERENCE_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.emoji} {opt.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {category === 'other' && (
+            
+            {category === 'custom' && (
               <Input
-                placeholder="Enter custom category"
+                placeholder="Enter custom category name"
                 value={customCategory}
                 onChange={(e) => setCustomCategory(e.target.value)}
                 className="mt-2"
@@ -103,37 +100,17 @@ const AddCustomPreferenceModal: React.FC<AddCustomPreferenceModalProps> = ({
             )}
           </div>
 
-          {/* Key/Label */}
-          <div className="space-y-2">
-            <Label htmlFor="key">Label</Label>
-            <Input
-              id="key"
-              placeholder="e.g., Texture preference, Reading time"
-              value={key}
-              onChange={(e) => setKey(e.target.value)}
-              list="key-examples"
-            />
-            <datalist id="key-examples">
-              {EXAMPLE_KEYS.map((k) => (
-                <option key={k} value={k} />
-              ))}
-            </datalist>
-            <p className="text-xs text-muted-foreground">
-              What aspect of your preference is this?
-            </p>
-          </div>
-
           {/* Value */}
           <div className="space-y-2">
-            <Label htmlFor="value">Value</Label>
+            <Label htmlFor="value">Preference Value</Label>
             <Input
               id="value"
-              placeholder="e.g., Lightweight, Morning, 30 minutes"
+              placeholder="e.g., Oily skin, Vegetarian, Sci-Fi movies"
               value={value}
               onChange={(e) => setValue(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Your specific preference
+              Enter your specific preference
             </p>
           </div>
 
@@ -141,11 +118,8 @@ const AddCustomPreferenceModal: React.FC<AddCustomPreferenceModalProps> = ({
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              disabled={!category || !key || !value || (category === 'other' && !customCategory)}
-            >
-              {initialPreference ? 'Update' : 'Add Preference'}
+            <Button type="submit" disabled={!isValid}>
+              Add Preference
             </Button>
           </DialogFooter>
         </form>
