@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,13 +11,13 @@ import PreferencesForm from './PreferencesForm';
 import ConstraintsSection from './ConstraintsSection';
 import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, X, Plus, Undo2 } from 'lucide-react';
+import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, X, Plus, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, CanonicalCategory } from '@/types/preferences';
 import { cn } from '@/lib/utils';
 import { countTotalPreferences, getCategoryValues, hasAnyPreferences, createPreferenceValue } from '@/utils/preferenceRouting';
+import { arePreferencesEqual, countPreferenceDifferences, isPendingRemoval as checkPendingRemoval, getChangeSummary } from '@/utils/preferenceUtils';
 import AddCustomPreferenceModal from './AddCustomPreferenceModal';
-import { ToastAction } from '@/components/ui/toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -81,15 +81,20 @@ const formatSummary = (items: string[], max = 4): string => {
 const PreferenceChip = ({ 
   pref, 
   field, 
-  onRemove 
+  onRemove,
+  isPendingRemoval = false,
+  disabled = false
 }: { 
   pref: PreferenceValue; 
   field: string; 
   onRemove: (field: string, normalizedValue: string) => void;
+  isPendingRemoval?: boolean;
+  disabled?: boolean;
 }) => (
   <div 
     className={cn(
-      "rounded-full py-1 px-3 text-xs flex items-center gap-1 group",
+      "rounded-full py-1 px-3 text-xs flex items-center gap-1 group transition-all duration-200",
+      isPendingRemoval && "opacity-40 line-through",
       pref.source === 'chatbot' 
         ? "bg-purple-500/20 text-purple-700 dark:text-purple-300" 
         : "bg-brand-orange/20 text-brand-orange"
@@ -102,10 +107,16 @@ const PreferenceChip = ({
     <button 
       onClick={(e) => {
         e.stopPropagation();
-        onRemove(field, pref.normalizedValue);
+        if (!isPendingRemoval && !disabled) {
+          onRemove(field, pref.normalizedValue);
+        }
       }}
-      className="opacity-0 group-hover:opacity-100 ml-0.5 hover:text-destructive transition-opacity"
-      title="Remove preference"
+      disabled={disabled || isPendingRemoval}
+      className={cn(
+        "opacity-0 group-hover:opacity-100 ml-0.5 hover:text-destructive transition-opacity",
+        (disabled || isPendingRemoval) && "cursor-not-allowed opacity-30 group-hover:opacity-30"
+      )}
+      title={isPendingRemoval ? "Pending removal" : "Remove preference"}
     >
       <X className="h-3 w-3" />
     </button>
@@ -124,81 +135,85 @@ const PreferencesSection = () => {
   const [clearConstraintsDialogOpen, setClearConstraintsDialogOpen] = useState(false);
   const [clearLearnedDialogOpen, setClearLearnedDialogOpen] = useState(false);
 
-  // Undo state for preference removal
-  const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Draft-based state for Save/Cancel system
+  const [draftPreferences, setDraftPreferences] = useState<UserPreferences>(preferences);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Cleanup undo timeout on unmount
+  // Sync draft when live preferences change (after save or external update)
   useEffect(() => {
-    return () => {
-      if (undoTimeoutRef.current) {
-        clearTimeout(undoTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Handle undoing a preference removal
-  const handleUndo = async (field: string, value: PreferenceValue) => {
-    // Clear the timeout
-    if (undoTimeoutRef.current) {
-      clearTimeout(undoTimeoutRef.current);
-      undoTimeoutRef.current = null;
+    if (!isEditing) {
+      setDraftPreferences(preferences);
     }
+  }, [preferences, isEditing]);
+
+  // Derived state using deep equality
+  const hasUnsavedChanges = !arePreferencesEqual(draftPreferences, preferences);
+
+  // Count what changed for the save bar
+  const { added, removed } = hasUnsavedChanges 
+    ? countPreferenceDifferences(preferences, draftPreferences) 
+    : { added: 0, removed: 0 };
+
+  // Check if a specific preference is pending removal
+  const isPendingRemovalCheck = (field: string, normalizedValue: string) => {
+    return checkPendingRemoval(preferences, draftPreferences, field, normalizedValue);
+  };
+
+  // Handle removing a preference (modifies draft, not API)
+  const handleRemovePreference = (field: string, normalizedValue: string) => {
+    if (isSaving) return; // Prevent changes while saving
     
-    // Re-add the preference
-    const success = await addPreferenceValue(field, value);
-    if (success) {
-      toast({
-        title: "Preference restored",
-        description: `"${value.value}" has been restored.`
-      });
+    setIsEditing(true);
+    setDraftPreferences(prev => {
+      const canonicalFields: CanonicalCategory[] = ['skin_type', 'hair_type', 'food_preferences', 'lifestyle', 'genre_preferences', 'goals'];
+      
+      if (canonicalFields.includes(field as CanonicalCategory)) {
+        const category = prev[field as CanonicalCategory] as PreferenceCategory | undefined;
+        if (!category?.values) return prev;
+        const updatedValues = category.values.filter(v => v.normalizedValue !== normalizedValue);
+        return {
+          ...prev,
+          [field]: updatedValues.length > 0 ? { values: updatedValues } : undefined
+        };
+      } else {
+        // Custom category
+        const customCategories = prev.custom_categories || {};
+        const category = customCategories[field];
+        if (!category?.values) return prev;
+        const updatedValues = category.values.filter(v => v.normalizedValue !== normalizedValue);
+        const newCustomCategories = { ...customCategories };
+        if (updatedValues.length > 0) {
+          newCustomCategories[field] = { values: updatedValues };
+        } else {
+          delete newCustomCategories[field];
+        }
+        return {
+          ...prev,
+          custom_categories: Object.keys(newCustomCategories).length > 0 ? newCustomCategories : undefined
+        };
+      }
+    });
+  };
+
+  // Save all pending changes
+  const handleSaveChanges = async () => {
+    setIsSaving(true);
+    try {
+      const success = await updatePreferences(draftPreferences);
+      if (success) {
+        setIsEditing(false);
+        toast({ title: "Changes saved" });
+      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Handle removing a preference with undo capability
-  const handleRemovePreference = async (field: string, normalizedValue: string) => {
-    // Find the preference value before removing (to enable undo)
-    const canonicalFields: CanonicalCategory[] = ['skin_type', 'hair_type', 'food_preferences', 'lifestyle', 'genre_preferences', 'goals'];
-    let removedPref: PreferenceValue | undefined;
-    
-    if (canonicalFields.includes(field as CanonicalCategory)) {
-      const category = preferences[field as CanonicalCategory] as PreferenceCategory | undefined;
-      removedPref = category?.values?.find(v => v.normalizedValue === normalizedValue);
-    } else {
-      const customCategory = preferences.custom_categories?.[field];
-      removedPref = customCategory?.values?.find(v => v.normalizedValue === normalizedValue);
-    }
-    
-    if (!removedPref) return;
-    
-    // Clear any existing timeout
-    if (undoTimeoutRef.current) {
-      clearTimeout(undoTimeoutRef.current);
-    }
-    
-    // Remove the preference
-    const success = await removePreferenceValue(field, normalizedValue);
-    
-    if (success) {
-      // Set timeout to clear undo option after 5 seconds
-      undoTimeoutRef.current = setTimeout(() => {
-        undoTimeoutRef.current = null;
-      }, 5000);
-      
-      // Store for undo - capture field and removedPref in closure
-      const capturedField = field;
-      const capturedPref = removedPref;
-      
-      toast({
-        title: "Preference removed",
-        description: `"${removedPref.value}" has been removed.`,
-        action: (
-          <ToastAction altText="Undo" onClick={() => handleUndo(capturedField, capturedPref)}>
-            <Undo2 className="h-3 w-3 mr-1" />
-            Undo
-          </ToastAction>
-        )
-      });
-    }
+  // Discard all pending changes
+  const handleDiscardChanges = () => {
+    setDraftPreferences(preferences);
+    setIsEditing(false);
   };
 
   // Handle adding a new preference from modal
@@ -509,7 +524,14 @@ const PreferencesSection = () => {
                         <h4 className="font-medium text-sm">🧴 Skin Type</h4>
                         <div className="flex flex-wrap gap-1">
                           {filterOtherValues(preferences.skin_type?.values).map((pref, idx) => (
-                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="skin_type" onRemove={handleRemovePreference} />
+                            <PreferenceChip 
+                              key={`${pref.normalizedValue}-${idx}`} 
+                              pref={pref} 
+                              field="skin_type" 
+                              onRemove={handleRemovePreference}
+                              isPendingRemoval={isPendingRemovalCheck("skin_type", pref.normalizedValue)}
+                              disabled={isSaving}
+                            />
                           ))}
                         </div>
                       </div>
@@ -520,7 +542,14 @@ const PreferencesSection = () => {
                         <h4 className="font-medium text-sm">💇 Hair Type</h4>
                         <div className="flex flex-wrap gap-1">
                           {filterOtherValues(preferences.hair_type?.values).map((pref, idx) => (
-                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="hair_type" onRemove={handleRemovePreference} />
+                            <PreferenceChip 
+                              key={`${pref.normalizedValue}-${idx}`} 
+                              pref={pref} 
+                              field="hair_type" 
+                              onRemove={handleRemovePreference}
+                              isPendingRemoval={isPendingRemovalCheck("hair_type", pref.normalizedValue)}
+                              disabled={isSaving}
+                            />
                           ))}
                         </div>
                       </div>
@@ -531,7 +560,14 @@ const PreferencesSection = () => {
                         <h4 className="font-medium text-sm">🍱 Food Preferences</h4>
                         <div className="flex flex-wrap gap-1">
                           {filterOtherValues(preferences.food_preferences?.values).map((pref, idx) => (
-                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="food_preferences" onRemove={handleRemovePreference} />
+                            <PreferenceChip 
+                              key={`${pref.normalizedValue}-${idx}`} 
+                              pref={pref} 
+                              field="food_preferences" 
+                              onRemove={handleRemovePreference}
+                              isPendingRemoval={isPendingRemovalCheck("food_preferences", pref.normalizedValue)}
+                              disabled={isSaving}
+                            />
                           ))}
                         </div>
                       </div>
@@ -542,7 +578,14 @@ const PreferencesSection = () => {
                         <h4 className="font-medium text-sm">🧘 Lifestyle</h4>
                         <div className="flex flex-wrap gap-1">
                           {filterOtherValues(preferences.lifestyle?.values).map((pref, idx) => (
-                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="lifestyle" onRemove={handleRemovePreference} />
+                            <PreferenceChip 
+                              key={`${pref.normalizedValue}-${idx}`} 
+                              pref={pref} 
+                              field="lifestyle" 
+                              onRemove={handleRemovePreference}
+                              isPendingRemoval={isPendingRemovalCheck("lifestyle", pref.normalizedValue)}
+                              disabled={isSaving}
+                            />
                           ))}
                         </div>
                       </div>
@@ -553,7 +596,14 @@ const PreferencesSection = () => {
                         <h4 className="font-medium text-sm">🎬 Genre Preferences</h4>
                         <div className="flex flex-wrap gap-1">
                           {filterOtherValues(preferences.genre_preferences?.values).map((pref, idx) => (
-                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="genre_preferences" onRemove={handleRemovePreference} />
+                            <PreferenceChip 
+                              key={`${pref.normalizedValue}-${idx}`} 
+                              pref={pref} 
+                              field="genre_preferences" 
+                              onRemove={handleRemovePreference}
+                              isPendingRemoval={isPendingRemovalCheck("genre_preferences", pref.normalizedValue)}
+                              disabled={isSaving}
+                            />
                           ))}
                         </div>
                       </div>
@@ -564,7 +614,14 @@ const PreferencesSection = () => {
                         <h4 className="font-medium text-sm">🎯 Goals</h4>
                         <div className="flex flex-wrap gap-1">
                           {filterOtherValues(preferences.goals?.values).map((pref, idx) => (
-                            <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field="goals" onRemove={handleRemovePreference} />
+                            <PreferenceChip 
+                              key={`${pref.normalizedValue}-${idx}`} 
+                              pref={pref} 
+                              field="goals" 
+                              onRemove={handleRemovePreference}
+                              isPendingRemoval={isPendingRemovalCheck("goals", pref.normalizedValue)}
+                              disabled={isSaving}
+                            />
                           ))}
                         </div>
                       </div>
@@ -582,7 +639,14 @@ const PreferencesSection = () => {
                           </h4>
                           <div className="flex flex-wrap gap-1">
                             {filteredValues.map((pref, idx) => (
-                              <PreferenceChip key={`${pref.normalizedValue}-${idx}`} pref={pref} field={categoryName} onRemove={handleRemovePreference} />
+                              <PreferenceChip 
+                                key={`${pref.normalizedValue}-${idx}`} 
+                                pref={pref} 
+                                field={categoryName} 
+                                onRemove={handleRemovePreference}
+                                isPendingRemoval={isPendingRemovalCheck(categoryName, pref.normalizedValue)}
+                                disabled={isSaving}
+                              />
                             ))}
                           </div>
                         </div>
@@ -745,6 +809,41 @@ const PreferencesSection = () => {
           </Accordion>
         </CardContent>
       </Card>
+
+      {/* Floating Save/Cancel Bar */}
+      {hasUnsavedChanges && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-background/95 backdrop-blur border rounded-xl shadow-lg p-4 flex items-center gap-4 z-50">
+          <span className="text-sm text-muted-foreground">
+            {getChangeSummary(added, removed)}
+          </span>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleDiscardChanges}
+              disabled={isSaving}
+              className="focus-visible:ring-0 focus-visible:ring-offset-0"
+            >
+              Cancel
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={handleSaveChanges}
+              disabled={isSaving}
+              className="focus-visible:ring-0 focus-visible:ring-offset-0"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Reset Preferences Confirmation */}
       <AlertDialog open={resetPreferencesDialogOpen} onOpenChange={setResetPreferencesDialogOpen}>
