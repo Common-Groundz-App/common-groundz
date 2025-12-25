@@ -4,11 +4,43 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { Plus, X, Shield } from 'lucide-react';
+import { Plus, X } from 'lucide-react';
 import { CustomConstraint, ConstraintsType, INTENT_COLORS } from '@/types/preferences';
 import TagInput from './TagInput';
 import AddCustomConstraintModal from './AddCustomConstraintModal';
 import { cn } from '@/lib/utils';
+
+// Constraint chip component - firmer style than preferences
+const ConstraintChip = ({ 
+  value, 
+  onRemove, 
+  disabled = false 
+}: { 
+  value: string; 
+  onRemove: () => void;
+  disabled?: boolean;
+}) => (
+  <div 
+    className={cn(
+      "rounded-full py-1.5 px-3 text-xs flex items-center gap-1.5 group transition-all",
+      "bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300",
+      "border border-rose-200/60 dark:border-rose-800/40"
+    )}
+  >
+    <span>{value}</span>
+    <button 
+      onClick={onRemove}
+      disabled={disabled}
+      className={cn(
+        "opacity-0 group-hover:opacity-100 transition-opacity rounded-full p-0.5",
+        "hover:bg-rose-200 dark:hover:bg-rose-800",
+        disabled && "cursor-not-allowed opacity-30"
+      )}
+    >
+      <X className="h-3 w-3" />
+    </button>
+  </div>
+);
 
 interface ConstraintsSectionProps {
   constraints: ConstraintsType;
@@ -92,19 +124,10 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Header with warning */}
-      <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-        <Shield className="h-5 w-5 text-red-500" />
-        <span className="text-sm font-medium text-red-600 dark:text-red-400">
-          Constraints are NEVER violated by AI recommendations
-        </span>
-      </div>
-
       {/* Hardcoded Constraints */}
       <div className="space-y-4">
         <div>
-          <Label className="text-sm font-medium">Ingredients to Avoid</Label>
-          <p className="text-xs text-muted-foreground mb-2">Products with these ingredients will never be recommended</p>
+          <Label className="text-sm font-medium">Exclude Ingredients</Label>
           {!isReadOnly && (
             <TagInput
               tags={constraints.avoidIngredients || []}
@@ -113,9 +136,9 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
             />
           )}
           {isReadOnly && (constraints.avoidIngredients?.length ?? 0) > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               {constraints.avoidIngredients?.map(item => (
-                <Badge key={item} variant="outline" className="bg-red-500/10 text-red-600">{item}</Badge>
+                <ConstraintChip key={item} value={item} onRemove={() => {}} disabled />
               ))}
             </div>
           )}
@@ -124,8 +147,7 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
         <Separator />
 
         <div>
-          <Label className="text-sm font-medium">Brands to Avoid</Label>
-          <p className="text-xs text-muted-foreground mb-2">Products from these brands will never be recommended</p>
+          <Label className="text-sm font-medium">Exclude Brands</Label>
           {!isReadOnly && (
             <TagInput
               tags={constraints.avoidBrands || []}
@@ -134,9 +156,9 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
             />
           )}
           {isReadOnly && (constraints.avoidBrands?.length ?? 0) > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               {constraints.avoidBrands?.map(item => (
-                <Badge key={item} variant="outline" className="bg-red-500/10 text-red-600">{item}</Badge>
+                <ConstraintChip key={item} value={item} onRemove={() => {}} disabled />
               ))}
             </div>
           )}
@@ -145,7 +167,7 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
         <Separator />
 
         <div>
-          <Label className="text-sm font-medium">Product Forms to Avoid</Label>
+          <Label className="text-sm font-medium">Exclude Formats</Label>
           <p className="text-xs text-muted-foreground mb-2">e.g., sprays, gels, powders</p>
           {!isReadOnly && (
             <TagInput
@@ -155,9 +177,9 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
             />
           )}
           {isReadOnly && (constraints.avoidProductForms?.length ?? 0) > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mt-2">
               {constraints.avoidProductForms?.map(item => (
-                <Badge key={item} variant="outline" className="bg-red-500/10 text-red-600">{item}</Badge>
+                <ConstraintChip key={item} value={item} onRemove={() => {}} disabled />
               ))}
             </div>
           )}

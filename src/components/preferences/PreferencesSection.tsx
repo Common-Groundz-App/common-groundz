@@ -11,7 +11,7 @@ import PreferencesForm from './PreferencesForm';
 import ConstraintsSection from './ConstraintsSection';
 import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Shield, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, X, Plus, Loader2 } from 'lucide-react';
+import { Ban, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, X, Plus, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, CanonicalCategory } from '@/types/preferences';
 import { cn } from '@/lib/utils';
@@ -679,10 +679,10 @@ const PreferencesSection = () => {
                   <div className="flex items-center w-full">
                     <div className="flex flex-col items-start flex-1">
                       <div className="flex items-center gap-2">
-                        <Shield className="h-5 w-5 text-red-500" />
+                        <Ban className="h-5 w-5 text-muted-foreground" />
                         <span className="font-medium">Things to Avoid</span>
                         {constraintCount > 0 && (
-                          <Badge variant="destructive" className="ml-2 text-xs">
+                          <Badge className="ml-2 text-xs bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300">
                             {constraintCount}
                           </Badge>
                         )}
