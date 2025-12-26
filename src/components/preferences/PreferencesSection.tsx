@@ -679,7 +679,7 @@ const PreferencesSection = () => {
                   <div className="flex items-center w-full">
                     <div className="flex flex-col items-start flex-1">
                       <div className="flex items-center gap-2">
-                        <Ban className="h-5 w-5 text-muted-foreground" />
+                        <Ban className="h-5 w-5 text-red-500" />
                         <span className="font-medium">Things to Avoid</span>
                         {constraintCount > 0 && (
                           <Badge className="ml-2 text-xs bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300">
