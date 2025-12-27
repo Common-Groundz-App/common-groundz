@@ -410,7 +410,7 @@ const PreferencesSection = () => {
   // Generate summary for Constraints using unified format
   const getConstraintsSummary = (): string => {
     if (!unifiedConstraints?.items?.length) {
-      return 'No constraints set';
+      return 'Nothing set yet';
     }
     
     const parts: string[] = [];
