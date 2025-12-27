@@ -10,7 +10,9 @@ import {
   LearnedPreference,
   PreferenceCategory,
   PreferenceValue,
-  CanonicalCategory
+  CanonicalCategory,
+  UnifiedConstraint,
+  UnifiedConstraintsType,
 } from '@/types/preferences';
 import {
   migratePreferencesToCanonical,
@@ -21,6 +23,13 @@ import {
   MIN_AUTO_ROUTE_CONFIDENCE,
   countTotalPreferences
 } from '@/utils/preferenceRouting';
+import {
+  isLegacyConstraintFormat,
+  migrateToUnifiedConstraints,
+  createUnifiedConstraint,
+  addUnifiedConstraint as addConstraintToList,
+  removeUnifiedConstraint as removeConstraintFromList,
+} from '@/utils/constraintUtils';
 
 interface PreferencesContextType {
   preferences: UserPreferences;
@@ -31,8 +40,13 @@ interface PreferencesContextType {
   resetPreferences: () => Promise<boolean>;
   shouldShowOnboarding: boolean;
   setShouldShowOnboarding: (show: boolean) => void;
-  // Constraint management
-  updateConstraints: (constraints: ConstraintsType) => Promise<boolean>;
+  // Unified constraint management (new)
+  unifiedConstraints: UnifiedConstraintsType;
+  updateUnifiedConstraints: (constraints: UnifiedConstraintsType) => Promise<boolean>;
+  addUnifiedConstraint: (constraint: UnifiedConstraint) => Promise<boolean>;
+  removeUnifiedConstraint: (id: string) => Promise<boolean>;
+  // Legacy constraint management (deprecated, for backward compat)
+  updateConstraints: (constraints: ConstraintsType | UnifiedConstraintsType) => Promise<boolean>;
   addCustomConstraint: (constraint: Omit<CustomConstraint, 'id' | 'createdAt'>) => Promise<boolean>;
   removeCustomConstraint: (id: string) => Promise<boolean>;
   // Preference value management (new canonical API)
@@ -48,6 +62,7 @@ const PreferencesContext = createContext<PreferencesContextType | undefined>(und
 
 export function PreferencesProvider({ children }: { children: React.ReactNode }) {
   const [preferences, setPreferences] = useState<UserPreferences>({});
+  const [unifiedConstraints, setUnifiedConstraints] = useState<UnifiedConstraintsType>({ items: [], budget: 'no_preference' });
   const [learnedPreferences, setLearnedPreferences] = useState<LearnedPreference[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [shouldShowOnboarding, setShouldShowOnboarding] = useState(false);
@@ -110,10 +125,18 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         
         setPreferences(userPrefs);
         
+        // Migrate constraints to unified format if needed
+        if (userPrefs.constraints && isLegacyConstraintFormat(userPrefs.constraints)) {
+          console.log('🔄 [PreferencesProvider] Migrating legacy constraints to unified format');
+          const migratedConstraints = migrateToUnifiedConstraints(userPrefs.constraints);
+          setUnifiedConstraints(migratedConstraints);
+        } else if (userPrefs.unifiedConstraints) {
+          setUnifiedConstraints(userPrefs.unifiedConstraints);
+        }
+        
         if (countTotalPreferences(userPrefs) === 0) {
           setShouldShowOnboarding(true);
         }
-        
         // Also fetch learned preferences
         await fetchLearnedPreferencesInternal(user.id);
       } catch (err) {
@@ -240,33 +263,47 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  // Constraint management
-  const updateConstraints = async (constraints: ConstraintsType) => {
-    const newPrefs = { ...preferences, constraints };
+
+  // Unified Constraint Management (new)
+  const updateUnifiedConstraints = async (constraints: UnifiedConstraintsType) => {
+    const newPrefs = { ...preferences, unifiedConstraints: constraints };
+    setUnifiedConstraints(constraints);
     return updatePreferences(newPrefs);
   };
 
+  const addUnifiedConstraint = async (constraint: UnifiedConstraint) => {
+    const updated = addConstraintToList(unifiedConstraints, constraint);
+    return updateUnifiedConstraints(updated);
+  };
+
+  const removeUnifiedConstraint = async (id: string) => {
+    const updated = removeConstraintFromList(unifiedConstraints, id);
+    return updateUnifiedConstraints(updated);
+  };
+
+  // Legacy constraint management (for backward compat - routes to unified)
+  const updateConstraints = async (constraints: ConstraintsType | UnifiedConstraintsType) => {
+    // Check if it's already unified format
+    if ('items' in constraints) {
+      return updateUnifiedConstraints(constraints as UnifiedConstraintsType);
+    }
+    // Migrate legacy to unified
+    const unified = migrateToUnifiedConstraints(constraints as ConstraintsType);
+    return updateUnifiedConstraints(unified);
+  };
+
   const addCustomConstraint = async (constraint: Omit<CustomConstraint, 'id' | 'createdAt'>) => {
-    const newConstraint: CustomConstraint = {
-      ...constraint,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString()
-    };
-    const currentConstraints = preferences.constraints || {};
-    const newConstraints = {
-      ...currentConstraints,
-      custom: [...(currentConstraints.custom || []), newConstraint]
-    };
-    return updateConstraints(newConstraints);
+    // Convert to unified constraint
+    const unified = createUnifiedConstraint('rule', constraint.value, {
+      scope: 'global',
+      intent: constraint.intent === 'strictly_avoid' ? 'strictly_avoid' : 'avoid',
+      source: constraint.source,
+    });
+    return addUnifiedConstraint(unified);
   };
 
   const removeCustomConstraint = async (id: string) => {
-    const currentConstraints = preferences.constraints || {};
-    const newConstraints = {
-      ...currentConstraints,
-      custom: (currentConstraints.custom || []).filter(c => c.id !== id)
-    };
-    return updateConstraints(newConstraints);
+    return removeUnifiedConstraint(id);
   };
 
   // New canonical preference value management
@@ -496,6 +533,12 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     resetPreferences,
     shouldShowOnboarding,
     setShouldShowOnboarding,
+    // Unified constraints (new)
+    unifiedConstraints,
+    updateUnifiedConstraints,
+    addUnifiedConstraint,
+    removeUnifiedConstraint,
+    // Legacy (backward compat)
     updateConstraints,
     addCustomConstraint,
     removeCustomConstraint,

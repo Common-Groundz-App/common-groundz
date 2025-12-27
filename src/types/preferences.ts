@@ -2,6 +2,8 @@
 
 // ============= Intent Types =============
 export type ConstraintIntent = 'strictly_avoid' | 'avoid' | 'limit' | 'prefer';
+// Simplified MVP intent for unified constraints
+export type UnifiedConstraintIntent = 'avoid' | 'strictly_avoid';
 export type PreferenceIntent = 'like' | 'dislike' | 'neutral';
 
 // ============= Source & Priority Types =============
@@ -16,6 +18,37 @@ export type CanonicalCategory =
   | 'lifestyle'
   | 'genre_preferences'
   | 'goals';
+
+// ============= Unified Constraint Types (MVP) =============
+// IMPORTANT: Do not add more target types until current ones are fully utilized
+// Current MVP types are expressive enough for: ingredients, brands, genres, food types, formats, rules
+export type ConstraintTargetType = 'ingredient' | 'brand' | 'genre' | 'food_type' | 'format' | 'rule';
+
+// Scope determines where the constraint applies
+// 'global' = applies everywhere, domain-specific = only in that domain
+export type ConstraintScope = 'global' | 'skincare' | 'haircare' | 'food' | 'entertainment' | 'supplements' | 'wellness';
+
+// ============= Unified Constraint (Entity-Based with Scope) =============
+export interface UnifiedConstraint {
+  id: string;
+  targetType: ConstraintTargetType;
+  targetValue: string;           // Display value (original casing)
+  normalizedValue: string;       // Lowercase, trimmed (for deduplication)
+  scope: ConstraintScope;        // Where this constraint applies
+  appliesTo?: string[];          // Optional: narrow to specific domains ['skincare', 'supplements']
+  intent: UnifiedConstraintIntent;
+  source: 'manual' | 'chatbot';
+  createdAt: string;             // ISO timestamp
+  // Future fields (staged for v2)
+  // confidence?: number;
+  // evidence?: string;
+}
+
+// ============= Unified Constraints Container =============
+export interface UnifiedConstraintsType {
+  items: UnifiedConstraint[];
+  budget?: 'affordable' | 'mid-range' | 'premium' | 'no_preference';
+}
 
 // ============= Core Preference Value (Canonical Shape) =============
 export interface PreferenceValue {
@@ -33,7 +66,8 @@ export interface PreferenceCategory {
   values: PreferenceValue[];
 }
 
-// ============= Constraint Types (unchanged) =============
+// ============= Legacy Constraint Types (for migration, deprecated) =============
+/** @deprecated Use UnifiedConstraint instead */
 export interface CustomConstraint {
   id: string;
   category: string;
@@ -46,6 +80,7 @@ export interface CustomConstraint {
   createdAt: string;
 }
 
+/** @deprecated Use UnifiedConstraintsType instead */
 export interface ConstraintsType {
   avoidIngredients?: string[];
   avoidBrands?: string[];
