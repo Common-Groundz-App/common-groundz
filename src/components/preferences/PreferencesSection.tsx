@@ -135,6 +135,9 @@ const PreferencesSection = () => {
   const [resetPreferencesDialogOpen, setResetPreferencesDialogOpen] = useState(false);
   const [clearConstraintsDialogOpen, setClearConstraintsDialogOpen] = useState(false);
   const [clearLearnedDialogOpen, setClearLearnedDialogOpen] = useState(false);
+  
+  // Add constraint modal state (controlled from 3-dots menu)
+  const [addConstraintModalOpen, setAddConstraintModalOpen] = useState(false);
 
   // Draft-based state for Save/Cancel system
   const [draftPreferences, setDraftPreferences] = useState<UserPreferences>(preferences);
@@ -281,7 +284,6 @@ const PreferencesSection = () => {
           avoidIngredients: [],
           avoidBrands: [],
           avoidProductForms: [],
-          budget: 'no_preference',
           custom: [],
         },
       });
@@ -407,7 +409,7 @@ const PreferencesSection = () => {
 
   // Generate summary for Constraints using unified format
   const getConstraintsSummary = (): string => {
-    if (!unifiedConstraints?.items?.length && (!unifiedConstraints?.budget || unifiedConstraints.budget === 'no_preference')) {
+    if (!unifiedConstraints?.items?.length) {
       return 'No constraints set';
     }
     
@@ -424,11 +426,6 @@ const PreferencesSection = () => {
       const label = getTargetTypeLabel(type as any);
       parts.push(`${count} ${label.toLowerCase()}${count > 1 ? 's' : ''}`);
     });
-    
-    // Add budget if set
-    if (unifiedConstraints?.budget && unifiedConstraints.budget !== 'no_preference') {
-      parts.push(unifiedConstraints.budget);
-    }
     
     return parts.join(' • ') || 'No constraints set';
   };
@@ -725,6 +722,11 @@ const PreferencesSection = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-background">
+                    <DropdownMenuItem onClick={() => setAddConstraintModalOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add constraint
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem 
                       onClick={() => setClearConstraintsDialogOpen(true)}
                       className="text-destructive focus:text-destructive"
@@ -740,6 +742,9 @@ const PreferencesSection = () => {
                 <ConstraintsSection
                   constraints={preferences?.constraints}
                   onUpdateConstraints={handleUpdateConstraints}
+                  isModalOpen={addConstraintModalOpen}
+                  onCloseModal={() => setAddConstraintModalOpen(false)}
+                  onOpenModal={() => setAddConstraintModalOpen(true)}
                 />
               </AccordionContent>
             </AccordionItem>

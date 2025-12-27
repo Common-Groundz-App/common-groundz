@@ -146,7 +146,43 @@ export const CONSTRAINT_CATEGORIES: ConstraintCategory[] = [
 ];
 
 /**
+ * DISPLAY ONLY - Determines the single category where a constraint should be visually rendered.
+ * 
+ * GUARDRAILS:
+ * 1. This function must be PURE and DETERMINISTIC - no side effects, no UI state dependencies
+ * 2. NEVER use this for enforcement/filtering logic - use scope/appliesTo/intent directly
+ * 
+ * Resolution order:
+ * 1. appliesTo[0] if explicitly set (single domain)
+ * 2. scope if domain-specific (not 'global')
+ * 3. Default mapping by targetType
+ */
+export const getPrimaryCategory = (constraint: UnifiedConstraint): string => {
+  // Priority 1: Explicit appliesTo (if single domain)
+  if (constraint.appliesTo?.length === 1) {
+    return constraint.appliesTo[0];
+  }
+  
+  // Priority 2: Domain-specific scope (not global)
+  if (constraint.scope !== 'global') {
+    return constraint.scope;
+  }
+  
+  // Priority 3: Default by targetType (deterministic mapping)
+  switch (constraint.targetType) {
+    case 'ingredient': return 'skincare';
+    case 'brand': return 'brands';
+    case 'format': return 'formats';
+    case 'genre': return 'entertainment';
+    case 'food_type': return 'food';
+    case 'rule': return 'other';
+    default: return 'other';
+  }
+};
+
+/**
  * Check if a constraint should appear in a category view
+ * FOR ENFORCEMENT: Use scope/appliesTo/intent directly, not this function
  */
 export const constraintAppliesToCategory = (
   constraint: UnifiedConstraint,
@@ -167,16 +203,19 @@ export const constraintAppliesToCategory = (
 };
 
 /**
- * Get all constraints that should display in a category
+ * Get all constraints that should display in a category.
+ * Uses PRIMARY CATEGORY to prevent duplication - each constraint appears in ONE category only.
  */
 export const getConstraintsForCategory = (
   constraints: UnifiedConstraintsType,
   categoryId: string
 ): UnifiedConstraint[] => {
-  const category = CONSTRAINT_CATEGORIES.find(c => c.id === categoryId);
-  if (!category) return [];
+  if (!constraints?.items?.length) return [];
   
-  return constraints.items.filter(c => constraintAppliesToCategory(c, category));
+  // Use primary category for display (prevents duplication)
+  return constraints.items.filter(constraint => 
+    getPrimaryCategory(constraint) === categoryId
+  );
 };
 
 /**
@@ -191,10 +230,10 @@ export const getCategoriesWithConstraints = (
 };
 
 /**
- * Count total constraints
+ * Count total constraints (budget not included - budget is not a constraint)
  */
 export const countConstraints = (constraints: UnifiedConstraintsType): number => {
-  return constraints.items.length + (constraints.budget && constraints.budget !== 'no_preference' ? 1 : 0);
+  return constraints?.items?.length ?? 0;
 };
 
 // ============= MIGRATION FUNCTIONS =============
