@@ -20,12 +20,11 @@ import { Link } from 'react-router-dom';
 import Logo from '@/components/Logo';
 import { INTENT_COLORS, getConfidenceLevel, PreferenceCategory, PreferenceValue } from '@/types/preferences';
 import { cn } from '@/lib/utils';
+import { CONSTRAINT_CATEGORIES, getConstraintsForCategory, getIntentStyles, getScopeLabel } from '@/utils/constraintUtils';
 
 const YourData = () => {
   const { user } = useAuth();
-  const { preferences, learnedPreferences, isLoading } = usePreferences();
-  
-  const constraints = preferences?.constraints || {};
+  const { preferences, learnedPreferences, isLoading, unifiedConstraints } = usePreferences();
 
   if (!user) {
     return <div>Loading...</div>;
@@ -133,67 +132,55 @@ const YourData = () => {
                   </AccordionTrigger>
                   <AccordionContent className="px-4 pb-4">
                     <div className="space-y-4">
-                      {/* Hardcoded constraints */}
-                      {constraints.avoidIngredients?.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium mb-2">Ingredients to Avoid</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {constraints.avoidIngredients.map((item: string) => (
-                              <Badge key={item} variant="outline" className="bg-red-500/10 text-red-600">
-                                {item}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {constraints.avoidBrands?.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium mb-2">Brands to Avoid</h4>
-                          <div className="flex flex-wrap gap-2">
-                            {constraints.avoidBrands.map((item: string) => (
-                              <Badge key={item} variant="outline" className="bg-red-500/10 text-red-600">
-                                {item}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {constraints.budget && constraints.budget !== 'no_preference' && (
-                        <div>
-                          <h4 className="text-sm font-medium mb-2">Budget</h4>
-                          <Badge variant="outline">{constraints.budget}</Badge>
-                        </div>
-                      )}
-                      
-                      {/* Custom constraints */}
-                      {constraints.custom?.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium mb-2">Custom Constraints</h4>
-                          <div className="space-y-2">
-                            {constraints.custom.map((c: any) => {
-                              const style = INTENT_COLORS[c.intent as keyof typeof INTENT_COLORS];
-                              return (
-                                <div key={c.id} className="flex items-center gap-2 p-2 bg-accent/30 rounded">
-                                  <Badge variant="outline" className={cn(style?.bg, style?.text)}>
-                                    {style?.label || c.intent}
+                      {/* Category-based constraint display */}
+                      {CONSTRAINT_CATEGORIES.map(category => {
+                        const categoryConstraints = getConstraintsForCategory(unifiedConstraints, category.id);
+                        if (categoryConstraints.length === 0) return null;
+                        
+                        return (
+                          <div key={category.id}>
+                            <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                              <span>{category.emoji}</span>
+                              {category.name}
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                              {categoryConstraints.map(constraint => {
+                                const intentStyles = getIntentStyles(constraint.intent);
+                                return (
+                                  <Badge 
+                                    key={constraint.id} 
+                                    variant="outline" 
+                                    className={cn(intentStyles.bg, intentStyles.text, "flex items-center gap-1")}
+                                  >
+                                    {constraint.targetValue}
+                                    {constraint.scope !== 'global' && (
+                                      <span className="opacity-70 text-[10px]">({getScopeLabel(constraint.scope)})</span>
+                                    )}
+                                    {constraint.source === 'chatbot' && (
+                                      <Bot className="h-3 w-3 opacity-70" />
+                                    )}
                                   </Badge>
-                                  <span className="text-sm">{c.category}: {c.rule} - {c.value}</span>
-                                  {c.source === 'chatbot' && (
-                                    <Bot className="h-3 w-3 text-purple-500 ml-auto" />
-                                  )}
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
+                        );
+                      })}
+                      
+                      {/* Budget display */}
+                      {unifiedConstraints?.budget && unifiedConstraints.budget !== 'no_preference' && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                            <span>💰</span>
+                            Budget
+                          </h4>
+                          <Badge variant="outline">{unifiedConstraints.budget}</Badge>
                         </div>
                       )}
                       
-                      {!constraints.avoidIngredients?.length && 
-                       !constraints.avoidBrands?.length && 
-                       !constraints.custom?.length &&
-                       (!constraints.budget || constraints.budget === 'no_preference') && (
+                      {/* Empty state */}
+                      {(!unifiedConstraints?.items?.length) && 
+                       (!unifiedConstraints?.budget || unifiedConstraints.budget === 'no_preference') && (
                         <p className="text-sm text-muted-foreground">No constraints set yet.</p>
                       )}
                     </div>
