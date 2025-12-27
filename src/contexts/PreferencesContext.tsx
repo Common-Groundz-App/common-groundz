@@ -125,11 +125,17 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         
         setPreferences(userPrefs);
         
-        // Migrate constraints to unified format if needed
-        if (userPrefs.constraints && isLegacyConstraintFormat(userPrefs.constraints)) {
-          console.log('🔄 [PreferencesProvider] Migrating legacy constraints to unified format');
-          const migratedConstraints = migrateToUnifiedConstraints(userPrefs.constraints);
-          setUnifiedConstraints(migratedConstraints);
+        // Load constraints - handle both legacy and unified formats
+        if (userPrefs.constraints) {
+          if (isLegacyConstraintFormat(userPrefs.constraints)) {
+            // Legacy format - migrate it
+            console.log('🔄 [PreferencesProvider] Migrating legacy constraints to unified format');
+            const migratedConstraints = migrateToUnifiedConstraints(userPrefs.constraints);
+            setUnifiedConstraints(migratedConstraints);
+          } else if ('items' in userPrefs.constraints) {
+            // Already unified format stored in constraints key
+            setUnifiedConstraints(userPrefs.constraints as UnifiedConstraintsType);
+          }
         } else if (userPrefs.unifiedConstraints) {
           setUnifiedConstraints(userPrefs.unifiedConstraints);
         }

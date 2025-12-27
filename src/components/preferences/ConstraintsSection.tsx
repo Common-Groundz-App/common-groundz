@@ -95,9 +95,6 @@ const ConstraintCategoryCard = ({
       <h4 className="font-medium text-sm flex items-center gap-2">
         <span>{category.emoji}</span>
         {category.name}
-        <Badge variant="outline" className="text-xs bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400">
-          {constraints.length}
-        </Badge>
       </h4>
       <div className="flex flex-wrap gap-1.5">
         {constraints.map((constraint) => (
@@ -183,10 +180,10 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
         <div className="text-center py-6 bg-accent/20 rounded-lg">
           <Ban className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
           <p className="text-sm text-muted-foreground mb-3">
-            No constraints set yet
+            Nothing to avoid yet
           </p>
           <p className="text-xs text-muted-foreground mb-4">
-            Add things you want to avoid in recommendations
+            Add things you'd like to avoid in recommendations
           </p>
           {!isReadOnly && onOpenModal && (
             <Button 
@@ -196,7 +193,7 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
               className="gap-1"
             >
               <Plus className="h-4 w-4" />
-              Add Constraint
+              Add Something to Avoid
             </Button>
           )}
         </div>
