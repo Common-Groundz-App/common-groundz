@@ -17,6 +17,7 @@ import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, 
 import { cn } from '@/lib/utils';
 import { countTotalPreferences, getCategoryValues, hasAnyPreferences, createPreferenceValue } from '@/utils/preferenceRouting';
 import { arePreferencesEqual, countPreferenceDifferences, isPendingRemoval as checkPendingRemoval, getChangeSummary } from '@/utils/preferenceUtils';
+import { countConstraints, CONSTRAINT_CATEGORIES, getConstraintsForCategory, getTargetTypeLabel } from '@/utils/constraintUtils';
 import AddCustomPreferenceModal from './AddCustomPreferenceModal';
 import {
   DropdownMenu,
@@ -362,13 +363,8 @@ const PreferencesSection = () => {
   };
 
   // Count constraints and learned preferences for badges
-  const constraints = preferences?.constraints || {};
-  const constraintCount = 
-    (constraints.avoidIngredients?.length || 0) +
-    (constraints.avoidBrands?.length || 0) +
-    (constraints.avoidProductForms?.length || 0) +
-    (constraints.custom?.length || 0) +
-    (constraints.budget && constraints.budget !== 'no_preference' ? 1 : 0);
+  const { unifiedConstraints } = usePreferences();
+  const constraintCount = countConstraints(unifiedConstraints);
 
   const activeLearned = learnedPreferences.filter(p => !p.dismissed);
   const pendingLearnedCount = activeLearned.filter(p => !p.approvedAt).length;
@@ -409,16 +405,30 @@ const PreferencesSection = () => {
     return formatSummary(items) || 'No preferences set';
   };
 
-  // Generate summary for Constraints
+  // Generate summary for Constraints using unified format
   const getConstraintsSummary = (): string => {
-    const parts: string[] = [];
-    const c = constraints;
+    if (!unifiedConstraints?.items?.length && (!unifiedConstraints?.budget || unifiedConstraints.budget === 'no_preference')) {
+      return 'No constraints set';
+    }
     
-    if (c.avoidIngredients?.length) parts.push(`${c.avoidIngredients.length} ingredient${c.avoidIngredients.length > 1 ? 's' : ''}`);
-    if (c.avoidBrands?.length) parts.push(`${c.avoidBrands.length} brand${c.avoidBrands.length > 1 ? 's' : ''}`);
-    if (c.avoidProductForms?.length) parts.push(`${c.avoidProductForms.length} form${c.avoidProductForms.length > 1 ? 's' : ''}`);
-    if (c.budget && c.budget !== 'no_preference') parts.push(c.budget);
-    if (c.custom?.length) parts.push(`${c.custom.length} custom rule${c.custom.length > 1 ? 's' : ''}`);
+    const parts: string[] = [];
+    
+    // Group constraints by targetType and count
+    const typeCounts: Record<string, number> = {};
+    unifiedConstraints?.items?.forEach(item => {
+      typeCounts[item.targetType] = (typeCounts[item.targetType] || 0) + 1;
+    });
+    
+    // Add counts by type
+    Object.entries(typeCounts).forEach(([type, count]) => {
+      const label = getTargetTypeLabel(type as any);
+      parts.push(`${count} ${label.toLowerCase()}${count > 1 ? 's' : ''}`);
+    });
+    
+    // Add budget if set
+    if (unifiedConstraints?.budget && unifiedConstraints.budget !== 'no_preference') {
+      parts.push(unifiedConstraints.budget);
+    }
     
     return parts.join(' • ') || 'No constraints set';
   };
@@ -728,7 +738,7 @@ const PreferencesSection = () => {
               </div>
               <AccordionContent className="pt-4">
                 <ConstraintsSection
-                  constraints={constraints}
+                  constraints={preferences?.constraints}
                   onUpdateConstraints={handleUpdateConstraints}
                 />
               </AccordionContent>
