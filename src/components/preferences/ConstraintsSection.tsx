@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { X, Plus, Ban, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { X, Plus, Ban } from 'lucide-react';
 import { 
   UnifiedConstraint, 
   UnifiedConstraintsType,
@@ -16,22 +15,32 @@ import {
   isLegacyConstraintFormat,
   migrateToUnifiedConstraints,
   countConstraints,
+  getPrimaryCategory,
   ConstraintCategory,
 } from '@/utils/constraintUtils';
 import AddUnifiedConstraintModal from './AddUnifiedConstraintModal';
 import { cn } from '@/lib/utils';
 
 // Constraint chip component - rose-toned, clean style
+// Hides scope label when rendered inside its primary category
 const ConstraintChip = ({ 
   constraint,
   onRemove, 
-  disabled = false 
+  disabled = false,
+  currentCategory,
 }: { 
   constraint: UnifiedConstraint;
   onRemove: (id: string) => void;
   disabled?: boolean;
+  currentCategory?: string;
 }) => {
   const intentStyles = getIntentStyles(constraint.intent);
+  const primaryCategory = getPrimaryCategory(constraint);
+  
+  // Only show scope if it's domain-specific AND different from current context
+  const showScope = constraint.scope !== 'global' && 
+                    constraint.scope !== currentCategory &&
+                    constraint.scope !== primaryCategory;
   
   return (
     <div 
@@ -43,7 +52,7 @@ const ConstraintChip = ({
       )}
     >
       <span className="font-medium">{constraint.targetValue}</span>
-      {constraint.scope !== 'global' && (
+      {showScope && (
         <span className="opacity-60 text-[10px]">({getScopeLabel(constraint.scope)})</span>
       )}
       {constraint.source === 'chatbot' && (
@@ -97,6 +106,7 @@ const ConstraintCategoryCard = ({
             constraint={constraint}
             onRemove={onRemoveConstraint}
             disabled={isReadOnly}
+            currentCategory={category.id}
           />
         ))}
       </div>
@@ -108,19 +118,23 @@ interface ConstraintsSectionProps {
   constraints: ConstraintsType | UnifiedConstraintsType;
   onUpdateConstraints: (constraints: ConstraintsType | UnifiedConstraintsType) => void;
   isReadOnly?: boolean;
+  isModalOpen?: boolean;
+  onCloseModal?: () => void;
+  onOpenModal?: () => void;
 }
 
 const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
   constraints,
   onUpdateConstraints,
-  isReadOnly = false
+  isReadOnly = false,
+  isModalOpen = false,
+  onCloseModal,
+  onOpenModal,
 }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
   // Normalize to unified format (handles both legacy and new)
   const unifiedConstraints: UnifiedConstraintsType = isLegacyConstraintFormat(constraints)
     ? migrateToUnifiedConstraints(constraints as ConstraintsType)
-    : (constraints as UnifiedConstraintsType) || { items: [], budget: 'no_preference' };
+    : (constraints as UnifiedConstraintsType) || { items: [] };
   
   // Handler for adding new constraint
   const handleAddConstraint = (constraint: UnifiedConstraint) => {
@@ -129,7 +143,7 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
       items: [...unifiedConstraints.items, constraint],
     };
     onUpdateConstraints(updated);
-    setIsModalOpen(false);
+    onCloseModal?.();
   };
   
   // Handler for removing constraint
@@ -141,16 +155,7 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
     onUpdateConstraints(updated);
   };
   
-  // Handler for budget change
-  const handleBudgetChange = (budget: string) => {
-    const updated: UnifiedConstraintsType = {
-      ...unifiedConstraints,
-      budget: budget as UnifiedConstraintsType['budget'],
-    };
-    onUpdateConstraints(updated);
-  };
-  
-  // Get categories that have constraints
+  // Get categories that have constraints (using primary category - no duplication)
   const categoriesWithConstraints = CONSTRAINT_CATEGORIES.map(category => ({
     category,
     constraints: getConstraintsForCategory(unifiedConstraints, category.id),
@@ -173,23 +178,6 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
               isReadOnly={isReadOnly}
             />
           ))}
-          
-          {/* Budget display (kept separate) */}
-          {unifiedConstraints.budget && unifiedConstraints.budget !== 'no_preference' && (
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm flex items-center gap-2">
-                <span>💰</span>
-                Budget
-              </h4>
-              <div className="flex flex-wrap gap-1.5">
-                <div className="rounded-full py-1.5 px-3 text-xs bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
-                  {unifiedConstraints.budget === 'affordable' && 'Budget-friendly'}
-                  {unifiedConstraints.budget === 'mid-range' && 'Mid-range'}
-                  {unifiedConstraints.budget === 'premium' && 'Premium only'}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       ) : (
         <div className="text-center py-6 bg-accent/20 rounded-lg">
@@ -200,11 +188,11 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
           <p className="text-xs text-muted-foreground mb-4">
             Add things you want to avoid in recommendations
           </p>
-          {!isReadOnly && (
+          {!isReadOnly && onOpenModal && (
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => setIsModalOpen(true)}
+              onClick={onOpenModal}
               className="gap-1"
             >
               <Plus className="h-4 w-4" />
@@ -213,55 +201,10 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
           )}
         </div>
       )}
-      
-      {/* Budget selector (always visible when there are constraints) */}
-      {hasAnyConstraints && (
-        <div className="pt-2 border-t">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium text-sm flex items-center gap-2">
-                <span>💰</span>
-                Budget Preference
-              </h4>
-              <p className="text-xs text-muted-foreground">Filter by price range</p>
-            </div>
-            <Select 
-              value={unifiedConstraints.budget || 'no_preference'} 
-              onValueChange={handleBudgetChange}
-              disabled={isReadOnly}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Any budget" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="no_preference">No preference</SelectItem>
-                <SelectItem value="affordable">Affordable</SelectItem>
-                <SelectItem value="mid-range">Mid-range</SelectItem>
-                <SelectItem value="premium">Premium</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
-      
-      {/* Add constraint button (when there are existing constraints) */}
-      {hasAnyConstraints && !isReadOnly && (
-        <div className="flex justify-center pt-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setIsModalOpen(true)}
-            className="text-muted-foreground hover:text-foreground gap-1"
-          >
-            <Plus className="h-4 w-4" />
-            Add another constraint
-          </Button>
-        </div>
-      )}
 
       <AddUnifiedConstraintModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => onCloseModal?.()}
         onSave={handleAddConstraint}
       />
     </div>
