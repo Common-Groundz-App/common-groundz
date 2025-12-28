@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   UnifiedConstraint, 
@@ -16,9 +15,8 @@ import {
   detectConstraintType, 
   getTargetTypeLabel, 
   getScopeLabel,
-  CONSTRAINT_CATEGORIES
 } from '@/utils/constraintUtils';
-import { Ban, AlertCircle, Check, Sparkles } from 'lucide-react';
+import { Ban, AlertCircle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AddUnifiedConstraintModalProps {
@@ -26,6 +24,18 @@ interface AddUnifiedConstraintModalProps {
   onClose: () => void;
   onSave: (constraint: UnifiedConstraint) => void;
 }
+
+// Deterministic human-readable summary based on type + scope
+const getDetectionSummary = (type: ConstraintTargetType, scope: ConstraintScope): string => {
+  const typeLabel = getTargetTypeLabel(type).toLowerCase();
+  
+  if (scope === 'global') {
+    return `This ${typeLabel} will be avoided everywhere`;
+  }
+  
+  const scopeLabel = getScopeLabel(scope).toLowerCase();
+  return `This ${typeLabel} will be avoided in ${scopeLabel}`;
+};
 
 const AddUnifiedConstraintModal: React.FC<AddUnifiedConstraintModalProps> = ({
   isOpen,
@@ -87,10 +97,10 @@ const AddUnifiedConstraintModal: React.FC<AddUnifiedConstraintModalProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Ban className="h-5 w-5 text-rose-500" />
-            Add Constraint
+            Add Something to Avoid
           </DialogTitle>
           <DialogDescription>
-            Tell us what you want to avoid, and we'll make sure it's respected in recommendations.
+            We'll make sure this is respected in your recommendations.
           </DialogDescription>
         </DialogHeader>
 
@@ -108,45 +118,31 @@ const AddUnifiedConstraintModal: React.FC<AddUnifiedConstraintModalProps> = ({
             />
           </div>
 
-          {/* AI Detection Preview */}
+          {/* Detection Summary - Always visible when input exists */}
           {input.trim() && (
-            <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Sparkles className="h-4 w-4" />
-                <span>Detected as:</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant="outline" className="bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300">
-                  {getTargetTypeLabel(finalType)}
-                </Badge>
-                <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300">
-                  {getScopeLabel(finalScope)}
-                </Badge>
-                {confidence < 0.7 && (
-                  <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-300">
-                    <AlertCircle className="h-3 w-3 mr-1" />
-                    Low confidence
-                  </Badge>
-                )}
+            <div className="rounded-lg border bg-green-50/50 dark:bg-green-950/20 border-green-200/50 dark:border-green-800/50 p-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+                <Check className="h-4 w-4 flex-shrink-0" />
+                <span>{getDetectionSummary(finalType, finalScope)}</span>
               </div>
               
-              {/* Adjust button */}
+              {/* Always visible subtle link */}
               {!showAdvanced && (
                 <button
                   type="button"
                   onClick={() => setShowAdvanced(true)}
-                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                  className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                 >
-                  Adjust detection
+                  Not quite right?
                 </button>
               )}
             </div>
           )}
 
-          {/* Advanced Options (hidden by default) */}
+          {/* Advanced Options - Summary stays visible above */}
           {showAdvanced && input.trim() && (
             <div className="space-y-3 rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">Override detection:</p>
+              <p className="text-xs text-muted-foreground">Adjust if needed:</p>
               
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -188,7 +184,7 @@ const AddUnifiedConstraintModal: React.FC<AddUnifiedConstraintModalProps> = ({
 
           {/* Intent Selection */}
           <div className="space-y-2">
-            <Label>How strict?</Label>
+            <Label>How should we handle this?</Label>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -200,12 +196,12 @@ const AddUnifiedConstraintModal: React.FC<AddUnifiedConstraintModalProps> = ({
                     : 'border-border hover:bg-accent/50'
                 )}
               >
-                <AlertCircle className="h-4 w-4" />
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Avoid</p>
-                  <p className="text-xs text-muted-foreground">Unless I ask</p>
+                  <p className="text-sm font-medium">Prefer to avoid</p>
+                  <p className="text-xs text-muted-foreground">Excluded by default</p>
                 </div>
-                {intent === 'avoid' && <Check className="h-4 w-4" />}
+                {intent === 'avoid' && <Check className="h-4 w-4 flex-shrink-0" />}
               </button>
               
               <button
@@ -218,12 +214,12 @@ const AddUnifiedConstraintModal: React.FC<AddUnifiedConstraintModalProps> = ({
                     : 'border-border hover:bg-accent/50'
                 )}
               >
-                <Ban className="h-4 w-4" />
+                <Ban className="h-4 w-4 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">Never</p>
-                  <p className="text-xs text-muted-foreground">Even if I ask</p>
+                  <p className="text-sm font-medium">Never recommend</p>
+                  <p className="text-xs text-muted-foreground">Strictly excluded</p>
                 </div>
-                {intent === 'strictly_avoid' && <Check className="h-4 w-4" />}
+                {intent === 'strictly_avoid' && <Check className="h-4 w-4 flex-shrink-0" />}
               </button>
             </div>
           </div>
@@ -237,7 +233,7 @@ const AddUnifiedConstraintModal: React.FC<AddUnifiedConstraintModalProps> = ({
               disabled={!input.trim()}
               className="bg-rose-600 hover:bg-rose-700 text-white"
             >
-              Add Constraint
+              Add to Avoid List
             </Button>
           </DialogFooter>
         </form>
