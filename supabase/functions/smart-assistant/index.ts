@@ -969,53 +969,136 @@ serve(async (req) => {
       }
     }
 
-    // Extract constraints from preferences (Phase 6.0 - with JSON block for deterministic parsing)
+    // Extract constraints from preferences (Phase 6.1 - Unified format with scope-aware logic)
     const prefs = profile?.preferences as any;
-    const hardcodedConstraints = {
-      avoidIngredients: prefs?.constraints?.avoidIngredients || [],
-      avoidBrands: prefs?.constraints?.avoidBrands || [],
-      avoidProductForms: prefs?.constraints?.avoidProductForms || [],
-      budget: prefs?.constraints?.budget || 'no_preference'
+    const constraintsData = prefs?.constraints || {};
+    
+    // Read from unified items array (primary source)
+    const unifiedItems = (constraintsData.items || []) as Array<{
+      id: string;
+      targetType: string;
+      targetValue: string;
+      scope: string;
+      intent: string;
+      source?: string;
+      addedAt?: string;
+    }>;
+    
+    // Group constraints by intent level for enforcement logic
+    const neverConstraints: typeof unifiedItems = [];
+    const avoidConstraints: typeof unifiedItems = [];
+    const limitConstraints: typeof unifiedItems = [];
+    
+    unifiedItems.forEach(item => {
+      const intent = item.intent?.toLowerCase() || 'avoid';
+      if (intent === 'never' || intent === 'strictly_avoid') {
+        neverConstraints.push(item);
+      } else if (intent === 'avoid') {
+        avoidConstraints.push(item);
+      } else if (intent === 'limit') {
+        limitConstraints.push(item);
+      }
+    });
+    
+    // Also read legacy format for backward compatibility
+    const legacyConstraints = {
+      avoidIngredients: constraintsData.avoidIngredients || [],
+      avoidBrands: constraintsData.avoidBrands || [],
+      avoidProductForms: constraintsData.avoidProductForms || [],
+      budget: constraintsData.budget || 'no_preference'
     };
     
-    // Get custom constraints with intent levels
-    const customConstraints = (prefs?.constraints?.custom || []).map((c: any) => ({
-      category: c.category,
-      rule: c.rule,
-      value: c.value,
-      intent: c.intent,
-      confidence: c.confidence || 1.0
-    }));
-    
-    // Build human-readable summary
+    // Build human-readable summary with scope context
     const constraintsSummary: string[] = [];
-    if (hardcodedConstraints.avoidIngredients.length) {
-      constraintsSummary.push(`- Avoid ingredients: ${hardcodedConstraints.avoidIngredients.join(', ')}`);
+    
+    // Add NEVER constraints (hard blocks)
+    if (neverConstraints.length > 0) {
+      const neverItems = neverConstraints.map(c => 
+        `${c.targetValue} (${c.targetType}, ${c.scope === 'global' ? 'all categories' : c.scope + ' only'})`
+      );
+      constraintsSummary.push(`- NEVER recommend (hard block): ${neverItems.join(', ')}`);
     }
-    if (hardcodedConstraints.avoidBrands.length) {
-      constraintsSummary.push(`- Avoid brands: ${hardcodedConstraints.avoidBrands.join(', ')}`);
+    
+    // Add AVOID constraints (soft blocks with scope)
+    if (avoidConstraints.length > 0) {
+      const avoidItems = avoidConstraints.map(c => 
+        `${c.targetValue} (${c.targetType}, ${c.scope === 'global' ? 'all categories' : c.scope + ' only'})`
+      );
+      constraintsSummary.push(`- Avoid: ${avoidItems.join(', ')}`);
     }
-    if (hardcodedConstraints.avoidProductForms.length) {
-      constraintsSummary.push(`- Avoid product forms: ${hardcodedConstraints.avoidProductForms.join(', ')}`);
+    
+    // Add LIMIT constraints
+    if (limitConstraints.length > 0) {
+      const limitItems = limitConstraints.map(c => 
+        `${c.targetValue} (${c.targetType}, ${c.scope === 'global' ? 'all categories' : c.scope + ' only'})`
+      );
+      constraintsSummary.push(`- Limit usage: ${limitItems.join(', ')}`);
     }
-    if (hardcodedConstraints.budget !== 'no_preference') {
-      constraintsSummary.push(`- Budget: ${hardcodedConstraints.budget}`);
+    
+    // Add legacy constraints if no unified items but legacy exists
+    if (unifiedItems.length === 0) {
+      if (legacyConstraints.avoidIngredients.length) {
+        constraintsSummary.push(`- Avoid ingredients: ${legacyConstraints.avoidIngredients.join(', ')}`);
+      }
+      if (legacyConstraints.avoidBrands.length) {
+        constraintsSummary.push(`- Avoid brands: ${legacyConstraints.avoidBrands.join(', ')}`);
+      }
+      if (legacyConstraints.avoidProductForms.length) {
+        constraintsSummary.push(`- Avoid product forms: ${legacyConstraints.avoidProductForms.join(', ')}`);
+      }
     }
-    if (customConstraints.length > 0) {
-      constraintsSummary.push(`- Custom constraints: ${customConstraints.length} rules`);
+    
+    if (legacyConstraints.budget !== 'no_preference') {
+      constraintsSummary.push(`- Budget: ${legacyConstraints.budget}`);
     }
     
     const constraintsSummaryText = constraintsSummary.length > 0 
       ? constraintsSummary.join('\n') 
       : '- No specific constraints';
     
-    // Build JSON block for deterministic LLM parsing
+    // Build JSON block for deterministic LLM parsing with full scope + intent data
     const constraintsJsonBlock = JSON.stringify({
       constraints: {
-        hardcoded: hardcodedConstraints,
-        custom: customConstraints
+        // Grouped by intent for enforcement logic
+        never: neverConstraints.map(c => ({
+          type: c.targetType,
+          value: c.targetValue,
+          scope: c.scope,
+          source: c.source
+        })),
+        avoid: avoidConstraints.map(c => ({
+          type: c.targetType,
+          value: c.targetValue,
+          scope: c.scope,
+          source: c.source
+        })),
+        limit: limitConstraints.map(c => ({
+          type: c.targetType,
+          value: c.targetValue,
+          scope: c.scope,
+          source: c.source
+        })),
+        // Legacy format for backward compatibility
+        legacy: legacyConstraints,
+        // Raw items for full context
+        rawItems: unifiedItems.map(c => ({
+          type: c.targetType,
+          value: c.targetValue,
+          scope: c.scope,
+          intent: c.intent,
+          source: c.source
+        }))
       }
     }, null, 2);
+    
+    // TODO: Future enhancement - Clarification Memory Hook
+    // When user responds to scope clarification questions (e.g., "Yes, avoid coconut in haircare too"),
+    // their answer should be saved as a new constraint with source: 'assistant_clarification'.
+    // This would use the saveInsightFromChat tool or a dedicated constraint creation tool.
+    // Example flow:
+    // 1. Assistant asks: "I see you avoid coconut in skincare. This is haircare. Is that okay?"
+    // 2. User responds: "No, avoid it everywhere"
+    // 3. System creates: { targetType: 'ingredient', targetValue: 'coconut', scope: 'global', intent: 'avoid', source: 'assistant_clarification' }
 
     const systemPrompt = `You are the Common Groundz AI Assistant. You help users discover products, analyze reviews, and get personalized recommendations based on real user experiences.
 
@@ -1048,15 +1131,14 @@ Structured data for precise parsing:
 ${constraintsJsonBlock}
 \`\`\`
 
-=== PREFERENCE PRIORITY RULES (PHASE 6.0) ===
+=== PREFERENCE PRIORITY RULES (PHASE 6.1) ===
 
 When preferences conflict, follow this STRICT order:
 
-1. CONSTRAINTS (highest priority - NEVER violate)
+1. CONSTRAINTS (highest priority - NEVER violate "never" intent)
    - All items in the constraints JSON above
-   - These are absolute rules the user has set
-   - Hardcoded constraints: ingredients, brands, product forms, budget
-   - Custom constraints: user-defined rules with intent levels
+   - These are rules the user has explicitly set
+   - Pay attention to scope and intent for each constraint
 
 2. USER-EDITED PREFERENCES (high priority, confidence = 1.0)
    - Any preference manually set or approved by user
@@ -1066,19 +1148,60 @@ When preferences conflict, follow this STRICT order:
    - Use these to personalize, but don't contradict #1 or #2
    - If confidence < 0.7, treat as suggestion not fact
 
-=== CONSTRAINT INTENT RULES ===
+=== SCOPE-AWARE CONSTRAINT ENFORCEMENT RULES (CRITICAL) ===
 
-Parse the "intent" field in each custom constraint and behave accordingly:
+When evaluating products against user constraints, follow this decision tree:
 
-- strictly_avoid: NEVER recommend under ANY circumstance, even if user explicitly asks
-- avoid: Strongly avoid unless user specifically requests it
-- limit: Only recommend when there's good justification or context requires it
-- prefer: Prioritize this when relevant, but it's not mandatory
+1. HARD BLOCK (intent = "never" or "strictly_avoid"):
+   - ALWAYS enforce, NO EXCEPTIONS
+   - Do NOT ask for clarification - these represent allergies, medical needs, religious/ethical rules, or firm boundaries
+   - Response format: "I cannot recommend this because you've indicated you strictly avoid [X]."
+
+2. GLOBAL SCOPE (scope = "global" AND intent = "avoid"):
+   - Soft block everywhere
+   - Recommend against but explain why
+   - Response format: "This contains [X] which you avoid. I'd recommend looking at alternatives."
+
+3. MATCHING SCOPE (constraint scope = product category AND intent = "avoid"):
+   - Soft block in that category
+   - Recommend against but explain why
+   - Response format: "Since you avoid [X] in [category], I wouldn't recommend this."
+
+4. DIFFERENT SCOPE (constraint scope ≠ product category AND intent = "avoid"):
+   - ASK FOR CLARIFICATION instead of rejecting
+   - The user may have different preferences for different product categories
+   - Response format: "I see you avoid [X] in [constraint scope] products. This is a [product category] product that contains [X]. Would you like me to avoid [X] in [product category] as well, or is this okay for you?"
+
+5. LIMIT INTENT (intent = "limit"):
+   - Only flag if there's a specific concern
+   - Can recommend with a note about the user's preference to limit usage
+   - Response format: "This contains [X] which you prefer to limit. It's still a good option if you're okay with occasional use."
+
+IMPORTANT SAFETY RULES:
+- NEVER assume a skincare constraint applies to haircare or vice versa without asking
+- NEVER ask for clarification on "never" or "strictly_avoid" constraints - always enforce them
+- When in doubt about scope, ask for clarification rather than blocking or ignoring
+
+=== CONSTRAINT MATCHING LOGIC ===
+
+Product categories and their domains:
+- skincare: cleansers, moisturizers, serums, sunscreens, masks, toners, exfoliators
+- haircare: shampoos, conditioners, hair treatments, styling products, hair oils
+- makeup: foundations, lipsticks, eyeshadows, mascaras, blushes, primers
+- fragrance: perfumes, colognes, body mists
+- supplements: vitamins, minerals, protein, wellness products
+- food: ingredients, recipes, restaurants, meals
+- movies: films, shows, documentaries, series
+- books: novels, non-fiction, audiobooks
+- global: applies to ALL categories above
+
+When a product is identified, determine its category and compare against each constraint's scope.
 
 When you detect a potential conflict between a recommendation and a constraint:
-1. Explain the conflict clearly to the user
-2. Ask which preference they want to keep
-3. NEVER assume chatbot-learned data overrides user-set constraints
+1. Check the intent level first (never/strictly_avoid = hard block)
+2. Check scope match (global or matching category = soft block)
+3. If scope differs, ask for clarification
+4. NEVER assume chatbot-learned data overrides user-set constraints
 
 === TOOL PRIORITY ===
 1. ALWAYS use search_reviews_semantic FIRST for product queries
