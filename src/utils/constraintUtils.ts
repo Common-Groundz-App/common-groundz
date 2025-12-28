@@ -143,6 +143,7 @@ export const CONSTRAINT_CATEGORIES: ConstraintCategory[] = [
   { id: 'supplements', name: 'Supplements', emoji: '💊', targetTypes: ['ingredient', 'brand'], scopes: ['global', 'supplements', 'wellness'] },
   { id: 'brands', name: 'Brands', emoji: '🏷️', targetTypes: ['brand'], scopes: ['global'] },
   { id: 'formats', name: 'Formats', emoji: '📦', targetTypes: ['format'], scopes: ['global', 'skincare', 'haircare'] },
+  { id: 'other', name: 'General', emoji: '📋', targetTypes: ['rule'], scopes: ['global'] },
 ];
 
 /**
@@ -390,7 +391,7 @@ interface DetectedConstraint {
 
 const INGREDIENT_KEYWORDS = ['vitamin', 'acid', 'retinol', 'niacinamide', 'hyaluronic', 'glycolic', 'salicylic', 'peptide', 'collagen', 'caffeine', 'alcohol', 'paraben', 'sulfate', 'silicone', 'fragrance', 'oil', 'butter', 'extract', 'sugar', 'salt', 'gluten', 'dairy', 'soy', 'nut'];
 const BRAND_KEYWORDS = ['brand', 'company', 'products from'];
-const GENRE_KEYWORDS = ['horror', 'comedy', 'drama', 'action', 'thriller', 'romance', 'sci-fi', 'fantasy', 'documentary', 'anime', 'musical', 'western'];
+const GENRE_KEYWORDS = ['horror', 'comedy', 'drama', 'action', 'thriller', 'romance', 'sci-fi', 'fantasy', 'documentary', 'anime', 'musical', 'western', 'tragedy'];
 const FOOD_KEYWORDS = ['food', 'fast food', 'junk food', 'processed', 'fried', 'spicy', 'sweet', 'sour', 'bitter', 'meat', 'vegetarian', 'vegan', 'organic'];
 const FORMAT_KEYWORDS = ['spray', 'gel', 'cream', 'lotion', 'serum', 'oil', 'powder', 'capsule', 'tablet', 'liquid', 'foam', 'mist'];
 
