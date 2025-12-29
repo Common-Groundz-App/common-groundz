@@ -13,12 +13,13 @@ import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Ban, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, X, Plus, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, CanonicalCategory } from '@/types/preferences';
+import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, CanonicalCategory, UnifiedConstraintsType } from '@/types/preferences';
 import { cn } from '@/lib/utils';
 import { countTotalPreferences, getCategoryValues, hasAnyPreferences, createPreferenceValue } from '@/utils/preferenceRouting';
 import { arePreferencesEqual, countPreferenceDifferences, isPendingRemoval as checkPendingRemoval, getChangeSummary } from '@/utils/preferenceUtils';
 import { countConstraints, CONSTRAINT_CATEGORIES, getConstraintsForCategory, getTargetTypeLabel } from '@/utils/constraintUtils';
 import AddCustomPreferenceModal from './AddCustomPreferenceModal';
+import AddUnifiedConstraintModal from './AddUnifiedConstraintModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -739,8 +740,6 @@ const PreferencesSection = () => {
                 <ConstraintsSection
                   constraints={preferences?.constraints}
                   onUpdateConstraints={handleUpdateConstraints}
-                  isModalOpen={addConstraintModalOpen}
-                  onCloseModal={() => setAddConstraintModalOpen(false)}
                   onOpenModal={() => setAddConstraintModalOpen(true)}
                 />
               </AccordionContent>
@@ -816,6 +815,21 @@ const PreferencesSection = () => {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+
+          {/* Add Constraint Modal - rendered outside accordion so it works when closed */}
+          <AddUnifiedConstraintModal
+            isOpen={addConstraintModalOpen}
+            onClose={() => setAddConstraintModalOpen(false)}
+            onSave={(constraint) => {
+              const currentConstraints = (preferences?.constraints as UnifiedConstraintsType) || { items: [] };
+              const updated: UnifiedConstraintsType = {
+                ...currentConstraints,
+                items: [...(currentConstraints.items || []), constraint],
+              };
+              handleUpdateConstraints(updated);
+              setAddConstraintModalOpen(false);
+            }}
+          />
         </CardContent>
       </Card>
 
