@@ -192,10 +192,13 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         });
         
         // Add detected constraints as learned (read approvedAt and dismissed from DB)
+        // Use unique ID based on rule + value to ensure each constraint is uniquely identifiable
         detectedConstraints.forEach((c: any) => {
+          const uniqueId = `${c.rule}:${c.value}`.toLowerCase().replace(/\s+/g, '_');
           learned.push({
+            id: uniqueId,
             scope: c.category,
-            key: `constraint: ${c.rule}`,
+            key: `constraint:${uniqueId}`,  // Unique key includes the value
             value: c.value,
             confidence: c.confidence || 0.7,
             evidence: c.evidence,
@@ -446,7 +449,9 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         if (memoryData?.metadata) {
           const metadata = memoryData.metadata as any;
           const updatedConstraints = (metadata.detected_constraints || []).map((c: any) => {
-            if (c.category === scope && `constraint: ${c.rule}` === key) {
+            const constraintId = `${c.rule}:${c.value}`.toLowerCase().replace(/\s+/g, '_');
+            const expectedKey = `constraint:${constraintId}`;
+            if (c.category === scope && expectedKey === key) {
               return { ...c, approvedAt: new Date().toISOString() };
             }
             return c;
@@ -498,7 +503,9 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       if (memoryData?.metadata) {
         const metadata = memoryData.metadata as any;
         const updatedConstraints = (metadata.detected_constraints || []).map((c: any) => {
-          if (c.category === scope && `constraint: ${c.rule}` === key) {
+          const constraintId = `${c.rule}:${c.value}`.toLowerCase().replace(/\s+/g, '_');
+          const expectedKey = `constraint:${constraintId}`;
+          if (c.category === scope && expectedKey === key) {
             return { ...c, dismissed: true, dismissedAt: new Date().toISOString() };
           }
           return c;
