@@ -499,29 +499,17 @@ const PreferencesSection = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-background">
-                          <DropdownMenuItem onSelect={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setAddModalOpen(true);
-                          }}>
+                          <DropdownMenuItem onSelect={() => setAddModalOpen(true)}>
                             <Plus className="h-4 w-4 mr-2" />
                             Add preference
                           </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setEditModalOpen(true);
-                          }}>
+                          <DropdownMenuItem onSelect={() => setEditModalOpen(true)}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit preferences
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setResetPreferencesDialogOpen(true);
-                            }}
+                            onSelect={() => setResetPreferencesDialogOpen(true)}
                             className="text-destructive focus:text-destructive"
                             disabled={!hasFormPreferences}
                           >
@@ -727,21 +715,13 @@ const PreferencesSection = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-background">
-                          <DropdownMenuItem onSelect={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setAddConstraintModalOpen(true);
-                          }}>
+                          <DropdownMenuItem onSelect={() => setAddConstraintModalOpen(true)}>
                             <Plus className="h-4 w-4 mr-2" />
                             Add constraint
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setClearConstraintsDialogOpen(true);
-                            }}
+                            onSelect={() => setClearConstraintsDialogOpen(true)}
                             className="text-destructive focus:text-destructive"
                             disabled={!hasConstraints}
                           >
@@ -801,11 +781,7 @@ const PreferencesSection = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-background">
                           <DropdownMenuItem 
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setClearLearnedDialogOpen(true);
-                            }}
+                            onSelect={() => setClearLearnedDialogOpen(true)}
                             className="text-destructive focus:text-destructive"
                             disabled={!hasLearnedData}
                           >
