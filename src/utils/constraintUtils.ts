@@ -439,7 +439,7 @@ export const getTargetTypeLabel = (targetType: ConstraintTargetType): string => 
     genre: 'Genre',
     food_type: 'Food Type',
     format: 'Format',
-    rule: 'Rule',
+    rule: 'Other',
   };
   return labels[targetType];
 };
