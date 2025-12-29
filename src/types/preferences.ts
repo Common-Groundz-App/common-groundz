@@ -104,6 +104,7 @@ export interface CustomPreference {
 }
 
 export interface LearnedPreference {
+  id?: string;  // Unique identifier for stable matching (rule:value format)
   scope: string;
   key: string;
   value: any;

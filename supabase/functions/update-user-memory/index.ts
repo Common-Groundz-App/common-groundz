@@ -427,25 +427,66 @@ Use the extract_scoped_memories function to structure your response.`;
       };
     });
 
-    // Merge detected constraints (avoid duplicates by value+category)
+    // Get existing TTA constraints from user's saved preferences (unified format)
+    const existingTTAConstraints = (profile?.preferences as any)?.constraints?.items || [];
+    
+    // Get existing preference values from user's saved preferences (canonical categories)
+    const existingSkinType = (profile?.preferences as any)?.skin_type?.values || [];
+    const existingHairType = (profile?.preferences as any)?.hair_type?.values || [];
+    const existingFoodPrefs = (profile?.preferences as any)?.food_preferences?.values || [];
+    const existingLifestyle = (profile?.preferences as any)?.lifestyle?.values || [];
+    const existingGenres = (profile?.preferences as any)?.genre_preferences?.values || [];
+    const existingGoals = (profile?.preferences as any)?.goals?.values || [];
+    
+    // Merge detected constraints (avoid duplicates by value+category AND check against existing TTA)
     const mergedConstraints = [...existingConstraints];
     for (const newConstraint of detectedConstraints) {
-      const exists = mergedConstraints.some(
+      const existsInMemory = mergedConstraints.some(
         c => c.category === newConstraint.category && 
              c.value?.toLowerCase() === newConstraint.value?.toLowerCase()
       );
-      if (!exists) {
+      
+      // Also check against existing TTA (unified constraints)
+      const existsInTTA = existingTTAConstraints.some(
+        (uc: any) => uc.normalizedValue?.toLowerCase() === newConstraint.value?.toLowerCase()
+      );
+      
+      if (!existsInMemory && !existsInTTA) {
         mergedConstraints.push({
           ...newConstraint,
           extractedAt: new Date().toISOString(),
           source: 'chatbot'
         });
+      } else if (existsInTTA) {
+        console.log(`[update-user-memory] Skipping constraint "${newConstraint.value}" - already in TTA`);
       }
     }
 
-    // Merge detected preferences (avoid duplicates by key+category)
+    // Merge detected preferences (avoid duplicates by key+category AND check against existing preferences)
     const mergedPreferences = [...existingPreferences];
     for (const newPref of detectedPreferences) {
+      // Check which existing preference list to compare against based on category
+      let existingPreferenceValues: any[] = [];
+      if (newPref.category === 'skincare') {
+        existingPreferenceValues = [...existingSkinType, ...existingGoals];
+      } else if (newPref.category === 'food') {
+        existingPreferenceValues = [...existingFoodPrefs, ...existingLifestyle];
+      } else if (newPref.category === 'movies') {
+        existingPreferenceValues = existingGenres;
+      } else if (newPref.category === 'haircare') {
+        existingPreferenceValues = existingHairType;
+      }
+      
+      // Check if this preference value already exists in user's saved preferences
+      const existsInSavedPrefs = existingPreferenceValues.some(
+        (pv: any) => pv.normalizedValue?.toLowerCase() === newPref.value?.toLowerCase()
+      );
+      
+      if (existsInSavedPrefs) {
+        console.log(`[update-user-memory] Skipping preference "${newPref.value}" - already in saved preferences`);
+        continue;
+      }
+      
       const existingIdx = mergedPreferences.findIndex(
         p => p.category === newPref.category && p.key === newPref.key
       );
