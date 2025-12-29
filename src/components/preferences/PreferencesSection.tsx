@@ -19,6 +19,8 @@ import { countTotalPreferences, getCategoryValues, hasAnyPreferences, createPref
 import { arePreferencesEqual, countPreferenceDifferences, isPendingRemoval as checkPendingRemoval, getChangeSummary } from '@/utils/preferenceUtils';
 import { countConstraints, CONSTRAINT_CATEGORIES, getConstraintsForCategory, getTargetTypeLabel } from '@/utils/constraintUtils';
 import AddCustomPreferenceModal from './AddCustomPreferenceModal';
+import AddUnifiedConstraintModal from './AddUnifiedConstraintModal';
+import { UnifiedConstraint, UnifiedConstraintsType } from '@/types/preferences';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -323,7 +325,7 @@ const PreferencesSection = () => {
   };
 
   // Handle constraints update
-  const handleUpdateConstraints = async (newConstraints: ConstraintsType) => {
+  const handleUpdateConstraints = async (newConstraints: ConstraintsType | UnifiedConstraintsType) => {
     try {
       await updatePreferences({
         ...preferences,
@@ -336,6 +338,17 @@ const PreferencesSection = () => {
         variant: "destructive"
       });
     }
+  };
+
+  // Handle adding constraint from modal (outside accordion)
+  const handleAddConstraintFromModal = async (constraint: UnifiedConstraint) => {
+    const currentConstraints = preferences?.constraints as UnifiedConstraintsType | undefined;
+    const updated: UnifiedConstraintsType = {
+      ...currentConstraints,
+      items: [...(currentConstraints?.items || []), constraint],
+    };
+    await handleUpdateConstraints(updated);
+    setAddConstraintModalOpen(false);
   };
 
   const handleApproveLearned = async (scope: string, key: string, value: any) => {
@@ -486,17 +499,29 @@ const PreferencesSection = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-background">
-                          <DropdownMenuItem onClick={() => setAddModalOpen(true)}>
+                          <DropdownMenuItem onSelect={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setAddModalOpen(true);
+                          }}>
                             <Plus className="h-4 w-4 mr-2" />
                             Add preference
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
+                          <DropdownMenuItem onSelect={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setEditModalOpen(true);
+                          }}>
                             <Pencil className="h-4 w-4 mr-2" />
                             Edit preferences
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onClick={() => setResetPreferencesDialogOpen(true)}
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setResetPreferencesDialogOpen(true);
+                            }}
                             className="text-destructive focus:text-destructive"
                             disabled={!hasFormPreferences}
                           >
@@ -702,13 +727,21 @@ const PreferencesSection = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-background">
-                          <DropdownMenuItem onClick={() => setAddConstraintModalOpen(true)}>
+                          <DropdownMenuItem onSelect={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setAddConstraintModalOpen(true);
+                          }}>
                             <Plus className="h-4 w-4 mr-2" />
                             Add constraint
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem 
-                            onClick={() => setClearConstraintsDialogOpen(true)}
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setClearConstraintsDialogOpen(true);
+                            }}
                             className="text-destructive focus:text-destructive"
                             disabled={!hasConstraints}
                           >
@@ -736,8 +769,6 @@ const PreferencesSection = () => {
                 <ConstraintsSection
                   constraints={preferences?.constraints}
                   onUpdateConstraints={handleUpdateConstraints}
-                  isModalOpen={addConstraintModalOpen}
-                  onCloseModal={() => setAddConstraintModalOpen(false)}
                   onOpenModal={() => setAddConstraintModalOpen(true)}
                 />
               </AccordionContent>
@@ -770,7 +801,11 @@ const PreferencesSection = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-background">
                           <DropdownMenuItem 
-                            onClick={() => setClearLearnedDialogOpen(true)}
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setClearLearnedDialogOpen(true);
+                            }}
                             className="text-destructive focus:text-destructive"
                             disabled={!hasLearnedData}
                           >
@@ -933,6 +968,13 @@ const PreferencesSection = () => {
         isOpen={addModalOpen}
         onClose={() => setAddModalOpen(false)}
         onSave={handleAddPreference}
+      />
+
+      {/* Add Constraint Modal (outside accordion to prevent unmounting) */}
+      <AddUnifiedConstraintModal
+        isOpen={addConstraintModalOpen}
+        onClose={() => setAddConstraintModalOpen(false)}
+        onSave={handleAddConstraintFromModal}
       />
     </>
   );
