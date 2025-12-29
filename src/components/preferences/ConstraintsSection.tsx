@@ -18,7 +18,6 @@ import {
   getPrimaryCategory,
   ConstraintCategory,
 } from '@/utils/constraintUtils';
-import AddUnifiedConstraintModal from './AddUnifiedConstraintModal';
 import { cn } from '@/lib/utils';
 
 // Constraint chip component - rose-toned, clean style
@@ -115,8 +114,6 @@ interface ConstraintsSectionProps {
   constraints: ConstraintsType | UnifiedConstraintsType;
   onUpdateConstraints: (constraints: ConstraintsType | UnifiedConstraintsType) => void;
   isReadOnly?: boolean;
-  isModalOpen?: boolean;
-  onCloseModal?: () => void;
   onOpenModal?: () => void;
 }
 
@@ -124,8 +121,6 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
   constraints,
   onUpdateConstraints,
   isReadOnly = false,
-  isModalOpen = false,
-  onCloseModal,
   onOpenModal,
 }) => {
   // Normalize to unified format (handles both legacy and new)
@@ -133,15 +128,6 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
     ? migrateToUnifiedConstraints(constraints as ConstraintsType)
     : (constraints as UnifiedConstraintsType) || { items: [] };
   
-  // Handler for adding new constraint
-  const handleAddConstraint = (constraint: UnifiedConstraint) => {
-    const updated: UnifiedConstraintsType = {
-      ...unifiedConstraints,
-      items: [...unifiedConstraints.items, constraint],
-    };
-    onUpdateConstraints(updated);
-    onCloseModal?.();
-  };
   
   // Handler for removing constraint
   const handleRemoveConstraint = (id: string) => {
@@ -199,11 +185,6 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
         </div>
       )}
 
-      <AddUnifiedConstraintModal
-        isOpen={isModalOpen}
-        onClose={() => onCloseModal?.()}
-        onSave={handleAddConstraint}
-      />
     </div>
   );
 };
