@@ -462,67 +462,64 @@ const PreferencesSection = () => {
           <Accordion type="multiple" defaultValue={["preferences"]} onValueChange={setOpenSections} className="w-full">
             {/* Section 1: Your Preferences */}
             <AccordionItem value="preferences" className="border-b">
-              <div className="flex items-center gap-2 group">
-                <AccordionTrigger className="flex-1 hover:no-underline py-4 hover:bg-muted/30 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden">
-                  <div className="flex items-center w-full">
-                    <div className="flex flex-col items-start flex-1">
-                      <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-orange-500" />
-                        <span className="font-medium">Your Preferences</span>
-                        {preferencesCount > 0 && (
-                          <Badge className="ml-2 text-xs bg-orange-100 text-orange-700">
-                            {preferencesCount}
-                          </Badge>
-                        )}
-                      </div>
-                      <span className="text-xs text-muted-foreground mt-1 text-left">
-                        {getPreferencesSummary()}
-                      </span>
-                    </div>
-                    
-                    {/* Chevron inside trigger - clickable */}
-                    <ChevronDown 
-                      className={cn(
-                        "h-5 w-5 shrink-0 text-muted-foreground/50 transition-all duration-200 mr-2 group-hover:text-muted-foreground/80",
-                        openSections.includes('preferences') && "rotate-180"
+              <AccordionTrigger className="hover:no-underline py-4 hover:bg-muted/50 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden group">
+                <div className="flex items-center w-full">
+                  <div className="flex flex-col items-start flex-1">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-orange-500" />
+                      <span className="font-medium">Your Preferences</span>
+                      {preferencesCount > 0 && (
+                        <Badge className="ml-2 text-xs bg-orange-100 text-orange-700">
+                          {preferencesCount}
+                        </Badge>
                       )}
-                    />
+                      {/* 3-dots menu - smaller, next to badge */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 shrink-0 ml-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-background">
+                          <DropdownMenuItem onClick={() => setAddModalOpen(true)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add preference
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit preferences
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => setResetPreferencesDialogOpen(true)}
+                            className="text-destructive focus:text-destructive"
+                            disabled={!hasFormPreferences}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            Reset preferences
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <span className="text-xs text-muted-foreground mt-1 text-left">
+                      {getPreferencesSummary()}
+                    </span>
                   </div>
-                </AccordionTrigger>
-                
-                {/* 3-dots menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-background">
-                    <DropdownMenuItem onClick={() => setAddModalOpen(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add preference
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setEditModalOpen(true)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit preferences
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => setResetPreferencesDialogOpen(true)}
-                      className="text-destructive focus:text-destructive"
-                      disabled={!hasFormPreferences}
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Reset preferences
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                  
+                  {/* Chevron at far right - darker */}
+                  <ChevronDown 
+                    className={cn(
+                      "h-5 w-5 shrink-0 text-foreground transition-all duration-200",
+                      openSections.includes('preferences') && "rotate-180"
+                    )}
+                  />
+                </div>
+              </AccordionTrigger>
               <AccordionContent className="pt-4">
                 {hasFormPreferences ? (
                   <div className="space-y-4">
@@ -681,63 +678,60 @@ const PreferencesSection = () => {
 
             {/* Section 2: Things to Avoid (Constraints) */}
             <AccordionItem value="constraints" className="border-b">
-              <div className="flex items-center gap-2 group">
-                <AccordionTrigger className="flex-1 hover:no-underline py-4 hover:bg-muted/30 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden">
-                  <div className="flex items-center w-full">
-                    <div className="flex flex-col items-start flex-1">
-                      <div className="flex items-center gap-2">
-                        <Ban className="h-5 w-5 text-red-500" />
-                        <span className="font-medium">Things to Avoid</span>
-                        {constraintCount > 0 && (
-                          <Badge className="ml-2 text-xs bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300">
-                            {constraintCount}
-                          </Badge>
-                        )}
-                      </div>
-                      <span className="text-xs text-muted-foreground mt-1 text-left">
-                        {getConstraintsSummary()}
-                      </span>
-                    </div>
-                    
-                    {/* Chevron inside trigger - clickable */}
-                    <ChevronDown 
-                      className={cn(
-                        "h-5 w-5 shrink-0 text-muted-foreground/50 transition-all duration-200 mr-2 group-hover:text-muted-foreground/80",
-                        openSections.includes('constraints') && "rotate-180"
+              <AccordionTrigger className="hover:no-underline py-4 hover:bg-muted/50 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden group">
+                <div className="flex items-center w-full">
+                  <div className="flex flex-col items-start flex-1">
+                    <div className="flex items-center gap-2">
+                      <Ban className="h-5 w-5 text-red-500" />
+                      <span className="font-medium">Things to Avoid</span>
+                      {constraintCount > 0 && (
+                        <Badge className="ml-2 text-xs bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300">
+                          {constraintCount}
+                        </Badge>
                       )}
-                    />
+                      {/* 3-dots menu - smaller, next to badge */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 shrink-0 ml-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-background">
+                          <DropdownMenuItem onClick={() => setAddConstraintModalOpen(true)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add constraint
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => setClearConstraintsDialogOpen(true)}
+                            className="text-destructive focus:text-destructive"
+                            disabled={!hasConstraints}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Clear all constraints
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <span className="text-xs text-muted-foreground mt-1 text-left">
+                      {getConstraintsSummary()}
+                    </span>
                   </div>
-                </AccordionTrigger>
-                
-                {/* 3-dots menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-background">
-                    <DropdownMenuItem onClick={() => setAddConstraintModalOpen(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add constraint
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => setClearConstraintsDialogOpen(true)}
-                      className="text-destructive focus:text-destructive"
-                      disabled={!hasConstraints}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Clear all constraints
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                  
+                  {/* Chevron at far right - darker */}
+                  <ChevronDown 
+                    className={cn(
+                      "h-5 w-5 shrink-0 text-foreground transition-all duration-200",
+                      openSections.includes('constraints') && "rotate-180"
+                    )}
+                  />
+                </div>
+              </AccordionTrigger>
               <AccordionContent className="pt-4">
                 <ConstraintsSection
                   constraints={preferences?.constraints}
@@ -751,58 +745,55 @@ const PreferencesSection = () => {
 
             {/* Section 3: Learned from Conversations */}
             <AccordionItem value="learned" className="border-0">
-              <div className="flex items-center gap-2 group">
-                <AccordionTrigger className="flex-1 hover:no-underline py-4 hover:bg-muted/30 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden">
-                  <div className="flex items-center w-full">
-                    <div className="flex flex-col items-start flex-1">
-                      <div className="flex items-center gap-2">
-                        <Brain className="h-5 w-5 text-purple-500" />
-                        <span className="font-medium">Learned from Conversations</span>
-                        {pendingLearnedCount > 0 && (
-                          <Badge className="ml-2 text-xs bg-purple-100 text-purple-700">
-                            {pendingLearnedCount} pending
-                          </Badge>
-                        )}
-                      </div>
-                      <span className="text-xs text-muted-foreground mt-1 text-left">
-                        {getLearnedSummary()}
-                      </span>
-                    </div>
-                    
-                    {/* Chevron inside trigger - clickable */}
-                    <ChevronDown 
-                      className={cn(
-                        "h-5 w-5 shrink-0 text-muted-foreground/50 transition-all duration-200 mr-2 group-hover:text-muted-foreground/80",
-                        openSections.includes('learned') && "rotate-180"
+              <AccordionTrigger className="hover:no-underline py-4 hover:bg-muted/50 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden group">
+                <div className="flex items-center w-full">
+                  <div className="flex flex-col items-start flex-1">
+                    <div className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-purple-500" />
+                      <span className="font-medium">Learned from Conversations</span>
+                      {pendingLearnedCount > 0 && (
+                        <Badge className="ml-2 text-xs bg-purple-100 text-purple-700">
+                          {pendingLearnedCount} pending
+                        </Badge>
                       )}
-                    />
+                      {/* 3-dots menu - smaller, next to badge */}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 shrink-0 ml-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-background">
+                          <DropdownMenuItem 
+                            onClick={() => setClearLearnedDialogOpen(true)}
+                            className="text-destructive focus:text-destructive"
+                            disabled={!hasLearnedData}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Clear all learned data
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <span className="text-xs text-muted-foreground mt-1 text-left">
+                      {getLearnedSummary()}
+                    </span>
                   </div>
-                </AccordionTrigger>
-                
-                {/* 3-dots menu */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 shrink-0"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="bg-background">
-                    <DropdownMenuItem 
-                      onClick={() => setClearLearnedDialogOpen(true)}
-                      className="text-destructive focus:text-destructive"
-                      disabled={!hasLearnedData}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Clear all learned data
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                  
+                  {/* Chevron at far right - darker */}
+                  <ChevronDown 
+                    className={cn(
+                      "h-5 w-5 shrink-0 text-foreground transition-all duration-200",
+                      openSections.includes('learned') && "rotate-180"
+                    )}
+                  />
+                </div>
+              </AccordionTrigger>
               <AccordionContent className="pt-4">
                 <LearnedPreferencesSection
                   learnedPreferences={learnedPreferences}
