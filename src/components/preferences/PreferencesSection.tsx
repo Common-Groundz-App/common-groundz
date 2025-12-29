@@ -459,7 +459,7 @@ const PreferencesSection = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <Accordion type="multiple" defaultValue={["preferences"]} onValueChange={setOpenSections} className="w-full">
+          <Accordion type="multiple" value={openSections} onValueChange={setOpenSections} className="w-full">
             {/* Section 1: Your Preferences */}
             <AccordionItem value="preferences" className="border-b">
               <AccordionTrigger className="hover:no-underline py-4 hover:bg-muted/50 rounded-lg px-2 -mx-2 cursor-pointer [&>svg:last-child]:hidden group">
