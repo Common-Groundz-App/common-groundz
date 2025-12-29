@@ -128,7 +128,7 @@ const PreferencesSection = () => {
   const { preferences, updatePreferences, isLoading, learnedPreferences, approveLearnedPreference, dismissLearnedPreference, addPreferenceValue, removePreferenceValue } = usePreferences();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [openSections, setOpenSections] = useState<string[]>(['preferences']);
+  const [openSections, setOpenSections] = useState<string[]>([]);
   const { toast } = useToast();
 
   // Confirmation dialog states
