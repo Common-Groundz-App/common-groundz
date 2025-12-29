@@ -702,7 +702,10 @@ const PreferencesSection = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-background">
-                          <DropdownMenuItem onClick={() => setAddConstraintModalOpen(true)}>
+                          <DropdownMenuItem onClick={(e) => {
+                            e.stopPropagation();
+                            setAddConstraintModalOpen(true);
+                          }}>
                             <Plus className="h-4 w-4 mr-2" />
                             Add constraint
                           </DropdownMenuItem>
