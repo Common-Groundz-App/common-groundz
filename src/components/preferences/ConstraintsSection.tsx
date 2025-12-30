@@ -5,15 +5,12 @@ import { X, Plus, Ban } from 'lucide-react';
 import { 
   UnifiedConstraint, 
   UnifiedConstraintsType,
-  ConstraintsType,
 } from '@/types/preferences';
 import {
   CONSTRAINT_CATEGORIES,
   getConstraintsForCategory,
   getIntentStyles,
   getScopeLabel,
-  isLegacyConstraintFormat,
-  migrateToUnifiedConstraints,
   countConstraints,
   getPrimaryCategory,
   ConstraintCategory,
@@ -111,8 +108,8 @@ const ConstraintCategoryCard = ({
 };
 
 interface ConstraintsSectionProps {
-  constraints: ConstraintsType | UnifiedConstraintsType;
-  onUpdateConstraints: (constraints: ConstraintsType | UnifiedConstraintsType) => void;
+  constraints: UnifiedConstraintsType;
+  onUpdateConstraints: (constraints: UnifiedConstraintsType) => void;
   isReadOnly?: boolean;
   onOpenModal?: () => void;
 }
@@ -123,10 +120,8 @@ const ConstraintsSection: React.FC<ConstraintsSectionProps> = ({
   isReadOnly = false,
   onOpenModal,
 }) => {
-  // Normalize to unified format (handles both legacy and new)
-  const unifiedConstraints: UnifiedConstraintsType = isLegacyConstraintFormat(constraints)
-    ? migrateToUnifiedConstraints(constraints as ConstraintsType)
-    : (constraints as UnifiedConstraintsType) || { items: [] };
+  // Use unified format directly (legacy migration handled at context level)
+  const unifiedConstraints: UnifiedConstraintsType = constraints || { items: [] };
   
   
   // Handler for removing constraint
