@@ -380,7 +380,7 @@ const PreferencesSection = () => {
   };
 
   // Count constraints and learned preferences for badges
-  const { unifiedConstraints } = usePreferences();
+  const { unifiedConstraints, updateUnifiedConstraints } = usePreferences();
   const constraintCount = countConstraints(unifiedConstraints);
 
   const activeLearned = learnedPreferences.filter(p => !p.dismissed);
@@ -752,8 +752,8 @@ const PreferencesSection = () => {
               </AccordionTrigger>
               <AccordionContent className="pt-4">
                 <ConstraintsSection
-                  constraints={preferences?.constraints}
-                  onUpdateConstraints={handleUpdateConstraints}
+                  constraints={unifiedConstraints}
+                  onUpdateConstraints={updateUnifiedConstraints}
                   onOpenModal={() => setAddConstraintModalOpen(true)}
                 />
               </AccordionContent>
@@ -835,12 +835,11 @@ const PreferencesSection = () => {
             isOpen={addConstraintModalOpen}
             onClose={() => setAddConstraintModalOpen(false)}
             onSave={(constraint) => {
-              const currentConstraints = (preferences?.constraints as UnifiedConstraintsType) || { items: [] };
               const updated: UnifiedConstraintsType = {
-                ...currentConstraints,
-                items: [...(currentConstraints.items || []), constraint],
+                ...unifiedConstraints,
+                items: [...(unifiedConstraints.items || []), constraint],
               };
-              handleUpdateConstraints(updated);
+              updateUnifiedConstraints(updated);
               setAddConstraintModalOpen(false);
             }}
           />
