@@ -113,6 +113,9 @@ export interface LearnedPreference {
   extractedAt: string;
   dismissed?: boolean;
   approvedAt?: string;
+  // Constraint-specific metadata (preserved from detection)
+  constraintRule?: string;           // e.g., "Avoid ingredient"
+  constraintIntent?: ConstraintIntent; // e.g., "avoid" | "strictly_avoid"
 }
 
 export interface DetectedConstraint {

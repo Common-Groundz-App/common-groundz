@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 
 interface LearnedPreferencesSectionProps {
   learnedPreferences: LearnedPreference[];
-  onApprove: (scope: string, key: string, value: any) => void;
+  onApprove: (scope: string, key: string, value: any, pref: LearnedPreference) => void;
   onDismiss: (scope: string, key: string) => void;
   onEdit?: (preference: LearnedPreference) => void;
   isLoading?: boolean;
@@ -130,7 +130,7 @@ const LearnedPreferencesSection: React.FC<LearnedPreferencesSectionProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onApprove(pref.scope, pref.key, pref.value)}
+                        onClick={() => onApprove(pref.scope, pref.key, pref.value, pref)}
                         className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-500/10"
                         title="Approve"
                       >

@@ -30,6 +30,7 @@ import {
   addUnifiedConstraint as addConstraintToList,
   removeUnifiedConstraint as removeConstraintFromList,
 } from '@/utils/constraintUtils';
+import type { ConstraintTargetType, ConstraintScope } from '@/types/preferences';
 
 interface PreferencesContextType {
   preferences: UserPreferences;
@@ -54,7 +55,7 @@ interface PreferencesContextType {
   removePreferenceValue: (field: CanonicalCategory | string, normalizedValue: string) => Promise<boolean>;
   // Learned preferences management
   fetchLearnedPreferences: () => Promise<void>;
-  approveLearnedPreference: (scope: string, key: string, value: any, confidence?: number, evidence?: string) => Promise<boolean>;
+  approveLearnedPreference: (scope: string, key: string, value: any, confidence?: number, evidence?: string, learnedPref?: LearnedPreference) => Promise<boolean>;
   dismissLearnedPreference: (scope: string, key: string) => Promise<boolean>;
 }
 
@@ -205,6 +206,9 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
             extractedAt: c.extractedAt || new Date().toISOString(),
             approvedAt: c.approvedAt,
             dismissed: c.dismissed,
+            // Preserve constraint metadata for approval routing
+            constraintRule: c.rule,
+            constraintIntent: c.intent || 'avoid',
           });
         });
         
@@ -376,13 +380,35 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  // Helper: Map detected rule to constraint target type
+  const ruleToTargetType = (rule?: string): ConstraintTargetType => {
+    if (!rule) return 'rule';
+    const r = rule.toLowerCase();
+    if (r.includes('ingredient')) return 'ingredient';
+    if (r.includes('brand')) return 'brand';
+    if (r.includes('genre')) return 'genre';
+    if (r.includes('food') || r.includes('cuisine')) return 'food_type';
+    if (r.includes('format') || r.includes('form')) return 'format';
+    return 'rule';
+  };
+
+  // Helper: Map scope string to ConstraintScope
+  const scopeToConstraintScope = (scopeStr: string): ConstraintScope => {
+    const s = scopeStr.toLowerCase();
+    if (['skincare', 'haircare', 'beauty'].includes(s)) return 'skincare';
+    if (['food', 'dietary', 'nutrition'].includes(s)) return 'food';
+    if (['movies', 'books', 'music', 'entertainment'].includes(s)) return 'entertainment';
+    return 'global';
+  };
+
   // Smart approval with routing
   const approveLearnedPreference = async (
     scope: string, 
     key: string, 
     value: any,
     confidence: number = 0.7,
-    evidence?: string
+    evidence?: string,
+    learnedPref?: LearnedPreference
   ) => {
     if (!user) return false;
     
@@ -392,23 +418,43 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
       return true; // Already processed, no-op
     }
     
+    // Use passed object or find from state
+    const fullPref = learnedPref || existingPref;
+    
     // Check if this is a constraint
     const isConstraint = key.startsWith('constraint:');
     
     let success = false;
     
     if (isConstraint) {
-      // Route to constraints.custom
-      const rule = key.replace('constraint: ', '');
-      success = await addCustomConstraint({
-        category: scope,
-        rule,
-        value: typeof value === 'object' ? JSON.stringify(value) : String(value),
-        intent: 'avoid',
-        source: 'chatbot',
-        confidence,
-        evidence,
-      });
+      // Check if we have constraint metadata (new format)
+      const hasConstraintMetadata = fullPref?.constraintRule || fullPref?.constraintIntent;
+      
+      if (hasConstraintMetadata) {
+        // Use preserved metadata - no re-fetching needed
+        const targetType = ruleToTargetType(fullPref!.constraintRule);
+        const constraintScope = scopeToConstraintScope(scope);
+        const intent = fullPref!.constraintIntent === 'strictly_avoid' ? 'strictly_avoid' : 'avoid';
+        
+        const unified = createUnifiedConstraint(
+          targetType,
+          typeof value === 'object' ? JSON.stringify(value) : String(value),
+          {
+            scope: constraintScope,
+            intent,
+            source: 'chatbot',
+          }
+        );
+        success = await addUnifiedConstraint(unified);
+      } else {
+        // Backward compatibility: older items without metadata
+        const unified = createUnifiedConstraint('rule', String(value), {
+          scope: 'global',
+          intent: 'avoid',
+          source: 'chatbot',
+        });
+        success = await addUnifiedConstraint(unified);
+      }
     } else {
       // Check confidence threshold
       if (confidence < MIN_AUTO_ROUTE_CONFIDENCE) {

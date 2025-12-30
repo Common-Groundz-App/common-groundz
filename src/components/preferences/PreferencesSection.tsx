@@ -13,7 +13,7 @@ import LearnedPreferencesSection from './LearnedPreferencesSection';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Ban, Brain, Sparkles, ExternalLink, MoreVertical, Pencil, RotateCcw, Trash2, ChevronDown, X, Plus, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, CanonicalCategory, UnifiedConstraintsType } from '@/types/preferences';
+import { ConstraintsType, PreferenceCategory, PreferenceValue, UserPreferences, CanonicalCategory, UnifiedConstraintsType, LearnedPreference } from '@/types/preferences';
 import { cn } from '@/lib/utils';
 import { countTotalPreferences, getCategoryValues, hasAnyPreferences, createPreferenceValue } from '@/utils/preferenceRouting';
 import { arePreferencesEqual, countPreferenceDifferences, isPendingRemoval as checkPendingRemoval, getChangeSummary } from '@/utils/preferenceUtils';
@@ -339,19 +339,33 @@ const PreferencesSection = () => {
     }
   };
 
-  const handleApproveLearned = async (scope: string, key: string, value: any) => {
-    // Find the preference to get confidence and evidence
-    const pref = learnedPreferences.find(p => p.scope === scope && p.key === key);
-    const success = await approveLearnedPreference(scope, key, value, pref?.confidence, pref?.evidence);
+  const handleApproveLearned = async (scope: string, key: string, value: any, pref?: LearnedPreference) => {
+    // Use passed pref or find it from state
+    const preference = pref || learnedPreferences.find(p => p.scope === scope && p.key === key);
+    const isConstraint = key.startsWith('constraint:');
+    
+    const success = await approveLearnedPreference(
+      scope, 
+      key, 
+      value, 
+      preference?.confidence, 
+      preference?.evidence,
+      preference  // Pass full preference object for constraint metadata
+    );
+    
     if (success) {
       toast({
-        title: "Preference approved",
-        description: `"${key}" has been added to your preferences.`
+        title: isConstraint ? "Constraint added" : "Preference approved",
+        description: isConstraint 
+          ? `"${value}" has been added to Things to Avoid.`
+          : `"${key}" has been added to your preferences.`
       });
     } else {
       toast({
         title: "Error",
-        description: "Failed to approve preference. Please try again.",
+        description: isConstraint 
+          ? "Failed to add constraint. Please try again."
+          : "Failed to approve preference. Please try again.",
         variant: "destructive"
       });
     }
