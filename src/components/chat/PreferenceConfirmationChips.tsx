@@ -21,33 +21,37 @@ export function PreferenceConfirmationChips({
   onSaveAsPreference,
   onDismiss,
 }: PreferenceConfirmationChipsProps) {
-  const defaultType = preference.type;
+  const detectedType = preference.type;
 
   return (
     <div className="flex items-center gap-2 mt-2 ml-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <span className="text-xs text-muted-foreground">Save as:</span>
-      <Button
-        variant={defaultType === 'avoid' ? 'default' : 'outline'}
-        size="sm"
-        className={cn(
-          "h-6 text-xs px-2",
-          defaultType === 'avoid' && "bg-destructive/90 hover:bg-destructive text-destructive-foreground"
-        )}
-        onClick={onSaveAsAvoid}
-      >
-        🚫 Avoid
-      </Button>
-      <Button
-        variant={defaultType === 'preference' ? 'default' : 'outline'}
-        size="sm"
-        className={cn(
-          "h-6 text-xs px-2",
-          defaultType === 'preference' && "bg-primary hover:bg-primary/90"
-        )}
-        onClick={onSaveAsPreference}
-      >
-        ⭐ Preference
-      </Button>
+      
+      {/* Only show Avoid button if type is 'avoid' */}
+      {detectedType === 'avoid' && (
+        <Button
+          variant="default"
+          size="sm"
+          className="h-6 text-xs px-2 bg-destructive/90 hover:bg-destructive text-destructive-foreground"
+          onClick={onSaveAsAvoid}
+        >
+          🚫 Avoid
+        </Button>
+      )}
+      
+      {/* Only show Preference button if type is 'preference' */}
+      {detectedType === 'preference' && (
+        <Button
+          variant="default"
+          size="sm"
+          className="h-6 text-xs px-2 bg-primary hover:bg-primary/90"
+          onClick={onSaveAsPreference}
+        >
+          ⭐ Preference
+        </Button>
+      )}
+      
+      {/* Always show Ignore option */}
       <Button
         variant="ghost"
         size="sm"
