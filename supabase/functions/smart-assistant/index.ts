@@ -774,6 +774,19 @@ const PREFERENCE_PATTERNS = [
   { pattern: /\bi(?:'m| am) (?:vegan|vegetarian|pescatarian)/i, type: 'preference' as const, confidence: 0.85, scope: 'food', extractFixed: true },
   { pattern: /\bi(?:'m| am) gluten[- ]?free/i, type: 'avoid' as const, confidence: 0.85, scope: 'food', extractValue: 'gluten' },
   { pattern: /\bi can(?:'t|not) (?:eat|use|have|stand|tolerate)\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.85, scope: 'general' },
+  
+  // CONFIDENCE & ORDERING GUARDRAIL
+  // This generalized avoid-pattern intentionally uses confidence 0.85.
+  // Do NOT raise its confidence above medical/allergy patterns (0.95+).
+  // Any future pattern with confidence >= 0.9 MUST be placed ABOVE this block.
+  // Pattern matching is first-match-wins.
+  { 
+    pattern: /\bi (?:don(?:'t| not)|never|avoid|can(?:'t| not))\s+(?:use|eat|drink|watch|read|consume|have|want|listen to)\s+(.+?)(?:\.|,|$)/i, 
+    type: 'avoid' as const, 
+    confidence: 0.85, 
+    scope: 'general' 
+  },
+  
   { pattern: /\bi(?:'ve| have) (?:oily|dry|sensitive|combination) skin/i, type: 'preference' as const, confidence: 0.85, scope: 'skincare', extractFixed: true },
   { pattern: /\bmy skin (?:type )?is\s+(\w+)/i, type: 'preference' as const, confidence: 0.85, scope: 'skincare' },
   { pattern: /\bmy hair (?:type )?is\s+(\w+)/i, type: 'preference' as const, confidence: 0.85, scope: 'haircare' },
