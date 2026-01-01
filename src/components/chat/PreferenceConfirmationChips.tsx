@@ -6,6 +6,7 @@ export interface DetectedPreference {
   value: string;
   scope: string;
   confidence: number;
+  targetType?: 'ingredient' | 'brand' | 'genre' | 'food_type' | 'format' | 'rule';
 }
 
 interface PreferenceConfirmationChipsProps {

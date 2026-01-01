@@ -757,6 +757,7 @@ interface DetectedPreferenceInfo {
   extractedValue?: string;
   scope?: string;
   confidence?: number;
+  targetType?: 'ingredient' | 'brand' | 'genre' | 'food_type' | 'format' | 'rule';
 }
 
 // Pattern definitions with confidence scores
@@ -809,6 +810,56 @@ function inferScope(value: string, defaultScope: string): string {
   return defaultScope;
 }
 
+function inferTargetType(value: string, scope: string): 'ingredient' | 'brand' | 'genre' | 'food_type' | 'format' | 'rule' {
+  const lowerValue = value.toLowerCase();
+  
+  // Behavioral/temporal rules (should display in General/Other category)
+  const behaviorPatterns = [
+    /\b(before|after)\s+\d{1,2}\s*(am|pm|a\.m\.|p\.m\.)?/i,  // "after 9 pm"
+    /\b(phone|screen|device|laptop|computer|tv|television|social media)/i, // devices
+    /\b(sleep|bed|morning|night|evening|bedtime)/i,  // time-related
+    /\b(exercise|workout|gym|walk|run|jog)/i,  // activities
+    /\b(work|meeting|email|calls?)/i,  // work-related
+    /\b(nap|rest|break)/i,  // rest-related
+  ];
+  
+  if (behaviorPatterns.some(p => p.test(lowerValue))) {
+    return 'rule';
+  }
+  
+  // Entertainment genres
+  if (/\b(horror|comedy|romance|action|thriller|drama|sci-fi|documentary|anime|musical)\b/.test(lowerValue)) {
+    return 'genre';
+  }
+  
+  // Food-related (when scope is food or contains food keywords)
+  if (scope === 'food' || /\b(caffeine|dairy|gluten|nuts|shellfish|sugar|meat|fish|eggs?|soy|alcohol|carbs?)\b/.test(lowerValue)) {
+    return 'food_type';
+  }
+  
+  // Skincare/haircare ingredients
+  if (/\b(retinol|fragrance|parabens?|sulfates?|niacinamide|hyaluronic|salicylic|glycolic|vitamin\s*c|acids?)\b/.test(lowerValue)) {
+    return 'ingredient';
+  }
+  
+  // Brand detection
+  if (/\b(brand|company|products? from)\b/.test(lowerValue)) {
+    return 'brand';
+  }
+  
+  // Format detection
+  if (/\b(gel|cream|serum|oil|foam|spray|lotion|balm|powder|capsule)\b/.test(lowerValue)) {
+    return 'format';
+  }
+  
+  // Default: if scope is general/global and no specific match, treat as rule
+  if (scope === 'general' || scope === 'global') {
+    return 'rule';
+  }
+  
+  return 'ingredient';
+}
+
 function extractPreferenceFromMessage(userMessage: string): DetectedPreferenceInfo | null {
   for (const patternDef of PREFERENCE_PATTERNS) {
     const match = userMessage.match(patternDef.pattern);
@@ -836,6 +887,7 @@ function extractPreferenceFromMessage(userMessage: string): DetectedPreferenceIn
       }
       
       const scope = inferScope(extractedValue, patternDef.scope);
+      const targetType = inferTargetType(extractedValue, scope);
       
       return {
         trigger: true,
@@ -844,6 +896,7 @@ function extractPreferenceFromMessage(userMessage: string): DetectedPreferenceIn
         extractedValue,
         scope,
         confidence: patternDef.confidence,
+        targetType,
       };
     }
   }
@@ -1239,6 +1292,34 @@ Structured data for precise parsing:
 \`\`\`json
 ${constraintsJsonBlock}
 \`\`\`
+
+=== PREFERENCE ACKNOWLEDGMENT RULES ===
+
+When a user shares a preference or avoid statement (e.g., "I avoid caffeine after 6 pm", "I prefer natural products"):
+
+1. ACKNOWLEDGE, DON'T CLAIM SAVED:
+   - Say "I've noted..." or "Got it, I'll keep in mind..." NOT "I've added..."
+   - The user will see confirmation chips below your message to actually save it
+   - Never claim something has been added to their preferences before they confirm
+   - If confirmation chips are shown, imply this is pending user confirmation, not permanent memory
+
+2. USE CORRECT TERMINOLOGY:
+   - For avoid statements: "I've noted that you avoid [X]" or "Got it, I'll keep that in mind"
+   - For preferences: "I've noted that you prefer [X]"
+   - Never say "added to preferences" for an avoid statement
+
+3. EXAMPLES:
+   - User: "I avoid caffeine after 6 pm"
+     Good: "Got it! I've noted that you avoid caffeine after 6 PM — you can save this below if you'd like."
+     Bad: "I've added 'avoid caffeine after 6 PM' to your preferences."
+   
+   - User: "I avoid my phone after 9 pm"
+     Good: "That's a great habit! I'll keep in mind that you avoid phone usage after 9 PM — save it below if you want."
+     Bad: "I've saved 'phone after 9 PM' to your preferences."
+
+4. KEEP RESPONSES NATURAL:
+   - Brief acknowledgment is fine
+   - Gently point to the save option without being verbose
 
 === PREFERENCE PRIORITY RULES (PHASE 6.1) ===
 
@@ -1882,6 +1963,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
             value: memoryTrigger.extractedValue,
             scope: memoryTrigger.scope || 'general',
             confidence: memoryTrigger.confidence,
+            targetType: memoryTrigger.targetType,
           }
         : null;
 
