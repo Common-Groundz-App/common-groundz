@@ -145,7 +145,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
           setShouldShowOnboarding(true);
         }
         // Also fetch learned preferences
-        await fetchLearnedPreferencesInternal(user.id);
+        await fetchLearnedPreferencesInternal(user.id, userPrefs);
       } catch (err) {
         console.error('❌ [PreferencesProvider] Error in fetchPreferences:', err);
       } finally {
@@ -156,7 +156,32 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
     fetchPreferences();
   }, [authReady, user?.id]);
 
-  const fetchLearnedPreferencesInternal = async (userId: string) => {
+  // Helper: Get all normalized preference values across all categories
+  const getAllNormalizedPreferenceValues = (prefs: UserPreferences): Set<string> => {
+    const values = new Set<string>();
+    
+    // Check all canonical categories
+    const categories = ['skin_type', 'hair_type', 'food_preferences', 'lifestyle', 'genre_preferences', 'goals'];
+    for (const key of categories) {
+      const category = prefs[key as keyof UserPreferences] as PreferenceCategory | undefined;
+      category?.values?.forEach(v => {
+        if (v.normalizedValue) values.add(v.normalizedValue.toLowerCase());
+      });
+    }
+    
+    // Check custom categories
+    if (prefs.custom_categories) {
+      Object.values(prefs.custom_categories).forEach(category => {
+        category?.values?.forEach(v => {
+          if (v.normalizedValue) values.add(v.normalizedValue.toLowerCase());
+        });
+      });
+    }
+    
+    return values;
+  };
+
+  const fetchLearnedPreferencesInternal = async (userId: string, currentPrefs?: UserPreferences) => {
     try {
       const { data, error } = await supabase
         .from('user_conversation_memory')
@@ -175,19 +200,34 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         const detectedConstraints = metadata.detected_constraints || [];
         const detectedPreferences = metadata.detected_preferences || [];
         
+        // Get all existing normalized values upfront for filtering
+        const existingValues = currentPrefs ? getAllNormalizedPreferenceValues(currentPrefs) : new Set<string>();
+        
         // Convert scopes to LearnedPreference format
         const learned: LearnedPreference[] = [];
         
         Object.entries(scopes).forEach(([scope, scopeData]: [string, any]) => {
           if (scopeData && typeof scopeData === 'object') {
             Object.entries(scopeData).forEach(([key, value]) => {
-              learned.push({
-                scope,
-                key,
-                value,
-                confidence: 0.7,
-                extractedAt: new Date().toISOString(),
-              });
+              const valuesToCheck = Array.isArray(value) ? value : [value];
+              
+              for (const singleValue of valuesToCheck) {
+                const normalizedValue = String(singleValue).toLowerCase().trim();
+                
+                // Skip if already exists in preferences
+                if (existingValues.has(normalizedValue)) {
+                  console.log(`⏭️ Skipping already-saved preference: ${scope}.${key} = ${singleValue}`);
+                  continue;
+                }
+                
+                learned.push({
+                  scope,
+                  key,
+                  value: singleValue,
+                  confidence: 0.7,
+                  extractedAt: new Date().toISOString(),
+                });
+              }
             });
           }
         });
@@ -237,7 +277,7 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
 
   const fetchLearnedPreferences = async () => {
     if (!user) return;
-    await fetchLearnedPreferencesInternal(user.id);
+    await fetchLearnedPreferencesInternal(user.id, preferences);
   };
 
   const updatePreferences = async (newPreferences: UserPreferences) => {
