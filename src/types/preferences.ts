@@ -8,7 +8,7 @@ export type PreferenceIntent = 'like' | 'dislike' | 'neutral';
 
 // ============= Source & Priority Types =============
 export type PreferencePriority = 'constraint' | 'user' | 'chatbot';
-export type PreferenceSource = 'form' | 'chatbot' | 'manual';
+export type PreferenceSource = 'form' | 'chatbot' | 'manual' | 'explicit_user_confirmation';
 
 // ============= Canonical Category Type =============
 export type CanonicalCategory =
@@ -37,7 +37,7 @@ export interface UnifiedConstraint {
   scope: ConstraintScope;        // Where this constraint applies
   appliesTo?: string[];          // Optional: narrow to specific domains ['skincare', 'supplements']
   intent: UnifiedConstraintIntent;
-  source: 'manual' | 'chatbot';
+  source: 'manual' | 'chatbot' | 'explicit_user_confirmation';
   createdAt: string;             // ISO timestamp
   // Future fields (staged for v2)
   // confidence?: number;

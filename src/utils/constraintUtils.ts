@@ -51,7 +51,7 @@ export const createUnifiedConstraint = (
     scope?: ConstraintScope;
     appliesTo?: string[];
     intent?: UnifiedConstraintIntent;
-    source?: 'manual' | 'chatbot';
+    source?: 'manual' | 'chatbot' | 'explicit_user_confirmation';
   }
 ): UnifiedConstraint => {
   const defaultScope = getDefaultScope(targetType);
@@ -371,7 +371,7 @@ export const convertToLegacyFormat = (unified: UnifiedConstraintsType): Constrai
         rule: `Avoid ${constraint.targetType}`,
         value: constraint.targetValue,
         intent: constraint.intent,
-        source: constraint.source,
+        source: constraint.source === 'explicit_user_confirmation' ? 'manual' : constraint.source,
         confidence: 1.0,
         createdAt: constraint.createdAt,
       });

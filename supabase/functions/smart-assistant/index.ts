@@ -748,14 +748,123 @@ async function searchUserMemory(
   }
 }
 
+// ========== DETECTED PREFERENCE TYPES ==========
+
+interface DetectedPreferenceInfo {
+  trigger: boolean;
+  reason?: string;
+  preferenceType?: 'avoid' | 'preference';
+  extractedValue?: string;
+  scope?: string;
+  confidence?: number;
+}
+
+// Pattern definitions with confidence scores
+const PREFERENCE_PATTERNS = [
+  // High confidence (0.9+) - Very explicit statements
+  { pattern: /\bi(?:'m| am) allergic to\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.95, scope: 'health' },
+  { pattern: /\bi have (?:a )?(.+?) allergy/i, type: 'avoid' as const, confidence: 0.95, scope: 'health' },
+  { pattern: /\bi(?:'m| am) (?:highly )?sensitive to\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.9, scope: 'health' },
+  { pattern: /\bi never (?:use|eat|consume|watch|read)\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.9, scope: 'general' },
+  { pattern: /\bi always avoid\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.9, scope: 'general' },
+  
+  // Good confidence (0.8-0.89) - Clear preferences
+  { pattern: /\bi avoid\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.85, scope: 'general' },
+  { pattern: /\bi(?:'m| am) (?:vegan|vegetarian|pescatarian)/i, type: 'preference' as const, confidence: 0.85, scope: 'food', extractFixed: true },
+  { pattern: /\bi(?:'m| am) gluten[- ]?free/i, type: 'avoid' as const, confidence: 0.85, scope: 'food', extractValue: 'gluten' },
+  { pattern: /\bi can(?:'t|not) (?:eat|use|have|stand|tolerate)\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.85, scope: 'general' },
+  { pattern: /\bi(?:'ve| have) (?:oily|dry|sensitive|combination) skin/i, type: 'preference' as const, confidence: 0.85, scope: 'skincare', extractFixed: true },
+  { pattern: /\bmy skin (?:type )?is\s+(\w+)/i, type: 'preference' as const, confidence: 0.85, scope: 'skincare' },
+  { pattern: /\bmy hair (?:type )?is\s+(\w+)/i, type: 'preference' as const, confidence: 0.85, scope: 'haircare' },
+  { pattern: /\bi prefer\s+(.+?)(?:\.|,|$)/i, type: 'preference' as const, confidence: 0.8, scope: 'general' },
+  { pattern: /\bi love\s+(.+?)(?:\.|,|$)/i, type: 'preference' as const, confidence: 0.8, scope: 'general' },
+  { pattern: /\bi hate\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.8, scope: 'general' },
+  
+  // Medium confidence (0.7-0.79) - Less explicit
+  { pattern: /\bi don't like\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.75, scope: 'general' },
+  { pattern: /\bi like\s+(.+?)(?:\.|,|$)/i, type: 'preference' as const, confidence: 0.75, scope: 'general' },
+  { pattern: /\bi usually (?:avoid|skip)\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.7, scope: 'general' },
+  
+  // Low confidence (<0.7) - Vague statements (won't show chips, only LFC)
+  { pattern: /\bi sometimes avoid\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.5, scope: 'general' },
+  { pattern: /\bi(?:'m| am) not (?:a fan of|into)\s+(.+?)(?:\.|,|$)/i, type: 'avoid' as const, confidence: 0.6, scope: 'general' },
+];
+
+function inferScope(value: string, defaultScope: string): string {
+  const lowerValue = value.toLowerCase();
+  
+  // Food-related
+  if (/\b(caffeine|dairy|gluten|nuts|shellfish|soy|eggs?|meat|fish|sugar|carbs?|alcohol)\b/.test(lowerValue)) {
+    return 'food';
+  }
+  // Skincare-related
+  if (/\b(retinol|fragrance|parabens?|sulfates?|alcohol|vitamin c|acids?|niacinamide|hyaluronic)\b/.test(lowerValue)) {
+    return 'skincare';
+  }
+  // Entertainment-related
+  if (/\b(horror|comedy|romance|action|thriller|drama|sci-fi|documentary|anime)\b/.test(lowerValue)) {
+    return 'entertainment';
+  }
+  
+  return defaultScope;
+}
+
+function extractPreferenceFromMessage(userMessage: string): DetectedPreferenceInfo | null {
+  for (const patternDef of PREFERENCE_PATTERNS) {
+    const match = userMessage.match(patternDef.pattern);
+    if (match) {
+      let extractedValue: string;
+      
+      if ((patternDef as any).extractValue) {
+        extractedValue = (patternDef as any).extractValue;
+      } else if ((patternDef as any).extractFixed) {
+        // Extract the matched portion directly (e.g., "vegan", "oily skin")
+        extractedValue = match[0].replace(/^i(?:'m| am| have| ve)\s*/i, '').trim();
+      } else if (match[1]) {
+        // Clean up extracted value
+        extractedValue = match[1]
+          .replace(/\s+(because|since|due to|as|so).*/i, '') // Remove trailing explanations
+          .replace(/[.,!?]+$/, '') // Remove punctuation
+          .trim();
+      } else {
+        continue;
+      }
+      
+      // Skip if extracted value is too long (likely captured too much)
+      if (extractedValue.length > 50 || extractedValue.split(' ').length > 6) {
+        continue;
+      }
+      
+      const scope = inferScope(extractedValue, patternDef.scope);
+      
+      return {
+        trigger: true,
+        reason: 'preference-detected',
+        preferenceType: patternDef.type,
+        extractedValue,
+        scope,
+        confidence: patternDef.confidence,
+      };
+    }
+  }
+  
+  return null;
+}
+
 function detectMemoryUpdateTrigger(
   userMessage: string,
   assistantMessage: string
-): { trigger: boolean; reason?: string } {
+): DetectedPreferenceInfo {
   const lowerUser = userMessage.toLowerCase();
   const lowerAssistant = assistantMessage.toLowerCase();
   
-  // === USER MESSAGE TRIGGERS ===
+  // === FIRST: Check for extractable preferences ===
+  const extracted = extractPreferenceFromMessage(userMessage);
+  if (extracted) {
+    return extracted;
+  }
+  
+  // === USER MESSAGE TRIGGERS (fallback to existing logic) ===
   
   // Conversation ending phrases
   const endPhrases = ['thanks', 'thank you', 'bye', 'goodbye', "that's all", 'perfect', 'great thanks'];
@@ -1761,11 +1870,30 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     const responseTime = Date.now() - startTime;
     console.log('[smart-assistant] Request completed in', responseTime, 'ms');
 
-    // Return response to frontend
+    // Return response to frontend with detected preference for inline confirmation
+    // Only include if confidence >= 0.7 (high enough for inline chips)
+    const detectedPreference = memoryTrigger.trigger && 
+      memoryTrigger.preferenceType && 
+      memoryTrigger.extractedValue && 
+      memoryTrigger.confidence && 
+      memoryTrigger.confidence >= 0.7
+        ? {
+            type: memoryTrigger.preferenceType,
+            value: memoryTrigger.extractedValue,
+            scope: memoryTrigger.scope || 'general',
+            confidence: memoryTrigger.confidence,
+          }
+        : null;
+
+    if (detectedPreference) {
+      console.log('[smart-assistant] Detected preference for inline confirmation:', detectedPreference);
+    }
+
     return new Response(JSON.stringify({
       conversationId: conversation.id,
       message: finalMessage,
       toolCalls: toolCalls || [],
+      detectedPreference,
       metadata: {
         responseTime,
         tokensUsed: aiData.usageMetadata
