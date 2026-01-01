@@ -1,17 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePreferences } from '@/contexts/PreferencesContext';
+import { PreferenceConfirmationChips, DetectedPreference } from './PreferenceConfirmationChips';
+import { createUnifiedConstraint } from '@/utils/constraintUtils';
+import { createPreferenceValue } from '@/utils/preferenceRouting';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   createdAt: Date;
+  detectedPreference?: DetectedPreference | null;
+  preferenceActionTaken?: 'saved_avoid' | 'saved_preference' | 'dismissed' | null;
 }
 
 interface ChatInterfaceProps {
@@ -28,12 +34,143 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
+  const { addUnifiedConstraint, addPreferenceValue } = usePreferences();
 
   useEffect(() => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Map scope to preference field
+  const scopeToPreferenceField = (scope: string): string => {
+    const mapping: Record<string, string> = {
+      'food': 'food_preferences',
+      'skincare': 'skin_type',
+      'haircare': 'hair_type',
+      'entertainment': 'genre_preferences',
+      'health': 'lifestyle',
+      'general': 'lifestyle',
+    };
+    return mapping[scope] || 'lifestyle';
+  };
+
+  // Map scope to constraint scope
+  const scopeToConstraintScope = (scope: string): 'global' | 'skincare' | 'food' | 'entertainment' => {
+    const mapping: Record<string, 'global' | 'skincare' | 'food' | 'entertainment'> = {
+      'food': 'food',
+      'skincare': 'skincare',
+      'haircare': 'skincare',
+      'entertainment': 'entertainment',
+      'health': 'global',
+      'general': 'global',
+    };
+    return mapping[scope] || 'global';
+  };
+
+  const handleSaveAsAvoid = async (messageId: string, pref: DetectedPreference) => {
+    const unified = createUnifiedConstraint('ingredient', pref.value, {
+      scope: scopeToConstraintScope(pref.scope),
+      intent: 'avoid',
+      source: 'explicit_user_confirmation',
+    });
+    
+    const success = await addUnifiedConstraint(unified);
+    
+    if (success) {
+      setMessages(prev => prev.map(m => 
+        m.id === messageId ? { ...m, preferenceActionTaken: 'saved_avoid' as const } : m
+      ));
+      
+      // Mark as dismissed in memory so it won't appear in LFC
+      await markPreferenceAsDismissedInMemory(pref.value, pref.scope, 'saved_as_avoid');
+      
+      toast({ 
+        title: "Added to Things to Avoid",
+        description: `"${pref.value}" will be avoided in recommendations`
+      });
+    }
+  };
+
+  const handleSaveAsPreference = async (messageId: string, pref: DetectedPreference) => {
+    const preferenceField = scopeToPreferenceField(pref.scope);
+    
+    const newValue = createPreferenceValue(
+      pref.value,
+      'explicit_user_confirmation',
+      'like',
+      pref.confidence
+    );
+    
+    const success = await addPreferenceValue(preferenceField, newValue);
+    
+    if (success) {
+      setMessages(prev => prev.map(m => 
+        m.id === messageId ? { ...m, preferenceActionTaken: 'saved_preference' as const } : m
+      ));
+      
+      // Mark as dismissed in memory so it won't appear in LFC
+      await markPreferenceAsDismissedInMemory(pref.value, pref.scope, 'saved_as_preference');
+      
+      toast({ 
+        title: "Added to Your Preferences",
+        description: `"${pref.value}" saved to your preferences`
+      });
+    }
+  };
+
+  const handleDismissPreference = async (messageId: string, pref: DetectedPreference) => {
+    // Mark as dismissed so it won't appear in LFC
+    await markPreferenceAsDismissedInMemory(pref.value, pref.scope, 'dismissed_inline');
+    
+    setMessages(prev => prev.map(m => 
+      m.id === messageId ? { ...m, preferenceActionTaken: 'dismissed' as const } : m
+    ));
+  };
+
+  const markPreferenceAsDismissedInMemory = async (value: string, scope: string, reason: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: existing } = await supabase
+        .from('user_conversation_memory')
+        .select('metadata')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      const metadata = (existing?.metadata as Record<string, any>) || {};
+      const dismissedInline = (metadata.dismissed_inline as any[]) || [];
+
+      dismissedInline.push({
+        value: value.toLowerCase(),
+        scope,
+        reason,
+        dismissedAt: new Date().toISOString(),
+        dismissedVia: 'inline_chip'
+      });
+
+      const updatedMetadata = { ...metadata, dismissed_inline: dismissedInline };
+
+      if (existing) {
+        await supabase
+          .from('user_conversation_memory')
+          .update({ metadata: updatedMetadata })
+          .eq('user_id', user.id);
+      } else {
+        await supabase
+          .from('user_conversation_memory')
+          .insert([{
+            user_id: user.id,
+            memory_type: 'conversation',
+            memory_summary: 'User preferences memory',
+            metadata: updatedMetadata
+          }]);
+      }
+    } catch (err) {
+      console.error('Error marking preference as dismissed:', err);
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -73,12 +210,14 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         setConversationId(data.conversationId);
       }
 
-      // Add assistant's response to messages
+      // Add assistant's response to messages with detected preference
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: data.message,
         createdAt: new Date(),
+        detectedPreference: data.detectedPreference || null,
+        preferenceActionTaken: null,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -273,23 +412,51 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         ) : (
           <div className="space-y-4">
             {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex",
-                  message.role === 'user' ? 'justify-end' : 'justify-start'
-                )}
-              >
+              <div key={message.id}>
+                {/* Message bubble */}
                 <div
                   className={cn(
-                    "max-w-[80%] rounded-lg px-4 py-2",
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-foreground'
+                    "flex",
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
                   )}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  <div
+                    className={cn(
+                      "max-w-[80%] rounded-lg px-4 py-2",
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-foreground'
+                    )}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  </div>
                 </div>
+
+                {/* Preference confirmation chips for assistant messages */}
+                {message.role === 'assistant' && 
+                 message.detectedPreference && 
+                 !message.preferenceActionTaken && (
+                  <PreferenceConfirmationChips
+                    preference={message.detectedPreference}
+                    onSaveAsAvoid={() => handleSaveAsAvoid(message.id, message.detectedPreference!)}
+                    onSaveAsPreference={() => handleSaveAsPreference(message.id, message.detectedPreference!)}
+                    onDismiss={() => handleDismissPreference(message.id, message.detectedPreference!)}
+                  />
+                )}
+
+                {/* Confirmation after action */}
+                {message.preferenceActionTaken === 'saved_avoid' && (
+                  <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
+                    <Check className="h-3 w-3" />
+                    Added to Things to Avoid
+                  </div>
+                )}
+                {message.preferenceActionTaken === 'saved_preference' && (
+                  <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
+                    <Check className="h-3 w-3" />
+                    Added to Your Preferences
+                  </div>
+                )}
               </div>
             ))}
             {isLoading && (
