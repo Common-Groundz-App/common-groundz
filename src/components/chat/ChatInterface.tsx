@@ -95,10 +95,13 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const handleSaveAsPreference = async (messageId: string, pref: DetectedPreference) => {
     const preferenceField = scopeToPreferenceField(pref.scope);
     
+    // Preserve original intent: if detected as 'avoid', store as 'avoid' intent
+    const intentToStore = pref.type === 'avoid' ? 'avoid' : 'prefer';
+    
     const newValue = createPreferenceValue(
       pref.value,
       'explicit_user_confirmation',
-      'like',
+      intentToStore,
       pref.confidence
     );
     

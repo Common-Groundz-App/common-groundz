@@ -4,7 +4,7 @@
 export type ConstraintIntent = 'strictly_avoid' | 'avoid' | 'limit' | 'prefer';
 // Simplified MVP intent for unified constraints
 export type UnifiedConstraintIntent = 'avoid' | 'strictly_avoid';
-export type PreferenceIntent = 'like' | 'dislike' | 'neutral';
+export type PreferenceIntent = 'like' | 'dislike' | 'neutral' | 'avoid' | 'prefer';
 
 // ============= Source & Priority Types =============
 export type PreferencePriority = 'constraint' | 'user' | 'chatbot';

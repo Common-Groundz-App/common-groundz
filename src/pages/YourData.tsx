@@ -50,27 +50,36 @@ const YourData = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Helper to render preference values with source indicator
+  // Helper to render preference values with source and intent indicator
   const renderPreferenceValues = (category: PreferenceCategory | undefined) => {
     if (!category?.values || category.values.length === 0) return null;
     
     return (
       <div className="flex flex-wrap gap-2">
-        {category.values.map((pref: PreferenceValue, index: number) => (
-          <Badge 
-            key={`${pref.normalizedValue}-${index}`}
-            variant="secondary"
-            className={cn(
-              "flex items-center gap-1",
-              pref.source === 'chatbot' && "bg-purple-100 dark:bg-purple-500/20"
-            )}
-          >
-            {pref.value}
-            {pref.source === 'chatbot' && (
-              <Bot className="h-3 w-3 opacity-70" />
-            )}
-          </Badge>
-        ))}
+        {category.values.map((pref: PreferenceValue, index: number) => {
+          // Determine if this is an avoid-type preference
+          const isAvoidIntent = pref.intent === 'avoid' || pref.intent === 'dislike';
+          // Display with full context if it's an avoid intent
+          const displayValue = isAvoidIntent ? `Avoids ${pref.value}` : pref.value;
+          
+          return (
+            <Badge 
+              key={`${pref.normalizedValue}-${index}`}
+              variant="secondary"
+              className={cn(
+                "flex items-center gap-1",
+                pref.source === 'chatbot' && "bg-purple-100 dark:bg-purple-500/20",
+                isAvoidIntent && "bg-orange-100 dark:bg-orange-500/20 text-orange-700 dark:text-orange-300"
+              )}
+            >
+              {isAvoidIntent && <span className="opacity-70">🚫</span>}
+              {displayValue}
+              {pref.source === 'chatbot' && (
+                <Bot className="h-3 w-3 opacity-70" />
+              )}
+            </Badge>
+          );
+        })}
       </div>
     );
   };
