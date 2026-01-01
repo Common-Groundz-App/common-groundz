@@ -69,7 +69,12 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   };
 
   const handleSaveAsAvoid = async (messageId: string, pref: DetectedPreference) => {
-    const unified = createUnifiedConstraint('ingredient', pref.value, {
+    // Use detected targetType with defensive fallback
+    // If backend inference fails, use 'rule' for general/global scope, 'ingredient' otherwise
+    const targetType = pref.targetType ?? 
+      (pref.scope === 'general' || pref.scope === 'global' ? 'rule' : 'ingredient');
+    
+    const unified = createUnifiedConstraint(targetType, pref.value, {
       scope: scopeToConstraintScope(pref.scope),
       intent: 'avoid',
       source: 'explicit_user_confirmation',
