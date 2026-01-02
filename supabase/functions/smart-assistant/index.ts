@@ -787,6 +787,19 @@ const PREFERENCE_PATTERNS = [
     scope: 'general' 
   },
   
+  // INTENT-LEVEL COMMITMENT PATTERN
+  // NOTE: This pattern captures *commitment intent*, not confirmed habit.
+  // Confidence intentionally capped at 0.85.
+  // Must remain below medical/allergy rules (0.95+).
+  // Covers: "From now on I will avoid X", "I'll avoid X", "Going forward I'm gonna avoid X"
+  // The (?!not\b) negative look-ahead prevents matching "I will avoid not X" false positives
+  { 
+    pattern: /\b(?:from now on|going forward|in the future)?\s*(?:i\s*(?:will|am going to|gonna|'ll))\s*avoid\s+(?!not\b)(.+?)(?:\.|,|$)/i, 
+    type: 'avoid' as const, 
+    confidence: 0.85, 
+    scope: 'general' 
+  },
+  
   { pattern: /\bi(?:'ve| have) (?:oily|dry|sensitive|combination) skin/i, type: 'preference' as const, confidence: 0.85, scope: 'skincare', extractFixed: true },
   { pattern: /\bmy skin (?:type )?is\s+(\w+)/i, type: 'preference' as const, confidence: 0.85, scope: 'skincare' },
   { pattern: /\bmy hair (?:type )?is\s+(\w+)/i, type: 'preference' as const, confidence: 0.85, scope: 'haircare' },
