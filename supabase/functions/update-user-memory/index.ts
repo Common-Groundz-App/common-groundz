@@ -6,6 +6,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper for consistent value normalization across all comparisons
+const normalize = (v?: string) => v?.toLowerCase().trim() || '';
+
 // Helper function to add timeout to promises
 function withTimeout(promise: Promise<any>, ms: number) {
   const timeout = new Promise((_, reject) =>
@@ -427,8 +430,13 @@ Use the extract_scoped_memories function to structure your response.`;
       };
     });
 
-    // Get existing TTA constraints from user's saved preferences (unified format)
-    const existingTTAConstraints = (profile?.preferences as any)?.constraints?.items || [];
+    // Get existing TTA constraints from user's saved preferences (check BOTH legacy and unified keys)
+    const legacyConstraints = (profile?.preferences as any)?.constraints?.items || [];
+    const unifiedConstraints = (profile?.preferences as any)?.unifiedConstraints?.items || [];
+    const existingTTAConstraints = [...legacyConstraints, ...unifiedConstraints];
+    
+    // Get dismissed inline items (from chip confirmations)
+    const dismissedInline = existingMemory?.metadata?.dismissed_inline || [];
     
     // Get existing preference values from user's saved preferences (canonical categories)
     const existingSkinType = (profile?.preferences as any)?.skin_type?.values || [];
@@ -438,33 +446,52 @@ Use the extract_scoped_memories function to structure your response.`;
     const existingGenres = (profile?.preferences as any)?.genre_preferences?.values || [];
     const existingGoals = (profile?.preferences as any)?.goals?.values || [];
     
+    // EXPLICIT PRECEDENCE RULE:
+    // 1. User-confirmed constraints (unifiedConstraints) always win
+    // 2. Inline-confirmed items (dismissed_inline) suppress learned memory
+    // 3. Learned-from-conversation is fallback only
+    
     // Merge detected constraints (avoid duplicates by value+category AND check against existing TTA)
     const mergedConstraints = [...existingConstraints];
     for (const newConstraint of detectedConstraints) {
+      const normalizedNewValue = normalize(newConstraint.value);
+      
       const existsInMemory = mergedConstraints.some(
         c => c.category === newConstraint.category && 
-             c.value?.toLowerCase() === newConstraint.value?.toLowerCase()
+             normalize(c.value) === normalizedNewValue
       );
       
-      // Also check against existing TTA (unified constraints)
+      // Check against existing TTA (both legacy and unified constraints)
       const existsInTTA = existingTTAConstraints.some(
-        (uc: any) => uc.normalizedValue?.toLowerCase() === newConstraint.value?.toLowerCase()
+        (uc: any) => normalize(uc.normalizedValue) === normalizedNewValue ||
+                     normalize(uc.value) === normalizedNewValue
       );
       
-      if (!existsInMemory && !existsInTTA) {
+      // Check against dismissed inline items (user already confirmed via chips)
+      const wasDismissedInline = dismissedInline.some(
+        (d: any) => normalize(d.value) === normalizedNewValue
+      );
+      
+      if (existsInMemory) {
+        console.log(`[update-user-memory] Skipping constraint "${newConstraint.value}" - already in memory`);
+      } else if (existsInTTA) {
+        console.log(`[update-user-memory] Skipping constraint "${newConstraint.value}" - already in TTA`);
+      } else if (wasDismissedInline) {
+        console.log(`[update-user-memory] Skipping constraint "${newConstraint.value}" - dismissed via inline chip`);
+      } else {
         mergedConstraints.push({
           ...newConstraint,
           extractedAt: new Date().toISOString(),
           source: 'chatbot'
         });
-      } else if (existsInTTA) {
-        console.log(`[update-user-memory] Skipping constraint "${newConstraint.value}" - already in TTA`);
       }
     }
 
-    // Merge detected preferences (avoid duplicates by key+category AND check against existing preferences)
+    // Merge detected preferences (avoid duplicates by key+category AND check against existing preferences + dismissed_inline)
     const mergedPreferences = [...existingPreferences];
     for (const newPref of detectedPreferences) {
+      const normalizedNewValue = normalize(newPref.value);
+      
       // Check which existing preference list to compare against based on category
       let existingPreferenceValues: any[] = [];
       if (newPref.category === 'skincare') {
@@ -479,11 +506,22 @@ Use the extract_scoped_memories function to structure your response.`;
       
       // Check if this preference value already exists in user's saved preferences
       const existsInSavedPrefs = existingPreferenceValues.some(
-        (pv: any) => pv.normalizedValue?.toLowerCase() === newPref.value?.toLowerCase()
+        (pv: any) => normalize(pv.normalizedValue) === normalizedNewValue ||
+                     normalize(pv.value) === normalizedNewValue
+      );
+      
+      // Check against dismissed inline items (user already confirmed via chips)
+      const wasDismissedInline = dismissedInline.some(
+        (d: any) => normalize(d.value) === normalizedNewValue
       );
       
       if (existsInSavedPrefs) {
         console.log(`[update-user-memory] Skipping preference "${newPref.value}" - already in saved preferences`);
+        continue;
+      }
+      
+      if (wasDismissedInline) {
+        console.log(`[update-user-memory] Skipping preference "${newPref.value}" - dismissed via inline chip`);
         continue;
       }
       
