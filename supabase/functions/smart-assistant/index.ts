@@ -10,6 +10,20 @@ const corsHeaders = {
 // ========== HELPER FUNCTIONS ==========
 
 /**
+ * ARCHITECTURAL INVARIANTS - DO NOT REMOVE OR MODIFY
+ * 
+ * 1. Intent-first routing: Classify query intent BEFORE selecting tools
+ * 2. General knowledge: LLM answers factual questions directly (no tools)
+ * 3. Fallback rule: If tools return empty AND question is not user-specific,
+ *    answer from knowledge instead of refusing
+ * 4. Trust hierarchy: User constraints (TTA) > User data (tools) > LLM knowledge > Web > Reviews
+ * 5. Internal tools add value; they do not gate intelligence
+ * 
+ * These invariants prevent regression to "tool-first" logic that blocks
+ * general-knowledge answers when internal search returns empty.
+ */
+
+/**
  * Timeout wrapper to prevent hanging requests
  */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -680,12 +694,13 @@ async function webSearch(query: string): Promise<any> {
   try {
     console.log('[webSearch] Query:', query);
 
-    // Placeholder implementation for Phase 3
+    // Gemini's native google_search tool handles web grounding automatically
+    // This function serves as graceful fallback messaging if called directly
     return {
       success: true,
-      message: `I searched the web for "${query}" but external search integration is not yet configured. I'll help you with information from Common Groundz instead.`,
+      message: `Web search for "${query}" is being handled by Gemini's native grounding. The response will include citations from the web.`,
       results: [],
-      note: 'Web search requires API key configuration (Serper, Brave, etc.)'
+      note: 'Gemini google_search grounding is enabled for real-time information'
     };
 
   } catch (error) {
@@ -693,7 +708,8 @@ async function webSearch(query: string): Promise<any> {
     return {
       success: false,
       error: error.message,
-      results: []
+      results: [],
+      fallback_message: 'Web search encountered an error. Answer from your knowledge instead.'
     };
   }
 }
@@ -1419,12 +1435,55 @@ When you detect a potential conflict between a recommendation and a constraint:
 3. If scope differs, ask for clarification
 4. NEVER assume chatbot-learned data overrides user-set constraints
 
-=== TOOL PRIORITY ===
-1. ALWAYS use search_reviews_semantic FIRST for product queries
-2. Use get_user_stuff to check what user owns before recommending
-3. Use get_personalized_transitions for upgrade/alternative suggestions
-4. Use save_insight when user wants to bookmark a recommendation
-5. ONLY use web_search if internal search returns no results
+=== RESPONSE STRATEGY ===
+
+BEFORE selecting any tool, CLASSIFY the query intent:
+
+1. GENERAL KNOWLEDGE (facts, definitions, comparisons, "what is", "why does", "what are good X"):
+   - Answer directly from your knowledge - NO tool call needed
+   - Examples: "What materials are BPA-free?", "Why is plastic bad?", "What are good alternatives to plastic?"
+   - These are factual questions - you know the answers
+
+2. REAL-TIME INFO (news, current events, prices, "latest", "recent"):
+   - Use google_search tool to get fresh information
+   - Always cite sources from groundingMetadata
+   - Examples: "What's the latest research on microplastics?", "Current price of X"
+
+3. PRODUCT DISCOVERY (reviews, recommendations, "best X on Common Groundz", "recommend me a"):
+   - Use search_reviews_semantic FIRST (Common Groundz database)
+   - If no results -> use google_search as fallback
+   - If still no results -> answer from knowledge with disclaimer
+   - Examples: "Best glass water bottles on Common Groundz", "Reviews of product X"
+
+4. USER-SPECIFIC (what do I use, my preferences, my history, my stuff):
+   - Use get_user_stuff, search_user_memory, get_user_context
+   - NEVER guess user data - always use tools
+   - Examples: "What water bottles do I currently use?", "What are my skincare preferences?"
+
+5. OPINION/ADVICE (context-aware recommendations):
+   - Combine your knowledge with user constraints from system prompt
+   - Examples: "Is Tupperware okay for me?", "Should I buy this?"
+   - Apply user's Things to Avoid constraints
+
+=== CRITICAL FALLBACK RULE ===
+
+If a tool returns empty or irrelevant results AND the question is NOT user-specific:
+-> Answer from your knowledge instead of refusing
+-> Add a brief disclaimer like "I didn't find specific Common Groundz reviews, but here's what I know..."
+-> NEVER say "I don't have enough information" for general knowledge questions
+
+=== INVARIANT ===
+
+Never block a general-knowledge answer just because internal search tools return empty results.
+Internal tools ADD VALUE; they do not GATE intelligence.
+
+=== TRUST HIERARCHY ===
+
+1. User constraints (Things to Avoid) - ALWAYS respect
+2. Explicit user data (tools: get_user_stuff, search_user_memory)
+3. Your knowledge (direct answers for general questions)
+4. Web grounding (google_search for real-time info)
+5. Common Groundz reviews (search_reviews_semantic for product discovery)
 
 === REASONING VISIBILITY ===
 When recommending, ALWAYS explain WHY:
@@ -1534,13 +1593,13 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
         type: "function",
         function: {
           name: "web_search",
-          description: "FALLBACK ONLY: Search external web ONLY after search_reviews_semantic returns zero results. Always explain to user that you checked internal database first but found nothing.",
+          description: "FOR REAL-TIME INFORMATION ONLY: Use when you need current/recent information that your knowledge may not have (news, prices, availability, recent events). The google_search grounding tool will automatically search the web. Do NOT use for general factual questions you can answer directly. Do NOT refuse to answer if this returns empty - fall back to your knowledge.",
           parameters: {
             type: "object",
             properties: {
               query: {
                 type: "string",
-                description: "Search query for external web search"
+                description: "Search query for real-time web information"
               }
             },
             required: ["query"]
@@ -1662,13 +1721,20 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     console.log('[smart-assistant] Calling Gemini AI with', conversationHistory.length, 'history messages');
 
     // Convert tools to Gemini format
-    const geminiTools = [{
-      function_declarations: tools.map(t => ({
-        name: t.function.name,
-        description: t.function.description,
-        parameters: t.function.parameters
-      }))
-    }];
+    // INVARIANT: Internal tools add value; they do not gate intelligence.
+    // Never block general-knowledge answers just because tools return empty.
+    const geminiTools = [
+      {
+        function_declarations: tools.map(t => ({
+          name: t.function.name,
+          description: t.function.description,
+          parameters: t.function.parameters
+        }))
+      },
+      {
+        google_search: {}  // Native Gemini web grounding for real-time info
+      }
+    ];
 
     // Convert conversation history to Gemini format
     const geminiMessages = [
@@ -1716,7 +1782,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     }
 
     const aiData = await aiResponse.json();
-    console.log('[smart-assistant] Gemini response:', JSON.stringify(aiData, null, 2));
+    console.log('[smart-assistant] Gemini response received');
 
     const candidate = aiData.candidates?.[0];
     if (!candidate) {
@@ -1725,6 +1791,15 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
 
     const assistantMessage = candidate.content?.parts?.find((p: any) => p.text)?.text || '';
     const functionCalls = candidate.content?.parts?.filter((p: any) => p.functionCall) || [];
+
+    // Extract grounding metadata (web search citations)
+    const groundingMetadata = candidate.groundingMetadata;
+    if (groundingMetadata?.groundingChunks?.length > 0) {
+      console.log('[smart-assistant] Web grounding used, citations:', groundingMetadata.groundingChunks.length);
+      groundingMetadata.groundingChunks.forEach((chunk: any, i: number) => {
+        console.log(`[smart-assistant] Citation ${i + 1}: ${chunk.web?.title} - ${chunk.web?.uri}`);
+      });
+    }
     
     // Convert Gemini function calls to OpenAI-style tool calls
     const toolCalls = functionCalls.map((fc: any, idx: number) => ({
