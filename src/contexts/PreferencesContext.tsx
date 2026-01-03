@@ -234,7 +234,20 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
         
         // Add detected constraints as learned (read approvedAt and dismissed from DB)
         // Use unique ID based on rule + value to ensure each constraint is uniquely identifiable
+        // FILTER: Skip constraints whose normalized value already exists in TTA (unifiedConstraints)
+        const existingConstraintValues = new Set(
+          unifiedConstraints.items.map(c => c.normalizedValue?.toLowerCase() || c.targetValue.toLowerCase())
+        );
+        
         detectedConstraints.forEach((c: any) => {
+          const normalizedValue = c.value?.toLowerCase().trim();
+          
+          // Skip if already exists in TTA
+          if (existingConstraintValues.has(normalizedValue)) {
+            console.log(`⏭️ Skipping already-saved TTA constraint: ${c.value}`);
+            return;
+          }
+          
           const uniqueId = `${c.rule}:${c.value}`.toLowerCase().replace(/\s+/g, '_');
           learned.push({
             id: uniqueId,
@@ -318,8 +331,12 @@ export function PreferencesProvider({ children }: { children: React.ReactNode })
 
 
   // Unified Constraint Management (new)
+  // INVARIANT: User-confirmed preferences (chip actions, TTA saves) are authoritative
+  // and must never be removed or downgraded by automated processes.
+  // Trust hierarchy: Chip actions > Learned memory > Inferred context.
   const updateUnifiedConstraints = async (constraints: UnifiedConstraintsType) => {
-    const newPrefs = { ...preferences, unifiedConstraints: constraints };
+    // Save to 'constraints' key - this is the primary key the app loads from on refresh
+    const newPrefs = { ...preferences, constraints: constraints };
     setUnifiedConstraints(constraints);
     return updatePreferences(newPrefs);
   };
