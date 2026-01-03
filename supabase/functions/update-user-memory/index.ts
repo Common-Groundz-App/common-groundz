@@ -556,6 +556,8 @@ Use the extract_scoped_memories function to structure your response.`;
       .join("\n\n");
 
     // UPSERT memory record with Phase 6.0 data
+    // INVARIANT: User-confirmed preferences are authoritative and must never be
+    // removed or downgraded by automated processes. Preserve dismissed_inline.
     const { data: memoryRecord, error: memoryError } = await supabaseClient
       .from("user_conversation_memory")
       .upsert(
@@ -564,6 +566,7 @@ Use the extract_scoped_memories function to structure your response.`;
           memory_type: 'preference',
           memory_summary: memorySummary,
           metadata: { 
+            ...existingMemory?.metadata,  // Preserve existing keys (dismissed_inline, etc.)
             scopes: mergedScopes,
             detected_constraints: mergedConstraints,
             detected_preferences: mergedPreferences
