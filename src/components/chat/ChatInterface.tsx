@@ -11,6 +11,12 @@ import { PreferenceConfirmationChips, DetectedPreference } from './PreferenceCon
 import { createUnifiedConstraint } from '@/utils/constraintUtils';
 import { createPreferenceValue } from '@/utils/preferenceRouting';
 
+interface Source {
+  title: string;
+  domain: string;
+  url: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -18,6 +24,7 @@ interface Message {
   createdAt: Date;
   detectedPreference?: DetectedPreference | null;
   preferenceActionTaken?: 'saved_avoid' | 'saved_preference' | 'dismissed' | null;
+  sources?: Source[];
 }
 
 interface ChatInterfaceProps {
@@ -36,6 +43,58 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const { toast } = useToast();
   const { addUnifiedConstraint, addPreferenceValue } = usePreferences();
 
+  // Simple markdown-to-JSX renderer
+  const renderMarkdown = (content: string) => {
+    const lines = content.split('\n');
+    
+    return lines.map((line, idx) => {
+      // Horizontal divider
+      if (line.trim() === '---') {
+        return <hr key={idx} className="my-2 border-border/50" />;
+      }
+      
+      // Process inline bold: **text**
+      const processInline = (text: string) => {
+        const parts = text.split(/(\*\*[^*]+\*\*)/g);
+        return parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+          }
+          return part;
+        });
+      };
+      
+      // Bullet points (•, -, *)
+      const bulletMatch = line.trim().match(/^[•\-\*]\s+(.*)$/);
+      if (bulletMatch) {
+        return (
+          <div key={idx} className="flex gap-2 ml-2">
+            <span className="text-muted-foreground">•</span>
+            <span>{processInline(bulletMatch[1])}</span>
+          </div>
+        );
+      }
+      
+      // Numbered list
+      const numMatch = line.trim().match(/^(\d+)\.\s+(.*)$/);
+      if (numMatch) {
+        return (
+          <div key={idx} className="flex gap-2 ml-2">
+            <span className="text-muted-foreground">{numMatch[1]}.</span>
+            <span>{processInline(numMatch[2])}</span>
+          </div>
+        );
+      }
+      
+      // Empty line
+      if (!line.trim()) {
+        return <div key={idx} className="h-2" />;
+      }
+      
+      // Regular paragraph
+      return <p key={idx}>{processInline(line)}</p>;
+    });
+  };
   useEffect(() => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
@@ -226,6 +285,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         createdAt: new Date(),
         detectedPreference: data.detectedPreference || null,
         preferenceActionTaken: null,
+        sources: data.sources || [],
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -436,7 +496,34 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                         : 'bg-muted text-foreground'
                     )}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <div className="text-sm space-y-1">
+                      {message.role === 'assistant' 
+                        ? renderMarkdown(message.content)
+                        : <p className="whitespace-pre-wrap">{message.content}</p>
+                      }
+                    </div>
+                    
+                    {/* Sources section for assistant messages with web search */}
+                    {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
+                      <div className="mt-3 pt-2 border-t border-border/50">
+                        <div className="text-xs text-muted-foreground mb-1.5">📚 Sources</div>
+                        <div className="space-y-1">
+                          {message.sources.map((source, idx) => (
+                            <a
+                              key={idx}
+                              href={source.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 text-xs hover:bg-background/50 rounded px-2 py-1 -mx-2 transition-colors"
+                            >
+                              <span className="text-muted-foreground">{idx + 1}.</span>
+                              <span className="font-medium truncate flex-1">{source.title}</span>
+                              <span className="text-muted-foreground text-[10px]">{source.domain}</span>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
