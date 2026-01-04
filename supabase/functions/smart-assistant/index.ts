@@ -40,8 +40,28 @@ const corsHeaders = {
  * IMPORTANT: "what are" is NOT in the explanatory override because it's often used for
  * product discovery (e.g., "What are the best steel bottles?")
  */
-function classifyQueryIntent(message: string): 'realtime' | 'product_user' | 'general' {
+function classifyQueryIntent(
+  message: string, 
+  conversationHistory: Array<{role: string; content: string}>
+): 'realtime' | 'product_user' | 'general' {
   const lowerMessage = message.toLowerCase();
+  
+  // CONCRETE NOUNS ONLY - no generic tokens like 'product', 'brand'
+  const productCategories = [
+    'bottle', 'bottles', 'container', 'containers', 'tupperware',
+    'sunscreen', 'lotion', 'cream', 'moisturizer', 'skincare',
+    'laptop', 'phone', 'headphones', 'earbuds', 'tablet',
+    'shoes', 'sneakers', 'clothing', 'jacket', 'shirt',
+    'cookware', 'pan', 'pot', 'utensils', 'knife',
+    'mattress', 'pillow', 'bedding', 'blanket',
+    'backpack', 'bag', 'luggage', 'suitcase',
+    'watch', 'fitness tracker', 'smartwatch',
+    'camera', 'lens', 'tripod',
+    'charger', 'cable', 'adapter',
+    'speaker', 'monitor', 'keyboard', 'mouse',
+    'steel', 'stainless', 'glass', 'ceramic', 'bamboo',
+    'drinkware', 'food storage', 'kitchen'
+  ];
   
   // PRIORITY 1: Explanatory questions -> general knowledge
   // NOTE: "what are" is intentionally NOT included - it's often used for product discovery
@@ -91,24 +111,24 @@ function classifyQueryIntent(message: string): 'realtime' | 'product_user' | 'ge
     return 'product_user';
   }
   
+  // PRIORITY 4.5: Follow-up category answer detection
+  // If user gives a short answer containing a product category,
+  // AND the previous assistant message was asking for product type
+  const lastAssistant = [...conversationHistory]
+    .reverse()
+    .find(m => m.role === 'assistant')?.content?.toLowerCase() ?? '';
+  
+  const askedForCategory = /what kind of product|product type|are you interested in|which (one|type)|looking for\?|for example|could you tell me/.test(lastAssistant);
+  const isShortAnswer = lowerMessage.trim().split(/\s+/).length <= 4;
+  const mentionsCategory = productCategories.some(c => lowerMessage.includes(c));
+  
+  if (askedForCategory && isShortAnswer && mentionsCategory) {
+    console.log('[classifyQueryIntent] Follow-up category answer detected');
+    return 'product_user';
+  }
+  
   // PRIORITY 5: Product discovery (COMPOUND CHECK - must have BOTH discovery intent AND concrete product category)
   const discoveryKeywords = ['best', 'top', 'recommend', 'reviews', 'alternatives'];
-  
-  // CONCRETE NOUNS ONLY - no generic tokens like 'product', 'brand'
-  const productCategories = [
-    'bottle', 'bottles', 'container', 'containers', 'tupperware',
-    'sunscreen', 'lotion', 'cream', 'moisturizer', 'skincare',
-    'laptop', 'phone', 'headphones', 'earbuds', 'tablet',
-    'shoes', 'sneakers', 'clothing', 'jacket', 'shirt',
-    'cookware', 'pan', 'pot', 'utensils', 'knife',
-    'mattress', 'pillow', 'bedding', 'blanket',
-    'backpack', 'bag', 'luggage', 'suitcase',
-    'watch', 'fitness tracker', 'smartwatch',
-    'camera', 'lens', 'tripod',
-    'charger', 'cable', 'adapter',
-    'speaker', 'monitor', 'keyboard', 'mouse',
-    'steel', 'stainless', 'glass', 'ceramic', 'bamboo'
-  ];
   
   const hasDiscoveryIntent = discoveryKeywords.some(k => lowerMessage.includes(k));
   const hasProductCategory = productCategories.some(c => lowerMessage.includes(c));
@@ -1837,7 +1857,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     console.log('[smart-assistant] Calling Gemini AI with', conversationHistory.length, 'history messages');
 
     // Classify intent to determine which tools to use
-    const queryIntent = classifyQueryIntent(message);
+    const queryIntent = classifyQueryIntent(message, conversationHistory);
     console.log(`[smart-assistant] Query intent: ${queryIntent}`);
 
     // Build tools array based on intent (to avoid google_search + function_declarations conflict)
@@ -1880,7 +1900,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       { role: 'model', parts: [{ text: 'Understood. I will follow the response strategy and trust hierarchy.' }] },
       ...conversationHistory.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.content }]
+        parts: [{ text: msg.role === 'assistant' ? cleanResponseFormatting(msg.content) : msg.content }]
       })),
       { role: 'user', parts: [{ text: message }] }
     ];
@@ -2091,7 +2111,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
         { role: 'model', parts: [{ text: 'Understood. I will help users with their questions using the available tools.' }] },
         ...conversationHistory.map(msg => ({
           role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.content }]
+          parts: [{ text: msg.role === 'assistant' ? cleanResponseFormatting(msg.content) : msg.content }]
         })),
         { role: 'user', parts: [{ text: message }] },
         { 
@@ -2171,18 +2191,43 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       }
     }
 
-    // Post-process response: Clean formatting issues
+    // Post-process response: Clean formatting issues (CRITICAL - prevents tool leak to UI)
     function cleanResponseFormatting(text: string): string {
       let cleaned = text;
       
-      // Remove tool narration that slipped through
+      // ===== TOOL CALL LEAKAGE REMOVAL (CRITICAL) =====
+      
+      // Remove "Tool Call:" lines (case-insensitive)
+      cleaned = cleaned.replace(/^Tool Call:.*$/gim, '');
+      cleaned = cleaned.replace(/Tool Calls?:.*$/gim, '');
+      
+      // Remove backticked function calls (e.g., `search_reviews_semantic(...)`)
+      cleaned = cleaned.replace(/`[a-z_]+\([^`]*\)`/gi, '');
+      
+      // Remove any line containing function names with _semantic, get_user, etc.
+      cleaned = cleaned.replace(/.*(_semantic|get_user|save_insight|find_similar|get_product).*\(.*\).*/gi, '');
+      
+      // Remove "**Calling Tool**:" patterns
       cleaned = cleaned.replace(/\*\*Calling Tool\*\*:.*$/gm, '');
-      cleaned = cleaned.replace(/Let me (search|look|check|find).*\.\.\./gi, '');
-      cleaned = cleaned.replace(/I'll (search|look|check|find).*\.\.\./gi, '');
+      
+      // Remove backticked tool names with parameters
       cleaned = cleaned.replace(/`[a-z_]+`\s*with parameters:.*$/gm, '');
       
-      // Remove small talk for search responses
+      // ===== PRE-TOOL NARRATION REMOVAL =====
+      
+      // "Let me see what users are saying..."
+      cleaned = cleaned.replace(/Let me see what.*users are saying.*/gi, '');
+      
+      // Generic "Let me search/look/check/find..."
+      cleaned = cleaned.replace(/Let me (search|look|check|find|see).*\.\.\./gi, '');
+      cleaned = cleaned.replace(/I'll (search|look|check|find|see).*\.\.\./gi, '');
+      
+      // ===== SMALL TALK REMOVAL =====
       cleaned = cleaned.replace(/^(That's a great question[!,]?\s*|Great question[!,]?\s*)/i, '');
+      
+      // ===== CLEANUP =====
+      // Remove empty lines left over from removals
+      cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
       
       return cleaned.trim();
     }
