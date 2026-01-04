@@ -43,9 +43,8 @@ const corsHeaders = {
 function classifyQueryIntent(message: string): 'realtime' | 'product_user' | 'general' {
   const lowerMessage = message.toLowerCase();
   
-  // PRIORITY: Explanatory questions should always be general knowledge
+  // PRIORITY 1: Explanatory questions -> general knowledge
   // NOTE: "what are" is intentionally NOT included - it's often used for product discovery
-  // e.g., "What are the best steel bottles?" should use search tools
   if (
     lowerMessage.startsWith('why ') ||
     lowerMessage.startsWith('how ') ||
@@ -56,7 +55,7 @@ function classifyQueryIntent(message: string): 'realtime' | 'product_user' | 'ge
     return 'general';
   }
   
-  // Real-time info patterns (use google_search)
+  // PRIORITY 2: Real-time patterns -> realtime (web search)
   const realtimePatterns = [
     'latest', 'recent', 'current', 'today', 'now', 'news',
     'price of', 'cost of', 'happening', 'update on',
@@ -65,16 +64,6 @@ function classifyQueryIntent(message: string): 'realtime' | 'product_user' | 'ge
     'research', 'study', 'paper', 'evidence', 'findings'
   ];
   
-  // Product/User data patterns (use function_declarations)
-  const productUserPatterns = [
-    'my stuff', 'my preferences', 'what do i use', 'what am i using',
-    'my history', 'my profile', 'i own', 'i have', 'i bought',
-    'best product', 'recommend me', 'reviews of', 'reviews for',
-    'on common groundz', 'common groundz', 'find me',
-    'save this', 'remember this', 'similar users', 'people like me'
-  ];
-  
-  // Check real-time patterns first (web search needed)
   for (const pattern of realtimePatterns) {
     if (lowerMessage.includes(pattern)) {
       console.log(`[classifyQueryIntent] Matched realtime pattern: "${pattern}"`);
@@ -82,16 +71,55 @@ function classifyQueryIntent(message: string): 'realtime' | 'product_user' | 'ge
     }
   }
   
-  // Check product/user patterns (internal tools needed)
-  for (const pattern of productUserPatterns) {
+  // PRIORITY 3: User-specific patterns -> product_user (always)
+  const userSpecificPatterns = [
+    'my stuff', 'my preferences', 'what do i use', 'what am i using',
+    'my history', 'my profile', 'i own', 'i have', 'i bought',
+    'save this', 'remember this', 'similar users', 'people like me'
+  ];
+  
+  for (const pattern of userSpecificPatterns) {
     if (lowerMessage.includes(pattern)) {
-      console.log(`[classifyQueryIntent] Matched product_user pattern: "${pattern}"`);
+      console.log(`[classifyQueryIntent] User-specific: "${pattern}"`);
       return 'product_user';
     }
   }
   
-  // Default to general knowledge (no tools, Gemini answers directly)
-  console.log('[classifyQueryIntent] No patterns matched, using general knowledge');
+  // PRIORITY 4: Explicit platform mention -> product_user
+  if (lowerMessage.includes('common groundz') || lowerMessage.includes('on common groundz')) {
+    console.log('[classifyQueryIntent] Explicit platform mention');
+    return 'product_user';
+  }
+  
+  // PRIORITY 5: Product discovery (COMPOUND CHECK - must have BOTH discovery intent AND concrete product category)
+  const discoveryKeywords = ['best', 'top', 'recommend', 'reviews', 'alternatives'];
+  
+  // CONCRETE NOUNS ONLY - no generic tokens like 'product', 'brand'
+  const productCategories = [
+    'bottle', 'bottles', 'container', 'containers', 'tupperware',
+    'sunscreen', 'lotion', 'cream', 'moisturizer', 'skincare',
+    'laptop', 'phone', 'headphones', 'earbuds', 'tablet',
+    'shoes', 'sneakers', 'clothing', 'jacket', 'shirt',
+    'cookware', 'pan', 'pot', 'utensils', 'knife',
+    'mattress', 'pillow', 'bedding', 'blanket',
+    'backpack', 'bag', 'luggage', 'suitcase',
+    'watch', 'fitness tracker', 'smartwatch',
+    'camera', 'lens', 'tripod',
+    'charger', 'cable', 'adapter',
+    'speaker', 'monitor', 'keyboard', 'mouse',
+    'steel', 'stainless', 'glass', 'ceramic', 'bamboo'
+  ];
+  
+  const hasDiscoveryIntent = discoveryKeywords.some(k => lowerMessage.includes(k));
+  const hasProductCategory = productCategories.some(c => lowerMessage.includes(c));
+  
+  if (hasDiscoveryIntent && hasProductCategory) {
+    console.log('[classifyQueryIntent] Product discovery (intent + category match)');
+    return 'product_user';
+  }
+  
+  // Default: general knowledge
+  console.log('[classifyQueryIntent] Default to general');
   return 'general';
 }
 
@@ -1559,6 +1587,27 @@ When recommending, ALWAYS explain WHY:
 - "Since you mentioned avoiding fragrance, this option..."
 - "I noticed you have 'retinol' as strictly_avoid, so I excluded products with retinol"
 
+=== RESPONSE FORMATTING (MANDATORY) ===
+
+1. TOOL CALLS ARE INVISIBLE:
+   - NEVER say "Calling Tool", "Let me search", "I'll look up"
+   - NEVER mention tool names, parameters, or execution
+   - Users should only see the final, polished answer
+
+2. SKIP SMALL TALK FOR SEARCH QUERIES:
+   - If query starts with "What are the best", "Best", "Top", "Show me":
+     -> Go straight to results, no "That's a great question!"
+
+3. USE VISUAL HIERARCHY:
+   - Section headers: Use emoji + bold (e.g., "🏆 **Top Picks**")
+   - Dividers: Use "---" between major sections
+   - Lists: Use "•" or emoji bullets, NOT markdown asterisks
+   - Bold: Use for product names and key terms only
+
+4. KEEP IT SCANNABLE:
+   - Lead with the answer, then details
+   - Short paragraphs (2-3 lines max)
+
 Current Context:
 ${context?.entityId ? `- User is viewing entity: ${context.entityId}` : '- General conversation'}
 
@@ -1915,7 +1964,11 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     let finalMessage = assistantMessage;
 
     if (toolCalls && toolCalls.length > 0) {
-      console.log('[smart-assistant] Executing', toolCalls.length, 'tool calls');
+      // CRITICAL: Discard pre-tool narration - only use follow-up response
+      // Gemini often generates "Let me search..." text before function calls
+      // This should NEVER reach the user
+      finalMessage = '';
+      console.log('[smart-assistant] Suppressing pre-tool narration, executing', toolCalls.length, 'tool calls');
       
       const toolResults = [];
 
@@ -2089,26 +2142,53 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       }
     }
 
-    // Extract grounding metadata for google_search responses and append citations
-    let citationsText = '';
+    // Extract grounding metadata for google_search responses as structured data
+    interface Source {
+      title: string;
+      domain: string;
+      url: string;
+    }
+    let sourcesData: Source[] = [];
+    
     if (toolMode === 'google_search') {
       const groundingMeta = aiData.candidates?.[0]?.groundingMetadata;
       if (groundingMeta?.groundingChunks?.length > 0) {
         console.log('[smart-assistant] Web grounding citations found:', groundingMeta.groundingChunks.length);
         
-        const citations = groundingMeta.groundingChunks
+        sourcesData = groundingMeta.groundingChunks
           .filter((chunk: any) => chunk.web?.uri && chunk.web?.title)
-          .map((chunk: any, i: number) => `[${i + 1}] ${chunk.web.title}: ${chunk.web.uri}`)
-          .join('\n');
-        
-        if (citations) {
-          citationsText = '\n\n**Sources:**\n' + citations;
-        }
+          .map((chunk: any) => {
+            let url = chunk.web.uri;
+            let domain = '';
+            try {
+              const urlObj = new URL(url);
+              domain = urlObj.hostname.replace('www.', '');
+            } catch {
+              domain = 'source';
+            }
+            return { title: chunk.web.title, domain, url };
+          });
       }
     }
 
-    // Append citations to final message if present
-    let finalAssistantMessage = finalMessage + citationsText;
+    // Post-process response: Clean formatting issues
+    function cleanResponseFormatting(text: string): string {
+      let cleaned = text;
+      
+      // Remove tool narration that slipped through
+      cleaned = cleaned.replace(/\*\*Calling Tool\*\*:.*$/gm, '');
+      cleaned = cleaned.replace(/Let me (search|look|check|find).*\.\.\./gi, '');
+      cleaned = cleaned.replace(/I'll (search|look|check|find).*\.\.\./gi, '');
+      cleaned = cleaned.replace(/`[a-z_]+`\s*with parameters:.*$/gm, '');
+      
+      // Remove small talk for search responses
+      cleaned = cleaned.replace(/^(That's a great question[!,]?\s*|Great question[!,]?\s*)/i, '');
+      
+      return cleaned.trim();
+    }
+
+    // Apply formatting cleanup
+    let finalAssistantMessage = cleanResponseFormatting(finalMessage);
 
     // Post-response safety net: If non-product query got a very short/empty response,
     // retry once with NO tools to let Gemini answer from knowledge
@@ -2241,6 +2321,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       message: finalAssistantMessage,
       toolCalls: toolCalls || [],
       detectedPreference,
+      sources: sourcesData,
       metadata: {
         responseTime,
         tokensUsed: aiData.usageMetadata
