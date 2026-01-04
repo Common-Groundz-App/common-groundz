@@ -10,18 +10,90 @@ const corsHeaders = {
 // ========== HELPER FUNCTIONS ==========
 
 /**
- * ARCHITECTURAL INVARIANTS - DO NOT REMOVE OR MODIFY
- * 
- * 1. Intent-first routing: Classify query intent BEFORE selecting tools
- * 2. General knowledge: LLM answers factual questions directly (no tools)
- * 3. Fallback rule: If tools return empty AND question is not user-specific,
- *    answer from knowledge instead of refusing
- * 4. Trust hierarchy: User constraints (TTA) > User data (tools) > LLM knowledge > Web > Reviews
- * 5. Internal tools add value; they do not gate intelligence
- * 
- * These invariants prevent regression to "tool-first" logic that blocks
- * general-knowledge answers when internal search returns empty.
+ * ARCHITECTURAL INVARIANT - DO NOT MODIFY
+ *
+ * - NEVER send google_search and function_declarations in the same Gemini request.
+ *   This causes 400 INVALID_ARGUMENT errors due to Gemini API constraints.
+ * - Tool selection MUST happen before the API call via intent routing (classifyQueryIntent).
+ * - Internal tools ADD value; they do NOT gate intelligence.
+ * - General knowledge questions MUST be answered even if tools return empty.
+ *
+ * Trust hierarchy:
+ * 1. User constraints (Things to Avoid) - ALWAYS respect
+ * 2. Explicit user data (tools: get_user_stuff, search_user_memory)
+ * 3. Gemini knowledge (direct answers for general questions)
+ * 4. Web grounding (google_search for real-time info)
+ * 5. Common Groundz reviews (search_reviews_semantic for product discovery)
+ *
+ * Breaking these invariants will cause API errors and regression to tool-first logic.
  */
+
+/**
+ * Classify user intent to determine which tools to use.
+ * This enables separate API calls to avoid google_search + function_declarations conflict.
+ * 
+ * NOTE: "general" includes both:
+ * 1. Pure general knowledge (facts, explanations) - e.g., "What is BPA?"
+ * 2. Context-aware opinions (apply user constraints, no tools) - e.g., "Is Tupperware okay for me?"
+ * These MUST NOT trigger function calls or web search by default.
+ * 
+ * IMPORTANT: "what are" is NOT in the explanatory override because it's often used for
+ * product discovery (e.g., "What are the best steel bottles?")
+ */
+function classifyQueryIntent(message: string): 'realtime' | 'product_user' | 'general' {
+  const lowerMessage = message.toLowerCase();
+  
+  // PRIORITY: Explanatory questions should always be general knowledge
+  // NOTE: "what are" is intentionally NOT included - it's often used for product discovery
+  // e.g., "What are the best steel bottles?" should use search tools
+  if (
+    lowerMessage.startsWith('why ') ||
+    lowerMessage.startsWith('how ') ||
+    lowerMessage.startsWith('what is ') ||
+    lowerMessage.startsWith('explain ')
+  ) {
+    console.log('[classifyQueryIntent] Explanatory question detected, using general');
+    return 'general';
+  }
+  
+  // Real-time info patterns (use google_search)
+  const realtimePatterns = [
+    'latest', 'recent', 'current', 'today', 'now', 'news',
+    'price of', 'cost of', 'happening', 'update on',
+    'what is the price', 'how much does', 'trending',
+    'this week', 'this month', 'right now', '2024', '2025', '2026',
+    'research', 'study', 'paper', 'evidence', 'findings'
+  ];
+  
+  // Product/User data patterns (use function_declarations)
+  const productUserPatterns = [
+    'my stuff', 'my preferences', 'what do i use', 'what am i using',
+    'my history', 'my profile', 'i own', 'i have', 'i bought',
+    'best product', 'recommend me', 'reviews of', 'reviews for',
+    'on common groundz', 'common groundz', 'find me',
+    'save this', 'remember this', 'similar users', 'people like me'
+  ];
+  
+  // Check real-time patterns first (web search needed)
+  for (const pattern of realtimePatterns) {
+    if (lowerMessage.includes(pattern)) {
+      console.log(`[classifyQueryIntent] Matched realtime pattern: "${pattern}"`);
+      return 'realtime';
+    }
+  }
+  
+  // Check product/user patterns (internal tools needed)
+  for (const pattern of productUserPatterns) {
+    if (lowerMessage.includes(pattern)) {
+      console.log(`[classifyQueryIntent] Matched product_user pattern: "${pattern}"`);
+      return 'product_user';
+    }
+  }
+  
+  // Default to general knowledge (no tools, Gemini answers directly)
+  console.log('[classifyQueryIntent] No patterns matched, using general knowledge');
+  return 'general';
+}
 
 /**
  * Timeout wrapper to prevent hanging requests
@@ -694,13 +766,13 @@ async function webSearch(query: string): Promise<any> {
   try {
     console.log('[webSearch] Query:', query);
 
-    // Gemini's native google_search tool handles web grounding automatically
-    // This function serves as graceful fallback messaging if called directly
+    // Web search is now handled via intent router -> google_search grounding
+    // This function is kept for backward compatibility
     return {
       success: true,
-      message: `Web search for "${query}" is being handled by Gemini's native grounding. The response will include citations from the web.`,
+      message: `Web search for "${query}" is handled by google_search grounding via intent router.`,
       results: [],
-      note: 'Gemini google_search grounding is enabled for real-time information'
+      note: 'Use queries with real-time keywords (latest, news, current, research) to trigger web search'
     };
 
   } catch (error) {
@@ -709,7 +781,7 @@ async function webSearch(query: string): Promise<any> {
       success: false,
       error: error.message,
       results: [],
-      fallback_message: 'Web search encountered an error. Answer from your knowledge instead.'
+      fallback_message: 'Answer from your knowledge instead.'
     };
   }
 }
@@ -1439,33 +1511,28 @@ When you detect a potential conflict between a recommendation and a constraint:
 
 BEFORE selecting any tool, CLASSIFY the query intent:
 
-1. GENERAL KNOWLEDGE (facts, definitions, comparisons, "what is", "why does", "what are good X"):
+1. GENERAL KNOWLEDGE (facts, definitions, comparisons, "what is", "why does"):
    - Answer directly from your knowledge - NO tool call needed
-   - Examples: "What materials are BPA-free?", "Why is plastic bad?", "What are good alternatives to plastic?"
-   - These are factual questions - you know the answers
+   - Examples: "What is BPA?", "Why is plastic bad?"
 
-2. REAL-TIME INFO (news, current events, prices, "latest", "recent"):
-   - Use google_search tool to get fresh information
-   - Always cite sources from groundingMetadata
-   - Examples: "What's the latest research on microplastics?", "Current price of X"
+2. REAL-TIME INFO (news, current events, prices, research, "latest", "recent"):
+   - Web search will be used automatically via google_search grounding
+   - Always cite sources when available
 
-3. PRODUCT DISCOVERY (reviews, recommendations, "best X on Common Groundz", "recommend me a"):
+3. PRODUCT DISCOVERY (reviews, recommendations, "best X", "what are the best"):
    - Use search_reviews_semantic FIRST (Common Groundz database)
-   - If no results -> use google_search as fallback
-   - If still no results -> answer from knowledge with disclaimer
-   - Examples: "Best glass water bottles on Common Groundz", "Reviews of product X"
+   - If no results -> answer from knowledge with disclaimer
 
-4. USER-SPECIFIC (what do I use, my preferences, my history, my stuff):
+4. USER-SPECIFIC (what do I use, my preferences, my history):
    - Use get_user_stuff, search_user_memory, get_user_context
    - NEVER guess user data - always use tools
-   - Examples: "What water bottles do I currently use?", "What are my skincare preferences?"
 
 5. OPINION/ADVICE (context-aware recommendations):
-   - Combine your knowledge with user constraints from system prompt
-   - Examples: "Is Tupperware okay for me?", "Should I buy this?"
+   - Combine your knowledge with user constraints
    - Apply user's Things to Avoid constraints
+   - This is still "general" intent - no tools needed
 
-=== CRITICAL FALLBACK RULE ===
+=== CRITICAL SOFT-FALLBACK RULE ===
 
 If a tool returns empty or irrelevant results AND the question is NOT user-specific:
 -> Answer from your knowledge instead of refusing
@@ -1475,7 +1542,7 @@ If a tool returns empty or irrelevant results AND the question is NOT user-speci
 === INVARIANT ===
 
 Never block a general-knowledge answer just because internal search tools return empty results.
-Internal tools ADD VALUE; they do not GATE intelligence.
+Internal tools ADD VALUE; they do NOT GATE intelligence.
 
 === TRUST HIERARCHY ===
 
@@ -1720,32 +1787,70 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
 
     console.log('[smart-assistant] Calling Gemini AI with', conversationHistory.length, 'history messages');
 
-    // Convert tools to Gemini format
-    // INVARIANT: Internal tools add value; they do not gate intelligence.
-    // Never block general-knowledge answers just because tools return empty.
-    const geminiTools = [
-      {
+    // Classify intent to determine which tools to use
+    const queryIntent = classifyQueryIntent(message);
+    console.log(`[smart-assistant] Query intent: ${queryIntent}`);
+
+    // Build tools array based on intent (to avoid google_search + function_declarations conflict)
+    let geminiTools: any[] = [];
+    let toolMode = 'none';
+
+    if (queryIntent === 'realtime') {
+      // Use ONLY google_search for real-time information
+      geminiTools = [{ google_search: {} }];
+      toolMode = 'google_search';
+      console.log('[smart-assistant] Using google_search tool for real-time info');
+    } else if (queryIntent === 'product_user') {
+      // Use ONLY function_declarations for product/user queries
+      geminiTools = [{
         function_declarations: tools.map(t => ({
           name: t.function.name,
           description: t.function.description,
           parameters: t.function.parameters
         }))
-      },
-      {
-        google_search: {}  // Native Gemini web grounding for real-time info
-      }
-    ];
+      }];
+      toolMode = 'functions';
+      console.log('[smart-assistant] Using function_declarations for product/user query');
+    } else {
+      // General knowledge - no tools, let Gemini answer directly
+      geminiTools = [];
+      toolMode = 'none';
+      console.log('[smart-assistant] No tools - general knowledge query');
+    }
+
+    // Structured debug log - captures all routing decisions in one line
+    console.log('[assistant-routing]', {
+      intent: queryIntent,
+      toolMode,
+      toolsAttached: geminiTools.length
+    });
 
     // Convert conversation history to Gemini format
     const geminiMessages = [
       { role: 'user', parts: [{ text: systemPrompt }] },
-      { role: 'model', parts: [{ text: 'Understood. I will help users with their questions using the available tools.' }] },
+      { role: 'model', parts: [{ text: 'Understood. I will follow the response strategy and trust hierarchy.' }] },
       ...conversationHistory.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.content }]
       })),
       { role: 'user', parts: [{ text: message }] }
     ];
+
+    // Build request body - only include tools if we have any
+    const requestBody: any = {
+      contents: geminiMessages,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 1000
+      }
+    };
+
+    if (geminiTools.length > 0) {
+      requestBody.tools = geminiTools;
+    }
+
+    // Track retry state to prevent loops
+    let retryAttempted = false;
 
     const aiResponse = await fetchWithRetry(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -1754,14 +1859,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          contents: geminiMessages,
-          tools: geminiTools,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000
-          }
-        }),
+        body: JSON.stringify(requestBody),
       },
       3, // maxRetries
       1000 // initialDelay (1 second)
@@ -1991,13 +2089,79 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       }
     }
 
+    // Extract grounding metadata for google_search responses and append citations
+    let citationsText = '';
+    if (toolMode === 'google_search') {
+      const groundingMeta = aiData.candidates?.[0]?.groundingMetadata;
+      if (groundingMeta?.groundingChunks?.length > 0) {
+        console.log('[smart-assistant] Web grounding citations found:', groundingMeta.groundingChunks.length);
+        
+        const citations = groundingMeta.groundingChunks
+          .filter((chunk: any) => chunk.web?.uri && chunk.web?.title)
+          .map((chunk: any, i: number) => `[${i + 1}] ${chunk.web.title}: ${chunk.web.uri}`)
+          .join('\n');
+        
+        if (citations) {
+          citationsText = '\n\n**Sources:**\n' + citations;
+        }
+      }
+    }
+
+    // Append citations to final message if present
+    let finalAssistantMessage = finalMessage + citationsText;
+
+    // Post-response safety net: If non-product query got a very short/empty response,
+    // retry once with NO tools to let Gemini answer from knowledge
+    // BUT: Don't retry if response is a legitimate short answer (yes/no responses)
+    const lowerResponse = finalAssistantMessage.toLowerCase().trim();
+    if (
+      queryIntent !== 'product_user' &&
+      finalAssistantMessage.trim().length < 20 &&
+      !lowerResponse.startsWith('yes') &&
+      !lowerResponse.startsWith('no') &&
+      !retryAttempted
+    ) {
+      console.log('[smart-assistant] Response too short and not yes/no, retrying with no tools');
+      retryAttempted = true;
+      
+      // Retry request with no tools
+      const retryRequestBody = {
+        contents: geminiMessages,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 1000
+        }
+        // No tools - force Gemini to answer from knowledge
+      };
+      
+      const retryResponse = await fetchWithRetry(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(retryRequestBody),
+        },
+        3,
+        1000
+      );
+      
+      if (retryResponse.ok) {
+        const retryData = await retryResponse.json();
+        const retryMessage = retryData.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
+        if (retryMessage && retryMessage.trim().length > finalAssistantMessage.trim().length) {
+          console.log('[smart-assistant] Retry produced better response');
+          finalAssistantMessage = retryMessage;
+        }
+      }
+    }
+
     // 10. Save assistant response to database
     const { error: assistantMsgError } = await supabaseClient
       .from('conversation_messages')
       .insert({
         conversation_id: conversation.id,
         role: 'assistant',
-        content: finalMessage,
+        content: finalAssistantMessage,
         metadata: {
           tool_calls: toolCalls || [],
           tools_executed: toolCalls?.length || 0,
@@ -2017,7 +2181,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       .eq('id', conversation.id);
 
     // 12. Check if memory should be updated (Phase 6.0 enhanced triggers)
-    const memoryTrigger = detectMemoryUpdateTrigger(message, finalMessage);
+    const memoryTrigger = detectMemoryUpdateTrigger(message, finalAssistantMessage);
 
     if (memoryTrigger.trigger) {
       console.log('[smart-assistant] Triggering background memory update:', memoryTrigger.reason);
@@ -2074,7 +2238,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
 
     return new Response(JSON.stringify({
       conversationId: conversation.id,
-      message: finalMessage,
+      message: finalAssistantMessage,
       toolCalls: toolCalls || [],
       detectedPreference,
       metadata: {
