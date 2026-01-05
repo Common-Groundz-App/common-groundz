@@ -76,24 +76,61 @@ function classifyQueryIntent(
   }
   
   // PRIORITY 2: Real-time patterns -> realtime (web search)
-  const realtimePatterns = [
+  // Use REGEX for flexible matching - describes structure, not every word variation
+  
+  // Regex patterns for purchase/find-online/availability intent (scalable approach)
+  const realtimeRegexPatterns = [
+    /find\b.*\bonline/i,                    // "find X online", "find them online", "find me any of them online"
+    /where\s+(?:can|do|would|could)\s+i\s+(?:buy|get|find|order|shop)/i,  // "where can I buy/get/find"
+    /(?:buy|purchase|order|get|shop)\s+.*\bonline/i,  // "buy X online", "shop for X online"
+    /available\s+(?:online|on\s+amazon|on\s+ebay|for\s+purchase)/i,  // "available online"
+    /(?:show|give|send)\s+(?:me\s+)?(?:a\s+)?links?\b/i,  // "show me links", "give me a link"
+    /\bonline\s+(?:store|shop|retailer|seller)/i,  // "online store", "online shop"
+    // URL-intent catch-all (Gemini suggestion)
+    /(?:link|url|website|where\s+to\s+buy|get\s+it\s+from)/i,  // "link please", "website for this"
+  ];
+
+  for (const pattern of realtimeRegexPatterns) {
+    if (pattern.test(lowerMessage)) {
+      console.log(`[classifyQueryIntent] Matched realtime regex: ${pattern}`);
+      return 'realtime';
+    }
+  }
+
+  // Simple keyword patterns for time-sensitive/research queries
+  const realtimeKeywords = [
     'latest', 'recent', 'current', 'today', 'now', 'news',
     'price of', 'cost of', 'happening', 'update on',
     'what is the price', 'how much does', 'trending',
     'this week', 'this month', 'right now', '2024', '2025', '2026',
     'research', 'study', 'paper', 'evidence', 'findings',
-    // Purchase/availability patterns - route to realtime for google_search
-    'find online', 'find them online', 'find any online', 'find me any online',
-    'buy online', 'where can i buy', 'where to buy', 'purchase',
-    'shop for', 'available online', 'get online', 'order online',
-    'amazon', 'ebay', 'walmart', 'target'
+    'amazon', 'ebay', 'walmart', 'target', 'flipkart'
   ];
-  
-  for (const pattern of realtimePatterns) {
-    if (lowerMessage.includes(pattern)) {
-      console.log(`[classifyQueryIntent] Matched realtime pattern: "${pattern}"`);
+
+  for (const keyword of realtimeKeywords) {
+    if (lowerMessage.includes(keyword)) {
+      console.log(`[classifyQueryIntent] Matched realtime keyword: "${keyword}"`);
       return 'realtime';
     }
+  }
+  
+  // PRIORITY 2.7: Context-aware follow-up escalation (ChatGPT suggestion)
+  // If previous assistant message discussed products, and user wants to find/get/show them online
+  const lastAssistantForRealtime = conversationHistory
+    ?.slice()
+    ?.reverse()
+    ?.find(m => m.role === 'assistant')
+    ?.content
+    ?.toLowerCase() ?? '';
+
+  const wasProductDiscussion = /bottle|steel|brand|product|option|choice|model|size|recommend|alternative|hydro|stanley|klean|container|tupperware|sunscreen|laptop|phone|headphone/i.test(lastAssistantForRealtime);
+
+  const followupFindOnline = /(?:find|get|show|give)\s+(?:me\s+)?(?:some|any|one|them|these|those|it)/i.test(lowerMessage) 
+    && /online|buy|shop|link|available|purchase|order/i.test(lowerMessage);
+
+  if (wasProductDiscussion && followupFindOnline) {
+    console.log('[classifyQueryIntent] Contextual find-online follow-up after product discussion → realtime');
+    return 'realtime';
   }
   
   // PRIORITY 3: User-specific patterns -> product_user (always)
@@ -144,7 +181,8 @@ function classifyQueryIntent(
   }
   
   // Default: general knowledge
-  console.log('[classifyQueryIntent] Default to general');
+  // Log unmatched queries for debugging and pattern improvement
+  console.log(`[classifyQueryIntent] Unmatched query, defaulting to general: "${lowerMessage.substring(0, 80)}..."`);
   return 'general';
 }
 
