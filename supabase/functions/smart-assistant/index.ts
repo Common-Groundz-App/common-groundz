@@ -1983,6 +1983,14 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     // 9. Execute tool calls if AI requested them
     let finalMessage = assistantMessage;
 
+    // ARCHITECTURAL FIX: For product_user intent, the first response is always
+    // pre-tool narration (even if Gemini doesn't emit formal functionCalls).
+    // Suppress it unconditionally and let tool results or follow-up drive the response.
+    if (queryIntent === 'product_user') {
+      console.log('[smart-assistant] product_user intent: suppressing initial message, awaiting tool results');
+      finalMessage = '';
+    }
+
     if (toolCalls && toolCalls.length > 0) {
       // CRITICAL: Discard pre-tool narration - only use follow-up response
       // Gemini often generates "Let me search..." text before function calls
@@ -2197,30 +2205,49 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       
       // ===== TOOL CALL LEAKAGE REMOVAL (CRITICAL) =====
       
-      // Remove "Tool Call:" lines (case-insensitive)
+      // Remove "Tool Call:" / "Calling Tool:" lines (case-insensitive, all variants)
       cleaned = cleaned.replace(/^Tool Call:.*$/gim, '');
+      cleaned = cleaned.replace(/^Calling Tools?:.*$/gim, '');
       cleaned = cleaned.replace(/Tool Calls?:.*$/gim, '');
+      cleaned = cleaned.replace(/\*\*Calling Tool\*\*:.*$/gm, '');
       
       // Remove backticked function calls (e.g., `search_reviews_semantic(...)`)
       cleaned = cleaned.replace(/`[a-z_]+\([^`]*\)`/gi, '');
       
-      // Remove any line containing function names with _semantic, get_user, etc.
-      cleaned = cleaned.replace(/.*(_semantic|get_user|save_insight|find_similar|get_product).*\(.*\).*/gi, '');
+      // Remove RAW function calls even without backticks (Gemini's suggestion)
+      // Catches: search_reviews_semantic(query="..."), get_user_stuff(...), etc.
+      cleaned = cleaned.replace(/[a-z_]+_semantic\s*\([^)]*\)/gi, '');
+      cleaned = cleaned.replace(/get_user[a-z_]*\s*\([^)]*\)/gi, '');
+      cleaned = cleaned.replace(/search_[a-z_]+\s*\([^)]*\)/gi, '');
+      cleaned = cleaned.replace(/find_[a-z_]+\s*\([^)]*\)/gi, '');
+      cleaned = cleaned.replace(/save_[a-z_]+\s*\([^)]*\)/gi, '');
       
-      // Remove "**Calling Tool**:" patterns
-      cleaned = cleaned.replace(/\*\*Calling Tool\*\*:.*$/gm, '');
+      // Remove any line containing function names with tool identifiers
+      cleaned = cleaned.replace(/.*(_semantic|get_user|save_insight|find_similar|get_product|web_search|search_user).*\(.*\).*/gi, '');
       
       // Remove backticked tool names with parameters
-      cleaned = cleaned.replace(/`[a-z_]+`\s*with parameters:.*$/gm, '');
+      cleaned = cleaned.replace(/`[a-z_]+`\s*with parameters.*$/gim, '');
+      
+      // ===== FENCED CODE BLOCK REMOVAL (for tool_code JSON) =====
+      
+      // Remove fenced blocks containing "tool_code"
+      cleaned = cleaned.replace(/```[\s\S]*?"tool_code"[\s\S]*?```/gi, '');
+      
+      // Remove fenced blocks containing _semantic or function calls
+      cleaned = cleaned.replace(/```[\s\S]*?_semantic[\s\S]*?```/gi, '');
+      cleaned = cleaned.replace(/```[\s\S]*?search_reviews[\s\S]*?```/gi, '');
+      
+      // Remove inline JSON with tool_code (without fences)
+      cleaned = cleaned.replace(/\{[^{}]*"tool_code"[^{}]*\}/gi, '');
       
       // ===== PRE-TOOL NARRATION REMOVAL =====
       
+      // Full sentence patterns (not just ellipses)
+      cleaned = cleaned.replace(/^Let me (search|look|check|find|see)\b.*$/gim, '');
+      cleaned = cleaned.replace(/^I('ll| will) (search|look|check|find|see)\b.*$/gim, '');
+      
       // "Let me see what users are saying..."
       cleaned = cleaned.replace(/Let me see what.*users are saying.*/gi, '');
-      
-      // Generic "Let me search/look/check/find..."
-      cleaned = cleaned.replace(/Let me (search|look|check|find|see).*\.\.\./gi, '');
-      cleaned = cleaned.replace(/I'll (search|look|check|find|see).*\.\.\./gi, '');
       
       // ===== SMALL TALK REMOVAL =====
       cleaned = cleaned.replace(/^(That's a great question[!,]?\s*|Great question[!,]?\s*)/i, '');
@@ -2234,6 +2261,16 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
 
     // Apply formatting cleanup
     let finalAssistantMessage = cleanResponseFormatting(finalMessage);
+
+    // Debug: Confirm sanitizer effectiveness
+    console.log('[smart-assistant] Sanitizer check:', {
+      rawHasCallingTool: finalMessage.toLowerCase().includes('calling tool'),
+      rawHasToolCode: finalMessage.toLowerCase().includes('tool_code'),
+      rawHasSemantic: finalMessage.toLowerCase().includes('_semantic'),
+      cleanedHasCallingTool: finalAssistantMessage.toLowerCase().includes('calling tool'),
+      cleanedHasToolCode: finalAssistantMessage.toLowerCase().includes('tool_code'),
+      cleanedHasSemantic: finalAssistantMessage.toLowerCase().includes('_semantic'),
+    });
 
     // Post-response safety net: If non-product query got a very short/empty response,
     // retry once with NO tools to let Gemini answer from knowledge
