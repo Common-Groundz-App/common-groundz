@@ -1614,6 +1614,14 @@ When recommending, ALWAYS explain WHY:
 
 === RESPONSE FORMATTING (MANDATORY) ===
 
+CRITICAL BEHAVIOR - SILENT EXECUTION:
+- NEVER say "please give me a moment", "please wait", "one moment", "searching now", "let me search"
+- NEVER announce that you are about to search or use a tool
+- NEVER mention tool names, parameters, or that you are using tools
+- When you need to search, do it silently - output ONLY the final results
+- If search is in progress, produce NO text - wait for results to complete
+- VIOLATION OF THIS RULE = SYSTEM FAILURE
+
 1. TOOL CALLS ARE INVISIBLE:
    - NEVER say "Calling Tool", "Let me search", "I'll look up"
    - NEVER mention tool names, parameters, or execution
@@ -1988,11 +1996,11 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     // 9. Execute tool calls if AI requested them
     let finalMessage = assistantMessage;
 
-    // ARCHITECTURAL FIX: For product_user intent, the first response is always
+    // ARCHITECTURAL FIX: For product_user AND realtime intents, the first response is always
     // pre-tool narration (even if Gemini doesn't emit formal functionCalls).
     // Suppress it unconditionally and let tool results or follow-up drive the response.
-    if (queryIntent === 'product_user') {
-      console.log('[smart-assistant] product_user intent: suppressing initial message, awaiting tool results');
+    if (queryIntent === 'product_user' || queryIntent === 'realtime') {
+      console.log(`[smart-assistant] ${queryIntent} intent: suppressing initial narration, awaiting results`);
       finalMessage = '';
     }
 
@@ -2175,6 +2183,45 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       }
     }
 
+    // Handle realtime intent: Ensure we have actual content, not just narration
+    if (queryIntent === 'realtime') {
+      const hasGroundingResults = aiData.candidates?.[0]?.groundingMetadata?.groundingChunks?.length > 0;
+      const isJustNarration = /please.*moment|give me a moment|let me search|searching now|one moment|i('ll| will) (search|look|find)/i.test(finalMessage);
+      const isEmptyOrShort = finalMessage.trim().length < 30;
+      
+      if ((isJustNarration || isEmptyOrShort) && !hasGroundingResults) {
+        console.log('[smart-assistant] realtime response is empty/narration-only, attempting fallback');
+        
+        // Retry without tools to get knowledge-based answer
+        try {
+          const fallbackResponse = await fetchWithRetry(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: geminiMessages,
+                generationConfig: { temperature: 0.7, maxOutputTokens: 1000 }
+                // No tools - force knowledge-based answer
+              }),
+            },
+            3, 1000
+          );
+          
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            const fallbackText = fallbackData.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
+            if (fallbackText && fallbackText.length > 30) {
+              finalMessage = fallbackText;
+              console.log('[smart-assistant] Fallback knowledge-based response generated');
+            }
+          }
+        } catch (fallbackError) {
+          console.error('[smart-assistant] Fallback failed:', fallbackError);
+        }
+      }
+    }
+
     // Extract grounding metadata for google_search responses as structured data
     interface Source {
       title: string;
@@ -2250,6 +2297,17 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       
       // ===== PRE-TOOL NARRATION REMOVAL =====
       
+      // Remove "please wait" / "moment to search" patterns
+      cleaned = cleaned.replace(/^Please give me a moment.*$/gim, '');
+      cleaned = cleaned.replace(/^Please wait.*$/gim, '');
+      cleaned = cleaned.replace(/^One moment.*$/gim, '');
+      cleaned = cleaned.replace(/^Searching now.*$/gim, '');
+      cleaned = cleaned.replace(/^Just a moment.*$/gim, '');
+      cleaned = cleaned.replace(/^Give me a (moment|second).*$/gim, '');
+      cleaned = cleaned.replace(/^Hold on.*$/gim, '');
+      cleaned = cleaned.replace(/^I('m| am) searching.*$/gim, '');
+      
+      // Existing patterns
       cleaned = cleaned.replace(/^Let me (search|look|check|find|see|use)\b.*$/gim, '');
       cleaned = cleaned.replace(/^I('ll| will) (search|look|check|find|see|use)\b.*$/gim, '');
       cleaned = cleaned.replace(/Let me see what.*users are saying.*/gi, '');
@@ -2265,6 +2323,12 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
 
     // Apply formatting cleanup
     let finalAssistantMessage = cleanResponseFormatting(finalMessage);
+
+    // CRITICAL INVARIANT: Never return empty response to user
+    if (!finalAssistantMessage || finalAssistantMessage.trim().length === 0) {
+      console.log('[smart-assistant] INVARIANT: Empty response detected, providing helpful fallback');
+      finalAssistantMessage = "I couldn't fetch live results right now, but I can still help! Would you like me to share what I know about this topic, or try a different search?";
+    }
 
     // Debug: Confirm sanitizer effectiveness
     console.log('[smart-assistant] Sanitizer check:', {
