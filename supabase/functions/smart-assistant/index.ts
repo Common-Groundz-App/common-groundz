@@ -2034,12 +2034,21 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     // 9. Execute tool calls if AI requested them
     let finalMessage = assistantMessage;
 
-    // ARCHITECTURAL FIX: For product_user AND realtime intents, the first response is always
-    // pre-tool narration (even if Gemini doesn't emit formal functionCalls).
-    // Suppress it unconditionally and let tool results or follow-up drive the response.
-    if (queryIntent === 'product_user' || queryIntent === 'realtime') {
-      console.log(`[smart-assistant] ${queryIntent} intent: suppressing initial narration, awaiting results`);
+    // PART 1: Conditional suppression for product_user vs realtime
+    // For product_user: Always suppress (follow-up call generates response after tool execution)
+    // For realtime: Only suppress if it's pure narration, NOT if we have actual content
+    if (queryIntent === 'product_user') {
+      console.log('[smart-assistant] product_user intent: suppressing initial narration, awaiting tool follow-up');
       finalMessage = '';
+    } else if (queryIntent === 'realtime') {
+      // Check if this is just narration that should be suppressed
+      const isJustNarration = /please.*moment|give me a moment|let me search|searching now|one moment|i('ll| will) (search|look|find)|couldn't fetch/i.test(assistantMessage);
+      if (isJustNarration) {
+        console.log('[smart-assistant] realtime intent: suppressing narration, will synthesize from grounding');
+        finalMessage = '';
+      } else {
+        console.log('[smart-assistant] realtime intent: keeping substantive response');
+      }
     }
 
     if (toolCalls && toolCalls.length > 0) {
@@ -2221,16 +2230,73 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       }
     }
 
-    // Handle realtime intent: Ensure we have actual content, not just narration
+    // PART 2: Handle realtime intent - Synthesize from grounding if text is empty/narration
     if (queryIntent === 'realtime') {
-      const hasGroundingResults = aiData.candidates?.[0]?.groundingMetadata?.groundingChunks?.length > 0;
-      const isJustNarration = /please.*moment|give me a moment|let me search|searching now|one moment|i('ll| will) (search|look|find)/i.test(finalMessage);
-      const isEmptyOrShort = finalMessage.trim().length < 30;
+      const groundingChunks = aiData.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+      const hasGroundingResults = groundingChunks.length > 0;
+      const isJustNarration = /please.*moment|give me a moment|let me search|searching now|one moment|i('ll| will) (search|look|find)|couldn't fetch/i.test(finalMessage);
+      const isEmptyOrShort = finalMessage.trim().length < 50;
       
-      if ((isJustNarration || isEmptyOrShort) && !hasGroundingResults) {
-        console.log('[smart-assistant] realtime response is empty/narration-only, attempting fallback');
+      console.log('[smart-assistant] Realtime check:', { 
+        hasGrounding: hasGroundingResults, 
+        groundingCount: groundingChunks.length,
+        isNarration: isJustNarration, 
+        isEmpty: isEmptyOrShort,
+        textLength: finalMessage.trim().length 
+      });
+      
+      // CASE 1: We have grounding results but empty/narration text → SYNTHESIZE
+      if (hasGroundingResults && (isEmptyOrShort || isJustNarration)) {
+        console.log('[smart-assistant] Grounding exists but text empty/narration → synthesizing response');
         
-        // Retry without tools to get knowledge-based answer
+        // Build a grounding summary to feed back to Gemini
+        const groundingSummary = groundingChunks.slice(0, 8).map((chunk: any, i: number) => {
+          const title = chunk.web?.title || 'Source';
+          const uri = chunk.web?.uri || '';
+          return `[${i + 1}] ${title} - ${uri}`;
+        }).join('\n');
+        
+        // Make synthesis call WITHOUT tools
+        try {
+          const synthesisPrompt = `Based on these web search results, provide a helpful answer to the user's question. Include citation numbers like [1], [2] where relevant.
+
+Web Search Results:
+${groundingSummary}
+
+User's question context: ${message}
+
+Provide a concise, helpful response synthesizing these sources. Do NOT say you couldn't find results - you have the sources above.`;
+
+          const synthesisResponse = await fetchWithRetry(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: synthesisPrompt }] }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
+              }),
+            },
+            2, 1000
+          );
+          
+          if (synthesisResponse.ok) {
+            const synthesisData = await synthesisResponse.json();
+            const synthesizedText = synthesisData.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
+            if (synthesizedText && synthesizedText.length > 30) {
+              finalMessage = synthesizedText;
+              console.log('[smart-assistant] Successfully synthesized response from grounding');
+            }
+          }
+        } catch (synthesisError) {
+          console.error('[smart-assistant] Synthesis failed:', synthesisError);
+        }
+      }
+      
+      // CASE 2: No grounding AND empty/narration → fallback to knowledge
+      if (!hasGroundingResults && (isEmptyOrShort || isJustNarration)) {
+        console.log('[smart-assistant] No grounding and empty text → knowledge fallback');
+        
         try {
           const fallbackResponse = await fetchWithRetry(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -2240,7 +2306,6 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
               body: JSON.stringify({
                 contents: geminiMessages,
                 generationConfig: { temperature: 0.7, maxOutputTokens: 1000 }
-                // No tools - force knowledge-based answer
               }),
             },
             3, 1000
@@ -2268,24 +2333,51 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     }
     let sourcesData: Source[] = [];
     
+    // PART 3: Extract and unwrap Google redirect URLs to show real publisher domains
     if (toolMode === 'google_search') {
       const groundingMeta = aiData.candidates?.[0]?.groundingMetadata;
       if (groundingMeta?.groundingChunks?.length > 0) {
         console.log('[smart-assistant] Web grounding citations found:', groundingMeta.groundingChunks.length);
         
+        // Helper to unwrap Vertex AI redirect URLs
+        function unwrapVertexUrl(rawUrl: string): string {
+          try {
+            // Vertex AI wraps URLs like: vertexaisearch.cloud.google.com/grounding-api-redirect/...?url=ENCODED_URL
+            if (rawUrl.includes('vertexaisearch.cloud.google.com') || rawUrl.includes('grounding-api-redirect')) {
+              const urlObj = new URL(rawUrl);
+              const encodedTarget = urlObj.searchParams.get('url');
+              if (encodedTarget) {
+                return decodeURIComponent(encodedTarget);
+              }
+            }
+            return rawUrl;
+          } catch {
+            return rawUrl;
+          }
+        }
+        
         sourcesData = groundingMeta.groundingChunks
-          .filter((chunk: any) => chunk.web?.uri && chunk.web?.title)
+          .filter((chunk: any) => chunk.web?.uri)
           .map((chunk: any) => {
-            let url = chunk.web.uri;
-            let domain = '';
+            const rawUrl = chunk.web.uri;
+            const cleanUrl = unwrapVertexUrl(rawUrl);
+            
+            let domain = 'source';
             try {
-              const urlObj = new URL(url);
+              const urlObj = new URL(cleanUrl);
               domain = urlObj.hostname.replace('www.', '');
             } catch {
-              domain = 'source';
+              // Keep default 'source' domain
             }
-            return { title: chunk.web.title, domain, url };
+            
+            return { 
+              title: chunk.web.title || 'View Source', 
+              domain, 
+              url: cleanUrl 
+            };
           });
+        
+        console.log('[smart-assistant] Processed sources:', sourcesData.map(s => s.domain));
       }
     }
 
@@ -2362,10 +2454,17 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     // Apply formatting cleanup
     let finalAssistantMessage = cleanResponseFormatting(finalMessage);
 
-    // CRITICAL INVARIANT: Never return empty response to user
+    // PART 4: FINAL INVARIANT - Only fire if ALL synthesis attempts failed
     if (!finalAssistantMessage || finalAssistantMessage.trim().length === 0) {
-      console.log('[smart-assistant] INVARIANT: Empty response detected, providing helpful fallback');
-      finalAssistantMessage = "I couldn't fetch live results right now, but I can still help! Would you like me to share what I know about this topic, or try a different search?";
+      // Check if we have sources - if so, generate a minimal response from them
+      if (sourcesData.length > 0) {
+        console.log('[smart-assistant] INVARIANT: Empty text but sources exist, generating minimal response');
+        const topSources = sourcesData.slice(0, 5).map((s, i) => `${i + 1}. ${s.title} (${s.domain})`).join('\n');
+        finalAssistantMessage = `Here are some relevant results I found:\n\n${topSources}\n\nClick on any source above for more details.`;
+      } else {
+        console.log('[smart-assistant] INVARIANT: Empty response AND no sources, providing fallback');
+        finalAssistantMessage = "I couldn't fetch live results right now, but I can still help! Would you like me to share what I know about this topic, or try a different search?";
+      }
     }
 
     // Debug: Confirm sanitizer effectiveness
