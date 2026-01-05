@@ -81,7 +81,12 @@ function classifyQueryIntent(
     'price of', 'cost of', 'happening', 'update on',
     'what is the price', 'how much does', 'trending',
     'this week', 'this month', 'right now', '2024', '2025', '2026',
-    'research', 'study', 'paper', 'evidence', 'findings'
+    'research', 'study', 'paper', 'evidence', 'findings',
+    // Purchase/availability patterns - route to realtime for google_search
+    'find online', 'find them online', 'find any online', 'find me any online',
+    'buy online', 'where can i buy', 'where to buy', 'purchase',
+    'shop for', 'available online', 'get online', 'order online',
+    'amazon', 'ebay', 'walmart', 'target'
   ];
   
   for (const pattern of realtimePatterns) {
@@ -2203,7 +2208,16 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     function cleanResponseFormatting(text: string): string {
       let cleaned = text;
       
-      // ===== TOOL CALL LEAKAGE REMOVAL (CRITICAL) =====
+      // ===== TOOL USAGE NARRATION REMOVAL (CRITICAL - catches "I'll use the `tool_name` tool") =====
+      
+      // Remove any sentence mentioning tool usage with backticked names
+      // Matches: "I'll use the `search_products_online` tool...", "I will use the `google_search` tool..."
+      cleaned = cleaned.replace(/^.*\b(use|using|run|running|call|calling)\b.*`[a-z0-9_]+`.*\btool\b.*$/gim, '');
+      
+      // Remove standalone backticked tool identifiers in tool-context sentences
+      cleaned = cleaned.replace(/.*`(search_|get_|find_|save_|web_|google_)[a-z0-9_]+`.*$/gim, '');
+      
+      // ===== TOOL CALL LEAKAGE REMOVAL =====
       
       // Remove "Tool Call:" / "Calling Tool:" lines (case-insensitive, all variants)
       cleaned = cleaned.replace(/^Tool Call:.*$/gim, '');
@@ -2214,8 +2228,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       // Remove backticked function calls (e.g., `search_reviews_semantic(...)`)
       cleaned = cleaned.replace(/`[a-z_]+\([^`]*\)`/gi, '');
       
-      // Remove RAW function calls even without backticks (Gemini's suggestion)
-      // Catches: search_reviews_semantic(query="..."), get_user_stuff(...), etc.
+      // Remove RAW function calls even without backticks
       cleaned = cleaned.replace(/[a-z_]+_semantic\s*\([^)]*\)/gi, '');
       cleaned = cleaned.replace(/get_user[a-z_]*\s*\([^)]*\)/gi, '');
       cleaned = cleaned.replace(/search_[a-z_]+\s*\([^)]*\)/gi, '');
@@ -2230,30 +2243,21 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       
       // ===== FENCED CODE BLOCK REMOVAL (for tool_code JSON) =====
       
-      // Remove fenced blocks containing "tool_code"
       cleaned = cleaned.replace(/```[\s\S]*?"tool_code"[\s\S]*?```/gi, '');
-      
-      // Remove fenced blocks containing _semantic or function calls
       cleaned = cleaned.replace(/```[\s\S]*?_semantic[\s\S]*?```/gi, '');
       cleaned = cleaned.replace(/```[\s\S]*?search_reviews[\s\S]*?```/gi, '');
-      
-      // Remove inline JSON with tool_code (without fences)
       cleaned = cleaned.replace(/\{[^{}]*"tool_code"[^{}]*\}/gi, '');
       
       // ===== PRE-TOOL NARRATION REMOVAL =====
       
-      // Full sentence patterns (not just ellipses)
-      cleaned = cleaned.replace(/^Let me (search|look|check|find|see)\b.*$/gim, '');
-      cleaned = cleaned.replace(/^I('ll| will) (search|look|check|find|see)\b.*$/gim, '');
-      
-      // "Let me see what users are saying..."
+      cleaned = cleaned.replace(/^Let me (search|look|check|find|see|use)\b.*$/gim, '');
+      cleaned = cleaned.replace(/^I('ll| will) (search|look|check|find|see|use)\b.*$/gim, '');
       cleaned = cleaned.replace(/Let me see what.*users are saying.*/gi, '');
       
       // ===== SMALL TALK REMOVAL =====
       cleaned = cleaned.replace(/^(That's a great question[!,]?\s*|Great question[!,]?\s*)/i, '');
       
       // ===== CLEANUP =====
-      // Remove empty lines left over from removals
       cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
       
       return cleaned.trim();
