@@ -2018,6 +2018,27 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
         console.log(`[smart-assistant] Citation ${i + 1}: ${chunk.web?.title} - ${chunk.web?.uri}`);
       });
     }
+
+    // PART 1: Truncation Detection
+    // Check if response was truncated via finishReason or pattern detection
+    const finishReason = candidate?.finishReason || 'UNKNOWN';
+    const wasResponseTruncated = finishReason === 'MAX_TOKENS' || finishReason === 'LENGTH';
+    
+    // Detect incomplete responses by checking for cut-off patterns
+    // Catches: "**Klean", "• **Stan", incomplete bullets, trailing asterisks, trailing colons
+    const endsWithIncompleteWord = /\*\*\w{1,15}$|^\s*[-•]\s*\*{0,2}\w{1,15}$|\w+\.{3}$|:\s*$/i.test(assistantMessage.trim());
+    const isTruncated = wasResponseTruncated || endsWithIncompleteWord;
+    
+    // Flag for completion quality invariant (Part 4)
+    let completionRetryAttempted = false;
+
+    console.log('[smart-assistant] Response quality:', { 
+      finishReason, 
+      wasResponseTruncated, 
+      endsWithIncompleteWord,
+      isTruncated,
+      messageLength: assistantMessage.length 
+    });
     
     // Convert Gemini function calls to OpenAI-style tool calls
     const toolCalls = functionCalls.map((fc: any, idx: number) => ({
@@ -2293,9 +2314,46 @@ Provide a concise, helpful response synthesizing these sources. Do NOT say you c
         }
       }
       
-      // CASE 2: No grounding AND empty/narration → fallback to knowledge
-      if (!hasGroundingResults && (isEmptyOrShort || isJustNarration)) {
-        console.log('[smart-assistant] No grounding and empty text → knowledge fallback');
+      // CASE 1.5: Grounding FAILED AND response is truncated → regenerate without google_search
+      if (!hasGroundingResults && isTruncated) {
+        console.log('[smart-assistant] Grounding failed AND response truncated → regenerating without google_search');
+        
+        try {
+          const retryResponse = await fetchWithRetry(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  ...geminiMessages.slice(0, -1),
+                  { role: 'user', parts: [{ text: `The user asked: "${message}"\n\nProvide a complete, helpful response. Include popular retailers like Amazon, official brand websites, and other trusted online stores if relevant. Do NOT cut off mid-sentence. Ensure your response ends with proper punctuation.` }] }
+                ],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+              }),
+            },
+            2, 1000
+          );
+          
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            const retryText = retryData.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
+            const retryFinishReason = retryData.candidates?.[0]?.finishReason;
+            
+            if (retryText && retryText.length > 50 && retryFinishReason === 'STOP') {
+              finalMessage = retryText;
+              console.log('[smart-assistant] Successfully regenerated complete response without grounding');
+            }
+          }
+        } catch (retryError) {
+          console.error('[smart-assistant] Retry without grounding failed:', retryError);
+        }
+      }
+      
+      // CASE 2: No grounding AND (empty/narration OR still truncated) → fallback to knowledge
+      const needsKnowledgeFallback = !hasGroundingResults && (isEmptyOrShort || isJustNarration || isTruncated);
+      if (needsKnowledgeFallback && finalMessage.trim().length < 100) {
+        console.log('[smart-assistant] No grounding and incomplete text → knowledge fallback');
         
         try {
           const fallbackResponse = await fetchWithRetry(
@@ -2464,6 +2522,55 @@ Provide a concise, helpful response synthesizing these sources. Do NOT say you c
       } else {
         console.log('[smart-assistant] INVARIANT: Empty response AND no sources, providing fallback');
         finalAssistantMessage = "I couldn't fetch live results right now, but I can still help! Would you like me to share what I know about this topic, or try a different search?";
+      }
+    }
+
+    // PART 4: COMPLETION QUALITY INVARIANT (ChatGPT suggestion)
+    // Final safety gate - catch ANY incomplete response before returning to user
+    const looksComplete = 
+      finalAssistantMessage.length > 120 &&
+      !/\*\*\w{1,15}$|^\s*[-•]\s*\*{0,2}\w{1,15}$|\w+\.{3}$|:\s*$/i.test(finalAssistantMessage.trim()) &&
+      /[.!?]$/.test(finalAssistantMessage.trim());
+
+    if (!looksComplete && !completionRetryAttempted && finalAssistantMessage.length > 0) {
+      console.log('[smart-assistant] COMPLETION INVARIANT: Response incomplete → forcing regeneration', {
+        length: finalAssistantMessage.length,
+        endsWithPunctuation: /[.!?]$/.test(finalAssistantMessage.trim()),
+        hasIncompletePattern: /\*\*\w{1,15}$/.test(finalAssistantMessage.trim())
+      });
+      
+      completionRetryAttempted = true;
+      
+      try {
+        const completionResponse = await fetchWithRetry(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [
+                ...geminiMessages,
+                { role: 'assistant', parts: [{ text: finalAssistantMessage }] },
+                { role: 'user', parts: [{ text: 'Your previous response was cut off. Please provide a complete response to my original question. End with proper punctuation.' }] }
+              ],
+              generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+            }),
+          },
+          2, 1000
+        );
+        
+        if (completionResponse.ok) {
+          const completionData = await completionResponse.json();
+          const completedText = completionData.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
+          const completionFinishReason = completionData.candidates?.[0]?.finishReason;
+          
+          if (completedText && completedText.length > 100 && completionFinishReason === 'STOP') {
+            finalAssistantMessage = cleanResponseFormatting(completedText);
+            console.log('[smart-assistant] Completion regeneration successful');
+          }
+        }
+      } catch (completionError) {
+        console.error('[smart-assistant] Completion regeneration failed:', completionError);
       }
     }
 
