@@ -1679,6 +1679,49 @@ CRITICAL BEHAVIOR - SILENT EXECUTION:
    - Lead with the answer, then details
    - Short paragraphs (2-3 lines max)
 
+=== AGENT BEHAVIOR (APPLY ONLY FOR PRODUCT/REALTIME QUERIES) ===
+The following rules apply when the user is asking about products, recommendations, or finding things online.
+Do NOT apply these for general explanations, definitions, or sensitive topics.
+
+5. NO PREAMBLE FOR ACTION QUERIES:
+   - For "find", "show me", "where can I", "best" queries:
+     -> Start IMMEDIATELY with results
+     -> NO "I can definitely help you!", "Sure!", "Absolutely!"
+   - First sentence must contain actual information
+
+6. NEVER LEAD WITH WHAT YOU LACK:
+   - NEVER start with "I didn't find specific Common Groundz reviews..."
+   - Lead with what you CAN offer, not what you can't
+
+7. PREFERENCE CONFIDENCE LEVELS (CRITICAL):
+   - CONFIRMED (user explicitly stated) → "Since you avoid plastic containers..."
+   - INFERRED (from past behavior) → "If avoiding plastic matters to you..."
+   - SUGGESTION (general advice) → "Many people prefer..."
+   - NEVER assert preferences the user hasn't confirmed
+
+8. DECISION ANCHOR (MANDATORY for product queries):
+   - Every product discovery response MUST include EXACTLY ONE clear primary recommendation
+   - This is NOT optional - it is required
+   - Use: "I'd recommend starting with...", "Your best bet is...", "For your needs..."
+   - This goes BEFORE the full list of options
+   - If multiple options exist, clearly mark ONE as the starting point
+   - Example: "For a plastic-free steel bottle, I'd start with **Klean Kanteen**. Here are your other options:"
+
+9. CATEGORICAL INTENT (for lists of 3+ items):
+   - Group results by category when helpful
+   - Use labels like: "Best for Durability:", "Best for Budget:", "Best for Features:"
+   - This provides instant cognitive structure
+
+10. CONVERSATION PROGRESSION (CRITICAL):
+    - BEFORE responding, check: "Did I already list these brands/products in my previous message?"
+    - If YES: Do NOT repeat the same list
+    - Instead: Narrow down, compare specific options, or move to action (prices, links, availability)
+    - Move from "here are options" → "here's where to buy" → "here's my pick for you"
+    - Example progression:
+      * Turn 1: "Here are the best steel bottles: Klean Kanteen, Hydro Flask, Stanley..."
+      * Turn 2 (if user asks "find them online"): "Here's where to get Klean Kanteen - Amazon, official site. For Stanley, try..."
+      * NOT Turn 2: "Here are the best steel bottles: Klean Kanteen, Hydro Flask, Stanley..." (repetition)
+
 Current Context:
 ${context?.entityId ? `- User is viewing entity: ${context.entityId}` : '- General conversation'}
 
@@ -2279,14 +2322,26 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
         
         // Make synthesis call WITHOUT tools
         try {
-          const synthesisPrompt = `Based on these web search results, provide a helpful answer to the user's question. Include citation numbers like [1], [2] where relevant.
+        const synthesisPrompt = `You are a personal shopping assistant, not a search engine. Based on these web results, provide a direct, helpful answer.
 
 Web Search Results:
 ${groundingSummary}
 
-User's question context: ${message}
+User's question: ${message}
 
-Provide a concise, helpful response synthesizing these sources. Do NOT say you couldn't find results - you have the sources above.`;
+MANDATORY RULES:
+1. Start with a DECISION ANCHOR - state EXACTLY ONE primary recommendation first
+2. Include citation numbers [1], [2] inline
+3. Maximum 150 words, max 5 items
+4. End with a clear next action or question
+5. DO NOT say "I found" or "Here are some options"
+6. DO NOT apologize for missing data
+7. If user already knows options from previous messages, focus on WHERE to buy or WHICH to pick
+
+Format:
+"For [need], I'd recommend **[Brand]** [1] - it's [key benefit]. Other solid options include **[Brand2]** [2] for [reason].
+
+Want me to compare prices or check specific retailers?"`;
 
           const synthesisResponse = await fetchWithRetry(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
@@ -2397,45 +2452,82 @@ Provide a concise, helpful response synthesizing these sources. Do NOT say you c
       if (groundingMeta?.groundingChunks?.length > 0) {
         console.log('[smart-assistant] Web grounding citations found:', groundingMeta.groundingChunks.length);
         
-        // Helper to unwrap Vertex AI redirect URLs
-        function unwrapVertexUrl(rawUrl: string): string {
+        // Helper to unwrap Vertex AI redirect URLs - ASYNC with redirect following
+        async function unwrapVertexUrl(rawUrl: string): Promise<string> {
           try {
-            // Vertex AI wraps URLs like: vertexaisearch.cloud.google.com/grounding-api-redirect/...?url=ENCODED_URL
-            if (rawUrl.includes('vertexaisearch.cloud.google.com') || rawUrl.includes('grounding-api-redirect')) {
-              const urlObj = new URL(rawUrl);
-              const encodedTarget = urlObj.searchParams.get('url');
-              if (encodedTarget) {
-                return decodeURIComponent(encodedTarget);
-              }
+            if (!rawUrl.includes('vertexaisearch.cloud.google.com') && !rawUrl.includes('grounding-api-redirect')) {
+              return rawUrl;
             }
+            
+            const urlObj = new URL(rawUrl);
+            
+            // Strategy 1: Check query param
+            const urlParam = urlObj.searchParams.get('url');
+            if (urlParam) return decodeURIComponent(urlParam);
+            
+            // Strategy 2: Check hash fragment
+            if (urlObj.hash) {
+              const hashParams = new URLSearchParams(urlObj.hash.slice(1));
+              const hashUrl = hashParams.get('url');
+              if (hashUrl) return decodeURIComponent(hashUrl);
+            }
+            
+            // Strategy 3: Follow redirect with HEAD request (3s timeout)
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 3000);
+              
+              const response = await fetch(rawUrl, { 
+                method: 'HEAD', 
+                redirect: 'follow',
+                signal: controller.signal
+              });
+              
+              clearTimeout(timeoutId);
+              
+              if (response.url && response.url !== rawUrl && !response.url.includes('vertexaisearch.cloud.google.com')) {
+                return response.url;
+              }
+            } catch {
+              // Redirect follow failed
+            }
+            
             return rawUrl;
           } catch {
             return rawUrl;
           }
         }
         
-        sourcesData = groundingMeta.groundingChunks
+        // Async source extraction with deduplication
+        const sourcePromises = groundingMeta.groundingChunks
           .filter((chunk: any) => chunk.web?.uri)
-          .map((chunk: any) => {
+          .slice(0, 12)
+          .map(async (chunk: any) => {
             const rawUrl = chunk.web.uri;
-            const cleanUrl = unwrapVertexUrl(rawUrl);
+            const cleanUrl = await unwrapVertexUrl(rawUrl);
             
             let domain = 'source';
             try {
-              const urlObj = new URL(cleanUrl);
-              domain = urlObj.hostname.replace('www.', '');
-            } catch {
-              // Keep default 'source' domain
-            }
+              domain = new URL(cleanUrl).hostname.replace('www.', '');
+            } catch {}
             
-            return { 
-              title: chunk.web.title || 'View Source', 
-              domain, 
-              url: cleanUrl 
-            };
+            return { title: chunk.web.title || 'View Source', domain, url: cleanUrl };
           });
         
-        console.log('[smart-assistant] Processed sources:', sourcesData.map(s => s.domain));
+        const allSources = await Promise.all(sourcePromises);
+        
+        // Deduplicate by domain, filter out failed unwraps
+        const seenDomains = new Set<string>();
+        sourcesData = allSources
+          .filter(source => {
+            if (source.domain.includes('google.com') || source.domain.includes('vertexaisearch')) return false;
+            if (seenDomains.has(source.domain)) return false;
+            seenDomains.add(source.domain);
+            return true;
+          })
+          .slice(0, 8);
+        
+        console.log('[smart-assistant] Deduplicated sources:', sourcesData.map(s => s.domain));
       }
     }
 
