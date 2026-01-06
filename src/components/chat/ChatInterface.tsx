@@ -64,13 +64,15 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         });
       };
       
-      // Bullet points (•, -, *)
-      const bulletMatch = line.trim().match(/^[•\-\*]\s+(.*)$/);
+      // Bullet points (•, -, *) - ensure bullet and text stay together
+      const bulletMatch = line.trim().match(/^[•\-\*]\s*(.*)$/);
       if (bulletMatch) {
+        const bulletContent = bulletMatch[1].trim();
+        if (!bulletContent) return null; // Skip empty bullet lines
         return (
-          <div key={idx} className="flex gap-2 ml-2">
-            <span className="text-muted-foreground">•</span>
-            <span>{processInline(bulletMatch[1])}</span>
+          <div key={idx} className="flex gap-2 ml-2 my-0.5">
+            <span className="text-muted-foreground shrink-0">•</span>
+            <span className="flex-1">{processInline(bulletContent)}</span>
           </div>
         );
       }
@@ -503,24 +505,28 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                       }
                     </div>
                     
-                    {/* Sources section for assistant messages with web search */}
+                    {/* Sources section - clean pill/chip design */}
                     {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-border/50">
-                        <div className="text-xs text-muted-foreground mb-1.5">📚 Sources</div>
-                        <div className="space-y-1">
-                          {message.sources.map((source, idx) => (
+                      <div className="mt-3 pt-2 border-t border-border/40">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground mr-1">Sources:</span>
+                          {message.sources.slice(0, 5).map((source, idx) => (
                             <a
                               key={idx}
                               href={source.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="flex items-center gap-2 text-xs hover:bg-background/50 rounded px-2 py-1 -mx-2 transition-colors"
+                              className="inline-flex items-center gap-1 text-[11px] bg-muted/60 hover:bg-muted px-2 py-0.5 rounded-full transition-colors text-foreground/80 hover:text-foreground"
                             >
-                              <span className="text-muted-foreground">{idx + 1}.</span>
-                              <span className="font-medium truncate flex-1">{source.title}</span>
-                              <span className="text-muted-foreground text-[10px]">{source.domain}</span>
+                              <span className="text-muted-foreground/70">[{idx + 1}]</span>
+                              <span>{source.domain}</span>
                             </a>
                           ))}
+                          {message.sources.length > 5 && (
+                            <span className="text-[11px] text-muted-foreground px-1">
+                              +{message.sources.length - 5} more
+                            </span>
+                          )}
                         </div>
                       </div>
                     )}
