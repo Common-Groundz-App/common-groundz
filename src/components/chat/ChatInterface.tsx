@@ -62,9 +62,60 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     });
   };
 
+  // Preprocess markdown text to ensure proper line structure for the renderer
+  const preprocessMarkdown = (text: string): string => {
+    // EARLY RETURN: Skip if nothing needs formatting
+    const needsFormatting = 
+      /\s---\s|^---$/m.test(text) ||  // Has --- separator
+      /(?:💧|🌲|🛠️|🏔️|🏆|⭐|🎯|🔥|✨|📦|🛒|💡|🎬|📚|🍽️|🏠|🚗|💻|📱|🎮|🎵|👕|💄|🧴|🏋️|⚽|🎨|✈️|🐕|👶)/.test(text) ||  // Has section emojis
+      /[.!?:,]\s*[•\-*]\s+\S/.test(text);  // Has inline bullets
+      
+    if (!needsFormatting) return text;
+    
+    let result = text;
+    
+    // RULE 1: Remove visual garbage (NARROW SCOPE - only actual --- separators)
+    result = result.replace(/\s---\s/g, '\n\n');  // Inline " --- " becomes line break
+    result = result.replace(/^---$/gm, '');        // Standalone --- line removed
+    result = result.replace(/:\s*---\s*/g, ':\n\n'); // ": ---" pattern
+    result = result.replace(/—\s*—\s*—/g, '');     // Em-dash separators
+    
+    // RULE 2: Convert emoji headers to ### heading format
+    const emojiList = '💧|🌲|🛠️|🏔️|🏆|⭐|🎯|🔥|✨|📦|🛒|💡|🎬|📚|🍽️|🏠|🚗|💻|📱|🎮|🎵|👕|💄|🧴|🏋️|⚽|🎨|✈️|🐕|👶';
+    
+    // Pattern: punctuation followed by emoji + brand name (inline header)
+    const emojiHeaderPattern = new RegExp(
+      `([.!?:,])\\s*((?:${emojiList})\\s*\\*?\\*?[A-Z][a-zA-Z\\s]+\\*?\\*?)`,
+      'g'
+    );
+    result = result.replace(emojiHeaderPattern, '$1\n\n### $2');
+    
+    // RULE 3: Ensure standalone emoji lines become headings
+    result = result.replace(
+      new RegExp(`^((?:${emojiList})\\s*\\*?\\*?[A-Z][a-zA-Z\\s]+\\*?\\*?)$`, 'gm'),
+      '### $1'
+    );
+    
+    // RULE 4: Force inline bullets onto new lines (NARROW SCOPE)
+    result = result.replace(/([.!?])\s*([•])\s+/g, '$1\n$2 ');
+    result = result.replace(/([.!?])\s*(\*)\s+(?=[A-Z])/g, '$1\n• ');
+    
+    // RULE 5: Merge orphaned emoji lines with next line
+    result = result.replace(
+      new RegExp(`^((?:${emojiList}))\\s*\\n\\s*(\\*?\\*?[A-Z])`, 'gm'),
+      '### $1 $2'
+    );
+    
+    // RULE 6: Normalize excessive line breaks
+    result = result.replace(/\n{3,}/g, '\n\n');
+    
+    return result.trim();
+  };
+
   // Simple markdown-to-JSX renderer
   const renderMarkdown = (content: string) => {
-    const lines = content.split('\n');
+    const preprocessed = preprocessMarkdown(content);
+    const lines = preprocessed.split('\n');
     
     return lines.map((line, idx) => {
       // Horizontal divider
