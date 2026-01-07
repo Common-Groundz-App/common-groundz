@@ -34,6 +34,7 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingState, setLoadingState] = useState<'typing' | 'searching' | 'thinking'>('typing');
@@ -42,6 +43,24 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const { addUnifiedConstraint, addPreferenceValue } = usePreferences();
+
+  // Process inline formatting: bold and citations
+  const processInline = (text: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*|\[\d+\])/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
+      }
+      if (/^\[\d+\]$/.test(part)) {
+        return (
+          <span key={i} className="text-[10px] text-muted-foreground align-super ml-0.5">
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
 
   // Simple markdown-to-JSX renderer
   const renderMarkdown = (content: string) => {
@@ -53,16 +72,22 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         return <hr key={idx} className="my-2 border-border/50" />;
       }
       
-      // Process inline bold: **text**
-      const processInline = (text: string) => {
-        const parts = text.split(/(\*\*[^*]+\*\*)/g);
-        return parts.map((part, i) => {
-          if (part.startsWith('**') && part.endsWith('**')) {
-            return <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>;
-          }
-          return part;
-        });
-      };
+      // Headings (### text, ## text, # text) - render as styled text, no hash marks
+      const headingMatch = line.trim().match(/^(#{1,3})\s+(.*)$/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        const headingText = headingMatch[2];
+        const sizes: Record<number, string> = {
+          1: 'text-base font-bold mt-3 mb-1',
+          2: 'text-sm font-semibold mt-2 mb-1',
+          3: 'text-sm font-medium mt-2 mb-0.5'
+        };
+        return (
+          <div key={idx} className={sizes[level] || sizes[3]}>
+            {processInline(headingText)}
+          </div>
+        );
+      }
       
       // Bullet points (•, -, *) - ensure bullet and text stay together
       const bulletMatch = line.trim().match(/^[•\-\*]\s*(.*)$/);
@@ -505,31 +530,49 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                       }
                     </div>
                     
-                    {/* Sources section - clean pill/chip design */}
-                    {message.role === 'assistant' && message.sources && message.sources.length > 0 && (
-                      <div className="mt-3 pt-2 border-t border-border/40">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-xs text-muted-foreground mr-1">Sources:</span>
-                          {message.sources.slice(0, 5).map((source, idx) => (
-                            <a
-                              key={idx}
-                              href={source.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-[11px] bg-muted/60 hover:bg-muted px-2 py-0.5 rounded-full transition-colors text-foreground/80 hover:text-foreground"
-                            >
-                              <span className="text-muted-foreground/70">[{idx + 1}]</span>
-                              <span>{source.domain}</span>
-                            </a>
-                          ))}
-                          {message.sources.length > 5 && (
-                            <span className="text-[11px] text-muted-foreground px-1">
-                              +{message.sources.length - 5} more
-                            </span>
-                          )}
+                    {/* Sources section - clean pill/chip design with favicons */}
+                    {message.role === 'assistant' && message.sources && message.sources.length > 0 && (() => {
+                      const messageKey = message.id || `msg-${messages.indexOf(message)}`;
+                      const isExpanded = expandedSources.has(messageKey);
+                      const visibleCount = isExpanded ? message.sources.length : 5;
+                      
+                      return (
+                        <div className="mt-3 pt-2 border-t border-border/40">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-xs text-muted-foreground mr-1">Sources:</span>
+                            {message.sources.slice(0, visibleCount).map((source, idx) => (
+                              <a
+                                key={idx}
+                                href={source.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-[11px] bg-background border border-border/60 hover:bg-muted px-2.5 py-1 rounded-full transition-colors"
+                              >
+                                <img 
+                                  src={`https://www.google.com/s2/favicons?domain=${source.domain}&sz=16`}
+                                  alt=""
+                                  className="w-3.5 h-3.5 rounded-sm"
+                                  onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                />
+                                <span>{source.domain}</span>
+                              </a>
+                            ))}
+                            {message.sources.length > 5 && !isExpanded && (
+                              <button 
+                                onClick={() => setExpandedSources(prev => {
+                                  const next = new Set(prev);
+                                  next.add(messageKey);
+                                  return next;
+                                })}
+                                className="text-[11px] text-primary hover:underline self-center"
+                              >
+                                +{message.sources.length - 5} more
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
 

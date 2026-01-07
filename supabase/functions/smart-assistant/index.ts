@@ -1285,6 +1285,33 @@ serve(async (req) => {
       content: msg.content
     })) || [];
 
+    // Detect conversation intent shift (brand-agnostic) for Part 2.3
+    let conversationProgression = '';
+    const prevAssistantMsg = conversationHistory.filter(m => m.role === 'assistant').pop();
+
+    if (prevAssistantMsg) {
+      // Check if previous message listed products/brands (detect structure, not specific brands)
+      const hasBoldItems = (prevAssistantMsg.content.match(/\*\*.+?\*\*/g) || []).length >= 2;
+      const hasRecommendationLanguage = /best|top picks|recommended|here are|options include|choices are/i.test(prevAssistantMsg.content);
+      const listedProducts = hasBoldItems || hasRecommendationLanguage;
+      
+      // Check if current message is asking for links/where to buy
+      const askingForLinks = /find|buy|online|where|link|shop|get|purchase|order|available/i.test(message.toLowerCase());
+      
+      if (listedProducts && askingForLinks) {
+        conversationProgression = `
+IMPORTANT CONTEXT: The user already knows the options from your previous message.
+DO NOT repeat the list. Focus ONLY on:
+1. WHERE to buy (specific retailers with links)
+2. WHICH ONE to pick for their needs
+3. Price comparison if available
+
+Skip all explanations - go straight to actionable links.
+`;
+        console.log('[smart-assistant] Intent shift detected: user wants links, not explanations');
+      }
+    }
+
     // 4. Load user profile
     const { data: profile } = await supabaseClient
       .from('profiles')
@@ -1722,9 +1749,24 @@ Do NOT apply these for general explanations, definitions, or sensitive topics.
       * Turn 2 (if user asks "find them online"): "Here's where to get Klean Kanteen - Amazon, official site. For Stanley, try..."
       * NOT Turn 2: "Here are the best steel bottles: Klean Kanteen, Hydro Flask, Stanley..." (repetition)
 
+11. CONTENT VOLUME LIMITS (STRICTLY ENFORCED):
+    - Maximum 3 brands expanded in detail
+    - Maximum 3 retailers per brand
+    - Maximum 12 bullets total in any response
+    - Maximum 1 screen of content (roughly 200 words)
+    - If you have more to say, add: "Want me to expand on any of these?"
+    - VIOLATION: Listing 20+ retailers across 4 brands is ALWAYS wrong
+
+12. SOURCES ARE EVIDENCE, NOT STRUCTURE:
+    - Structure your answer around USER NEEDS, not around the sources you found
+    - If you removed the sources, the answer should still make sense
+    - BAD: "Brand A is available at: [list of 5 retailers from sources]"
+    - GOOD: "For Brand A, I'd recommend checking [1] for best prices. Other options include [2] and [3]."
+    - Sources SUPPORT claims, they don't DRIVE structure
+
 Current Context:
 ${context?.entityId ? `- User is viewing entity: ${context.entityId}` : '- General conversation'}
-
+${conversationProgression ? `\n${conversationProgression}` : ''}
 Be helpful, concise, and always prioritize user experience. ALWAYS respect user constraints.`;
 
     // 7. Define function calling tools (Phase 3 will implement execution)
@@ -2603,6 +2645,43 @@ Want me to compare prices or check specific retailers?"`;
 
     // Apply formatting cleanup
     let finalAssistantMessage = cleanResponseFormatting(finalMessage);
+
+    // Post-processing: Bad pattern fix + decision anchor check (Part 2.4)
+    const badPatterns = [
+      /^I didn't find specific/i,
+      /^I couldn't find/i,
+      /^I wasn't able to find/i,
+      /^You can find a variety of/i,
+      /^I can definitely help you/i,
+      /^Sure! I can help/i,
+      /^Absolutely!/i,
+      /^Great question/i,
+    ];
+
+    let needsPrefix = false;
+    for (const pattern of badPatterns) {
+      if (pattern.test(finalAssistantMessage.trim())) {
+        needsPrefix = true;
+        console.log('[smart-assistant] Bad pattern detected, prepending decision anchor');
+        break;
+      }
+    }
+
+    if (needsPrefix && (queryIntent === 'realtime' || queryIntent === 'product_user')) {
+      // Remove the bad opening and prepend an advisor-tone anchor
+      finalAssistantMessage = finalAssistantMessage.replace(/^(I didn't find specific.*?but|I can definitely help you.*?!|Sure!.*?!|Absolutely!.*?)\s*/i, '');
+      finalAssistantMessage = "Here's how I'd approach this:\n\n" + finalAssistantMessage.trim();
+    }
+
+    // Decision anchor safety net - ensure product responses have a clear recommendation
+    if (queryIntent === 'product_user' || queryIntent === 'realtime') {
+      const hasDecisionAnchor = /I'd recommend|I recommend|best pick|go with|start with|my pick|I'd start|I'd suggest/i.test(finalAssistantMessage);
+      
+      if (!hasDecisionAnchor && finalAssistantMessage.length > 100) {
+        console.log('[smart-assistant] No decision anchor detected, prepending fallback');
+        finalAssistantMessage = "Quick pick: If you want a safe default, start with the first option below.\n\n" + finalAssistantMessage;
+      }
+    }
 
     // PART 4: FINAL INVARIANT - Only fire if ALL synthesis attempts failed
     if (!finalAssistantMessage || finalAssistantMessage.trim().length === 0) {
