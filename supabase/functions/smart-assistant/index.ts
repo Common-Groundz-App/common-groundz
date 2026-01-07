@@ -7,6 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Centralized emoji list for section detection (prevents regex duplication bugs)
+const SECTION_EMOJIS = '💧|🌲|🛠️|🏔️|🏆|⭐|🎯|🔥|✨|📦|🛒|💡|🎬|📚|🍽️|🏠|🚗|💻|📱|🎮|🎵|👕|💄|🧴|🏋️|⚽|🎨|✈️|🐕|👶';
+
 // ========== HELPER FUNCTIONS ==========
 
 /**
@@ -2728,16 +2731,24 @@ Want me to compare prices or check specific retailers?"`;
         }
       }
       
-      // Enforce max 3-4 retailers per brand section
-      finalAssistantMessage = finalAssistantMessage.replace(
-        /((?:💧|🌲|🛠️|🏔️|🏆|[\u{1F300}-\u{1F9FF}])\s*\*?\*?[A-Z][a-zA-Z\s]+\*?\*?[\s\S]*?)((?:^[•\-–—*]\s*.+\n?){5,})/gmu,
-        (match, header, bullets) => {
-          const bulletLines = bullets.trim().split('\n').filter((l: string) => l.trim());
-          const trimmedBullets = bulletLines.slice(0, 3).join('\n');
-          console.log(`[smart-assistant] Trimmed section from ${bulletLines.length} to 3 retailers`);
-          return header + trimmedBullets + '\n';
-        }
-      );
+      // Enforce max 3-4 retailers per brand section (with safety wrapper)
+      try {
+        const sectionTrimPattern = new RegExp(
+          `((?:${SECTION_EMOJIS})\\s*\\*?\\*?[A-Z][a-zA-Z\\s]+\\*?\\*?[\\s\\S]*?)((?:^[•\\-–—*]\\s*.+\\n?){5,})`,
+          'gm'
+        );
+        finalAssistantMessage = finalAssistantMessage.replace(
+          sectionTrimPattern,
+          (match, header, bullets) => {
+            const bulletLines = bullets.trim().split('\n').filter((l: string) => l.trim());
+            const trimmedBullets = bulletLines.slice(0, 3).join('\n');
+            console.log(`[smart-assistant] Trimmed section from ${bulletLines.length} to 3 retailers`);
+            return header + trimmedBullets + '\n';
+          }
+        );
+      } catch (regexError) {
+        console.error('[smart-assistant] Section trim regex failed, skipping:', regexError);
+      }
     }
 
     // PART 2: Hedging Language Stripping
@@ -2766,8 +2777,18 @@ Want me to compare prices or check specific retailers?"`;
 
     // PART 3: Retailer-Dump Structure Prevention
     if (queryIntent === 'product_user' || queryIntent === 'realtime') {
-      const sectionPattern = /(?:💧|🌲|🛠️|🏔️|🏆|[\u{1F300}-\u{1F9FF}])\s*\*?\*?[A-Z][a-zA-Z\s]+\*?\*?/g;
-      const sections = finalAssistantMessage.match(sectionPattern) || [];
+      let sections: RegExpMatchArray | null = [];
+      
+      try {
+        const sectionPattern = new RegExp(
+          `(?:${SECTION_EMOJIS})\\s*\\*?\\*?[A-Z][a-zA-Z\\s]+\\*?\\*?`,
+          'g'
+        );
+        sections = finalAssistantMessage.match(sectionPattern) || [];
+      } catch (regexError) {
+        console.error('[smart-assistant] Section pattern regex failed, skipping dump detection:', regexError);
+        sections = [];
+      }
       const bulletPatternForDump = /^[•\-–—*]\s*/gm;
       const totalBullets = (finalAssistantMessage.match(bulletPatternForDump) || []).length;
       
