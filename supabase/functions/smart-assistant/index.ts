@@ -2683,6 +2683,124 @@ Want me to compare prices or check specific retailers?"`;
       }
     }
 
+    // ========== HARD ENFORCEMENT LAYER (Post-Processing Guarantees) ==========
+    // This layer ensures the model CANNOT violate agent behavioral rules
+    
+    // BEFORE enforcement snapshot (for debugging)
+    const beforeEnforcement = {
+      bulletCount: (finalAssistantMessage.match(/^[•\-–—*]\s*/gm) || []).length,
+      wordCount: finalAssistantMessage.split(/\s+/).length,
+      hasDecisionAnchor: /i'd recommend|i recommend|best pick|go with|start with|my pick/i.test(finalAssistantMessage),
+      startsWithQuickAnswer: /^quick (answer|pick)/i.test(finalAssistantMessage.trim()),
+    };
+    console.log('[smart-assistant] BEFORE enforcement:', beforeEnforcement);
+
+    // PART 1: Hard Post-Trim for Content Caps
+    if (queryIntent === 'product_user' || queryIntent === 'realtime') {
+      // Robust bullet pattern (catches •, -, –, —, *)
+      const bulletPattern = /^[•\-–—*]\s*/gm;
+      const bulletCount = (finalAssistantMessage.match(bulletPattern) || []).length;
+      
+      if (bulletCount > 12) {
+        console.log(`[smart-assistant] Content cap violation: ${bulletCount} bullets, trimming to 12`);
+        
+        const lines = finalAssistantMessage.split('\n');
+        let bulletsSeen = 0;
+        const trimmedLines: string[] = [];
+        
+        for (const line of lines) {
+          const isBullet = /^[•\-–—*]\s*/.test(line.trim());
+          if (isBullet) {
+            bulletsSeen++;
+            if (bulletsSeen <= 12) {
+              trimmedLines.push(line);
+            }
+          } else {
+            trimmedLines.push(line);
+          }
+        }
+        
+        finalAssistantMessage = trimmedLines.join('\n').trim();
+        
+        // Add CTA if we trimmed (with guard to prevent duplicates)
+        if (!/want me to/i.test(finalAssistantMessage)) {
+          finalAssistantMessage += '\n\nWant me to expand on any of these?';
+        }
+      }
+      
+      // Enforce max 3-4 retailers per brand section
+      finalAssistantMessage = finalAssistantMessage.replace(
+        /((?:💧|🌲|🛠️|🏔️|🏆|[\u{1F300}-\u{1F9FF}])\s*\*?\*?[A-Z][a-zA-Z\s]+\*?\*?[\s\S]*?)((?:^[•\-–—*]\s*.+\n?){5,})/gmu,
+        (match, header, bullets) => {
+          const bulletLines = bullets.trim().split('\n').filter((l: string) => l.trim());
+          const trimmedBullets = bulletLines.slice(0, 3).join('\n');
+          console.log(`[smart-assistant] Trimmed section from ${bulletLines.length} to 3 retailers`);
+          return header + trimmedBullets + '\n';
+        }
+      );
+    }
+
+    // PART 2: Hedging Language Stripping
+    const hedgingPatterns = [
+      /based on (general|my) knowledge,?\s*/gi,
+      /widely praised\s*/gi,
+      /generally offer\s*/gi,
+      /generally speaking,?\s*/gi,
+      /it's worth noting that\s*/gi,
+      /it should be noted that\s*/gi,
+      /from what I (know|understand),?\s*/gi,
+      /as far as I (know|can tell),?\s*/gi,
+      /I believe that\s*/gi,
+      /in my understanding,?\s*/gi,
+    ];
+
+    for (const pattern of hedgingPatterns) {
+      finalAssistantMessage = finalAssistantMessage.replace(pattern, '');
+    }
+
+    // Clean up double spaces and orphaned punctuation
+    finalAssistantMessage = finalAssistantMessage
+      .replace(/\s{2,}/g, ' ')
+      .replace(/^,\s*/gm, '')
+      .replace(/\s+,/g, ',');
+
+    // PART 3: Retailer-Dump Structure Prevention
+    if (queryIntent === 'product_user' || queryIntent === 'realtime') {
+      const sectionPattern = /(?:💧|🌲|🛠️|🏔️|🏆|[\u{1F300}-\u{1F9FF}])\s*\*?\*?[A-Z][a-zA-Z\s]+\*?\*?/g;
+      const sections = finalAssistantMessage.match(sectionPattern) || [];
+      const bulletPatternForDump = /^[•\-–—*]\s*/gm;
+      const totalBullets = (finalAssistantMessage.match(bulletPatternForDump) || []).length;
+      
+      // If we have 3+ sections each with 3+ bullets, it's a dump
+      if (sections.length >= 3 && totalBullets > 9) {
+        console.log(`[smart-assistant] Retailer-dump detected: ${sections.length} sections, ${totalBullets} bullets`);
+        
+        // GUARD: Only prepend if no existing quick answer (prevents stacking)
+        const hasQuickAnswer = /quick (pick|answer)|i'd (recommend|suggest|start)|start with|here's how i'd/i.test(finalAssistantMessage);
+        
+        if (!hasQuickAnswer) {
+          finalAssistantMessage = "Quick answer: Start with the official brand sites for best selection, or Amazon for convenience and price comparison.\n\n" + finalAssistantMessage;
+        }
+        
+        // Add closing CTA if not present
+        if (!/want me to compare|want me to narrow|want me to expand/i.test(finalAssistantMessage)) {
+          finalAssistantMessage = finalAssistantMessage.trimEnd() + '\n\nWant me to compare prices or narrow down to one option?';
+        }
+      }
+    }
+
+    // AFTER enforcement snapshot (for debugging)
+    const afterEnforcement = {
+      bulletCount: (finalAssistantMessage.match(/^[•\-–—*]\s*/gm) || []).length,
+      wordCount: finalAssistantMessage.split(/\s+/).length,
+      hasDecisionAnchor: /i'd recommend|i recommend|best pick|go with|start with|my pick/i.test(finalAssistantMessage),
+      startsWithQuickAnswer: /^quick (answer|pick)/i.test(finalAssistantMessage.trim()),
+      trimmed: beforeEnforcement.bulletCount !== (finalAssistantMessage.match(/^[•\-–—*]\s*/gm) || []).length,
+    };
+    console.log('[smart-assistant] AFTER enforcement:', afterEnforcement);
+
+    // ========== END HARD ENFORCEMENT LAYER ==========
+
     // PART 4: FINAL INVARIANT - Only fire if ALL synthesis attempts failed
     if (!finalAssistantMessage || finalAssistantMessage.trim().length === 0) {
       // Check if we have sources - if so, generate a minimal response from them
