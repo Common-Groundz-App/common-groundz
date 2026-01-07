@@ -68,11 +68,32 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     const needsFormatting = 
       /\s---\s|^---$/m.test(text) ||  // Has --- separator
       /(?:💧|🌲|🛠️|🏔️|🏆|⭐|🎯|🔥|✨|📦|🛒|💡|🎬|📚|🍽️|🏠|🚗|💻|📱|🎮|🎵|👕|💄|🧴|🏋️|⚽|🎨|✈️|🐕|👶)/.test(text) ||  // Has section emojis
-      /[.!?:,]\s*[•\-*]\s+\S/.test(text);  // Has inline bullets
+      /[.!?:,]\s*[•\-*]\s+\S/.test(text) ||  // Has inline bullets
+      /\*\*[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3}\*\*/.test(text) ||  // Bold brand (1-4 Title Case words)
+      /[•*]\s*\*\*[A-Z]/.test(text);  // Bullet + bold pattern
       
     if (!needsFormatting) return text;
     
     let result = text;
+    
+    // RULE 0: Extract inline brand headers to their own lines (CRITICAL - runs first)
+    // Pattern: punctuation followed by optional bullet + bold brand (1-4 words) + colon
+    result = result.replace(
+      /([.!?:])\s*(?:[•*]\s*)?\*\*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3})\*\*:/g,
+      '$1\n\n### **$2**\n'
+    );
+    
+    // Handle: "starting with **Brand**." embedded in paragraphs
+    result = result.replace(
+      /(starting with|recommend|try|consider|check out)\s*\*\*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3})\*\*\.\s*/gi,
+      '$1:\n\n### **$2**\n\n'
+    );
+    
+    // Force standalone bold brand lines to become headings
+    result = result.replace(
+      /^\*\*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3})\*\*$/gm,
+      '### **$1**'
+    );
     
     // RULE 1: Remove visual garbage (NARROW SCOPE - only actual --- separators)
     result = result.replace(/\s---\s/g, '\n\n');  // Inline " --- " becomes line break
