@@ -20,12 +20,33 @@ function normalizeAssistantOutput(text: string, queryIntent: string): string {
   const lineCount = text.split('\n').length;
   const hasEmojis = new RegExp(`(?:${SECTION_EMOJIS})`).test(text);
   
-  // Skip if: general query, very short, or no section emojis
-  if (queryIntent === 'general' || lineCount < 4 || !hasEmojis) {
+  // Detect structural signals that indicate product/brand sections
+  // Brand pattern: 1-4 Title Case words in bold (prevents false positives like "Good Choice")
+  const hasBoldBrand = /\*\*[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3}\*\*/.test(text);
+  const hasBulletBrand = /[•*]\s*\*\*[A-Z]/.test(text);
+  const hasColonBrand = /:\s*\*\s*\*\*[A-Z]/.test(text);
+  
+  const hasStructuralSignals = hasEmojis || hasBoldBrand || hasBulletBrand || hasColonBrand;
+  
+  // Skip if: general query, very short, or no structural signals
+  if (queryIntent === 'general' || lineCount < 4 || !hasStructuralSignals) {
     return text;
   }
   
   let result = text;
+  
+  // RULE 0: Extract inline brand headers to their own lines (CRITICAL - runs first)
+  // Pattern: punctuation followed by optional bullet + bold brand (1-4 words) + colon
+  result = result.replace(
+    /([.!?:])\s*(?:[•*]\s*)?\*\*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3})\*\*:/g,
+    '$1\n\n**$2**\n'
+  );
+  
+  // Also handle: "starting with **Brand**." embedded in paragraphs
+  result = result.replace(
+    /(starting with|recommend|try|consider|check out)\s*\*\*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3})\*\*\.\s*/gi,
+    '$1:\n\n**$2**\n\n'
+  );
   
   // RULE 1: Remove visual garbage (---, —, horizontal rules)
   result = result.replace(/^-{2,}\s*/gm, ''); // Lines starting with ---
