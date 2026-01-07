@@ -10,6 +10,70 @@ const corsHeaders = {
 // Centralized emoji list for section detection (prevents regex duplication bugs)
 const SECTION_EMOJIS = '💧|🌲|🛠️|🏔️|🏆|⭐|🎯|🔥|✨|📦|🛒|💡|🎬|📚|🍽️|🏠|🚗|💻|📱|🎮|🎵|👕|💄|🧴|🏋️|⚽|🎨|✈️|🐕|👶';
 
+/**
+ * Final Response Normalizer
+ * Ensures clean visual structure after all enforcement passes
+ * This is a FORMATTER, not a filter - it restructures for display
+ */
+function normalizeAssistantOutput(text: string, queryIntent: string): string {
+  // SKIP HEURISTIC: Don't over-format short or conversational responses
+  const lineCount = text.split('\n').length;
+  const hasEmojis = new RegExp(`(?:${SECTION_EMOJIS})`).test(text);
+  
+  // Skip if: general query, very short, or no section emojis
+  if (queryIntent === 'general' || lineCount < 4 || !hasEmojis) {
+    return text;
+  }
+  
+  let result = text;
+  
+  // RULE 1: Remove visual garbage (---, —, horizontal rules)
+  result = result.replace(/^-{2,}\s*/gm, ''); // Lines starting with ---
+  result = result.replace(/\s*-{2,}\s*/g, '\n\n'); // Inline --- becomes line break
+  result = result.replace(/—\s*—\s*—/g, ''); // Em-dash separators
+  result = result.replace(/^\s*[-–—]{3,}\s*$/gm, ''); // Full line of dashes
+  
+  // RULE 2: Force emoji headers onto their own line
+  const emojiHeaderPattern = new RegExp(
+    `([.!?:,])\\s*((?:${SECTION_EMOJIS})\\s*\\*?\\*?[A-Z][a-zA-Z\\s]+\\*?\\*?)`,
+    'g'
+  );
+  result = result.replace(emojiHeaderPattern, '$1\n\n$2');
+  
+  // RULE 3: Ensure emoji headers have line break after them
+  const emojiLinePattern = new RegExp(
+    `((?:${SECTION_EMOJIS})\\s*\\*?\\*?[A-Z][a-zA-Z\\s]+\\*?\\*?)([^\\n])`,
+    'g'
+  );
+  result = result.replace(emojiLinePattern, '$1\n$2');
+  
+  // RULE 4: Fix inline bullets (bullet embedded in paragraph)
+  result = result.replace(/([.!?:,])\s*([•\-–—*]\s*\*?\*?[A-Z])/g, '$1\n\n$2');
+  
+  // RULE 5: Ensure blank line before each emoji header section
+  const sectionHeaderPattern = new RegExp(
+    `([^\\n])\\n((?:${SECTION_EMOJIS})\\s*\\*?\\*?[A-Z])`,
+    'g'
+  );
+  result = result.replace(sectionHeaderPattern, '$1\n\n$2');
+  
+  // RULE 6: Normalize spacing
+  result = result.replace(/\n{3,}/g, '\n\n'); // Max 2 line breaks
+  
+  // RULE 7: Clean up orphaned emojis on their own line
+  const orphanEmojiPattern = new RegExp(
+    `^\\s*((?:${SECTION_EMOJIS}))\\s*$\\n\\s*(\\*?\\*?[A-Z][a-zA-Z\\s]+\\*?\\*?)`,
+    'gm'
+  );
+  result = result.replace(orphanEmojiPattern, '$1 $2');
+  
+  // RULE 8: Final whitespace cleanup
+  result = result.trim();
+  result = result.replace(/\s+$/gm, ''); // Trailing spaces on each line
+  
+  return result;
+}
+
 // ========== HELPER FUNCTIONS ==========
 
 /**
@@ -2819,6 +2883,29 @@ Want me to compare prices or check specific retailers?"`;
       trimmed: beforeEnforcement.bulletCount !== (finalAssistantMessage.match(/^[•\-–—*]\s*/gm) || []).length,
     };
     console.log('[smart-assistant] AFTER enforcement:', afterEnforcement);
+
+    // ========== FINAL RESPONSE NORMALIZATION ==========
+    // This ensures clean visual structure after all enforcement passes
+    console.log('[smart-assistant] Running final response normalizer');
+
+    try {
+      const beforeNormalization = finalAssistantMessage;
+      finalAssistantMessage = normalizeAssistantOutput(finalAssistantMessage, queryIntent);
+      
+      // Log if normalization made changes
+      if (beforeNormalization !== finalAssistantMessage) {
+        console.log('[smart-assistant] Normalization made changes:', {
+          removedDashes: beforeNormalization.includes('---') && !finalAssistantMessage.includes('---'),
+          lengthDiff: beforeNormalization.length - finalAssistantMessage.length,
+        });
+      } else {
+        console.log('[smart-assistant] Normalization skipped or no changes needed');
+      }
+    } catch (normalizationError) {
+      console.error('[smart-assistant] Normalizer failed, skipping:', normalizationError);
+      // Keep the pre-normalization message - worst case is ugly UI, not broken assistant
+    }
+    // ========== END FINAL RESPONSE NORMALIZATION ==========
 
     // ========== END HARD ENFORCEMENT LAYER ==========
 
