@@ -89,10 +89,16 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
       '$1:\n\n### **$2**\n\n'
     );
     
-    // Force standalone bold brand lines to become headings
+    // Force standalone bold brand lines to become headings (allow trailing whitespace)
     result = result.replace(
-      /^\*\*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3})\*\*$/gm,
+      /^\*\*([A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3})\*\*\s*$/gm,
       '### **$1**'
+    );
+    
+    // Also catch: **Brand Name** followed by newline + paragraph content
+    result = result.replace(
+      /^(\*\*[A-Z][a-zA-Z]+(?:\s[A-Z][a-zA-Z]+){0,3}\*\*)\s*\n(?=\S)/gm,
+      '### $1\n'
     );
     
     // RULE 1: Remove visual garbage (NARROW SCOPE - only actual --- separators)
