@@ -257,8 +257,37 @@ function classifyQueryIntent(
     return 'product_user';
   }
   
+  // PRIORITY 4.55: Conversation-state override (PRIMARY for follow-ups)
+  // If previous assistant turn discussed products, and user's follow-up isn't explicitly off-topic,
+  // maintain the product_user intent. Users don't repeat "best", "recommend" in follow-ups.
+  const wasProductExchange = /hydro flask|klean kanteen|stanley|yeti|brand|bottle|option|choice|recommend|alternative|comparison|container|tupperware|sunscreen|laptop|phone|headphone|product|item/i.test(lastAssistant)
+    && lastAssistant.length > 200; // Substantial product response
+
+  // Follow-up indicators: pronouns, demonstratives, comparison/elaboration intent
+  const isContextualFollowUp = /(?:these|them|those|which one|which should|the|differences?|between|compare|comparison|help me understand|tell me more|more about|elaborate|explain|should i|buy|pick|choose)/i.test(lowerMessage);
+
+  // Explicit off-topic indicators (user is changing subject)
+  const isExplicitlyOffTopic = /(?:^how to|^what is a|^why do|^explain what|^tell me about something|completely different|new topic|another question|unrelated|forget|never mind|different subject)/i.test(lowerMessage);
+
+  if (wasProductExchange && isContextualFollowUp && !isExplicitlyOffTopic) {
+    console.log('[classifyQueryIntent] Conversation-state override: continuing product_user flow');
+    return 'product_user';
+  }
+
+  // PRIORITY 4.56: Explicit comparison/elaboration detection (FALLBACK)
+  // Catches cases where conversation-state check doesn't trigger but keywords are present
+  const followupCompareOrLearn = /(?:compare|comparison|difference|differences|between|which one|which should|help me understand|understand the|tell me more|more about|elaborate|explain these)/i.test(lowerMessage)
+    && /(?:these|them|those|brand|brands|option|options|which|the)/i.test(lowerMessage);
+
+  const wasProductListing = /hydro flask|klean kanteen|stanley|yeti|brand|bottle|option|choice|recommend/i.test(lastAssistant);
+
+  if (wasProductListing && followupCompareOrLearn) {
+    console.log('[classifyQueryIntent] Explicit comparison/elaboration follow-up → product_user');
+    return 'product_user';
+  }
+  
   // PRIORITY 5: Product discovery (COMPOUND CHECK - must have BOTH discovery intent AND concrete product category)
-  const discoveryKeywords = ['best', 'top', 'recommend', 'reviews', 'alternatives'];
+  const discoveryKeywords = ['best', 'top', 'recommend', 'reviews', 'alternatives', 'should i buy', 'which should', 'which one', 'help me choose'];
   
   const hasDiscoveryIntent = discoveryKeywords.some(k => lowerMessage.includes(k));
   const hasProductCategory = productCategories.some(c => lowerMessage.includes(c));
@@ -2134,7 +2163,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       contents: geminiMessages,
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 1000
+        maxOutputTokens: 1500
       }
     };
 
@@ -2403,7 +2432,7 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
             tools: geminiTools,
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 1000
+              maxOutputTokens: 1500
             }
           }),
         },
@@ -2480,7 +2509,7 @@ Want me to compare prices or check specific retailers?"`;
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 contents: [{ role: 'user', parts: [{ text: synthesisPrompt }] }],
-                generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
+                generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
               }),
             },
             2, 1000
@@ -2514,7 +2543,7 @@ Want me to compare prices or check specific retailers?"`;
                   ...geminiMessages.slice(0, -1),
                   { role: 'user', parts: [{ text: `The user asked: "${message}"\n\nProvide a complete, helpful response. Include popular retailers like Amazon, official brand websites, and other trusted online stores if relevant. Do NOT cut off mid-sentence. Ensure your response ends with proper punctuation.` }] }
                 ],
-                generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+                generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
               }),
             },
             2, 1000
@@ -2548,7 +2577,7 @@ Want me to compare prices or check specific retailers?"`;
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 contents: geminiMessages,
-                generationConfig: { temperature: 0.7, maxOutputTokens: 1000 }
+                generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
               }),
             },
             3, 1000
@@ -2971,7 +3000,7 @@ Want me to compare prices or check specific retailers?"`;
                 { role: 'assistant', parts: [{ text: finalAssistantMessage }] },
                 { role: 'user', parts: [{ text: 'Your previous response was cut off. Please provide a complete response to my original question. End with proper punctuation.' }] }
               ],
-              generationConfig: { temperature: 0.7, maxOutputTokens: 1200 }
+              generationConfig: { temperature: 0.7, maxOutputTokens: 1800 }
             }),
           },
           2, 1000
@@ -3021,7 +3050,7 @@ Want me to compare prices or check specific retailers?"`;
         contents: geminiMessages,
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 1000
+          maxOutputTokens: 1500
         }
         // No tools - force Gemini to answer from knowledge
       };
