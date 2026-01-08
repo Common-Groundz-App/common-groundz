@@ -208,10 +208,95 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     return pickStable(['⭐', '✨', '🌟', '💫'], brandName);
   };
 
+  // Semantic emoji decoration for conversational tone
+  // GUARDRAILS:
+  // - One emoji per paragraph (first match wins)
+  // - Skip long paragraphs (>160 chars)
+  // - Skip list items and quotes (precise regex)
+  const getSemanticEmoji = (text: string): { emoji: string; position: 'prepend' | 'none' } => {
+    const trimmedText = text.trim();
+    
+    // GUARDRAIL 1: Skip long paragraphs (explanatory text shouldn't get emojis)
+    if (trimmedText.length > 160) {
+      return { emoji: '', position: 'none' };
+    }
+    
+    // GUARDRAIL 2: Never decorate list items, numbered lists, or blockquotes
+    // Precise regex: only matches "1. ", "- ", "• ", "* ", "> "
+    if (/^(\d+\.\s|[-•*>]\s)/.test(trimmedText)) {
+      return { emoji: '', position: 'none' };
+    }
+    
+    const lowerText = trimmedText.toLowerCase();
+    
+    // GUARDRAIL 3: First match wins (one emoji per paragraph)
+    
+    // Recommendations / suggestions
+    if (/^(i'd recommend|i recommend|my recommendation|i suggest|i'd suggest|my top pick|my pick)/i.test(lowerText)) {
+      return { emoji: '👉', position: 'prepend' };
+    }
+    
+    // Best for / Good for
+    if (/^(best for|good for|great for|ideal for|perfect for)/i.test(lowerText)) {
+      return { emoji: '✅', position: 'prepend' };
+    }
+    
+    // Tips / advice
+    if (/^(tip:|pro tip:|quick tip:|here's a tip|one tip)/i.test(lowerText)) {
+      return { emoji: '💡', position: 'prepend' };
+    }
+    
+    // Warnings / downsides / considerations
+    if (/^(warning:|note:|keep in mind|be aware|however,|one downside|the downside|watch out)/i.test(lowerText)) {
+      return { emoji: '⚠️', position: 'prepend' };
+    }
+    
+    // Final verdict / conclusion
+    if (/^(overall,|in summary|to summarize|final verdict|bottom line|in conclusion|all in all)/i.test(lowerText)) {
+      return { emoji: '🏁', position: 'prepend' };
+    }
+    
+    // Comparisons
+    if (/^(compared to|in comparison|versus|vs\.|when comparing)/i.test(lowerText)) {
+      return { emoji: '⚖️', position: 'prepend' };
+    }
+    
+    // Price / value mentions
+    if (/^(price-wise|in terms of price|for the price|value for money|budget-friendly)/i.test(lowerText)) {
+      return { emoji: '💰', position: 'prepend' };
+    }
+    
+    // Sustainability / eco (only short mentions)
+    if (/^.{0,50}(sustainable|eco-friendly|environmentally|green choice)/i.test(lowerText)) {
+      return { emoji: '🌱', position: 'prepend' };
+    }
+    
+    // Durability / quality
+    if (/^(built to last|durable|long-lasting|high quality|premium quality)/i.test(lowerText)) {
+      return { emoji: '🛠️', position: 'prepend' };
+    }
+    
+    // Questions back to user
+    if (/^(would you like|do you want|shall i|should i|can i help|anything else)/i.test(lowerText)) {
+      return { emoji: '🤔', position: 'prepend' };
+    }
+    
+    // Hope this helps / happy to help (sign-offs)
+    if (/^.{0,30}(hope this helps|happy to help|let me know|feel free to ask)/i.test(lowerText)) {
+      return { emoji: '😊', position: 'prepend' };
+    }
+    
+    return { emoji: '', position: 'none' };
+  };
+
   // Simple markdown-to-JSX renderer
   const renderMarkdown = (content: string) => {
     const preprocessed = preprocessMarkdown(content);
     const lines = preprocessed.split('\n');
+    
+    // GUARDRAIL 4: Global emoji cap per message (max 4 semantic emojis)
+    let semanticEmojiCount = 0;
+    const MAX_SEMANTIC_EMOJIS = 4;
     
     return lines.map((line, idx) => {
       // Horizontal divider
@@ -271,7 +356,17 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         return <div key={idx} className="h-2" />;
       }
       
-      // Regular paragraph
+      // Regular paragraph - with semantic emoji decoration (capped)
+      const semanticDecor = getSemanticEmoji(line);
+      if (semanticDecor.emoji && semanticDecor.position === 'prepend' && semanticEmojiCount < MAX_SEMANTIC_EMOJIS) {
+        semanticEmojiCount++;
+        return (
+          <p key={idx}>
+            <span className="mr-1.5">{semanticDecor.emoji}</span>
+            {processInline(line)}
+          </p>
+        );
+      }
       return <p key={idx}>{processInline(line)}</p>;
     });
   };
