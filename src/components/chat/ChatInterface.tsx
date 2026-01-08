@@ -133,6 +133,75 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     return result.trim();
   };
 
+  // Non-brand headings that should NOT get emoji decoration
+  // NOTE: Expand this list over time as we observe false positives
+  const NON_BRAND_HEADINGS = [
+    'Pros', 'Cons', 'Things', 'Things To Consider', 'Recommendations',
+    'Summary', 'Conclusion', 'Overview', 'Key Features', 'Features',
+    'Benefits', 'Drawbacks', 'Alternatives', 'Options', 'Tips', 'Notes',
+    'Warning', 'Important', 'Final Verdict', 'My Experience', 'Who This Is For',
+    'Quick Take', 'Bottom Line', 'What To Know', 'The Verdict', 'In Summary'
+  ];
+
+  // Simple hash function to get stable index from string
+  // Ensures same brand always gets same emoji (no flicker on re-render)
+  const getStableIndex = (str: string, arrayLength: number): number => {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash) % arrayLength;
+  };
+
+  // Pick emoji from array using stable hash (same input = same output)
+  const pickStable = (emojis: string[], seed: string): string => {
+    return emojis[getStableIndex(seed, emojis.length)];
+  };
+
+  // Check if heading text looks like a brand name (Title Case, 1-4 words)
+  const isBrandHeading = (text: string): boolean => {
+    const cleaned = text.replace(/\*\*/g, '').trim();
+    if (NON_BRAND_HEADINGS.some(h => h.toLowerCase() === cleaned.toLowerCase())) {
+      return false;
+    }
+    return /^[A-Z][a-zA-Z]+(\s[A-Z][a-zA-Z]+){0,3}$/.test(cleaned);
+  };
+
+  // Get category-appropriate emoji for brand headers (stable per brand)
+  const getBrandEmoji = (brandName: string, contextText?: string): string => {
+    const lowerBrand = brandName.toLowerCase();
+    const lowerContext = (contextText || '').toLowerCase();
+    const combined = lowerBrand + ' ' + lowerContext;
+
+    if (/hydro|flask|bottle|water|drink|stanley|kanteen|yeti|nalgene|thermos|tumbler/i.test(combined)) {
+      return pickStable(['💧', '🚰', '🥤', '🧊'], brandName);
+    }
+    if (/cerave|skincare|skin|beauty|serum|moistur|cleanser|sunscreen|retinol|lotion|cream|cosmetic/i.test(combined)) {
+      return pickStable(['✨', '💄', '🧴', '💅'], brandName);
+    }
+    if (/patagonia|outdoor|eco|hiking|camping|trail|nature|sustainable|north face|rei/i.test(combined)) {
+      return pickStable(['🌲', '🏔️', '🌿', '🏕️'], brandName);
+    }
+    if (/sony|apple|samsung|laptop|phone|headphone|speaker|tech|computer|tablet|airpod|pixel/i.test(combined)) {
+      return pickStable(['💻', '📱', '🎧', '⚡'], brandName);
+    }
+    if (/food|restaurant|cafe|kitchen|recipe|meal|cook|eat|dining|bistro/i.test(combined)) {
+      return pickStable(['🍽️', '🍴', '👨‍🍳', '🥗'], brandName);
+    }
+    if (/fashion|cloth|wear|shirt|shoe|dress|style|outfit|nike|adidas|levi/i.test(combined)) {
+      return pickStable(['👕', '👗', '👟', '🧥'], brandName);
+    }
+    if (/home|house|furniture|decor|room|living|bedroom|ikea|wayfair/i.test(combined)) {
+      return pickStable(['🏠', '🛋️', '🏡', '🪴'], brandName);
+    }
+    if (/fitness|gym|workout|exercise|sport|run|yoga|peloton|lululemon/i.test(combined)) {
+      return pickStable(['🏋️', '💪', '🏃', '🧘'], brandName);
+    }
+    return pickStable(['⭐', '✨', '🌟', '💫'], brandName);
+  };
+
   // Simple markdown-to-JSX renderer
   const renderMarkdown = (content: string) => {
     const preprocessed = preprocessMarkdown(content);
@@ -154,8 +223,14 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
           2: 'text-sm font-semibold mt-2 mb-1',
           3: 'text-sm font-medium mt-2 mb-0.5'
         };
+        
+        // Check if this looks like a brand heading and add emoji decoration
+        const shouldDecorate = isBrandHeading(headingText);
+        const emoji = shouldDecorate ? getBrandEmoji(headingText.replace(/\*\*/g, '').trim(), content) : '';
+        
         return (
           <div key={idx} className={sizes[level] || sizes[3]}>
+            {emoji && <span className="mr-1.5">{emoji}</span>}
             {processInline(headingText)}
           </div>
         );
