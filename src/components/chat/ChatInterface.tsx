@@ -25,6 +25,9 @@ interface Message {
   detectedPreference?: DetectedPreference | null;
   preferenceActionTaken?: 'saved_avoid' | 'saved_preference' | 'dismissed' | null;
   sources?: Source[];
+  // Phase 0: Resolver confidence data
+  confidenceLabel?: 'high' | 'medium' | 'limited' | null;
+  resolverState?: 'success' | 'insufficient_data' | 'web_fallback' | null;
 }
 
 interface ChatInterfaceProps {
@@ -561,6 +564,8 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         detectedPreference: data.detectedPreference || null,
         preferenceActionTaken: null,
         sources: data.sources || [],
+        confidenceLabel: data.confidenceLabel || null,
+        resolverState: data.resolverState || null,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -777,6 +782,21 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                         : <p className="whitespace-pre-wrap">{message.content}</p>
                       }
                     </div>
+                    
+                    {/* Phase 0: Confidence indicator */}
+                    {message.role === 'assistant' && message.confidenceLabel && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-2 pt-1.5 border-t border-border/30">
+                        {message.confidenceLabel === 'high' && (
+                          <><span>🏠</span> Based on Common Groundz data</>
+                        )}
+                        {message.confidenceLabel === 'medium' && (
+                          <><span>📊</span> Mixed sources</>
+                        )}
+                        {message.confidenceLabel === 'limited' && (
+                          <><span>🌐</span> Based on broader research</>
+                        )}
+                      </div>
+                    )}
                     
                     {/* Sources section - clean pill/chip design with favicons */}
                     {message.role === 'assistant' && message.sources && message.sources.length > 0 && (() => {
