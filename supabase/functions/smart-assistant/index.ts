@@ -7,6 +7,62 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ============= RECOMMENDATION RESOLVER TYPES (Phase 0) =============
+
+type ResolverState = 'success' | 'insufficient_data' | 'web_fallback';
+
+interface ResolverInput {
+  userId: string;
+  query: string;
+  category?: string;
+  constraints: string[];
+  conversationContext?: Array<{role: string; content: string}>;
+}
+
+interface ResolverProductSource {
+  type: 'platform_review' | 'similar_user' | 'user_history' | 'web';
+  count: number;
+}
+
+interface ResolverShortlistItem {
+  product: string;
+  entityId?: string;
+  reason: string;
+  score: number;
+  sources: ResolverProductSource[];
+}
+
+interface ResolverRejectedItem {
+  product: string;
+  reason: string;
+}
+
+interface ResolverUserContext {
+  skinType?: string;
+  hairType?: string;
+  dietaryNeeds?: string[];
+  constraints: string[];
+  currentProducts: string[];
+}
+
+interface ResolverSourceSummary {
+  platformReviews: number;
+  similarUsers: number;
+  userItems: number;
+  webSearchUsed: boolean;
+}
+
+interface ResolverOutput {
+  state: ResolverState;
+  shortlist: ResolverShortlistItem[];
+  rejected: ResolverRejectedItem[];
+  userContext: ResolverUserContext;
+  confidence: number;
+  confidenceLabel: 'high' | 'medium' | 'limited';
+  sourceSummary: ResolverSourceSummary;
+  fallbackMessage?: string;
+}
+
 // Centralized emoji list for section detection (prevents regex duplication bugs)
 const SECTION_EMOJIS = '💧|🌲|🛠️|🏔️|🏆|⭐|🎯|🔥|✨|📦|🛒|💡|🎬|📚|🍽️|🏠|🚗|💻|📱|🎮|🎵|👕|💄|🧴|🏋️|⚽|🎨|✈️|🐕|👶';
 
@@ -1042,6 +1098,367 @@ async function searchUserMemory(
       error: error.message
     };
   }
+}
+
+// ============= RECOMMENDATION RESOLVER (Phase 0) =============
+
+/**
+ * Detect product category from user query
+ */
+function detectCategory(query: string): string | undefined {
+  const lowerQuery = query.toLowerCase();
+  
+  const categoryPatterns: Record<string, RegExp> = {
+    skincare: /\b(sunscreen|moisturizer|serum|cleanser|toner|mask|exfoliat|acne|anti-aging|retinol|spf|skin care|skincare|face wash|lotion)\b/i,
+    haircare: /\b(shampoo|conditioner|hair oil|hair mask|hair care|haircare|hair treatment|styling|dry shampoo)\b/i,
+    makeup: /\b(foundation|lipstick|mascara|eyeshadow|concealer|blush|primer|makeup|cosmetic)\b/i,
+    food: /\b(recipe|ingredient|cook|meal|restaurant|diet|nutrition|food|eat|drink|snack)\b/i,
+    electronics: /\b(phone|laptop|tablet|headphone|earbuds|computer|monitor|keyboard|mouse|charger|camera|speaker)\b/i,
+    fitness: /\b(workout|exercise|gym|protein|supplement|fitness|yoga|running|weight)\b/i,
+  };
+  
+  for (const [category, pattern] of Object.entries(categoryPatterns)) {
+    if (pattern.test(lowerQuery)) {
+      return category;
+    }
+  }
+  
+  return undefined;
+}
+
+/**
+ * Extract constraints from user preferences as simple string array
+ */
+function extractConstraintsForResolver(preferences: any): string[] {
+  if (!preferences) return [];
+  
+  const constraints: string[] = [];
+  
+  // Extract from unified_constraints
+  const unifiedItems = preferences.unified_constraints?.items || [];
+  for (const item of unifiedItems) {
+    if (item.intent === 'never' || item.intent === 'strictly_avoid' || item.intent === 'avoid') {
+      constraints.push(item.targetValue.toLowerCase());
+    }
+  }
+  
+  // Extract from legacy constraints
+  if (preferences.avoidIngredients?.length) {
+    constraints.push(...preferences.avoidIngredients.map((i: string) => i.toLowerCase()));
+  }
+  if (preferences.avoidBrands?.length) {
+    constraints.push(...preferences.avoidBrands.map((b: string) => b.toLowerCase()));
+  }
+  
+  return [...new Set(constraints)]; // Deduplicate
+}
+
+/**
+ * Check if a product violates any user constraints
+ */
+function checkConstraintViolation(product: string, constraints: string[]): string | null {
+  const productLower = product.toLowerCase();
+  
+  for (const constraint of constraints) {
+    if (productLower.includes(constraint) || constraint.includes(productLower.split(' ')[0])) {
+      return `Contains ${constraint} (user constraint)`;
+    }
+  }
+  return null;
+}
+
+/**
+ * Calculate confidence score based on available data
+ */
+function calculateResolverConfidence(
+  sourceSummary: ResolverSourceSummary, 
+  shortlistCount: number
+): { confidence: number; label: 'high' | 'medium' | 'limited' } {
+  let confidence = 0;
+  
+  // Platform reviews contribution (max 0.35)
+  confidence += Math.min(sourceSummary.platformReviews * 0.07, 0.35);
+  
+  // Similar users contribution (max 0.25)
+  confidence += Math.min(sourceSummary.similarUsers * 0.05, 0.25);
+  
+  // User has tracked items (0.15)
+  if (sourceSummary.userItems > 0) confidence += 0.15;
+  
+  // Shortlist quality (max 0.25)
+  confidence += Math.min(shortlistCount * 0.05, 0.25);
+  
+  confidence = Math.min(confidence, 1.0);
+  
+  const label: 'high' | 'medium' | 'limited' = 
+    confidence >= 0.7 ? 'high' : 
+    confidence >= 0.4 ? 'medium' : 'limited';
+  
+  return { confidence, label };
+}
+
+/**
+ * Log resolver snapshot for debugging (ChatGPT Guardrail #2)
+ */
+function logResolverSnapshot(
+  input: ResolverInput, 
+  output: ResolverOutput, 
+  durationMs: number
+): void {
+  console.log('[RESOLVER_SNAPSHOT]', JSON.stringify({
+    timestamp: new Date().toISOString(),
+    userId: input.userId,
+    query: input.query.substring(0, 100),
+    category: input.category,
+    state: output.state,
+    shortlistCount: output.shortlist.length,
+    shortlistProducts: output.shortlist.map(p => p.product),
+    rejectedCount: output.rejected.length,
+    confidence: output.confidence.toFixed(2),
+    confidenceLabel: output.confidenceLabel,
+    sources: output.sourceSummary,
+    durationMs
+  }));
+}
+
+/**
+ * Aggregate sources by type
+ */
+function aggregateSources(sources: ResolverProductSource[]): ResolverProductSource[] {
+  const aggregated = new Map<string, number>();
+  
+  for (const source of sources) {
+    const current = aggregated.get(source.type) || 0;
+    aggregated.set(source.type, current + source.count);
+  }
+  
+  return Array.from(aggregated.entries()).map(([type, count]) => ({
+    type: type as ResolverProductSource['type'],
+    count
+  }));
+}
+
+/**
+ * CORE RESOLVER: Runs BEFORE the LLM for product_user queries
+ * This is deterministic - no LLM calls inside
+ */
+async function resolveRecommendation(
+  supabaseClient: any,
+  input: ResolverInput
+): Promise<ResolverOutput> {
+  const startTime = Date.now();
+  
+  // Initialize output structure
+  const output: ResolverOutput = {
+    state: 'success',
+    shortlist: [],
+    rejected: [],
+    userContext: { 
+      constraints: input.constraints, 
+      currentProducts: [] 
+    },
+    confidence: 0,
+    confidenceLabel: 'limited',
+    sourceSummary: { 
+      platformReviews: 0, 
+      similarUsers: 0, 
+      userItems: 0, 
+      webSearchUsed: false 
+    }
+  };
+
+  console.log('[resolveRecommendation] Starting resolver for query:', input.query.substring(0, 80));
+
+  // Step 1: Load User Context (ALWAYS runs)
+  try {
+    const userContextResult = await getUserContext(supabaseClient, input.userId, 'preferences');
+    if (userContextResult.success && userContextResult.data) {
+      output.userContext.skinType = userContextResult.data.preferences?.skin_type?.values?.[0]?.value;
+      output.userContext.hairType = userContextResult.data.preferences?.hair_type?.values?.[0]?.value;
+    }
+  } catch (error) {
+    console.error('[resolveRecommendation] Error loading user context:', error);
+  }
+
+  // Step 2: Get User's Stuff (ALWAYS runs)
+  try {
+    const userStuffResult = await getUserStuff(supabaseClient, input.userId, input.category);
+    if (userStuffResult.success && userStuffResult.items) {
+      output.userContext.currentProducts = userStuffResult.items
+        .map((item: any) => item.entity?.name)
+        .filter(Boolean)
+        .slice(0, 10);
+      output.sourceSummary.userItems = output.userContext.currentProducts.length;
+    }
+  } catch (error) {
+    console.error('[resolveRecommendation] Error loading user stuff:', error);
+  }
+
+  // Step 3: Search Platform Reviews (ALWAYS runs for product queries)
+  const productScores = new Map<string, {
+    score: number; 
+    reasons: string[]; 
+    sources: ResolverProductSource[];
+    entityId?: string;
+  }>();
+
+  try {
+    const reviewsResult = await searchReviewsSemantic(supabaseClient, input.query, undefined, 15);
+    if (reviewsResult.success && reviewsResult.results) {
+      output.sourceSummary.platformReviews = reviewsResult.results.length;
+      
+      for (const review of reviewsResult.results) {
+        const productName = review.entity?.name;
+        if (!productName) continue;
+        
+        const existing = productScores.get(productName) || {
+          score: 0, 
+          reasons: [], 
+          sources: [],
+          entityId: review.entity?.id
+        };
+        
+        // Platform review scoring: rating * 0.1 + relevance bonus
+        const ratingScore = (review.rating || 3) * 0.08;
+        const relevanceScore = (review.relevance_score || 0.5) * 0.15;
+        existing.score += ratingScore + relevanceScore;
+        
+        // Add reason if we don't have too many already
+        if (existing.reasons.length < 2) {
+          existing.reasons.push(`${review.rating || 3}/5 on Common Groundz`);
+        }
+        existing.sources.push({ type: 'platform_review', count: 1 });
+        existing.entityId = review.entity?.id;
+        
+        productScores.set(productName, existing);
+      }
+      
+      console.log('[resolveRecommendation] Found', reviewsResult.results.length, 'platform reviews');
+    }
+  } catch (error) {
+    console.error('[resolveRecommendation] Error searching reviews:', error);
+  }
+
+  // Step 4: Find Similar Users (ALWAYS runs)
+  try {
+    const similarUsersResult = await findSimilarUsers(supabaseClient, input.userId, 5);
+    if (similarUsersResult.success && similarUsersResult.results) {
+      output.sourceSummary.similarUsers = similarUsersResult.results.length;
+      
+      // For now, just count similar users found - in future we'd get their recommendations
+      // and cross-reference with our product scores
+      console.log('[resolveRecommendation] Found', similarUsersResult.results.length, 'similar users');
+    }
+  } catch (error) {
+    console.error('[resolveRecommendation] Error finding similar users:', error);
+  }
+
+  // Step 5: Apply Constraint Filters and Build Shortlist (DETERMINISTIC)
+  for (const [product, data] of productScores.entries()) {
+    const constraintViolation = checkConstraintViolation(product, input.constraints);
+    
+    if (constraintViolation) {
+      output.rejected.push({
+        product,
+        reason: constraintViolation
+      });
+    } else {
+      // Add constraint match bonus (no violations = good)
+      const finalScore = data.score + 0.1;
+      
+      output.shortlist.push({
+        product,
+        entityId: data.entityId,
+        score: finalScore,
+        reason: data.reasons.length > 0 ? data.reasons.join('; ') : 'Matches your criteria',
+        sources: aggregateSources(data.sources)
+      });
+    }
+  }
+
+  // Step 6: Sort and Cap Shortlist (MAX 5 items - ChatGPT Guardrail #3)
+  output.shortlist.sort((a, b) => b.score - a.score);
+  output.shortlist = output.shortlist.slice(0, 5);
+
+  // Step 7: Calculate Confidence (DETERMINISTIC formula)
+  const { confidence, label } = calculateResolverConfidence(output.sourceSummary, output.shortlist.length);
+  output.confidence = confidence;
+  output.confidenceLabel = label;
+
+  // Step 8: Handle Insufficient Data (ChatGPT Guardrail #1)
+  if (output.shortlist.length === 0 && output.confidence < 0.3) {
+    output.state = 'insufficient_data';
+    output.fallbackMessage = "I don't have enough trusted data yet to recommend confidently in this category. Would you like me to search broader sources?";
+    
+    logResolverSnapshot(input, output, Date.now() - startTime);
+    return output;
+  }
+
+  // Step 9: Web Fallback Decision (only if confidence too low)
+  if (output.confidence < 0.3 && output.shortlist.length < 2) {
+    output.state = 'web_fallback';
+    output.sourceSummary.webSearchUsed = true;
+    output.fallbackMessage = 'Limited Common Groundz data - supplementing with broader research.';
+  }
+
+  // Step 10: Log Resolver Snapshot (ChatGPT Guardrail #2 - CRITICAL)
+  logResolverSnapshot(input, output, Date.now() - startTime);
+
+  return output;
+}
+
+/**
+ * Build the explanation-only prompt for the LLM
+ * The LLM receives structured data and explains ONLY - no tool calls
+ */
+function buildResolverExplanationPrompt(
+  output: ResolverOutput, 
+  userName: string
+): string {
+  const confidenceText = output.confidenceLabel === 'high' ? 'HIGH - Strong platform data available' : 
+                         output.confidenceLabel === 'medium' ? 'MEDIUM - Some platform insights available' : 
+                         'LIMITED - Mostly external research';
+  
+  return `You are explaining personalized recommendations to ${userName}.
+
+=== USER CONTEXT ===
+- Skin Type: ${output.userContext.skinType || 'Not specified'}
+- Hair Type: ${output.userContext.hairType || 'Not specified'}
+- Dietary Needs: ${output.userContext.dietaryNeeds?.join(', ') || 'None specified'}
+- Current Products: ${output.userContext.currentProducts.join(', ') || 'None tracked'}
+- Things to Avoid: ${output.userContext.constraints.join(', ') || 'None'}
+
+=== SHORTLISTED PRODUCTS (ranked by fit) ===
+${output.shortlist.length > 0 ? output.shortlist.map((p, i) => 
+  `${i+1}. ${p.product} (score: ${p.score.toFixed(2)})
+   - Why: ${p.reason}
+   - Sources: ${p.sources.map(s => `${s.type}: ${s.count}`).join(', ')}`
+).join('\n\n') : 'No products matched the criteria from Common Groundz data.'}
+
+${output.rejected.length > 0 ? `
+=== EXCLUDED (due to user constraints) ===
+${output.rejected.map(p => `- ${p.product}: ${p.reason}`).join('\n')}
+` : ''}
+
+=== DATA SOURCES ===
+- Common Groundz reviews: ${output.sourceSummary.platformReviews}
+- Similar users consulted: ${output.sourceSummary.similarUsers}
+- User's tracked items: ${output.sourceSummary.userItems}
+${output.sourceSummary.webSearchUsed ? `- Web research: Yes (${output.fallbackMessage})` : ''}
+
+=== CONFIDENCE: ${confidenceText} ===
+
+=== STRICT INSTRUCTIONS (NON-NEGOTIABLE) ===
+1. Explain WHY these products fit THIS specific user
+2. Reference their constraints when products were excluded
+3. Do NOT introduce products not listed above
+4. Do NOT invent features, reviews, or opinions
+5. Do NOT create rankings or scores - they are provided above
+6. If confidence is LIMITED, say "Based on broader research..."
+7. If similar users influenced a pick, say "Users with similar preferences..."
+8. Be concise - the data above is your ONLY source of truth
+9. If no products matched, acknowledge honestly and ask what they're looking for
+10. Start with a clear recommendation, not preamble`;
 }
 
 // ========== DETECTED PREFERENCE TYPES ==========
@@ -2116,6 +2533,8 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     // Build tools array based on intent (to avoid google_search + function_declarations conflict)
     let geminiTools: any[] = [];
     let toolMode = 'none';
+    let resolverOutput: ResolverOutput | null = null;
+    let resolverSystemPrompt: string | null = null;
 
     if (queryIntent === 'realtime') {
       // Use ONLY google_search for real-time information
@@ -2123,16 +2542,84 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
       toolMode = 'google_search';
       console.log('[smart-assistant] Using google_search tool for real-time info');
     } else if (queryIntent === 'product_user') {
-      // Use ONLY function_declarations for product/user queries
-      geminiTools = [{
-        function_declarations: tools.map(t => ({
-          name: t.function.name,
-          description: t.function.description,
-          parameters: t.function.parameters
-        }))
-      }];
-      toolMode = 'functions';
-      console.log('[smart-assistant] Using function_declarations for product/user query');
+      // === PHASE 0: RESOLVER RUNS FIRST - SYSTEM DECIDES, NOT LLM ===
+      console.log('[smart-assistant] Running recommendation resolver before LLM...');
+      
+      // Extract constraints for resolver
+      const resolverConstraints = extractConstraintsForResolver(profile?.preferences);
+      const detectedCategory = detectCategory(message);
+      
+      try {
+        resolverOutput = await resolveRecommendation(supabaseClient, {
+          userId: user.id,
+          query: message,
+          category: detectedCategory,
+          constraints: resolverConstraints,
+          conversationContext: conversationHistory
+        });
+        
+        console.log('[smart-assistant] Resolver completed:', {
+          state: resolverOutput.state,
+          shortlistCount: resolverOutput.shortlist.length,
+          confidence: resolverOutput.confidence.toFixed(2),
+          confidenceLabel: resolverOutput.confidenceLabel
+        });
+        
+        // Handle insufficient data state (ChatGPT Guardrail #1)
+        if (resolverOutput.state === 'insufficient_data') {
+          // Return early with honest "not enough data" message
+          const insufficientDataResponse = resolverOutput.fallbackMessage || 
+            "I don't have enough trusted data yet to recommend confidently. Would you like me to search broader sources?";
+          
+          // Save assistant response to database
+          await supabaseClient
+            .from('conversation_messages')
+            .insert({
+              conversation_id: conversation.id,
+              role: 'assistant',
+              content: insufficientDataResponse,
+              metadata: {
+                resolver_state: 'insufficient_data',
+                confidence: resolverOutput.confidence,
+                model: 'resolver_only'
+              }
+            });
+          
+          return new Response(JSON.stringify({
+            conversationId: conversation.id,
+            message: insufficientDataResponse,
+            toolCalls: [],
+            sources: [],
+            resolverState: 'insufficient_data',
+            confidence: resolverOutput.confidence,
+            confidenceLabel: resolverOutput.confidenceLabel,
+            sourceSummary: resolverOutput.sourceSummary,
+            metadata: { responseTime: Date.now() - startTime }
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // Build resolver explanation prompt (ChatGPT Guardrail #4 - LLM explains only)
+        resolverSystemPrompt = buildResolverExplanationPrompt(resolverOutput, userName);
+        
+        // NO TOOLS for product queries - LLM explains only
+        geminiTools = [];
+        toolMode = 'resolver';
+        console.log('[smart-assistant] Resolver mode: LLM will explain structured data (no tools)');
+        
+      } catch (resolverError) {
+        console.error('[smart-assistant] Resolver failed, falling back to tool mode:', resolverError);
+        // Fallback to original tool-based approach if resolver fails
+        geminiTools = [{
+          function_declarations: tools.map(t => ({
+            name: t.function.name,
+            description: t.function.description,
+            parameters: t.function.parameters
+          }))
+        }];
+        toolMode = 'functions';
+      }
     } else {
       // General knowledge - no tools, let Gemini answer directly
       geminiTools = [];
@@ -2148,9 +2635,13 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     });
 
     // Convert conversation history to Gemini format
+    // Use resolver system prompt if available, otherwise use main system prompt
+    const activeSystemPrompt = resolverSystemPrompt || systemPrompt;
     const geminiMessages = [
-      { role: 'user', parts: [{ text: systemPrompt }] },
-      { role: 'model', parts: [{ text: 'Understood. I will follow the response strategy and trust hierarchy.' }] },
+      { role: 'user', parts: [{ text: activeSystemPrompt }] },
+      { role: 'model', parts: [{ text: toolMode === 'resolver' 
+        ? 'Understood. I will explain the recommendations based on the structured data provided.' 
+        : 'Understood. I will follow the response strategy and trust hierarchy.' }] },
       ...conversationHistory.map(msg => ({
         role: msg.role === 'user' ? 'user' : 'model',
         parts: [{ text: msg.role === 'assistant' ? cleanResponseFormatting(msg.content) : msg.content }]
@@ -3163,9 +3654,15 @@ Want me to compare prices or check specific retailers?"`;
       toolCalls: toolCalls || [],
       detectedPreference,
       sources: sourcesData,
+      // Phase 0: Include resolver data for UI transparency
+      resolverState: resolverOutput?.state || null,
+      confidence: resolverOutput?.confidence || null,
+      confidenceLabel: resolverOutput?.confidenceLabel || null,
+      sourceSummary: resolverOutput?.sourceSummary || null,
       metadata: {
         responseTime,
-        tokensUsed: aiData.usageMetadata
+        tokensUsed: aiData.usageMetadata,
+        toolMode
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
