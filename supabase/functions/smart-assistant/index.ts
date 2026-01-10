@@ -7,9 +7,25 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// ============= RECOMMENDATION RESOLVER TYPES (Phase 1 Enhanced) =============
+// ============= RECOMMENDATION RESOLVER TYPES (Phase 2 Enhanced) =============
 
 type ResolverState = 'success' | 'insufficient_data' | 'web_fallback';
+
+// Type-safe score source enum (Phase 2)
+enum ScoreSource {
+  SIMILAR_USER = 'similar_user',
+  PLATFORM_REVIEW = 'platform_review',
+  USER_HISTORY = 'user_history',
+  CONSTRAINT_MATCH = 'constraint_match'
+}
+
+// Rejection priority - lower number = higher priority = shown first (ChatGPT Guardrail #3)
+const REJECTION_PRIORITY: Record<string, number> = {
+  already_owns: 1,
+  constraint_violation: 2,
+  negative_override: 3,
+  previously_used: 4
+};
 
 interface ResolverInput {
   userId: string;
@@ -65,59 +81,186 @@ interface CandidateProduct {
 }
 
 /**
- * Scoring configuration for outcome-weighted signals
+ * UNIFIED SCORING CONFIGURATION (Phase 2)
+ * 
+ * Centralized configuration for ALL scoring sources.
+ * Weights are FROZEN for Phase 2 - no tuning until real usage data.
+ * 
+ * ChatGPT Guardrail #1: Freeze weights
+ * ChatGPT Guardrail #2: Source dominance ordering via caps:
+ *   Similar-user (0.60) > Platform (0.50) > History (0.20) > Preference (0.15)
  */
-const OUTCOME_SCORING_CONFIG = {
-  // Per-user caps (ChatGPT Refinement #1)
-  maxContributionPerUser: 0.35,
-  
-  // Total contribution caps (ChatGPT Add #2)
-  maxSimilarUserScorePerProduct: 0.60,
-  
-  // Minimum thresholds (ChatGPT Add #1 & #2)
-  minDistinctUsersForScoring: 2,
-  minDistinctUsersForBonus: 2,
-  
-  // Weights for signal calculation
-  weights: {
-    stillUsing: 0.25,
-    usageDurationPerMonth: 0.033,  // capped at 12 months = 0.40
-    maxUsageDurationMonths: 12,
-    hasTimeline: 0.15,
-    ratingImproving: 0.20,
-    ratingDeclining: -0.20,
-    ratingStable: 0.10,
-    stoppedUsing: -0.40
+const UNIFIED_SCORING_CONFIG = {
+  // ============= PLATFORM REVIEW SCORING =============
+  platformReview: {
+    baseWeight: 0.08,
+    ratingMultiplier: 0.02,      // per star above 3
+    relevanceMultiplier: 0.15,
+    recencyDecay: {
+      enabled: true,
+      decayPerMonth: 0.02,
+      maxDecay: 0.20,
+      freshBonus: 0.05,
+      freshThresholdMonths: 3
+    },
+    maxContributionPerReview: 0.40,
+    maxTotalContribution: 0.50   // ChatGPT Guardrail #2
   },
   
-  // Negative override threshold (ChatGPT Add #3)
-  negativeOverride: {
-    minStoppedCount: 2,
-    penalty: -0.30,
-    triggerWhenStoppedGteStillUsing: true
+  // ============= SIMILAR USER SCORING =============
+  similarUser: {
+    maxContributionPerUser: 0.35,
+    maxSimilarUserScorePerProduct: 0.60,  // ChatGPT Guardrail #2: Highest cap
+    minDistinctUsersForScoring: 2,
+    minDistinctUsersForBonus: 2,
+    
+    weights: {
+      stillUsing: 0.25,
+      usageDurationPerMonth: 0.033,  // capped at 12 months = 0.40
+      maxUsageDurationMonths: 12,
+      hasTimeline: 0.15,
+      ratingImproving: 0.20,
+      ratingDeclining: -0.20,
+      ratingStable: 0.10,
+      stoppedUsing: -0.40
+    },
+    
+    negativeOverride: {
+      minStoppedCount: 2,
+      penalty: -0.30,
+      triggerWhenStoppedGteStillUsing: true
+    },
+    
+    scoring: {
+      base: 0.10,
+      signalStrengthMultiplier: 0.25,
+      stillUsingPerUser: 0.05,
+      timelinePerUser: 0.03,
+      stoppedUsingPerUser: -0.08
+    },
+    
+    // Similar-user recency decay (My Addition #2)
+    recencyDecay: {
+      enabled: true,
+      thresholds: [
+        { daysAgo: 30, multiplier: 1.0 },
+        { daysAgo: 60, multiplier: 0.95 },
+        { daysAgo: 90, multiplier: 0.90 }
+      ]
+    },
+    
+    activeWithinDays: 90
   },
   
-  // Scoring weights
-  scoring: {
-    base: 0.10,
-    signalStrengthMultiplier: 0.25,
-    stillUsingPerUser: 0.05,
-    timelinePerUser: 0.03,
-    stoppedUsingPerUser: -0.08
+  // ============= USER HISTORY SCORING (NEW Phase 2) =============
+  userHistory: {
+    maxTotalContribution: 0.20,  // ChatGPT Guardrail #2
+    
+    currentlyOwns: {
+      penalty: -1.0,
+      rejectionType: 'already_owns'
+    },
+    previouslyUsed: {
+      penalty: -0.15,
+      showWarning: true
+    },
+    brandLoyalty: {
+      bonus: 0.08,
+      minLovedItems: 2
+    },
+    categoryFamiliarity: {
+      bonus: 0.05
+    }
   },
   
-  // Active user filter (My Addition #1)
-  activeWithinDays: 90
+  // ============= CONSTRAINT MATCHING (NEW Phase 2) =============
+  constraints: {
+    maxTotalContribution: 0.15,  // ChatGPT Guardrail #2
+    
+    violation: {
+      penalty: -1.0,
+      rejectionType: 'constraint_violation'
+    },
+    matchBonus: {
+      exactMatch: 0.12,
+      partialMatch: 0.06,
+      keywordMatch: 0.03
+    },
+    skinTypeMatch: {
+      enabled: true,
+      exactMatch: 0.10,
+      complementary: 0.05
+    }
+  },
+  
+  // ============= GLOBAL CAPS (ChatGPT Guardrail #2) =============
+  global: {
+    maxTotalScore: 1.5,
+    minScoreForShortlist: 0.10,
+    dominanceOrder: [
+      ScoreSource.SIMILAR_USER,      // 1st: People like you (0.60)
+      ScoreSource.PLATFORM_REVIEW,   // 2nd: Platform reviews (0.50)
+      ScoreSource.USER_HISTORY,      // 3rd: Your history (0.20)
+      ScoreSource.CONSTRAINT_MATCH   // 4th: Preference bonuses (0.15)
+    ]
+  },
+  
+  // ============= INSUFFICIENT DATA THRESHOLDS (ChatGPT Final #2) =============
+  insufficientData: {
+    minSimilarUsers: 2,
+    minPlatformReviews: 3,
+    minConfidence: 0.30,
+    minShortlistItems: 1
+  }
 };
 
-// Enhanced shortlist item with factual signals
+// Legacy alias for backward compatibility
+const OUTCOME_SCORING_CONFIG = UNIFIED_SCORING_CONFIG.similarUser;
+
+// ============= PHASE 2: SCORE BREAKDOWN INTERFACE =============
+
+interface ScoreBreakdown {
+  platformReview: {
+    total: number;
+    reviewCount: number;
+    avgRating: number;
+    recencyAdjustment: number;
+    cappedAt: number | null;
+  };
+  similarUser: {
+    total: number;
+    userCount: number;
+    avgSignalStrength: number;
+    negativeOverride: boolean;
+    recencyAdjustment: number;
+    cappedAt: number | null;
+  };
+  userHistory: {
+    total: number;
+    brandLoyalty: number;
+    categoryFamiliarity: number;
+    previouslyUsedPenalty: number;
+    cappedAt: number | null;
+  };
+  constraintMatch: {
+    total: number;
+    matchCount: number;
+    skinTypeMatch: boolean;
+    cappedAt: number | null;
+  };
+  rawTotal: number;
+  cappedTotal: number;
+  dominanceViolation: boolean;
+}
+
+// Enhanced shortlist item with factual signals and score breakdown (Phase 2)
 interface ResolverShortlistItem {
   product: string;
   entityId?: string;
   reason: string;  // Kept for backward compat, but signals are primary
   score: number;
   
-  // NEW: Factual signals (LLM converts to language)
+  // Phase 1: Factual signals (LLM converts to language)
   signals?: {
     platformReviews: number;
     avgPlatformRating: number;
@@ -130,12 +273,18 @@ interface ResolverShortlistItem {
     negativeOverrideApplied: boolean;
   };
   
+  // Phase 2 NEW: Score breakdown for transparency
+  scoreBreakdown?: ScoreBreakdown;
+  
   sources: ResolverProductSource[];
 }
 
+// Enhanced rejected item with priority (ChatGPT Guardrail #3)
 interface ResolverRejectedItem {
   product: string;
   reason: string;
+  rejectionType?: 'already_owns' | 'constraint_violation' | 'negative_override' | 'previously_used';
+  priority?: number;
 }
 
 interface ResolverUserContext {
@@ -144,6 +293,9 @@ interface ResolverUserContext {
   dietaryNeeds?: string[];
   constraints: string[];
   currentProducts: string[];
+  stoppedProducts?: string[];  // Phase 2 NEW
+  lovedBrands?: string[];      // Phase 2 NEW
+  activeCategories?: string[]; // Phase 2 NEW
 }
 
 interface ResolverSourceSummary {
@@ -151,7 +303,7 @@ interface ResolverSourceSummary {
   similarUsers: number;
   userItems: number;
   webSearchUsed: boolean;
-  distinctUsersWithSignals?: number;  // NEW for Phase 1
+  distinctUsersWithSignals?: number;  // Phase 1
 }
 
 interface ResolverOutput {
@@ -1584,7 +1736,337 @@ function calculateAvgUsageDuration(users: CandidateProduct['recommendedByUsers']
   return Math.round(total / users.length);
 }
 
-// ============= RECOMMENDATION RESOLVER (Phase 1) =============
+// ============= PHASE 2: DETERMINISTIC SCORING FUNCTIONS =============
+
+/**
+ * Score platform review with recency decay (Phase 2)
+ */
+function scorePlatformReview(
+  review: { rating: number; relevance_score?: number; created_at?: string },
+  config: typeof UNIFIED_SCORING_CONFIG.platformReview
+): { score: number; breakdown: { base: number; rating: number; relevance: number; recency: number } } {
+  const breakdown = {
+    base: config.baseWeight,
+    rating: 0,
+    relevance: 0,
+    recency: 0
+  };
+  
+  // Rating contribution (per star above 3)
+  const starsAbove3 = Math.max(0, (review.rating || 3) - 3);
+  breakdown.rating = starsAbove3 * config.ratingMultiplier;
+  
+  // Relevance contribution (from semantic search)
+  breakdown.relevance = (review.relevance_score || 0.5) * config.relevanceMultiplier;
+  
+  // Recency adjustment
+  if (config.recencyDecay.enabled && review.created_at) {
+    const reviewDate = new Date(review.created_at);
+    const monthsOld = (Date.now() - reviewDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+    
+    if (monthsOld < config.recencyDecay.freshThresholdMonths) {
+      // Fresh review bonus
+      breakdown.recency = config.recencyDecay.freshBonus;
+    } else {
+      // Decay for older reviews
+      const decay = Math.min(
+        monthsOld * config.recencyDecay.decayPerMonth,
+        config.recencyDecay.maxDecay
+      );
+      breakdown.recency = -decay;
+    }
+  }
+  
+  // Calculate total, capped
+  let total = breakdown.base + breakdown.rating + breakdown.relevance + breakdown.recency;
+  total = Math.min(total, config.maxContributionPerReview);
+  
+  return { score: total, breakdown };
+}
+
+/**
+ * Score user history (Phase 2 NEW)
+ * 
+ * ChatGPT Guardrail #3: Returns rejection with priority for single-rejection logic
+ */
+function scoreUserHistory(
+  productName: string,
+  productBrand: string | null,
+  userContext: {
+    currentProducts: string[];
+    stoppedProducts?: string[];
+    lovedBrands?: string[];
+    activeCategories?: string[];
+  },
+  category: string | undefined,
+  config: typeof UNIFIED_SCORING_CONFIG.userHistory
+): { 
+  score: number; 
+  shouldReject: boolean; 
+  rejectionType?: string;
+  rejectionPriority?: number;
+  reason?: string;
+  breakdown: { alreadyOwns: number; previouslyUsed: number; brandLoyalty: number; categoryFamiliarity: number }
+} {
+  const breakdown = {
+    alreadyOwns: 0,
+    previouslyUsed: 0,
+    brandLoyalty: 0,
+    categoryFamiliarity: 0
+  };
+  
+  let shouldReject = false;
+  let rejectionType: string | undefined;
+  let rejectionPriority: number | undefined;
+  let reason: string | undefined;
+  
+  const normalizedProduct = productName.toLowerCase();
+  
+  // Check if already owns
+  if (userContext.currentProducts.some(p => p.toLowerCase() === normalizedProduct)) {
+    breakdown.alreadyOwns = config.currentlyOwns.penalty;
+    shouldReject = true;
+    rejectionType = config.currentlyOwns.rejectionType;
+    rejectionPriority = REJECTION_PRIORITY[rejectionType];
+    reason = 'Already in your collection';
+  }
+  
+  // Check if previously used and stopped
+  if (!shouldReject && userContext.stoppedProducts?.some(p => p.toLowerCase().includes(normalizedProduct))) {
+    breakdown.previouslyUsed = config.previouslyUsed.penalty;
+    reason = 'Previously used and stopped';
+    // Note: Not rejecting, just penalizing with warning
+  }
+  
+  // Brand loyalty bonus
+  if (!shouldReject && productBrand && userContext.lovedBrands) {
+    const brandLower = productBrand.toLowerCase();
+    const lovedCount = userContext.lovedBrands.filter(b => b.toLowerCase() === brandLower).length;
+    
+    if (lovedCount >= config.brandLoyalty.minLovedItems) {
+      breakdown.brandLoyalty = config.brandLoyalty.bonus;
+    }
+  }
+  
+  // Category familiarity bonus
+  if (!shouldReject && category && userContext.activeCategories?.includes(category)) {
+    breakdown.categoryFamiliarity = config.categoryFamiliarity.bonus;
+  }
+  
+  // Calculate total and cap
+  let score = breakdown.alreadyOwns + breakdown.previouslyUsed + breakdown.brandLoyalty + breakdown.categoryFamiliarity;
+  score = Math.min(score, config.maxTotalContribution);
+  
+  return { score, shouldReject, rejectionType, rejectionPriority, reason, breakdown };
+}
+
+/**
+ * Check if skin types are complementary (Phase 2 NEW)
+ */
+function isComplementarySkinType(userType: string, productTypes: string[]): boolean {
+  const complementaryMap: Record<string, string[]> = {
+    'oily': ['combination', 'normal'],
+    'dry': ['normal', 'sensitive'],
+    'combination': ['oily', 'normal'],
+    'sensitive': ['dry', 'normal'],
+    'normal': ['oily', 'dry', 'combination', 'sensitive']
+  };
+  
+  const complementary = complementaryMap[userType.toLowerCase()] || [];
+  return productTypes.some(t => complementary.includes(t.toLowerCase()));
+}
+
+/**
+ * Score constraint matching (Phase 2 NEW)
+ * 
+ * ChatGPT Guardrail #3: Returns rejection with priority for single-rejection logic
+ */
+function scoreConstraintMatch(
+  productName: string,
+  productAttributes: string[],
+  userConstraints: string[],
+  userSkinType: string | undefined,
+  productForSkinTypes: string[] | undefined,
+  config: typeof UNIFIED_SCORING_CONFIG.constraints
+): { 
+  score: number; 
+  shouldReject: boolean;
+  rejectionType?: string;
+  rejectionPriority?: number;
+  violationReason?: string;
+  breakdown: { violation: number; exactMatch: number; partialMatch: number; skinTypeMatch: number }
+} {
+  const breakdown = {
+    violation: 0,
+    exactMatch: 0,
+    partialMatch: 0,
+    skinTypeMatch: 0
+  };
+  
+  const productLower = productName.toLowerCase();
+  
+  // Check for violations
+  for (const constraint of userConstraints) {
+    const constraintLower = constraint.toLowerCase();
+    
+    // Check if constraint is an "avoid" type
+    if (constraintLower.startsWith('avoid ')) {
+      const avoidTerm = constraintLower.replace('avoid ', '');
+      if (productLower.includes(avoidTerm) || 
+          productAttributes.some(a => a.toLowerCase().includes(avoidTerm))) {
+        breakdown.violation = config.violation.penalty;
+        return {
+          score: config.violation.penalty,
+          shouldReject: true,
+          rejectionType: config.violation.rejectionType,
+          rejectionPriority: REJECTION_PRIORITY[config.violation.rejectionType],
+          violationReason: `Contains ${avoidTerm} (user constraint)`,
+          breakdown
+        };
+      }
+    }
+    
+    // Check direct constraint match
+    if (productLower.includes(constraintLower) || 
+        productAttributes.some(a => a.toLowerCase().includes(constraintLower))) {
+      breakdown.violation = config.violation.penalty;
+      return {
+        score: config.violation.penalty,
+        shouldReject: true,
+        rejectionType: config.violation.rejectionType,
+        rejectionPriority: REJECTION_PRIORITY[config.violation.rejectionType],
+        violationReason: `Contains ${constraint} (user constraint)`,
+        breakdown
+      };
+    }
+    
+    // Check for positive matches ("prefer X")
+    if (constraintLower.startsWith('prefer ')) {
+      const preferTerm = constraintLower.replace('prefer ', '');
+      if (productLower.includes(preferTerm) || 
+          productAttributes.some(a => a.toLowerCase().includes(preferTerm))) {
+        breakdown.exactMatch += config.matchBonus.exactMatch;
+      }
+    }
+  }
+  
+  // Skin type matching
+  if (config.skinTypeMatch.enabled && userSkinType && productForSkinTypes?.length) {
+    const userSkinLower = userSkinType.toLowerCase();
+    if (productForSkinTypes.some(s => s.toLowerCase() === userSkinLower)) {
+      breakdown.skinTypeMatch = config.skinTypeMatch.exactMatch;
+    } else if (isComplementarySkinType(userSkinType, productForSkinTypes)) {
+      breakdown.skinTypeMatch = config.skinTypeMatch.complementary;
+    }
+  }
+  
+  // Calculate total and cap
+  let score = breakdown.exactMatch + breakdown.partialMatch + breakdown.skinTypeMatch;
+  score = Math.min(score, config.maxTotalContribution);
+  
+  return { score, shouldReject: false, breakdown };
+}
+
+/**
+ * Select strongest rejection (ChatGPT Guardrail #3)
+ * Only store the single strongest rejection reason
+ */
+function selectStrongestRejection(
+  rejections: Array<{ type: string; reason: string; priority: number }>
+): { type: string; reason: string } | null {
+  if (rejections.length === 0) return null;
+  
+  // Sort by priority ascending (lower = higher priority)
+  rejections.sort((a, b) => a.priority - b.priority);
+  
+  return { type: rejections[0].type, reason: rejections[0].reason };
+}
+
+/**
+ * Build score breakdown for transparency (Phase 2 NEW)
+ */
+function buildScoreBreakdown(
+  platformScore: { total: number; reviewCount: number; avgRating: number; recencyAdjustment: number },
+  similarUserScore: { total: number; userCount: number; avgSignalStrength: number; negativeOverride: boolean },
+  userHistoryScore: { total: number; brandLoyalty: number; categoryFamiliarity: number; previouslyUsedPenalty: number },
+  constraintScore: { total: number; matchCount: number; skinTypeMatch: boolean }
+): ScoreBreakdown {
+  // Check for dominance violation (lower priority source > higher priority source)
+  let dominanceViolation = false;
+  if (similarUserScore.userCount >= 2 && platformScore.total > similarUserScore.total) {
+    dominanceViolation = true;
+    console.log('[buildScoreBreakdown] Warning: Platform score exceeds similar-user score when similar users present');
+  }
+  
+  const rawTotal = platformScore.total + similarUserScore.total + userHistoryScore.total + constraintScore.total;
+  const cappedTotal = Math.min(rawTotal, UNIFIED_SCORING_CONFIG.global.maxTotalScore);
+  
+  return {
+    platformReview: {
+      total: platformScore.total,
+      reviewCount: platformScore.reviewCount,
+      avgRating: platformScore.avgRating,
+      recencyAdjustment: platformScore.recencyAdjustment,
+      cappedAt: platformScore.total >= UNIFIED_SCORING_CONFIG.platformReview.maxTotalContribution 
+        ? UNIFIED_SCORING_CONFIG.platformReview.maxTotalContribution : null
+    },
+    similarUser: {
+      total: similarUserScore.total,
+      userCount: similarUserScore.userCount,
+      avgSignalStrength: similarUserScore.avgSignalStrength,
+      negativeOverride: similarUserScore.negativeOverride,
+      recencyAdjustment: 0,  // TODO: Implement similar-user recency decay
+      cappedAt: similarUserScore.total >= UNIFIED_SCORING_CONFIG.similarUser.maxSimilarUserScorePerProduct
+        ? UNIFIED_SCORING_CONFIG.similarUser.maxSimilarUserScorePerProduct : null
+    },
+    userHistory: {
+      total: userHistoryScore.total,
+      brandLoyalty: userHistoryScore.brandLoyalty,
+      categoryFamiliarity: userHistoryScore.categoryFamiliarity,
+      previouslyUsedPenalty: userHistoryScore.previouslyUsedPenalty,
+      cappedAt: userHistoryScore.total >= UNIFIED_SCORING_CONFIG.userHistory.maxTotalContribution
+        ? UNIFIED_SCORING_CONFIG.userHistory.maxTotalContribution : null
+    },
+    constraintMatch: {
+      total: constraintScore.total,
+      matchCount: constraintScore.matchCount,
+      skinTypeMatch: constraintScore.skinTypeMatch,
+      cappedAt: constraintScore.total >= UNIFIED_SCORING_CONFIG.constraints.maxTotalContribution
+        ? UNIFIED_SCORING_CONFIG.constraints.maxTotalContribution : null
+    },
+    rawTotal,
+    cappedTotal,
+    dominanceViolation
+  };
+}
+
+/**
+ * Log scoring decision for debugging (Phase 2 NEW)
+ */
+function logScoringDecision(
+  product: string,
+  breakdown: ScoreBreakdown,
+  finalDecision: 'shortlisted' | 'rejected' | 'below_threshold'
+): void {
+  console.log('[SCORING_DECISION]', JSON.stringify({
+    timestamp: new Date().toISOString(),
+    product,
+    decision: finalDecision,
+    breakdown: {
+      platformReview: breakdown.platformReview.total.toFixed(3),
+      similarUser: breakdown.similarUser.total.toFixed(3),
+      userHistory: breakdown.userHistory.total.toFixed(3),
+      constraints: breakdown.constraintMatch.total.toFixed(3),
+      raw: breakdown.rawTotal.toFixed(3),
+      capped: breakdown.cappedTotal.toFixed(3)
+    },
+    negativeOverride: breakdown.similarUser.negativeOverride,
+    skinTypeMatch: breakdown.constraintMatch.skinTypeMatch,
+    dominanceViolation: breakdown.dominanceViolation
+  }));
+}
+
+// ============= RECOMMENDATION RESOLVER (Phase 2 Enhanced) =============
 
 /**
  * Detect product category from user query
@@ -1786,8 +2268,9 @@ async function resolveRecommendation(
     console.error('[resolveRecommendation] Error loading user context:', error);
   }
 
-  // Step 2: Get User's Stuff (ALWAYS runs)
+  // Step 2: Get User's Stuff (ALWAYS runs) - ENHANCED for Phase 2
   try {
+    // Get currently using items
     const userStuffResult = await getUserStuff(supabaseClient, input.userId, input.category);
     if (userStuffResult.success && userStuffResult.items) {
       output.userContext.currentProducts = userStuffResult.items
@@ -1796,16 +2279,66 @@ async function resolveRecommendation(
         .slice(0, 10);
       output.sourceSummary.userItems = output.userContext.currentProducts.length;
     }
+    
+    // Phase 2 NEW: Get stopped products for user history scoring
+    const stoppedItems = await supabaseClient
+      .from('user_stuff')
+      .select('entity:entity_id(name)')
+      .eq('user_id', input.userId)
+      .eq('status', 'stopped_using')
+      .limit(20);
+    
+    if (stoppedItems.data) {
+      output.userContext.stoppedProducts = stoppedItems.data
+        .map((i: any) => i.entity?.name)
+        .filter(Boolean);
+    }
+    
+    // Phase 2 NEW: Get loved brands (items with high sentiment or 'favorite' status)
+    const lovedItems = await supabaseClient
+      .from('user_stuff')
+      .select('entity:entity_id(name, metadata)')
+      .eq('user_id', input.userId)
+      .or('status.eq.favorite,sentiment_score.gte.4')
+      .limit(30);
+    
+    if (lovedItems.data) {
+      // Extract brand names from loved items (would need entity.metadata.brand)
+      output.userContext.lovedBrands = lovedItems.data
+        .map((i: any) => i.entity?.metadata?.brand)
+        .filter(Boolean);
+    }
+    
+    // Set active categories
+    output.userContext.activeCategories = input.category ? [input.category] : [];
+    
   } catch (error) {
     console.error('[resolveRecommendation] Error loading user stuff:', error);
   }
 
-  // Step 3: Search Platform Reviews (ALWAYS runs for product queries)
+  /**
+   * ARCHITECTURE INVARIANT (Phase 2 - ChatGPT Final #1):
+   * - Candidate generation (Steps 3-4) introduces products into productScores
+   * - Scoring functions (Steps 4.5-5) ONLY adjust weights of existing candidates
+   * - No scoring function may introduce new candidates
+   * - This separation enables clean Phase 3 web grounding
+   */
+  
+  // Step 3: Search Platform Reviews with Enhanced Scoring (Phase 2)
   const productScores = new Map<string, {
     score: number; 
     reasons: string[]; 
     sources: ResolverProductSource[];
     entityId?: string;
+    signals?: ResolverShortlistItem['signals'];
+    // Phase 2 NEW: Per-source tracking for score breakdown
+    platformReviewScore: { total: number; reviewCount: number; avgRating: number; recencyAdjustment: number };
+    similarUserScore: { total: number; userCount: number; avgSignalStrength: number; negativeOverride: boolean };
+    userHistoryScore: { total: number; brandLoyalty: number; categoryFamiliarity: number; previouslyUsedPenalty: number };
+    constraintScore: { total: number; matchCount: number; skinTypeMatch: boolean };
+    productBrand?: string;
+    productAttributes?: string[];
+    productForSkinTypes?: string[];
   }>();
 
   try {
@@ -1817,17 +2350,37 @@ async function resolveRecommendation(
         const productName = review.entity?.name;
         if (!productName) continue;
         
+        // Phase 2: Use enhanced platform review scoring with recency decay
+        const reviewScore = scorePlatformReview(
+          {
+            rating: review.rating || 3,
+            relevance_score: review.relevance_score || 0.5,
+            created_at: review.created_at
+          },
+          UNIFIED_SCORING_CONFIG.platformReview
+        );
+        
         const existing = productScores.get(productName) || {
           score: 0, 
           reasons: [], 
           sources: [],
-          entityId: review.entity?.id
+          entityId: review.entity?.id,
+          platformReviewScore: { total: 0, reviewCount: 0, avgRating: 0, recencyAdjustment: 0 },
+          similarUserScore: { total: 0, userCount: 0, avgSignalStrength: 0, negativeOverride: false },
+          userHistoryScore: { total: 0, brandLoyalty: 0, categoryFamiliarity: 0, previouslyUsedPenalty: 0 },
+          constraintScore: { total: 0, matchCount: 0, skinTypeMatch: false },
+          productBrand: undefined,
+          productAttributes: [],
+          productForSkinTypes: []
         };
         
-        // Platform review scoring: rating * 0.1 + relevance bonus
-        const ratingScore = (review.rating || 3) * 0.08;
-        const relevanceScore = (review.relevance_score || 0.5) * 0.15;
-        existing.score += ratingScore + relevanceScore;
+        existing.score += reviewScore.score;
+        existing.platformReviewScore.total += reviewScore.score;
+        existing.platformReviewScore.reviewCount += 1;
+        existing.platformReviewScore.avgRating = 
+          ((existing.platformReviewScore.avgRating * (existing.platformReviewScore.reviewCount - 1)) + (review.rating || 3)) 
+          / existing.platformReviewScore.reviewCount;
+        existing.platformReviewScore.recencyAdjustment += reviewScore.breakdown.recency;
         
         // Add reason if we don't have too many already
         if (existing.reasons.length < 2) {
@@ -1836,10 +2389,17 @@ async function resolveRecommendation(
         existing.sources.push({ type: 'platform_review', count: 1 });
         existing.entityId = review.entity?.id;
         
+        // Cap platform review contribution (Phase 2 Guardrail #2)
+        if (existing.platformReviewScore.total > UNIFIED_SCORING_CONFIG.platformReview.maxTotalContribution) {
+          const excess = existing.platformReviewScore.total - UNIFIED_SCORING_CONFIG.platformReview.maxTotalContribution;
+          existing.score -= excess;
+          existing.platformReviewScore.total = UNIFIED_SCORING_CONFIG.platformReview.maxTotalContribution;
+        }
+        
         productScores.set(productName, existing);
       }
       
-      console.log('[resolveRecommendation] Found', reviewsResult.results.length, 'platform reviews');
+      console.log('[resolveRecommendation] Found', reviewsResult.results.length, 'platform reviews with recency scoring');
     }
   } catch (error) {
     console.error('[resolveRecommendation] Error searching reviews:', error);
@@ -1943,27 +2503,87 @@ async function resolveRecommendation(
   // Update source summary with distinct users count
   output.sourceSummary.distinctUsersWithSignals = totalDistinctUsersWithSignals;
 
-  // Step 5: Apply Constraint Filters and Build Shortlist (DETERMINISTIC)
+  // Step 4.5: Apply User History Scoring (Phase 2 NEW)
   for (const [product, data] of productScores.entries()) {
-    const constraintViolation = checkConstraintViolation(product, input.constraints);
+    const historyScore = scoreUserHistory(
+      product,
+      data.productBrand || null,
+      output.userContext,
+      input.category,
+      UNIFIED_SCORING_CONFIG.userHistory
+    );
     
-    if (constraintViolation) {
+    if (historyScore.shouldReject) {
       output.rejected.push({
         product,
-        reason: constraintViolation
+        reason: historyScore.reason || 'User history conflict',
+        rejectionType: historyScore.rejectionType as any,
+        priority: historyScore.rejectionPriority
+      });
+      productScores.delete(product);
+    } else {
+      data.score += historyScore.score;
+      data.userHistoryScore = {
+        total: historyScore.score,
+        brandLoyalty: historyScore.breakdown.brandLoyalty,
+        categoryFamiliarity: historyScore.breakdown.categoryFamiliarity,
+        previouslyUsedPenalty: historyScore.breakdown.previouslyUsed
+      };
+    }
+  }
+
+  // Step 5: Apply Constraint Scoring and Build Shortlist (Phase 2 ENHANCED)
+  for (const [product, data] of productScores.entries()) {
+    const constraintScore = scoreConstraintMatch(
+      product,
+      data.productAttributes || [],
+      input.constraints,
+      output.userContext.skinType,
+      data.productForSkinTypes,
+      UNIFIED_SCORING_CONFIG.constraints
+    );
+    
+    if (constraintScore.shouldReject) {
+      output.rejected.push({
+        product,
+        reason: constraintScore.violationReason || 'Constraint violation',
+        rejectionType: constraintScore.rejectionType as any,
+        priority: constraintScore.rejectionPriority
       });
     } else {
-      // Add constraint match bonus (no violations = good)
-      const finalScore = data.score + 0.1;
+      data.score += constraintScore.score;
+      data.constraintScore = {
+        total: constraintScore.score,
+        matchCount: constraintScore.breakdown.exactMatch > 0 ? 1 : 0,
+        skinTypeMatch: constraintScore.breakdown.skinTypeMatch > 0
+      };
       
-      output.shortlist.push({
-        product,
-        entityId: data.entityId,
-        score: finalScore,
-        reason: data.reasons.length > 0 ? data.reasons.join('; ') : 'Matches your criteria',
-        signals: data.signals,  // NEW: Include factual signals
-        sources: aggregateSources(data.sources)
-      });
+      // Apply global cap
+      const cappedScore = Math.min(data.score, UNIFIED_SCORING_CONFIG.global.maxTotalScore);
+      
+      // Only add if meets minimum threshold
+      if (cappedScore >= UNIFIED_SCORING_CONFIG.global.minScoreForShortlist) {
+        // Build score breakdown for transparency
+        const scoreBreakdown = buildScoreBreakdown(
+          data.platformReviewScore,
+          data.similarUserScore || { total: 0, userCount: 0, avgSignalStrength: 0, negativeOverride: false },
+          data.userHistoryScore,
+          data.constraintScore
+        );
+        
+        // Log scoring decision
+        logScoringDecision(product, scoreBreakdown, 'shortlisted');
+        
+        output.shortlist.push({
+          product,
+          entityId: data.entityId,
+          score: cappedScore,
+          reason: data.reasons.length > 0 ? data.reasons.join('; ') : 'Matches your criteria',
+          signals: data.signals,
+          scoreBreakdown,
+          sources: aggregateSources(data.sources)
+        });
+      }
     }
   }
 
@@ -1980,10 +2600,25 @@ async function resolveRecommendation(
   output.confidence = confidence;
   output.confidenceLabel = label;
 
-  // Step 8: Handle Insufficient Data (ChatGPT Guardrail #1)
-  if (output.shortlist.length === 0 && output.confidence < 0.3) {
+  // Step 8: Handle Insufficient Data (Phase 2 ENHANCED - ChatGPT Final #2)
+  const insufficientDataConfig = UNIFIED_SCORING_CONFIG.insufficientData;
+  const hasInsufficientData = 
+    output.shortlist.length < insufficientDataConfig.minShortlistItems ||
+    output.confidence < insufficientDataConfig.minConfidence ||
+    (output.sourceSummary.similarUsers < insufficientDataConfig.minSimilarUsers &&
+     output.sourceSummary.platformReviews < insufficientDataConfig.minPlatformReviews);
+
+  if (hasInsufficientData) {
     output.state = 'insufficient_data';
-    output.fallbackMessage = "I don't have enough trusted data yet to recommend confidently in this category. Would you like me to search broader sources?";
+    
+    // Generate specific message based on what's missing
+    if (output.sourceSummary.similarUsers < 2 && output.sourceSummary.platformReviews < 3) {
+      output.fallbackMessage = "I don't have enough data from users like you or from Common Groundz reviews in this category yet. Would you like me to search broader sources?";
+    } else if (output.sourceSummary.similarUsers < 2) {
+      output.fallbackMessage = "I found some platform reviews, but not enough data from users with similar preferences. Would you like me to search broader sources?";
+    } else {
+      output.fallbackMessage = "I don't have enough trusted data yet to recommend confidently. Would you like me to search broader sources?";
+    }
     
     logResolverSnapshot(input, output, Date.now() - startTime, contributingUsersLog);
     return output;
