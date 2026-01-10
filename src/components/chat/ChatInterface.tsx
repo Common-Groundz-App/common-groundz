@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Check } from 'lucide-react';
+import { Send, Loader2, Check, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
@@ -795,6 +795,14 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                         {message.confidenceLabel === 'limited' && (
                           <><span>🌐</span> Based on broader research</>
                         )}
+                      </div>
+                    )}
+                    
+                    {/* Phase 3: Web fallback indicator */}
+                    {message.role === 'assistant' && message.resolverState === 'web_fallback' && (
+                      <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        <Globe className="h-3 w-3" />
+                        <span>Some results from broader web research</span>
                       </div>
                     )}
                     

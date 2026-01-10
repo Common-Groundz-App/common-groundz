@@ -211,6 +211,37 @@ const UNIFIED_SCORING_CONFIG = {
     minPlatformReviews: 3,
     minConfidence: 0.30,
     minShortlistItems: 1
+  },
+  
+  // ============= WEB FALLBACK CONFIGURATION (Phase 3) =============
+  webFallback: {
+    // Trigger conditions
+    triggerConditions: {
+      confidenceBelow: 0.30,
+      shortlistBelow: 2,
+      requireBothConditions: true
+    },
+    
+    // Scoring for web results (Guardrail #1)
+    scoring: {
+      maxScorePerWebResult: 0.35,
+      maxTotalWebContribution: 0.40,  // GUARDRAIL: Cap total web influence
+      baseScore: 0.20,
+      maxWebResultsToAdd: 3
+    },
+    
+    // Search configuration
+    search: {
+      yearContext: true,
+      categoryPrefix: true,
+      excludeExistingProducts: true
+    },
+    
+    // Timeout protection (Guardrail #6)
+    timeout: {
+      maxMs: 5000,
+      fallbackOnTimeout: true
+    }
   }
 };
 
@@ -277,6 +308,9 @@ interface ResolverShortlistItem {
   scoreBreakdown?: ScoreBreakdown;
   
   sources: ResolverProductSource[];
+  
+  // Phase 3: Web fallback verification (Guardrail #2)
+  verified: boolean;
 }
 
 // Enhanced rejected item with priority (ChatGPT Guardrail #3)
@@ -304,6 +338,9 @@ interface ResolverSourceSummary {
   userItems: number;
   webSearchUsed: boolean;
   distinctUsersWithSignals?: number;  // Phase 1
+  // Phase 3: Web fallback tracking (Guardrail #5)
+  webSearchAttempted: boolean;
+  webSearchFailureReason?: string;
 }
 
 interface ResolverOutput {
@@ -2193,13 +2230,22 @@ function logResolverSnapshot(
     shortlistProducts: output.shortlist.map(p => ({
       product: p.product,
       score: p.score,
-      signals: p.signals  // NEW: Include factual signals
+      verified: p.verified,  // Phase 3: Include verification status
+      signals: p.signals
     })),
     rejectedCount: output.rejected.length,
     confidence: output.confidence.toFixed(2),
     confidenceLabel: output.confidenceLabel,
     sources: output.sourceSummary,
-    // NEW: Per-user contribution breakdown (ChatGPT Refinement #4)
+    // Phase 3: Web fallback details
+    webFallback: {
+      attempted: output.sourceSummary.webSearchAttempted,
+      used: output.sourceSummary.webSearchUsed,
+      failureReason: output.sourceSummary.webSearchFailureReason,
+      productsAdded: output.shortlist.filter(p => !p.verified).length,
+      confidenceAtTrigger: output.confidence
+    },
+    // Per-user contribution breakdown (ChatGPT Refinement #4)
     contributingUsers: contributingUsers?.map(u => ({
       id: u.userId.substring(0, 8) + '...',
       strength: u.signalStrength.toFixed(2),
@@ -2251,7 +2297,9 @@ async function resolveRecommendation(
       platformReviews: 0, 
       similarUsers: 0, 
       userItems: 0, 
-      webSearchUsed: false 
+      webSearchUsed: false,
+      webSearchAttempted: false,
+      webSearchFailureReason: undefined
     }
   };
 
@@ -2581,7 +2629,8 @@ async function resolveRecommendation(
           reason: data.reasons.length > 0 ? data.reasons.join('; ') : 'Matches your criteria',
           signals: data.signals,
           scoreBreakdown,
-          sources: aggregateSources(data.sources)
+          sources: aggregateSources(data.sources),
+          verified: true  // Phase 3: Platform items are verified (Guardrail #2)
         });
       }
     }
@@ -2624,17 +2673,293 @@ async function resolveRecommendation(
     return output;
   }
 
-  // Step 9: Web Fallback Decision (only if confidence too low)
-  if (output.confidence < 0.3 && output.shortlist.length < 2) {
-    output.state = 'web_fallback';
-    output.sourceSummary.webSearchUsed = true;
-    output.fallbackMessage = 'Limited Common Groundz data - supplementing with broader research.';
+  /**
+   * PHASE 3 INVARIANT (Guardrail #4):
+   * Web fallback supplements missing candidates but NEVER increases trust,
+   * confidence, or overrides platform dominance.
+   * 
+   * - Confidence was computed in Step 7 and is FROZEN (Guardrail #3)
+   * - Web results capped at maxTotalWebContribution (Guardrail #1)
+   * - All web items marked verified: false (Guardrail #2)
+   * - Verified items always rank above unverified (Guardrail #7)
+   */
+  
+  // Step 9: Web Fallback Decision (Phase 3 - Full Implementation)
+  const webConfig = UNIFIED_SCORING_CONFIG.webFallback;
+  const shouldTriggerWebFallback = 
+    output.confidence < webConfig.triggerConditions.confidenceBelow &&
+    output.shortlist.length < webConfig.triggerConditions.shortlistBelow;
+
+  if (shouldTriggerWebFallback) {
+    console.log('[resolveRecommendation] Low confidence, triggering web fallback search');
+    output.sourceSummary.webSearchAttempted = true;
+    
+    const webResults = await webFallbackSearch(
+      input.query,
+      input.category || 'product',
+      output.shortlist.map(p => p.product),
+      input.constraints,
+      webConfig
+    );
+    
+    if (webResults.success && webResults.products.length > 0) {
+      output.state = 'web_fallback';
+      output.sourceSummary.webSearchUsed = true;
+      output.fallbackMessage = 'Limited Common Groundz data - supplementing with broader web research.';
+      
+      // Guardrail #1: Track total web contribution
+      let totalWebContribution = 0;
+      
+      for (const webProduct of webResults.products) {
+        // Check if adding this would exceed total web cap
+        const productScore = Math.min(webProduct.score, webConfig.scoring.maxScorePerWebResult);
+        if (totalWebContribution + productScore > webConfig.scoring.maxTotalWebContribution) {
+          console.log('[resolveRecommendation] Skipping web product, would exceed total cap:', webProduct.name);
+          break;
+        }
+        
+        totalWebContribution += productScore;
+        
+        // Guardrail #2: Mark as unverified
+        output.shortlist.push({
+          product: webProduct.name,
+          entityId: undefined,
+          score: productScore,
+          reason: webProduct.reason,
+          signals: undefined,
+          scoreBreakdown: undefined,
+          sources: [{ type: 'web', count: 1 }],
+          verified: false  // GUARDRAIL: Web results are not verified
+        });
+      }
+      
+      // Guardrail #7: Verified items ALWAYS rank above unverified
+      output.shortlist.sort((a, b) => {
+        if (a.verified !== b.verified) {
+          return a.verified ? -1 : 1; // verified always wins
+        }
+        return b.score - a.score;
+      });
+      output.shortlist = output.shortlist.slice(0, 5);
+      
+      console.log('[resolveRecommendation] Web fallback added products:', webResults.products.length);
+    } else {
+      // Web search failed or returned nothing
+      output.sourceSummary.webSearchUsed = false;
+      output.sourceSummary.webSearchFailureReason = webResults.failureReason;
+      
+      if (webResults.timedOut) {
+        output.state = 'insufficient_data';
+        output.fallbackMessage = "I couldn't complete the search in time. Could you try again or tell me more about what you're looking for?";
+      } else {
+        output.state = 'insufficient_data';
+        output.fallbackMessage = "I couldn't find enough trusted data for this recommendation. Could you tell me more about what you're looking for?";
+      }
+    }
+  } else {
+    output.sourceSummary.webSearchAttempted = false;
+    output.sourceSummary.webSearchUsed = false;
   }
 
   // Step 10: Log Resolver Snapshot (ChatGPT Refinement #4 - with per-user breakdown)
   logResolverSnapshot(input, output, Date.now() - startTime, contributingUsersLog);
 
   return output;
+}
+
+// ============= PHASE 3: WEB FALLBACK SEARCH =============
+
+interface WebFallbackResult {
+  success: boolean;
+  products: Array<{
+    name: string;
+    reason: string;
+    url?: string;
+    score: number;
+  }>;
+  searchQuery: string;
+  sourcesCount: number;
+  timedOut: boolean;
+  failureReason?: string;
+}
+
+/**
+ * Phase 3: Web Fallback Search
+ * Uses Gemini's google_search grounding to find products
+ * Only called when platform confidence is too low
+ * 
+ * INVARIANT: This function GENERATES candidates, not scores them.
+ * Web results are added to shortlist with fixed reduced scoring.
+ */
+async function webFallbackSearch(
+  query: string,
+  category: string,
+  existingProducts: string[],
+  userConstraints: string[],
+  config: typeof UNIFIED_SCORING_CONFIG.webFallback
+): Promise<WebFallbackResult> {
+  const startTime = Date.now();
+  const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+  
+  if (!GEMINI_API_KEY) {
+    console.error('[webFallbackSearch] Missing GEMINI_API_KEY');
+    return { 
+      success: false, 
+      products: [], 
+      searchQuery: '', 
+      sourcesCount: 0, 
+      timedOut: false,
+      failureReason: 'Missing API key'
+    };
+  }
+  
+  // Build search query with year context and category
+  const currentYear = new Date().getFullYear();
+  const searchQuery = config.search.categoryPrefix 
+    ? `best ${category} ${query} reviews ${currentYear} ${currentYear - 1}`
+    : `best ${query} reviews ${currentYear}`;
+  
+  console.log('[webFallbackSearch] Starting web search:', { query: searchQuery, category });
+  
+  // Timeout protection (Guardrail #6)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), config.timeout.maxMs);
+  
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{
+            role: 'user',
+            parts: [{
+              text: `Find the top 5 ${category} products for: "${query}".
+              
+Requirements:
+- Return ONLY product names, one per line
+- Focus on products with good reviews
+- Exclude: ${existingProducts.join(', ') || 'none'}
+- User constraints to respect: ${userConstraints.join(', ') || 'none'}
+
+Return format:
+1. Product Name - Brief reason
+2. Product Name - Brief reason
+...`
+            }]
+          }],
+          tools: [{ google_search: {} }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 500
+          }
+        })
+      }
+    );
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.error('[webFallbackSearch] Gemini API error:', response.status);
+      return { 
+        success: false, 
+        products: [], 
+        searchQuery, 
+        sourcesCount: 0, 
+        timedOut: false,
+        failureReason: `API error: ${response.status}`
+      };
+    }
+    
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const groundingMeta = data.candidates?.[0]?.groundingMetadata;
+    
+    // Parse product names from response
+    const products: WebFallbackResult['products'] = [];
+    const lines = content.split('\n').filter((l: string) => l.trim());
+    
+    for (const line of lines) {
+      const match = line.match(/^\d*[.\-\)]*\s*\*?\*?([A-Z][^-:]+?)\*?\*?\s*[-:]\s*(.+)/i);
+      if (match) {
+        const productName = match[1].trim().replace(/\*\*/g, '');
+        const reason = match[2].trim();
+        
+        // Skip if already in existing products
+        if (config.search.excludeExistingProducts && 
+            existingProducts.some(p => p.toLowerCase().includes(productName.toLowerCase()))) {
+          continue;
+        }
+        
+        // Skip if violates user constraints
+        const violatesConstraint = userConstraints.some(c => {
+          const constraintLower = c.toLowerCase();
+          if (constraintLower.startsWith('avoid ')) {
+            const avoidTerm = constraintLower.replace('avoid ', '');
+            return productName.toLowerCase().includes(avoidTerm);
+          }
+          return productName.toLowerCase().includes(constraintLower);
+        });
+        
+        if (violatesConstraint) continue;
+        
+        products.push({
+          name: productName,
+          reason: `Web research: ${reason}`,
+          score: config.scoring.baseScore
+        });
+        
+        if (products.length >= config.scoring.maxWebResultsToAdd) break;
+      }
+    }
+    
+    // Extract source URLs from grounding metadata
+    let sourcesCount = 0;
+    if (groundingMeta?.groundingChunks?.length > 0) {
+      sourcesCount = groundingMeta.groundingChunks.length;
+    }
+    
+    console.log('[webFallbackSearch] Completed:', { 
+      productsFound: products.length, 
+      sourcesCount,
+      duration: Date.now() - startTime 
+    });
+    
+    return {
+      success: true,
+      products,
+      searchQuery,
+      sourcesCount,
+      timedOut: false
+    };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    // Check if it was a timeout
+    if (error.name === 'AbortError') {
+      console.warn('[webFallbackSearch] Timed out after', config.timeout.maxMs, 'ms');
+      return { 
+        success: false, 
+        products: [], 
+        searchQuery, 
+        sourcesCount: 0, 
+        timedOut: true,
+        failureReason: 'Timeout'
+      };
+    }
+    
+    console.error('[webFallbackSearch] Error:', error);
+    return { 
+      success: false, 
+      products: [], 
+      searchQuery, 
+      sourcesCount: 0, 
+      timedOut: false,
+      failureReason: error.message || 'Unknown error'
+    };
+  }
 }
 
 /**
@@ -2663,6 +2988,7 @@ function buildResolverExplanationPrompt(
 === SHORTLISTED PRODUCTS (with factual signals) ===
 ${output.shortlist.length > 0 ? output.shortlist.map((p, i) => {
   const sig = p.signals;
+  const verifiedStatus = p.verified ? '✓ Platform verified' : '🌐 Web research (unverified)';
   const signalLines = sig ? `
    Signals:
    - Platform reviews: ${sig.platformReviews} (avg ${sig.avgPlatformRating.toFixed(1)}/5)
@@ -2674,14 +3000,14 @@ ${output.shortlist.length > 0 ? output.shortlist.map((p, i) => {
    - Rating improving over time: ${sig.ratingTrajectoryPositive}
    ${sig.negativeOverrideApplied ? '⚠️ WARNING: More users stopped than continued using this product' : ''}` : '';
   
-  return `${i+1}. ${p.product} (score: ${p.score.toFixed(2)})
+  return `${i+1}. ${p.product} (score: ${p.score.toFixed(2)}) [${verifiedStatus}]
    - Why: ${p.reason}
-   - Sources: ${p.sources.map(s => `${s.type}: ${s.count}`).join(', ')}${signalLines}`;
+   - Sources: ${p.sources.map(s => s.type + ': ' + s.count).join(', ')}${signalLines}`;
 }).join('\n\n') : 'No products matched the criteria from Common Groundz data.'}
 
 ${output.rejected.length > 0 ? `
 === EXCLUDED (due to user constraints) ===
-${output.rejected.map(p => `- ${p.product}: ${p.reason}`).join('\n')}
+${output.rejected.map(p => '- ' + p.product + ': ' + p.reason).join('\n')}
 ` : ''}
 
 === DATA SOURCES ===
@@ -2689,9 +3015,22 @@ ${output.rejected.map(p => `- ${p.product}: ${p.reason}`).join('\n')}
 - Similar users consulted: ${output.sourceSummary.similarUsers}
 - Users with outcome signals: ${output.sourceSummary.distinctUsersWithSignals || 0}
 - User's tracked items: ${output.sourceSummary.userItems}
-${output.sourceSummary.webSearchUsed ? `- Web research: Yes (${output.fallbackMessage})` : ''}
+${output.sourceSummary.webSearchUsed ? '- Web research: Yes (' + output.fallbackMessage + ')' : ''}
 
 === CONFIDENCE: ${confidenceText} ===
+
+${output.sourceSummary.webSearchUsed ? `
+=== WEB FALLBACK NOTICE ===
+Some recommendations come from broader web research because Common Groundz 
+doesn't have enough data in this category yet. Web-sourced products are 
+marked with [🌐 Web research (unverified)] and should be treated as less verified.
+
+When explaining web-sourced products:
+- Always prefix with "Based on broader research..."
+- Do NOT claim these are verified by Common Groundz users
+- Be honest that platform data is limited
+- Encourage users to share their experiences if they try these products
+` : ''}
 
 === CONVERT SIGNALS TO NATURAL LANGUAGE ===
 Use the factual signals above to explain recommendations naturally.
@@ -2712,7 +3051,10 @@ Examples:
 7. Convert the signals above to natural language explanations
 8. Be concise - the signals above are your ONLY source of truth
 9. If no products matched, acknowledge honestly and ask what they're looking for
-10. Start with a clear recommendation, not preamble`;
+10. Start with a clear recommendation, not preamble
+11. If any product has [🌐 Web research (unverified)], clearly state it's from web research, not platform data
+12. For web-sourced products, use phrases like "Based on broader research..." or "According to web reviews..."
+13. NEVER imply web results are as trusted as platform-verified recommendations`;
 }
 
 // ========== DETECTED PREFERENCE TYPES ==========
