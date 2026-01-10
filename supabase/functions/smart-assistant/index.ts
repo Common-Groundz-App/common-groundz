@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// ============= RECOMMENDATION RESOLVER TYPES (Phase 0) =============
+// ============= RECOMMENDATION RESOLVER TYPES (Phase 1 Enhanced) =============
 
 type ResolverState = 'success' | 'insufficient_data' | 'web_fallback';
 
@@ -24,11 +24,112 @@ interface ResolverProductSource {
   count: number;
 }
 
+// ============= PHASE 1: OUTCOME SIGNALS TYPES =============
+
+/**
+ * Outcome signals extracted from a single user's interaction with an entity
+ * These are pure, cacheable by (userId, entityId)
+ */
+interface OutcomeSignals {
+  usageDurationMonths: number;
+  stillUsing: boolean;
+  stoppedUsing: boolean;
+  hasTimeline: boolean;
+  timelineUpdates: number;
+  ratingTrajectory: 'improving' | 'declining' | 'stable';
+  latestRating: number;
+  signalStrength: number;  // 0 to 0.35, computed deterministically
+}
+
+/**
+ * A product candidate from similar users with aggregated signals
+ */
+interface CandidateProduct {
+  entityId: string;
+  entityName: string;
+  category: string;
+  recommendedByUsers: Array<{
+    userId: string;
+    signals: OutcomeSignals;
+    cappedContribution: number;  // max 0.35 per user
+  }>;
+  aggregatedSignals: {
+    totalUsers: number;
+    avgSignalStrength: number;
+    avgLatestRating: number;
+    stillUsingCount: number;
+    stoppedUsingCount: number;
+    hasTimelineCount: number;
+    distinctUsersWithSignals: number;
+  };
+}
+
+/**
+ * Scoring configuration for outcome-weighted signals
+ */
+const OUTCOME_SCORING_CONFIG = {
+  // Per-user caps (ChatGPT Refinement #1)
+  maxContributionPerUser: 0.35,
+  
+  // Total contribution caps (ChatGPT Add #2)
+  maxSimilarUserScorePerProduct: 0.60,
+  
+  // Minimum thresholds (ChatGPT Add #1 & #2)
+  minDistinctUsersForScoring: 2,
+  minDistinctUsersForBonus: 2,
+  
+  // Weights for signal calculation
+  weights: {
+    stillUsing: 0.25,
+    usageDurationPerMonth: 0.033,  // capped at 12 months = 0.40
+    maxUsageDurationMonths: 12,
+    hasTimeline: 0.15,
+    ratingImproving: 0.20,
+    ratingDeclining: -0.20,
+    ratingStable: 0.10,
+    stoppedUsing: -0.40
+  },
+  
+  // Negative override threshold (ChatGPT Add #3)
+  negativeOverride: {
+    minStoppedCount: 2,
+    penalty: -0.30,
+    triggerWhenStoppedGteStillUsing: true
+  },
+  
+  // Scoring weights
+  scoring: {
+    base: 0.10,
+    signalStrengthMultiplier: 0.25,
+    stillUsingPerUser: 0.05,
+    timelinePerUser: 0.03,
+    stoppedUsingPerUser: -0.08
+  },
+  
+  // Active user filter (My Addition #1)
+  activeWithinDays: 90
+};
+
+// Enhanced shortlist item with factual signals
 interface ResolverShortlistItem {
   product: string;
   entityId?: string;
-  reason: string;
+  reason: string;  // Kept for backward compat, but signals are primary
   score: number;
+  
+  // NEW: Factual signals (LLM converts to language)
+  signals?: {
+    platformReviews: number;
+    avgPlatformRating: number;
+    similarUsers: number;
+    stillUsingCount: number;
+    stoppedUsingCount: number;
+    avgUsageDurationMonths: number;
+    hasTimelineCount: number;
+    ratingTrajectoryPositive: number;
+    negativeOverrideApplied: boolean;
+  };
+  
   sources: ResolverProductSource[];
 }
 
@@ -50,6 +151,7 @@ interface ResolverSourceSummary {
   similarUsers: number;
   userItems: number;
   webSearchUsed: boolean;
+  distinctUsersWithSignals?: number;  // NEW for Phase 1
 }
 
 interface ResolverOutput {
@@ -61,6 +163,13 @@ interface ResolverOutput {
   confidenceLabel: 'high' | 'medium' | 'limited';
   sourceSummary: ResolverSourceSummary;
   fallbackMessage?: string;
+}
+
+// Type for contributing users log (ChatGPT Refinement #4)
+interface ContributingUserLog {
+  userId: string;
+  signalStrength: number;
+  products: string[];
 }
 
 // Centralized emoji list for section detection (prevents regex duplication bugs)
@@ -1100,7 +1209,382 @@ async function searchUserMemory(
   }
 }
 
-// ============= RECOMMENDATION RESOLVER (Phase 0) =============
+// ============= PHASE 1: OUTCOME SIGNAL FUNCTIONS =============
+
+/**
+ * Get rating trajectory from review updates
+ * Pure function - deterministic, cacheable
+ */
+async function getRatingTrajectory(
+  supabaseClient: any,
+  reviewId: string
+): Promise<'improving' | 'declining' | 'stable'> {
+  try {
+    const { data: updates } = await supabaseClient
+      .from('review_updates')
+      .select('rating')
+      .eq('review_id', reviewId)
+      .order('created_at', { ascending: true });
+    
+    if (!updates || updates.length < 2) return 'stable';
+    
+    // Filter out null ratings
+    const validRatings = updates.filter((u: any) => u.rating !== null);
+    if (validRatings.length < 2) return 'stable';
+    
+    const firstRating = validRatings[0].rating;
+    const lastRating = validRatings[validRatings.length - 1].rating;
+    
+    if (lastRating > firstRating) return 'improving';
+    if (lastRating < firstRating) return 'declining';
+    return 'stable';
+  } catch (error) {
+    console.error('[getRatingTrajectory] Error:', error);
+    return 'stable';
+  }
+}
+
+/**
+ * Extract outcome signals for a user's interaction with an entity
+ * 
+ * CRITICAL: This function MUST be:
+ * - Deterministic (same input → same output)
+ * - Side-effect free (no writes, no external calls)
+ * - Cacheable by (userId, entityId)
+ * 
+ * ChatGPT Refinement #3: Pure & Cacheable
+ */
+async function extractOutcomeSignals(
+  supabaseClient: any,
+  userId: string,
+  entityId: string,
+  category?: string
+): Promise<OutcomeSignals | null> {
+  try {
+    // 1. Query user_stuff for this user+entity
+    const { data: userStuff } = await supabaseClient
+      .from('user_stuff')
+      .select('status, started_using_at, stopped_using_at, entity_id, entity_type')
+      .eq('user_id', userId)
+      .eq('entity_id', entityId)
+      .maybeSingle();
+    
+    if (!userStuff) return null;
+    
+    // 2. Calculate usage duration
+    const startDate = userStuff.started_using_at ? new Date(userStuff.started_using_at) : null;
+    const endDate = userStuff.stopped_using_at ? new Date(userStuff.stopped_using_at) : new Date();
+    const usageDurationMonths = startDate 
+      ? Math.max(0, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)))
+      : 0;
+    
+    // 3. Determine usage status
+    const stillUsing = userStuff.status === 'currently_using';
+    const stoppedUsing = userStuff.status === 'stopped_using' || !!userStuff.stopped_using_at;
+    
+    // 4. Query reviews for timeline data
+    const { data: review } = await supabaseClient
+      .from('reviews')
+      .select('id, rating, latest_rating, has_timeline, timeline_count')
+      .eq('user_id', userId)
+      .eq('entity_id', entityId)
+      .maybeSingle();
+    
+    const hasTimeline = review?.has_timeline || false;
+    const timelineUpdates = review?.timeline_count || 0;
+    const latestRating = review?.latest_rating || review?.rating || 0;
+    
+    // 5. Get rating trajectory
+    const ratingTrajectory = review?.id 
+      ? await getRatingTrajectory(supabaseClient, review.id)
+      : 'stable';
+    
+    // 6. Calculate signal strength (DETERMINISTIC formula)
+    const weights = OUTCOME_SCORING_CONFIG.weights;
+    let rawSignalStrength = 0;
+    
+    // Usage duration contribution (capped at 12 months)
+    const cappedDuration = Math.min(usageDurationMonths, weights.maxUsageDurationMonths);
+    rawSignalStrength += cappedDuration * weights.usageDurationPerMonth;
+    
+    // Usage status contribution
+    rawSignalStrength += stillUsing ? weights.stillUsing : 0;
+    rawSignalStrength += stoppedUsing ? weights.stoppedUsing : 0;
+    
+    // Timeline contribution
+    rawSignalStrength += hasTimeline ? weights.hasTimeline : 0;
+    
+    // Rating trajectory contribution
+    rawSignalStrength += ratingTrajectory === 'improving' ? weights.ratingImproving :
+                         ratingTrajectory === 'declining' ? weights.ratingDeclining :
+                         weights.ratingStable;
+    
+    // CAP at maxContributionPerUser (ChatGPT Refinement #1)
+    const signalStrength = Math.min(
+      Math.max(rawSignalStrength, -0.40),  // Floor at -0.40
+      OUTCOME_SCORING_CONFIG.maxContributionPerUser
+    );
+    
+    console.log(`[extractOutcomeSignals] User ${userId.substring(0, 8)}... Entity ${entityId.substring(0, 8)}... Signal: ${signalStrength.toFixed(3)}`);
+    
+    return {
+      usageDurationMonths,
+      stillUsing,
+      stoppedUsing,
+      hasTimeline,
+      timelineUpdates,
+      ratingTrajectory,
+      latestRating,
+      signalStrength
+    };
+  } catch (error) {
+    console.error('[extractOutcomeSignals] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Get candidate products from similar users with outcome signals
+ * 
+ * My Addition #1: Filter to active users (within 90 days)
+ * My Addition #2: Category-aware filtering
+ */
+async function getSimilarUserCandidates(
+  supabaseClient: any,
+  similarUserIds: string[],
+  category?: string,
+  activeWithinDays: number = 90
+): Promise<CandidateProduct[]> {
+  if (!similarUserIds.length) return [];
+  
+  try {
+    console.log(`[getSimilarUserCandidates] Processing ${similarUserIds.length} similar users, category: ${category || 'all'}`);
+    
+    // 1. Query user_stuff for similar users' items
+    let query = supabaseClient
+      .from('user_stuff')
+      .select(`
+        entity_id,
+        user_id,
+        status,
+        updated_at,
+        entity_type,
+        entities!inner(id, name, type)
+      `)
+      .in('user_id', similarUserIds)
+      .in('status', ['currently_using', 'stopped_using']);
+    
+    // My Addition #2: Category-aware filtering
+    if (category) {
+      // Map category to entity types
+      const categoryToTypes: Record<string, string[]> = {
+        skincare: ['product', 'skincare'],
+        haircare: ['product', 'haircare'],
+        food: ['food', 'restaurant', 'product'],
+        electronics: ['product', 'electronics'],
+        fitness: ['product', 'fitness']
+      };
+      const types = categoryToTypes[category] || ['product'];
+      query = query.in('entities.type', types);
+    }
+    
+    const { data: stuffItems, error } = await query;
+    
+    if (error) {
+      console.error('[getSimilarUserCandidates] Query error:', error);
+      return [];
+    }
+    
+    if (!stuffItems?.length) {
+      console.log('[getSimilarUserCandidates] No stuff items found');
+      return [];
+    }
+    
+    // My Addition #1: Filter to active users (updated within N days)
+    const activeThreshold = new Date();
+    activeThreshold.setDate(activeThreshold.getDate() - activeWithinDays);
+    const activeItems = stuffItems.filter((item: any) => {
+      const updatedAt = new Date(item.updated_at);
+      return updatedAt >= activeThreshold;
+    });
+    
+    console.log(`[getSimilarUserCandidates] Found ${stuffItems.length} items, ${activeItems.length} from active users`);
+    
+    // 2. Group by entity and extract signals
+    const entityMap = new Map<string, CandidateProduct>();
+    
+    for (const item of activeItems) {
+      const entityId = item.entity_id;
+      const entityName = item.entities?.name || 'Unknown';
+      const entityType = item.entities?.type || 'product';
+      
+      // Get outcome signals for this user+entity
+      const signals = await extractOutcomeSignals(
+        supabaseClient,
+        item.user_id,
+        entityId,
+        category
+      );
+      
+      if (!signals) continue;
+      
+      // Get or create candidate
+      let candidate = entityMap.get(entityId);
+      if (!candidate) {
+        candidate = {
+          entityId,
+          entityName,
+          category: entityType,
+          recommendedByUsers: [],
+          aggregatedSignals: {
+            totalUsers: 0,
+            avgSignalStrength: 0,
+            avgLatestRating: 0,
+            stillUsingCount: 0,
+            stoppedUsingCount: 0,
+            hasTimelineCount: 0,
+            distinctUsersWithSignals: 0
+          }
+        };
+        entityMap.set(entityId, candidate);
+      }
+      
+      // Add user's signals (capped contribution)
+      candidate.recommendedByUsers.push({
+        userId: item.user_id,
+        signals,
+        cappedContribution: signals.signalStrength
+      });
+    }
+    
+    // 3. Aggregate signals for each candidate
+    for (const candidate of entityMap.values()) {
+      const users = candidate.recommendedByUsers;
+      const totalSignalStrength = users.reduce((sum, u) => sum + u.signals.signalStrength, 0);
+      const totalRating = users.reduce((sum, u) => sum + u.signals.latestRating, 0);
+      
+      candidate.aggregatedSignals = {
+        totalUsers: users.length,
+        avgSignalStrength: users.length > 0 ? totalSignalStrength / users.length : 0,
+        avgLatestRating: users.length > 0 ? totalRating / users.length : 0,
+        stillUsingCount: users.filter(u => u.signals.stillUsing).length,
+        stoppedUsingCount: users.filter(u => u.signals.stoppedUsing).length,
+        hasTimelineCount: users.filter(u => u.signals.hasTimeline).length,
+        distinctUsersWithSignals: users.filter(u => u.signals.signalStrength !== 0).length
+      };
+    }
+    
+    const candidates = Array.from(entityMap.values());
+    console.log(`[getSimilarUserCandidates] Generated ${candidates.length} candidate products`);
+    
+    return candidates;
+  } catch (error) {
+    console.error('[getSimilarUserCandidates] Error:', error);
+    return [];
+  }
+}
+
+/**
+ * Apply scoring to a candidate product based on outcome signals
+ * 
+ * ChatGPT Add #1: Skip scoring if < 2 users have signals
+ * ChatGPT Add #2: Cap total similar-user score at 0.6
+ * ChatGPT Add #3: Negative override when stopped >= stillUsing && stopped >= 2
+ */
+function applySimilarUserScore(
+  candidate: CandidateProduct,
+  config: typeof OUTCOME_SCORING_CONFIG
+): {
+  score: number;
+  breakdown: Record<string, number>;
+  skipScoring: boolean;
+  negativeOverrideApplied: boolean;
+} {
+  const agg = candidate.aggregatedSignals;
+  
+  // ChatGPT Add #1: Skip scoring if < 2 users have signals
+  if (agg.distinctUsersWithSignals < config.minDistinctUsersForScoring) {
+    console.log(`[applySimilarUserScore] Skipping ${candidate.entityName} - only ${agg.distinctUsersWithSignals} users with signals`);
+    return {
+      score: 0,
+      breakdown: { skipped: 1, reason: 'insufficient_users' },
+      skipScoring: true,
+      negativeOverrideApplied: false
+    };
+  }
+  
+  // ChatGPT Add #3: Check for negative signal dominance
+  const negativeOverrideApplied = 
+    config.negativeOverride.triggerWhenStoppedGteStillUsing &&
+    agg.stoppedUsingCount >= agg.stillUsingCount &&
+    agg.stoppedUsingCount >= config.negativeOverride.minStoppedCount;
+  
+  if (negativeOverrideApplied) {
+    console.log(`[applySimilarUserScore] Negative override for ${candidate.entityName} - ${agg.stoppedUsingCount} stopped vs ${agg.stillUsingCount} still using`);
+    return {
+      score: config.negativeOverride.penalty,
+      breakdown: {
+        negativeOverride: config.negativeOverride.penalty,
+        stoppedUsingCount: agg.stoppedUsingCount,
+        stillUsingCount: agg.stillUsingCount
+      },
+      skipScoring: false,
+      negativeOverrideApplied: true
+    };
+  }
+  
+  // Normal scoring
+  const scoring = config.scoring;
+  let score = scoring.base;
+  const breakdown: Record<string, number> = { base: scoring.base };
+  
+  // Signal strength contribution
+  const signalScore = agg.avgSignalStrength * scoring.signalStrengthMultiplier;
+  score += signalScore;
+  breakdown.signalStrength = signalScore;
+  
+  // Still using bonus
+  const stillUsingScore = agg.stillUsingCount * scoring.stillUsingPerUser;
+  score += stillUsingScore;
+  breakdown.stillUsing = stillUsingScore;
+  
+  // Timeline bonus
+  const timelineScore = agg.hasTimelineCount * scoring.timelinePerUser;
+  score += timelineScore;
+  breakdown.timeline = timelineScore;
+  
+  // Stopped using penalty
+  const stoppedPenalty = agg.stoppedUsingCount * scoring.stoppedUsingPerUser;
+  score += stoppedPenalty;
+  breakdown.stoppedUsing = stoppedPenalty;
+  
+  // ChatGPT Add #2: Cap total similar-user contribution
+  const cappedScore = Math.min(Math.max(score, -0.40), config.maxSimilarUserScorePerProduct);
+  if (cappedScore !== score) {
+    breakdown.cappedFrom = score;
+    breakdown.cappedTo = cappedScore;
+  }
+  
+  console.log(`[applySimilarUserScore] ${candidate.entityName}: score=${cappedScore.toFixed(3)}, users=${agg.totalUsers}, stillUsing=${agg.stillUsingCount}`);
+  
+  return {
+    score: cappedScore,
+    breakdown,
+    skipScoring: false,
+    negativeOverrideApplied: false
+  };
+}
+
+/**
+ * Calculate average usage duration from users
+ */
+function calculateAvgUsageDuration(users: CandidateProduct['recommendedByUsers']): number {
+  if (users.length === 0) return 0;
+  const total = users.reduce((sum, u) => sum + u.signals.usageDurationMonths, 0);
+  return Math.round(total / users.length);
+}
+
+// ============= RECOMMENDATION RESOLVER (Phase 1) =============
 
 /**
  * Detect product category from user query
@@ -1169,41 +1653,53 @@ function checkConstraintViolation(product: string, constraints: string[]): strin
 
 /**
  * Calculate confidence score based on available data
+ * 
+ * ChatGPT Refinement #2: Only apply outcome signal bonus if 2+ distinct users have signals
  */
 function calculateResolverConfidence(
   sourceSummary: ResolverSourceSummary, 
-  shortlistCount: number
+  shortlistCount: number,
+  distinctUsersWithSignals: number = 0  // NEW parameter for Phase 1
 ): { confidence: number; label: 'high' | 'medium' | 'limited' } {
   let confidence = 0;
   
-  // Platform reviews contribution (max 0.35)
-  confidence += Math.min(sourceSummary.platformReviews * 0.07, 0.35);
+  // Platform reviews contribution (max 0.30)
+  confidence += Math.min(sourceSummary.platformReviews * 0.06, 0.30);
   
-  // Similar users contribution (max 0.25)
-  confidence += Math.min(sourceSummary.similarUsers * 0.05, 0.25);
+  // Similar users contribution (max 0.20)
+  confidence += Math.min(sourceSummary.similarUsers * 0.04, 0.20);
   
-  // User has tracked items (0.15)
-  if (sourceSummary.userItems > 0) confidence += 0.15;
+  // NEW: Outcome signals bonus (ChatGPT Refinement #2)
+  // Only if 2+ distinct users have signals
+  if (distinctUsersWithSignals >= OUTCOME_SCORING_CONFIG.minDistinctUsersForBonus) {
+    confidence += 0.15;
+  }
+  
+  // User has tracked items (0.10)
+  if (sourceSummary.userItems > 0) confidence += 0.10;
   
   // Shortlist quality (max 0.25)
   confidence += Math.min(shortlistCount * 0.05, 0.25);
   
-  confidence = Math.min(confidence, 1.0);
+  const finalConfidence = Math.min(confidence, 1.0);
   
   const label: 'high' | 'medium' | 'limited' = 
-    confidence >= 0.7 ? 'high' : 
-    confidence >= 0.4 ? 'medium' : 'limited';
+    finalConfidence >= 0.7 ? 'high' : 
+    finalConfidence >= 0.4 ? 'medium' : 'limited';
   
-  return { confidence, label };
+  return { confidence: finalConfidence, label };
 }
 
 /**
- * Log resolver snapshot for debugging (ChatGPT Guardrail #2)
+ * Log resolver snapshot for debugging
+ * 
+ * ChatGPT Refinement #4: Include per-user contribution breakdown
  */
 function logResolverSnapshot(
   input: ResolverInput, 
   output: ResolverOutput, 
-  durationMs: number
+  durationMs: number,
+  contributingUsers?: ContributingUserLog[]  // NEW parameter
 ): void {
   console.log('[RESOLVER_SNAPSHOT]', JSON.stringify({
     timestamp: new Date().toISOString(),
@@ -1212,11 +1708,21 @@ function logResolverSnapshot(
     category: input.category,
     state: output.state,
     shortlistCount: output.shortlist.length,
-    shortlistProducts: output.shortlist.map(p => p.product),
+    shortlistProducts: output.shortlist.map(p => ({
+      product: p.product,
+      score: p.score,
+      signals: p.signals  // NEW: Include factual signals
+    })),
     rejectedCount: output.rejected.length,
     confidence: output.confidence.toFixed(2),
     confidenceLabel: output.confidenceLabel,
     sources: output.sourceSummary,
+    // NEW: Per-user contribution breakdown (ChatGPT Refinement #4)
+    contributingUsers: contributingUsers?.map(u => ({
+      id: u.userId.substring(0, 8) + '...',
+      strength: u.signalStrength.toFixed(2),
+      products: u.products.length
+    })),
     durationMs
   }));
 }
@@ -1339,19 +1845,103 @@ async function resolveRecommendation(
     console.error('[resolveRecommendation] Error searching reviews:', error);
   }
 
-  // Step 4: Find Similar Users (ALWAYS runs)
+  // Step 4: Find Similar Users and Get Their Recommendations (PHASE 1 ENHANCED)
+  let contributingUsersLog: ContributingUserLog[] = [];
+  let totalDistinctUsersWithSignals = 0;
+
   try {
-    const similarUsersResult = await findSimilarUsers(supabaseClient, input.userId, 5);
-    if (similarUsersResult.success && similarUsersResult.results) {
+    const similarUsersResult = await findSimilarUsers(supabaseClient, input.userId, 8);
+    
+    if (similarUsersResult.success && similarUsersResult.results?.length > 0) {
       output.sourceSummary.similarUsers = similarUsersResult.results.length;
-      
-      // For now, just count similar users found - in future we'd get their recommendations
-      // and cross-reference with our product scores
       console.log('[resolveRecommendation] Found', similarUsersResult.results.length, 'similar users');
+      
+      // Step 4a: Get candidates with outcome signals
+      const similarUserIds = similarUsersResult.results.map((u: any) => u.user_id || u.id);
+      const candidates = await getSimilarUserCandidates(
+        supabaseClient,
+        similarUserIds,
+        input.category,
+        OUTCOME_SCORING_CONFIG.activeWithinDays
+      );
+      
+      console.log('[resolveRecommendation] Generated', candidates.length, 'candidate products from similar users');
+      
+      // Step 4b: Score and merge into productScores
+      for (const candidate of candidates) {
+        const scoreResult = applySimilarUserScore(candidate, OUTCOME_SCORING_CONFIG);
+        
+        // Skip if not enough users (ChatGPT Add #1)
+        if (scoreResult.skipScoring) {
+          console.log('[resolveRecommendation] Skipping', candidate.entityName, '- insufficient users');
+          continue;
+        }
+        
+        // Track distinct users with signals for confidence calculation
+        totalDistinctUsersWithSignals = Math.max(
+          totalDistinctUsersWithSignals, 
+          candidate.aggregatedSignals.distinctUsersWithSignals
+        );
+        
+        const existing = productScores.get(candidate.entityName) || {
+          score: 0, 
+          reasons: [], 
+          sources: [],
+          entityId: candidate.entityId,
+          signals: {
+            platformReviews: 0,
+            avgPlatformRating: 0,
+            similarUsers: 0,
+            stillUsingCount: 0,
+            stoppedUsingCount: 0,
+            avgUsageDurationMonths: 0,
+            hasTimelineCount: 0,
+            ratingTrajectoryPositive: 0,
+            negativeOverrideApplied: false
+          }
+        };
+        
+        existing.score += scoreResult.score;
+        
+        // Store factual signals (LLM converts to language)
+        existing.signals = {
+          platformReviews: existing.signals?.platformReviews || 0,
+          avgPlatformRating: existing.signals?.avgPlatformRating || 0,
+          similarUsers: candidate.aggregatedSignals.totalUsers,
+          stillUsingCount: candidate.aggregatedSignals.stillUsingCount,
+          stoppedUsingCount: candidate.aggregatedSignals.stoppedUsingCount,
+          avgUsageDurationMonths: calculateAvgUsageDuration(candidate.recommendedByUsers),
+          hasTimelineCount: candidate.aggregatedSignals.hasTimelineCount,
+          ratingTrajectoryPositive: candidate.recommendedByUsers.filter(u => u.signals.ratingTrajectory === 'improving').length,
+          negativeOverrideApplied: scoreResult.negativeOverrideApplied
+        };
+        
+        existing.sources.push({
+          type: 'similar_user',
+          count: candidate.aggregatedSignals.totalUsers
+        });
+        
+        productScores.set(candidate.entityName, existing);
+        
+        // Track contributing users for logging (ChatGPT Refinement #4)
+        for (const user of candidate.recommendedByUsers) {
+          let userLog = contributingUsersLog.find(u => u.userId === user.userId);
+          if (!userLog) {
+            userLog = { userId: user.userId, signalStrength: user.signals.signalStrength, products: [] };
+            contributingUsersLog.push(userLog);
+          }
+          userLog.products.push(candidate.entityName);
+        }
+      }
+      
+      console.log('[resolveRecommendation] Processed', candidates.length, 'similar user candidates, distinct users with signals:', totalDistinctUsersWithSignals);
     }
   } catch (error) {
-    console.error('[resolveRecommendation] Error finding similar users:', error);
+    console.error('[resolveRecommendation] Error processing similar users:', error);
   }
+
+  // Update source summary with distinct users count
+  output.sourceSummary.distinctUsersWithSignals = totalDistinctUsersWithSignals;
 
   // Step 5: Apply Constraint Filters and Build Shortlist (DETERMINISTIC)
   for (const [product, data] of productScores.entries()) {
@@ -1371,6 +1961,7 @@ async function resolveRecommendation(
         entityId: data.entityId,
         score: finalScore,
         reason: data.reasons.length > 0 ? data.reasons.join('; ') : 'Matches your criteria',
+        signals: data.signals,  // NEW: Include factual signals
         sources: aggregateSources(data.sources)
       });
     }
@@ -1380,8 +1971,12 @@ async function resolveRecommendation(
   output.shortlist.sort((a, b) => b.score - a.score);
   output.shortlist = output.shortlist.slice(0, 5);
 
-  // Step 7: Calculate Confidence (DETERMINISTIC formula)
-  const { confidence, label } = calculateResolverConfidence(output.sourceSummary, output.shortlist.length);
+  // Step 7: Calculate Confidence (DETERMINISTIC formula with outcome signals bonus)
+  const { confidence, label } = calculateResolverConfidence(
+    output.sourceSummary, 
+    output.shortlist.length,
+    totalDistinctUsersWithSignals  // NEW: Pass for Phase 1 confidence bonus
+  );
   output.confidence = confidence;
   output.confidenceLabel = label;
 
@@ -1390,7 +1985,7 @@ async function resolveRecommendation(
     output.state = 'insufficient_data';
     output.fallbackMessage = "I don't have enough trusted data yet to recommend confidently in this category. Would you like me to search broader sources?";
     
-    logResolverSnapshot(input, output, Date.now() - startTime);
+    logResolverSnapshot(input, output, Date.now() - startTime, contributingUsersLog);
     return output;
   }
 
@@ -1401,8 +1996,8 @@ async function resolveRecommendation(
     output.fallbackMessage = 'Limited Common Groundz data - supplementing with broader research.';
   }
 
-  // Step 10: Log Resolver Snapshot (ChatGPT Guardrail #2 - CRITICAL)
-  logResolverSnapshot(input, output, Date.now() - startTime);
+  // Step 10: Log Resolver Snapshot (ChatGPT Refinement #4 - with per-user breakdown)
+  logResolverSnapshot(input, output, Date.now() - startTime, contributingUsersLog);
 
   return output;
 }
@@ -1410,12 +2005,14 @@ async function resolveRecommendation(
 /**
  * Build the explanation-only prompt for the LLM
  * The LLM receives structured data and explains ONLY - no tool calls
+ * 
+ * PHASE 1: Now includes factual outcome signals for the LLM to convert to natural language
  */
 function buildResolverExplanationPrompt(
   output: ResolverOutput, 
   userName: string
 ): string {
-  const confidenceText = output.confidenceLabel === 'high' ? 'HIGH - Strong platform data available' : 
+  const confidenceText = output.confidenceLabel === 'high' ? 'HIGH - Strong platform data with outcome signals' : 
                          output.confidenceLabel === 'medium' ? 'MEDIUM - Some platform insights available' : 
                          'LIMITED - Mostly external research';
   
@@ -1428,12 +2025,24 @@ function buildResolverExplanationPrompt(
 - Current Products: ${output.userContext.currentProducts.join(', ') || 'None tracked'}
 - Things to Avoid: ${output.userContext.constraints.join(', ') || 'None'}
 
-=== SHORTLISTED PRODUCTS (ranked by fit) ===
-${output.shortlist.length > 0 ? output.shortlist.map((p, i) => 
-  `${i+1}. ${p.product} (score: ${p.score.toFixed(2)})
+=== SHORTLISTED PRODUCTS (with factual signals) ===
+${output.shortlist.length > 0 ? output.shortlist.map((p, i) => {
+  const sig = p.signals;
+  const signalLines = sig ? `
+   Signals:
+   - Platform reviews: ${sig.platformReviews} (avg ${sig.avgPlatformRating.toFixed(1)}/5)
+   - Similar users using: ${sig.similarUsers}
+   - Still using long-term: ${sig.stillUsingCount}
+   - Stopped using: ${sig.stoppedUsingCount}
+   - Avg usage duration: ${sig.avgUsageDurationMonths} months
+   - Have timeline updates: ${sig.hasTimelineCount}
+   - Rating improving over time: ${sig.ratingTrajectoryPositive}
+   ${sig.negativeOverrideApplied ? '⚠️ WARNING: More users stopped than continued using this product' : ''}` : '';
+  
+  return `${i+1}. ${p.product} (score: ${p.score.toFixed(2)})
    - Why: ${p.reason}
-   - Sources: ${p.sources.map(s => `${s.type}: ${s.count}`).join(', ')}`
-).join('\n\n') : 'No products matched the criteria from Common Groundz data.'}
+   - Sources: ${p.sources.map(s => `${s.type}: ${s.count}`).join(', ')}${signalLines}`;
+}).join('\n\n') : 'No products matched the criteria from Common Groundz data.'}
 
 ${output.rejected.length > 0 ? `
 === EXCLUDED (due to user constraints) ===
@@ -1443,20 +2052,30 @@ ${output.rejected.map(p => `- ${p.product}: ${p.reason}`).join('\n')}
 === DATA SOURCES ===
 - Common Groundz reviews: ${output.sourceSummary.platformReviews}
 - Similar users consulted: ${output.sourceSummary.similarUsers}
+- Users with outcome signals: ${output.sourceSummary.distinctUsersWithSignals || 0}
 - User's tracked items: ${output.sourceSummary.userItems}
 ${output.sourceSummary.webSearchUsed ? `- Web research: Yes (${output.fallbackMessage})` : ''}
 
 === CONFIDENCE: ${confidenceText} ===
 
+=== CONVERT SIGNALS TO NATURAL LANGUAGE ===
+Use the factual signals above to explain recommendations naturally.
+
+Examples:
+- "6 similar users" + "4 still using" + "8 months avg" → "6 users with similar preferences have been using this for 8+ months, and 4 are still loving it"
+- "hasTimelineCount: 3" → "3 users have updated their reviews over time, showing ongoing satisfaction"
+- "stoppedUsingCount: 3, stillUsingCount: 1" → "Worth noting: 3 similar users stopped using this over time"
+- If negativeOverrideApplied is true, clearly communicate this is a warning sign
+
 === STRICT INSTRUCTIONS (NON-NEGOTIABLE) ===
 1. Explain WHY these products fit THIS specific user
 2. Reference their constraints when products were excluded
 3. Do NOT introduce products not listed above
-4. Do NOT invent features, reviews, or opinions
+4. Do NOT invent features, reviews, or opinions not in signals
 5. Do NOT create rankings or scores - they are provided above
 6. If confidence is LIMITED, say "Based on broader research..."
-7. If similar users influenced a pick, say "Users with similar preferences..."
-8. Be concise - the data above is your ONLY source of truth
+7. Convert the signals above to natural language explanations
+8. Be concise - the signals above are your ONLY source of truth
 9. If no products matched, acknowledge honestly and ask what they're looking for
 10. Start with a clear recommendation, not preamble`;
 }
