@@ -5255,6 +5255,17 @@ Want me to compare prices or check specific retailers?"`;
       confidence: resolverOutput?.confidence || null,
       confidenceLabel: resolverOutput?.confidenceLabel || null,
       sourceSummary: resolverOutput?.sourceSummary || null,
+      // Phase 4: Full transparency data - shortlist and rejected
+      shortlist: resolverOutput?.shortlist?.map(item => ({
+        product: item.product,
+        score: item.score,
+        verified: item.verified,
+        sources: item.sources
+      })) || null,
+      rejected: resolverOutput?.rejected?.map(item => ({
+        product: item.product,
+        reason: item.reason
+      })) || null,
       metadata: {
         responseTime,
         tokensUsed: aiData.usageMetadata,

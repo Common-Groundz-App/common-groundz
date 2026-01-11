@@ -10,11 +10,34 @@ import { usePreferences } from '@/contexts/PreferencesContext';
 import { PreferenceConfirmationChips, DetectedPreference } from './PreferenceConfirmationChips';
 import { createUnifiedConstraint } from '@/utils/constraintUtils';
 import { createPreferenceValue } from '@/utils/preferenceRouting';
+import { ConfidenceIndicator } from './ConfidenceIndicator';
+import { RecommendationExplanation } from './RecommendationExplanation';
 
 interface Source {
   title: string;
   domain: string;
   url: string;
+}
+
+// Phase 4: Shortlist and rejected item types
+interface ShortlistItem {
+  product: string;
+  score: number;
+  verified: boolean;
+  sources: Array<{ type: string; count: number }>;
+}
+
+interface RejectedItem {
+  product: string;
+  reason: string;
+}
+
+interface SourceSummary {
+  platformReviews: number;
+  similarUsers: number;
+  userItems: number;
+  webSearchUsed: boolean;
+  webSearchAttempted?: boolean;
 }
 
 interface Message {
@@ -28,6 +51,10 @@ interface Message {
   // Phase 0: Resolver confidence data
   confidenceLabel?: 'high' | 'medium' | 'limited' | null;
   resolverState?: 'success' | 'insufficient_data' | 'web_fallback' | null;
+  // Phase 4: Full transparency data
+  sourceSummary?: SourceSummary | null;
+  shortlist?: ShortlistItem[] | null;
+  rejected?: RejectedItem[] | null;
 }
 
 interface ChatInterfaceProps {
@@ -566,6 +593,10 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         sources: data.sources || [],
         confidenceLabel: data.confidenceLabel || null,
         resolverState: data.resolverState || null,
+        // Phase 4: Full transparency data
+        sourceSummary: data.sourceSummary || null,
+        shortlist: data.shortlist || null,
+        rejected: data.rejected || null,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -783,27 +814,21 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                       }
                     </div>
                     
-                    {/* Phase 0: Confidence indicator */}
+                    {/* Phase 4: Enhanced Confidence Indicator */}
                     {message.role === 'assistant' && message.confidenceLabel && (
-                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-2 pt-1.5 border-t border-border/30">
-                        {message.confidenceLabel === 'high' && (
-                          <><span>🏠</span> Based on Common Groundz data</>
-                        )}
-                        {message.confidenceLabel === 'medium' && (
-                          <><span>📊</span> Mixed sources</>
-                        )}
-                        {message.confidenceLabel === 'limited' && (
-                          <><span>🌐</span> Based on broader research</>
-                        )}
-                      </div>
+                      <ConfidenceIndicator
+                        confidenceLabel={message.confidenceLabel}
+                        resolverState={message.resolverState}
+                        sourceSummary={message.sourceSummary}
+                      />
                     )}
-                    
-                    {/* Phase 3: Web fallback indicator */}
-                    {message.role === 'assistant' && message.resolverState === 'web_fallback' && (
-                      <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 mt-1">
-                        <Globe className="h-3 w-3" />
-                        <span>Some results from broader web research</span>
-                      </div>
+
+                    {/* Phase 4: Why These Recommendations */}
+                    {message.role === 'assistant' && (message.shortlist?.length || message.rejected?.length) && (
+                      <RecommendationExplanation
+                        shortlist={message.shortlist}
+                        rejected={message.rejected}
+                      />
                     )}
                     
                     {/* Sources section - clean pill/chip design with favicons */}
