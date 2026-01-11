@@ -879,6 +879,28 @@ async function saveInsightFromChat(
 
 // ========== TOOL EXECUTION FUNCTIONS ==========
 
+// Category mapping for fallback search
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  'food': ['restaurant', 'food', 'eat', 'dining', 'cuisine', 'meal', 'dessert', 'cafe', 'coffee', 'breakfast', 'lunch', 'dinner', 'snack', 'burger', 'pizza', 'ice cream', 'biryani', 'dosa', 'idli', 'vegetarian', 'vegan', 'non-veg'],
+  'place': ['place', 'visit', 'travel', 'destination', 'attraction', 'park', 'garden', 'museum', 'temple', 'bangalore', 'mumbai', 'delhi', 'chennai', 'hyderabad'],
+  'product': ['product', 'protein', 'powder', 'supplement', 'vitamin', 'bottle', 'container', 'gadget', 'device', 'appliance'],
+  'movie': ['movie', 'film', 'watch', 'cinema', 'show', 'series', 'documentary'],
+  'book': ['book', 'read', 'novel', 'author', 'fiction', 'non-fiction', 'biography']
+};
+
+function detectCategoryFromQuery(query: string): string[] {
+  const lowerQuery = query.toLowerCase();
+  const detectedCategories: string[] = [];
+  
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some(keyword => lowerQuery.includes(keyword))) {
+      detectedCategories.push(category);
+    }
+  }
+  
+  return detectedCategories;
+}
+
 async function searchReviewsSemantic(
   supabaseClient: any,
   query: string,
@@ -888,57 +910,144 @@ async function searchReviewsSemantic(
   try {
     console.log('[searchReviewsSemantic] Query:', query, 'EntityId:', entityId, 'Limit:', limit);
     
-    // Generate embedding for the search query
-  const embeddingResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-embeddings`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-    },
-    body: JSON.stringify({ 
-      texts: [{ 
-        id: 'search_query', 
-        content: query, 
-        type: 'review' 
-      }] 
-    })
-  });
+    let semanticResults: any[] = [];
+    let searchSource = 'semantic';
+    
+    // Step 1: Try semantic search first (if embeddings exist)
+    try {
+      const embeddingResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-embeddings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+        },
+        body: JSON.stringify({ 
+          texts: [{ 
+            id: 'search_query', 
+            content: query, 
+            type: 'review' 
+          }] 
+        })
+      });
 
-  if (!embeddingResponse.ok) {
-    const errorText = await embeddingResponse.text();
-    console.error('[searchReviewsSemantic] Embedding API error:', errorText);
-    throw new Error('Failed to generate embedding for search query');
-  }
+      if (embeddingResponse.ok) {
+        const { embeddings } = await embeddingResponse.json();
+        if (embeddings && embeddings[0]?.embedding) {
+          const embedding = embeddings[0].embedding;
 
-  const { embeddings } = await embeddingResponse.json();
-  const embedding = embeddings[0].embedding;
+          const { data, error } = await supabaseClient.rpc('match_reviews', {
+            query_embedding: embedding,
+            match_threshold: 0.5,  // Lowered from 0.7 for better recall
+            match_count: limit,
+            filter_entity_id: entityId || null
+          });
 
-    // Use match_reviews RPC for vector similarity search
-    const { data, error } = await supabaseClient.rpc('match_reviews', {
-      query_embedding: embedding,
-      match_threshold: 0.7,
-      match_count: limit,
-      filter_entity_id: entityId || null
-    });
+          if (!error && data && data.length > 0) {
+            semanticResults = data;
+            console.log(`[searchReviewsSemantic] Semantic search found ${data.length} results`);
+          } else {
+            console.log('[searchReviewsSemantic] Semantic search returned no results');
+          }
+        }
+      }
+    } catch (embeddingError) {
+      console.warn('[searchReviewsSemantic] Semantic search failed, trying fallbacks:', embeddingError);
+    }
 
-    if (error) {
-      console.error('[searchReviewsSemantic] Error:', error);
-      throw error;
+    // Step 2: If semantic search returned nothing, try text-based fallback
+    if (semanticResults.length === 0) {
+      console.log('[searchReviewsSemantic] Trying text-based fallback search');
+      searchSource = 'text_fallback';
+      
+      // Extract key search terms from query
+      const searchTerms = query.toLowerCase()
+        .replace(/[^\w\s]/g, '')
+        .split(/\s+/)
+        .filter(term => term.length > 2 && !['the', 'and', 'for', 'what', 'are', 'good', 'best', 'recommend', 'can', 'you', 'please', 'looking'].includes(term));
+      
+      console.log('[searchReviewsSemantic] Search terms:', searchTerms);
+
+      if (searchTerms.length > 0) {
+        // Build OR query for text search
+        const searchPattern = searchTerms.slice(0, 3).map(term => `%${term}%`);
+        
+        let textQuery = supabaseClient
+          .from('reviews')
+          .select(`
+            id, title, description, rating, category, venue, user_id, entity_id, created_at,
+            entities!inner(id, name, type, slug, description, venue)
+          `)
+          .limit(limit * 2);  // Fetch more to allow filtering
+
+        // Search in title, description, venue, or entity name
+        const orConditions = searchPattern.flatMap(pattern => [
+          `title.ilike.${pattern}`,
+          `description.ilike.${pattern}`,
+          `venue.ilike.${pattern}`,
+          `entities.name.ilike.${pattern}`
+        ]).join(',');
+
+        textQuery = textQuery.or(orConditions);
+
+        const { data: textResults, error: textError } = await textQuery;
+
+        if (!textError && textResults && textResults.length > 0) {
+          console.log(`[searchReviewsSemantic] Text fallback found ${textResults.length} results`);
+          semanticResults = textResults.map((r: any) => ({
+            ...r,
+            similarity: 0.6  // Assign moderate similarity for text matches
+          }));
+        }
+      }
+    }
+
+    // Step 3: If still nothing, try category-based fallback
+    if (semanticResults.length === 0) {
+      console.log('[searchReviewsSemantic] Trying category-based fallback');
+      searchSource = 'category_fallback';
+      
+      const detectedCategories = detectCategoryFromQuery(query);
+      console.log('[searchReviewsSemantic] Detected categories:', detectedCategories);
+
+      if (detectedCategories.length > 0) {
+        const { data: categoryResults, error: categoryError } = await supabaseClient
+          .from('reviews')
+          .select(`
+            id, title, description, rating, category, venue, user_id, entity_id, created_at,
+            entities!inner(id, name, type, slug, description, venue)
+          `)
+          .in('category', detectedCategories)
+          .order('rating', { ascending: false })
+          .limit(limit);
+
+        if (!categoryError && categoryResults && categoryResults.length > 0) {
+          console.log(`[searchReviewsSemantic] Category fallback found ${categoryResults.length} results`);
+          semanticResults = categoryResults.map((r: any) => ({
+            ...r,
+            similarity: 0.5  // Assign lower similarity for category matches
+          }));
+        }
+      }
     }
 
     // Enrich results with entity and user information
-    if (data && data.length > 0) {
+    if (semanticResults.length > 0) {
       const enrichedData = await Promise.all(
-        data.map(async (review: any) => {
-          const { data: entity } = await supabaseClient
-            .from('entities')
-            .select('id, name, type, slug')
-            .eq('id', review.entity_id)
-            .single();
+        semanticResults.slice(0, limit).map(async (review: any) => {
+          // Entity might already be joined from text/category search
+          let entity = review.entities || review.entity;
+          if (!entity && review.entity_id) {
+            const { data: entityData } = await supabaseClient
+              .from('entities')
+              .select('id, name, type, slug')
+              .eq('id', review.entity_id)
+              .single();
+            entity = entityData;
+          }
 
           const { data: user } = await supabaseClient
             .from('profiles')
-            .select('id, username, full_name')
+            .select('id, username, first_name, last_name')
             .eq('id', review.user_id)
             .single();
 
@@ -946,7 +1055,8 @@ async function searchReviewsSemantic(
             ...review,
             entity,
             user,
-            relevance_score: review.similarity
+            relevance_score: review.similarity || 0.5,
+            search_source: searchSource
           };
         })
       );
@@ -954,7 +1064,8 @@ async function searchReviewsSemantic(
       return {
         success: true,
         results: enrichedData,
-        count: enrichedData.length
+        count: enrichedData.length,
+        searchSource
       };
     }
 
@@ -962,6 +1073,7 @@ async function searchReviewsSemantic(
       success: true,
       results: [],
       count: 0,
+      searchSource: 'none',
       message: 'No relevant reviews found for this query.'
     };
 
@@ -970,7 +1082,8 @@ async function searchReviewsSemantic(
     return {
       success: false,
       error: error.message,
-      results: []
+      results: [],
+      searchSource: 'error'
     };
   }
 }
