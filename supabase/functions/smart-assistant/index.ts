@@ -1,6 +1,15 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.3";
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.49.3";
+import {
+  findMatchedToken,
+  findMatchedSynonym,
+  hasRecommendationVerb,
+  isLikelyDiscoveryQuery,
+  VALID_LLM_CATEGORIES,
+  getCategoryFromToken,
+  getCategoryFromSynonym
+} from "./discovery-config.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -470,9 +479,120 @@ function normalizeAssistantOutput(text: string, queryIntent: string): string {
  * Breaking these invariants will cause API errors and regression to tool-first logic.
  */
 
+// ============= LLM CLASSIFICATION CACHE =============
+// In-memory cache for LLM classification results (per function instance)
+// Prevents redundant API calls for repeated queries
+
+interface LLMClassificationCacheEntry {
+  category: string;
+  confidence: number;
+  timestamp: number;
+}
+
+const llmClassificationCache = new Map<string, LLMClassificationCacheEntry>();
+const LLM_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function normalizeQueryForCache(query: string): string {
+  return query.toLowerCase().trim().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
+}
+
+// ============= DISCOVERY TELEMETRY =============
+
+interface DiscoveryTelemetry {
+  tier: 'keyword' | 'llm_fallback';
+  matchedCategory: string | null;
+  llmConfidence: number | null;
+  timestamp: number;
+}
+
+function logDiscoveryTelemetry(
+  tier: 'keyword' | 'llm_fallback',
+  matchedCategory: string | null,
+  llmConfidence: number | null
+): void {
+  const telemetry: DiscoveryTelemetry = {
+    tier,
+    matchedCategory,
+    llmConfidence,
+    timestamp: Date.now()
+  };
+  
+  console.log('[discovery-telemetry]', JSON.stringify(telemetry));
+}
+
+// ============= LLM CLASSIFICATION HELPER =============
+
+/**
+ * Classify query using LLM (Tier 2 fallback)
+ * Uses existing classify-search-query edge function with caching
+ */
+async function classifyQueryWithLLM(
+  query: string
+): Promise<{ category: string; confidence: number } | null> {
+  const cacheKey = normalizeQueryForCache(query);
+  
+  // Check cache first
+  const cached = llmClassificationCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp) < LLM_CACHE_TTL_MS) {
+    console.log(`[classifyQueryWithLLM] Cache hit: "${cacheKey.substring(0, 40)}..." → ${cached.category}`);
+    return { category: cached.category, confidence: cached.confidence };
+  }
+  
+  try {
+    // Call existing classify-search-query edge function via direct fetch
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[classifyQueryWithLLM] Missing Supabase config');
+      return null;
+    }
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/classify-search-query`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`
+      },
+      body: JSON.stringify({ query })
+    });
+    
+    if (!response.ok) {
+      console.error('[classifyQueryWithLLM] Classification failed:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    
+    // Validate against supported categories
+    if (!VALID_LLM_CATEGORIES.includes(data.classification)) {
+      console.log(`[classifyQueryWithLLM] Unsupported category: ${data.classification}`);
+      return null;
+    }
+    
+    // Cache the result
+    llmClassificationCache.set(cacheKey, {
+      category: data.classification,
+      confidence: data.confidence,
+      timestamp: Date.now()
+    });
+    
+    console.log(`[classifyQueryWithLLM] LLM classified: "${query.substring(0, 40)}..." → ${data.classification} (${data.confidence})`);
+    
+    return { category: data.classification, confidence: data.confidence };
+  } catch (error) {
+    console.error('[classifyQueryWithLLM] Error:', error);
+    return null;
+  }
+}
+
 /**
  * Classify user intent to determine which tools to use.
  * This enables separate API calls to avoid google_search + function_declarations conflict.
+ * 
+ * HYBRID APPROACH (Phase 2):
+ * - Tier 1: Fast keyword matching using discovery-config.ts (0ms)
+ * - Tier 2: LLM classification fallback for natural language (~300ms)
  * 
  * NOTE: "general" includes both:
  * 1. Pure general knowledge (facts, explanations) - e.g., "What is BPA?"
@@ -482,13 +602,13 @@ function normalizeAssistantOutput(text: string, queryIntent: string): string {
  * IMPORTANT: "what are" is NOT in the explanatory override because it's often used for
  * product discovery (e.g., "What are the best steel bottles?")
  */
-function classifyQueryIntent(
+async function classifyQueryIntent(
   message: string, 
   conversationHistory: Array<{role: string; content: string}>
-): 'realtime' | 'product_user' | 'general' {
+): Promise<'realtime' | 'product_user' | 'general'> {
   const lowerMessage = message.toLowerCase();
   
-  // CONCRETE NOUNS ONLY - no generic tokens like 'product', 'brand'
+  // Legacy product categories (kept for backward compatibility with existing checks)
   const productCategories = [
     'bottle', 'bottles', 'container', 'containers', 'tupperware',
     'sunscreen', 'lotion', 'cream', 'moisturizer', 'skincare',
@@ -640,14 +760,55 @@ function classifyQueryIntent(
     return 'product_user';
   }
   
-  // PRIORITY 5: Product discovery (COMPOUND CHECK - must have BOTH discovery intent AND concrete product category)
+  // ============= HYBRID DISCOVERY ROUTING (Phase 2) =============
+  
+  // PRIORITY 5: Platform Discovery - Tier 1 (Keyword Matching) - 0ms
+  const hasDiscoveryVerb = hasRecommendationVerb(message);
+  const matchedToken = findMatchedToken(message);
+  const matchedSynonym = findMatchedSynonym(message);
+  
+  if (hasDiscoveryVerb && (matchedToken || matchedSynonym)) {
+    const matchedCategory = matchedToken 
+      ? getCategoryFromToken(matchedToken) 
+      : getCategoryFromSynonym(matchedSynonym!);
+    
+    logDiscoveryTelemetry('keyword', matchedCategory, null);
+    console.log(`[classifyQueryIntent] Tier 1 keyword match: token="${matchedToken}", synonym="${matchedSynonym}", category="${matchedCategory}"`);
+    return 'product_user';
+  }
+  
+  // PRIORITY 5.5: Recommendation + Location Override
+  // If user has discovery verb + location marker, route to product_user
+  const hasLocationMarker = /\b(in|around|near|at|for)\s+[A-Z][a-z]+/i.test(message);
+  if (hasDiscoveryVerb && hasLocationMarker) {
+    logDiscoveryTelemetry('keyword', 'location_override', null);
+    console.log('[classifyQueryIntent] Recommendation + location detected');
+    return 'product_user';
+  }
+  
+  // PRIORITY 6: Platform Discovery - Tier 2 (LLM Classification) - ~300ms
+  // Only trigger if: likely discovery query AND no keyword match
+  if (isLikelyDiscoveryQuery(message)) {
+    console.log('[classifyQueryIntent] No keyword match, trying LLM classification...');
+    
+    const llmResult = await classifyQueryWithLLM(message);
+    
+    if (llmResult && llmResult.confidence > 0.7) {
+      logDiscoveryTelemetry('llm_fallback', llmResult.category, llmResult.confidence);
+      console.log(`[classifyQueryIntent] Tier 2 LLM match: category="${llmResult.category}", confidence=${llmResult.confidence}`);
+      return 'product_user';
+    }
+  }
+  
+  // PRIORITY 7 (Legacy): Product discovery with concrete categories
+  // Kept for backward compatibility with existing product tokens
   const discoveryKeywords = ['best', 'top', 'recommend', 'reviews', 'alternatives', 'should i buy', 'which should', 'which one', 'help me choose'];
   
-  const hasDiscoveryIntent = discoveryKeywords.some(k => lowerMessage.includes(k));
-  const hasProductCategory = productCategories.some(c => lowerMessage.includes(c));
+  const hasLegacyDiscoveryIntent = discoveryKeywords.some(k => lowerMessage.includes(k));
+  const hasLegacyProductCategory = productCategories.some(c => lowerMessage.includes(c));
   
-  if (hasDiscoveryIntent && hasProductCategory) {
-    console.log('[classifyQueryIntent] Product discovery (intent + category match)');
+  if (hasLegacyDiscoveryIntent && hasLegacyProductCategory) {
+    console.log('[classifyQueryIntent] Legacy product discovery (intent + category match)');
     return 'product_user';
   }
   
@@ -4235,8 +4396,8 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
 
     console.log('[smart-assistant] Calling Gemini AI with', conversationHistory.length, 'history messages');
 
-    // Classify intent to determine which tools to use
-    const queryIntent = classifyQueryIntent(message, conversationHistory);
+    // Classify intent to determine which tools to use (now async with LLM fallback)
+    const queryIntent = await classifyQueryIntent(message, conversationHistory);
     console.log(`[smart-assistant] Query intent: ${queryIntent}`);
 
     // Build tools array based on intent (to avoid google_search + function_declarations conflict)
