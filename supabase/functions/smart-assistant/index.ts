@@ -4618,12 +4618,36 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
     // 9. Execute tool calls if AI requested them
     let finalMessage = assistantMessage;
 
-    // PART 1: Conditional suppression for product_user vs realtime
-    // For product_user: Always suppress (follow-up call generates response after tool execution)
-    // For realtime: Only suppress if it's pure narration, NOT if we have actual content
-    if (queryIntent === 'product_user') {
-      console.log('[smart-assistant] product_user intent: suppressing initial narration, awaiting tool follow-up');
+    // CONSOLIDATED SUPPRESSION LOGIC (runs AFTER toolCalls is populated)
+    // Decision tree:
+    // 1. Tool calls present -> Suppress (tools will generate follow-up)
+    // 2. Resolver mode with shortlist -> KEEP (LLM explains structured data)
+    // 3. Resolver mode with EMPTY shortlist -> KEEP (LLM should give honest response)
+    // 4. Realtime with just narration -> Suppress (will synthesize from grounding)
+    // 5. Otherwise -> Keep response
+    const hasToolCalls = toolCalls && toolCalls.length > 0;
+    const isResolverMode = toolMode === 'resolver';
+    const hasResolverShortlist = resolverOutput?.shortlist?.length > 0;
+
+    console.log('[smart-assistant] Response suppression decision:', {
+      queryIntent,
+      toolMode,
+      hasToolCalls,
+      hasResolverShortlist,
+      resolverState: resolverOutput?.state
+    });
+
+    if (hasToolCalls) {
+      // CRITICAL: Discard pre-tool narration - only use follow-up response
+      // Gemini often generates "Let me search..." text before function calls
+      // This should NEVER reach the user
       finalMessage = '';
+      console.log('[smart-assistant] Suppressing pre-tool narration, executing', toolCalls.length, 'tool calls');
+    } else if (queryIntent === 'product_user' && isResolverMode) {
+      // Resolver mode - KEEP the LLM response regardless of shortlist
+      // If shortlist empty, LLM should have been instructed to be honest via resolver prompt
+      console.log('[smart-assistant] Resolver mode: keeping LLM explanation');
+      // Don't suppress - finalMessage stays as assistantMessage
     } else if (queryIntent === 'realtime') {
       // Check if this is just narration that should be suppressed
       const isJustNarration = /please.*moment|give me a moment|let me search|searching now|one moment|i('ll| will) (search|look|find)|couldn't fetch/i.test(assistantMessage);
@@ -4634,13 +4658,9 @@ Be helpful, concise, and always prioritize user experience. ALWAYS respect user 
         console.log('[smart-assistant] realtime intent: keeping substantive response');
       }
     }
+    // General intent or other cases: keep response as-is
 
-    if (toolCalls && toolCalls.length > 0) {
-      // CRITICAL: Discard pre-tool narration - only use follow-up response
-      // Gemini often generates "Let me search..." text before function calls
-      // This should NEVER reach the user
-      finalMessage = '';
-      console.log('[smart-assistant] Suppressing pre-tool narration, executing', toolCalls.length, 'tool calls');
+    if (hasToolCalls) {
       
       const toolResults = [];
 
@@ -5321,16 +5341,56 @@ Want me to compare prices or check specific retailers?"`;
     // ========== END HARD ENFORCEMENT LAYER ==========
 
     // PART 4: FINAL INVARIANT - Only fire if ALL synthesis attempts failed
-    if (!finalAssistantMessage || finalAssistantMessage.trim().length === 0) {
-      // Check if we have sources - if so, generate a minimal response from them
-      if (sourcesData.length > 0) {
+    // Strict empty check: only run fallback when response is truly empty or just suppressed narration
+    const isEmptyOrNarration = !finalAssistantMessage || 
+      finalAssistantMessage.trim().length === 0 ||
+      /^(I('ll| will) (search|look|find)|please.*moment|searching|one moment|couldn't fetch)/i.test(finalAssistantMessage.trim());
+
+    if (isEmptyOrNarration) {
+      console.log('[smart-assistant] INVARIANT: Response empty or narration, checking fallback options');
+      
+      // Priority 1: Resolver shortlist exists - use SAME order as UI (Codex safeguard)
+      if (resolverOutput?.shortlist?.length > 0) {
+        console.log('[smart-assistant] INVARIANT: Synthesizing from resolver shortlist (same order as UI)');
+        
+        const categoryHint = resolverOutput.shortlist[0]?.product?.entity_type || 'items';
+        const confidenceLabel = resolverOutput.confidenceLabel || 'limited';
+        
+        // Match exact confidence label shown in UI (Codex safeguard - UI/text alignment)
+        const confidenceText = confidenceLabel === 'high' 
+          ? '**High confidence** — Based on trusted Common Groundz reviews'
+          : confidenceLabel === 'medium'
+            ? '**Medium confidence** — Based on available platform data'
+            : '**Limited confidence** — Based on limited platform data';
+        
+        // Use resolverOutput.shortlist directly - SAME array UI consumes
+        const shortlistItems = resolverOutput.shortlist.slice(0, 5).map((item: any, i: number) => {
+          const name = item.product?.name || item.product?.title || 'Unknown';
+          const verified = item.verified ? '✓ Platform verified' : '🌐 Web';
+          const reason = item.reason || '';
+          return `**${i + 1}. ${name}** [${verified}]${reason ? `\n   ${reason}` : ''}`;
+        }).join('\n\n');
+        
+        finalAssistantMessage = `${confidenceText}, here are some ${categoryHint} recommendations:\n\n${shortlistItems}\n\nWould you like more details about any of these?`;
+      }
+      // Priority 2: Resolver mode ran but empty shortlist - be honest (Codex safeguard)
+      else if (toolMode === 'resolver' && (!resolverOutput?.shortlist || resolverOutput.shortlist.length === 0)) {
+        console.log('[smart-assistant] INVARIANT: Resolver mode but empty shortlist, honest response');
+        finalAssistantMessage = "I searched Common Groundz reviews but couldn't find matches for your query yet. Would you like me to share what I know from general knowledge, or try a different search?";
+      }
+      // Priority 3: Check if we have sources - if so, generate a minimal response from them
+      else if (sourcesData.length > 0) {
         console.log('[smart-assistant] INVARIANT: Empty text but sources exist, generating minimal response');
         const topSources = sourcesData.slice(0, 5).map((s, i) => `${i + 1}. ${s.title} (${s.domain})`).join('\n');
         finalAssistantMessage = `Here are some relevant results I found:\n\n${topSources}\n\nClick on any source above for more details.`;
-      } else {
-        console.log('[smart-assistant] INVARIANT: Empty response AND no sources, providing fallback');
+      } 
+      // Priority 4: Generic fallback
+      else {
+        console.log('[smart-assistant] INVARIANT: Empty response AND no sources AND no resolver data, providing fallback');
         finalAssistantMessage = "I couldn't fetch live results right now, but I can still help! Would you like me to share what I know about this topic, or try a different search?";
       }
+    } else {
+      console.log('[smart-assistant] INVARIANT: Valid response exists, skipping fallback synthesis');
     }
 
     // PART 4: COMPLETION QUALITY INVARIANT (ChatGPT suggestion)
