@@ -4,10 +4,18 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { cn } from '@/lib/utils';
 
 interface ShortlistItem {
-  product: string;
+  entityId?: string;
+  entityName?: string;
+  product?: string; // Legacy field name
+  entityType?: string;
   score: number;
   verified: boolean;
+  reason?: string;
   sources: Array<{ type: string; count: number }>;
+  signals?: {
+    avgRating?: number;
+    reviewCount?: number;
+  };
 }
 
 interface RejectedItem {
@@ -108,7 +116,7 @@ export function RecommendationExplanation({
                         <Globe className="h-3 w-3 text-amber-500 shrink-0 mt-0.5" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <span className="font-medium">{item.product}</span>
+                        <span className="font-medium">{item.entityName || item.product}</span>
                         <span className={cn("ml-1.5", getMatchQualityStyle(item.score))}>
                           — {getMatchDisplay(item.score, item.sources)}
                         </span>

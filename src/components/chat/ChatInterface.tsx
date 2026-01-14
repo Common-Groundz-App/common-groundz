@@ -12,6 +12,7 @@ import { createUnifiedConstraint } from '@/utils/constraintUtils';
 import { createPreferenceValue } from '@/utils/preferenceRouting';
 import { ConfidenceIndicator } from './ConfidenceIndicator';
 import { RecommendationExplanation } from './RecommendationExplanation';
+import { ChatRecommendationCards } from './ChatRecommendationCards';
 
 interface Source {
   title: string;
@@ -19,12 +20,20 @@ interface Source {
   url: string;
 }
 
-// Phase 4: Shortlist and rejected item types
+// Phase 4: Shortlist and rejected item types (ID-based for frontend entity fetching)
 interface ShortlistItem {
-  product: string;
+  entityId?: string;
+  entityName?: string;
+  product?: string; // Legacy field name for backwards compatibility
+  entityType?: string;
   score: number;
   verified: boolean;
+  reason?: string;
   sources: Array<{ type: string; count: number }>;
+  signals?: {
+    avgRating?: number;
+    reviewCount?: number;
+  };
 }
 
 interface RejectedItem {
@@ -807,6 +816,14 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                         : 'bg-muted text-foreground'
                     )}
                   >
+                    {/* ENTITY CARDS FIRST (PRIMARY) - Cards before text per plan */}
+                    {message.role === 'assistant' && message.shortlist && message.shortlist.length > 0 && message.shortlist.some(s => s.entityId) && (
+                      <div className="mb-3">
+                        <ChatRecommendationCards shortlist={message.shortlist} />
+                      </div>
+                    )}
+                    
+                    {/* SUPPORTING TEXT (SECONDARY) */}
                     <div className="text-sm space-y-1">
                       {message.role === 'assistant' 
                         ? renderMarkdown(message.content)

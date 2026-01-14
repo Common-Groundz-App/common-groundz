@@ -133,28 +133,55 @@ export function ConfidenceIndicator({
         {/* Expanded source breakdown (My Addition #3: Visual hierarchy) */}
         <CollapsibleContent>
           <div className="flex flex-wrap gap-1.5 mt-2">
-            {/* Platform reviews - solid styling */}
+            {/* Platform reviews - with tooltip */}
             {sourceSummary && sourceSummary.platformReviews > 0 && (
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-border text-[10px]">
-                <FileText className="h-2.5 w-2.5 text-primary" />
-                <span>{sourceSummary.platformReviews} reviews</span>
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-border text-[10px] cursor-help">
+                      <FileText className="h-2.5 w-2.5 text-primary" />
+                      <span>{sourceSummary.platformReviews} reviews</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[200px] text-xs">
+                    <p>Number of Common Groundz reviews searched for this recommendation.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
 
-            {/* Similar users - solid styling */}
+            {/* Similar users - with tooltip */}
             {sourceSummary && sourceSummary.similarUsers > 0 && (
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-border text-[10px]">
-                <Users className="h-2.5 w-2.5 text-primary" />
-                <span>{sourceSummary.similarUsers} similar users</span>
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-border text-[10px] cursor-help">
+                      <Users className="h-2.5 w-2.5 text-primary" />
+                      <span>{sourceSummary.similarUsers} similar users</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[200px] text-xs">
+                    <p>Users with similar tastes who influenced these recommendations.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
 
-            {/* User items - solid styling */}
+            {/* User items - with tooltip */}
             {sourceSummary && sourceSummary.userItems > 0 && (
-              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-border text-[10px]">
-                <Package className="h-2.5 w-2.5 text-primary" />
-                <span>{sourceSummary.userItems} your items</span>
-              </div>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-border text-[10px] cursor-help">
+                      <Package className="h-2.5 w-2.5 text-primary" />
+                      <span>{sourceSummary.userItems} your items</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[200px] text-xs">
+                    <p>Items from your collection that influenced these recommendations.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
 
             {/* Web search - dashed/amber styling (My #3: Visual hierarchy) */}
