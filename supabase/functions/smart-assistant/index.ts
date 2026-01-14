@@ -2687,6 +2687,7 @@ async function resolveRecommendation(
           reasons: [], 
           sources: [],
           entityId: review.entity?.id,
+          entityType: review.entity?.type, // Capture entity type for frontend cards
           platformReviewScore: { total: 0, reviewCount: 0, avgRating: 0, recencyAdjustment: 0 },
           similarUserScore: { total: 0, userCount: 0, avgSignalStrength: 0, negativeOverride: false },
           userHistoryScore: { total: 0, brandLoyalty: 0, categoryFamiliarity: 0, previouslyUsedPenalty: 0 },
@@ -2899,6 +2900,7 @@ async function resolveRecommendation(
         output.shortlist.push({
           product,
           entityId: data.entityId,
+          entityType: data.entityType || null, // For frontend card rendering
           score: cappedScore,
           reason: data.reasons.length > 0 ? data.reasons.join('; ') : 'Matches your criteria',
           signals: data.signals,
@@ -5591,10 +5593,20 @@ Want me to compare prices or check specific retailers?"`;
       sourceSummary: resolverOutput?.sourceSummary || null,
       // Phase 4: Full transparency data - shortlist and rejected
       shortlist: resolverOutput?.shortlist?.map(item => ({
-        product: item.product,
+        // ID-based response for frontend entity fetching
+        entityId: item.entityId,
+        entityName: item.product,
+        entityType: item.entityType || null,
+        // Scoring and trust signals
         score: item.score,
         verified: item.verified,
-        sources: item.sources
+        reason: item.reason || null,
+        sources: item.sources,
+        // Rating signals for consistency
+        signals: item.signals ? {
+          avgRating: item.signals.avgRating || item.signals.avgPlatformRating,
+          reviewCount: item.signals.platformReviews || 0,
+        } : null
       })) || null,
       rejected: resolverOutput?.rejected?.map(item => ({
         product: item.product,
