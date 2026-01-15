@@ -3,6 +3,7 @@ import { Shield, Globe, Users, ExternalLink } from 'lucide-react';
 import { Entity } from '@/services/recommendation/types';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { getEntityTypeLabel, getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
+import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { cn } from '@/lib/utils';
 
 interface ChatEntityCardProps {
@@ -23,30 +24,42 @@ interface ChatEntityCardProps {
 
 /**
  * Generate a fallback description when entity.description is null
+ * Strips rating-related text to avoid duplication with rating display
  */
 const getFallbackDescription = (
   entity: Entity | null | undefined,
   entityType: string | undefined,
   reason?: string
 ): string => {
-  // Priority 1: Use the recommendation reason
-  if (reason) return reason;
+  // Priority 1: Use the recommendation reason (but strip rating mentions)
+  if (reason) {
+    const cleanedReason = reason
+      .replace(/\d+\/\d+\s*(on|rating|stars?|from)/gi, '')
+      .replace(/rated?\s*\d+(\.\d+)?/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (cleanedReason && cleanedReason.length > 10) return cleanedReason;
+  }
   
-  // Priority 2: Generate from entity data
+  // Priority 2: Use entity description
+  if (entity?.description) {
+    return entity.description;
+  }
+  
+  // Priority 3: Generate from entity data
   if (entity) {
     const type = getEntityTypeLabel(entity.type || entityType || 'product');
     const metadata = entity.metadata as Record<string, any> | null;
     
     if (metadata?.formatted_address) {
-      return `A ${type.toLowerCase()} located in ${metadata.formatted_address}`;
+      return `A ${type.toLowerCase()} in ${metadata.formatted_address}`;
     }
     if (entity.venue) {
       return `A ${type.toLowerCase()} at ${entity.venue}`;
     }
-    return `A ${type.toLowerCase()} on Common Groundz`;
   }
   
-  return 'Recommended based on platform reviews';
+  return 'Tap to view details and reviews';
 };
 
 /**
@@ -128,15 +141,30 @@ export function ChatEntityCard({
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{typeLabel}</span>
           
-          {displayRating && displayRating > 0 && (
+          {displayRating && displayRating > 0 ? (
             <>
               <span>•</span>
               <div className="flex items-center gap-1">
-                <RatingRingIcon rating={displayRating} size={12} />
-                <span>{displayRating.toFixed(1)}</span>
+                <RatingRingIcon rating={displayRating} size={14} />
+                <span 
+                  className="font-medium" 
+                  style={{ color: getSentimentColor(displayRating) }}
+                >
+                  {displayRating.toFixed(1)}
+                </span>
                 {reviewCount > 0 && (
-                  <span className="text-muted-foreground/70">({reviewCount})</span>
+                  <span className="text-muted-foreground ml-0.5">
+                    ({reviewCount} review{reviewCount !== 1 ? 's' : ''})
+                  </span>
                 )}
+              </div>
+            </>
+          ) : (
+            <>
+              <span>•</span>
+              <div className="flex items-center gap-1">
+                <RatingRingIcon rating={0} size={14} />
+                <span className="text-muted-foreground">No ratings yet</span>
               </div>
             </>
           )}
@@ -145,9 +173,19 @@ export function ChatEntityCard({
             <>
               <span>•</span>
               <div className="flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                <span>{circleRating.toFixed(1)}</span>
-                <span className="text-muted-foreground/70">({circleRatingCount})</span>
+                <Users 
+                  className="h-3 w-3" 
+                  style={{ color: getSentimentColor(circleRating) }}
+                />
+                <span 
+                  className="font-medium" 
+                  style={{ color: getSentimentColor(circleRating) }}
+                >
+                  {circleRating.toFixed(1)}
+                </span>
+                <span className="text-muted-foreground ml-0.5">
+                  ({circleRatingCount})
+                </span>
               </div>
             </>
           )}
