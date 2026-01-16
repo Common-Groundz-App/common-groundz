@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Shield, Globe, Users, ExternalLink } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { Entity } from '@/services/recommendation/types';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
-import { getEntityTypeLabel, getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
+import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { cn } from '@/lib/utils';
 
@@ -48,14 +48,13 @@ const getFallbackDescription = (
   
   // Priority 3: Generate from entity data
   if (entity) {
-    const type = getEntityTypeLabel(entity.type || entityType || 'product');
     const metadata = entity.metadata as Record<string, any> | null;
     
     if (metadata?.formatted_address) {
-      return `A ${type.toLowerCase()} in ${metadata.formatted_address}`;
+      return `Located in ${metadata.formatted_address}`;
     }
     if (entity.venue) {
-      return `A ${type.toLowerCase()} at ${entity.venue}`;
+      return `At ${entity.venue}`;
     }
   }
   
@@ -64,13 +63,12 @@ const getFallbackDescription = (
 
 /**
  * Compact entity card for chat recommendations.
- * Shows image, name, type, rating, verified status, and description.
+ * Shows image, name, rating, and description.
  */
 export function ChatEntityCard({
   entityId,
   entityName,
   entityType,
-  verified,
   score,
   reason,
   signals,
@@ -80,15 +78,23 @@ export function ChatEntityCard({
 }: ChatEntityCardProps) {
   const navigate = useNavigate();
   
-  // Use resolver signals for rating (consistency with backend)
-  const displayRating = signals?.avgRating ?? (entity as any)?.average_rating ?? null;
-  const reviewCount = signals?.reviewCount ?? 0;
+  // Rating precedence: resolver signals (if valid) → entity stats → null
+  const resolverRating = typeof signals?.avgRating === 'number' && signals.avgRating > 0 
+    ? signals.avgRating 
+    : null;
+  const entityRating = (entity as any)?.average_rating ?? null;
+  const displayRating = resolverRating ?? entityRating;
+  
+  const reviewCount = 
+    (typeof signals?.reviewCount === 'number' && signals.reviewCount > 0)
+      ? signals.reviewCount
+      : (entity as any)?.review_count ?? 0;
+  
+  // Explicit guard for valid rating display
+  const hasValidRating = typeof displayRating === 'number' && displayRating > 0 && !isNaN(displayRating);
   
   // Get image URL with fallback
   const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entityType || entity?.type || 'product');
-  
-  // Get type label
-  const typeLabel = getEntityTypeLabel(entityType || entity?.type || 'product');
   
   // Get description with fallback
   const description = entity?.description || getFallbackDescription(entity, entityType, reason);
@@ -125,27 +131,20 @@ export function ChatEntityCard({
       
       {/* Content */}
       <div className="flex-1 min-w-0 space-y-1">
-        {/* Header: Name + Verified badge */}
+        {/* Header: Name only */}
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-medium text-foreground truncate">
             {entityName}
           </span>
-          {verified ? (
-            <Shield className="h-3.5 w-3.5 text-primary shrink-0" />
-          ) : (
-            <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-          )}
         </div>
         
-        {/* Meta: Type, Rating, Circle Rating */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{typeLabel}</span>
-          
-          {displayRating && displayRating > 0 ? (
-            <>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <RatingRingIcon rating={displayRating} size={14} />
+        {/* Meta: Rating + Circle Rating with overflow protection */}
+        <div className="flex items-center gap-x-2 gap-y-1 text-xs text-muted-foreground flex-wrap min-w-0">
+          {/* Overall Rating */}
+          <div className="flex items-center gap-1.5">
+            <RatingRingIcon rating={displayRating || 0} size={14} />
+            {hasValidRating ? (
+              <>
                 <span 
                   className="font-medium" 
                   style={{ color: getSentimentColor(displayRating) }}
@@ -153,28 +152,23 @@ export function ChatEntityCard({
                   {displayRating.toFixed(1)}
                 </span>
                 {reviewCount > 0 && (
-                  <span className="text-muted-foreground ml-0.5">
-                    ({reviewCount} review{reviewCount !== 1 ? 's' : ''})
+                  <span className="text-muted-foreground">
+                    ({reviewCount})
                   </span>
                 )}
-              </div>
-            </>
-          ) : (
-            <>
-              <span>•</span>
-              <div className="flex items-center gap-1">
-                <RatingRingIcon rating={0} size={14} />
-                <span className="text-muted-foreground">No ratings yet</span>
-              </div>
-            </>
-          )}
+              </>
+            ) : (
+              <span className="text-muted-foreground">No ratings</span>
+            )}
+          </div>
           
+          {/* Circle Rating */}
           {circleRating && circleRatingCount > 0 && (
             <>
               <span>•</span>
               <div className="flex items-center gap-1">
                 <Users 
-                  className="h-3 w-3" 
+                  className="h-3.5 w-3.5" 
                   style={{ color: getSentimentColor(circleRating) }}
                 />
                 <span 
@@ -183,7 +177,7 @@ export function ChatEntityCard({
                 >
                   {circleRating.toFixed(1)}
                 </span>
-                <span className="text-muted-foreground ml-0.5">
+                <span className="text-muted-foreground">
                   ({circleRatingCount})
                 </span>
               </div>
@@ -196,9 +190,6 @@ export function ChatEntityCard({
           {description}
         </p>
       </div>
-      
-      {/* Arrow indicator */}
-      <ExternalLink className="h-4 w-4 text-muted-foreground/50 shrink-0 mt-0.5" />
     </button>
   );
 }
