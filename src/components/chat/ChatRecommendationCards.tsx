@@ -57,16 +57,13 @@ export function ChatRecommendationCards({
   const remainingCount = shortlist.length - maxCards;
   
   return (
-    <div className="space-y-2">
-      <p className="text-xs text-muted-foreground">
-        Based on Common Groundz reviews:
-      </p>
-      
+    <div className="space-y-3 mt-1">
       {visibleItems.map((item, idx) => (
         <ChatEntityCardWithCircle
           key={item.entityId || idx}
           item={item}
           entity={item.entityId ? entitiesMap?.get(item.entityId) : undefined}
+          isTopPick={idx === 0}
         />
       ))}
       
@@ -84,10 +81,12 @@ export function ChatRecommendationCards({
  */
 function ChatEntityCardWithCircle({ 
   item, 
-  entity 
+  entity,
+  isTopPick = false,
 }: { 
   item: ShortlistItem; 
   entity?: any;
+  isTopPick?: boolean;
 }) {
   // Fetch circle rating for this entity
   const { circleRating, circleRatingCount, isLoading } = useCircleRating(item.entityId || '');
@@ -104,6 +103,7 @@ function ChatEntityCardWithCircle({
       entity={entity}
       circleRating={isLoading ? null : circleRating}
       circleRatingCount={circleRatingCount}
+      isTopPick={isTopPick}
     />
   );
 }

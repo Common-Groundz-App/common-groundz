@@ -20,45 +20,100 @@ interface ChatEntityCardProps {
   entity?: Entity | null;
   circleRating?: number | null;
   circleRatingCount?: number;
+  isTopPick?: boolean;
 }
 
 /**
- * Generate a fallback description when entity.description is null
- * Strips rating-related text to avoid duplication with rating display
+ * Get a human-readable label for entity type
  */
-const getFallbackDescription = (
+const getEntityTypeLabel = (type: string): string => {
+  const typeLabels: Record<string, string> = {
+    place: 'Place',
+    product: 'Product',
+    movie: 'Movie',
+    book: 'Book',
+    service: 'Service',
+    restaurant: 'Restaurant',
+    cafe: 'Cafe',
+    hotel: 'Hotel',
+    attraction: 'Attraction',
+    others: 'Recommendation',
+  };
+  return typeLabels[type?.toLowerCase()] || 'Recommendation';
+};
+
+/**
+ * Extract area/neighborhood from formatted address
+ */
+const extractAreaFromAddress = (address: string | undefined): string | null => {
+  if (!address) return null;
+  
+  // Split by comma and get the 2nd segment (usually neighborhood/area)
+  const parts = address.split(',').map(p => p.trim());
+  
+  // Skip first part (usually street/building), return second if it looks like an area
+  if (parts.length >= 2 && parts[1].length < 30 && parts[1].length > 2) {
+    return parts[1];
+  }
+  
+  return null;
+};
+
+/**
+ * Generate a clean, human-readable subtitle for entity cards
+ * Format: {type} · {location/context}
+ */
+const getSmartSubtitle = (
   entity: Entity | null | undefined,
   entityType: string | undefined,
   reason?: string
 ): string => {
-  // Priority 1: Use the recommendation reason (but strip rating mentions)
+  const typeLabel = getEntityTypeLabel(entityType || entity?.type || 'others');
+  
+  // Priority 1: Type + Location from metadata
+  if (entity) {
+    const metadata = entity.metadata as Record<string, any> | null;
+    
+    // Extract location/area info
+    const location = metadata?.locality || 
+                     metadata?.city || 
+                     metadata?.area ||
+                     extractAreaFromAddress(metadata?.formatted_address);
+    
+    if (location) {
+      return `${typeLabel} · ${location}`;
+    }
+    
+    // Venue as fallback location
+    if (entity.venue) {
+      return `${typeLabel} · ${entity.venue}`;
+    }
+  }
+  
+  // Priority 2: Clean reason (stripped of rating text, reasonable length)
   if (reason) {
     const cleanedReason = reason
       .replace(/\d+\/\d+\s*(on|rating|stars?|from)/gi, '')
       .replace(/rated?\s*\d+(\.\d+)?/gi, '')
+      .replace(/Common Groundz[;,]?\s*/gi, '')
       .replace(/\s+/g, ' ')
       .trim();
-    if (cleanedReason && cleanedReason.length > 10) return cleanedReason;
-  }
-  
-  // Priority 2: Use entity description
-  if (entity?.description) {
-    return entity.description;
-  }
-  
-  // Priority 3: Generate from entity data
-  if (entity) {
-    const metadata = entity.metadata as Record<string, any> | null;
     
-    if (metadata?.formatted_address) {
-      return `Located in ${metadata.formatted_address}`;
-    }
-    if (entity.venue) {
-      return `At ${entity.venue}`;
+    if (cleanedReason.length > 15 && cleanedReason.length < 60) {
+      return cleanedReason;
     }
   }
   
-  return 'Tap to view details and reviews';
+  // Priority 3: Entity description (first sentence only)
+  if (entity?.description) {
+    const firstSentence = entity.description.split(/[.!?]/)[0].trim();
+    if (firstSentence.length > 10 && firstSentence.length < 60) {
+      return firstSentence;
+    }
+  }
+  
+  // Fallback: Just the type
+  return typeLabel;
 };
 
 /**
@@ -75,6 +130,7 @@ export function ChatEntityCard({
   entity,
   circleRating,
   circleRatingCount = 0,
+  isTopPick = false,
 }: ChatEntityCardProps) {
   const navigate = useNavigate();
   
@@ -96,8 +152,8 @@ export function ChatEntityCard({
   // Get image URL with fallback
   const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entityType || entity?.type || 'product');
   
-  // Get description with fallback
-  const description = entity?.description || getFallbackDescription(entity, entityType, reason);
+  // Get smart subtitle for card (replaces verbose description)
+  const subtitle = getSmartSubtitle(entity, entityType, reason);
   
   // Handle click to navigate to entity page
   const handleClick = () => {
@@ -112,11 +168,20 @@ export function ChatEntityCard({
     <button
       onClick={handleClick}
       className={cn(
-        "w-full flex items-start gap-3 p-3 rounded-lg border border-border/60 bg-background/50",
+        "relative w-full flex items-start gap-3 p-3 rounded-lg border bg-background/50",
         "hover:bg-muted/50 hover:border-border transition-all cursor-pointer text-left",
-        "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1"
+        "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1",
+        isTopPick 
+          ? "border-primary/40 bg-primary/5" 
+          : "border-border/60"
       )}
     >
+      {/* Top Pick Badge */}
+      {isTopPick && (
+        <div className="absolute -top-2 left-3 px-1.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-medium rounded">
+          Top pick
+        </div>
+      )}
       {/* Entity Image */}
       <div className="w-12 h-12 rounded-md overflow-hidden shrink-0 bg-muted">
         <img
@@ -185,9 +250,9 @@ export function ChatEntityCard({
           )}
         </div>
         
-        {/* Description */}
-        <p className="text-xs text-muted-foreground line-clamp-1">
-          {description}
+        {/* Subtitle */}
+        <p className="text-xs text-muted-foreground truncate">
+          {subtitle}
         </p>
       </div>
     </button>

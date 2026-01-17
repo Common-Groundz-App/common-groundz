@@ -3330,7 +3330,19 @@ Examples:
 10. Start with a clear recommendation, not preamble
 11. If any product has [🌐 Web research (unverified)], clearly state it's from web research, not platform data
 12. For web-sourced products, use phrases like "Based on broader research..." or "According to web reviews..."
-13. NEVER imply web results are as trusted as platform-verified recommendations`;
+13. NEVER imply web results are as trusted as platform-verified recommendations
+
+=== CARD-AWARE NARRATION RULES ===
+When product cards will be shown in the UI (which they always are for recommendations):
+14. Keep your text to 1-2 contextual sentences ONLY
+15. Do NOT list entity/product names in text - the cards show these
+16. Do NOT mention ratings or review counts in text - the cards show these
+17. Do NOT use bullet points to list products - the cards are the list
+18. Your job is to explain WHY these are good matches, not WHAT they are
+19. Focus on context: user preferences, category insights, or decision guidance
+Example good response: "Based on nature lovers in Bangalore, these spots offer peaceful escapes from the city."
+Example bad response: "Here are my recommendations: 1. Lalbagh Garden (4.5/5)..."
+`;
 }
 
 // ========== DETECTED PREFERENCE TYPES ==========
@@ -5178,9 +5190,59 @@ Want me to compare prices or check specific retailers?"`;
       const hasDecisionAnchor = /I'd recommend|I recommend|best pick|go with|start with|my pick|I'd start|I'd suggest/i.test(finalAssistantMessage);
       
       if (!hasDecisionAnchor && finalAssistantMessage.length > 100) {
-        console.log('[smart-assistant] No decision anchor detected, prepending fallback');
-        finalAssistantMessage = "Quick pick: If you want a safe default, start with the first option below.\n\n" + finalAssistantMessage;
+        // If we have cards, use a contextual hook instead of "Quick pick" (cards speak, assistant whispers)
+        if (resolverOutput?.shortlist?.length > 0) {
+          console.log('[smart-assistant] Cards present - using minimal contextual hook');
+          // Don't prepend anything - let the card-aware compression handle it
+        } else {
+          console.log('[smart-assistant] No cards - using decision anchor fallback');
+          finalAssistantMessage = "Here's how I'd approach this:\n\n" + finalAssistantMessage;
+        }
       }
+    }
+    
+    // CARD-AWARE RESPONSE COMPRESSION
+    // When cards are present, aggressively compress narration to avoid redundancy
+    if (resolverOutput?.shortlist?.length > 0) {
+      console.log('[smart-assistant] Cards present - compressing narration to avoid card duplication');
+      
+      // Remove rating mentions (cards show these)
+      finalAssistantMessage = finalAssistantMessage
+        .replace(/\d+(\.\d+)?\/\d+(\.\d+)?/g, '')  // X/Y ratings
+        .replace(/rated?\s*\d+(\.\d+)?/gi, '')      // "rated 4.5"
+        .replace(/\(\d+\s*reviews?\)/gi, '')        // "(6 reviews)"
+        .replace(/Quick pick:.*?\n\n/gi, '')        // Remove "Quick pick" if present
+        .replace(/\s+/g, ' ')                        // Clean up whitespace
+        .trim();
+      
+      // Get entity names from shortlist to filter redundant bullets
+      const entityNames = resolverOutput.shortlist.map((s: any) => 
+        (s.product?.name || s.entityName || '').toLowerCase()
+      ).filter(Boolean);
+      
+      // Remove bullet lines that just name entities (cards do this)
+      const lines = finalAssistantMessage.split('\n');
+      const filteredLines = lines.filter((line: string) => {
+        const isBullet = /^[•\-–—*]\s*/.test(line.trim());
+        if (!isBullet) return true;
+        
+        // Remove bullets that just name an entity
+        const lineLower = line.toLowerCase();
+        return !entityNames.some((name: string) => lineLower.includes(name));
+      });
+      
+      finalAssistantMessage = filteredLines.join('\n').trim();
+      
+      // Cap to ~3 sentences if still too long (cards should be primary)
+      const sentences = finalAssistantMessage.split(/(?<=[.!?])\s+/);
+      if (sentences.length > 4) {
+        finalAssistantMessage = sentences.slice(0, 3).join(' ');
+        if (!finalAssistantMessage.endsWith('.') && !finalAssistantMessage.endsWith('!') && !finalAssistantMessage.endsWith('?')) {
+          finalAssistantMessage += '.';
+        }
+      }
+      
+      console.log('[smart-assistant] Narration compressed for card context');
     }
 
     // ========== HARD ENFORCEMENT LAYER (Post-Processing Guarantees) ==========
