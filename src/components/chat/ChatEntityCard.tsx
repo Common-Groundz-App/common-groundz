@@ -43,49 +43,109 @@ const getEntityTypeLabel = (type: string): string => {
 };
 
 /**
- * Extract area/neighborhood from formatted address
+ * Extract area/neighborhood from formatted address (filters postcodes & generic data)
  */
 const extractAreaFromAddress = (address: string | undefined): string | null => {
   if (!address) return null;
   
-  // Split by comma and get the 2nd segment (usually neighborhood/area)
   const parts = address.split(',').map(p => p.trim());
   
-  // Skip first part (usually street/building), return second if it looks like an area
-  if (parts.length >= 2 && parts[1].length < 30 && parts[1].length > 2) {
-    return parts[1];
+  // Find a segment that looks like a neighborhood/area
+  for (let i = 1; i < Math.min(parts.length, 4); i++) {
+    const part = parts[i];
+    // Skip if it's mostly numbers (postcode)
+    if (/^\d+$/.test(part.replace(/\s/g, ''))) continue;
+    // Skip if it contains a postcode pattern (5-6 digit number)
+    if (/\b\d{5,6}\b/.test(part)) continue;
+    // Skip if too short or too long
+    if (part.length < 4 || part.length > 30) continue;
+    // Skip country names
+    if (/^(India|USA|UK|United States|United Kingdom)$/i.test(part)) continue;
+    // Skip state names that are too generic
+    if (/^(Karnataka|Tamil Nadu|Maharashtra|Delhi|Kerala)$/i.test(part)) continue;
+    
+    return part;
   }
   
   return null;
 };
 
 /**
+ * Infer a more specific type label from entity name/description
+ */
+const inferSpecificType = (
+  entity: Entity | null | undefined,
+  baseType: string
+): string => {
+  const name = entity?.name?.toLowerCase() || '';
+  const desc = entity?.description?.toLowerCase() || '';
+  const combined = `${name} ${desc}`;
+  
+  // Type inference patterns (order matters - more specific first)
+  const patterns: Array<{ keywords: string[]; label: string }> = [
+    { keywords: ['botanical garden', 'botanic garden'], label: 'Botanical garden' },
+    { keywords: ['garden'], label: 'Garden' },
+    { keywords: ['park'], label: 'Park' },
+    { keywords: ['pizzeria', 'pizza'], label: 'Pizzeria' },
+    { keywords: ['cafe', 'coffee', 'bakery'], label: 'Cafe' },
+    { keywords: ['restaurant', 'dining', 'eatery'], label: 'Restaurant' },
+    { keywords: ['hotel', 'resort', 'stay'], label: 'Hotel' },
+    { keywords: ['temple', 'mandir'], label: 'Temple' },
+    { keywords: ['church', 'cathedral', 'chapel'], label: 'Church' },
+    { keywords: ['mosque', 'masjid'], label: 'Mosque' },
+    { keywords: ['ashram', 'foundation', 'spiritual', 'meditation', 'yoga'], label: 'Spiritual center' },
+    { keywords: ['museum', 'gallery'], label: 'Museum' },
+    { keywords: ['mall', 'shopping'], label: 'Shopping' },
+    { keywords: ['bar', 'pub', 'brewery', 'lounge'], label: 'Bar' },
+    { keywords: ['gym', 'fitness'], label: 'Fitness' },
+    { keywords: ['spa', 'wellness'], label: 'Spa' },
+    { keywords: ['beach'], label: 'Beach' },
+    { keywords: ['lake', 'waterfall', 'falls'], label: 'Natural attraction' },
+    { keywords: ['zoo', 'sanctuary', 'wildlife'], label: 'Wildlife' },
+    { keywords: ['theater', 'theatre', 'cinema'], label: 'Entertainment' },
+  ];
+  
+  for (const { keywords, label } of patterns) {
+    if (keywords.some(kw => combined.includes(kw))) {
+      return label;
+    }
+  }
+  
+  // Fallback to base type
+  return baseType;
+};
+
+/**
  * Generate a clean, human-readable subtitle for entity cards
- * Format: {type} · {location/context}
+ * Format: {specificType} · {location/context}
  */
 const getSmartSubtitle = (
   entity: Entity | null | undefined,
   entityType: string | undefined,
   reason?: string
 ): string => {
-  const typeLabel = getEntityTypeLabel(entityType || entity?.type || 'others');
+  const baseType = getEntityTypeLabel(entityType || entity?.type || 'others');
+  const typeLabel = inferSpecificType(entity, baseType);
   
   // Priority 1: Type + Location from metadata
   if (entity) {
     const metadata = entity.metadata as Record<string, any> | null;
     
-    // Extract location/area info
-    const location = metadata?.locality || 
-                     metadata?.city || 
+    // Try neighborhood/area first, then locality, then city
+    const location = metadata?.neighborhood ||
                      metadata?.area ||
-                     extractAreaFromAddress(metadata?.formatted_address);
+                     metadata?.sublocality ||
+                     extractAreaFromAddress(metadata?.formatted_address) ||
+                     metadata?.locality ||
+                     metadata?.city;
     
-    if (location) {
+    // Filter out if location is just a postcode
+    if (location && !/^\d{5,6}$/.test(location)) {
       return `${typeLabel} · ${location}`;
     }
     
     // Venue as fallback location
-    if (entity.venue) {
+    if (entity.venue && !/^\d{5,6}$/.test(entity.venue)) {
       return `${typeLabel} · ${entity.venue}`;
     }
   }
@@ -112,7 +172,7 @@ const getSmartSubtitle = (
     }
   }
   
-  // Fallback: Just the type
+  // Fallback: Just the specific type
   return typeLabel;
 };
 
