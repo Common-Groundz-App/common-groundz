@@ -816,20 +816,20 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                         : 'bg-muted text-foreground'
                     )}
                   >
-                    {/* ENTITY CARDS FIRST (PRIMARY) - Cards before text per plan */}
-                    {message.role === 'assistant' && message.shortlist && message.shortlist.length > 0 && message.shortlist.some(s => s.entityId) && (
-                      <div className="mb-3">
-                        <ChatRecommendationCards shortlist={message.shortlist} />
-                      </div>
-                    )}
-                    
-                    {/* SUPPORTING TEXT (SECONDARY) */}
+                    {/* CONTEXTUAL HOOK (primes user before cards) */}
                     <div className="text-sm space-y-1">
                       {message.role === 'assistant' 
                         ? renderMarkdown(message.content)
                         : <p className="whitespace-pre-wrap">{message.content}</p>
                       }
                     </div>
+                    
+                    {/* ENTITY CARDS (primary answer after context) */}
+                    {message.role === 'assistant' && message.shortlist && message.shortlist.length > 0 && message.shortlist.some(s => s.entityId) && (
+                      <div className="mt-3">
+                        <ChatRecommendationCards shortlist={message.shortlist} />
+                      </div>
+                    )}
                     
                     {/* Phase 4: Enhanced Confidence Indicator */}
                     {message.role === 'assistant' && message.confidenceLabel && (
