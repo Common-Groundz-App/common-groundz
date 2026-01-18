@@ -2897,13 +2897,33 @@ async function resolveRecommendation(
         // Log scoring decision
         logScoringDecision(product, scoreBreakdown, 'shortlisted');
         
+        // Create merged signals with platform review data for frontend Top Pick logic
+        const mergedSignals = {
+          ...data.signals,
+          // Sync platform review data (these were tracked separately)
+          platformReviews: data.platformReviewScore?.reviewCount || data.signals?.platformReviews || 0,
+          avgPlatformRating: data.platformReviewScore?.avgRating || data.signals?.avgPlatformRating || 0,
+          // Direct frontend-expected field names
+          avgRating: data.platformReviewScore?.avgRating || data.signals?.avgPlatformRating || 0,
+          reviewCount: data.platformReviewScore?.reviewCount || data.signals?.platformReviews || 0,
+        };
+
+        // Debug assertion: warn if signals mismatch occurs
+        if (mergedSignals.reviewCount === 0 && data.platformReviewScore?.reviewCount > 0) {
+          console.warn('[signals-mismatch] Platform reviews exist but not synced:', {
+            entityId: data.entityId,
+            platformReviewCount: data.platformReviewScore.reviewCount,
+            signalsReviewCount: mergedSignals.reviewCount
+          });
+        }
+
         output.shortlist.push({
           product,
           entityId: data.entityId,
           entityType: data.entityType || null, // For frontend card rendering
           score: cappedScore,
           reason: data.reasons.length > 0 ? data.reasons.join('; ') : 'Matches your criteria',
-          signals: data.signals,
+          signals: mergedSignals,  // Now includes platform review data!
           scoreBreakdown,
           sources: aggregateSources(data.sources),
           verified: true  // Phase 3: Platform items are verified (Guardrail #2)
@@ -5685,10 +5705,10 @@ Want me to compare prices or check specific retailers?"`;
         verified: item.verified,
         reason: item.reason || null,
         sources: item.sources,
-        // Rating signals for consistency
+        // Rating signals for Top Pick logic (now properly merged)
         signals: item.signals ? {
-          avgRating: item.signals.avgRating || item.signals.avgPlatformRating,
-          reviewCount: item.signals.platformReviews || 0,
+          avgRating: item.signals.avgRating || 0,
+          reviewCount: item.signals.reviewCount || 0,
         } : null
       })) || null,
       rejected: resolverOutput?.rejected?.map(item => ({

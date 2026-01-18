@@ -2,6 +2,7 @@ import { useBatchEntities } from '@/hooks/use-batch-entities';
 import { ChatEntityCard } from './ChatEntityCard';
 import { EntityCardSkeleton } from './EntityCardSkeleton';
 import { useCircleRating } from '@/hooks/use-circle-rating';
+import { Entity } from '@/services/recommendation/types';
 
 interface ShortlistItem {
   entityId?: string;
@@ -29,26 +30,48 @@ interface ChatRecommendationCardsProps {
  * 
  * Guardrail: Items with < 2 reviews are never marked as top pick
  * Returns -1 if no item qualifies (all have insufficient reviews)
+ * 
+ * Fallback: If signals are missing, uses entity.external_rating and entity.external_rating_count
+ * Tie-breaker: Higher review count wins, then alphabetical by entityId
  */
-const getTopPickIndex = (items: ShortlistItem[]): number => {
+const getTopPickIndex = (
+  items: ShortlistItem[], 
+  entitiesMap?: Map<string, Entity>
+): number => {
   if (items.length === 0) return -1;
   
   let maxScore = -1;
+  let maxReviews = -1;
+  let topEntityId = '';
   let topIdx = -1; // -1 means no top pick
   
   items.forEach((item, idx) => {
-    const rating = item.signals?.avgRating || 0;
-    const reviews = item.signals?.reviewCount || 0;
+    // Try signals first, then fallback to entity data
+    const entity = item.entityId ? entitiesMap?.get(item.entityId) : undefined;
+    // Fallback chain: signals -> Entity interface fields -> 0
+    const rating = item.signals?.avgRating || entity?.average_rating || 0;
+    const reviews = item.signals?.reviewCount || entity?.review_count || 0;
     
     // GUARDRAIL: Minimum 2 reviews to be eligible for top pick
     if (reviews < 2) return;
     
     // Weighted score: rating * log(reviewCount + 2)
-    // This balances quality with confidence (more reviews = higher confidence)
     const score = rating * Math.log(reviews + 2);
+    const entityId = item.entityId || '';
     
-    if (score > maxScore) {
+    // Deterministic selection with tie-breakers:
+    // 1. Higher score wins
+    // 2. If tied: higher review count wins (more confidence)
+    // 3. If still tied: alphabetically later entityId wins (deterministic)
+    const shouldReplace = 
+      score > maxScore || 
+      (score === maxScore && reviews > maxReviews) ||
+      (score === maxScore && reviews === maxReviews && entityId > topEntityId);
+    
+    if (shouldReplace) {
       maxScore = score;
+      maxReviews = reviews;
+      topEntityId = entityId;
       topIdx = idx;
     }
   });
@@ -89,8 +112,9 @@ export function ChatRecommendationCards({
   const visibleItems = shortlist.slice(0, maxCards);
   const remainingCount = shortlist.length - maxCards;
   
-  // Calculate top pick based on score (not just position)
-  const topPickIdx = getTopPickIndex(visibleItems);
+  // Calculate top pick based on score (with entity fallback for resilience)
+  // Gate computation until entities are loaded to prevent flicker
+  const topPickIdx = isLoading ? -1 : getTopPickIndex(visibleItems, entitiesMap);
   
   return (
     <div className="space-y-3 mt-1">
