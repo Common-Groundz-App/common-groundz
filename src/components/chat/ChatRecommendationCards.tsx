@@ -24,6 +24,39 @@ interface ChatRecommendationCardsProps {
 }
 
 /**
+ * Calculate which item should be top pick based on weighted score
+ * Formula: rating * log(reviewCount + 2) balances quality with confidence
+ * 
+ * Guardrail: Items with < 2 reviews are never marked as top pick
+ * Returns -1 if no item qualifies (all have insufficient reviews)
+ */
+const getTopPickIndex = (items: ShortlistItem[]): number => {
+  if (items.length === 0) return -1;
+  
+  let maxScore = -1;
+  let topIdx = -1; // -1 means no top pick
+  
+  items.forEach((item, idx) => {
+    const rating = item.signals?.avgRating || 0;
+    const reviews = item.signals?.reviewCount || 0;
+    
+    // GUARDRAIL: Minimum 2 reviews to be eligible for top pick
+    if (reviews < 2) return;
+    
+    // Weighted score: rating * log(reviewCount + 2)
+    // This balances quality with confidence (more reviews = higher confidence)
+    const score = rating * Math.log(reviews + 2);
+    
+    if (score > maxScore) {
+      maxScore = score;
+      topIdx = idx;
+    }
+  });
+  
+  return topIdx;
+};
+
+/**
  * Container component that handles batch fetching and renders entity cards
  */
 export function ChatRecommendationCards({ 
@@ -56,6 +89,9 @@ export function ChatRecommendationCards({
   const visibleItems = shortlist.slice(0, maxCards);
   const remainingCount = shortlist.length - maxCards;
   
+  // Calculate top pick based on score (not just position)
+  const topPickIdx = getTopPickIndex(visibleItems);
+  
   return (
     <div className="space-y-3 mt-1">
       {visibleItems.map((item, idx) => (
@@ -63,7 +99,7 @@ export function ChatRecommendationCards({
           key={item.entityId || idx}
           item={item}
           entity={item.entityId ? entitiesMap?.get(item.entityId) : undefined}
-          isTopPick={idx === 0}
+          isTopPick={idx === topPickIdx}
         />
       ))}
       

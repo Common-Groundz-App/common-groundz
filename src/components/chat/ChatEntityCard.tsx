@@ -116,8 +116,13 @@ const inferSpecificType = (
 };
 
 /**
- * Generate a clean, human-readable subtitle for entity cards
- * Format: {specificType} · {location/context}
+ * Generate a smart subtitle for the card that provides context
+ * Priority: Type + Location (NEVER uses entity name as location)
+ * 
+ * Key rules:
+ * 1. Never use entity name as location (avoid redundancy)
+ * 2. Skip postcodes, too-long locations, and generic terms
+ * 3. Fallback to just type label (better than bad location)
  */
 const getSmartSubtitle = (
   entity: Entity | null | undefined,
@@ -126,53 +131,42 @@ const getSmartSubtitle = (
 ): string => {
   const baseType = getEntityTypeLabel(entityType || entity?.type || 'others');
   const typeLabel = inferSpecificType(entity, baseType);
+  const entityName = entity?.name?.toLowerCase() || '';
   
-  // Priority 1: Type + Location from metadata
+  // Only try location if we have entity data
   if (entity) {
     const metadata = entity.metadata as Record<string, any> | null;
     
-    // Try neighborhood/area first, then locality, then city
-    const location = metadata?.neighborhood ||
-                     metadata?.area ||
-                     metadata?.sublocality ||
-                     extractAreaFromAddress(metadata?.formatted_address) ||
-                     metadata?.locality ||
-                     metadata?.city;
+    // Location candidates in priority order
+    const locationCandidates = [
+      metadata?.neighborhood,
+      metadata?.sublocality,
+      extractAreaFromAddress(metadata?.formatted_address),
+      metadata?.locality,
+      metadata?.area,
+      metadata?.city,
+      entity.venue,
+    ].filter((loc): loc is string => Boolean(loc) && typeof loc === 'string');
     
-    // Filter out if location is just a postcode
-    if (location && !/^\d{5,6}$/.test(location)) {
-      return `${typeLabel} · ${location}`;
-    }
-    
-    // Venue as fallback location
-    if (entity.venue && !/^\d{5,6}$/.test(entity.venue)) {
-      return `${typeLabel} · ${entity.venue}`;
+    for (const loc of locationCandidates) {
+      // Skip postcodes
+      if (/^\d{5,6}$/.test(loc)) continue;
+      
+      // Skip if location contains the entity name (to avoid "Isha Foundation · Isha Foun...")
+      if (entityName && loc.toLowerCase().includes(entityName.substring(0, 8))) continue;
+      
+      // Skip if too long (> 25 chars)
+      if (loc.length > 25) continue;
+      
+      // Skip generic country/state names
+      const genericTerms = ['india', 'karnataka', 'maharashtra', 'tamil nadu', 'delhi', 'unknown'];
+      if (genericTerms.some(term => loc.toLowerCase() === term)) continue;
+      
+      return `${typeLabel} · ${loc}`;
     }
   }
   
-  // Priority 2: Clean reason (stripped of rating text, reasonable length)
-  if (reason) {
-    const cleanedReason = reason
-      .replace(/\d+\/\d+\s*(on|rating|stars?|from)/gi, '')
-      .replace(/rated?\s*\d+(\.\d+)?/gi, '')
-      .replace(/Common Groundz[;,]?\s*/gi, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    
-    if (cleanedReason.length > 15 && cleanedReason.length < 60) {
-      return cleanedReason;
-    }
-  }
-  
-  // Priority 3: Entity description (first sentence only)
-  if (entity?.description) {
-    const firstSentence = entity.description.split(/[.!?]/)[0].trim();
-    if (firstSentence.length > 10 && firstSentence.length < 60) {
-      return firstSentence;
-    }
-  }
-  
-  // Fallback: Just the specific type
+  // Fallback: Just the type label (no location is better than bad location)
   return typeLabel;
 };
 
