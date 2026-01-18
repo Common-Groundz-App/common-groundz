@@ -3340,8 +3340,17 @@ When product cards will be shown in the UI (which they always are for recommenda
 17. Do NOT use bullet points to list products - the cards are the list
 18. Your job is to explain WHY these are good matches, not WHAT they are
 19. Focus on context: user preferences, category insights, or decision guidance
-Example good response: "Based on nature lovers in Bangalore, these spots offer peaceful escapes from the city."
-Example bad response: "Here are my recommendations: 1. Lalbagh Garden (4.5/5)..."
+
+=== ANTI-HEDGING RULES (CRITICAL) ===
+20. Do NOT hedge or add disclaimers - let the ratings in cards speak for themselves
+21. Do NOT use phrases like "While some...", "However...", "Keep in mind...", "That said..."
+22. Do NOT say "While one of the options has received... some have also reported..."
+23. Do NOT add defensive language about mixed reviews - the cards show rating variance
+24. Be CONFIDENT and CONCISE - uncertainty is conveyed through ratings, not text
+25. If data is limited, say so briefly once, then move on
+
+Example good response: "Popular spots among Common Groundz users for a relaxed day in Bangalore."
+Example bad response: "While one of the options has received top ratings, some have also reported a less positive experience."
 `;
 }
 
@@ -5242,7 +5251,19 @@ Want me to compare prices or check specific retailers?"`;
         }
       }
       
-      console.log('[smart-assistant] Narration compressed for card context');
+      // ANTI-HEDGING: Remove defensive/hedging language that weakens card confidence
+      // The cards already show rating variance - text shouldn't add disclaimers
+      finalAssistantMessage = finalAssistantMessage
+        .replace(/While (one|some) of the options.*?(experience|ratings?|reviews?)\.\s*/gi, '')
+        .replace(/However,?\s*(some|a few|others?).*?(negative|less positive|mixed).*?\.\s*/gi, '')
+        .replace(/Keep in mind that.*?\.\s*/gi, '')
+        .replace(/It's worth noting that.*?\.\s*/gi, '')
+        .replace(/That said,?\s*.*?\.\s*/gi, '')
+        .replace(/Some users have (also )?reported.*?\.\s*/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      console.log('[smart-assistant] Narration compressed and hedging removed for card context');
     }
 
     // ========== HARD ENFORCEMENT LAYER (Post-Processing Guarantees) ==========
