@@ -5,7 +5,7 @@ import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoGalleryModal } from '@/components/ui/photo-gallery-modal';
 import { PhotoReportModal } from '@/components/ui/photo-report-modal';
 import { EntityPhotoEditModal } from './EntityPhotoEditModal';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,

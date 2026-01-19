@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import PreferencesForm from './PreferencesForm';
 import { useAuth } from '@/contexts/AuthContext';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 
 const PreferencesOnboardingModal = () => {
   const [openModal, setOpenModal] = React.useState(false);

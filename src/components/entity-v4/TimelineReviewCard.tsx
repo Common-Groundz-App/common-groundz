@@ -20,7 +20,7 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { deleteReview } from '@/services/review/core';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';

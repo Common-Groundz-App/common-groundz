@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import SelectablePills from './SelectablePills';
 import { Button } from '@/components/ui/button';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { 
   createPreferenceValue, 

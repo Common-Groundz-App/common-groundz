@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader2, Check, Globe } from 'lucide-react';
+import { Check, Globe, MoreHorizontal, Plus, Trash2, RotateCcw, X, ArrowUp, Sparkles, User, Search, Heart, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +12,14 @@ import { createPreferenceValue } from '@/utils/preferenceRouting';
 import { ConfidenceIndicator } from './ConfidenceIndicator';
 import { RecommendationExplanation } from './RecommendationExplanation';
 import { ChatRecommendationCards } from './ChatRecommendationCards';
+import { ConfirmationDialog } from '@/components/common/ConfirmationDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Source {
   title: string;
@@ -76,12 +83,53 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [loadingState, setLoadingState] = useState<'typing' | 'searching' | 'thinking'>('typing');
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
   const { addUnifiedConstraint, addPreferenceValue } = usePreferences();
+
+  // Sync textarea height to content
+  const syncTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    }
+  };
+
+  // Sync height when input changes programmatically
+  useEffect(() => {
+    syncTextareaHeight();
+  }, [input]);
+
+  // Conditional desktop focus on open
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    // Only auto-focus on desktop (pointer devices, not touch)
+    const isDesktop = window.matchMedia('(min-width: 640px) and (hover: hover)').matches;
+    if (isDesktop) {
+      const timer = setTimeout(() => textareaRef.current?.focus(), 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  // Mobile scroll lock when chat is open
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    // Only lock scroll on mobile (when backdrop would be visible)
+    const isMobileViewport = window.matchMedia('(max-width: 639px)').matches;
+    if (isMobileViewport) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
+    }
+  }, [isOpen]);
 
   // Process inline formatting: bold and citations
   const processInline = (text: string) => {
@@ -409,6 +457,8 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
       return <p key={idx}>{processInline(line)}</p>;
     });
   };
+
+  // Scroll to bottom on new messages
   useEffect(() => {
     if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
@@ -443,61 +493,62 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
 
   const handleSaveAsAvoid = async (messageId: string, pref: DetectedPreference) => {
     // Use detected targetType with defensive fallback
-    // If backend inference fails, use 'rule' for general/global scope, 'ingredient' otherwise
-    const targetType = pref.targetType ?? 
-      (pref.scope === 'general' || pref.scope === 'global' ? 'rule' : 'ingredient');
+    const detectedType = (pref.targetType || 'ingredient') as import('@/utils/constraintUtils').ConstraintTargetType;
     
-    const unified = createUnifiedConstraint(targetType, pref.value, {
-      scope: scopeToConstraintScope(pref.scope),
-      intent: 'avoid',
-      source: 'explicit_user_confirmation',
-    });
-    
-    const success = await addUnifiedConstraint(unified);
-    
-    if (success) {
-      setMessages(prev => prev.map(m => 
-        m.id === messageId ? { ...m, preferenceActionTaken: 'saved_avoid' as const } : m
-      ));
-      
-      // Mark as dismissed in memory so it won't appear in LFC
-      await markPreferenceAsDismissedInMemory(pref.value, pref.scope, 'saved_as_avoid');
-      
-      toast({ 
-        title: "Added to Things to Avoid",
-        description: `"${pref.value}" will be avoided in recommendations`
-      });
-    }
+    // Create unified constraint using utility function
+    const constraint = createUnifiedConstraint(
+      pref.value,
+      detectedType,
+      scopeToConstraintScope(pref.scope)
+    );
+
+    // Save to local preferences context
+    addUnifiedConstraint(constraint);
+
+    // Update message state
+    setMessages(prev => prev.map(m => 
+      m.id === messageId ? { ...m, preferenceActionTaken: 'saved_avoid' as const } : m
+    ));
   };
 
   const handleSaveAsPreference = async (messageId: string, pref: DetectedPreference) => {
-    const preferenceField = scopeToPreferenceField(pref.scope);
-    
-    // Preserve original intent: if detected as 'avoid', store as 'avoid' intent
-    const intentToStore = pref.type === 'avoid' ? 'avoid' : 'prefer';
-    
-    const newValue = createPreferenceValue(
+    // Create preference value using utility function
+    const field = scopeToPreferenceField(pref.scope) as import('@/utils/preferenceRouting').PreferenceSource;
+    const preferenceValue = createPreferenceValue(
       pref.value,
-      'explicit_user_confirmation',
-      intentToStore,
-      pref.confidence
+      field,
+      pref.scope as import('@/utils/preferenceRouting').PreferenceScope
     );
-    
-    const success = await addPreferenceValue(preferenceField, newValue);
-    
-    if (success) {
-      setMessages(prev => prev.map(m => 
-        m.id === messageId ? { ...m, preferenceActionTaken: 'saved_preference' as const } : m
-      ));
-      
-      // Mark as dismissed in memory so it won't appear in LFC
-      await markPreferenceAsDismissedInMemory(pref.value, pref.scope, 'saved_as_preference');
-      
-      toast({ 
-        title: "Added to Your Preferences",
-        description: `"${pref.value}" saved to your preferences`
-      });
+
+    // Save to local preferences context
+    addPreferenceValue(preferenceValue);
+
+    // Save to database
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const field = scopeToPreferenceField(pref.scope);
+        
+        const { error } = await supabase
+          .from('user_preferences')
+          .upsert({
+            user_id: user.id,
+            [field]: pref.value,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id'
+          });
+
+        if (error) throw error;
+      }
+    } catch (error) {
+      console.error('Error saving preference:', error);
     }
+
+    // Update message state
+    setMessages(prev => prev.map(m => 
+      m.id === messageId ? { ...m, preferenceActionTaken: 'saved_preference' as const } : m
+    ));
   };
 
   const handleDismissPreference = async (messageId: string, pref: DetectedPreference) => {
@@ -566,8 +617,11 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     setMessages(prev => [...prev, userMessage]);
     const messageText = input;
     setInput('');
+    // Reset textarea height after clearing
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
     setIsLoading(true);
-    setLoadingState('thinking');
 
     try {
       // Call the smart-assistant edge function
@@ -646,14 +700,21 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     });
   };
 
-  const handleDeleteConversation = async () => {
+  // Handle delete click - skip confirmation for empty state
+  const handleDeleteClick = () => {
     if (!conversationId) {
-      // Just clear local state
+      // Empty state: no conversation to delete, just clear local state
       setMessages([]);
       setInput('');
+      toast({ title: "Chat cleared" });
       return;
     }
-    
+    // Has conversation: show confirmation dialog
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirmed = async () => {
+    setIsDeleting(true);
     try {
       const { error } = await supabase
         .from('conversations')
@@ -665,6 +726,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
       setMessages([]);
       setConversationId(null);
       setInput('');
+      setShowDeleteConfirm(false);
       
       toast({
         title: "Conversation deleted",
@@ -677,16 +739,13 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         description: "Failed to delete conversation",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const handleResetMemory = async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to reset your memory? This will delete all learned preferences and cannot be undone.'
-    );
-    
-    if (!confirmed) return;
-    
+  const handleResetConfirmed = async () => {
+    setIsResetting(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -701,6 +760,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
       
       if (error) throw error;
       
+      setShowResetConfirm(false);
       toast({
         title: "Memory reset",
         description: "All learned preferences have been cleared",
@@ -712,257 +772,335 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         description: "Failed to reset memory",
         variant: "destructive",
       });
+    } finally {
+      setIsResetting(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+  // Handle suggestion click - set input AND sync height
+  const handleSuggestionClick = (text: string) => {
+    setInput(text);
+    // Use requestAnimationFrame to ensure state has updated
+    requestAnimationFrame(() => syncTextareaHeight());
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-24 right-6 w-96 h-[600px] bg-background border border-border rounded-lg shadow-2xl flex flex-col z-40">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-          <h3 className="font-semibold text-foreground">Assistant</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleNewConversation}
-            className="text-xs h-auto py-1.5 px-2"
-          >
-            New Chat
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDeleteConversation}
-            className="text-xs text-destructive h-auto py-1.5 px-2"
-          >
-            Delete
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleResetMemory}
-            className="text-xs text-amber-500 h-auto py-1.5 px-2"
-          >
-            Reset Memory
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="h-8 w-8 p-0"
-          >
-            ✕
-          </Button>
-        </div>
-      </div>
+    <>
+      {/* Mobile backdrop - CSS controlled, scroll locked via effect */}
+      <div 
+        className="fixed inset-0 bg-black/50 z-40 sm:hidden"
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        {messages.length === 0 ? (
-          <div className="space-y-4">
-            <div className="text-center text-muted-foreground text-sm mb-4">
-              Start a conversation or try a quick action:
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {[
-                "Get personalized recommendations",
-                "What do you know about my preferences?",
-                "Find products for sensitive skin",
-                "Show me my favorite genres"
-              ].map((action) => (
-                <Button
-                  key={action}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setInput(action);
-                    textareaRef.current?.focus();
-                  }}
-                  className="text-left justify-start h-auto py-2 px-3"
-                >
-                  {action}
+      {/* Chat container - pure CSS responsive */}
+      <div 
+        className={cn(
+          "fixed z-50 bg-background border border-border/40 shadow-xl overflow-hidden flex flex-col",
+          // Mobile: near full-screen
+          "bottom-16 left-2 right-2 top-16 rounded-2xl",
+          // Desktop: fixed size, right side
+          "sm:bottom-24 sm:left-auto sm:top-auto sm:right-6 sm:w-96 sm:h-[600px]"
+        )}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Chat assistant"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border/30">
+          <h3 className="font-semibold text-foreground">Assistant</h3>
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" aria-label="Chat options">
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {messages.map((message) => (
-              <div key={message.id}>
-                {/* Message bubble */}
-                <div
-                  className={cn(
-                    "flex",
-                    message.role === 'user' ? 'justify-end' : 'justify-start'
-                  )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={handleNewConversation}>
+                  <Plus className="h-4 w-4 mr-2" /> New Chat
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={handleDeleteClick}
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                  role="menuitem"
+                  aria-label="Delete conversation (destructive action)"
                 >
+                  <Trash2 className="h-4 w-4 mr-2" /> Delete Conversation
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => setShowResetConfirm(true)}
+                  className="text-amber-600 dark:text-amber-400 focus:bg-amber-500/10"
+                  role="menuitem"
+                  aria-label="Reset memory (warning: clears all preferences)"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" /> Reset Memory
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 hover:bg-muted" aria-label="Close chat">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+          {messages.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full px-4 sm:px-6">
+              <div className="flex-1 min-h-[40px]" />
+              
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-6 text-center">
+                What can I help with today?
+              </h2>
+              
+              <div className="w-full max-w-sm space-y-1">
+                {[
+                  { icon: Sparkles, text: "Get personalized recommendations" },
+                  { icon: User, text: "What do you know about my preferences?" },
+                  { icon: Search, text: "Find products for sensitive skin" },
+                  { icon: Heart, text: "Show me my favorite genres" }
+                ].map(({ icon: Icon, text }) => (
+                  <button
+                    key={text}
+                    onClick={() => handleSuggestionClick(text)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-muted-foreground 
+                               hover:text-foreground hover:bg-muted/50 
+                               focus:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                               rounded-xl transition-colors text-left group"
+                  >
+                    <Icon className="h-4 w-4 shrink-0 group-hover:text-primary transition-colors" />
+                    <span>{text}</span>
+                  </button>
+                ))}
+              </div>
+              
+              <div className="flex-1 min-h-[40px]" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <div key={message.id}>
+                  {/* Message bubble */}
                   <div
                     className={cn(
-                      "max-w-[80%] rounded-lg px-4 py-2",
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground'
+                      "flex",
+                      message.role === 'user' ? 'justify-end' : 'justify-start'
                     )}
                   >
-                    {/* CONTEXTUAL HOOK (primes user before cards) */}
-                    <div className="text-sm space-y-1">
-                      {message.role === 'assistant' 
-                        ? renderMarkdown(message.content)
-                        : <p className="whitespace-pre-wrap">{message.content}</p>
-                      }
-                    </div>
-                    
-                    {/* ENTITY CARDS (primary answer after context) */}
-                    {message.role === 'assistant' && message.shortlist && message.shortlist.length > 0 && message.shortlist.some(s => s.entityId) && (
-                      <div className="mt-3">
-                        <ChatRecommendationCards shortlist={message.shortlist} />
+                    <div
+                      className={cn(
+                        "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
+                        message.role === 'user'
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-transparent text-foreground'
+                      )}
+                    >
+                      {/* CONTEXTUAL HOOK (primes user before cards) */}
+                      <div className="space-y-1">
+                        {message.role === 'assistant' 
+                          ? renderMarkdown(message.content)
+                          : <p className="whitespace-pre-wrap">{message.content}</p>
+                        }
                       </div>
-                    )}
-                    
-                    {/* Phase 4: Enhanced Confidence Indicator */}
-                    {message.role === 'assistant' && message.confidenceLabel && (
-                      <ConfidenceIndicator
-                        confidenceLabel={message.confidenceLabel}
-                        resolverState={message.resolverState}
-                        sourceSummary={message.sourceSummary}
-                      />
-                    )}
-
-                    {/* Phase 4: Why These Recommendations */}
-                    {message.role === 'assistant' && (message.shortlist?.length || message.rejected?.length) && (
-                      <RecommendationExplanation
-                        shortlist={message.shortlist}
-                        rejected={message.rejected}
-                      />
-                    )}
-                    
-                    {/* Sources section - clean pill/chip design with favicons */}
-                    {message.role === 'assistant' && message.sources && message.sources.length > 0 && (() => {
-                      const messageKey = message.id || `msg-${messages.indexOf(message)}`;
-                      const isExpanded = expandedSources.has(messageKey);
-                      const visibleCount = isExpanded ? message.sources.length : 5;
                       
-                      return (
-                        <div className="mt-3 pt-2 border-t border-border/40">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-xs text-muted-foreground mr-1">Sources:</span>
-                            {message.sources.slice(0, visibleCount).map((source, idx) => (
-                              <a
-                                key={idx}
-                                href={source.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 text-[11px] bg-background border border-border/60 hover:bg-muted px-2.5 py-1 rounded-full transition-colors"
-                              >
-                                <img 
-                                  src={`https://www.google.com/s2/favicons?domain=${source.domain}&sz=16`}
-                                  alt=""
-                                  className="w-3.5 h-3.5 rounded-sm"
-                                  onError={(e) => { e.currentTarget.style.display = 'none' }}
-                                />
-                                <span>{source.domain}</span>
-                              </a>
-                            ))}
-                            {message.sources.length > 5 && !isExpanded && (
-                              <button 
-                                onClick={() => setExpandedSources(prev => {
-                                  const next = new Set(prev);
-                                  next.add(messageKey);
-                                  return next;
-                                })}
-                                className="text-[11px] text-primary hover:underline self-center"
-                              >
-                                +{message.sources.length - 5} more
-                              </button>
-                            )}
-                          </div>
+                      {/* ENTITY CARDS (primary answer after context) */}
+                      {message.role === 'assistant' && message.shortlist && message.shortlist.length > 0 && message.shortlist.some(s => s.entityId) && (
+                        <div className="mt-3">
+                          <ChatRecommendationCards shortlist={message.shortlist} />
                         </div>
-                      );
-                    })()}
-                  </div>
-                </div>
+                      )}
+                      
+                      {/* Phase 4: Enhanced Confidence Indicator */}
+                      {message.role === 'assistant' && message.confidenceLabel && (
+                        <ConfidenceIndicator
+                          confidenceLabel={message.confidenceLabel}
+                          resolverState={message.resolverState}
+                          sourceSummary={message.sourceSummary}
+                        />
+                      )}
 
-                {/* Preference confirmation chips for assistant messages */}
-                {message.role === 'assistant' && 
-                 message.detectedPreference && 
-                 !message.preferenceActionTaken && (
-                  <PreferenceConfirmationChips
-                    preference={message.detectedPreference}
-                    onSaveAsAvoid={() => handleSaveAsAvoid(message.id, message.detectedPreference!)}
-                    onSaveAsPreference={() => handleSaveAsPreference(message.id, message.detectedPreference!)}
-                    onDismiss={() => handleDismissPreference(message.id, message.detectedPreference!)}
-                  />
-                )}
+                      {/* Phase 4: Why These Recommendations */}
+                      {message.role === 'assistant' && (message.shortlist?.length || message.rejected?.length) && (
+                        <RecommendationExplanation
+                          shortlist={message.shortlist}
+                          rejected={message.rejected}
+                        />
+                      )}
+                      
+                      {/* Sources section - clean pill/chip design with favicons */}
+                      {message.role === 'assistant' && message.sources && message.sources.length > 0 && (() => {
+                        const messageKey = message.id || `msg-${messages.indexOf(message)}`;
+                        const isExpanded = expandedSources.has(messageKey);
+                        const visibleCount = isExpanded ? message.sources.length : 5;
+                        
+                        return (
+                          <div className="mt-3 pt-2 border-t border-border/40">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-xs text-muted-foreground mr-1">Sources:</span>
+                              {message.sources.slice(0, visibleCount).map((source, idx) => (
+                                <a
+                                  key={idx}
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1.5 text-[11px] bg-background border border-border/60 hover:bg-muted px-2.5 py-1 rounded-full transition-colors"
+                                >
+                                  <img 
+                                    src={`https://www.google.com/s2/favicons?domain=${source.domain}&sz=16`}
+                                    alt=""
+                                    className="w-3.5 h-3.5 rounded-sm"
+                                    onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                  />
+                                  <span>{source.domain}</span>
+                                </a>
+                              ))}
+                              {message.sources.length > 5 && !isExpanded && (
+                                <button 
+                                  onClick={() => setExpandedSources(prev => {
+                                    const next = new Set(prev);
+                                    next.add(messageKey);
+                                    return next;
+                                  })}
+                                  className="text-[11px] text-primary hover:underline self-center"
+                                >
+                                  +{message.sources.length - 5} more
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
 
-                {/* Confirmation after action */}
-                {message.preferenceActionTaken === 'saved_avoid' && (
-                  <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
-                    <Check className="h-3 w-3" />
-                    Added to Things to Avoid
-                  </div>
-                )}
-                {message.preferenceActionTaken === 'saved_preference' && (
-                  <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
-                    <Check className="h-3 w-3" />
-                    Added to Your Preferences
-                  </div>
-                )}
-              </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-muted text-foreground rounded-lg px-4 py-2 flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm">
-                    {loadingState === 'typing' && 'AI is typing...'}
-                    {loadingState === 'searching' && 'Searching reviews...'}
-                    {loadingState === 'thinking' && 'Thinking...'}
-                  </span>
+                  {/* Preference confirmation chips for assistant messages */}
+                  {message.role === 'assistant' && 
+                   message.detectedPreference && 
+                   !message.preferenceActionTaken && (
+                    <PreferenceConfirmationChips
+                      preference={message.detectedPreference}
+                      onSaveAsAvoid={() => handleSaveAsAvoid(message.id, message.detectedPreference!)}
+                      onSaveAsPreference={() => handleSaveAsPreference(message.id, message.detectedPreference!)}
+                      onDismiss={() => handleDismissPreference(message.id, message.detectedPreference!)}
+                    />
+                  )}
+
+                  {/* Confirmation after action */}
+                  {message.preferenceActionTaken === 'saved_avoid' && (
+                    <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
+                      <Check className="h-3 w-3" />
+                      Added to Things to Avoid
+                    </div>
+                  )}
+                  {message.preferenceActionTaken === 'saved_preference' && (
+                    <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
+                      <Check className="h-3 w-3" />
+                      Added to Your Preferences
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              ))}
+              
+              {/* Accessible typing indicator */}
+              {isLoading && (
+                <div 
+                  className="flex justify-start"
+                  role="status"
+                  aria-label="Assistant is typing"
+                  aria-live="polite"
+                >
+                  <div className="flex items-center gap-1.5 py-3 px-1" aria-hidden="true">
+                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
+                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce animation-delay-150" />
+                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce animation-delay-300" />
+                  </div>
+                  <span className="sr-only">Assistant is typing</span>
+                </div>
+              )}
+            </div>
+          )}
+        </ScrollArea>
+
+        {/* Input - pill style with auto-expanding textarea */}
+        <div className="p-3 sm:p-4 pt-2 border-t border-border/30">
+          <div className="flex items-end gap-2 bg-muted/50 dark:bg-muted/30 rounded-2xl 
+                          px-4 py-2 border border-border/50 
+                          focus-within:border-ring focus-within:ring-1 focus-within:ring-ring
+                          transition-colors">
+            
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                syncTextareaHeight();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              placeholder="Ask anything..."
+              rows={1}
+              className="flex-1 bg-transparent border-none outline-none text-sm resize-none
+                         placeholder:text-muted-foreground min-w-0 max-h-[120px] py-1"
+              disabled={isLoading}
+              aria-label="Message input"
+            />
+            
+            <Button
+              onClick={handleSend}
+              disabled={!input.trim() || isLoading}
+              size="icon"
+              className="h-8 w-8 rounded-full shrink-0 mb-0.5
+                         bg-foreground hover:bg-foreground/90 text-background
+                         disabled:bg-muted-foreground/30 disabled:text-muted-foreground
+                         transition-colors"
+              aria-label="Send message"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowUp className="h-4 w-4" />
+              )}
+            </Button>
           </div>
-        )}
-      </ScrollArea>
-
-      {/* Input */}
-      <div className="p-4 border-t border-border">
-        <div className="flex gap-2">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type your message..."
-            className="min-h-[60px] max-h-[120px] resize-none"
-            disabled={isLoading}
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!input.trim() || isLoading}
-            size="icon"
-            variant="gradient"
-            className="self-end"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
+          
+          <p className="text-xs text-muted-foreground/60 text-center mt-2">
+            AI can make mistakes. Verify important info.
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground mt-2">
-          Press Enter to send, Shift + Enter for new line
-        </p>
       </div>
-    </div>
+
+      {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteConfirmed}
+        title="Delete Conversation"
+        description="Are you sure? This cannot be undone."
+        variant="destructive"
+        confirmLabel="Delete"
+        loadingLabel="Deleting..."
+        isLoading={isDeleting}
+      />
+
+      <ConfirmationDialog
+        isOpen={showResetConfirm}
+        onClose={() => setShowResetConfirm(false)}
+        onConfirm={handleResetConfirmed}
+        title="Reset Memory"
+        description="This clears all learned preferences. You'll need to teach the assistant again."
+        variant="warning"
+        confirmLabel="Reset"
+        loadingLabel="Resetting..."
+        isLoading={isResetting}
+      />
+    </>
   );
 }

@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { deleteReview, updateReviewStatus } from '@/services/reviewService';
 import ReviewForm from './ReviewForm';
 import { formatRelativeDate } from '@/utils/dateUtils';

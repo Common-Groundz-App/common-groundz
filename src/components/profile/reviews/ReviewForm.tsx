@@ -7,7 +7,7 @@ import { EntityType, Entity as RecommendationEntity } from '@/services/recommend
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { getCanonicalType } from '@/services/entityTypeHelpers';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
 
