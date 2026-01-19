@@ -492,14 +492,14 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   };
 
   const handleSaveAsAvoid = async (messageId: string, pref: DetectedPreference) => {
-    // Use detected targetType with defensive fallback
-    const detectedType = (pref.targetType || 'ingredient') as import('@/utils/constraintUtils').ConstraintTargetType;
+    // Use detected targetType with defensive fallback - cast to the correct type
+    const detectedType = (pref.targetType || 'ingredient') as 'ingredient' | 'brand' | 'genre' | 'food_type' | 'format' | 'rule';
     
-    // Create unified constraint using utility function
+    // Create unified constraint using utility function (note: order is targetType, targetValue, options)
     const constraint = createUnifiedConstraint(
-      pref.value,
       detectedType,
-      scopeToConstraintScope(pref.scope)
+      pref.value,
+      { scope: scopeToConstraintScope(pref.scope) }
     );
 
     // Save to local preferences context
@@ -509,46 +509,39 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     setMessages(prev => prev.map(m => 
       m.id === messageId ? { ...m, preferenceActionTaken: 'saved_avoid' as const } : m
     ));
+    
+    toast({ title: "Added to Things to Avoid" });
   };
 
   const handleSaveAsPreference = async (messageId: string, pref: DetectedPreference) => {
+    // Map scope to canonical category field
+    const fieldMap: Record<string, string> = {
+      'food': 'food_preferences',
+      'skincare': 'skin_type',
+      'haircare': 'hair_type',
+      'entertainment': 'genre_preferences',
+      'health': 'lifestyle',
+      'general': 'lifestyle',
+    };
+    const field = fieldMap[pref.scope] || 'lifestyle';
+    
     // Create preference value using utility function
-    const field = scopeToPreferenceField(pref.scope) as import('@/utils/preferenceRouting').PreferenceSource;
+    // Signature: createPreferenceValue(value, source, intent?, confidence?, evidence?)
     const preferenceValue = createPreferenceValue(
       pref.value,
-      field,
-      pref.scope as import('@/utils/preferenceRouting').PreferenceScope
+      'chatbot' as const, // source
+      'like' as const // intent
     );
 
-    // Save to local preferences context
-    addPreferenceValue(preferenceValue);
-
-    // Save to database
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const field = scopeToPreferenceField(pref.scope);
-        
-        const { error } = await supabase
-          .from('user_preferences')
-          .upsert({
-            user_id: user.id,
-            [field]: pref.value,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'user_id'
-          });
-
-        if (error) throw error;
-      }
-    } catch (error) {
-      console.error('Error saving preference:', error);
-    }
+    // Save to local preferences context (requires field and value)
+    addPreferenceValue(field, preferenceValue);
 
     // Update message state
     setMessages(prev => prev.map(m => 
       m.id === messageId ? { ...m, preferenceActionTaken: 'saved_preference' as const } : m
     ));
+    
+    toast({ title: "Saved to Your Preferences" });
   };
 
   const handleDismissPreference = async (messageId: string, pref: DetectedPreference) => {
