@@ -11,14 +11,19 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-interface DeleteConfirmationDialogProps {
+interface ConfirmationDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
   title: string;
   description: string;
   isLoading?: boolean;
+  variant?: 'destructive' | 'warning' | 'default';
+  confirmLabel?: string;
+  cancelLabel?: string;
+  loadingLabel?: string;
 }
 
 // Helper function to reset pointer-events on body if they're set to none
@@ -28,13 +33,17 @@ const resetBodyPointerEvents = () => {
   }
 };
 
-const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
+const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   isOpen,
   onClose,
   onConfirm,
   title,
   description,
   isLoading = false,
+  variant = 'default',
+  confirmLabel = 'Confirm',
+  cancelLabel = 'Cancel',
+  loadingLabel,
 }) => {
   // Clean up pointer-events when dialog closes or component unmounts
   useEffect(() => {
@@ -68,6 +77,20 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
   // Only render if the dialog is open
   if (!isOpen) return null;
 
+  // Determine button styling based on variant
+  const getButtonClassName = () => {
+    switch (variant) {
+      case 'destructive':
+        return 'bg-destructive hover:bg-destructive/90 text-destructive-foreground';
+      case 'warning':
+        return 'bg-amber-500 hover:bg-amber-600 text-white';
+      default:
+        return 'bg-primary hover:bg-primary/90 text-primary-foreground';
+    }
+  };
+
+  const displayLoadingLabel = loadingLabel || `${confirmLabel}...`;
+
   return (
     <AlertDialog 
       open={isOpen} 
@@ -93,7 +116,7 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
               onClose();
             }}
           >
-            Cancel
+            {cancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction 
             onClick={(e) => {
@@ -102,15 +125,15 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
               onConfirm();
             }}
             disabled={isLoading}
-            className="bg-destructive hover:bg-destructive/90"
+            className={cn(getButtonClassName())}
           >
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
-                Deleting...
+                {displayLoadingLabel}
               </>
             ) : (
-              'Delete'
+              confirmLabel
             )}
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -119,4 +142,24 @@ const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = ({
   );
 };
 
+// Backwards compatibility wrapper
+interface DeleteConfirmationDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title: string;
+  description: string;
+  isLoading?: boolean;
+}
+
+const DeleteConfirmationDialog: React.FC<DeleteConfirmationDialogProps> = (props) => (
+  <ConfirmationDialog 
+    {...props} 
+    variant="destructive" 
+    confirmLabel="Delete" 
+    loadingLabel="Deleting..." 
+  />
+);
+
+export { ConfirmationDialog, DeleteConfirmationDialog };
 export default DeleteConfirmationDialog;

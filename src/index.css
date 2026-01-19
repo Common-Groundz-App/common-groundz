@@ -129,3 +129,11 @@
     display: none;
   }
 }
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-bounce,
+  .animate-pulse {
+    animation: none !important;
+  }
+}

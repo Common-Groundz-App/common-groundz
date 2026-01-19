@@ -13,7 +13,7 @@ import { useForm, Controller } from "react-hook-form";
 import EntitySearch from './EntitySearch';
 import { RecommendationVisibility, Recommendation } from '@/services/recommendationService';
 import ConnectedRingsRating from './ConnectedRingsRating';
-import DeleteConfirmationDialog from '@/components/common/DeleteConfirmationDialog';
+import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 
 // String literal type for category fields in forms
