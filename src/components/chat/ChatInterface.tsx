@@ -102,6 +102,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [isHydratingHistory, setIsHydratingHistory] = useState(false);
   const [historyStale, setHistoryStale] = useState(false);
   const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
+  const [conversationOrigin, setConversationOrigin] = useState<'new' | 'history' | null>(null);
   
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -661,7 +662,11 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
 
       setMessages(loadedMessages);
       setConversationId(convId);
+      setConversationOrigin('history'); // Track that this came from history
       setView('chat');
+      
+      // Reset safety guard after successful load
+      setIsHydratingHistory(false);
       
       // Focus textarea only on desktop/pointer devices (avoid disrupting mobile IME/screen readers)
       setTimeout(() => {
@@ -674,7 +679,8 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     } catch (error) {
       console.error('Error loading conversation:', error);
       toast({ title: "Error", description: "Failed to load conversation", variant: "destructive" });
-      setIsHydratingHistory(false);
+      setIsHydratingHistory(false); // Reset safety guard on failure
+      setConversationOrigin(null); // Clear stale origin on failure
     } finally {
       setIsLoadingConversation(false);
     }
@@ -816,6 +822,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const handleNewConversation = () => {
     setMessages([]);
     setConversationId(null);
+    setConversationOrigin(null); // Reset to new conversation state
     setInput('');
     setIsHydratingHistory(false); // Critical reset
     setView('chat');
@@ -871,6 +878,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
       if (targetId === conversationId) {
         setMessages([]);
         setConversationId(null);
+        setConversationOrigin(null); // Reset origin when active conversation deleted
         setIsHydratingHistory(false);
         setView('chat');
       }
@@ -891,9 +899,10 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   };
 
   // Handle close - reset view and all pending state
+  // Note: Do NOT reset conversationOrigin - preserves UI state across close/reopen
+  // isHydratingHistory is now reset after load completes (success/failure), not on close
   const handleClose = () => {
     setView('chat'); // Always reset to chat view
-    setIsHydratingHistory(false); // Critical reset
     setConversationToDelete(null); // Clear pending delete
     onClose();
   };
@@ -951,7 +960,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                 </Button>
                 <span className="font-semibold text-foreground">Chat history</span>
               </>
-            ) : conversationId && isHydratingHistory ? (
+            ) : conversationId && conversationOrigin === 'history' ? (
               <h3 className="font-semibold text-foreground truncate max-w-[200px]">
                 {currentConvTitle || 'Assistant'}
               </h3>
@@ -963,7 +972,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
           {/* Right side icons */}
           <div className="flex items-center gap-1 shrink-0">
             {/* New Chat - only when viewing a past conversation */}
-            {view === 'chat' && conversationId && isHydratingHistory && (
+            {view === 'chat' && conversationId && conversationOrigin === 'history' && (
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -1000,7 +1009,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         </div>
 
         {/* Context indicator for resumed conversations */}
-        {view === 'chat' && conversationId && isHydratingHistory && (
+        {view === 'chat' && conversationId && conversationOrigin === 'history' && (
           <div className="text-xs text-muted-foreground text-center py-2 border-b border-border/20 bg-muted/30">
             Resumed conversation · {(() => {
               const conv = conversations.find(c => c.id === conversationId);
