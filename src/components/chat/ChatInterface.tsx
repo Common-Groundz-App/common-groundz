@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Check, Globe, MoreHorizontal, Plus, Trash2, X, ArrowUp, Sparkles, User, Search, Heart, Loader2 } from 'lucide-react';
+import { Check, Globe, MoreHorizontal, Trash2, X, ArrowUp, Sparkles, User, Search, Heart, Loader2, Clock, PenSquare, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -13,11 +13,11 @@ import { ConfidenceIndicator } from './ConfidenceIndicator';
 import { RecommendationExplanation } from './RecommendationExplanation';
 import { ChatRecommendationCards } from './ChatRecommendationCards';
 import { ConfirmationDialog } from '@/components/common/ConfirmationDialog';
+import { format } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
@@ -73,6 +73,13 @@ interface Message {
   rejected?: RejectedItem[] | null;
 }
 
+interface Conversation {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ChatInterfaceProps {
   isOpen: boolean;
   onClose: () => void;
@@ -86,6 +93,16 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // History panel state
+  const [view, setView] = useState<'chat' | 'history'>('chat');
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [isHydratingHistory, setIsHydratingHistory] = useState(false);
+  const [historyStale, setHistoryStale] = useState(false);
+  const [conversationToDelete, setConversationToDelete] = useState<string | null>(null);
+  
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
@@ -595,8 +612,114 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     }
   };
 
+  // Fetch user's conversation history
+  const fetchConversations = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id, title, created_at, updated_at')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(50);
+
+      if (error) throw error;
+      setConversations(data || []);
+      setHistoryStale(false);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      toast({ title: "Error", description: "Failed to load history", variant: "destructive" });
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Load a specific conversation (read-only hydration)
+  const loadConversation = async (convId: string) => {
+    setIsLoadingConversation(true);
+    setIsHydratingHistory(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('conversation_messages')
+        .select('id, role, content, created_at')
+        .eq('conversation_id', convId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const loadedMessages: Message[] = (data || []).map(msg => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+        createdAt: new Date(msg.created_at),
+      }));
+
+      setMessages(loadedMessages);
+      setConversationId(convId);
+      setView('chat');
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      toast({ title: "Error", description: "Failed to load conversation", variant: "destructive" });
+      setIsHydratingHistory(false);
+    } finally {
+      setIsLoadingConversation(false);
+    }
+  };
+
+  // Group conversations by date
+  const groupConversationsByDate = (convs: Conversation[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+    const lastWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const lastMonth = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const groups: { label: string; items: Conversation[] }[] = [];
+    
+    const todayItems = convs.filter(c => new Date(c.updated_at) >= today);
+    const yesterdayItems = convs.filter(c => {
+      const d = new Date(c.updated_at);
+      return d >= yesterday && d < today;
+    });
+    const lastWeekItems = convs.filter(c => {
+      const d = new Date(c.updated_at);
+      return d >= lastWeek && d < yesterday;
+    });
+    const lastMonthItems = convs.filter(c => {
+      const d = new Date(c.updated_at);
+      return d >= lastMonth && d < lastWeek;
+    });
+    const olderItems = convs.filter(c => new Date(c.updated_at) < lastMonth);
+
+    if (todayItems.length) groups.push({ label: 'Today', items: todayItems });
+    if (yesterdayItems.length) groups.push({ label: 'Yesterday', items: yesterdayItems });
+    if (lastWeekItems.length) groups.push({ label: 'Last 7 days', items: lastWeekItems });
+    if (lastMonthItems.length) groups.push({ label: 'Last 30 days', items: lastMonthItems });
+    if (olderItems.length) groups.push({ label: 'Older', items: olderItems });
+
+    return groups;
+  };
+
   const handleSend = async () => {
+    // SAFETY INVARIANT: isHydratingHistory must ALWAYS be false before learning pipelines run.
+    // This is a safety invariant. Do not remove without full audit.
+    if (isHydratingHistory) {
+      console.warn('[Safety] Blocked send during historical hydration');
+      toast({ title: "Loading conversation", description: "Please wait..." });
+      return;
+    }
+    
     if (!input.trim() || isLoading) return;
+
+    // Clear hydration mode on successful send commit
+    setIsHydratingHistory(false);
+    // Mark history as stale after sending (for refresh on next open)
+    setHistoryStale(true);
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
@@ -685,44 +808,67 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     setMessages([]);
     setConversationId(null);
     setInput('');
+    setIsHydratingHistory(false); // Critical reset
+    setView('chat');
     toast({
       title: "New conversation started",
       description: "Previous conversation saved",
     });
   };
 
-  // Handle delete click - skip confirmation for empty state
-  const handleDeleteClick = () => {
-    if (!conversationId) {
-      // Empty state: no conversation to delete, just clear local state
-      setMessages([]);
-      setInput('');
-      toast({ title: "Chat cleared" });
-      return;
+  // Toggle history panel
+  const handleOpenHistory = () => {
+    if (view === 'history') {
+      setView('chat');
+    } else {
+      // Only fetch if stale or empty
+      if (historyStale || conversations.length === 0) {
+        fetchConversations();
+      }
+      setView('history');
     }
-    // Has conversation: show confirmation dialog
+  };
+
+  // Delete from history list (sets explicit target)
+  const handleDeleteFromHistory = (convId: string) => {
+    setConversationToDelete(convId);
     setShowDeleteConfirm(true);
   };
 
+  // Handle delete confirmation (explicit target required)
   const handleDeleteConfirmed = async () => {
+    // SAFETY: Require explicit target, no fallback to conversationId
+    if (!conversationToDelete) {
+      console.warn('[Safety] Delete attempted without explicit target');
+      setShowDeleteConfirm(false);
+      return;
+    }
+    
+    const targetId = conversationToDelete;
     setIsDeleting(true);
+    
     try {
       const { error } = await supabase
         .from('conversations')
         .delete()
-        .eq('id', conversationId);
+        .eq('id', targetId);
       
       if (error) throw error;
       
-      setMessages([]);
-      setConversationId(null);
-      setInput('');
-      setShowDeleteConfirm(false);
+      // Optimistic UI: Remove from list immediately
+      setConversations(prev => prev.filter(c => c.id !== targetId));
       
-      toast({
-        title: "Conversation deleted",
-        description: "Messages have been removed",
-      });
+      // If deleted active conversation -> fresh empty chat
+      if (targetId === conversationId) {
+        setMessages([]);
+        setConversationId(null);
+        setIsHydratingHistory(false);
+        setView('chat');
+      }
+      
+      setShowDeleteConfirm(false);
+      setConversationToDelete(null);
+      toast({ title: "Conversation deleted" });
     } catch (error) {
       console.error('Error deleting conversation:', error);
       toast({
@@ -735,6 +881,13 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     }
   };
 
+  // Handle close - reset view and all pending state
+  const handleClose = () => {
+    setView('chat'); // Always reset to chat view
+    setIsHydratingHistory(false); // Critical reset
+    setConversationToDelete(null); // Clear pending delete
+    onClose();
+  };
 
   // Handle suggestion click - set input AND sync height
   const handleSuggestionClick = (text: string) => {
@@ -745,12 +898,17 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
 
   if (!isOpen) return null;
 
+  // Get current conversation title for header
+  const currentConvTitle = conversationId 
+    ? conversations.find(c => c.id === conversationId)?.title 
+    : null;
+
   return (
     <>
       {/* Mobile backdrop - CSS controlled, scroll locked via effect */}
       <div 
         className="fixed inset-0 bg-black/50 z-40 sm:hidden"
-        onClick={onClose}
+        onClick={handleClose}
         aria-hidden="true"
       />
 
@@ -767,270 +925,419 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         aria-modal="true"
         aria-label="Chat assistant"
       >
-        {/* Header */}
+        {/* Header - Dynamic based on view and conversation state */}
         <div className="flex items-center justify-between p-4 border-b border-border/30">
-          <h3 className="font-semibold text-foreground">Assistant</h3>
-          <div className="flex items-center gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted" aria-label="Chat options">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={handleNewConversation}>
-                  <Plus className="h-4 w-4 mr-2" /> New Chat
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={handleDeleteClick}
-                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                  role="menuitem"
-                  aria-label="Delete conversation (destructive action)"
+          {/* Left side */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {view === 'history' ? (
+              <>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setView('chat')}
+                  className="h-8 w-8 shrink-0"
+                  aria-label="Back to chat"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" /> Delete Conversation
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 hover:bg-muted" aria-label="Close chat">
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <span className="font-semibold text-foreground">Chat history</span>
+              </>
+            ) : conversationId && isHydratingHistory ? (
+              <h3 className="font-semibold text-foreground truncate max-w-[200px]">
+                {currentConvTitle || 'Assistant'}
+              </h3>
+            ) : (
+              <h3 className="font-semibold text-foreground">Assistant</h3>
+            )}
+          </div>
+
+          {/* Right side icons */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* New Chat - only when viewing a past conversation */}
+            {view === 'chat' && conversationId && isHydratingHistory && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={handleNewConversation}
+                className="h-8 w-8 hover:bg-muted" 
+                aria-label="New chat"
+              >
+                <PenSquare className="h-4 w-4" />
+              </Button>
+            )}
+            
+            {/* History button - always visible */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleOpenHistory}
+              className={cn("h-8 w-8 hover:bg-muted", view === 'history' && "bg-muted")}
+              aria-label="Chat history"
+            >
+              <Clock className="h-4 w-4" />
+            </Button>
+            
+            {/* Close button */}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleClose} 
+              className="h-8 w-8 hover:bg-muted" 
+              aria-label="Close chat"
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Messages */}
-        <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-          {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full px-4 sm:px-6">
-              <div className="flex-1 min-h-[40px]" />
-              
-              <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-6 text-center">
-                What can I help with today?
-              </h2>
-              
-              <div className="w-full max-w-sm space-y-1">
-                {[
-                  { icon: Sparkles, text: "Get personalized recommendations" },
-                  { icon: User, text: "What do you know about my preferences?" },
-                  { icon: Search, text: "Find products for sensitive skin" },
-                  { icon: Heart, text: "Show me my favorite genres" }
-                ].map(({ icon: Icon, text }) => (
-                  <button
-                    key={text}
-                    onClick={() => handleSuggestionClick(text)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-muted-foreground 
-                               hover:text-foreground hover:bg-muted/50 
-                               focus:outline-none focus-visible:ring-2 focus-visible:ring-ring
-                               rounded-xl transition-colors text-left group"
-                  >
-                    <Icon className="h-4 w-4 shrink-0 group-hover:text-primary transition-colors" />
-                    <span>{text}</span>
-                  </button>
+        {/* Context indicator for resumed conversations */}
+        {view === 'chat' && conversationId && isHydratingHistory && (
+          <div className="text-xs text-muted-foreground text-center py-2 border-b border-border/20 bg-muted/30">
+            Resumed conversation · {(() => {
+              const conv = conversations.find(c => c.id === conversationId);
+              if (!conv) return '';
+              try {
+                return format(new Date(conv.created_at), 'MMM d, yyyy');
+              } catch {
+                return new Date(conv.created_at).toLocaleDateString();
+              }
+            })()}
+          </div>
+        )}
+
+        {/* Loading overlay during conversation hydration */}
+        {isLoadingConversation && (
+          <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {/* History panel OR Messages */}
+        {view === 'history' ? (
+          <div className="flex-1 overflow-auto p-2">
+            {isLoadingHistory ? (
+              <div className="flex items-center justify-center h-32">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                <Clock className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                <p className="text-muted-foreground">No conversations yet</p>
+                <p className="text-sm text-muted-foreground/60 mt-1 mb-4">
+                  Start chatting to see your history here
+                </p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setView('chat')}
+                >
+                  Start new chat
+                </Button>
+              </div>
+            ) : (
+              <div>
+                {groupConversationsByDate(conversations).map(({ label, items }) => (
+                  <div key={label} className="mb-4">
+                    <p className="text-xs font-medium text-muted-foreground px-3 py-2">
+                      {label}
+                    </p>
+                    <div className="space-y-1">
+                      {items.map((conv) => (
+                        <div
+                          key={conv.id}
+                          className={cn(
+                            "group relative flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors",
+                            conv.id === conversationId 
+                              ? "bg-muted" 
+                              : "hover:bg-muted/50"
+                          )}
+                          onClick={() => loadConversation(conv.id)}
+                        >
+                          <span className="flex-1 text-sm truncate">
+                            {conv.title || 'Untitled conversation'}
+                          </span>
+                          
+                          {/* 3-dots menu - hover on desktop, always on mobile */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "h-7 w-7 shrink-0 transition-opacity",
+                                  "opacity-0 group-hover:opacity-100",
+                                  "max-sm:opacity-100"
+                                )}
+                                onClick={(e) => e.stopPropagation()}
+                                aria-label="Conversation options"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteFromHistory(conv.id);
+                                }}
+                                className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-              
-              <div className="flex-1 min-h-[40px]" />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {messages.map((message) => (
-                <div key={message.id}>
-                  {/* Message bubble */}
-                  <div
-                    className={cn(
-                      "flex",
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
-                    )}
-                  >
+            )}
+          </div>
+        ) : (
+          /* Messages */
+          <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full px-4 sm:px-6">
+                <div className="flex-1 min-h-[40px]" />
+                
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-6 text-center">
+                  What can I help with today?
+                </h2>
+                
+                <div className="w-full max-w-sm space-y-1">
+                  {[
+                    { icon: Sparkles, text: "Get personalized recommendations" },
+                    { icon: User, text: "What do you know about my preferences?" },
+                    { icon: Search, text: "Find products for sensitive skin" },
+                    { icon: Heart, text: "Show me my favorite genres" }
+                  ].map(({ icon: Icon, text }) => (
+                    <button
+                      key={text}
+                      onClick={() => handleSuggestionClick(text)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-muted-foreground 
+                                 hover:text-foreground hover:bg-muted/50 
+                                 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                                 rounded-xl transition-colors text-left group"
+                    >
+                      <Icon className="h-4 w-4 shrink-0 group-hover:text-primary transition-colors" />
+                      <span>{text}</span>
+                    </button>
+                  ))}
+                </div>
+                
+                <div className="flex-1 min-h-[40px]" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div key={message.id}>
+                    {/* Message bubble */}
                     <div
                       className={cn(
-                        "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-transparent text-foreground'
+                        "flex",
+                        message.role === 'user' ? 'justify-end' : 'justify-start'
                       )}
                     >
-                      {/* CONTEXTUAL HOOK (primes user before cards) */}
-                      <div className="space-y-1">
-                        {message.role === 'assistant' 
-                          ? renderMarkdown(message.content)
-                          : <p className="whitespace-pre-wrap">{message.content}</p>
-                        }
-                      </div>
-                      
-                      {/* ENTITY CARDS (primary answer after context) */}
-                      {message.role === 'assistant' && message.shortlist && message.shortlist.length > 0 && message.shortlist.some(s => s.entityId) && (
-                        <div className="mt-3">
-                          <ChatRecommendationCards shortlist={message.shortlist} />
+                      <div
+                        className={cn(
+                          "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
+                          message.role === 'user'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-transparent text-foreground'
+                        )}
+                      >
+                        {/* CONTEXTUAL HOOK (primes user before cards) */}
+                        <div className="space-y-1">
+                          {message.role === 'assistant' 
+                            ? renderMarkdown(message.content)
+                            : <p className="whitespace-pre-wrap">{message.content}</p>
+                          }
                         </div>
-                      )}
-                      
-                      {/* Phase 4: Enhanced Confidence Indicator */}
-                      {message.role === 'assistant' && message.confidenceLabel && (
-                        <ConfidenceIndicator
-                          confidenceLabel={message.confidenceLabel}
-                          resolverState={message.resolverState}
-                          sourceSummary={message.sourceSummary}
-                        />
-                      )}
-
-                      {/* Phase 4: Why These Recommendations */}
-                      {message.role === 'assistant' && (message.shortlist?.length || message.rejected?.length) && (
-                        <RecommendationExplanation
-                          shortlist={message.shortlist}
-                          rejected={message.rejected}
-                        />
-                      )}
-                      
-                      {/* Sources section - clean pill/chip design with favicons */}
-                      {message.role === 'assistant' && message.sources && message.sources.length > 0 && (() => {
-                        const messageKey = message.id || `msg-${messages.indexOf(message)}`;
-                        const isExpanded = expandedSources.has(messageKey);
-                        const visibleCount = isExpanded ? message.sources.length : 5;
                         
-                        return (
-                          <div className="mt-3 pt-2 border-t border-border/40">
-                            <div className="flex flex-wrap items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground mr-1">Sources:</span>
-                              {message.sources.slice(0, visibleCount).map((source, idx) => (
-                                <a
-                                  key={idx}
-                                  href={source.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1.5 text-[11px] bg-background border border-border/60 hover:bg-muted px-2.5 py-1 rounded-full transition-colors"
-                                >
-                                  <img 
-                                    src={`https://www.google.com/s2/favicons?domain=${source.domain}&sz=16`}
-                                    alt=""
-                                    className="w-3.5 h-3.5 rounded-sm"
-                                    onError={(e) => { e.currentTarget.style.display = 'none' }}
-                                  />
-                                  <span>{source.domain}</span>
-                                </a>
-                              ))}
-                              {message.sources.length > 5 && !isExpanded && (
-                                <button 
-                                  onClick={() => setExpandedSources(prev => {
-                                    const next = new Set(prev);
-                                    next.add(messageKey);
-                                    return next;
-                                  })}
-                                  className="text-[11px] text-primary hover:underline self-center"
-                                >
-                                  +{message.sources.length - 5} more
-                                </button>
-                              )}
-                            </div>
+                        {/* ENTITY CARDS (primary answer after context) */}
+                        {message.role === 'assistant' && message.shortlist && message.shortlist.length > 0 && message.shortlist.some(s => s.entityId) && (
+                          <div className="mt-3">
+                            <ChatRecommendationCards shortlist={message.shortlist} />
                           </div>
-                        );
-                      })()}
+                        )}
+                        
+                        {/* Phase 4: Enhanced Confidence Indicator */}
+                        {message.role === 'assistant' && message.confidenceLabel && (
+                          <ConfidenceIndicator
+                            confidenceLabel={message.confidenceLabel}
+                            resolverState={message.resolverState}
+                            sourceSummary={message.sourceSummary}
+                          />
+                        )}
+
+                        {/* Phase 4: Why These Recommendations */}
+                        {message.role === 'assistant' && (message.shortlist?.length || message.rejected?.length) && (
+                          <RecommendationExplanation
+                            shortlist={message.shortlist}
+                            rejected={message.rejected}
+                          />
+                        )}
+                        
+                        {/* Sources section - clean pill/chip design with favicons */}
+                        {message.role === 'assistant' && message.sources && message.sources.length > 0 && (() => {
+                          const messageKey = message.id || `msg-${messages.indexOf(message)}`;
+                          const isExpanded = expandedSources.has(messageKey);
+                          const visibleCount = isExpanded ? message.sources.length : 5;
+                          
+                          return (
+                            <div className="mt-3 pt-2 border-t border-border/40">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-xs text-muted-foreground mr-1">Sources:</span>
+                                {message.sources.slice(0, visibleCount).map((source, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={source.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-[11px] bg-background border border-border/60 hover:bg-muted px-2.5 py-1 rounded-full transition-colors"
+                                  >
+                                    <img 
+                                      src={`https://www.google.com/s2/favicons?domain=${source.domain}&sz=16`}
+                                      alt=""
+                                      className="w-3.5 h-3.5 rounded-sm"
+                                      onError={(e) => { e.currentTarget.style.display = 'none' }}
+                                    />
+                                    <span>{source.domain}</span>
+                                  </a>
+                                ))}
+                                {message.sources.length > 5 && !isExpanded && (
+                                  <button 
+                                    onClick={() => setExpandedSources(prev => {
+                                      const next = new Set(prev);
+                                      next.add(messageKey);
+                                      return next;
+                                    })}
+                                    className="text-[11px] text-primary hover:underline self-center"
+                                  >
+                                    +{message.sources.length - 5} more
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
+
+                    {/* Preference confirmation chips for assistant messages */}
+                    {message.role === 'assistant' && 
+                     message.detectedPreference && 
+                     !message.preferenceActionTaken && (
+                      <PreferenceConfirmationChips
+                        preference={message.detectedPreference}
+                        onSaveAsAvoid={() => handleSaveAsAvoid(message.id, message.detectedPreference!)}
+                        onSaveAsPreference={() => handleSaveAsPreference(message.id, message.detectedPreference!)}
+                        onDismiss={() => handleDismissPreference(message.id, message.detectedPreference!)}
+                      />
+                    )}
+
+                    {/* Confirmation after action */}
+                    {message.preferenceActionTaken === 'saved_avoid' && (
+                      <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
+                        <Check className="h-3 w-3" />
+                        Added to Things to Avoid
+                      </div>
+                    )}
+                    {message.preferenceActionTaken === 'saved_preference' && (
+                      <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
+                        <Check className="h-3 w-3" />
+                        Added to Your Preferences
+                      </div>
+                    )}
                   </div>
-
-                  {/* Preference confirmation chips for assistant messages */}
-                  {message.role === 'assistant' && 
-                   message.detectedPreference && 
-                   !message.preferenceActionTaken && (
-                    <PreferenceConfirmationChips
-                      preference={message.detectedPreference}
-                      onSaveAsAvoid={() => handleSaveAsAvoid(message.id, message.detectedPreference!)}
-                      onSaveAsPreference={() => handleSaveAsPreference(message.id, message.detectedPreference!)}
-                      onDismiss={() => handleDismissPreference(message.id, message.detectedPreference!)}
-                    />
-                  )}
-
-                  {/* Confirmation after action */}
-                  {message.preferenceActionTaken === 'saved_avoid' && (
-                    <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
-                      <Check className="h-3 w-3" />
-                      Added to Things to Avoid
+                ))}
+                
+                {/* Accessible typing indicator */}
+                {isLoading && (
+                  <div 
+                    className="flex justify-start"
+                    role="status"
+                    aria-label="Assistant is typing"
+                    aria-live="polite"
+                  >
+                    <div className="flex items-center gap-1.5 py-3 px-1" aria-hidden="true">
+                      <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
+                      <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce animation-delay-150" />
+                      <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce animation-delay-300" />
                     </div>
-                  )}
-                  {message.preferenceActionTaken === 'saved_preference' && (
-                    <div className="flex items-center gap-1 text-xs text-green-600 ml-2 mt-1">
-                      <Check className="h-3 w-3" />
-                      Added to Your Preferences
-                    </div>
-                  )}
-                </div>
-              ))}
+                    <span className="sr-only">Assistant is typing</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </ScrollArea>
+        )}
+
+        {/* Input - pill style with auto-expanding textarea (hidden in history view) */}
+        {view === 'chat' && (
+          <div className="p-3 sm:p-4 pt-2 border-t border-border/30">
+            <div className="flex items-end gap-2 bg-muted/50 dark:bg-muted/30 rounded-2xl 
+                            px-4 py-2 border border-border/50 
+                            focus-within:border-ring focus-within:ring-1 focus-within:ring-ring
+                            transition-colors">
               
-              {/* Accessible typing indicator */}
-              {isLoading && (
-                <div 
-                  className="flex justify-start"
-                  role="status"
-                  aria-label="Assistant is typing"
-                  aria-live="polite"
-                >
-                  <div className="flex items-center gap-1.5 py-3 px-1" aria-hidden="true">
-                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" />
-                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce animation-delay-150" />
-                    <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce animation-delay-300" />
-                  </div>
-                  <span className="sr-only">Assistant is typing</span>
-                </div>
-              )}
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  syncTextareaHeight();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder={isLoadingConversation ? "Loading..." : "Ask anything..."}
+                rows={1}
+                className={cn(
+                  "flex-1 bg-transparent border-none outline-none text-sm resize-none",
+                  "placeholder:text-muted-foreground min-w-0 max-h-[120px] py-1",
+                  (isLoading || isLoadingConversation) && "opacity-50 cursor-not-allowed"
+                )}
+                disabled={isLoading || isLoadingConversation}
+                aria-label="Message input"
+              />
+              
+              <Button
+                onClick={handleSend}
+                disabled={!input.trim() || isLoading || isLoadingConversation}
+                size="icon"
+                className="h-8 w-8 rounded-full shrink-0 mb-0.5
+                           bg-foreground hover:bg-foreground/90 text-background
+                           disabled:bg-muted-foreground/30 disabled:text-muted-foreground
+                           transition-colors"
+                aria-label="Send message"
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUp className="h-4 w-4" />
+                )}
+              </Button>
             </div>
-          )}
-        </ScrollArea>
-
-        {/* Input - pill style with auto-expanding textarea */}
-        <div className="p-3 sm:p-4 pt-2 border-t border-border/30">
-          <div className="flex items-end gap-2 bg-muted/50 dark:bg-muted/30 rounded-2xl 
-                          px-4 py-2 border border-border/50 
-                          focus-within:border-ring focus-within:ring-1 focus-within:ring-ring
-                          transition-colors">
             
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                syncTextareaHeight();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Ask anything..."
-              rows={1}
-              className="flex-1 bg-transparent border-none outline-none text-sm resize-none
-                         placeholder:text-muted-foreground min-w-0 max-h-[120px] py-1"
-              disabled={isLoading}
-              aria-label="Message input"
-            />
-            
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              size="icon"
-              className="h-8 w-8 rounded-full shrink-0 mb-0.5
-                         bg-foreground hover:bg-foreground/90 text-background
-                         disabled:bg-muted-foreground/30 disabled:text-muted-foreground
-                         transition-colors"
-              aria-label="Send message"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <ArrowUp className="h-4 w-4" />
-              )}
-            </Button>
+            <p className="text-xs text-muted-foreground/60 text-center mt-2">
+              AI can make mistakes. Verify important info.
+            </p>
           </div>
-          
-          <p className="text-xs text-muted-foreground/60 text-center mt-2">
-            AI can make mistakes. Verify important info.
-          </p>
-        </div>
+        )}
       </div>
 
-      {/* Confirmation Dialogs */}
+      {/* Confirmation Dialog */}
       <ConfirmationDialog
         isOpen={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
+        onClose={() => {
+          setShowDeleteConfirm(false);
+          setConversationToDelete(null); // Clear pending delete state
+        }}
         onConfirm={handleDeleteConfirmed}
         title="Delete Conversation"
         description="Are you sure? This cannot be undone."
