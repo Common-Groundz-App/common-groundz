@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Check, Globe, MoreHorizontal, Plus, Trash2, RotateCcw, X, ArrowUp, Sparkles, User, Search, Heart, Loader2 } from 'lucide-react';
+import { Check, Globe, MoreHorizontal, Plus, Trash2, X, ArrowUp, Sparkles, User, Search, Heart, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -85,9 +85,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
@@ -737,38 +735,6 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     }
   };
 
-  const handleResetConfirmed = async () => {
-    setIsResetting(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error('User not authenticated');
-      }
-      
-      const { error } = await supabase
-        .from('user_conversation_memory')
-        .delete()
-        .eq('user_id', user.id);
-      
-      if (error) throw error;
-      
-      setShowResetConfirm(false);
-      toast({
-        title: "Memory reset",
-        description: "All learned preferences have been cleared",
-      });
-    } catch (error) {
-      console.error('Error resetting memory:', error);
-      toast({
-        title: "Error",
-        description: "Failed to reset memory",
-        variant: "destructive",
-      });
-    } finally {
-      setIsResetting(false);
-    }
-  };
 
   // Handle suggestion click - set input AND sync height
   const handleSuggestionClick = (text: string) => {
@@ -822,15 +788,6 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                   aria-label="Delete conversation (destructive action)"
                 >
                   <Trash2 className="h-4 w-4 mr-2" /> Delete Conversation
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => setShowResetConfirm(true)}
-                  className="text-amber-600 dark:text-amber-400 focus:bg-amber-500/10"
-                  role="menuitem"
-                  aria-label="Reset memory (warning: clears all preferences)"
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" /> Reset Memory
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1083,17 +1040,6 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
         isLoading={isDeleting}
       />
 
-      <ConfirmationDialog
-        isOpen={showResetConfirm}
-        onClose={() => setShowResetConfirm(false)}
-        onConfirm={handleResetConfirmed}
-        title="Reset Memory"
-        description="This clears all learned preferences. You'll need to teach the assistant again."
-        variant="warning"
-        confirmLabel="Reset"
-        loadingLabel="Resetting..."
-        isLoading={isResetting}
-      />
     </>
   );
 }
