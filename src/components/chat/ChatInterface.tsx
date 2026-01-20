@@ -662,6 +662,15 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
       setMessages(loadedMessages);
       setConversationId(convId);
       setView('chat');
+      
+      // Focus textarea only on desktop/pointer devices (avoid disrupting mobile IME/screen readers)
+      setTimeout(() => {
+        const isPointerDevice = window.matchMedia('(pointer: fine)').matches;
+        const isDesktopWidth = window.innerWidth >= 768;
+        if (isPointerDevice && isDesktopWidth) {
+          textareaRef.current?.focus();
+        }
+      }, 100);
     } catch (error) {
       console.error('Error loading conversation:', error);
       toast({ title: "Error", description: "Failed to load conversation", variant: "destructive" });
@@ -1011,6 +1020,11 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         )}
+
+        {/* Always-mounted status announcer - persists during view transitions for screen readers */}
+        <div role="status" aria-live="polite" className="sr-only">
+          {isLoadingConversation && "Loading conversation..."}
+        </div>
 
         {/* History panel OR Messages */}
         {view === 'history' ? (
