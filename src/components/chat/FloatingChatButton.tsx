@@ -15,7 +15,12 @@ export function FloatingChatButton({ isOpen, onClick, unreadCount = 0 }: Floatin
       variant="gradient"
       size="icon"
       className={cn(
-        "fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all z-50",
+        "fixed h-14 w-14 rounded-full shadow-lg transition-all z-50",
+        // Mobile/Tablet (<xl): Above bottom nav with safe area, capped at 25vh max
+        "bottom-[clamp(1.5rem,calc(4rem+env(safe-area-inset-bottom)+1.5rem),25vh)]",
+        "right-[calc(1.5rem+env(safe-area-inset-right))]",
+        // Desktop (xl+): Standard corner position (no bottom nav)
+        "xl:bottom-6 xl:right-6",
         "hover:scale-110 active:scale-95",
         isOpen && "rotate-90"
       )}
