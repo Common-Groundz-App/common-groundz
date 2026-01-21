@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Check, Globe, MoreHorizontal, Trash2, X, ArrowUp, Sparkles, User, Search, Heart, Loader2, Clock, PenSquare, ArrowLeft } from 'lucide-react';
+import { Check, Globe, MoreHorizontal, Trash2, X, ArrowUp, Sparkles, User, Search, Heart, Loader2, History, PenSquare, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -826,10 +826,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
     setInput('');
     setIsHydratingHistory(false); // Critical reset
     setView('chat');
-    toast({
-      title: "New conversation started",
-      description: "Previous conversation saved",
-    });
+    // Toast removed - UI reset is sufficient feedback
   };
 
   // Toggle history panel
@@ -874,18 +871,20 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
       // Optimistic UI: Remove from list immediately
       setConversations(prev => prev.filter(c => c.id !== targetId));
       
-      // If deleted active conversation -> fresh empty chat
+      // If deleted active conversation -> fresh empty chat (no toast needed)
       if (targetId === conversationId) {
         setMessages([]);
         setConversationId(null);
         setConversationOrigin(null); // Reset origin when active conversation deleted
         setIsHydratingHistory(false);
         setView('chat');
+      } else {
+        // Deleted from history list - subtle short toast
+        toast({ title: "Conversation deleted", duration: 1500 });
       }
       
       setShowDeleteConfirm(false);
       setConversationToDelete(null);
-      toast({ title: "Conversation deleted" });
     } catch (error) {
       console.error('Error deleting conversation:', error);
       toast({
@@ -962,10 +961,10 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
               </>
             ) : conversationId && conversationOrigin === 'history' ? (
               <h3 className="font-semibold text-foreground truncate max-w-[200px]">
-                {currentConvTitle || 'Assistant'}
+                {currentConvTitle || 'Ground'}
               </h3>
             ) : (
-              <h3 className="font-semibold text-foreground">Assistant</h3>
+              <h3 className="font-semibold text-foreground">Ground</h3>
             )}
           </div>
 
@@ -983,6 +982,22 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
                 <PenSquare className="h-4 w-4" />
               </Button>
             )}
+
+            {/* Delete - only when conversation has messages and not loading */}
+            {view === 'chat' && conversationId && messages.length > 0 && !isLoadingConversation && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => {
+                  setConversationToDelete(conversationId);
+                  setShowDeleteConfirm(true);
+                }}
+                className="h-8 w-8 hover:bg-muted hover:text-destructive" 
+                aria-label="Delete conversation"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
             
             {/* History button - always visible */}
             <Button 
@@ -992,7 +1007,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
               className={cn("h-8 w-8 hover:bg-muted", view === 'history' && "bg-muted")}
               aria-label="Chat history"
             >
-              <Clock className="h-4 w-4" />
+              <History className="h-4 w-4" />
             </Button>
             
             {/* Close button */}
@@ -1044,7 +1059,7 @@ export function ChatInterface({ isOpen, onClose }: ChatInterfaceProps) {
               </div>
             ) : conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                <Clock className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                <History className="h-12 w-12 text-muted-foreground/30 mb-4" />
                 <p className="text-muted-foreground">No conversations yet</p>
                 <p className="text-sm text-muted-foreground/60 mt-1 mb-4">
                   Start chatting to see your history here
