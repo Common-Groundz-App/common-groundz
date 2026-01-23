@@ -8,7 +8,7 @@ const corsHeaders = {
 
 // In-memory cache for search results (5 minutes TTL)
 const searchCache = new Map<string, { results: any[], timestamp: number }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes (increased from 5 minutes)
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {

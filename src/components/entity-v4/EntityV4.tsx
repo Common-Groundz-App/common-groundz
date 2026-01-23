@@ -73,7 +73,7 @@ const EntityV4 = () => {
       // DELAYED START: Wait 15 seconds before first check (give enrichment time)
       const initialDelay = setTimeout(() => {
         let pollCount = 0;
-        const maxPolls = 6; // 6 polls × 10s = 60 seconds max (gives enrichment more time)
+        const maxPolls = 2; // Reduced from 6 to minimize unnecessary polling
         
         const pollInterval = setInterval(() => {
           pollCount++;
@@ -107,7 +107,7 @@ const EntityV4 = () => {
             console.log('⏱️ Polling timeout reached, using proxy URLs');
             clearInterval(pollInterval);
           }
-        }, 10000); // 10 seconds between polls (was 3000)
+        }, 30000); // 30 seconds between polls (reduced from 10s to minimize API calls)
         
         return () => clearInterval(pollInterval);
       }, 15000); // Wait 15 seconds before starting (was immediate)
