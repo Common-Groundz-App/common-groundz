@@ -53,7 +53,13 @@ interface EntityStats {
   recentRefreshes: number;
 }
 
-const getImageStatus = (imageUrl?: string | null) => {
+const getImageStatus = (imageUrl?: string | null, entity?: any) => {
+  // First check if stored_photo_urls exists in metadata (most reliable indicator of successful storage)
+  const storedPhotos = entity?.metadata?.stored_photo_urls || entity?.stored_photo_urls;
+  if (storedPhotos && Array.isArray(storedPhotos) && storedPhotos.length > 0 && storedPhotos[0]?.storedUrl) {
+    return { status: 'local', color: 'bg-green-500', label: 'Local Storage' };
+  }
+  
   if (!imageUrl) return { status: 'none', color: 'bg-gray-500', label: 'No Image' };
   
   // Check for actual local storage URLs (not proxy URLs)
@@ -204,7 +210,7 @@ export const AdminEntityManagementPanel = () => {
     const stats = activeEntities.reduce((acc, entity) => {
       acc.totalEntities++;
       
-      const imageStatus = getImageStatus(entity.image_url);
+      const imageStatus = getImageStatus(entity.image_url, entity);
       switch (imageStatus.status) {
         case 'local':
           acc.localStorageImages++;
@@ -351,7 +357,7 @@ export const AdminEntityManagementPanel = () => {
     
     const matchesType = typeFilter === 'all' || entity.type === typeFilter;
     
-    const imageStatus = getImageStatus(entity.image_url);
+    const imageStatus = getImageStatus(entity.image_url, entity);
     const matchesStatus = statusFilter === 'all' || imageStatus.status === statusFilter;
     
     return matchesSearch && matchesType && matchesStatus;
@@ -602,7 +608,7 @@ export const AdminEntityManagementPanel = () => {
             </TableHeader>
             <TableBody>
               {paginatedEntities.map((entity) => {
-                const imageStatus = getImageStatus(entity.image_url);
+                const imageStatus = getImageStatus(entity.image_url, entity);
                 const isRefreshingImage = refreshingEntities.has(entity.id);
                 const isProcessingEntity = isProcessing[entity.id];
                 
