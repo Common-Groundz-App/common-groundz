@@ -13,6 +13,7 @@ import { useDiscovery } from '@/hooks/use-discovery';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface CategoryHighlightsProps {
   entityType?: EntityTypeString;
@@ -116,7 +117,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                 >
                   <div className="h-32 relative">
                     <ImageWithFallback
-                      src={entity.image_url || ''}
+                      src={getOptimalEntityImageUrl(entity) || ''}
                       alt={entity.name}
                       className="h-full w-full object-cover"
                       fallbackSrc="/placeholder.svg"
@@ -177,7 +178,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                 >
                   <div className="h-32 relative">
                     <ImageWithFallback
-                      src={entity.image_url || ''}
+                      src={getOptimalEntityImageUrl(entity) || ''}
                       alt={entity.name}
                       className="h-full w-full object-cover"
                       fallbackSrc="/placeholder.svg"
@@ -272,7 +273,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
               >
                 <div className="h-32 relative">
                   <ImageWithFallback
-                    src={entity.image_url || ''}
+                    src={getOptimalEntityImageUrl(entity) || ''}
                     alt={entity.name}
                     className="h-full w-full object-cover"
                     fallbackSrc="/placeholder.svg"

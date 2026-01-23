@@ -32,6 +32,7 @@ import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { RatingEvolutionDisplay } from './RatingEvolutionDisplay';
 import { getEntityTypeLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface ReviewCardProps {
   review: Review;
@@ -69,8 +70,8 @@ const ReviewCard = ({
   // Check if user can start timeline (owns review and has no timeline)
   const canStartTimeline = isOwner && (!review.has_timeline || !review.timeline_count || review.timeline_count === 0);
   
-  // Get entity image URL if available, ensuring it uses HTTPS
-  const entityImageUrl = review.entity?.image_url ? ensureHttps(review.entity.image_url) : null;
+  // Get entity image URL if available, ensuring it uses HTTPS and optimal URL helper
+  const entityImageUrl = review.entity ? (getOptimalEntityImageUrl(review.entity) || (review.entity.image_url ? ensureHttps(review.entity.image_url) : null)) : null;
   
   // Process media items for display with improved fallback handling
   const mediaItems = React.useMemo(() => {

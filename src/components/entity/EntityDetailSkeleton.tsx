@@ -6,6 +6,7 @@ import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { OptimisticLoadingProgress } from '@/components/ui/optimistic-loading-progress';
 import { EnhancedEntitySkeleton } from '@/components/ui/enhanced-entity-skeleton';
 import { getRandomLoadingMessage } from '@/utils/loadingMessages';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 export const EntityDetailSkeleton = () => {
   return <EnhancedEntitySkeleton showStats={true} showTabs={true} />;
@@ -101,9 +102,9 @@ export const OptimisticEntityDisplay = ({
             {/* Entity Image */}
             <div className="w-full md:w-1/3 lg:w-1/4">
               <AspectRatio ratio={4/3} className="overflow-hidden rounded-lg">
-                {optimisticEntity.image_url ? (
+                {getOptimalEntityImageUrl(optimisticEntity) ? (
                   <img 
-                    src={optimisticEntity.image_url} 
+                    src={getOptimalEntityImageUrl(optimisticEntity) || ''} 
                     alt={optimisticEntity.name}
                     className="w-full h-full object-cover"
                   />

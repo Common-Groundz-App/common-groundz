@@ -9,6 +9,7 @@ import { useUnifiedSearch } from '@/hooks/use-unified-search';
 import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 export default function ProductSearch() {
   const { query } = useParams<{ query: string }>();
@@ -105,9 +106,9 @@ export default function ProductSearch() {
                       onClick={() => navigate(getEntityUrlWithParent(entity))}
                     >
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                        {entity.image_url ? (
+                        {getOptimalEntityImageUrl(entity) ? (
                           <img 
-                            src={entity.image_url} 
+                            src={getOptimalEntityImageUrl(entity) || ''} 
                             alt={entity.name}
                             className="w-full h-full object-cover"
                           />

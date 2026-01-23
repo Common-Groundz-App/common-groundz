@@ -37,6 +37,7 @@ import { TagInput, Tag } from '@/components/admin/TagInput';
 import { getEntityTags } from '@/services/tagService';
 import { fetchCategoriesByType } from '@/services/categoryService';
 import { getCanonicalType } from '@/services/entityTypeHelpers';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 const MAX_MEDIA_ITEMS = 4;
 
@@ -1052,7 +1053,7 @@ const AdminEntityEdit = () => {
                           <p className="text-sm text-muted-foreground mb-2">Preview:</p>
                           <div className="w-32 h-32 rounded-md overflow-hidden bg-muted">
                             <ImageWithFallback
-                              src={entity.image_url}
+                              src={getOptimalEntityImageUrl(entity) || entity.image_url || ''}
                               alt={entity.name}
                               className="w-full h-full object-cover"
                             />

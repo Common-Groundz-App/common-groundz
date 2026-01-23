@@ -35,7 +35,7 @@ export interface EntityImageSource {
       photoReference?: string;
     }>;
     [key: string]: any;
-  } | null;
+  } | null | any; // Accept Json type from database rows
 }
 
 /**

@@ -39,6 +39,7 @@ import { useAdminEntityOperations } from '@/hooks/admin/useAdminEntityOperations
 import { CreateEntityDialog } from './CreateEntityDialog';
 import { AdminEntityPlaceIdTool } from './AdminEntityPlaceIdTool';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -617,9 +618,9 @@ export const AdminEntityManagementPanel = () => {
                     )}
                     <TableCell>
                       <div className="w-12 h-12 rounded-md overflow-hidden bg-muted">
-                        {entity.image_url ? (
+                        {getOptimalEntityImageUrl(entity) || entity.image_url ? (
                           <ImageWithFallback
-                            src={entity.image_url}
+                            src={getOptimalEntityImageUrl(entity) || entity.image_url || ''}
                             alt={entity.name}
                             className="w-full h-full object-cover"
                             suppressConsoleErrors

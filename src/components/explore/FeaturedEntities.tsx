@@ -14,6 +14,7 @@ import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 export const FeaturedEntities = () => {
   const navigate = useNavigate();
@@ -108,7 +109,7 @@ export const FeaturedEntities = () => {
           >
             <div className="h-48 relative">
               <ImageWithFallback
-                src={entity.image_url || ''}
+                src={getOptimalEntityImageUrl(entity) || ''}
                 alt={entity.name}
                 className="h-full w-full object-cover"
                 fallbackSrc="/placeholder.svg"
