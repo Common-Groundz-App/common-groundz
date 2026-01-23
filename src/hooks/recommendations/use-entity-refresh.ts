@@ -162,26 +162,11 @@ export const useEntityImageRefresh = () => {
           throw new Error(refreshData.error || 'Failed to get fresh Google Places data');
         }
 
-        // Update entity with fresh metadata and new image URL
-        const existingMetadata = entity.metadata && typeof entity.metadata === 'object' ? entity.metadata : {};
-        const newMetadata = refreshData.updatedMetadata && typeof refreshData.updatedMetadata === 'object' ? refreshData.updatedMetadata : {};
-        const updatedMetadata = { ...existingMetadata as Record<string, any>, ...newMetadata as Record<string, any> };
-
-        const { error: updateError } = await supabase
-          .from('entities')
-          .update({
-            image_url: refreshData.newImageUrl,
-            metadata: updatedMetadata
-          })
-          .eq('id', entityId);
-
-        if (updateError) {
-          console.error('Error updating entity with fresh data:', updateError);
-          throw new Error(`Failed to update entity: ${updateError.message}`);
-        }
-
-        result = { imageUrl: refreshData.newImageUrl };
-        console.log('✅ Google Places entity refreshed with fresh data');
+        // Edge function already handles all database updates (image_url, stored_photo_urls, metadata)
+        // Use stored URL from response if available, otherwise fall back to newImageUrl
+        const storedUrl = refreshData.updatedMetadata?.stored_photo_urls?.[0]?.storedUrl;
+        result = { imageUrl: storedUrl || refreshData.newImageUrl };
+        console.log('✅ Google Places entity refreshed, using:', storedUrl ? 'permanent storage URL' : 'proxy fallback');
       } 
       // Handle Google Places entities WITHOUT place_id (special error handling)
       else if (entity.api_source === 'google_places' && !(entity.metadata as any)?.place_id) {

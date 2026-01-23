@@ -246,11 +246,14 @@ serve(async (req) => {
       }
     }
 
-    // Generate new proxy image URL using the primary photo reference
+    // Use stored URL if available, otherwise fallback to proxy
     let newImageUrl = null;
-    if (primaryPhotoReference) {
+    if (storedPhotoUrls.length > 0) {
+      newImageUrl = storedPhotoUrls[0].storedUrl;
+      console.log(`🖼️ Using permanent stored URL: ${newImageUrl}`);
+    } else if (primaryPhotoReference) {
       newImageUrl = `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-image?ref=${primaryPhotoReference}&maxWidth=800`;
-      console.log(`🖼️ Generated new image URL: ${newImageUrl}`);
+      console.log(`🖼️ Fallback to proxy URL: ${newImageUrl}`);
     }
 
     // Prepare updated metadata with stored photo URLs
