@@ -11,6 +11,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { useToast } from '@/hooks/use-toast';
+import { getOptimalEntityImageUrl, getEntityTypeFallbackImage } from '@/utils/entityImageUtils';
 
 interface SimpleEntitySelectorProps {
   onEntitiesChange: (entities: EntityAdapter[]) => void;
@@ -164,16 +165,16 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
     return "Use my location";
   };
 
-  // Get image URL for entity or result based on type with improved Google Places handling
+  // Get image URL for entity or result based on type with optimal URL helper
   const getImageUrl = (item: any) => {
-    console.log('SimpleEntitySelector - Getting image URL for item:', item);
-    
-    if (item.image_url) {
-      console.log('SimpleEntitySelector - Using existing image_url:', item.image_url);
-      return item.image_url;
+    // First try to get optimal stored image URL
+    const optimalUrl = getOptimalEntityImageUrl(item);
+    if (optimalUrl) {
+      console.log('SimpleEntitySelector - Using optimal image URL:', optimalUrl.substring(0, 50));
+      return optimalUrl;
     }
     
-    // For place/food results from Google, check for photos in metadata
+    // For place/food results from Google without stored photos, use proxy temporarily
     if ((entityType === 'place' || entityType === 'food') && 
         item.metadata?.photos && 
         item.metadata.photos.length > 0) {
@@ -186,23 +187,8 @@ export function SimpleEntitySelector({ onEntitiesChange, initialEntities = [], i
       return `${proxyUrl}?photoReference=${photoReference}&maxWidth=100`;
     }
     
-    // Type-specific placeholder images with better fallbacks
-    switch (entityType) {
-      case 'movie':
-        return "https://images.unsplash.com/photo-1489599510961-b3f9db2a06be?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      case 'book':
-        return "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      case 'product':
-        return "https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      case 'food':
-        return "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      case 'place':
-        return "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      case 'people':
-        return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-      default:
-        return "https://images.unsplash.com/photo-1495195134817-aeb325a55b65?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&q=80";
-    }
+    // Return type-specific fallback
+    return getEntityTypeFallbackImage(entityType);
   };
 
   // Check if we should show distance for a result

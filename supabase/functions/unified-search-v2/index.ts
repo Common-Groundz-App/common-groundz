@@ -687,8 +687,9 @@ serve(async (req) => {
     }
 
     // 2. Search external APIs with enhanced error handling
+    // Only call external APIs in 'quick' mode, skip in 'local-only' mode
     if (mode === 'quick') {
-      console.log('🌐 Starting external API searches...')
+      console.log('🌐 Starting external API searches (quick mode)...')
       
       // Use Promise.allSettled for parallel execution with individual error handling
       const [booksResult, moviesResult, placesResult] = await Promise.allSettled([
@@ -706,6 +707,10 @@ serve(async (req) => {
       if (placesResult.status === 'fulfilled') {
         results.categorized.places = placesResult.value
       }
+    } else if (mode === 'local-only') {
+      // Local-only mode: Skip ALL external API calls to minimize costs
+      // Used for fast initial search results during typing
+      console.log('🏠 Local-only mode - skipping ALL external API calls')
     }
 
     // Combine all products for backwards compatibility

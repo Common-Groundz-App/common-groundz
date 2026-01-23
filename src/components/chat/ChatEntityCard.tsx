@@ -2,7 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { Users } from 'lucide-react';
 import { Entity } from '@/services/recommendation/types';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
-import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
+import { getEntityTypeFallbackImage as getTypeHelperFallback } from '@/services/entityTypeHelpers';
+import { getOptimalEntityImageUrl, getEntityTypeFallbackImage } from '@/utils/entityImageUtils';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
 import { cn } from '@/lib/utils';
 
@@ -203,8 +204,8 @@ export function ChatEntityCard({
   // Explicit guard for valid rating display
   const hasValidRating = typeof displayRating === 'number' && displayRating > 0 && !isNaN(displayRating);
   
-  // Get image URL with fallback
-  const imageUrl = entity?.image_url || getEntityTypeFallbackImage(entityType || entity?.type || 'product');
+  // Get image URL with optimal helper - prioritizes stored photos over proxy URLs
+  const imageUrl = getOptimalEntityImageUrl(entity) || getEntityTypeFallbackImage(entityType || entity?.type || 'product');
   
   // Get smart subtitle for card (replaces verbose description)
   const subtitle = getSmartSubtitle(entity, entityType, reason);

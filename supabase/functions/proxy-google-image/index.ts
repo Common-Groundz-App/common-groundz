@@ -12,7 +12,7 @@ const DEFAULT_WIDTH = 400;
 
 // Simple in-memory cache for frequently requested images
 const imageCache = new Map<string, { data: Blob, contentType: string, timestamp: number }>();
-const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds (increased from 1 hour)
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {

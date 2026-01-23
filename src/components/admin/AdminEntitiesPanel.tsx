@@ -8,6 +8,7 @@ import { useAdminEntities } from '@/hooks/admin/useAdminEntities';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 export const AdminEntitiesPanel = () => {
   const { entities, isLoading, isGenerating, isBulkGenerating, generateEntitySummary, generateBulkEntitySummaries } = useAdminEntities();
@@ -103,7 +104,7 @@ export const AdminEntitiesPanel = () => {
                   {/* Entity Image */}
                   <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                     <ImageWithFallback
-                      src={entity.image_url}
+                      src={getOptimalEntityImageUrl(entity)}
                       alt={entity.name}
                       className="w-full h-full object-cover"
                       entityType={entity.type}

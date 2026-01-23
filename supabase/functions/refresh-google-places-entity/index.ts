@@ -289,8 +289,13 @@ serve(async (req) => {
       };
       
       // Add stored_photo_urls if we have them
+      // CRITICAL: Also update image_url to permanent storage URL
+      // This prevents proxy URLs from triggering API calls on every render
       if (storedPhotoUrls.length > 0) {
         updatePayload.stored_photo_urls = storedPhotoUrls;
+        // Update image_url to the first stored photo URL (permanent, no API cost)
+        updatePayload.image_url = storedPhotoUrls[0].storedUrl;
+        console.log(`📸 Updated image_url to permanent storage: ${storedPhotoUrls[0].storedUrl}`);
       }
       
       const { error: updateError } = await supabase

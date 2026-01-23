@@ -53,12 +53,25 @@ export const createEntityQuick = async (
     // Generate slug
     const slug = generateSlug(externalData.name);
 
+    // Import image validation utility
+    const { validateImageUrlForStorage } = await import('@/utils/entityImageUtils');
+    
+    /**
+     * ⚠️ PROXY URLs ARE TEMPORARY ONLY
+     * Initial image_url may be a proxy URL for immediate display.
+     * The refresh-google-places-entity function MUST update image_url 
+     * to a permanent storage URL after photos are stored.
+     */
     // Minimal entity data - just enough to create the record
     const entityData = {
       name: externalData.name,
       type: entityType as Database['public']['Enums']['entity_type'],
       description: externalData.description || null,
-      image_url: externalData.image_url || null,
+      // Validate image URL - prefer stored if available, warn on proxy
+      image_url: validateImageUrlForStorage(
+        externalData.image_url || null,
+        externalData.metadata?.stored_photo_urls
+      ),
       venue: externalData.venue || null,
       api_source: externalData.api_source || null,
       api_ref: externalData.api_ref || null,

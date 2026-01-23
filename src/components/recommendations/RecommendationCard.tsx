@@ -22,6 +22,7 @@ import { deleteRecommendation } from '@/services/recommendation/crudOperations';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { MediaItem } from '@/types/media';
 import { ensureHttps } from '@/utils/urlUtils';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ProfileDisplay } from '@/components/common/ProfileDisplay';
@@ -55,10 +56,8 @@ const RecommendationCard = ({
   
   const isOwner = user?.id === recommendation.user_id;
 
-  // Get entity image URL if available, ensuring it uses HTTPS
-  const entityImageUrl = recommendation.entity?.image_url 
-    ? ensureHttps(recommendation.entity.image_url) 
-    : null;
+  // Get optimal entity image URL - prioritizes stored photos over proxy URLs
+  const entityImageUrl = getOptimalEntityImageUrl(recommendation.entity);
 
   console.log(`RecommendationCard - Recommendation ${recommendation.id} entity data:`, {
     hasEntity: !!recommendation.entity,

@@ -91,3 +91,6 @@ verify_jwt = true
 
 [functions.update-user-memory]
 verify_jwt = true
+
+[functions.migrate-entity-image-urls]
+verify_jwt = true

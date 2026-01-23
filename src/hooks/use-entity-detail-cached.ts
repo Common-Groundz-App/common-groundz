@@ -50,35 +50,15 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
         throw new Error('Entity not found');
       }
       
-      // Staleness check: only refresh Google Places entities if data is >7 days old
-      const REFRESH_THRESHOLD = 7 * 24 * 60 * 60 * 1000; // 7 days
-      const GRACE_PERIOD = 5 * 60 * 1000; // 5 minutes grace for new entities
-      
-      const entityAge = Date.now() - new Date(entity.created_at).getTime();
+      // REMOVED: Automatic staleness refresh
+      // Staleness refresh is now admin-only via the "Refresh" button in entity management
+      // This eliminates excessive Google Places API calls on every entity page load
       const lastRefreshed = entity.metadata?.last_refreshed_at;
-      const isStale = lastRefreshed && 
-        (Date.now() - new Date(lastRefreshed).getTime() > REFRESH_THRESHOLD);
-      
-      // Skip refresh for newly created entities (within 5 minutes)
-      const isNewlyCreated = entityAge < GRACE_PERIOD;
-      
-      if (entity.type === 'place' && 
-          entity.api_source === 'google_places' && 
-          isStale && 
-          !isNewlyCreated && 
-          entity.metadata?.place_id) {
-        console.log('🔄 Entity stale (>7 days), triggering Google Places refresh...');
-        const { supabase } = await import('@/integrations/supabase/client');
-        await supabase.functions.invoke('refresh-google-places-entity', {
-          body: { entityId: entity.id, placeId: entity.metadata.place_id }
-        });
-        
-        // Refetch entity to get updated data
-        entity = await fetchEntityBySlug(slug);
-      } else if (isNewlyCreated) {
-        console.log(`✨ Entity newly created (${Math.round(entityAge / 1000)}s old), skipping staleness check`);
-      } else if (entity.type === 'place' && !isStale) {
-        console.log(`✅ Entity fresh (${lastRefreshed ? Math.round((Date.now() - new Date(lastRefreshed).getTime()) / (24 * 60 * 60 * 1000)) : 0} days old), skipping refresh`);
+      if (lastRefreshed) {
+        const daysSinceRefresh = Math.round((Date.now() - new Date(lastRefreshed).getTime()) / (24 * 60 * 60 * 1000));
+        console.log(`✅ Entity loaded. Last refreshed: ${daysSinceRefresh} days ago (auto-refresh disabled)`);
+      } else {
+        console.log(`✅ Entity loaded. Never refreshed (auto-refresh disabled)`);
       }
       
       // Fetch related data in parallel
