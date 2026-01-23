@@ -26,6 +26,7 @@ import { useAdminSuggestions, AdminSuggestion } from '@/hooks/admin/useAdminSugg
 import { SuggestionReviewModal } from './SuggestionReviewModal';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 const getPriorityColor = (score: number) => {
   if (score >= 70) return 'bg-red-100 text-red-800';
@@ -340,7 +341,7 @@ export const AdminSuggestionsPanel: React.FC = () => {
                             {suggestion.entity ? (
                               <div className="flex items-center gap-3">
                                 <ImageWithFallback
-                                  src={suggestion.entity.image_url}
+                                  src={getOptimalEntityImageUrl(suggestion.entity) || suggestion.entity.image_url}
                                   alt={suggestion.entity.name}
                                   entityType={suggestion.entity.type}
                                   className="w-10 h-10 rounded object-cover"

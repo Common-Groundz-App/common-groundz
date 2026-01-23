@@ -14,6 +14,7 @@ import { Link } from 'react-router-dom';
 import EditMyStuffModal from './EditMyStuffModal';
 import AlternativesDrawer from './AlternativesDrawer';
 import { cn } from '@/lib/utils';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface MyStuffItemCardProps {
   item: any;
@@ -66,11 +67,11 @@ const MyStuffItemCard = ({ item, readOnly = false, onUpdate, onDelete }: MyStuff
     <>
       <Card className="overflow-hidden hover:shadow-lg transition-shadow">
         {/* Entity Image */}
-        {item.entity?.image_url && (
+        {getOptimalEntityImageUrl(item.entity) && (
           <div className="aspect-video bg-muted relative">
             <img 
-              src={item.entity.image_url} 
-              alt={item.entity.name}
+              src={getOptimalEntityImageUrl(item.entity) || ''} 
+              alt={item.entity?.name || 'Entity'}
               className="w-full h-full object-cover"
             />
             {/* Watch indicator */}

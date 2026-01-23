@@ -32,6 +32,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Link } from 'react-router-dom';
 import { downloadFileFromUrl } from '@/utils/downloadUtils';
 import { toast } from 'sonner';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface ClaimReviewModalProps {
   claim: AdminSuggestion | null;
@@ -233,7 +234,7 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
               {entity ? (
                 <div className="flex items-start gap-4">
                   <ImageWithFallback
-                    src={entity.image_url}
+                    src={getOptimalEntityImageUrl(entity) || entity.image_url}
                     alt={entity.name}
                     entityType={entity.type}
                     className="w-16 h-16 rounded object-cover"

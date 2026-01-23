@@ -10,6 +10,7 @@ import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 import { shouldHideCategory } from '@/services/categoryService';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface EntityResultItemProps {
   entity: EntitySearchResult;
@@ -30,7 +31,7 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
       onClick={onClick}
     >
       <Avatar className="h-12 w-12">
-        <AvatarImage src={entity.image_url || undefined} alt={entity.name} />
+        <AvatarImage src={getOptimalEntityImageUrl(entity) || undefined} alt={entity.name} />
         <AvatarFallback className="bg-primary/10 text-primary">
           {entity.name[0]?.toUpperCase() || 'E'}
         </AvatarFallback>

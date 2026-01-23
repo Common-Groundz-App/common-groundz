@@ -8,6 +8,7 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Entity } from '@/services/recommendation/types';
 import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface EntityChildrenCardProps {
   children: Entity[];
@@ -28,10 +29,12 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
   onAddChild,
   canAddChildren = false
 }) => {
-  // Helper function to get fallback image using parent if needed
+  // Helper function to get fallback image using parent if needed - now uses optimal URL helper
   const getChildImage = (child: Entity) => {
-    if (child.image_url) return child.image_url;
-    if (parentEntity?.image_url) return parentEntity.image_url;
+    const optimalUrl = getOptimalEntityImageUrl(child);
+    if (optimalUrl) return optimalUrl;
+    const parentOptimalUrl = getOptimalEntityImageUrl(parentEntity);
+    if (parentOptimalUrl) return parentOptimalUrl;
     return getEntityTypeFallbackImage(child.type);
   };
 

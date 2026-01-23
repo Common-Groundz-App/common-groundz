@@ -8,6 +8,7 @@ import { RecommendationEntityCard } from '@/components/entity/RecommendationEnti
 import { ProcessedNetworkRecommendation } from '@/services/networkRecommendationService';
 import { ProcessedFallbackRecommendation } from '@/services/fallbackRecommendationService';
 import { analytics } from '@/services/analytics';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface RecommendationsModalProps {
   isOpen: boolean;
@@ -38,35 +39,43 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({
 
   // Combine and normalize all recommendations
   const allRecommendations = useMemo(() => {
-    const network = networkRecommendations.map(rec => ({
-      id: rec.entity_id,
-      name: rec.entity_name,
-      type: rec.entity_type,
-      image_url: rec.entity_image_url,
-      averageRating: rec.circle_rating || rec.average_rating,
-      recommendedBy: rec.displayUsernames,
-      recommendedByUserId: rec.recommendedByUserId,
-      recommendedByAvatars: rec.displayAvatars,
-      recommendationCount: rec.recommendation_count,
-      latestRecommendationDate: rec.latest_recommendation_date,
-      hasTimelineUpdates: rec.has_timeline_updates,
-      slug: rec.entity_slug,
-      isNetwork: true,
-      reason: undefined
-    }));
+    const network = networkRecommendations.map(rec => {
+      // Create a pseudo-entity object to use the helper
+      const entityObj = { image_url: rec.entity_image_url, metadata: (rec as any).metadata };
+      return {
+        id: rec.entity_id,
+        name: rec.entity_name,
+        type: rec.entity_type,
+        image_url: getOptimalEntityImageUrl(entityObj) || rec.entity_image_url,
+        averageRating: rec.circle_rating || rec.average_rating,
+        recommendedBy: rec.displayUsernames,
+        recommendedByUserId: rec.recommendedByUserId,
+        recommendedByAvatars: rec.displayAvatars,
+        recommendationCount: rec.recommendation_count,
+        latestRecommendationDate: rec.latest_recommendation_date,
+        hasTimelineUpdates: rec.has_timeline_updates,
+        slug: rec.entity_slug,
+        isNetwork: true,
+        reason: undefined
+      };
+    });
 
-    const fallback = fallbackRecommendations.map(rec => ({
-      id: rec.entity_id,
-      name: rec.entity_name,
-      type: rec.entity_type,
-      image_url: rec.entity_image_url,
-      averageRating: rec.average_rating,
-      recommendedBy: [],
-      slug: rec.entity_slug,
-      isNetwork: false,
-      reason: rec.displayReason,
-      latestRecommendationDate: undefined // Fallback recommendations don't have dates
-    }));
+    const fallback = fallbackRecommendations.map(rec => {
+      // Create a pseudo-entity object to use the helper
+      const entityObj = { image_url: rec.entity_image_url, metadata: (rec as any).metadata };
+      return {
+        id: rec.entity_id,
+        name: rec.entity_name,
+        type: rec.entity_type,
+        image_url: getOptimalEntityImageUrl(entityObj) || rec.entity_image_url,
+        averageRating: rec.average_rating,
+        recommendedBy: [],
+        slug: rec.entity_slug,
+        isNetwork: false,
+        reason: rec.displayReason,
+        latestRecommendationDate: undefined // Fallback recommendations don't have dates
+      };
+    });
 
     return [...network, ...fallback];
   }, [networkRecommendations, fallbackRecommendations]);

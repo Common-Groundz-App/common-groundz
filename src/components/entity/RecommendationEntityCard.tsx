@@ -10,6 +10,7 @@ import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 import { Badge } from '@/components/ui/badge';
 import { shouldHideCategory } from '@/services/categoryService';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface RecommendationData {
   id: string;
@@ -98,9 +99,9 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
     >
       {/* Image */}
       <div className="w-16 h-16 bg-muted relative overflow-hidden rounded-md flex-shrink-0">
-        {recommendation.image_url ? (
+        {getOptimalEntityImageUrl(recommendation) ? (
           <img 
-            src={recommendation.image_url} 
+            src={getOptimalEntityImageUrl(recommendation) || ''} 
             alt={recommendation.name}
             className="w-full h-full object-cover"
           />

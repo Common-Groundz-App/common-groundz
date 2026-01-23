@@ -25,6 +25,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { AdminSuggestion } from '@/hooks/admin/useAdminSuggestions';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { Link } from 'react-router-dom';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface SuggestionReviewModalProps {
   suggestion: AdminSuggestion | null;
@@ -166,7 +167,7 @@ export const SuggestionReviewModal: React.FC<SuggestionReviewModalProps> = ({
               {entity ? (
                 <div className="flex items-start gap-4">
                   <ImageWithFallback
-                    src={entity.image_url}
+                    src={getOptimalEntityImageUrl(entity) || entity.image_url}
                     alt={entity.name}
                     entityType={entity.type}
                     className="w-16 h-16 rounded object-cover"

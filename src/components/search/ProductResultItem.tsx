@@ -6,6 +6,7 @@ import { ProductSearchResult } from '@/hooks/use-unified-search';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
 import { Badge } from '@/components/ui/badge';
 import { shouldHideCategory } from '@/services/categoryService';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface ProductResultItemProps {
   result: ProductSearchResult;
@@ -32,7 +33,7 @@ export function ProductResultItem({ result, onClick }: ProductResultItemProps) {
     >
       <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
         <ImageWithFallback
-          src={result.image_url}
+          src={getOptimalEntityImageUrl(result) || result.image_url}
           alt={result.name}
           entityType={result.metadata?.type || 'product'}
           suppressConsoleErrors={true}
