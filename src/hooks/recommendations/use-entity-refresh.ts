@@ -26,11 +26,11 @@ export const useEntityImageRefresh = () => {
   const prepareEdgeFunctionRequest = (entity: any) => {
     const baseRequest = { entityId: entity.id };
     
-    // Google Places
+    // Google Places - use api_ref as fallback for place_id
     if (entity.api_source === 'google_places') {
       return {
         ...baseRequest,
-        placeId: (entity.metadata as any)?.place_id,
+        placeId: (entity.metadata as any)?.place_id || entity.api_ref,
         photoReference: (entity.metadata as any)?.photo_reference,
         apiSource: 'google_places'
       };
@@ -95,7 +95,7 @@ export const useEntityImageRefresh = () => {
         startTime,
         true,
         undefined,
-        { placeId, photoReference }
+        { placeId: placeId, photoReference }
       );
       
       // Get entity data to determine refresh strategy
@@ -127,8 +127,11 @@ export const useEntityImageRefresh = () => {
       let result;
 
       // Handle Google Places entities with fresh data fetch
-      if (entity.api_source === 'google_places' && (entity.metadata as any)?.place_id) {
-        console.log(`🔄 Refreshing Google Places entity with fresh data from API`);
+      // Check both metadata.place_id and api_ref for the Place ID
+      const resolvedPlaceId = (entity.metadata as any)?.place_id || entity.api_ref;
+      
+      if (entity.api_source === 'google_places' && resolvedPlaceId) {
+        console.log(`🔄 Refreshing Google Places entity with fresh data from API (placeId: ${resolvedPlaceId})`);
         
         const response = await fetch(`https://uyjtgybbktgapspodajy.supabase.co/functions/v1/refresh-google-places-entity`, {
           method: 'POST',
@@ -139,7 +142,7 @@ export const useEntityImageRefresh = () => {
           },
           body: JSON.stringify({
             entityId: entity.id,
-            placeId: (entity.metadata as any).place_id
+            placeId: resolvedPlaceId
           })
         });
 
@@ -168,8 +171,8 @@ export const useEntityImageRefresh = () => {
         result = { imageUrl: storedUrl || refreshData.newImageUrl };
         console.log('✅ Google Places entity refreshed, using:', storedUrl ? 'permanent storage URL' : 'proxy fallback');
       } 
-      // Handle Google Places entities WITHOUT place_id (special error handling)
-      else if (entity.api_source === 'google_places' && !(entity.metadata as any)?.place_id) {
+      // Handle Google Places entities WITHOUT place_id or api_ref (special error handling)
+      else if (entity.api_source === 'google_places' && !resolvedPlaceId) {
         console.log(`⚠️ Google Places entity missing place_id, checking photo_reference fallback`);
         
         const photoReference = (entity.metadata as any)?.photo_reference;
