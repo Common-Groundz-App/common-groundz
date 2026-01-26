@@ -32,6 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
+import { ConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { Link } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +41,9 @@ import { CreateEntityDialog } from './CreateEntityDialog';
 import { AdminEntityPlaceIdTool } from './AdminEntityPlaceIdTool';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+
+// Constants for bulk operations
+const MAX_BULK_REFRESH = 50; // Limit per run to prevent API abuse
 
 // Use the exact type from Supabase
 type DatabaseEntity = Database['public']['Tables']['entities']['Row'];
@@ -101,6 +105,8 @@ export const AdminEntityManagementPanel = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [isBulkRefreshingProxies, setIsBulkRefreshingProxies] = useState(false);
+  const [showBulkProxyConfirmation, setShowBulkProxyConfirmation] = useState(false);
   
   const { toast } = useToast();
   const { refreshEntityImage, isRefreshing } = useEntityImageRefresh();
@@ -332,6 +338,96 @@ export const AdminEntityManagementPanel = () => {
     });
   };
 
+  // Helper to check if entity can be refreshed (has required data)
+  const canEntityBeRefreshed = (entity: DatabaseEntity): boolean => {
+    // For Google Places entities, must have placeId in metadata or api_ref
+    if (entity.api_source === 'google_places') {
+      const placeId = (entity.metadata as any)?.place_id || entity.api_ref;
+      return !!placeId;
+    }
+    // For other entity types, they can always be attempted
+    return true;
+  };
+
+  const handleBulkRefreshProxyEntities = async () => {
+    // Get all entities with proxy URLs
+    const allProxyEntities = entities.filter(entity => {
+      const imageStatus = getImageStatus(entity.image_url, entity);
+      return imageStatus.status === 'proxy';
+    });
+
+    if (allProxyEntities.length === 0) {
+      toast({
+        title: 'No Proxy URLs',
+        description: 'All entities are already using local storage or external URLs.',
+      });
+      return;
+    }
+
+    // Filter out entities that can't be refreshed (missing placeId for Google Places)
+    const refreshableEntities = allProxyEntities.filter(canEntityBeRefreshed);
+    const skippedCount = allProxyEntities.length - refreshableEntities.length;
+
+    if (refreshableEntities.length === 0) {
+      toast({
+        title: 'No Refreshable Entities',
+        description: `All ${allProxyEntities.length} proxy entities are missing required data (placeId). Use "Fix Metadata" on each entity first.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Apply batch limit
+    const proxyEntities = refreshableEntities.slice(0, MAX_BULK_REFRESH);
+    const hasMore = refreshableEntities.length > MAX_BULK_REFRESH;
+
+    setShowBulkProxyConfirmation(false);
+    setIsBulkRefreshingProxies(true);
+    setShowBulkProgress(true);
+    setBulkRefreshProgress(0);
+
+    let completed = 0;
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const entity of proxyEntities) {
+      try {
+        await handleRefreshImage(entity);
+        succeeded++;
+      } catch (error) {
+        console.error(`Failed to refresh entity ${entity.id}:`, error);
+        failed++;
+      }
+      completed++;
+      setBulkRefreshProgress((completed / proxyEntities.length) * 100);
+      
+      // 500ms delay between requests to avoid rate limiting
+      if (completed < proxyEntities.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    setShowBulkProgress(false);
+    setIsBulkRefreshingProxies(false);
+
+    // Refresh data to show updated statuses
+    await fetchEntities();
+
+    // Build description with all relevant info
+    let description = `Processed ${completed} entities: ${succeeded} succeeded, ${failed} failed.`;
+    if (skippedCount > 0) {
+      description += ` Skipped ${skippedCount} entities missing placeId.`;
+    }
+    if (hasMore) {
+      description += ` Run again to continue (${refreshableEntities.length - MAX_BULK_REFRESH} remaining).`;
+    }
+
+    toast({
+      title: 'Bulk Refresh Complete',
+      description,
+    });
+  };
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedEntities(new Set(filteredEntities.map(e => e.id)));
@@ -548,7 +644,7 @@ export const AdminEntityManagementPanel = () => {
               </Select>
             </div>
             
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {!showDeleted && (
                 <Button
                   onClick={handleBulkRefresh}
@@ -557,6 +653,18 @@ export const AdminEntityManagementPanel = () => {
                 >
                   <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                   Refresh Selected ({selectedEntities.size})
+                </Button>
+              )}
+              
+              {!showDeleted && stats.proxyImages > 0 && (
+                <Button
+                  onClick={() => setShowBulkProxyConfirmation(true)}
+                  disabled={isBulkRefreshingProxies || loading}
+                  variant="outline"
+                  className="border-yellow-500 text-yellow-700 hover:bg-yellow-50 dark:border-yellow-600 dark:text-yellow-500 dark:hover:bg-yellow-950"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${isBulkRefreshingProxies ? 'animate-spin' : ''}`} />
+                  Bulk Refresh Proxy URLs ({stats.proxyImages})
                 </Button>
               )}
               
@@ -864,6 +972,19 @@ export const AdminEntityManagementPanel = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Bulk Refresh Proxy URLs Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={showBulkProxyConfirmation}
+        onClose={() => setShowBulkProxyConfirmation(false)}
+        onConfirm={handleBulkRefreshProxyEntities}
+        title="Bulk Refresh Proxy URLs"
+        description={`This will refresh up to ${MAX_BULK_REFRESH} entities with proxy URLs, replacing them with permanent storage URLs. This calls the Google Places API for each entity. Entities missing placeId will be skipped. Continue?`}
+        variant="warning"
+        confirmLabel="Refresh All"
+        isLoading={isBulkRefreshingProxies}
+        loadingLabel="Refreshing..."
+      />
     </div>
   );
 };
