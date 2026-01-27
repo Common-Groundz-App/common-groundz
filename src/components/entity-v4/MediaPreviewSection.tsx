@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Camera, ChevronRight, Play, Plus, MoreVertical, Edit3, Trash2, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
@@ -45,9 +45,17 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   const [deletingPhoto, setDeletingPhoto] = useState<EntityPhoto | null>(null);
   const [isDeletingPhoto, setIsDeletingPhoto] = useState(false);
   const [entityPhotos, setEntityPhotos] = useState<EntityPhoto[]>([]);
+  
+  // Track if this is the initial load vs a background refresh
+  const isInitialLoadRef = useRef(true);
 
-  const loadPhotos = async () => {
-    setLoading(true);
+  const loadPhotos = async (isInitialLoad: boolean = false) => {
+    // Only show loading skeleton on initial load, not background refreshes
+    // This prevents jarring image flash when photos silently upgrade
+    if (isInitialLoad) {
+      setLoading(true);
+    }
+    
     try {
       // Request high quality for first photo, medium for rest (faster initial load)
       const qualityPreference: PhotoQuality[] = ['high', 'medium'];
@@ -97,19 +105,24 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
     }
   };
 
-  // Derive a stable key from fields that change during image refresh
+  // Only trigger refresh when photo-specific data changes, not all metadata
   const photoRefreshKey = useMemo(() => {
     const metadata = entity.metadata as any;
     return JSON.stringify({
       id: entity.id,
       imageUrl: entity.image_url,
       photoReference: metadata?.photo_reference,
-      photoReferences: metadata?.photo_references
+      photoReferences: metadata?.photo_references,
+      storedPhotoUrls: metadata?.stored_photo_urls
     });
-  }, [entity.id, entity.image_url, entity.metadata]);
+  }, [entity.id, entity.image_url, 
+      (entity.metadata as any)?.photo_reference,
+      (entity.metadata as any)?.photo_references,
+      (entity.metadata as any)?.stored_photo_urls]);
 
   useEffect(() => {
-    loadPhotos();
+    loadPhotos(isInitialLoadRef.current);
+    isInitialLoadRef.current = false;
   }, [photoRefreshKey]);
 
   const handlePhotoClick = (index: number) => {
