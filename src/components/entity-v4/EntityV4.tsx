@@ -70,10 +70,10 @@ const EntityV4 = () => {
     if (isNewlyCreated && entity && !entity.metadata?.stored_photo_urls) {
       console.log('🔄 New entity detected, will silently check for stored photos in background...');
       
-      // DELAYED START: Wait 15 seconds before first check (give enrichment time)
+      // DELAYED START: Wait 8 seconds before first check (enrichment usually completes in 5-15s)
       const initialDelay = setTimeout(() => {
         let pollCount = 0;
-        const maxPolls = 2; // Reduced from 6 to minimize unnecessary polling
+        const maxPolls = 3; // Check up to 3 times to catch slower enrichments
         
         const pollInterval = setInterval(() => {
           pollCount++;
@@ -85,21 +85,15 @@ const EntityV4 = () => {
           
           // If stored URLs are NOT available yet, silently refetch
           if (!currentEntity?.metadata?.stored_photo_urls) {
-            // Silently refetch without invalidation (no "Refreshing" badge)
+            // Silently refetch without invalidation
             queryClient.refetchQueries({ 
               queryKey: ['entity-detail', entitySlug],
               exact: true 
             });
           } else {
+            // Photos detected - silent upgrade complete (no toast, no badge)
             console.log('✅ Stored photos detected, silent upgrade complete');
             clearInterval(pollInterval);
-            
-            // Optional: Show subtle one-time toast
-            toast({
-              title: 'Photos optimized',
-              description: 'Gallery images are now fully cached',
-              duration: 2000,
-            });
           }
           
           // Stop after max polls
@@ -107,15 +101,15 @@ const EntityV4 = () => {
             console.log('⏱️ Polling timeout reached, using proxy URLs');
             clearInterval(pollInterval);
           }
-        }, 30000); // 30 seconds between polls (reduced from 10s to minimize API calls)
+        }, 12000); // 12 seconds between polls for faster detection
         
         return () => clearInterval(pollInterval);
-      }, 15000); // Wait 15 seconds before starting (was immediate)
+      }, 8000); // Wait 8 seconds before starting (matches enrichment timing)
       
       // Cleanup on unmount
       return () => clearTimeout(initialDelay);
     }
-  }, [isNewlyCreated, entity?.id, entitySlug, queryClient, toast]);
+  }, [isNewlyCreated, entity?.id, entitySlug, queryClient]);
 
   // Fetch entity hierarchy data (children/products and parent)
   const {
@@ -497,15 +491,7 @@ const EntityV4 = () => {
       
       {/* Main Content */}
       <div className="flex-1 pt-8">
-        {/* Subtle indicator during background refetch */}
-        {isRefetching && (
-          <div className="fixed top-16 right-4 z-50 animate-fade-in">
-            <div className="bg-primary/10 backdrop-blur-sm text-primary px-3 py-1.5 rounded-full text-xs font-medium shadow-sm flex items-center gap-2">
-              <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              Refreshing...
-            </div>
-          </div>
-        )}
+        {/* Background refetches are now completely silent - no badge shown */}
         
         <div className="min-h-screen bg-gray-50">
           {/* SECTION 1: Header & Primary Actions */}

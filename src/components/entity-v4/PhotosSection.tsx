@@ -45,6 +45,9 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   
+  // Track if this is the initial load vs a background refresh
+  const isInitialLoadRef = useRef(true);
+  
   
   // Photo management states
   const [editingPhoto, setEditingPhoto] = useState<EntityPhoto | null>(null);
@@ -57,8 +60,13 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const [photosToShow, setPhotosToShow] = useState(12);
   const PHOTOS_PER_LOAD = 12;
 
-  const loadPhotos = async () => {
-    setLoading(true);
+  const loadPhotos = async (isInitialLoad: boolean = false) => {
+    // Only show loading skeleton on initial load, not background refreshes
+    // This prevents jarring image flash when photos silently upgrade
+    if (isInitialLoad) {
+      setLoading(true);
+    }
+    
     try {
       const [googlePhotos, reviewPhotos, userPhotos] = await Promise.all([
         fetchGooglePlacesPhotos(entity),
@@ -226,7 +234,10 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   }, [entity.id, entity.image_url, entity.metadata]);
 
   useEffect(() => {
-    loadPhotos();
+    // Pass whether this is initial load or a background refresh
+    loadPhotos(isInitialLoadRef.current);
+    // Mark subsequent loads as background refreshes (silent, no skeleton)
+    isInitialLoadRef.current = false;
   }, [photoRefreshKey]);
 
   // Reset pagination when filters change
