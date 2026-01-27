@@ -222,16 +222,20 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
     resetPagination();
   };
 
-  // Derive a stable key from fields that change during image refresh
+  // Only trigger refresh when photo-specific data changes, not all metadata
   const photoRefreshKey = useMemo(() => {
     const metadata = entity.metadata as any;
     return JSON.stringify({
       id: entity.id,
       imageUrl: entity.image_url,
       photoReference: metadata?.photo_reference,
-      photoReferences: metadata?.photo_references
+      photoReferences: metadata?.photo_references,
+      storedPhotoUrls: metadata?.stored_photo_urls
     });
-  }, [entity.id, entity.image_url, entity.metadata]);
+  }, [entity.id, entity.image_url, 
+      (entity.metadata as any)?.photo_reference,
+      (entity.metadata as any)?.photo_references,
+      (entity.metadata as any)?.stored_photo_urls]);
 
   useEffect(() => {
     // Pass whether this is initial load or a background refresh
