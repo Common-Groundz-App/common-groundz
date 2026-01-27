@@ -1,102 +1,34 @@
 
-
-# Silent Background Photo Enrichment: Complete UX Fix
+# Fix Silent Photo Enrichment - Complete Solution
 
 ## Problem Summary
+After entity creation, the photo gallery shows jarring skeleton placeholders ~20 seconds later because:
 
-When a new entity is created, users experience three disruptive behaviors:
+1. **`MediaPreviewSection.tsx` was NOT fixed** - It still sets `loading = true` on every photo load
+2. **Unstable `photoRefreshKey`** - Depends on entire `entity.metadata` object instead of only photo-specific fields
+3. **Unnecessary re-fetching** - Photos re-load even when they haven't changed
 
-1. **"Refreshing..." badge** appears ~45 seconds after creation
-2. **Jarring image flash** - gallery shows empty gray placeholder boxes while images reload
-3. **"Photos optimized" toast** appears ~80 seconds after creation
+## Technical Fix
 
-These occur because the background polling triggers `queryClient.refetchQueries()`, which:
-- Sets `isRefetching = true` → shows the badge
-- Changes `entity.metadata` → triggers `photoRefreshKey` change in `PhotosSection`
-- `photoRefreshKey` change → triggers `loadPhotos()` with `setLoading(true)` → shows skeleton placeholders
+### File 1: `src/components/entity-v4/MediaPreviewSection.tsx`
 
----
-
-## Root Cause Flow
-
-```text
-Entity Created
-     ↓ (3s)
-Background enrichment runs (stores photos to Supabase)
-     ↓ (5-10s)
-Photos stored successfully
-     ↓ (15s)
-Polling starts in EntityV4.tsx
-     ↓
-queryClient.refetchQueries() called
-     ↓
-┌──────────────────────────────────────────────────────┐
-│ isRefetching = true  →  "Refreshing..." badge shown  │
-│ entity.metadata changes  →  photoRefreshKey changes  │
-│ PhotosSection: setLoading(true)  →  SKELETON FLASH   │
-└──────────────────────────────────────────────────────┘
-     ↓ (few seconds)
-Data loaded, stored_photo_urls detected
-     ↓
-"Photos optimized" toast shown
+**Change 1A: Add initial load tracking ref (after line 47)**
+```typescript
+// Track if this is the initial load vs a background refresh
+const isInitialLoadRef = useRef(true);
 ```
 
----
-
-## Solution: True Silent Upgrade
-
-### Goal
-Background photo enrichment should be **completely invisible** to users. The gallery should progressively enhance without any visual disruption.
-
-### Changes Required
-
----
-
-### File 1: `src/components/entity-v4/EntityV4.tsx`
-
-#### Change 1A: Remove "Photos optimized" toast
-**Lines 97-102** - Delete the toast notification entirely
-
-#### Change 1B: Remove "Refreshing..." badge for background polling
-**Lines 500-508** - Remove or conditionalize the badge
-
-The badge is currently tied to `isRefetching` from React Query, which fires during ANY refetch. We should remove this badge entirely since:
-- User-initiated refreshes have their own feedback (button spinner)
-- Background refreshes should be silent
-
-#### Change 1C: Faster polling timing
-**Lines 74, 110, 113** - Reduce delays to match actual enrichment speed:
-- Initial delay: 15s → 8s (enrichment usually completes in 5-15s)
-- Poll interval: 30s → 12s (check more frequently)
-- Max polls: 2 → 3 (catch slower enrichments)
-
----
-
-### File 2: `src/components/entity-v4/PhotosSection.tsx`
-
-#### Change 2: Prevent skeleton flash on background updates
-
-The key fix - **don't show loading skeleton when photos already exist**.
-
-**Lines 60-77** - Modify `loadPhotos()` to only set `loading = true` on initial load:
-
+**Change 1B: Modify `loadPhotos()` to only show skeleton on initial load (lines 49-98)**
 ```typescript
 const loadPhotos = async (isInitialLoad: boolean = false) => {
   // Only show loading skeleton on initial load, not background refreshes
+  // This prevents jarring image flash when photos silently upgrade
   if (isInitialLoad) {
     setLoading(true);
   }
   
   try {
-    const [googlePhotos, reviewPhotos, userPhotos] = await Promise.all([
-      fetchGooglePlacesPhotos(entity),
-      fetchEntityReviewMedia(entity.id),
-      fetchEntityPhotos(entity.id)
-    ]);
-    
-    const allPhotos = [...googlePhotos, ...reviewPhotos];
-    setPhotos(allPhotos);
-    setEntityPhotos(userPhotos);
+    // ... existing fetch logic stays the same ...
   } catch (error) {
     console.error('Error loading photos:', error);
   } finally {
@@ -105,20 +37,53 @@ const loadPhotos = async (isInitialLoad: boolean = false) => {
 };
 ```
 
-**Lines 228-230** - Track if this is initial load vs background refresh:
-
+**Change 1C: Stabilize `photoRefreshKey` to only depend on photo-specific fields (lines 100-109)**
 ```typescript
-const isInitialLoadRef = useRef(true);
+// Only trigger refresh when photo-specific data changes, not all metadata
+const photoRefreshKey = useMemo(() => {
+  const metadata = entity.metadata as any;
+  return JSON.stringify({
+    id: entity.id,
+    imageUrl: entity.image_url,
+    photoReference: metadata?.photo_reference,
+    photoReferences: metadata?.photo_references,
+    storedPhotoUrls: metadata?.stored_photo_urls  // Track when stored URLs appear
+  });
+}, [entity.id, entity.image_url, 
+    (entity.metadata as any)?.photo_reference,
+    (entity.metadata as any)?.photo_references,
+    (entity.metadata as any)?.stored_photo_urls]);  // Specific fields only!
+```
 
+**Change 1D: Update useEffect to pass isInitialLoad flag (lines 111-113)**
+```typescript
 useEffect(() => {
   loadPhotos(isInitialLoadRef.current);
-  isInitialLoadRef.current = false; // Subsequent loads are background refreshes
+  isInitialLoadRef.current = false;
 }, [photoRefreshKey]);
 ```
 
-This ensures:
-- First load: Shows skeleton placeholders (expected behavior)
-- Background refresh: Silently updates photos in place without flashing
+---
+
+### File 2: `src/components/entity-v4/PhotosSection.tsx`
+
+**Change 2: Stabilize `photoRefreshKey` to only depend on photo-specific fields (lines 226-234)**
+```typescript
+// Only trigger refresh when photo-specific data changes, not all metadata
+const photoRefreshKey = useMemo(() => {
+  const metadata = entity.metadata as any;
+  return JSON.stringify({
+    id: entity.id,
+    imageUrl: entity.image_url,
+    photoReference: metadata?.photo_reference,
+    photoReferences: metadata?.photo_references,
+    storedPhotoUrls: metadata?.stored_photo_urls
+  });
+}, [entity.id, entity.image_url,
+    (entity.metadata as any)?.photo_reference,
+    (entity.metadata as any)?.photo_references,
+    (entity.metadata as any)?.stored_photo_urls]);
+```
 
 ---
 
@@ -126,40 +91,43 @@ This ensures:
 
 | Issue | File | Fix |
 |-------|------|-----|
-| "Refreshing..." badge | EntityV4.tsx | Remove the badge entirely (lines 500-508) |
-| "Photos optimized" toast | EntityV4.tsx | Delete toast call (lines 97-102) |
-| Jarring image flash | PhotosSection.tsx | Only show skeleton on initial load, not refreshes |
-| Slow polling | EntityV4.tsx | Reduce timing: 8s initial, 12s interval, 3 max polls |
+| Skeleton flash in hero gallery | MediaPreviewSection.tsx | Add `isInitialLoadRef` + only show skeleton on initial load |
+| Unstable refresh key | MediaPreviewSection.tsx | Change dependency from `entity.metadata` to specific photo fields |
+| Unstable refresh key | PhotosSection.tsx | Change dependency from `entity.metadata` to specific photo fields |
 
 ---
 
 ## Expected Behavior After Fix
 
 ```text
-Entity Created
+Entity Created (0s)
      ↓ (3s)
 Background enrichment runs
      ↓ (5-15s)  
-Photos stored to Supabase (silent)
+Photos stored to Supabase
      ↓ (8s)
-First poll runs (silent)
+First poll runs
      ↓
-If stored_photo_urls found:
-  → Photos seamlessly upgrade in gallery (no flash, no badge, no toast)
-  → User sees higher quality images without disruption
+stored_photo_urls field changes in metadata
+     ↓
+photoRefreshKey changes (stable, only photo fields)
+     ↓
+loadPhotos(false) called ← isInitialLoad = false
+     ↓
+setLoading(true) is SKIPPED ← no skeleton!
+     ↓
+New photo URLs silently populate in state
+     ↓
+React re-renders with new images seamlessly
 
-If not found yet:
-  → Poll again in 12s (silent)
-  → Repeat up to 3 times
-
-User experience: Photos just "get better" without any visible process
+User experience: Photos just "get better" without any visible placeholder flash
 ```
 
 ---
 
 ## Technical Notes
 
-- The `isRefetching` state from React Query is useful for debugging but should not drive visible UI for background operations
-- The `photoRefreshKey` pattern is correct for detecting metadata changes, but the loading state needs to distinguish initial load vs refresh
-- Timing of 8s initial + 12s interval means photos upgrade within ~20s worst case (vs ~75s currently)
-
+- The key insight is that `entity.metadata` contains ~20+ fields that change during enrichment (like `last_refreshed_at`, `vicinity`, `rating`, etc.)
+- By specifying only photo-specific fields in the dependency array, we prevent unnecessary re-renders when non-photo metadata changes
+- The `isInitialLoadRef` pattern distinguishes "user just opened the page" from "background enrichment completed"
+- Both `MediaPreviewSection` (hero gallery) and `PhotosSection` (full gallery tab) need the same fix applied
