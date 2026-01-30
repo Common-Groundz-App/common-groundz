@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { validateUsernameFormat, checkUsernameUniqueness, checkUsernameNotHistorical } from '@/utils/usernameValidation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDebouncedCallback } from 'use-debounce';
+import { useProfileCacheActions } from '@/hooks/use-profile-cache';
 import { AtSign } from 'lucide-react';
 
 interface ProfileEditFormProps {
@@ -44,6 +45,7 @@ const ProfileEditForm = ({
 }: ProfileEditFormProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { invalidateProfile } = useProfileCacheActions();
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [initialUsername, setInitialUsername] = useState('');
@@ -164,13 +166,20 @@ const ProfileEditForm = ({
       // Update local state
       onProfileUpdate(data.username, data.bio, data.location, data.firstName, data.lastName);
       
+      // Invalidate the profile cache so useViewedProfile gets fresh data
+      if (user?.id) {
+        invalidateProfile(user.id);
+      }
+      
       toast({
         title: 'Profile updated',
         description: 'Your profile has been successfully updated.'
       });
       
-      // Refresh the UserMenu
-      window.dispatchEvent(new CustomEvent('profile-updated'));
+      // Refresh the UserMenu and other listeners with userId for targeted invalidation
+      window.dispatchEvent(new CustomEvent('profile-updated', { 
+        detail: { userId: user.id } 
+      }));
       
       onClose();
     } catch (error: any) {

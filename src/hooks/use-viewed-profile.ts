@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useProfile } from '@/hooks/use-profile-cache';
+import { useProfile, useProfileCacheActions } from '@/hooks/use-profile-cache';
 import { fetchFollowerCount, fetchFollowingCount } from '@/services/profileService';
 
 interface ViewedProfile {
@@ -24,6 +24,7 @@ export const useViewedProfile = (profileUserId?: string) => {
   
   // Use enhanced profile service
   const { data: profile, isLoading: profileLoading, error: profileError } = useProfile(viewingUserId);
+  const { invalidateProfile } = useProfileCacheActions();
   
   const [profile_state, setProfile] = useState<ViewedProfile>({
     username: '',
@@ -104,6 +105,20 @@ export const useViewedProfile = (profileUserId?: string) => {
       }));
     }
   }, [profileUserId, user, profile, profileLoading, profileError, viewingUserId, isOwnProfile]);
+
+  // Listen for profile-updated events to invalidate cache
+  useEffect(() => {
+    const handleProfileUpdated = (event: CustomEvent) => {
+      const eventUserId = event.detail?.userId;
+      // Only invalidate if this is the profile we're viewing
+      if (viewingUserId && (!eventUserId || eventUserId === viewingUserId)) {
+        invalidateProfile(viewingUserId);
+      }
+    };
+    
+    window.addEventListener('profile-updated', handleProfileUpdated as EventListener);
+    return () => window.removeEventListener('profile-updated', handleProfileUpdated as EventListener);
+  }, [viewingUserId, invalidateProfile]);
 
   useEffect(() => {
     const handleFollowStatusChange = async (event: CustomEvent) => {
