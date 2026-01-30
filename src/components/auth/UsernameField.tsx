@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { AtSign } from 'lucide-react';
+import { useDebouncedCallback } from 'use-debounce';
 import { validateUsernameFormat, checkUsernameUniqueness } from '@/utils/usernameValidation';
 
 interface UsernameFieldProps {
@@ -23,18 +24,32 @@ const UsernameField = ({
   setIsCheckingUsername 
 }: UsernameFieldProps) => {
   
-  const handleUsernameChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Debounced uniqueness check (400ms delay)
+  const debouncedCheckUniqueness = useDebouncedCallback(
+    async (value: string) => {
+      if (value.length >= 3) {
+        setIsCheckingUsername(true);
+        const { isUnique, error } = await checkUsernameUniqueness(value);
+        if (!isUnique) {
+          setUsernameError(error);
+        }
+        setIsCheckingUsername(false);
+      }
+    },
+    400
+  );
+
+  const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.toLowerCase();
     setUsername(value);
     
+    // Immediate format validation
     const formatError = validateUsernameFormat(value);
     setUsernameError(formatError);
     
+    // Only check uniqueness if format is valid
     if (!formatError && value.length >= 3) {
-      setIsCheckingUsername(true);
-      const { isUnique, error } = await checkUsernameUniqueness(value);
-      setUsernameError(error);
-      setIsCheckingUsername(false);
+      debouncedCheckUniqueness(value);
     }
   };
 
@@ -58,7 +73,9 @@ const UsernameField = ({
       {isCheckingUsername && (
         <p className="text-gray-500 text-xs mt-1">Checking username availability...</p>
       )}
-      <p className="text-xs text-gray-500">Username must be lowercase, contain only letters, numbers, dots, and underscores.</p>
+      <p className="text-xs text-gray-500">
+        3-20 characters. Letters, numbers, dots, and underscores only. Cannot start or end with dots/underscores.
+      </p>
     </div>
   );
 };

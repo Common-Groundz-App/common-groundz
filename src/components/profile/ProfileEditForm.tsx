@@ -10,6 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { validateUsernameFormat, checkUsernameUniqueness } from '@/utils/usernameValidation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDebouncedCallback } from 'use-debounce';
+import { AtSign } from 'lucide-react';
 
 interface ProfileEditFormProps {
   isOpen: boolean;
@@ -71,24 +73,32 @@ const ProfileEditForm = ({
     }
   }, [isOpen, username, bio, location, firstName, lastName, form]);
 
-  const handleUsernameChange = async (value: string) => {
-    // Force lowercase
-    const newValue = value.toLowerCase();
-    
-    // Only validate if username has changed from initial value
-    if (newValue !== initialUsername) {
-      const formatError = validateUsernameFormat(newValue);
-      setUsernameError(formatError);
-      
-      if (!formatError && newValue.length >= 3) {
+  // Debounced uniqueness check (400ms delay)
+  const debouncedCheckUniqueness = useDebouncedCallback(
+    async (value: string) => {
+      if (value.length >= 3 && value !== initialUsername) {
         setIsCheckingUsername(true);
-        const { isUnique, error } = await checkUsernameUniqueness(newValue);
+        const { isUnique, error } = await checkUsernameUniqueness(value);
         if (!isUnique) {
           setUsernameError(error);
         } else {
           setUsernameError('');
         }
         setIsCheckingUsername(false);
+      }
+    },
+    400
+  );
+
+  const handleUsernameChange = (value: string) => {
+    const newValue = value.toLowerCase();
+    
+    if (newValue !== initialUsername) {
+      const formatError = validateUsernameFormat(newValue);
+      setUsernameError(formatError);
+      
+      if (!formatError && newValue.length >= 3) {
+        debouncedCheckUniqueness(newValue);
       }
     } else {
       setUsernameError('');
@@ -207,17 +217,20 @@ const ProfileEditForm = ({
                 <FormItem>
                   <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <Input 
-                      placeholder="Username" 
-                      {...field} 
-                      value={field.value.toLowerCase()}
-                      onChange={(e) => {
-                        const lowercaseValue = e.target.value.toLowerCase();
-                        field.onChange(lowercaseValue);
-                        handleUsernameChange(lowercaseValue);
-                      }}
-                      className={usernameError ? 'border-red-500' : ''}
-                    />
+                    <div className="relative">
+                      <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        placeholder="username" 
+                        {...field} 
+                        value={field.value.toLowerCase()}
+                        onChange={(e) => {
+                          const lowercaseValue = e.target.value.toLowerCase();
+                          field.onChange(lowercaseValue);
+                          handleUsernameChange(lowercaseValue);
+                        }}
+                        className={`pl-10 ${usernameError ? 'border-red-500' : ''}`}
+                      />
+                    </div>
                   </FormControl>
                   {usernameError && (
                     <p className="text-red-500 text-xs mt-1">{usernameError}</p>
@@ -225,6 +238,9 @@ const ProfileEditForm = ({
                   {isCheckingUsername && (
                     <p className="text-gray-500 text-xs mt-1">Checking username availability...</p>
                   )}
+                  <p className="text-xs text-gray-500">
+                    3-20 characters. Letters, numbers, dots, and underscores only. Cannot start or end with dots/underscores.
+                  </p>
                   <FormMessage />
                 </FormItem>
               )}
