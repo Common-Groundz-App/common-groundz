@@ -2183,6 +2183,7 @@ export type Database = {
           preferences: Json | null
           updated_at: string
           username: string | null
+          username_changed_at: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -2198,6 +2199,7 @@ export type Database = {
           preferences?: Json | null
           updated_at?: string
           username?: string | null
+          username_changed_at?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -2213,6 +2215,7 @@ export type Database = {
           preferences?: Json | null
           updated_at?: string
           username?: string | null
+          username_changed_at?: string | null
         }
         Relationships: []
       }
@@ -2522,6 +2525,24 @@ export type Database = {
           visibility?:
             | Database["public"]["Enums"]["recommendation_visibility"]
             | null
+        }
+        Relationships: []
+      }
+      reserved_usernames: {
+        Row: {
+          created_at: string | null
+          reason: string | null
+          username: string
+        }
+        Insert: {
+          created_at?: string | null
+          reason?: string | null
+          username: string
+        }
+        Update: {
+          created_at?: string | null
+          reason?: string | null
+          username?: string
         }
         Relationships: []
       }
