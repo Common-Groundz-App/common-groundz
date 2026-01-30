@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { validateUsernameFormat, checkUsernameUniqueness } from '@/utils/usernameValidation';
+import { validateUsernameFormat, checkUsernameUniqueness, checkUsernameNotHistorical } from '@/utils/usernameValidation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDebouncedCallback } from 'use-debounce';
 import { AtSign } from 'lucide-react';
@@ -73,14 +73,24 @@ const ProfileEditForm = ({
     }
   }, [isOpen, username, bio, location, firstName, lastName, form]);
 
-  // Debounced uniqueness check (400ms delay)
-  const debouncedCheckUniqueness = useDebouncedCallback(
+  // Debounced uniqueness and historical check (400ms delay)
+  const debouncedCheckAvailability = useDebouncedCallback(
     async (value: string) => {
       if (value.length >= 3 && value !== initialUsername) {
         setIsCheckingUsername(true);
-        const { isUnique, error } = await checkUsernameUniqueness(value);
+        
+        // Check historical first
+        const { isAvailable, error: historyError } = await checkUsernameNotHistorical(value);
+        if (!isAvailable) {
+          setUsernameError(historyError);
+          setIsCheckingUsername(false);
+          return;
+        }
+        
+        // Then check uniqueness
+        const { isUnique, error: uniqueError } = await checkUsernameUniqueness(value);
         if (!isUnique) {
-          setUsernameError(error);
+          setUsernameError(uniqueError);
         } else {
           setUsernameError('');
         }
@@ -98,7 +108,7 @@ const ProfileEditForm = ({
       setUsernameError(formatError);
       
       if (!formatError && newValue.length >= 3) {
-        debouncedCheckUniqueness(newValue);
+        debouncedCheckAvailability(newValue);
       }
     } else {
       setUsernameError('');

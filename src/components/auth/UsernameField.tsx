@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { AtSign } from 'lucide-react';
 import { useDebouncedCallback } from 'use-debounce';
-import { validateUsernameFormat, checkUsernameUniqueness } from '@/utils/usernameValidation';
+import { validateUsernameFormat, checkUsernameUniqueness, checkUsernameNotHistorical } from '@/utils/usernameValidation';
 
 interface UsernameFieldProps {
   username: string;
@@ -24,14 +24,24 @@ const UsernameField = ({
   setIsCheckingUsername 
 }: UsernameFieldProps) => {
   
-  // Debounced uniqueness check (400ms delay)
-  const debouncedCheckUniqueness = useDebouncedCallback(
+  // Debounced availability check (400ms delay)
+  const debouncedCheckAvailability = useDebouncedCallback(
     async (value: string) => {
       if (value.length >= 3) {
         setIsCheckingUsername(true);
-        const { isUnique, error } = await checkUsernameUniqueness(value);
+        
+        // Check historical first
+        const { isAvailable, error: historyError } = await checkUsernameNotHistorical(value);
+        if (!isAvailable) {
+          setUsernameError(historyError);
+          setIsCheckingUsername(false);
+          return;
+        }
+        
+        // Then check uniqueness
+        const { isUnique, error: uniqueError } = await checkUsernameUniqueness(value);
         if (!isUnique) {
-          setUsernameError(error);
+          setUsernameError(uniqueError);
         }
         setIsCheckingUsername(false);
       }
@@ -47,9 +57,9 @@ const UsernameField = ({
     const formatError = validateUsernameFormat(value);
     setUsernameError(formatError);
     
-    // Only check uniqueness if format is valid
+    // Only check availability if format is valid
     if (!formatError && value.length >= 3) {
-      debouncedCheckUniqueness(value);
+      debouncedCheckAvailability(value);
     }
   };
 

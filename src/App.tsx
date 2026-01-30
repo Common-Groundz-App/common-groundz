@@ -32,6 +32,7 @@ import AdminPortal from '@/pages/AdminPortal';
 import AdminEntityEdit from '@/pages/admin/AdminEntityEdit';
 import YourData from '@/pages/YourData';
 import NotFound from '@/pages/NotFound';
+import UserProfile from '@/pages/UserProfile';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
 
@@ -187,6 +188,7 @@ function App() {
                       <YourData />
                     </ProtectedRoute>
                   } />
+                  <Route path="/u/:username" element={<UserProfile />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </AuthInitializer>

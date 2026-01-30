@@ -2178,6 +2178,7 @@ export type Database = {
           embedding_updated_at: string | null
           first_name: string | null
           id: string
+          is_verified: boolean | null
           last_name: string | null
           location: string | null
           preferences: Json | null
@@ -2194,6 +2195,7 @@ export type Database = {
           embedding_updated_at?: string | null
           first_name?: string | null
           id: string
+          is_verified?: boolean | null
           last_name?: string | null
           location?: string | null
           preferences?: Json | null
@@ -2210,6 +2212,7 @@ export type Database = {
           embedding_updated_at?: string | null
           first_name?: string | null
           id?: string
+          is_verified?: boolean | null
           last_name?: string | null
           location?: string | null
           preferences?: Json | null
@@ -3464,6 +3467,41 @@ export type Database = {
           },
           {
             foreignKeyName: "user_stuff_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      username_history: {
+        Row: {
+          created_at: string | null
+          id: string
+          new_username: string
+          old_username: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          new_username: string
+          old_username: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          new_username?: string
+          old_username?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "username_history_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
