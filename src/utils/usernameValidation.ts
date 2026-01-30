@@ -61,3 +61,30 @@ export const checkUsernameUniqueness = async (value: string): Promise<{ isUnique
     return { isUnique: false, error: 'Error checking username availability' };
   }
 };
+
+export const checkUsernameNotHistorical = async (
+  value: string
+): Promise<{ isAvailable: boolean; error: string }> => {
+  try {
+    const normalizedValue = value.toLowerCase();
+    
+    const { data, error } = await supabase
+      .from('username_history')
+      .select('user_id')
+      .eq('old_username', normalizedValue)
+      .maybeSingle();
+    
+    if (error) throw error;
+    
+    if (data) {
+      return { 
+        isAvailable: false, 
+        error: 'This username was previously used and is no longer available' 
+      };
+    }
+    return { isAvailable: true, error: '' };
+  } catch (error) {
+    console.error('Error checking username history:', error);
+    return { isAvailable: false, error: 'Error checking username availability' };
+  }
+};
