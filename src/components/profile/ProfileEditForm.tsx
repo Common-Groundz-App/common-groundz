@@ -12,7 +12,8 @@ import { validateUsernameFormat, checkUsernameUniqueness, checkUsernameNotHistor
 import { useAuth } from '@/contexts/AuthContext';
 import { useDebouncedCallback } from 'use-debounce';
 import { useProfileCacheActions } from '@/hooks/use-profile-cache';
-import { AtSign } from 'lucide-react';
+import { AtSign, Lock, AlertTriangle } from 'lucide-react';
+import { calculateUsernameCooldown } from '@/utils/usernameCooldown';
 
 interface ProfileEditFormProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ interface ProfileEditFormProps {
   firstName: string;
   lastName: string;
   onProfileUpdate: (username: string, bio: string, location: string, firstName: string, lastName: string) => void;
+  usernameChangedAt: string | null;
 }
 
 interface FormValues {
@@ -41,7 +43,8 @@ const ProfileEditForm = ({
   location, 
   firstName, 
   lastName, 
-  onProfileUpdate 
+  onProfileUpdate,
+  usernameChangedAt
 }: ProfileEditFormProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -49,6 +52,8 @@ const ProfileEditForm = ({
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [initialUsername, setInitialUsername] = useState('');
+
+  const cooldownState = calculateUsernameCooldown(usernameChangedAt);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -74,6 +79,13 @@ const ProfileEditForm = ({
       setUsernameError('');
     }
   }, [isOpen, username, bio, location, firstName, lastName, form]);
+
+  // Clear username error when locked (prevents blocking other edits)
+  useEffect(() => {
+    if (cooldownState.isLocked) {
+      setUsernameError('');
+    }
+  }, [cooldownState.isLocked]);
 
   // Debounced uniqueness and historical check (400ms delay)
   const debouncedCheckAvailability = useDebouncedCallback(
@@ -121,7 +133,8 @@ const ProfileEditForm = ({
     // Ensure username is lowercase
     data.username = data.username.toLowerCase();
     
-    if (usernameError) {
+    // Only check username error if not locked
+    if (!cooldownState.isLocked && usernameError) {
       toast({
         title: 'Invalid username',
         description: usernameError,
@@ -130,7 +143,7 @@ const ProfileEditForm = ({
       return;
     }
 
-    if (isCheckingUsername) {
+    if (!cooldownState.isLocked && isCheckingUsername) {
       toast({
         title: 'Please wait',
         description: 'Checking username availability...'
@@ -141,14 +154,21 @@ const ProfileEditForm = ({
     try {
       if (!user) throw new Error('User not authenticated');
       
+      // Build update object - exclude username if locked
+      const profileUpdate: { bio: string; location: string; username?: string } = {
+        bio: data.bio,
+        location: data.location
+      };
+      
+      // Only include username if not locked
+      if (!cooldownState.isLocked) {
+        profileUpdate.username = data.username;
+      }
+      
       // Update profile in database
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
-          username: data.username,
-          bio: data.bio,
-          location: data.location
-        })
+        .update(profileUpdate)
         .eq('id', user.id);
 
       if (profileError) throw profileError;
@@ -163,8 +183,9 @@ const ProfileEditForm = ({
 
       if (userError) throw userError;
 
-      // Update local state
-      onProfileUpdate(data.username, data.bio, data.location, data.firstName, data.lastName);
+      // Update local state - use original username if locked
+      const updatedUsername = cooldownState.isLocked ? username : data.username;
+      onProfileUpdate(updatedUsername, data.bio, data.location, data.firstName, data.lastName);
       
       // Invalidate the profile cache so useViewedProfile gets fresh data
       if (user?.id) {
@@ -236,30 +257,58 @@ const ProfileEditForm = ({
                 <FormItem>
                   <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <div className="relative">
-                      <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input 
-                        placeholder="username" 
-                        {...field} 
-                        value={field.value.toLowerCase()}
-                        onChange={(e) => {
-                          const lowercaseValue = e.target.value.toLowerCase();
-                          field.onChange(lowercaseValue);
-                          handleUsernameChange(lowercaseValue);
-                        }}
-                        className={`pl-10 ${usernameError ? 'border-red-500' : ''}`}
-                      />
-                    </div>
+                    {cooldownState.isLocked ? (
+                      // LOCKED STATE
+                      <>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            value={field.value}
+                            disabled
+                            className="pl-10 bg-muted cursor-not-allowed"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      // EDITABLE STATE
+                      <div className="relative">
+                        <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          placeholder="username" 
+                          {...field} 
+                          value={field.value.toLowerCase()}
+                          onChange={(e) => {
+                            const lowercaseValue = e.target.value.toLowerCase();
+                            field.onChange(lowercaseValue);
+                            handleUsernameChange(lowercaseValue);
+                          }}
+                          className={`pl-10 ${usernameError ? 'border-red-500' : ''}`}
+                        />
+                      </div>
+                    )}
                   </FormControl>
-                  {usernameError && (
-                    <p className="text-red-500 text-xs mt-1">{usernameError}</p>
+                  
+                  {cooldownState.isLocked ? (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Username changes available: {cooldownState.formattedNextChangeDate}
+                    </p>
+                  ) : (
+                    <>
+                      {usernameError && (
+                        <p className="text-red-500 text-xs mt-1">{usernameError}</p>
+                      )}
+                      {isCheckingUsername && (
+                        <p className="text-muted-foreground text-xs mt-1">Checking username availability...</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        3-20 characters. Letters, numbers, dots, and underscores only. Cannot start or end with dots/underscores.
+                      </p>
+                      <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                        You can only change your username once every 30 days. Your old username will be permanently retired.
+                      </p>
+                    </>
                   )}
-                  {isCheckingUsername && (
-                    <p className="text-gray-500 text-xs mt-1">Checking username availability...</p>
-                  )}
-                  <p className="text-xs text-gray-500">
-                    3-20 characters. Letters, numbers, dots, and underscores only. Cannot start or end with dots/underscores.
-                  </p>
                   <FormMessage />
                 </FormItem>
               )}
@@ -299,7 +348,12 @@ const ProfileEditForm = ({
             
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={!!usernameError || isCheckingUsername}>Save changes</Button>
+              <Button 
+                type="submit" 
+                disabled={(!!usernameError && !cooldownState.isLocked) || isCheckingUsername}
+              >
+                Save changes
+              </Button>
             </DialogFooter>
           </form>
         </Form>

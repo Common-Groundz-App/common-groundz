@@ -31,7 +31,8 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
     followingCount,
     isLoading,
     error,
-    isOwnProfile
+    isOwnProfile,
+    usernameChangedAt
   } = useViewedProfile(profileUserId);
 
   const {
@@ -130,6 +131,7 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
           firstName={user?.user_metadata?.first_name || ''}
           lastName={user?.user_metadata?.last_name || ''}
           onProfileUpdate={handleProfileUpdate}
+          usernameChangedAt={usernameChangedAt}
         />
       )}
     </>

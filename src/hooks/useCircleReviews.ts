@@ -94,7 +94,9 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
                   first_name: profile.first_name,
                   last_name: profile.last_name,
                   bio: null,
-                  location: null
+                  location: null,
+                  created_at: null,
+                  username_changed_at: null
                 } : null),
                 // Add required InteractionData fields
                 likes: 0,

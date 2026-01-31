@@ -126,7 +126,7 @@ class ProfileCache {
     try {
       const { data: profilesData, error } = await supabase
         .from('profiles')
-        .select('id, username, avatar_url, first_name, last_name, bio, location')
+        .select('id, username, avatar_url, first_name, last_name, bio, location, created_at, username_changed_at')
         .in('id', uniqueUserIds);
 
       if (error) {
@@ -302,7 +302,7 @@ const fetchSingleProfileDirect = async (userId: string): Promise<SafeUserProfile
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, first_name, last_name, bio, location')
+      .select('id, username, avatar_url, first_name, last_name, bio, location, created_at, username_changed_at')
       .eq('id', userId)
       .single();
 
