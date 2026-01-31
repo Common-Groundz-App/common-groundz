@@ -15,6 +15,7 @@ interface ViewedProfile {
   isLoading: boolean;
   error: Error | null;
   isOwnProfile: boolean;
+  usernameChangedAt: string | null;
 }
 
 export const useViewedProfile = (profileUserId?: string) => {
@@ -37,7 +38,8 @@ export const useViewedProfile = (profileUserId?: string) => {
     followingCount: 0,
     isLoading: true,
     error: null,
-    isOwnProfile
+    isOwnProfile,
+    usernameChangedAt: null
   });
 
   useEffect(() => {
@@ -72,7 +74,8 @@ export const useViewedProfile = (profileUserId?: string) => {
             followingCount: followingCountData,
             isLoading: false,
             error: null,
-            isOwnProfile
+            isOwnProfile,
+            usernameChangedAt: profile.username_changed_at || null
           });
         }
       } catch (error) {

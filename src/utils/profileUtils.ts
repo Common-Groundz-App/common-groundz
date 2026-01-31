@@ -21,6 +21,7 @@ export const transformToSafeProfile = (profile: BaseUserProfile | null): SafeUse
       last_name: null,
       bio: null,
       location: null,
+      username_changed_at: null,
     };
   }
 
@@ -52,6 +53,7 @@ export const transformToSafeProfile = (profile: BaseUserProfile | null): SafeUse
     last_name: profile.last_name,
     bio: profile.bio,
     location: profile.location,
+    username_changed_at: profile.username_changed_at,
   };
 };
 
