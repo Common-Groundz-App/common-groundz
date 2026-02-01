@@ -11,6 +11,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = React.useState<Session | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
+  // Compute email verification status from user data
+  const isEmailVerified = React.useMemo(() => {
+    return user?.email_confirmed_at != null;
+  }, [user]);
+
   React.useEffect(() => {
     let mounted = true;
     
@@ -84,10 +89,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     username?: string;
   }) => {
     try {
+      const redirectUrl = `${window.location.origin}/`;
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: redirectUrl,
           data: {
             first_name: userData?.firstName || '',
             last_name: userData?.lastName || '',
@@ -100,6 +107,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: error as Error, user: null };
     }
   }, []);
+
+  const resetPassword = React.useCallback(async (email: string) => {
+    try {
+      const redirectUrl = `${window.location.origin}/auth/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectUrl,
+      });
+      return { error };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }, []);
+
+  const updatePassword = React.useCallback(async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      return { error };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }, []);
+
+  const resendVerificationEmail = React.useCallback(async () => {
+    try {
+      if (!user?.email) {
+        return { error: new Error('No email address found') };
+      }
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: user.email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+        }
+      });
+      return { error };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  }, [user?.email]);
 
   const signOut = React.useCallback(async () => {
     try {
@@ -149,10 +195,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     session,
     isLoading,
+    isEmailVerified,
     signIn,
     signUp,
-    signOut
-  }), [user, session, isLoading, signIn, signUp, signOut]);
+    signOut,
+    resetPassword,
+    updatePassword,
+    resendVerificationEmail
+  }), [user, session, isLoading, isEmailVerified, signIn, signUp, signOut, resetPassword, updatePassword, resendVerificationEmail]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

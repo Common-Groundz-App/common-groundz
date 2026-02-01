@@ -1,30 +1,55 @@
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { validateUsernameFormat, checkUsernameUniqueness } from '@/utils/usernameValidation';
+import { calculatePasswordStrength } from '@/utils/passwordStrength';
 import UserInfoFields from './UserInfoFields';
 import CredentialFields from './CredentialFields';
 import UsernameField from './UsernameField';
+import EmailVerificationPending from './EmailVerificationPending';
 
-const SignUpForm = () => {
+interface SignUpFormProps {
+  onSwitchToSignIn?: () => void;
+}
+
+const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showVerificationPending, setShowVerificationPending] = useState(false);
   const { signUp } = useAuth();
-  const navigate = useNavigate();
+
+  // Clear password error when passwords change
+  useEffect(() => {
+    setPasswordError('');
+  }, [password, confirmPassword]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate password strength
+    const strength = calculatePasswordStrength(password);
+    if (!strength.meetsMinimum) {
+      setPasswordError('Please choose a stronger password');
+      return;
+    }
+
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+
     const formatError = validateUsernameFormat(username);
     if (formatError) {
       setUsernameError(formatError);
@@ -52,12 +77,8 @@ const SignUpForm = () => {
       
       if (error) throw error;
       
-      if (user) {
-        toast.success('Registration successful! Please check your email to confirm your account.');
-      } else {
-        toast.info('Please check your email to confirm your registration.');
-      }
-      navigate('/');
+      // Show verification pending screen instead of navigating away
+      setShowVerificationPending(true);
     } catch (error: any) {
       toast.error(error.message || 'Error signing up');
       console.error(error);
@@ -65,6 +86,19 @@ const SignUpForm = () => {
       setIsLoading(false);
     }
   };
+
+  // Show verification pending screen after successful signup
+  if (showVerificationPending) {
+    return (
+      <EmailVerificationPending 
+        email={email}
+        onBackToSignIn={() => {
+          setShowVerificationPending(false);
+          onSwitchToSignIn?.();
+        }}
+      />
+    );
+  }
 
   return (
     <Card className="border-none shadow-lg">
@@ -88,6 +122,11 @@ const SignUpForm = () => {
             setEmail={setEmail}
             password={password}
             setPassword={setPassword}
+            confirmPassword={confirmPassword}
+            setConfirmPassword={setConfirmPassword}
+            passwordError={passwordError}
+            showConfirmField={true}
+            showStrengthIndicator={true}
           />
           
           <UsernameField 

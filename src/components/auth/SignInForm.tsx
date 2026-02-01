@@ -7,12 +7,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { UserIcon, KeyIcon } from 'lucide-react';
+import { UserIcon, KeyIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
+import ForgotPasswordForm from './ForgotPasswordForm';
 
 const SignInForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn } = useAuth();
   const navigate = useNavigate();
 
@@ -32,6 +35,11 @@ const SignInForm = () => {
       setIsLoading(false);
     }
   };
+
+  // Show forgot password form
+  if (showForgotPassword) {
+    return <ForgotPasswordForm onBackToSignIn={() => setShowForgotPassword(false)} />;
+  }
 
   return (
     <Card className="border-none shadow-lg">
@@ -64,13 +72,31 @@ const SignInForm = () => {
               <KeyIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input 
                 id="signin-password" 
-                type="password" 
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="pl-10"
+                className="pl-10 pr-10"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                {showPassword ? (
+                  <EyeOffIcon className="h-4 w-4" />
+                ) : (
+                  <EyeIcon className="h-4 w-4" />
+                )}
+              </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="text-sm text-brand-orange hover:text-brand-orange/80 hover:underline"
+            >
+              Forgot password?
+            </button>
           </div>
         </CardContent>
         <CardFooter>
