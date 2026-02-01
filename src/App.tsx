@@ -33,6 +33,7 @@ import AdminEntityEdit from '@/pages/admin/AdminEntityEdit';
 import YourData from '@/pages/YourData';
 import NotFound from '@/pages/NotFound';
 import UserProfile from '@/pages/UserProfile';
+import ResetPassword from '@/pages/ResetPassword';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
 
@@ -73,6 +74,7 @@ function App() {
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
+                  <Route path="/auth/reset-password" element={<ResetPassword />} />
                   <Route path="/home" element={
                     <ProtectedRoute>
                       <Feed />
