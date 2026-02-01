@@ -1,285 +1,236 @@
 
 
-# Username Cooldown UX Implementation (Final Plan)
+# Authentication Enhancement - Final Implementation Plan
 
-## Problem
+## Summary
 
-When users are in the 30-day username change cooldown period:
-1. The username field appears editable
-2. Users can type a new username  
-3. Error only appears when they click "Save changes"
-4. No indication of when they can change again
+This plan implements core authentication security features while keeping the scope appropriate for your current 8-user stage. It includes future-proofing hooks as recommended by external reviewers.
 
-This is frustrating - users waste time editing only to be blocked at save time.
+---
 
-## Solution
+## What We're Building
 
-Implement proactive cooldown UX that prevents frustration by showing restrictions **before** users attempt to save.
-
-### Visual States
-
-**Locked State (In Cooldown):**
-```
-Username
-[ 🔒 linda_williamss                    ] (greyed out, disabled)
-Username changes available: March 1, 2026
-```
-
-**Editable State (First Change or Cooldown Expired):**
-```
-Username  
-[ @ new_username                         ]
-3-20 characters. Letters, numbers, dots, and underscores only.
-You can only change your username once every 30 days. Your old username will be permanently retired.
-```
+| Feature | Priority | Status |
+|---------|----------|--------|
+| Password strength meter | Core | Implement now |
+| Confirm password field | Core | Implement now |
+| Show/hide password toggle | Core | Implement now |
+| Forgot password flow | Core | Implement now |
+| "Check your email" holding screen | Core | Implement now |
+| `isEmailVerified` in AuthContext | Future-proofing | Implement now (for later use) |
+| TODO hooks for restrictions | Future-proofing | Add comments only |
 
 ---
 
 ## Implementation Steps
 
-### Step 1: Add Fields to Profile Types
+### Step 1: Create Auth Configuration
 
-**File: `src/types/profile.ts`**
+**New File: `src/config/authConfig.ts`**
 
-Add `username_changed_at` and ensure `created_at` is included:
-
-| Interface | Add Field |
-|-----------|-----------|
-| `BaseUserProfile` | `created_at: string \| null;` and `username_changed_at: string \| null;` |
-| `SafeUserProfile` | `username_changed_at: string \| null;` |
-| `transformToSafeProfile` | Pass through the new field |
+Centralized policy constants following existing codebase patterns. Contains `MIN_PASSWORD_SCORE`, `MIN_PASSWORD_LENGTH`, cooldown timers, and a commented `UNVERIFIED_USER_RESTRICTIONS` object for future use.
 
 ---
 
-### Step 2: Update Profile Service Queries
+### Step 2: Create Password Strength Utility
 
-**File: `src/services/enhancedUnifiedProfileService.ts`**
+**New File: `src/utils/passwordStrength.ts`**
 
-Update select queries in two locations:
-
-| Line | Current | Updated |
-|------|---------|---------|
-| 129 | `'id, username, avatar_url, first_name, last_name, bio, location'` | `'id, username, avatar_url, first_name, last_name, bio, location, created_at, username_changed_at'` |
-| 305 | `'id, username, avatar_url, first_name, last_name, bio, location'` | `'id, username, avatar_url, first_name, last_name, bio, location, created_at, username_changed_at'` |
-
----
-
-### Step 3: Create Cooldown Utility
-
-**New File: `src/utils/usernameCooldown.ts`**
-
-```typescript
-const COOLDOWN_DAYS = 30;
-
-export interface UsernameCooldownState {
-  isLocked: boolean;
-  nextChangeDate: Date | null;
-  formattedNextChangeDate: string | null;
-  isFirstChange: boolean;
-}
-
-export const calculateUsernameCooldown = (
-  usernameChangedAt: string | null
-): UsernameCooldownState => {
-  // First change is always free
-  if (!usernameChangedAt) {
-    return {
-      isLocked: false,
-      nextChangeDate: null,
-      formattedNextChangeDate: null,
-      isFirstChange: true
-    };
-  }
-  
-  const lastChange = new Date(usernameChangedAt);
-  const nextChange = new Date(lastChange);
-  nextChange.setDate(nextChange.getDate() + COOLDOWN_DAYS);
-  
-  const now = new Date();
-  const isLocked = now < nextChange;
-  
-  return {
-    isLocked,
-    nextChangeDate: isLocked ? nextChange : null,
-    formattedNextChangeDate: isLocked 
-      ? nextChange.toLocaleDateString('en-US', { 
-          month: 'long', 
-          day: 'numeric', 
-          year: 'numeric' 
-        })
-      : null,
-    isFirstChange: false
-  };
-};
-```
+Simple strength calculator (no external dependencies) that returns:
+- Score (0-4)
+- Label (Very Weak to Very Strong)
+- Color class for visual feedback
+- Improvement tips
+- `meetsMinimum` boolean using config constant
 
 ---
 
-### Step 4: Expose `usernameChangedAt` in useViewedProfile
+### Step 3: Create Password Strength Indicator Component
 
-**File: `src/hooks/use-viewed-profile.ts`**
+**New File: `src/components/auth/PasswordStrengthIndicator.tsx`**
 
-| Change | Details |
-|--------|---------|
-| Add to interface | `usernameChangedAt: string \| null;` in `ViewedProfile` |
-| Add to initial state | `usernameChangedAt: null` |
-| Set from profile | `usernameChangedAt: profile.username_changed_at \|\| null` |
-| Return value | Already returns `...profile_state` so it will be included |
+Visual 5-segment bar showing password strength with feedback tips below.
 
 ---
 
-### Step 5: Update ProfileCard to Pass Cooldown Data
+### Step 4: Update Auth Types
 
-**File: `src/components/profile/ProfileCard.tsx`**
+**File: `src/types/auth.ts`**
 
-Extract `usernameChangedAt` from the hook and pass to form:
-
-```tsx
-const { usernameChangedAt, createdAt, ...rest } = useViewedProfile(profileUserId);
-
-<ProfileEditForm 
-  // ... existing props
-  usernameChangedAt={usernameChangedAt}
-  profileCreatedAt={createdAt}
-/>
-```
+Add to `AuthContextType`:
+- `isEmailVerified: boolean` (future-proofing hook)
+- `resetPassword: (email: string) => Promise<{ error: Error | null }>`
+- `updatePassword: (newPassword: string) => Promise<{ error: Error | null }>`
+- `resendVerificationEmail: () => Promise<{ error: Error | null }>`
 
 ---
 
-### Step 6: Update ProfileEditForm with Cooldown-Aware UI
+### Step 5: Update AuthContext
 
-**File: `src/components/profile/ProfileEditForm.tsx`**
+**File: `src/contexts/AuthContext.tsx`**
 
-**6a. Add new props:**
-```typescript
-interface ProfileEditFormProps {
-  // ... existing props
-  usernameChangedAt: string | null;
-  profileCreatedAt: string;
-}
+Add:
+- `isEmailVerified` computed from `user?.email_confirmed_at`
+- `resetPassword()` using `supabase.auth.resetPasswordForEmail()` with redirect URL
+- `updatePassword()` using `supabase.auth.updateUser()`
+- `resendVerificationEmail()` using `supabase.auth.resend()`
+- Add `emailRedirectTo` option to existing `signUp()` for proper verification links
+
+---
+
+### Step 6: Update CredentialFields Component
+
+**File: `src/components/auth/CredentialFields.tsx`**
+
+Transform from simple email/password to full-featured credential input:
+- Add show/hide password toggle (Eye/EyeOff icons from lucide-react)
+- Add optional confirm password field with its own show/hide toggle
+- Integrate PasswordStrengthIndicator below password field
+- New optional props: `confirmPassword`, `setConfirmPassword`, `passwordError`, `showConfirmField`
+
+---
+
+### Step 7: Update SignUpForm
+
+**File: `src/components/auth/SignUpForm.tsx`**
+
+Add password validation flow:
+- New state: `confirmPassword`, `passwordError`, `showVerificationPending`
+- Validate passwords match before submit
+- Validate password strength meets minimum before submit
+- After successful signup: Show EmailVerificationPending screen instead of navigating away
+
+---
+
+### Step 8: Create Email Verification Pending Screen
+
+**New File: `src/components/auth/EmailVerificationPending.tsx`**
+
+Post-signup "Check your email" card with:
+- Mail icon with clear confirmation message
+- User's email displayed
+- "Resend verification email" button with 60-second cooldown timer
+- "Back to sign in" link
+
+---
+
+### Step 9: Create Forgot Password Form
+
+**New File: `src/components/auth/ForgotPasswordForm.tsx`**
+
+Request password reset form:
+- Email input field
+- Submit shows "Check your email" confirmation
+- "Back to Sign In" button
+- Uses config cooldown constant
+
+---
+
+### Step 10: Create Reset Password Page
+
+**New File: `src/pages/ResetPassword.tsx`**
+
+Password reset completion (user lands here from email link):
+- New password field with strength indicator
+- Confirm password field
+- Both have show/hide toggles
+- Validation before submit
+- Success toast and redirect to /auth
+
+---
+
+### Step 11: Update SignInForm
+
+**File: `src/components/auth/SignInForm.tsx`**
+
+Add:
+- Show/hide password toggle
+- "Forgot password?" link below password field
+- State to toggle between SignInForm and ForgotPasswordForm views
+
+---
+
+### Step 12: Add Reset Password Route
+
+**File: `src/App.tsx`**
+
+Add new route:
 ```
-
-**6b. Add imports and calculate cooldown:**
-```typescript
-import { calculateUsernameCooldown } from '@/utils/usernameCooldown';
-import { Lock, AlertTriangle, AtSign } from 'lucide-react';
-
-// In component:
-const cooldownState = calculateUsernameCooldown(usernameChangedAt);
-```
-
-**6c. Clear username error when locked (prevents blocking other edits):**
-```typescript
-// Add useEffect to reset username error when locked
-useEffect(() => {
-  if (cooldownState.isLocked) {
-    setUsernameError('');
-  }
-}, [cooldownState.isLocked]);
-```
-
-**6d. Update username field rendering:**
-
-```tsx
-{cooldownState.isLocked ? (
-  // LOCKED STATE
-  <>
-    <div className="relative">
-      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      <Input 
-        value={field.value}
-        disabled
-        className="pl-10 bg-muted cursor-not-allowed"
-      />
-    </div>
-    <p className="text-xs text-muted-foreground mt-1">
-      Username changes available: {cooldownState.formattedNextChangeDate}
-    </p>
-  </>
-) : (
-  // EDITABLE STATE
-  <>
-    <div className="relative">
-      <AtSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-      <Input 
-        placeholder="username" 
-        {...field} 
-        // ... existing onChange logic
-        className={`pl-10 ${usernameError ? 'border-red-500' : ''}`}
-      />
-    </div>
-    {/* Existing error display */}
-    {usernameError && <p className="text-red-500 text-xs mt-1">{usernameError}</p>}
-    {isCheckingUsername && <p className="text-gray-500 text-xs mt-1">Checking username availability...</p>}
-    
-    {/* Format rules + static warning */}
-    <p className="text-xs text-gray-500">
-      3-20 characters. Letters, numbers, dots, and underscores only. Cannot start or end with dots/underscores.
-    </p>
-    <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-      <AlertTriangle className="h-3 w-3" />
-      You can only change your username once every 30 days. Your old username will be permanently retired.
-    </p>
-  </>
-)}
-```
-
-**6e. Update save button to allow saving when username is locked:**
-```typescript
-<Button 
-  type="submit" 
-  disabled={(!!usernameError && !cooldownState.isLocked) || isCheckingUsername}
->
-  Save changes
-</Button>
+/auth/reset-password → <ResetPassword />
 ```
 
 ---
 
-## Files Changed Summary
+## Manual Dashboard Step Required
+
+**Add Redirect URL** in Supabase Dashboard:
+- Navigate to: Authentication → URL Configuration
+- Add: `https://common-groundz.lovable.app/auth/reset-password`
+- Add preview URL: `https://id-preview--1ce0faa5-5842-4fa5-acb5-1f9e3bdad6b9.lovable.app/auth/reset-password`
+
+---
+
+## Files Summary
 
 | File | Change |
 |------|--------|
-| `src/types/profile.ts` | Add `created_at` and `username_changed_at` to interfaces and transform |
-| `src/services/enhancedUnifiedProfileService.ts` | Add fields to two select queries |
-| `src/utils/usernameCooldown.ts` | **NEW** - Centralized cooldown calculation |
-| `src/hooks/use-viewed-profile.ts` | Add `usernameChangedAt` to interface, state, and data flow |
-| `src/components/profile/ProfileCard.tsx` | Pass cooldown props to form |
-| `src/components/profile/ProfileEditForm.tsx` | Cooldown-aware UI with locked/editable states |
+| `src/config/authConfig.ts` | **NEW** - Policy constants + commented future restrictions |
+| `src/utils/passwordStrength.ts` | **NEW** - Strength calculator |
+| `src/components/auth/PasswordStrengthIndicator.tsx` | **NEW** - Visual meter |
+| `src/types/auth.ts` | Add new methods + isEmailVerified |
+| `src/contexts/AuthContext.tsx` | Add new methods + isEmailVerified |
+| `src/components/auth/CredentialFields.tsx` | Add confirm password, show/hide, strength indicator |
+| `src/components/auth/SignUpForm.tsx` | Add validation, show verification pending screen |
+| `src/components/auth/EmailVerificationPending.tsx` | **NEW** - Post-signup screen |
+| `src/components/auth/ForgotPasswordForm.tsx` | **NEW** - Request reset form |
+| `src/pages/ResetPassword.tsx` | **NEW** - Reset completion page |
+| `src/components/auth/SignInForm.tsx` | Add forgot password link, show/hide toggle |
+| `src/App.tsx` | Add reset-password route |
 
 ---
 
-## Key Design Decisions
+## Future-Proofing Hooks (No Implementation Yet)
 
-| Decision | Rationale |
-|----------|-----------|
-| Static warning (not dynamic banner) | Simpler, fewer edge cases, still sets expectations |
-| Centralized cooldown logic in utility | Single source of truth, prevents drift |
-| Allow form save when username locked | Users can still edit bio, location, name during cooldown |
-| Always show warning when editable | Users know the consequence before they type |
-| Disable field when locked | Follows Instagram/Discord/VRChat pattern |
+The config file will include a commented block for future restrictions:
+
+```typescript
+/**
+ * DEFERRED: Unverified user restrictions
+ * Uncomment and enforce when real users onboard
+ * 
+ * TODO: Add useEmailVerification hook when ready to enforce
+ * TODO: Add EmailVerificationBanner component when ready
+ */
+// export const UNVERIFIED_USER_RESTRICTIONS = {
+//   canBrowse: true,
+//   canCreatePosts: false,
+//   canComment: false,
+//   canChangeUsername: false,
+//   canFollowUsers: false,
+// };
+```
 
 ---
 
-## Testing
+## Testing Checklist
 
-After implementing:
+1. **Signup with weak password** → Blocked with strength feedback
+2. **Signup with mismatched passwords** → "Passwords do not match"
+3. **Successful signup** → Shows "Check your email" screen
+4. **Click resend** → Email sent, 60s cooldown enforced
+5. **Forgot password from sign in** → Shows reset request form
+6. **Submit forgot password** → Shows "Check your email" confirmation
+7. **Click reset link in email** → Lands on /auth/reset-password
+8. **Set new password** → Validates strength, redirects to sign in
+9. **Show/hide password toggle** → Works on all password fields
 
-1. **Account that has never changed username:**
-   - Username field should be editable
-   - Static warning text should be visible below field
+---
 
-2. **Change username and save:**
-   - Profile card updates immediately
-   - Success toast appears
+## What's Explicitly Deferred
 
-3. **Reopen edit form:**
-   - Username field should be disabled/greyed out
-   - Lock icon visible
-   - Shows "Username changes available: [date 30 days from now]"
-   - Bio, location, first/last name should still be editable
-
-4. **Edit bio while username is locked:**
-   - Bio change should save successfully
-   - Form should not be blocked by username cooldown
+- Email verification banner (Phase 2)
+- Unverified user action restrictions (Phase 2)
+- `useEmailVerification` hook enforcement (Phase 2)
+- Rate limiting / CAPTCHA (Phase 2)
+- Magic link / social logins (Phase 2)
 
