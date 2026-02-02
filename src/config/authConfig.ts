@@ -20,23 +20,26 @@ export const AUTH_CONFIG = {
 } as const;
 
 /**
- * Unverified user restrictions - UI-level enforcement
+ * Unverified user restrictions - Email verification enforcement COMPLETE
  * 
- * PHASE 3 TODO: Add RLS enforcement for these actions
- * when preparing for public launch. Create a security 
- * definer function that checks email_confirmed_at and
- * apply to: posts, post_comments, recommendation_comments,
- * post_likes, recommendation_likes, follows, recommendations tables.
+ * PHASE 2 (COMPLETE): UI-level enforcement via useEmailVerification hook
+ *   - Centralized in useEmailVerification.ts
+ *   - All UI gates marked with: // Email verification gate (Phase 2 — UI only)
  * 
- * Implementation pattern:
- * 1. CREATE FUNCTION is_email_verified(user_id uuid) RETURNS boolean
- *    AS $$ SELECT email_confirmed_at IS NOT NULL FROM auth.users WHERE id = user_id $$
- *    LANGUAGE sql SECURITY DEFINER;
+ * PHASE 3 (COMPLETE): RLS enforcement via is_email_verified() function
+ *   - SECURITY DEFINER function queries auth.users.email_confirmed_at
+ *   - Applied to INSERT policies on:
+ *     - posts
+ *     - post_comments
+ *     - recommendation_comments
+ *     - post_likes
+ *     - recommendation_likes
+ *     - follows
+ *     - recommendations
  * 
- * 2. Add RLS policies to tables (INSERT operations):
- *    WITH CHECK (is_email_verified(auth.uid()))
- * 
- * Trigger: Before public launch or when abuse is detected
+ * Both layers work together:
+ *   - UI provides helpful feedback before action
+ *   - RLS enforces at database level (cannot bypass)
  */
 export const UNVERIFIED_USER_RESTRICTIONS = {
   canBrowse: true,
