@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { fetchUserRecommendations, toggleReviewLike, toggleReviewSave, Review } from '@/services/reviewService';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 
 interface UseRecommendationsProps {
   profileUserId?: string;
@@ -17,6 +18,7 @@ export const useRecommendations = ({
 }: UseRecommendationsProps = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const [recommendations, setRecommendations] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -59,6 +61,12 @@ export const useRecommendations = ({
         description: "Please sign in to like recommendations",
         variant: "destructive"
       });
+      return;
+    }
+
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canLikeContent')) {
+      showVerificationRequired('canLikeContent');
       return;
     }
 

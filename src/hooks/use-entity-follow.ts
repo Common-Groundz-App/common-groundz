@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   followEntity, 
   unfollowEntity, 
@@ -10,6 +11,7 @@ import {
 
 export const useEntityFollow = (entityId: string) => {
   const { user } = useAuth();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const [isFollowing, setIsFollowing] = useState(false);
   const [followersCount, setFollowersCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,6 +73,12 @@ export const useEntityFollow = (entityId: string) => {
 
   const toggleFollow = async () => {
     if (!user || !entityId) return;
+
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canFollowUsers')) {
+      showVerificationRequired('canFollowUsers');
+      return;
+    }
 
     try {
       if (isFollowing) {

@@ -3,9 +3,11 @@ import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { toggleFollowStatus } from '../api/circleService';
 import { UserProfile } from '../types';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 
 export const useFollowActions = (currentUserId?: string) => {
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const handleFollowToggle = async (
@@ -15,6 +17,12 @@ export const useFollowActions = (currentUserId?: string) => {
     updateFollowing: (userId: string, isFollowing: boolean) => void
   ) => {
     if (!currentUserId) return false;
+    
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canFollowUsers')) {
+      showVerificationRequired('canFollowUsers');
+      return false;
+    }
     
     setActionLoading(targetUserId);
     

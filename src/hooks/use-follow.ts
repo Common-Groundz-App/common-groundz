@@ -3,10 +3,12 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 
 export const useFollow = (profileUserId?: string) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
   const [followLoading, setFollowLoading] = useState<boolean>(false);
   
@@ -35,6 +37,12 @@ export const useFollow = (profileUserId?: string) => {
 
   const handleFollowToggle = async () => {
     if (!user || !profileUserId) return;
+    
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canFollowUsers')) {
+      showVerificationRequired('canFollowUsers');
+      return;
+    }
     
     setFollowLoading(true);
     

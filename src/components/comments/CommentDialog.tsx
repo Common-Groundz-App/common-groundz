@@ -7,6 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { formatDistanceToNow } from 'date-fns';
 import { fetchComments, addComment, deleteComment, updateComment, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -50,6 +51,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
 
   // Sort comments: current user's comments first, then others by most recent
   const sortedComments = useMemo(() => {
@@ -131,6 +133,12 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
         description: "Please sign in to comment",
         variant: "destructive"
       });
+      return;
+    }
+
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canComment')) {
+      showVerificationRequired('canComment');
       return;
     }
 

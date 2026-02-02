@@ -10,6 +10,7 @@ import RecommendationCard from '@/components/recommendations/RecommendationCard'
 import { useEntityDetail } from '@/hooks/use-entity-detail';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import NotFound from './NotFound';
 import ReviewCard from '@/components/profile/reviews/ReviewCard';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
@@ -56,6 +57,7 @@ const EntityDetailOriginal = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const [activeTab, setActiveTab] = useState('reviews');
   const { handleImageUpload } = useRecommendationUploads();
 
@@ -290,6 +292,12 @@ const EntityDetailOriginal = () => {
         description: "Please sign in to add a recommendation",
         variant: "destructive",
       });
+      return;
+    }
+
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canCreateRecommendations')) {
+      showVerificationRequired('canCreateRecommendations');
       return;
     }
 
