@@ -20,21 +20,55 @@ export const AUTH_CONFIG = {
 } as const;
 
 /**
- * DEFERRED: Unverified user restrictions
- * Uncomment and enforce when real users onboard
+ * Unverified user restrictions - UI-level enforcement
  * 
- * TODO: Add useEmailVerification hook when ready to enforce
- * TODO: Add EmailVerificationBanner component when ready
+ * PHASE 3 TODO: Add RLS enforcement for these actions
+ * when preparing for public launch. Create a security 
+ * definer function that checks email_confirmed_at and
+ * apply to: posts, post_comments, recommendation_comments,
+ * post_likes, recommendation_likes, follows, recommendations tables.
+ * 
+ * Implementation pattern:
+ * 1. CREATE FUNCTION is_email_verified(user_id uuid) RETURNS boolean
+ *    AS $$ SELECT email_confirmed_at IS NOT NULL FROM auth.users WHERE id = user_id $$
+ *    LANGUAGE sql SECURITY DEFINER;
+ * 
+ * 2. Add RLS policies to tables (INSERT operations):
+ *    WITH CHECK (is_email_verified(auth.uid()))
+ * 
+ * Trigger: Before public launch or when abuse is detected
  */
-// export const UNVERIFIED_USER_RESTRICTIONS = {
-//   canBrowse: true,
-//   canViewProfiles: true,
-//   canEditOwnProfile: true,
-//   canChangeUsername: false,
-//   canCreatePosts: false,
-//   canCreateRecommendations: false,
-//   canComment: false,
-//   canFollowUsers: false,
-//   canLikeContent: false,
-//   canSaveContent: true,
-// } as const;
+export const UNVERIFIED_USER_RESTRICTIONS = {
+  canBrowse: true,
+  canViewProfiles: true,
+  canEditOwnProfile: true,
+  canChangeUsername: false,
+  canCreatePosts: false,
+  canCreateRecommendations: false,
+  canComment: false,
+  canFollowUsers: false,
+  canLikeContent: false,
+  canSaveContent: true,
+} as const;
+
+export type RestrictionAction = keyof typeof UNVERIFIED_USER_RESTRICTIONS;
+
+/**
+ * Centralized verification-related copy for consistent UX
+ */
+export const VERIFICATION_MESSAGES = {
+  bannerTitle: 'Please verify your email',
+  bannerDescription: 'Verify your email to unlock all features.',
+  toastTitle: 'Email verification required',
+  actionDescriptions: {
+    canFollowUsers: 'follow users',
+    canLikeContent: 'like content',
+    canComment: 'comment',
+    canCreatePosts: 'create posts',
+    canCreateRecommendations: 'create recommendations',
+    canChangeUsername: 'change your username',
+  },
+  resendButton: 'Resend email',
+  resendSuccess: 'Verification email sent!',
+  resendError: 'Failed to send verification email',
+} as const;

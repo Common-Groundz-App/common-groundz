@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { validateUsernameFormat, checkUsernameUniqueness, checkUsernameNotHistorical } from '@/utils/usernameValidation';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { useDebouncedCallback } from 'use-debounce';
 import { useProfileCacheActions } from '@/hooks/use-profile-cache';
 import { AtSign, Lock, AlertTriangle } from 'lucide-react';
@@ -48,12 +49,15 @@ const ProfileEditForm = ({
 }: ProfileEditFormProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { isVerified } = useEmailVerification();
   const { invalidateProfile } = useProfileCacheActions();
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [initialUsername, setInitialUsername] = useState('');
 
   const cooldownState = calculateUsernameCooldown(usernameChangedAt);
+  // Username is locked if in cooldown OR not email verified
+  const isUsernameLocked = cooldownState.isLocked || !isVerified;
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -82,10 +86,10 @@ const ProfileEditForm = ({
 
   // Clear username error when locked (prevents blocking other edits)
   useEffect(() => {
-    if (cooldownState.isLocked) {
+    if (isUsernameLocked) {
       setUsernameError('');
     }
-  }, [cooldownState.isLocked]);
+  }, [isUsernameLocked]);
 
   // Debounced uniqueness and historical check (400ms delay)
   const debouncedCheckAvailability = useDebouncedCallback(
@@ -134,7 +138,7 @@ const ProfileEditForm = ({
     data.username = data.username.toLowerCase();
     
     // Only check username error if not locked
-    if (!cooldownState.isLocked && usernameError) {
+    if (!isUsernameLocked && usernameError) {
       toast({
         title: 'Invalid username',
         description: usernameError,
@@ -143,7 +147,7 @@ const ProfileEditForm = ({
       return;
     }
 
-    if (!cooldownState.isLocked && isCheckingUsername) {
+    if (!isUsernameLocked && isCheckingUsername) {
       toast({
         title: 'Please wait',
         description: 'Checking username availability...'
@@ -161,7 +165,7 @@ const ProfileEditForm = ({
       };
       
       // Only include username if not locked
-      if (!cooldownState.isLocked) {
+      if (!isUsernameLocked) {
         profileUpdate.username = data.username;
       }
       
@@ -184,7 +188,7 @@ const ProfileEditForm = ({
       if (userError) throw userError;
 
       // Update local state - use original username if locked
-      const updatedUsername = cooldownState.isLocked ? username : data.username;
+      const updatedUsername = isUsernameLocked ? username : data.username;
       onProfileUpdate(updatedUsername, data.bio, data.location, data.firstName, data.lastName);
       
       // Invalidate the profile cache so useViewedProfile gets fresh data
@@ -257,7 +261,7 @@ const ProfileEditForm = ({
                 <FormItem>
                   <FormLabel>Username</FormLabel>
                   <FormControl>
-                    {cooldownState.isLocked ? (
+                    {isUsernameLocked ? (
                       // LOCKED STATE
                       <>
                         <div className="relative">
@@ -288,10 +292,19 @@ const ProfileEditForm = ({
                     )}
                   </FormControl>
                   
-                  {cooldownState.isLocked ? (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Username changes available: {cooldownState.formattedNextChangeDate}
-                    </p>
+                  {isUsernameLocked ? (
+                    <>
+                      {cooldownState.isLocked ? (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Username changes available: {cooldownState.formattedNextChangeDate}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
+                          <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                          Verify your email to change your username.
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <>
                       {usernameError && (
@@ -350,7 +363,7 @@ const ProfileEditForm = ({
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
               <Button 
                 type="submit" 
-                disabled={(!!usernameError && !cooldownState.isLocked) || isCheckingUsername}
+                disabled={(!!usernameError && !isUsernameLocked) || isCheckingUsername}
               >
                 Save changes
               </Button>

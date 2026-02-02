@@ -10,6 +10,7 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +60,7 @@ interface ProfilePostItemProps {
 const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -137,6 +139,12 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
 
   const handleLikeClick = async () => {
     if (!user || !post) return;
+    
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canLikeContent')) {
+      showVerificationRequired('canLikeContent');
+      return;
+    }
     
     try {
       if (localIsLiked) {

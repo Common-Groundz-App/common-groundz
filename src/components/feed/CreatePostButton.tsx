@@ -5,6 +5,7 @@ import { PlusCircle } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { EnhancedCreatePostForm } from './EnhancedCreatePostForm';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { fetchUserProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,6 +16,7 @@ interface CreatePostButtonProps {
 export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const { user } = useAuth();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const { toast } = useToast();
   const [profileData, setProfileData] = React.useState<any>(null);
 
@@ -43,18 +45,34 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
 
   // Listen for the "open-create-post-dialog" event
   React.useEffect(() => {
-    const handleOpenDialog = () => setIsDialogOpen(true);
+    const handleOpenDialog = () => {
+      // Email verification gate (Phase 2 — UI only)
+      if (!canPerformAction('canCreatePosts')) {
+        showVerificationRequired('canCreatePosts');
+        return;
+      }
+      setIsDialogOpen(true);
+    };
     window.addEventListener('open-create-post-dialog', handleOpenDialog);
     
     return () => {
       window.removeEventListener('open-create-post-dialog', handleOpenDialog);
     };
-  }, []);
+  }, [canPerformAction, showVerificationRequired]);
+
+  const handleButtonClick = () => {
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canCreatePosts')) {
+      showVerificationRequired('canCreatePosts');
+      return;
+    }
+    setIsDialogOpen(true);
+  };
 
   return (
     <>
       <Button
-        onClick={() => setIsDialogOpen(true)}
+        onClick={handleButtonClick}
         className="bg-brand-orange hover:bg-brand-orange/90 gap-2"
       >
         <PlusCircle size={18} />

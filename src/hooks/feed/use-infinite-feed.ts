@@ -2,6 +2,7 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { FeedVisibility, CombinedFeedItem } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { toggleFeedItemLike, toggleFeedItemSave } from './interactions';
@@ -14,6 +15,7 @@ const ITEMS_PER_PAGE = 10;
 export const useInfiniteFeed = (feedType: FeedVisibility) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const queryClient = useQueryClient();
 
   // Use infinite query for seamless pagination
@@ -89,6 +91,12 @@ export const useInfiniteFeed = (feedType: FeedVisibility) => {
         description: 'Please sign in to like content',
         variant: 'destructive'
       });
+      return;
+    }
+
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canLikeContent')) {
+      showVerificationRequired('canLikeContent');
       return;
     }
 

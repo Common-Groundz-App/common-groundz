@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useReviewsFetch } from './reviews/use-reviews-fetch';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   toggleReviewLike, 
   toggleReviewSave,
@@ -18,6 +19,7 @@ interface UseReviewsProps {
 export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const queryClient = useQueryClient();
   
   const { 
@@ -34,6 +36,12 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
         description: "Please sign in to like reviews",
         variant: "destructive"
       });
+      return;
+    }
+
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canLikeContent')) {
+      showVerificationRequired('canLikeContent');
       return;
     }
 

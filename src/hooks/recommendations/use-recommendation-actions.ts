@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   Recommendation,
   toggleLike,
@@ -15,6 +16,7 @@ export const useRecommendationActions = (
 ) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
 
   const handleLike = async (id: string) => {
     if (!user) {
@@ -23,6 +25,12 @@ export const useRecommendationActions = (
         description: 'Please sign in to like recommendations',
         variant: 'destructive'
       });
+      return;
+    }
+
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canLikeContent')) {
+      showVerificationRequired('canLikeContent');
       return;
     }
 
@@ -116,6 +124,12 @@ export const useRecommendationActions = (
         description: 'Please sign in to add recommendations',
         variant: 'destructive'
       });
+      return null;
+    }
+
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canCreateRecommendations')) {
+      showVerificationRequired('canCreateRecommendations');
       return null;
     }
 

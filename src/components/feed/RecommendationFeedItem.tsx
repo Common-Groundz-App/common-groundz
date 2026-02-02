@@ -10,6 +10,7 @@ import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +60,7 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const navigate = useNavigate();
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(false);
   const [localCommentCount, setLocalCommentCount] = useState<number | null>(null);
@@ -209,6 +211,13 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
   const handleLike = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
+    
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canLikeContent')) {
+      showVerificationRequired('canLikeContent');
+      return;
+    }
+    
     if (onLike) {
       onLike(recommendation.id);
       

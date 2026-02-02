@@ -15,6 +15,7 @@ import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +62,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(!!highlightCommentId);
@@ -91,6 +93,12 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
 
   const handleLikeClick = async () => {
     if (!user || !post) return;
+    
+    // Email verification gate (Phase 2 — UI only)
+    if (!canPerformAction('canLikeContent')) {
+      showVerificationRequired('canLikeContent');
+      return;
+    }
     
     try {
       if (localIsLiked) {

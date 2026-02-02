@@ -4,6 +4,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { ChatProvider } from '@/components/chat/ChatProvider';
+import { EmailVerificationBanner } from '@/components/auth/EmailVerificationBanner';
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -31,7 +32,13 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   console.log('ProtectedRoute: User authenticated, rendering protected content');
   // If user is authenticated with valid session, render the children with chat
-  return <ChatProvider>{children}</ChatProvider>;
+  return (
+    <ChatProvider>
+      <EmailVerificationBanner />
+      {children}
+    </ChatProvider>
+  );
 };
+
 
 export default ProtectedRoute;
