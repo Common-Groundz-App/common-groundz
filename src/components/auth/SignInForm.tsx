@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { UserIcon, KeyIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import ForgotPasswordForm from './ForgotPasswordForm';
+import { loginViaGateway, formatRateLimitError } from '@/lib/authGateway';
+import { supabase } from '@/integrations/supabase/client';
 
 const SignInForm = () => {
   const [email, setEmail] = useState('');
@@ -16,16 +18,42 @@ const SignInForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const { signIn } = useAuth();
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (retryCountdown && retryCountdown > 0) {
+      toast.error(`Please wait ${retryCountdown} seconds before trying again`);
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
-      const { error } = await signIn(email, password);
-      if (error) throw error;
+      const result = await loginViaGateway({ email, password });
+      
+      if (result.error) {
+        // Handle rate limiting
+        if (result.code === 'RATE_LIMITED' && result.retryAfter) {
+          toast.error(formatRateLimitError(result.retryAfter));
+          startRetryCountdown(result.retryAfter);
+          return;
+        }
+        throw new Error(result.error);
+      }
+
+      // Set the session from the gateway response
+      if (result.data?.session) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: result.data.session.access_token,
+          refresh_token: result.data.session.refresh_token,
+        });
+        
+        if (sessionError) throw sessionError;
+      }
+      
       toast.success('Successfully signed in!');
       navigate('/home');
     } catch (error: any) {
@@ -34,6 +62,19 @@ const SignInForm = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const startRetryCountdown = (seconds: number) => {
+    setRetryCountdown(seconds);
+    const interval = setInterval(() => {
+      setRetryCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   // Show forgot password form
@@ -63,6 +104,7 @@ const SignInForm = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="pl-10"
+                disabled={retryCountdown !== null}
               />
             </div>
           </div>
@@ -77,6 +119,7 @@ const SignInForm = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="pl-10 pr-10"
+                disabled={retryCountdown !== null}
               />
               <button
                 type="button"
@@ -100,8 +143,16 @@ const SignInForm = () => {
           </div>
         </CardContent>
         <CardFooter>
-          <Button type="submit" className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" disabled={isLoading}>
-            {isLoading ? 'Signing In...' : 'Sign In'}
+          <Button 
+            type="submit" 
+            className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" 
+            disabled={isLoading || retryCountdown !== null}
+          >
+            {retryCountdown !== null 
+              ? `Try again in ${retryCountdown}s`
+              : isLoading 
+                ? 'Signing In...' 
+                : 'Sign In'}
           </Button>
         </CardFooter>
       </form>

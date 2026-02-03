@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -10,6 +9,8 @@ import UserInfoFields from './UserInfoFields';
 import CredentialFields from './CredentialFields';
 import UsernameField from './UsernameField';
 import EmailVerificationPending from './EmailVerificationPending';
+import TurnstileWidget from './TurnstileWidget';
+import { signUpViaGateway, formatRateLimitError } from '@/lib/authGateway';
 
 interface SignUpFormProps {
   onSwitchToSignIn?: () => void;
@@ -27,12 +28,25 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showVerificationPending, setShowVerificationPending] = useState(false);
-  const { signUp } = useAuth();
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   // Clear password error when passwords change
   useEffect(() => {
     setPasswordError('');
   }, [password, confirmPassword]);
+
+  const handleTurnstileVerify = (token: string) => {
+    setTurnstileToken(token);
+  };
+
+  const handleTurnstileError = () => {
+    setTurnstileToken(null);
+    toast.error('Security verification failed. Please refresh the page.');
+  };
+
+  const handleTurnstileExpire = () => {
+    setTurnstileToken(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,12 +69,18 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       setUsernameError(formatError);
       return;
     }
+
+    // Verify Turnstile token
+    if (!turnstileToken) {
+      toast.error('Please wait for security verification to complete');
+      return;
+    }
     
     setIsLoading(true);
     
-    const { isUnique, error } = await checkUsernameUniqueness(username);
+    const { isUnique, error: usernameCheckError } = await checkUsernameUniqueness(username);
     if (!isUnique) {
-      setUsernameError(error);
+      setUsernameError(usernameCheckError);
       setIsLoading(false);
       return;
     }
@@ -69,13 +89,30 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
       const formattedLastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
       
-      const { error, user } = await signUp(email, password, {
-        firstName: formattedFirstName,
-        lastName: formattedLastName,
-        username: username.toLowerCase()
-      });
+      const result = await signUpViaGateway(
+        {
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              first_name: formattedFirstName,
+              last_name: formattedLastName,
+              username: username.toLowerCase(),
+            },
+          },
+        },
+        turnstileToken
+      );
       
-      if (error) throw error;
+      if (result.error) {
+        // Handle rate limiting
+        if (result.code === 'RATE_LIMITED') {
+          toast.error(formatRateLimitError(result.retryAfter));
+          return;
+        }
+        throw new Error(result.error);
+      }
       
       // Show verification pending screen instead of navigating away
       setShowVerificationPending(true);
@@ -137,12 +174,19 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
             isCheckingUsername={isCheckingUsername}
             setIsCheckingUsername={setIsCheckingUsername}
           />
+
+          {/* Invisible Turnstile CAPTCHA */}
+          <TurnstileWidget
+            onVerify={handleTurnstileVerify}
+            onError={handleTurnstileError}
+            onExpire={handleTurnstileExpire}
+          />
         </CardContent>
         <CardFooter>
           <Button 
             type="submit" 
             className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" 
-            disabled={isLoading || !!usernameError || isCheckingUsername}
+            disabled={isLoading || !!usernameError || isCheckingUsername || !turnstileToken}
           >
             {isLoading ? 'Creating Account...' : 'Create Account'}
           </Button>
