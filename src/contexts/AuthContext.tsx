@@ -134,14 +134,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user?.email) {
         return { error: new Error('No email address found') };
       }
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email: user.email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
+      
+      // Use auth gateway for rate limiting
+      const response = await fetch(
+        'https://uyjtgybbktgapspodajy.supabase.co/functions/v1/auth-gateway',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'resend_verification',
+            email: user.email,
+            redirectTo: `${window.location.origin}/`,
+          }),
         }
-      });
-      return { error };
+      );
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return { error: new Error(result.error || 'Failed to resend verification email') };
+      }
+      
+      return { error: null };
     } catch (error) {
       return { error: error as Error };
     }

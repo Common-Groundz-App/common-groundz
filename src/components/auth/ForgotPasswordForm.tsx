@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { resetPasswordViaGateway, formatRateLimitError } from '@/lib/authGateway';
 
 interface ForgotPasswordFormProps {
   onBackToSignIn: () => void;
@@ -15,22 +15,51 @@ const ForgotPasswordForm = ({ onBackToSignIn }: ForgotPasswordFormProps) => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
-  const { resetPassword } = useAuth();
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
 
+    if (retryCountdown && retryCountdown > 0) {
+      toast.error(`Please wait ${retryCountdown} seconds before trying again`);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const { error } = await resetPassword(email);
-      if (error) throw error;
+      const redirectUrl = `${window.location.origin}/auth/reset-password`;
+      const result = await resetPasswordViaGateway({ email, redirectTo: redirectUrl });
+      
+      if (result.error) {
+        // Handle rate limiting
+        if (result.code === 'RATE_LIMITED' && result.retryAfter) {
+          toast.error(formatRateLimitError(result.retryAfter));
+          startRetryCountdown(result.retryAfter);
+          return;
+        }
+        throw new Error(result.error);
+      }
+      
       setIsEmailSent(true);
     } catch (error: any) {
       toast.error(error.message || 'Failed to send reset email');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const startRetryCountdown = (seconds: number) => {
+    setRetryCountdown(seconds);
+    const interval = setInterval(() => {
+      setRetryCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   if (isEmailSent) {
@@ -91,6 +120,7 @@ const ForgotPasswordForm = ({ onBackToSignIn }: ForgotPasswordFormProps) => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="pl-10"
+                disabled={retryCountdown !== null}
               />
             </div>
           </div>
@@ -100,9 +130,13 @@ const ForgotPasswordForm = ({ onBackToSignIn }: ForgotPasswordFormProps) => {
           <Button 
             type="submit" 
             className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white"
-            disabled={isLoading}
+            disabled={isLoading || retryCountdown !== null}
           >
-            {isLoading ? 'Sending...' : 'Send Reset Link'}
+            {retryCountdown !== null 
+              ? `Try again in ${retryCountdown}s`
+              : isLoading 
+                ? 'Sending...' 
+                : 'Send Reset Link'}
           </Button>
           
           <Button

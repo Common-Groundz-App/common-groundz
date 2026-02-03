@@ -37,9 +37,21 @@ export const AUTH_CONFIG = {
  *     - follows
  *     - recommendations
  * 
- * Both layers work together:
+ * PHASE 4 (COMPLETE): Rate Limiting + CAPTCHA
+ *   - auth-gateway edge function handles rate limiting for all auth actions
+ *   - Cloudflare Turnstile CAPTCHA required for signup
+ *   - Rate limit data stored in auth_rate_limits table
+ *   - Rate limits:
+ *     - Login: 5 attempts/minute, 5 min block
+ *     - Signup: 3 attempts/5 min, 15 min block
+ *     - Password Reset: 3 attempts/5 min, 10 min block
+ *     - Resend Verification: 2 attempts/minute, 5 min block
+ * 
+ * All layers work together:
  *   - UI provides helpful feedback before action
  *   - RLS enforces at database level (cannot bypass)
+ *   - Rate limiting prevents brute force attacks
+ *   - CAPTCHA blocks automated signup bots
  */
 export const UNVERIFIED_USER_RESTRICTIONS = {
   canBrowse: true,
