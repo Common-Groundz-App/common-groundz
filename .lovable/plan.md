@@ -1,25 +1,41 @@
 
 
-# Phase 3: RLS Enforcement for Email Verification - Final Plan
+# Phase 4: Rate Limiting + CAPTCHA for MVP Security
 
 ## Summary
 
-This plan adds server-side (database-level) enforcement for email verification, complementing the Phase 2 UI restrictions. Incorporates all reviewer feedback:
-- ✅ Transaction wrapping (atomic migration)
-- ✅ Policy comments for traceability
-- ✅ Post-migration verification guidance
-- ✅ Proper timestamped migration naming
+Phase 4 adds two critical MVP security features:
+1. **Rate Limiting** - Prevents brute force attacks on login, signup, and password reset
+2. **CAPTCHA (Cloudflare Turnstile)** - Blocks automated signup bots
+
+Both features protect the authentication endpoints where attacks have the highest impact.
 
 ---
 
-## Why This Matters
+## Why This Matters for MVP
 
-| Layer | Purpose | Bypass Risk |
-|-------|---------|-------------|
-| Phase 2 (UI) | Good UX, helpful feedback | Easy to bypass via API calls |
-| Phase 3 (RLS) | True security enforcement | Cannot bypass |
+| Threat | Without Protection | With Phase 4 |
+|--------|-------------------|--------------|
+| Brute force login | Attackers can try unlimited passwords | 5 attempts/minute, then blocked |
+| Credential stuffing | Leaked password lists tested against your users | Rate limited + CAPTCHA stops automation |
+| Signup spam bots | Fake accounts pollute trust graph | CAPTCHA blocks 99%+ of bots |
+| Password reset abuse | Spam reset emails to any address | Rate limited to prevent harassment |
 
-After Phase 3: **UI = UX, RLS = Law**
+---
+
+## Technology Choice: Cloudflare Turnstile
+
+| Option | Pros | Cons |
+|--------|------|------|
+| **Cloudflare Turnstile** | Free, privacy-focused, invisible, no friction | Newer service |
+| reCAPTCHA v3 | Proven, invisible | Google data collection, GDPR concerns |
+| hCaptcha | Privacy-focused | Often requires user interaction |
+
+**Decision: Cloudflare Turnstile**
+- Free unlimited use
+- Privacy-first (GDPR compliant)
+- Invisible to users - no "click the traffic lights"
+- Simple integration
 
 ---
 
@@ -27,25 +43,29 @@ After Phase 3: **UI = UX, RLS = Law**
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Client Application                           │
-│  (Phase 2 UI gates - helpful feedback, not security)            │
+│                        Client (React)                            │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │  SignUpForm + Turnstile Widget (invisible)                  ││
+│  │  SignInForm → auth-gateway                                  ││
+│  │  ForgotPasswordForm → auth-gateway                          ││
+│  └─────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Supabase RLS                              │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │  is_email_verified(user_id) - SECURITY DEFINER function   │  │
-│  │  Queries auth.users.email_confirmed_at                    │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                              │                                   │
-│  ┌───────────────────────────┼───────────────────────────────┐  │
-│  │           Modified INSERT Policies                         │  │
-│  │  - posts                  - recommendation_likes           │  │
-│  │  - post_comments          - follows                        │  │
-│  │  - post_likes             - recommendations                │  │
-│  │  - recommendation_comments                                 │  │
-│  └────────────────────────────────────────────────────────────┘  │
+│                    Edge Function: auth-gateway                   │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │  1. Check rate limit (IP + action)                          ││
+│  │  2. Verify Turnstile token (signup only)                    ││
+│  │  3. Forward to Supabase Auth                                ││
+│  │  4. Record attempt in auth_rate_limits table                ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                        Supabase Auth                             │
+│                 (signUp, signIn, resetPassword)                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -53,188 +73,179 @@ After Phase 3: **UI = UX, RLS = Law**
 
 ## Implementation Steps
 
-### Step 1: Create Complete Migration File (Transaction-Wrapped)
+### Step 1: Setup Cloudflare Turnstile (Manual Step)
 
-**New File: Migration via Supabase tool**
+Before implementation, you'll need to:
 
-The entire migration is wrapped in a single transaction for atomicity:
+1. Go to https://dash.cloudflare.com → Turnstile
+2. Add a site for your domain (`common-groundz.lovable.app`)
+3. Choose "Invisible" widget type
+4. Copy the **Site Key** (public) and **Secret Key** (private)
+
+**Add to Lovable Secrets:**
+- `TURNSTILE_SECRET_KEY` - Secret key for edge function verification
+
+**Add to Environment:**
+- `VITE_TURNSTILE_SITE_KEY` - Site key for frontend widget
+
+---
+
+### Step 2: Create Rate Limit Table
+
+**New Database Migration:**
+
+Creates a table to track authentication attempts by IP address:
 
 ```sql
--- ============================================
--- Phase 3: Email Verification RLS Enforcement
--- ============================================
--- Wrapped in transaction: if ANY step fails, ALL changes rollback
--- ============================================
+-- Phase 4: Rate limiting for auth endpoints
+CREATE TABLE public.auth_rate_limits (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    identifier text NOT NULL,           -- IP address
+    action text NOT NULL,               -- 'login', 'signup', 'password_reset', 'resend_verification'
+    attempt_count int DEFAULT 1,
+    window_start timestamptz DEFAULT now(),
+    blocked_until timestamptz,
+    created_at timestamptz DEFAULT now(),
+    UNIQUE (identifier, action)
+);
 
-BEGIN;
+-- RLS enabled but service role can access
+ALTER TABLE public.auth_rate_limits ENABLE ROW LEVEL SECURITY;
 
--- Step 1: Create the verification check function
-CREATE OR REPLACE FUNCTION public.is_email_verified(check_user_id uuid)
-RETURNS boolean
+-- Fast lookup index
+CREATE INDEX idx_auth_rate_limits_lookup 
+ON public.auth_rate_limits (identifier, action, window_start);
+
+-- Cleanup function for old records (can be scheduled)
+CREATE OR REPLACE FUNCTION cleanup_old_rate_limits()
+RETURNS void
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = 'public'
 AS $$
-  SELECT COALESCE(
-    (SELECT email_confirmed_at IS NOT NULL 
-     FROM auth.users 
-     WHERE id = check_user_id),
-    false
-  )
+  DELETE FROM public.auth_rate_limits 
+  WHERE window_start < now() - interval '1 hour';
 $$;
 
-GRANT EXECUTE ON FUNCTION public.is_email_verified(uuid) TO authenticated;
-
-COMMENT ON FUNCTION public.is_email_verified IS 
-'Phase 3: Checks if user email is verified. Used in RLS INSERT policies.';
-
--- Step 2: Update posts INSERT policy
-DROP POLICY IF EXISTS "Users can insert their own posts" ON posts;
-CREATE POLICY "Users can insert their own posts" ON posts
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id 
-    AND is_email_verified(auth.uid())
-  );
-COMMENT ON POLICY "Users can insert their own posts" ON posts IS 
-'Phase 3: Requires email verification to create posts';
-
--- Step 3: Update post_comments INSERT policy
-DROP POLICY IF EXISTS "Authenticated users can add post comments" ON post_comments;
-CREATE POLICY "Authenticated users can add post comments" ON post_comments
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id 
-    AND is_email_verified(auth.uid())
-  );
-COMMENT ON POLICY "Authenticated users can add post comments" ON post_comments IS 
-'Phase 3: Requires email verification to comment on posts';
-
--- Step 4: Update post_likes INSERT policy
-DROP POLICY IF EXISTS "Users can create their own likes" ON post_likes;
-CREATE POLICY "Users can create their own likes" ON post_likes
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id 
-    AND is_email_verified(auth.uid())
-  );
-COMMENT ON POLICY "Users can create their own likes" ON post_likes IS 
-'Phase 3: Requires email verification to like posts';
-
--- Step 5: Update recommendation_comments INSERT policy
-DROP POLICY IF EXISTS "Authenticated users can add comments" ON recommendation_comments;
-CREATE POLICY "Authenticated users can add comments" ON recommendation_comments
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id 
-    AND is_email_verified(auth.uid())
-  );
-COMMENT ON POLICY "Authenticated users can add comments" ON recommendation_comments IS 
-'Phase 3: Requires email verification to comment on recommendations';
-
--- Step 6: Update recommendation_likes INSERT policy
-DROP POLICY IF EXISTS "Users can insert their own likes" ON recommendation_likes;
-CREATE POLICY "Users can insert their own likes" ON recommendation_likes
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id 
-    AND is_email_verified(auth.uid())
-  );
-COMMENT ON POLICY "Users can insert their own likes" ON recommendation_likes IS 
-'Phase 3: Requires email verification to like recommendations';
-
--- Step 7: Update follows INSERT policy
-DROP POLICY IF EXISTS "Users can create follows" ON follows;
-CREATE POLICY "Users can create follows" ON follows
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = follower_id 
-    AND is_email_verified(auth.uid())
-  );
-COMMENT ON POLICY "Users can create follows" ON follows IS 
-'Phase 3: Requires email verification to follow users';
-
--- Step 8: Update recommendations INSERT policy
-DROP POLICY IF EXISTS "Users can insert their own recommendations" ON recommendations;
-CREATE POLICY "Users can insert their own recommendations" ON recommendations
-  FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id 
-    AND is_email_verified(auth.uid())
-  );
-COMMENT ON POLICY "Users can insert their own recommendations" ON recommendations IS 
-'Phase 3: Requires email verification to create recommendations';
-
-COMMIT;
+COMMENT ON TABLE public.auth_rate_limits IS 
+'Phase 4: Tracks auth attempts for rate limiting. Cleaned up hourly.';
 ```
 
 ---
 
-### Step 2: Update authConfig.ts Documentation
+### Step 3: Create Auth Gateway Edge Function
 
-**File: `src/config/authConfig.ts`**
+**New File: `supabase/functions/auth-gateway/index.ts`**
 
-Update the Phase 3 TODO comment to mark completion:
+A unified edge function that:
+- Checks rate limits before processing requests
+- Verifies Turnstile tokens on signup
+- Forwards valid requests to Supabase Auth
+- Returns user-friendly error messages when blocked
 
-```typescript
-/**
- * Email verification enforcement - COMPLETE
- * 
- * PHASE 2 (COMPLETE): UI-level enforcement via useEmailVerification hook
- *   - Centralized in useEmailVerification.ts
- *   - All UI gates marked with: // Email verification gate (Phase 2 — UI only)
- * 
- * PHASE 3 (COMPLETE): RLS enforcement via is_email_verified() function
- *   - SECURITY DEFINER function queries auth.users.email_confirmed_at
- *   - Applied to INSERT policies on:
- *     - posts
- *     - post_comments
- *     - recommendation_comments
- *     - post_likes
- *     - recommendation_likes
- *     - follows
- *     - recommendations
- * 
- * Both layers work together:
- *   - UI provides helpful feedback before action
- *   - RLS enforces at database level (cannot bypass)
- */
-```
+**Rate Limit Configuration:**
+
+| Action | Max Attempts | Window | Block Duration |
+|--------|-------------|--------|----------------|
+| Login | 5 per minute | 60s | 5 minutes |
+| Signup | 3 per 5 min | 300s | 15 minutes |
+| Password Reset | 3 per 5 min | 300s | 10 minutes |
+| Resend Verification | 2 per minute | 60s | 5 minutes |
 
 ---
 
-### Step 3: Post-Migration Verification (Manual Step)
+### Step 4: Create Turnstile React Component
 
-**IMPORTANT**: After migration, ensure your 8 test accounts are verified.
+**New File: `src/components/auth/TurnstileWidget.tsx`**
 
-**Option A - Via Supabase Dashboard:**
-1. Go to Authentication > Users
-2. For each test user, check that `email_confirmed_at` is set
-3. If not, manually confirm them
+A React component that:
+- Loads Cloudflare Turnstile script
+- Renders an invisible CAPTCHA widget
+- Returns a verification token on success
+- Calls error/expire callbacks as needed
 
-**Option B - Via SQL (faster for multiple accounts):**
-```sql
--- Run this in Supabase SQL Editor if needed
-UPDATE auth.users
-SET email_confirmed_at = NOW()
-WHERE email IN (
-  'test1@example.com',
-  'test2@example.com'
-  -- Add your test account emails
-)
-AND email_confirmed_at IS NULL;
-```
+---
+
+### Step 5: Update SignUpForm
+
+**Modified: `src/components/auth/SignUpForm.tsx`**
+
+Changes:
+- Add TurnstileWidget component
+- Store Turnstile token in state
+- Route signup through auth-gateway edge function
+- Validate CAPTCHA token before submission
+- Display appropriate errors for rate limiting
+
+---
+
+### Step 6: Update SignInForm
+
+**Modified: `src/components/auth/SignInForm.tsx`**
+
+Changes:
+- Route login through auth-gateway edge function
+- Handle 429 (rate limited) responses
+- Display retry countdown when blocked
+
+---
+
+### Step 7: Update ForgotPasswordForm
+
+**Modified: `src/components/auth/ForgotPasswordForm.tsx`**
+
+Changes:
+- Route password reset through auth-gateway edge function
+- Handle 429 responses with user-friendly messaging
+
+---
+
+### Step 8: Update AuthContext
+
+**Modified: `src/contexts/AuthContext.tsx`**
+
+Changes:
+- Update `resendVerificationEmail` to use auth-gateway
+- Add utility function for calling auth-gateway endpoint
+
+---
+
+### Step 9: Update Configuration
+
+**Modified: `src/config/authConfig.ts`**
+
+Add Phase 4 documentation and rate limit reference configuration.
 
 ---
 
 ## Files Summary
 
-| File | Change Type | Notes |
-|------|-------------|-------|
-| Database Migration | **NEW** | Transaction-wrapped RLS migration |
-| `src/config/authConfig.ts` | **UPDATE** | Mark Phase 3 complete |
+| File | Type | Purpose |
+|------|------|---------|
+| Database Migration | NEW | `auth_rate_limits` table |
+| `supabase/functions/auth-gateway/index.ts` | NEW | Rate limiting + CAPTCHA verification |
+| `src/components/auth/TurnstileWidget.tsx` | NEW | Cloudflare Turnstile React wrapper |
+| `src/components/auth/SignUpForm.tsx` | UPDATE | Add Turnstile, use gateway |
+| `src/components/auth/SignInForm.tsx` | UPDATE | Use gateway for rate limiting |
+| `src/components/auth/ForgotPasswordForm.tsx` | UPDATE | Use gateway for rate limiting |
+| `src/contexts/AuthContext.tsx` | UPDATE | Use gateway for resend verification |
+| `src/config/authConfig.ts` | UPDATE | Document Phase 4 completion |
 
-**Total: 1 migration, 1 code file update**
+**Total: 3 new files, 5 updated files, 2 new secrets**
+
+---
+
+## Setup Requirements Before Implementation
+
+1. **Cloudflare Turnstile Account**
+   - Create at https://dash.cloudflare.com → Turnstile
+   - Add site with "Invisible" widget type
+   
+2. **Add Secret to Lovable**
+   - `TURNSTILE_SECRET_KEY` → your secret key
+
+3. **Add Environment Variable**
+   - `VITE_TURNSTILE_SITE_KEY` → your site key
 
 ---
 
@@ -242,77 +253,41 @@ AND email_confirmed_at IS NULL;
 
 | Concern | Status |
 |---------|--------|
-| Existing data | ✅ Unaffected (policies only affect new INSERTs) |
-| SELECT operations | ✅ Unchanged |
-| UPDATE operations | ✅ Unchanged |
-| DELETE operations | ✅ Unchanged |
-| Performance | ✅ Single PK lookup on auth.users (indexed) |
-| Verified users | ✅ All actions work normally |
-
----
-
-## Rollback Plan
-
-If issues are discovered:
-
-```sql
-BEGIN;
-
--- Restore original policies (without email verification)
-DROP POLICY IF EXISTS "Users can insert their own posts" ON posts;
-CREATE POLICY "Users can insert their own posts" ON posts
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "Authenticated users can add post comments" ON post_comments;
-CREATE POLICY "Authenticated users can add post comments" ON post_comments
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "Users can create their own likes" ON post_likes;
-CREATE POLICY "Users can create their own likes" ON post_likes
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "Authenticated users can add comments" ON recommendation_comments;
-CREATE POLICY "Authenticated users can add comments" ON recommendation_comments
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "Users can insert their own likes" ON recommendation_likes;
-CREATE POLICY "Users can insert their own likes" ON recommendation_likes
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-DROP POLICY IF EXISTS "Users can create follows" ON follows;
-CREATE POLICY "Users can create follows" ON follows
-  FOR INSERT WITH CHECK (auth.uid() = follower_id);
-
-DROP POLICY IF EXISTS "Users can insert their own recommendations" ON recommendations;
-CREATE POLICY "Users can insert their own recommendations" ON recommendations
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Optionally remove function
-DROP FUNCTION IF EXISTS public.is_email_verified(uuid);
-
-COMMIT;
-```
+| Existing authenticated sessions | ✅ Unaffected |
+| Normal user login flow | ✅ Works, just routed through gateway |
+| Verified users' actions | ✅ No change to Phase 2/3 behavior |
+| Direct Supabase API calls | ✅ Still work (auth is only gated via forms) |
 
 ---
 
 ## Testing Checklist
 
-### After Migration
+### Rate Limiting
+1. Try 6 failed logins quickly → blocked for 5 minutes
+2. Wait, then retry → works again
+3. Signup 4 times quickly → blocked for 15 minutes
+4. Password reset 4 times quickly → blocked for 10 minutes
 
-1. **Function works correctly**:
-   ```sql
-   -- Test with a verified user ID
-   SELECT is_email_verified('verified-user-uuid'); -- Should return true
-   
-   -- Test with an unverified user ID  
-   SELECT is_email_verified('unverified-user-uuid'); -- Should return false
-   ```
+### CAPTCHA
+1. Turnstile widget loads invisibly on signup page
+2. Signup works when Turnstile verifies successfully
+3. Signup fails gracefully if CAPTCHA blocked
+4. No CAPTCHA friction for normal users
 
-2. **Verified user can perform all actions** (posts, comments, likes, follows, recommendations)
+---
 
-3. **Unverified user gets RLS error** when attempting INSERT on protected tables
+## Rollback Plan
 
-4. **UI still shows helpful toast** before RLS error would occur (Phase 2 + Phase 3 working together)
+If issues occur after deployment:
+
+**Quick fix - Disable gateway routing:**
+- Revert auth forms to call Supabase directly
+- Gateway remains deployed but unused
+
+**Full rollback:**
+- Revert all form changes
+- Delete auth-gateway edge function
+- Drop auth_rate_limits table
 
 ---
 
@@ -320,14 +295,14 @@ COMMIT;
 
 | Concern | Mitigation |
 |---------|------------|
-| Function accesses `auth.users` | `SECURITY DEFINER` with explicit `SET search_path` |
-| Partial migration failure | Entire migration wrapped in transaction |
-| Performance overhead | Single indexed PK lookup (negligible) |
-| Error messages | RLS gives generic error; UI (Phase 2) provides context |
+| IP spoofing | Using trusted x-forwarded-for from Supabase edge |
+| Token replay | Turnstile tokens are single-use |
+| Rate limit bypass | Server-side enforcement, cannot bypass from client |
+| Blocking legitimate users | Generous limits, clear retry-after messaging |
 
 ---
 
-## After Phase 3: What's Complete
+## Phase 4 Completion Status (After Implementation)
 
 | Feature | Status |
 |---------|--------|
@@ -336,15 +311,17 @@ COMMIT;
 | Forgot password flow | ✅ Phase 1 |
 | UI restrictions for unverified users | ✅ Phase 2 |
 | RLS enforcement for email verification | ✅ Phase 3 |
+| Rate limiting on auth endpoints | 📋 Phase 4 |
+| CAPTCHA on signup | 📋 Phase 4 |
 
 ---
 
-## What's Deferred to Phase 4+
+## Deferred to Phase 5+
 
-| Feature | Phase |
-|---------|-------|
-| Rate limiting on auth endpoints | Phase 4 |
-| CAPTCHA for signup | Phase 4 |
-| Magic link / OTP login | Phase 4+ |
-| Social logins (Google, GitHub) | Phase 4+ |
+| Feature | Status |
+|---------|--------|
+| Magic Link / OTP login | Deferred (convenience, not security) |
+| Social Logins | Deferred (growth feature, adds complexity) |
+| CAPTCHA on login | Add only if brute force attacks observed |
+| Geographic rate limiting | Premature optimization |
 
