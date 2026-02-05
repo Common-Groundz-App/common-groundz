@@ -8,6 +8,8 @@ import { ContentViewerProvider } from '@/contexts/ContentViewerContext';
 import AuthErrorBoundary from '@/components/AuthErrorBoundary';
 import AuthInitializer from '@/components/AuthInitializer';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import AppProtectedRoute from '@/components/AppProtectedRoute';
+import RequireCompleteProfile from '@/components/auth/RequireCompleteProfile';
 import AdminRoute from '@/components/AdminRoute';
 import Index from '@/pages/Index';
 import Feed from '@/pages/Feed';
@@ -77,111 +79,122 @@ function App() {
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/auth/reset-password" element={<ResetPassword />} />
+                  {/* 
+                    IMPORTANT: Do NOT use AppProtectedRoute here.
+                    This route must be accessible to authenticated users
+                    whose profile is incomplete (no username yet).
+                    
+                    RequireCompleteProfile with allowIncomplete ensures:
+                    - Soft-deleted users are still caught and redirected
+                    - Users without usernames can access this page
+                  */}
                   <Route path="/complete-profile" element={
                     <ProtectedRoute>
-                      <CompleteProfile />
+                      <RequireCompleteProfile allowIncomplete>
+                        <CompleteProfile />
+                      </RequireCompleteProfile>
                     </ProtectedRoute>
                   } />
                   <Route path="/account-deleted" element={<AccountDeleted />} />
                   <Route path="/home" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <Feed />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/profile" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <Profile />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/profile/:id" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <Profile />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/explore" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <Explore />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/settings" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <Settings />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/my-stuff" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <MyStuffPage />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/saved-insights" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <SavedInsights />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/search" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <Search />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/search/:query" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <Search />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/entity/:slug" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <EntityDetail />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/entity/:parentSlug/:childSlug" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <EntityDetail />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/post/:postId" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <PostView />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/recommendations/:recommendationId" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <RecommendationView />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/t/:hashtag" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <TagPage />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/product-search/:query" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <ProductSearch />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/places" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <PlacesPage />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/products" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <ProductsPage />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/books" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <BooksPage />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/movies" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <MoviesPage />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/food" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <FoodPage />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/admin" element={
                     <AdminRoute>
@@ -194,9 +207,9 @@ function App() {
                     </AdminRoute>
                   } />
                   <Route path="/your-data" element={
-                    <ProtectedRoute>
+                    <AppProtectedRoute>
                       <YourData />
-                    </ProtectedRoute>
+                    </AppProtectedRoute>
                   } />
                   <Route path="/u/:username" element={<UserProfile />} />
                   <Route path="*" element={<NotFound />} />
