@@ -21,32 +21,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     const initializeAuth = async () => {
       try {
-        // Get initial session first
+        // Get initial session first (fast, from localStorage)
         const { data, error } = await supabase.auth.getSession();
         
-        if (mounted && !error) {
-          console.log('Initial session:', data.session ? 'Found' : 'None');
+        if (!mounted) return;
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setIsLoading(false);
+          return;
+        }
+        
+        if (data.session) {
+          console.log('Cached session found, validating with server...');
+          
+          // CRITICAL: Validate JWT with Supabase server using getUser()
+          // This catches deleted users whose JWT is still in localStorage
+          const { data: userData, error: userError } = await supabase.auth.getUser();
+          
+          if (!mounted) return;
+          
+          if (userError || !userData.user) {
+            // User deleted or JWT invalid - clear everything
+            console.log('User validation failed (user may be deleted), clearing session');
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+          
+          // Valid user - proceed with session
+          console.log('User validated successfully');
           setSession(data.session);
-          setUser(data.session?.user ?? null);
+          setUser(userData.user);
+        } else {
+          console.log('No cached session found');
+          setSession(null);
+          setUser(null);
         }
         
         if (mounted) {
           // Set up auth state listener for future changes
           const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, currentSession) => {
+            (event, currentSession) => {
               console.log('Auth event:', event, currentSession ? 'Session present' : 'No session');
               
-              if (mounted) {
-                setSession(currentSession);
-                setUser(currentSession?.user ?? null);
-                
-                // Handle sign out event specifically
-                if (event === 'SIGNED_OUT') {
-                  console.log('User signed out - clearing all state');
-                  setSession(null);
-                  setUser(null);
-                }
+              if (!mounted) return;
+              
+              // Handle sign out event specifically
+              if (event === 'SIGNED_OUT') {
+                console.log('User signed out - clearing all state');
+                setSession(null);
+                setUser(null);
+                return;
               }
+              
+              // Handle token refresh - revalidate user exists
+              if (event === 'TOKEN_REFRESHED' && currentSession) {
+                console.log('Token refreshed, revalidating user with server...');
+                // Use setTimeout to avoid Supabase deadlock
+                setTimeout(async () => {
+                  if (!mounted) return;
+                  const { data: userData, error: userError } = await supabase.auth.getUser();
+                  if (userError || !userData.user) {
+                    console.log('User no longer exists on token refresh, signing out');
+                    await supabase.auth.signOut();
+                    setSession(null);
+                    setUser(null);
+                  }
+                }, 0);
+              }
+              
+              // Normal state update
+              setSession(currentSession);
+              setUser(currentSession?.user ?? null);
             }
           );
           
