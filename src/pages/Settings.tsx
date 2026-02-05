@@ -1,4 +1,3 @@
-import React, { useEffect } from 'react';
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
