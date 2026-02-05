@@ -69,6 +69,26 @@ export const UNVERIFIED_USER_RESTRICTIONS = {
 export type RestrictionAction = keyof typeof UNVERIFIED_USER_RESTRICTIONS;
 
 /**
+ * Account Recovery Policy for Soft-Deleted Accounts
+ * 
+ * PHASE 5: Minimal soft delete with 30-day recovery window
+ *   - Users can request deletion via Settings > Account > Delete Account
+ *   - deleted_at timestamp is set on profiles table
+ *   - Recovery is manual via support contact
+ *   - After 30 days, data may be permanently deleted (future implementation)
+ */
+export const ACCOUNT_RECOVERY_POLICY = {
+  /** Number of days data is retained before potential hard delete */
+  windowDays: 30,
+  /** How users can request recovery */
+  method: 'Contact support',
+  /** Support contact email */
+  supportEmail: 'support@commongroundz.com',
+  /** User-facing description */
+  description: 'Accounts can be restored within 30 days of deletion by contacting support.',
+} as const;
+
+/**
  * Centralized verification-related copy for consistent UX
  */
 export const VERIFICATION_MESSAGES = {

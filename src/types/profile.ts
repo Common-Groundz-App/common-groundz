@@ -14,6 +14,7 @@ export interface BaseUserProfile {
   location: string | null;
   created_at: string | null;
   username_changed_at: string | null;
+  deleted_at: string | null;
 }
 
 // Enhanced profile with computed fields for UI consumption
@@ -37,6 +38,7 @@ export interface SafeUserProfile {
   location: string | null;
   created_at?: string;
   username_changed_at: string | null;
+  deleted_at: string | null;
 }
 
 // Profile data as it comes from JOIN queries (nested structure)
@@ -83,6 +85,7 @@ export const transformToSafeProfile = (profile: BaseUserProfile | null): SafeUse
       bio: null,
       location: null,
       username_changed_at: null,
+      deleted_at: null,
     };
   }
 
@@ -116,5 +119,6 @@ export const transformToSafeProfile = (profile: BaseUserProfile | null): SafeUse
     location: profile.location,
     created_at: profile.created_at || undefined,
     username_changed_at: profile.username_changed_at,
+    deleted_at: profile.deleted_at,
   };
 };
