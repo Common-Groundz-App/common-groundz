@@ -11,6 +11,8 @@ import UsernameField from './UsernameField';
 import EmailVerificationPending from './EmailVerificationPending';
 import TurnstileWidget from './TurnstileWidget';
 import { signUpViaGateway, formatRateLimitError } from '@/lib/authGateway';
+import GoogleSignInButton from './GoogleSignInButton';
+import { Separator } from '@/components/ui/separator';
 
 interface SignUpFormProps {
   onSwitchToSignIn?: () => void;
@@ -192,6 +194,20 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
           </Button>
         </CardFooter>
       </form>
+      
+      <div className="px-6 pb-6">
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">
+              Or continue with
+            </span>
+          </div>
+        </div>
+        <GoogleSignInButton />
+      </div>
     </Card>
   );
 };
