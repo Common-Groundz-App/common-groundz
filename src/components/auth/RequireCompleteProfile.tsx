@@ -7,14 +7,20 @@
  
  interface RequireCompleteProfileProps {
    children: React.ReactNode;
+  allowIncomplete?: boolean; // Skip username check, but still check soft-delete
  }
  
  /**
   * Route guard that ensures:
   * 1. User is not soft-deleted (forces sign out if deleted)
   * 2. User has a complete profile with username (redirects to /complete-profile if not)
+  * 
+  * Set allowIncomplete=true to skip the username check (used for /complete-profile route).
   */
- const RequireCompleteProfile: React.FC<RequireCompleteProfileProps> = ({ children }) => {
+const RequireCompleteProfile: React.FC<RequireCompleteProfileProps> = ({ 
+  children, 
+  allowIncomplete = false 
+}) => {
    const { user, signOut } = useAuth();
    const navigate = useNavigate();
  
@@ -66,8 +72,8 @@
      return null;
    }
  
-   // If no username, redirect to profile completion
-   if (profile && !profile.username) {
+  // If no username, redirect to profile completion (unless allowIncomplete)
+  if (!allowIncomplete && profile && !profile.username) {
      return <Navigate to="/complete-profile" replace />;
    }
  
