@@ -11,6 +11,8 @@ import { UserIcon, KeyIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import ForgotPasswordForm from './ForgotPasswordForm';
 import { loginViaGateway, formatRateLimitError } from '@/lib/authGateway';
 import { supabase } from '@/integrations/supabase/client';
+import GoogleSignInButton from './GoogleSignInButton';
+import { Separator } from '@/components/ui/separator';
 
 const SignInForm = () => {
   const [email, setEmail] = useState('');
@@ -156,6 +158,20 @@ const SignInForm = () => {
           </Button>
         </CardFooter>
       </form>
+      
+      <div className="px-6 pb-6">
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <Separator className="w-full" />
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-card px-2 text-muted-foreground">
+              Or continue with
+            </span>
+          </div>
+        </div>
+        <GoogleSignInButton />
+      </div>
     </Card>
   );
 };

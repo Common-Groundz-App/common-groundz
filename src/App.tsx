@@ -34,6 +34,8 @@ import YourData from '@/pages/YourData';
 import NotFound from '@/pages/NotFound';
 import UserProfile from '@/pages/UserProfile';
 import ResetPassword from '@/pages/ResetPassword';
+import CompleteProfile from '@/pages/CompleteProfile';
+import AccountDeleted from '@/pages/AccountDeleted';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
 
@@ -75,6 +77,12 @@ function App() {
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/auth/reset-password" element={<ResetPassword />} />
+                  <Route path="/complete-profile" element={
+                    <ProtectedRoute>
+                      <CompleteProfile />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/account-deleted" element={<AccountDeleted />} />
                   <Route path="/home" element={
                     <ProtectedRoute>
                       <Feed />

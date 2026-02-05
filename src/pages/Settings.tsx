@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useLocation, setLocationStatus } from '@/contexts/LocationContext';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -7,7 +8,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Bell, User, Shield, Palette, MapPin, Info, AlertTriangle, Mail, Route, Sparkles, Download } from 'lucide-react';
+import { Bell, User, Shield, Palette, MapPin, Info, AlertTriangle, Mail, Route, Sparkles, Download, Key, LogOut, CheckCircle2, XCircle } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -21,9 +22,13 @@ import { useToast } from '@/hooks/use-toast';
 import { locationEventBus } from '@/hooks/use-geolocation';
 import PreferencesSection from '@/components/preferences/PreferencesSection';
 import { useNotificationPreferences } from '@/hooks/use-notification-preferences';
+import ChangePasswordModal from '@/components/settings/ChangePasswordModal';
+import DeleteAccountModal from '@/components/settings/DeleteAccountModal';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { Badge } from '@/components/ui/badge';
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, signOut, resendVerificationEmail } = useAuth();
   const { 
     locationEnabled, 
     enableLocation, 
@@ -42,6 +47,55 @@ const Settings = () => {
     toggleWeeklyDigest,
     toggleJourneyNotifications 
   } = useNotificationPreferences();
+  const { isVerified } = useEmailVerification();
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  // Detect if user is OAuth-only (no email/password identity)
+  const isOAuthOnlyUser = !user?.identities?.some(i => i.provider === 'email');
+
+  const handleResendVerification = async () => {
+    setIsResendingVerification(true);
+    try {
+      const { error } = await resendVerificationEmail();
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to send verification email',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Email sent',
+          description: 'Verification email has been sent to your inbox.',
+        });
+      }
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
+
+  const handleLogoutAllDevices = async () => {
+    setIsLoggingOutAll(true);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      if (error) throw error;
+      toast({
+        title: 'Logged out',
+        description: 'You have been logged out from all devices.',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to logout from all devices',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoggingOutAll(false);
+    }
+  };
   
   // Subscribe to location events to keep UI in sync
   useEffect(() => {
@@ -394,37 +448,90 @@ const Settings = () => {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div>
-                      <h3 className="text-lg font-medium">Email</h3>
-                      <p className="text-muted-foreground mb-2">{user.email}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Your email is used for notifications and account recovery.
-                      </p>
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Email
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-muted-foreground">{user.email}</p>
+                        {isVerified ? (
+                          <Badge variant="outline" className="text-green-600 border-green-600">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Verified
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-amber-600 border-amber-600">
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Unverified
+                          </Badge>
+                        )}
+                      </div>
+                      {!isVerified && (
+                        <Button 
+                          variant="link" 
+                          size="sm" 
+                          className="p-0 h-auto mt-1"
+                          onClick={handleResendVerification}
+                          disabled={isResendingVerification}
+                        >
+                          {isResendingVerification ? 'Sending...' : 'Resend verification email'}
+                        </Button>
+                      )}
                     </div>
                     
                     <Separator />
                     
+                    {!isOAuthOnlyUser && (
+                      <>
+                        <div>
+                          <h3 className="text-lg font-medium flex items-center gap-2">
+                            <Key className="h-4 w-4" />
+                            Password
+                          </h3>
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Change your password to keep your account secure.
+                          </p>
+                          <Button variant="outline" size="sm" onClick={() => setShowChangePasswordModal(true)}>
+                            Change Password
+                          </Button>
+                        </div>
+                        <Separator />
+                      </>
+                    )}
+                    
                     <div>
-                      <h3 className="text-lg font-medium">Profile Information</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Update your profile information in the Profile page.
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <LogOut className="h-4 w-4" />
+                        Active Sessions
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Sign out from all devices at once.
                       </p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleLogoutAllDevices}
+                        disabled={isLoggingOutAll}
+                      >
+                        {isLoggingOutAll ? 'Logging out...' : 'Logout from all devices'}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
                 
                 {/* Danger Zone */}
-                <Card className="border-red-200 dark:border-red-800">
+                <Card className="border-destructive/50">
                   <CardHeader>
-                    <CardTitle className="text-red-600 dark:text-red-400">Danger Zone</CardTitle>
+                    <CardTitle className="text-destructive flex items-center gap-2">
+                      <AlertTriangle className="h-5 w-5" />
+                      Danger Zone
+                    </CardTitle>
                     <CardDescription>
-                      Irreversible actions
+                      Once deleted, your account can be recovered within 30 days by contacting support.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      Once you delete your account, there is no going back. Please be certain.
-                    </p>
-                    <Button variant="destructive" size="sm">
+                    <Button variant="destructive" size="sm" onClick={() => setShowDeleteAccountModal(true)}>
                       Delete Account
                     </Button>
                   </CardContent>
@@ -439,6 +546,16 @@ const Settings = () => {
       <div className="xl:hidden">
         <BottomNavigation />
       </div>
+      
+      {/* Modals */}
+      <ChangePasswordModal 
+        isOpen={showChangePasswordModal} 
+        onClose={() => setShowChangePasswordModal(false)} 
+      />
+      <DeleteAccountModal 
+        isOpen={showDeleteAccountModal} 
+        onClose={() => setShowDeleteAccountModal(false)} 
+      />
     </div>
   );
 };

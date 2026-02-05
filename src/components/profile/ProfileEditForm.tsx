@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ interface ProfileEditFormProps {
   lastName: string;
   onProfileUpdate: (username: string, bio: string, location: string, firstName: string, lastName: string) => void;
   usernameChangedAt: string | null;
+  mode?: 'edit' | 'onboarding';
 }
 
 interface FormValues {
@@ -45,7 +47,8 @@ const ProfileEditForm = ({
   firstName, 
   lastName, 
   onProfileUpdate,
-  usernameChangedAt
+  usernameChangedAt,
+  mode = 'edit'
 }: ProfileEditFormProps) => {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -54,10 +57,13 @@ const ProfileEditForm = ({
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [initialUsername, setInitialUsername] = useState('');
+  const navigate = useNavigate();
+
+  const isOnboarding = mode === 'onboarding';
 
   const cooldownState = calculateUsernameCooldown(usernameChangedAt);
-  // Username is locked if in cooldown OR not email verified
-  const isUsernameLocked = cooldownState.isLocked || !isVerified;
+  // Username is locked if in cooldown OR not email verified (but never locked in onboarding mode)
+  const isUsernameLocked = isOnboarding ? false : (cooldownState.isLocked || !isVerified);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -206,7 +212,11 @@ const ProfileEditForm = ({
         detail: { userId: user.id } 
       }));
       
-      onClose();
+      if (isOnboarding) {
+        navigate('/home', { replace: true });
+      } else {
+        onClose();
+      }
     } catch (error: any) {
       console.error('Error updating profile:', error);
       toast({
@@ -218,10 +228,10 @@ const ProfileEditForm = ({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isOnboarding && onClose()}>
+      <DialogContent className="sm:max-w-[425px]" onPointerDownOutside={isOnboarding ? (e) => e.preventDefault() : undefined}>
         <DialogHeader>
-          <DialogTitle>Edit Profile</DialogTitle>
+          <DialogTitle>{isOnboarding ? 'Complete Your Profile' : 'Edit Profile'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -360,12 +370,14 @@ const ProfileEditForm = ({
             />
             
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              {!isOnboarding && (
+                <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              )}
               <Button 
                 type="submit" 
                 disabled={(!!usernameError && !isUsernameLocked) || isCheckingUsername}
               >
-                Save changes
+                {isOnboarding ? 'Continue' : 'Save changes'}
               </Button>
             </DialogFooter>
           </form>
