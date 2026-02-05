@@ -115,5 +115,3 @@ const RequireCompleteProfile: React.FC<RequireCompleteProfileProps> = ({
 };
 
 export default RequireCompleteProfile;
- 
- export default RequireCompleteProfile;
