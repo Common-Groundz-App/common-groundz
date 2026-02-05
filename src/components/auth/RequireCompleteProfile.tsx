@@ -113,5 +113,7 @@ const RequireCompleteProfile: React.FC<RequireCompleteProfileProps> = ({
   // Profile is complete, render children
   return <>{children}</>;
 };
+
+export default RequireCompleteProfile;
  
  export default RequireCompleteProfile;
