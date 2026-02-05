@@ -2204,6 +2204,7 @@ export type Database = {
           bio: string | null
           cover_url: string | null
           created_at: string
+          deleted_at: string | null
           embedding: string | null
           embedding_updated_at: string | null
           first_name: string | null
@@ -2221,6 +2222,7 @@ export type Database = {
           bio?: string | null
           cover_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           embedding?: string | null
           embedding_updated_at?: string | null
           first_name?: string | null
@@ -2238,6 +2240,7 @@ export type Database = {
           bio?: string | null
           cover_url?: string | null
           created_at?: string
+          deleted_at?: string | null
           embedding?: string | null
           embedding_updated_at?: string | null
           first_name?: string | null
