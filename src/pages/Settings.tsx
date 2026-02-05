@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { useLocation, setLocationStatus } from '@/contexts/LocationContext';
 import { usePreferences } from '@/contexts/PreferencesContext';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -7,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Bell, User, Shield, Palette, MapPin, Info, AlertTriangle, Mail, Route, Sparkles, Download } from 'lucide-react';
+import { Bell, User, Shield, Palette, MapPin, Info, AlertTriangle, Mail, Route, Sparkles, Download, Key, LogOut, CheckCircle2, XCircle } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -21,9 +23,13 @@ import { useToast } from '@/hooks/use-toast';
 import { locationEventBus } from '@/hooks/use-geolocation';
 import PreferencesSection from '@/components/preferences/PreferencesSection';
 import { useNotificationPreferences } from '@/hooks/use-notification-preferences';
+import ChangePasswordModal from '@/components/settings/ChangePasswordModal';
+import DeleteAccountModal from '@/components/settings/DeleteAccountModal';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { Badge } from '@/components/ui/badge';
 
 const Settings = () => {
-  const { user } = useAuth();
+  const { user, signOut, resendVerificationEmail } = useAuth();
   const { 
     locationEnabled, 
     enableLocation, 
@@ -42,6 +48,55 @@ const Settings = () => {
     toggleWeeklyDigest,
     toggleJourneyNotifications 
   } = useNotificationPreferences();
+  const { isVerified } = useEmailVerification();
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
+  const [isLoggingOutAll, setIsLoggingOutAll] = useState(false);
+
+  // Detect if user is OAuth-only (no email/password identity)
+  const isOAuthOnlyUser = !user?.identities?.some(i => i.provider === 'email');
+
+  const handleResendVerification = async () => {
+    setIsResendingVerification(true);
+    try {
+      const { error } = await resendVerificationEmail();
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to send verification email',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Email sent',
+          description: 'Verification email has been sent to your inbox.',
+        });
+      }
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
+
+  const handleLogoutAllDevices = async () => {
+    setIsLoggingOutAll(true);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      if (error) throw error;
+      toast({
+        title: 'Logged out',
+        description: 'You have been logged out from all devices.',
+      });
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'Failed to logout from all devices',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoggingOutAll(false);
+    }
+  };
   
   // Subscribe to location events to keep UI in sync
   useEffect(() => {
