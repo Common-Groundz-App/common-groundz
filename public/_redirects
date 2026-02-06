@@ -15,5 +15,9 @@
 /food/*    /index.html   200
 /product/*    /index.html   200
 
+/privacy    /index.html   200
+/terms    /index.html   200
+/cookies    /index.html   200
+
 # Catch-all fallback for any other routes
 /*    /index.html   200
