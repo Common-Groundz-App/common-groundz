@@ -1,184 +1,119 @@
 
 
-# Refined Plan: Orphaned Auth State Detection (Production-Grade)
+# Legal Pages Implementation — Final Plan
 
-## Summary
+## Overview
 
-Implementing server-side JWT validation and orphan detection to prevent deleted users from appearing as "Anonymous User". This incorporates ChatGPT's critical refinement to distinguish between "user not found" (fatal) and "temporary failure" (retry).
-
----
-
-## Architecture Overview
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                  Defense in Depth Layers                    │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  Layer 1: AuthContext                                       │
-│  └── getUser() validates JWT with Supabase server           │
-│  └── TOKEN_REFRESHED event revalidates user existence       │
-│  └── If invalid → signOut() + clear state                   │
-│                                                             │
-│  Layer 2: RequireCompleteProfile                            │
-│  └── Profile fetch checks for PGRST116 (not found)          │
-│  └── Only NOT FOUND = orphaned state = force logout         │
-│  └── Other errors = show error state, NOT auto-logout       │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+Create Privacy Policy, Terms of Service, and Cookie Policy pages for Common Groundz, an India-based AI-powered recommendation and discovery platform.
 
 ---
 
-## Implementation Details
+## Files
 
-### Step 1: AuthContext Server Validation
+### New (4)
+- `src/config/legalConfig.ts` — Centralized legal metadata
+- `src/pages/PrivacyPolicy.tsx` — Privacy policy page
+- `src/pages/TermsOfService.tsx` — Terms of service page
+- `src/pages/CookiePolicy.tsx` — Cookie policy page
 
-**File**: `src/contexts/AuthContext.tsx`
-
-**Changes**:
-1. After getting cached session with `getSession()`, validate with `getUser()`
-2. If user is deleted/invalid, force `signOut()` and clear state
-3. Add revalidation on `TOKEN_REFRESHED` event
-
-**Logic flow**:
-```text
-initializeAuth():
-  1. getSession() → get cached session from localStorage
-  2. If session exists:
-     a. getUser() → validate JWT with Supabase server
-     b. If error (user deleted/invalid):
-        - signOut()
-        - setSession(null), setUser(null)
-     c. If valid:
-        - setSession, setUser normally
-  3. Setup onAuthStateChange listener
-     - On TOKEN_REFRESHED: revalidate user with getUser()
-```
-
-### Step 2: RequireCompleteProfile Orphan Detection
-
-**File**: `src/components/auth/RequireCompleteProfile.tsx`
-
-**Changes**:
-1. Detect `PGRST116` error code specifically (means "not found")
-2. Return `{ _orphaned: true }` marker for this case
-3. Add useEffect to force logout on orphaned state
-4. For OTHER errors → do NOT logout, just log and return null (component will handle gracefully)
-
-**Critical distinction** (ChatGPT's refinement):
-```text
-Error type: PGRST116 ("not found")
-  → User was deleted but JWT still valid
-  → Force signOut() + redirect to /
-  
-Error type: ANY OTHER error  
-  → Temporary DB failure, network issue, etc.
-  → Do NOT auto-logout (prevents false logouts)
-  → Log error, return null, let component handle
-```
-
-### Step 3: Profile Fallback Context (No Code Changes)
-
-**Current behavior is actually correct for most cases**:
-
-- `UserMenu` already falls back to email: `profile?.displayName || user?.email?.split('@')[0] || 'User'`
-- This is safe because if profile is missing but user exists, they see their email
-- The "Anonymous User" string only appears when `transformToSafeProfile(null)` is used
-
-**Where fallback IS appropriate** (no changes needed):
-- Viewing other users' old content (deleted user's posts)
-- Batch profile fetching where some users may be deleted
-- Public profile views
-
-**The real fix**: Layers 1 & 2 catch orphaned states BEFORE they reach components that use fallbacks.
+### Modified (3)
+- `src/App.tsx` — Add 3 public routes
+- `src/components/Footer.tsx` — Replace placeholder `#` links with Router Links
+- `public/_redirects` — Add 3 route entries
 
 ---
 
-## Files to Modify
+## Legal Config
 
-| File | Changes |
-|------|---------|
-| `src/contexts/AuthContext.tsx` | Add `getUser()` validation in init + `TOKEN_REFRESHED` handler |
-| `src/components/auth/RequireCompleteProfile.tsx` | Add `PGRST116` detection + orphan handling |
-
-**Total: 2 files modified**
-
----
-
-## Protection Flow After Implementation
-
-```text
-App loads with stale JWT (user deleted from Supabase)
-         │
-         ▼
-    AuthContext.initializeAuth()
-         │
-    getSession() returns cached session
-         │
-         ▼
-    getUser() validates with server ← NEW LAYER 1
-         │
-    Error returned ──────────────────┐
-         │                           │
-         ▼                           ▼
-    Valid user              signOut() + clear state
-         │                  Redirect to /
-         ▼                  (User never sees "Anonymous")
-    RequireCompleteProfile
-         │
-    Fetch profile from DB
-         │
-    Error: PGRST116 ────────────────┐ ← NEW LAYER 2
-         │                          │
-    Other error                signOut() + redirect
-         │                     (Backup protection)
-         ▼
-    Log + return null
-    (Don't logout - temp failure)
-         │
-         ▼
-    Has valid profile
-         │
-         ▼
-    Render app normally
-```
+`src/config/legalConfig.ts`:
+- companyName: "Common Groundz"
+- supportEmail: "support@commongroundz.co"
+- websiteUrl: "https://commongroundz.co"
+- jurisdiction: "India"
+- lastUpdated: "February 6, 2026"
 
 ---
 
-## Why This Matches Production Standards
+## Privacy Policy Sections
 
-| Pattern | Implementation |
-|---------|---------------|
-| Server validation | `getUser()` contacts Supabase Auth server |
-| Error classification | Only `PGRST116` triggers logout, not temp failures |
-| Defense in depth | Auth layer + Profile layer both validate |
-| Clean failure | Immediate redirect, never "Anonymous User" |
-| Event-based revalidation | `TOKEN_REFRESHED` triggers check |
-| No over-engineering | Just 2 files, minimal code changes |
-
----
-
-## Testing Checklist
-
-After implementation:
-
-- [ ] Delete user from Supabase dashboard → user immediately logged out on page load
-- [ ] Delete user while app is open → logged out on token refresh
-- [ ] Temporary DB outage → user NOT auto-logged out (just see error/retry)
-- [ ] Normal users with valid profiles → no change in behavior
-- [ ] OAuth users completing onboarding → still works correctly
-- [ ] Soft-deleted users → still caught and redirected to /account-deleted
-- [ ] View deleted user's old posts → shows "Anonymous User" (correct for public context)
+1. **Introduction**
+2. **Information We Collect** — Account info (Google OAuth), user content, AI-learned preferences, usage data
+3. **Automated Processing and AI** — "Recommendations are generated using automated systems and may be based on user-submitted content and behavioral data. We do not guarantee that recommendations will be accurate, complete, or suitable for any specific purpose. These should not be considered professional, medical, legal, or financial advice."
+4. **How We Use Your Information**
+5. **Data Sharing** — "We do not sell your personal data. We use third-party infrastructure providers such as cloud hosting, database services, and authentication services to operate the platform."
+6. **Data Security** — "We implement reasonable technical and organizational measures to protect user data."
+7. **Your Rights** — Access (/your-data), delete (settings), export, contact support
+8. **Data Retention** — "We retain account data for up to 30 days after deletion to allow account recovery. After this period, data is scheduled for permanent deletion, subject to technical constraints and legal obligations."
+9. **Data Deletion** — Clear instructions: delete from account settings or contact support@commongroundz.co
+10. **International Users** — "If you access the platform from outside India, you understand that your information may be processed and stored in India or other countries where our service providers operate."
+11. **Third-Party Links** — Not responsible for external content
+12. **Children's Privacy** — "The platform is not intended for children under the age of 13. If you are under the age of 18, you should use the platform under the supervision of a parent or legal guardian."
+13. **Changes to This Policy** — "We may update this policy from time to time. Continued use of the platform constitutes acceptance of the updated policy."
+14. **Contact** — support@commongroundz.co
 
 ---
 
-## What We're NOT Doing (Avoiding Over-Engineering)
+## Terms of Service Sections
 
-ChatGPT mentioned optional future enhancements:
-- Background revalidation on tab focus
-- Global session invalidation strategy  
-- Audit logging for orphaned states
+1. **Acceptance of Terms**
+2. **Eligibility** — 13+; under 18 requires parental supervision
+3. **Account Registration**
+4. **User Content** — Users own content; grant platform display license. "You are solely responsible for the content you post, including reviews, ratings, and recommendations. You represent that your content does not violate any laws or third-party rights."
+5. **Prohibited Conduct**
+6. **Content Moderation** — "We reserve the right to remove content or suspend accounts that violate our policies, at our sole discretion, with or without notice."
+7. **No Professional Advice** — Informational only, no guarantee of accuracy or reliability
+8. **User Responsibility for Decisions** — "You acknowledge that any decisions you make based on content or recommendations on the platform are made at your own risk."
+9. **Platform Role** — "Common Groundz is a discovery and recommendation platform. We do not manufacture, sell, distribute, or control the products, services, or businesses listed on the platform. Any transaction or interaction with third parties is solely between you and the relevant third party."
+10. **No Endorsement and Commercial Relationships** — "The inclusion of any product, service, place, or recommendation on the platform does not constitute an endorsement or guarantee by Common Groundz. Some listings, recommendations, or content may be influenced by partnerships, sponsorships, affiliate relationships, or commercial arrangements. Where applicable, such relationships will be disclosed in accordance with applicable law."
+11. **Third-Party Links and Services**
+12. **Intellectual Property**
+13. **Indemnification** — "You agree to indemnify and hold harmless Common Groundz, its founders, and affiliates from any claims, damages, or expenses arising from your use of the platform, your content, or your violation of these Terms."
+14. **Disclaimers** — "As is" and "as available" + "We do not guarantee that the platform will be uninterrupted, secure, or error-free."
+15. **Limitation of Liability** — "To the fullest extent permitted by law, our maximum liability is limited to the amount paid by you (if any) in the last 12 months."
+16. **Modification of Service** — "We reserve the right to modify, suspend, or discontinue any part of the platform at any time without liability."
+17. **Termination**
+18. **Changes to Terms** — "We may update these Terms from time to time. Continued use of the platform constitutes acceptance of the updated Terms."
+19. **Governing Law** — Laws of India; courts in Bangalore, Karnataka
+20. **Contact** — support@commongroundz.co
 
-**Decision**: Skip these for now. The 2-layer defense is sufficient for production. We can add these if needed later, but they're enterprise-level concerns that would add complexity without immediate benefit.
+---
+
+## Cookie Policy Sections (Updated)
+
+1. **What Are Cookies**
+2. **Strictly Necessary Cookies** — "These cookies are essential for the platform to function and cannot be disabled. They include authentication session cookies (via Supabase) and security cookies. These do not require your consent as they are necessary for the operation of the platform."
+3. **Preference Cookies** — "These cookies remember your settings such as theme preferences. They enhance your experience but are not essential."
+4. **Third-Party Cookies** — Google OAuth
+5. **Future Changes** — "If advertising, analytics, or other optional cookie categories are introduced in the future, this policy will be updated accordingly and appropriate consent mechanisms will be provided before any optional cookies are set."
+6. **Managing Cookies** — Browser settings instructions
+7. **Updates to This Policy**
+8. **Contact** — support@commongroundz.co
+
+---
+
+## Page Layout
+
+Each page follows the existing app pattern:
+- NavBarComponent at top
+- Main content area: container, max-w-4xl, centered
+- Page title (h1), last updated date, sections with h2 headings
+- Footer at bottom
+- Scroll to top on mount
+- Public routes (no auth required)
+- Mobile responsive
+
+## Routing
+
+Three public routes in App.tsx (alongside `/auth`, `/account-deleted`):
+- `/privacy` — PrivacyPolicy
+- `/terms` — TermsOfService
+- `/cookies` — CookiePolicy
+
+## Footer
+
+Replace placeholder `#` links in the Legal section with Router Link components pointing to `/privacy`, `/terms`, `/cookies`. The "Cookie Policy" link replaces the current "Cookie Policy" placeholder. No other footer sections changed.
+
+## Redirects
+
+Add `/privacy`, `/terms`, `/cookies` to `public/_redirects` above the catch-all for clarity.
 
