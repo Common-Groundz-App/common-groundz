@@ -38,6 +38,9 @@ import UserProfile from '@/pages/UserProfile';
 import ResetPassword from '@/pages/ResetPassword';
 import CompleteProfile from '@/pages/CompleteProfile';
 import AccountDeleted from '@/pages/AccountDeleted';
+import PrivacyPolicy from '@/pages/PrivacyPolicy';
+import TermsOfService from '@/pages/TermsOfService';
+import CookiePolicy from '@/pages/CookiePolicy';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
 
@@ -96,6 +99,9 @@ function App() {
                     </ProtectedRoute>
                   } />
                   <Route path="/account-deleted" element={<AccountDeleted />} />
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                  <Route path="/terms" element={<TermsOfService />} />
+                  <Route path="/cookies" element={<CookiePolicy />} />
                   <Route path="/home" element={
                     <AppProtectedRoute>
                       <Feed />
