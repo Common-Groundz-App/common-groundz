@@ -57,7 +57,7 @@ const PrivacyPolicy = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">5. Data Sharing</h2>
             <p className="text-muted-foreground">
-              We do not sell your personal data. We use third-party infrastructure providers such as cloud hosting, database services, and authentication services to operate the platform. These providers may process your data on our behalf in accordance with their own privacy policies.
+              We do not sell your personal data. We use third-party infrastructure providers such as cloud hosting, database services, and authentication services to operate the platform. These providers may process your data on our behalf in accordance with their own privacy policies. We may also disclose personal information if required to do so by law, court order, or in response to valid legal requests by government authorities.
             </p>
           </section>
 

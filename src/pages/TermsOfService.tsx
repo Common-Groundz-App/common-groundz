@@ -55,7 +55,7 @@ const TermsOfService = () => {
               <li>Harass, abuse, or threaten other users</li>
               <li>Use the platform for any unlawful purpose</li>
               <li>Attempt to gain unauthorized access to the platform or its systems</li>
-              <li>Use automated tools to scrape or collect data from the platform without permission</li>
+              <li>Use bots, scrapers, crawlers, or automated means to access, collect, or index content from the platform without our prior written consent</li>
               <li>Impersonate any person or entity</li>
             </ul>
           </section>
@@ -126,7 +126,7 @@ const TermsOfService = () => {
           <section>
             <h2 className="text-xl font-semibold mb-3">15. Limitation of Liability</h2>
             <p className="text-muted-foreground">
-              To the fullest extent permitted by law, our maximum liability is limited to the amount paid by you (if any) in the last 12 months. We are not liable for any indirect, incidental, consequential, or punitive damages.
+              To the fullest extent permitted by law, our maximum liability is limited to the amount paid by you (if any) in the last 12 months. We are not liable for any indirect, incidental, consequential, or punitive damages, including loss of profits, data, goodwill, or business interruption.
             </p>
           </section>
 
