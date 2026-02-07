@@ -1,64 +1,57 @@
 
 
-# Legal Pages — Final Polish (3 Small Edits)
+# Fix OAuth Redirect Race Condition + Linking Toast
 
-Three targeted text changes across two files. No new files, no structural changes.
+Two small changes. One file modified, one file lightly touched.
+
+---
+
+## What's Already Covered
+
+The ChatGPT suggestion to add an "auth hydration guard" is **already implemented**:
+- `AuthInitializer` wraps the entire app and blocks rendering until `isLoading` is false
+- `Index` page shows a loading spinner until auth state resolves
+- `ProtectedRoute` also waits for `isLoading`
+
+No changes needed there.
 
 ---
 
 ## Changes
 
-### 1. Legal Disclosure Clause (Privacy Policy)
+### 1. Fix OAuth redirect target
 
-**File:** `src/pages/PrivacyPolicy.tsx`
+**File:** `src/components/auth/GoogleSignInButton.tsx`
 
-Add one sentence to the end of the **Data Sharing** section (Section 5):
+Change `redirectTo` from `/home` to `/`:
 
-> "We may also disclose personal information if required to do so by law, court order, or in response to valid legal requests by government authorities."
+```
+// Before
+redirectTo: `${window.location.origin}/home`
 
-This is standard and protects against government/legal request scenarios.
+// After
+redirectTo: `${window.location.origin}/`
+```
 
----
+This prevents the race condition where `ProtectedRoute` on `/home` rejects the user before Supabase finishes processing OAuth tokens from the URL.
 
-### 2. Stronger Anti-Scraping Wording (Terms of Service)
+### 2. Add identity linking toast notification
 
-**File:** `src/pages/TermsOfService.tsx`
+**File:** `src/contexts/AuthContext.tsx`
 
-In **Prohibited Conduct** (Section 5), replace:
+In the `onAuthStateChange` listener, when the event is `USER_UPDATED` (which fires during identity linking), show a toast:
 
-> "Use automated tools to scrape or collect data from the platform without permission"
+> "Your Google account has been linked to your existing account."
 
-With:
-
-> "Use bots, scrapers, crawlers, or automated means to access, collect, or index content from the platform without our prior written consent"
-
-Important because Common Groundz is building structured taste/preference data that needs protection.
-
----
-
-### 3. Expanded Limitation of Liability (Terms of Service)
-
-**File:** `src/pages/TermsOfService.tsx`
-
-In **Limitation of Liability** (Section 15), replace:
-
-> "We are not liable for any indirect, incidental, consequential, or punitive damages."
-
-With:
-
-> "We are not liable for any indirect, incidental, consequential, or punitive damages, including loss of profits, data, goodwill, or business interruption."
-
-Strengthens the liability shield with specific damage categories.
+This only fires once during the linking event, not on regular logins. It builds user trust and prevents confusion about what just happened.
 
 ---
 
 ## Summary
 
-| File | Section | Change |
-|------|---------|--------|
-| `PrivacyPolicy.tsx` | 5. Data Sharing | Add legal disclosure sentence |
-| `TermsOfService.tsx` | 5. Prohibited Conduct | Stronger anti-scraping wording |
-| `TermsOfService.tsx` | 15. Limitation of Liability | Expand damage categories |
+| File | Change |
+|------|--------|
+| `GoogleSignInButton.tsx` | `redirectTo` -> `/` |
+| `AuthContext.tsx` | Toast on `USER_UPDATED` auth event |
 
-Two files modified. Three single-line text edits. No layout, routing, or structural changes.
-
+Two files. Two minimal edits. No structural changes.
