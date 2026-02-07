@@ -1,57 +1,81 @@
 
 
-# Fix OAuth Redirect Race Condition + Linking Toast
+# Auth Flow Polish: Inline Errors + Validation (Final Plan)
 
-Two small changes. One file modified, one file lightly touched.
+## Clarification: Google Sign-In Button
 
----
-
-## What's Already Covered
-
-The ChatGPT suggestion to add an "auth hydration guard" is **already implemented**:
-- `AuthInitializer` wraps the entire app and blocks rendering until `isLoading` is false
-- `Index` page shows a loading spinner until auth state resolves
-- `ProtectedRoute` also waits for `isLoading`
-
-No changes needed there.
+The `GoogleSignInButton` already has a loading/disabled state in the existing codebase (lines 11, 40, 42-43). It shows a spinner and disables the button on click. No change needed here.
 
 ---
 
 ## Changes
 
-### 1. Fix OAuth redirect target
+### 1. SignInForm.tsx -- Replace toast errors with inline errors
 
-**File:** `src/components/auth/GoogleSignInButton.tsx`
+**Problem:** When incorrect credentials are entered, `toast.error()` fires but may not be visible. Even if it were, toasts are the wrong UX for credential errors. Industry standard (OpenAI, Google, GitHub) uses inline errors.
 
-Change `redirectTo` from `/home` to `/`:
+**What changes:**
+- Add `formError` state variable
+- Add a `getFriendlyAuthError()` helper to map Supabase errors to user-friendly messages
+- Replace `toast.error()` in the credential error catch block with `setFormError()`
+- Render error text below the password field in red (`text-destructive`)
+- Add red border (`border-destructive`) to the password input when there's an error
+- Clear error when user modifies email or password (via `useEffect`)
+- Add client-side validation: check email format and non-empty password before calling the gateway
+- Keep toasts only for rate limiting and success messages
 
-```
-// Before
-redirectTo: `${window.location.origin}/home`
+**Error mapping:**
 
-// After
-redirectTo: `${window.location.origin}/`
-```
+| Raw Supabase Error | Inline Message |
+|---|---|
+| `Invalid login credentials` | Incorrect email or password. Please try again. |
+| `Email not confirmed` | Please verify your email before signing in. Check your inbox. |
+| `User not found` | Incorrect email or password. Please try again. |
+| Default fallback | Something went wrong. Please try again. |
 
-This prevents the race condition where `ProtectedRoute` on `/home` rejects the user before Supabase finishes processing OAuth tokens from the URL.
+**Visual behavior (matching OpenAI style):**
+- Red error text appears below the password field, above the "Forgot password?" link
+- Password input border turns red
+- Error disappears when user starts typing in either field
 
-### 2. Add identity linking toast notification
+### 2. SignUpForm.tsx -- Handle "already registered" + name validation
 
-**File:** `src/contexts/AuthContext.tsx`
+**What changes:**
+- In the catch block, detect "User already registered" error and show a specific inline message suggesting the user sign in instead
+- Add name validation before submit: trim whitespace, reject empty names, max 50 characters
+- Keep toasts for rate limiting and system-level errors only
 
-In the `onAuthStateChange` listener, when the event is `USER_UPDATED` (which fires during identity linking), show a toast:
+### 3. UserInfoFields.tsx -- Add maxLength to name inputs
 
-> "Your Google account has been linked to your existing account."
+**What changes:**
+- Add `maxLength={50}` to first name and last name `Input` components
+- No other visual changes
 
-This only fires once during the linking event, not on regular logins. It builds user trust and prevents confusion about what just happened.
+### 4. CredentialFields.tsx -- Add maxLength to email input
+
+**What changes:**
+- Add `maxLength={255}` to the email `Input` component
+- No other visual changes
 
 ---
 
-## Summary
+## Files Modified
 
 | File | Change |
-|------|--------|
-| `GoogleSignInButton.tsx` | `redirectTo` -> `/` |
-| `AuthContext.tsx` | Toast on `USER_UPDATED` auth event |
+|---|---|
+| `SignInForm.tsx` | Inline error state, error mapping helper, red border on error, client-side validation, remove toast for credential errors |
+| `SignUpForm.tsx` | Handle "already registered" error specifically, add name validation |
+| `UserInfoFields.tsx` | Add `maxLength={50}` to name inputs |
+| `CredentialFields.tsx` | Add `maxLength={255}` to email input |
 
-Two files. Two minimal edits. No structural changes.
+Four files. Targeted edits only. No layout, structure, or other component changes.
+
+---
+
+## What does NOT change
+
+- GoogleSignInButton (already has loading state)
+- Toasts for: rate limiting, account linked notification, password reset, system errors
+- Form layout, card styling, structure
+- All other pages and components
+
