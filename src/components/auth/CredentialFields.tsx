@@ -44,6 +44,7 @@ const CredentialFields = ({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            maxLength={255}
             className="pl-10"
           />
         </div>

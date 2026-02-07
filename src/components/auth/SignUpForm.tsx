@@ -87,9 +87,23 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       return;
     }
     
+    // Name validation
+    const trimmedFirst = firstName.trim();
+    const trimmedLast = lastName.trim();
+    if (!trimmedFirst || !trimmedLast) {
+      toast.error('First name and last name are required.');
+      setIsLoading(false);
+      return;
+    }
+    if (trimmedFirst.length > 50 || trimmedLast.length > 50) {
+      toast.error('Names must be 50 characters or less.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
-      const formattedFirstName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
-      const formattedLastName = lastName.charAt(0).toUpperCase() + lastName.slice(1);
+      const formattedFirstName = trimmedFirst.charAt(0).toUpperCase() + trimmedFirst.slice(1);
+      const formattedLastName = trimmedLast.charAt(0).toUpperCase() + trimmedLast.slice(1);
       
       const result = await signUpViaGateway(
         {
@@ -119,7 +133,12 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       // Show verification pending screen instead of navigating away
       setShowVerificationPending(true);
     } catch (error: any) {
-      toast.error(error.message || 'Error signing up');
+      const msg = error.message || 'Error signing up';
+      if (msg.toLowerCase().includes('user already registered')) {
+        toast.error('An account with this email already exists. Try signing in instead.');
+      } else {
+        toast.error(msg);
+      }
       console.error(error);
     } finally {
       setIsLoading(false);
