@@ -3,6 +3,7 @@ import React from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType } from '@/types/auth';
+import { toast } from '@/hooks/use-toast';
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
@@ -77,6 +78,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
               }
               
+              // Handle identity linking notification
+              if (event === 'USER_UPDATED' && currentSession) {
+                toast({
+                  title: 'Account linked',
+                  description: 'Your Google account has been linked to your existing account.',
+                });
+              }
+
               // Handle token refresh - revalidate user exists
               if (event === 'TOKEN_REFRESHED' && currentSession) {
                 console.log('Token refreshed, revalidating user with server...');
