@@ -24,6 +24,7 @@ const UserInfoFields = ({ firstName, setFirstName, lastName, setLastName }: User
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
             required
+            maxLength={50}
             className="pl-10"
           />
         </div>
@@ -38,6 +39,7 @@ const UserInfoFields = ({ firstName, setFirstName, lastName, setLastName }: User
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
             required
+            maxLength={50}
             className="pl-10"
           />
         </div>

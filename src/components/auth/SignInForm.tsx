@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,21 @@ import { supabase } from '@/integrations/supabase/client';
 import GoogleSignInButton from './GoogleSignInButton';
 import { Separator } from '@/components/ui/separator';
 
+const getFriendlyAuthError = (message: string): string => {
+  const lower = message.toLowerCase();
+  if (lower.includes('invalid login credentials') || lower.includes('user not found')) {
+    return 'Incorrect email or password. Please try again.';
+  }
+  if (lower.includes('email not confirmed')) {
+    return 'Please verify your email before signing in. Check your inbox.';
+  }
+  return 'Something went wrong. Please try again.';
+};
+
+const isValidEmail = (email: string): boolean => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
 const SignInForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,10 +36,31 @@ const SignInForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
+  const [formError, setFormError] = useState('');
   const navigate = useNavigate();
+
+  // Clear inline error when user types
+  useEffect(() => {
+    if (formError) setFormError('');
+  }, [email, password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError('');
+    
+    // Client-side validation
+    if (!email.trim()) {
+      setFormError('Please enter your email address.');
+      return;
+    }
+    if (!isValidEmail(email.trim())) {
+      setFormError('Please enter a valid email address.');
+      return;
+    }
+    if (!password) {
+      setFormError('Please enter your password.');
+      return;
+    }
     
     if (retryCountdown && retryCountdown > 0) {
       toast.error(`Please wait ${retryCountdown} seconds before trying again`);
@@ -34,10 +70,9 @@ const SignInForm = () => {
     setIsLoading(true);
     
     try {
-      const result = await loginViaGateway({ email, password });
+      const result = await loginViaGateway({ email: email.trim(), password });
       
       if (result.error) {
-        // Handle rate limiting
         if (result.code === 'RATE_LIMITED' && result.retryAfter) {
           toast.error(formatRateLimitError(result.retryAfter));
           startRetryCountdown(result.retryAfter);
@@ -46,7 +81,6 @@ const SignInForm = () => {
         throw new Error(result.error);
       }
 
-      // Set the session from the gateway response
       if (result.data?.session) {
         const { error: sessionError } = await supabase.auth.setSession({
           access_token: result.data.session.access_token,
@@ -59,7 +93,7 @@ const SignInForm = () => {
       toast.success('Successfully signed in!');
       navigate('/home');
     } catch (error: any) {
-      toast.error(error.message || 'Error signing in');
+      setFormError(getFriendlyAuthError(error.message || 'Error signing in'));
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -120,7 +154,7 @@ const SignInForm = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="pl-10 pr-10"
+                className={`pl-10 pr-10 ${formError ? 'border-destructive' : ''}`}
                 disabled={retryCountdown !== null}
               />
               <button
@@ -135,6 +169,9 @@ const SignInForm = () => {
                 )}
               </button>
             </div>
+            {formError && (
+              <p className="text-sm text-destructive">{formError}</p>
+            )}
             <button
               type="button"
               onClick={() => setShowForgotPassword(true)}
