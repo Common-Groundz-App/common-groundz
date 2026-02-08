@@ -4,6 +4,7 @@ interface TurnstileWidgetProps {
   onVerify: (token: string) => void;
   onError?: () => void;
   onExpire?: () => void;
+  theme?: 'light' | 'dark';
 }
 
 declare global {
@@ -24,12 +25,14 @@ interface TurnstileOptions {
   'expired-callback'?: () => void;
   theme?: 'light' | 'dark' | 'auto';
   size?: 'normal' | 'compact' | 'flexible';
+  appearance?: 'always' | 'execute' | 'interaction-only';
 }
 
 const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   onVerify,
   onError,
   onExpire,
+  theme = 'light',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -52,8 +55,9 @@ const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
         callback: onVerify,
         'error-callback': onError,
         'expired-callback': onExpire,
-        theme: 'auto',
+        theme: theme,
         size: 'flexible',
+        appearance: 'interaction-only',
       });
       console.log('Turnstile widget initialized');
     } catch (error) {

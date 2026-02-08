@@ -13,12 +13,14 @@ import TurnstileWidget from './TurnstileWidget';
 import { signUpViaGateway, formatRateLimitError } from '@/lib/authGateway';
 import GoogleSignInButton from './GoogleSignInButton';
 import { Separator } from '@/components/ui/separator';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface SignUpFormProps {
   onSwitchToSignIn?: () => void;
 }
 
 const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
+  const { resolvedTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -204,6 +206,7 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
             onVerify={handleTurnstileVerify}
             onError={handleTurnstileError}
             onExpire={handleTurnstileExpire}
+            theme={resolvedTheme}
           />
         </CardContent>
         <CardFooter>
