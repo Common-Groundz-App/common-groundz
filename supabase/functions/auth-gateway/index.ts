@@ -232,6 +232,21 @@ serve(async (req) => {
           password,
           options,
         });
+
+        // Detect existing user: Supabase returns fake success with empty identities
+        if (!result.error && result.data?.user?.identities?.length === 0) {
+          console.log(`Signup detected existing user for action: ${action}`);
+          return new Response(
+            JSON.stringify({
+              error: "User already registered",
+              code: "USER_EXISTS",
+            }),
+            {
+              status: 409,
+              headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+            }
+          );
+        }
         break;
       }
 

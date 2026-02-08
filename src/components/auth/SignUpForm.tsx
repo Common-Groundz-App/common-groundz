@@ -122,9 +122,12 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       );
       
       if (result.error) {
-        // Handle rate limiting
         if (result.code === 'RATE_LIMITED') {
           toast.error(formatRateLimitError(result.retryAfter));
+          return;
+        }
+        if (result.code === 'USER_EXISTS') {
+          toast.error('An account with this email already exists. Try signing in instead.');
           return;
         }
         throw new Error(result.error);
