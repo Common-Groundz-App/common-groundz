@@ -1,81 +1,72 @@
 
 
-# Auth Flow Polish: Inline Errors + Validation (Final Plan)
+# Fix: Sign Up with Existing Email (Final Plan)
 
-## Clarification: Google Sign-In Button
+## Problem
 
-The `GoogleSignInButton` already has a loading/disabled state in the existing codebase (lines 11, 40, 42-43). It shows a spinner and disables the button on click. No change needed here.
+When a user signs up with an email that already exists, Supabase returns a fake success (with `identities: []` and no error). The app then shows a misleading "Check Your Email" verification screen, even though no email was sent.
 
----
+## Root Cause
 
-## Changes
+Supabase intentionally does this to prevent email enumeration at the protocol level. But for a consumer/social app, this creates a broken UX. GitHub, Google, OpenAI, and Slack all explicitly tell the user the account exists.
 
-### 1. SignInForm.tsx -- Replace toast errors with inline errors
+## Fix
 
-**Problem:** When incorrect credentials are entered, `toast.error()` fires but may not be visible. Even if it were, toasts are the wrong UX for credential errors. Industry standard (OpenAI, Google, GitHub) uses inline errors.
+Two files. Two small, targeted changes.
 
-**What changes:**
-- Add `formError` state variable
-- Add a `getFriendlyAuthError()` helper to map Supabase errors to user-friendly messages
-- Replace `toast.error()` in the credential error catch block with `setFormError()`
-- Render error text below the password field in red (`text-destructive`)
-- Add red border (`border-destructive`) to the password input when there's an error
-- Clear error when user modifies email or password (via `useEffect`)
-- Add client-side validation: check email format and non-empty password before calling the gateway
-- Keep toasts only for rate limiting and success messages
+### 1. Auth Gateway (`supabase/functions/auth-gateway/index.ts`)
 
-**Error mapping:**
+After the `signUp` call succeeds (line 234), add a check before returning the success response:
 
-| Raw Supabase Error | Inline Message |
-|---|---|
-| `Invalid login credentials` | Incorrect email or password. Please try again. |
-| `Email not confirmed` | Please verify your email before signing in. Check your inbox. |
-| `User not found` | Incorrect email or password. Please try again. |
-| Default fallback | Something went wrong. Please try again. |
+- If `result.data?.user?.identities?.length === 0`, the email already exists
+- Return a `409 Conflict` response with:
+  - `error: "User already registered"`
+  - `code: "USER_EXISTS"` (stable error code for frontend matching)
 
-**Visual behavior (matching OpenAI style):**
-- Red error text appears below the password field, above the "Forgot password?" link
-- Password input border turns red
-- Error disappears when user starts typing in either field
+This goes right after the signup `break` statement (line 235), before the generic `result.error` check at line 275. Specifically, insert it between lines 235-236 as an early return within the signup case.
 
-### 2. SignUpForm.tsx -- Handle "already registered" + name validation
+### 2. SignUpForm.tsx (`src/components/auth/SignUpForm.tsx`)
 
-**What changes:**
-- In the catch block, detect "User already registered" error and show a specific inline message suggesting the user sign in instead
-- Add name validation before submit: trim whitespace, reject empty names, max 50 characters
-- Keep toasts for rate limiting and system-level errors only
+Update the error handling block (lines 124-145) to:
 
-### 3. UserInfoFields.tsx -- Add maxLength to name inputs
+- Check `result.code === 'USER_EXISTS'` in the `if (result.error)` block (not in the catch)
+- Show toast: "An account with this email already exists. Try signing in instead."
+- Keep the string-match fallback in the catch block for safety, but the primary detection uses the stable code
+- No layout or structural changes
 
-**What changes:**
-- Add `maxLength={50}` to first name and last name `Input` components
-- No other visual changes
+### Why stable error codes matter
 
-### 4. CredentialFields.tsx -- Add maxLength to email input
+Current code uses brittle string matching:
+```text
+msg.toLowerCase().includes('user already registered')
+```
 
-**What changes:**
-- Add `maxLength={255}` to the email `Input` component
-- No other visual changes
+Updated approach uses the stable code as primary check:
+```text
+result.code === 'USER_EXISTS'
+```
 
----
+This is safer, easier to maintain, and won't break if Supabase changes their error wording.
+
+## Security Note
+
+This does not meaningfully increase enumeration risk because:
+- Rate limiting (3 signup attempts per 5 minutes) is already enforced on the gateway
+- The same message pattern is used by GitHub, Google, OpenAI, and Slack
+- Attackers gain no new signal beyond what rate-limited attempts already reveal
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `SignInForm.tsx` | Inline error state, error mapping helper, red border on error, client-side validation, remove toast for credential errors |
-| `SignUpForm.tsx` | Handle "already registered" error specifically, add name validation |
-| `UserInfoFields.tsx` | Add `maxLength={50}` to name inputs |
-| `CredentialFields.tsx` | Add `maxLength={255}` to email input |
-
-Four files. Targeted edits only. No layout, structure, or other component changes.
-
----
+| `supabase/functions/auth-gateway/index.ts` | Add empty `identities` check after signup, return 409 with `USER_EXISTS` code |
+| `src/components/auth/SignUpForm.tsx` | Check `result.code === 'USER_EXISTS'` in error block instead of string matching |
 
 ## What does NOT change
 
-- GoogleSignInButton (already has loading state)
-- Toasts for: rate limiting, account linked notification, password reset, system errors
-- Form layout, card styling, structure
+- Sign-in form (inline errors already implemented)
+- Google Sign-In button
+- Email verification flow for genuinely new users
+- Rate limiting behavior
 - All other pages and components
 
