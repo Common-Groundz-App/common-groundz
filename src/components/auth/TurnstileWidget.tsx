@@ -23,7 +23,7 @@ interface TurnstileOptions {
   'error-callback'?: () => void;
   'expired-callback'?: () => void;
   theme?: 'light' | 'dark' | 'auto';
-  size?: 'normal' | 'compact' | 'invisible';
+  size?: 'normal' | 'compact' | 'flexible';
 }
 
 const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
@@ -53,7 +53,7 @@ const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
         'error-callback': onError,
         'expired-callback': onExpire,
         theme: 'auto',
-        size: 'invisible',
+        size: 'flexible',
       });
       console.log('Turnstile widget initialized');
     } catch (error) {
