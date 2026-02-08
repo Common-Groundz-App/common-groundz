@@ -1,58 +1,67 @@
 
 
-# Fix Turnstile Layout Flicker: Portal + Delayed Init
+# Signup Form Polish: Inline Errors + Stronger Password Enforcement
 
-## Problem
+## Changes
 
-Turnstile injects an iframe immediately on mount. Even with `interaction-only` mode, the iframe participates in layout, causing visible reflow (form jumps up/down during the first second of page load). CSS-based fixes cannot solve this because the iframe is always present as a child element.
+### 1. Real-time "passwords don't match" inline error
 
-## Solution
+Show an inline error below the Confirm Password field as the user types (after they've started typing in it), clearing it when they match.
 
-Two changes working together:
+**File: `src/components/auth/CredentialFields.tsx`**
+- Add an `onBlur` or live-check that compares `password` and `confirmPassword`
+- Display a red inline error message ("Passwords do not match") below the confirm field when they differ and the confirm field is non-empty
+- Clear the error when they match
 
-### 1. React Portal (eliminates CLS)
+### 2. Raise minimum password strength to "Strong" (score 3)
 
-Render Turnstile into a fixed, zero-size container outside the form's document flow using `createPortal()`. This is the core fix.
+Currently `MIN_PASSWORD_SCORE = 2` (Fair), which allows passwords like "password1" through. Raising to 3 means users need at least 3 of: length >= 8, length >= 12, mixed case, number, special character.
 
-### 2. Delayed Initialization (eliminates render-time jank)
+**File: `src/config/authConfig.ts`**
+- Change `MIN_PASSWORD_SCORE: 2` to `MIN_PASSWORD_SCORE: 3`
 
-Wrap the Turnstile `render()` call in `requestIdleCallback` (with `setTimeout` fallback) so it initializes after first paint, not during critical rendering. This prevents script execution from blocking the initial frame.
+### 3. No change to button disabled behavior
+
+The button stays always active (current behavior). Validation happens on submit with clear inline/toast feedback. This matches industry standards.
+
+## Technical Details
+
+### CredentialFields.tsx changes
+
+Add local state to track whether the confirm field has been interacted with:
+
+```
+const [confirmTouched, setConfirmTouched] = useState(false);
+```
+
+On the confirm password input, add `onBlur={() => setConfirmTouched(true)}`.
+
+Show inline mismatch error when:
+- `confirmTouched` is true
+- `confirmPassword` is non-empty
+- `password !== confirmPassword`
+
+The existing `passwordError` prop (used for submit-time errors) continues to work alongside this new real-time check.
+
+### authConfig.ts change
+
+```
+MIN_PASSWORD_SCORE: 3  // was 2 — now requires "Strong" password
+```
+
+This means the password strength indicator will show feedback tips until the user reaches "Strong" (score 3), which naturally requires a combination of length + character variety without rigid mandates.
 
 ## Files Modified
 
-### `index.html`
-
-Add a portal target div inside `<body>`, before `<div id="root">`:
-
-```html
-<div id="turnstile-root" style="position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;pointer-events:none;"></div>
-```
-
-Inline styles because Tailwind classes are not available in `index.html`.
-
-### `src/components/auth/TurnstileWidget.tsx`
-
-- Import `createPortal` from `react-dom`
-- Use `createPortal` to render the container div into `#turnstile-root` instead of inline
-- Fallback: if `#turnstile-root` is missing, render in-place with `[&:empty]:hidden` (safe degradation)
-- Replace the existing `setTimeout(initWidget, 100)` with `requestIdleCallback(initWidget)` (falling back to `setTimeout(initWidget, 150)` for browsers that don't support it)
-
-### `src/components/auth/SignUpForm.tsx`
-
-No changes needed. The widget stays in the same JSX position; the portal handles relocation internally.
-
-## Summary
-
 | File | Change |
 |---|---|
-| `index.html` | Add zero-size `#turnstile-root` portal target |
-| `src/components/auth/TurnstileWidget.tsx` | Portal rendering + `requestIdleCallback` delayed init |
+| `src/components/auth/CredentialFields.tsx` | Add real-time inline "passwords don't match" error |
+| `src/config/authConfig.ts` | Raise `MIN_PASSWORD_SCORE` from 2 to 3 |
 
-## What this achieves
+## What stays the same
 
-- Zero layout shift on page load
-- No visible flicker or form jumping
-- Bot protection remains fully functional
-- Page feels stable from the first frame
-- Works on slow devices too (delayed init prevents render blocking)
+- "Create Account" button remains always active (no greying out)
+- No mandatory "must have uppercase" or "must have special character" rules
+- Password strength indicator continues to show helpful tips
+- Submit-time validation still catches everything as a safety net
 
