@@ -142,6 +142,8 @@ const ProfileEditForm = ({
   const onSubmit = async (data: FormValues) => {
     // Ensure username is lowercase
     data.username = data.username.toLowerCase();
+    data.firstName = data.firstName.trim();
+    data.lastName = data.lastName.trim();
     
     // Only check username error if not locked
     if (!isUsernameLocked && usernameError) {
@@ -239,9 +241,10 @@ const ProfileEditForm = ({
               <FormField
                 control={form.control}
                 name="firstName"
+                rules={{ required: 'First name is required', validate: v => v.trim().length > 0 || 'First name is required' }}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name</FormLabel>
+                    <FormLabel>First Name <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <Input placeholder="First Name" {...field} />
                     </FormControl>
@@ -252,9 +255,10 @@ const ProfileEditForm = ({
               <FormField
                 control={form.control}
                 name="lastName"
+                rules={{ required: 'Last name is required', validate: v => v.trim().length > 0 || 'Last name is required' }}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name</FormLabel>
+                    <FormLabel>Last Name <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <Input placeholder="Last Name" {...field} />
                     </FormControl>
@@ -267,9 +271,13 @@ const ProfileEditForm = ({
             <FormField
               control={form.control}
               name="username"
+              rules={{ 
+                required: !isUsernameLocked && 'Username is required', 
+                validate: v => isUsernameLocked || v.trim().length >= 3 || 'Username must be at least 3 characters' 
+              }}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Username</FormLabel>
+                  <FormLabel>Username <span className="text-destructive">*</span></FormLabel>
                   <FormControl>
                     {isUsernameLocked ? (
                       // LOCKED STATE
