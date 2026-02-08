@@ -126,7 +126,7 @@ const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
     }
   }, [initWidget]);
 
-  return <div ref={containerRef} className="turnstile-container" />;
+  return <div ref={containerRef} className="turnstile-container [&:empty]:hidden" />;
 };
 
 export default TurnstileWidget;
