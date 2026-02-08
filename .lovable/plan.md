@@ -1,72 +1,35 @@
 
 
-# Fix: Sign Up with Existing Email (Final Plan)
+# Fix: Sonner Toasts Not Rendering
 
 ## Problem
 
-When a user signs up with an email that already exists, Supabase returns a fake success (with `identities: []` and no error). The app then shows a misleading "Check Your Email" verification screen, even though no email was sent.
+The gateway fix is working correctly — it returns 409 with `USER_EXISTS` code, and the frontend code handles it properly by calling `toast.error(...)`. However, **the toast never appears** because the Sonner `Toaster` component is not mounted in the app.
 
-## Root Cause
+**Root cause:** `App.tsx` imports `Toaster` from `@/components/ui/toaster` (radix/shadcn toaster), but all auth components (and many others across the app) use `toast()` from the `sonner` library. The Sonner renderer (`@/components/ui/sonner.tsx`) exists but is never mounted anywhere.
 
-Supabase intentionally does this to prevent email enumeration at the protocol level. But for a consumer/social app, this creates a broken UX. GitHub, Google, OpenAI, and Slack all explicitly tell the user the account exists.
+This means every `toast()` call from sonner across the entire app has been silently failing.
 
 ## Fix
 
-Two files. Two small, targeted changes.
+### `src/App.tsx` — Add the Sonner Toaster
 
-### 1. Auth Gateway (`supabase/functions/auth-gateway/index.ts`)
+Add the Sonner Toaster alongside the existing radix Toaster:
 
-After the `signUp` call succeeds (line 234), add a check before returning the success response:
+- Import `Toaster as SonnerToaster` from `@/components/ui/sonner`
+- Add `<SonnerToaster />` next to the existing `<Toaster />` on line 225
 
-- If `result.data?.user?.identities?.length === 0`, the email already exists
-- Return a `409 Conflict` response with:
-  - `error: "User already registered"`
-  - `code: "USER_EXISTS"` (stable error code for frontend matching)
-
-This goes right after the signup `break` statement (line 235), before the generic `result.error` check at line 275. Specifically, insert it between lines 235-236 as an early return within the signup case.
-
-### 2. SignUpForm.tsx (`src/components/auth/SignUpForm.tsx`)
-
-Update the error handling block (lines 124-145) to:
-
-- Check `result.code === 'USER_EXISTS'` in the `if (result.error)` block (not in the catch)
-- Show toast: "An account with this email already exists. Try signing in instead."
-- Keep the string-match fallback in the catch block for safety, but the primary detection uses the stable code
-- No layout or structural changes
-
-### Why stable error codes matter
-
-Current code uses brittle string matching:
-```text
-msg.toLowerCase().includes('user already registered')
-```
-
-Updated approach uses the stable code as primary check:
-```text
-result.code === 'USER_EXISTS'
-```
-
-This is safer, easier to maintain, and won't break if Supabase changes their error wording.
-
-## Security Note
-
-This does not meaningfully increase enumeration risk because:
-- Rate limiting (3 signup attempts per 5 minutes) is already enforced on the gateway
-- The same message pattern is used by GitHub, Google, OpenAI, and Slack
-- Attackers gain no new signal beyond what rate-limited attempts already reveal
+This is a one-line import and one-line JSX addition. No other changes needed.
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `supabase/functions/auth-gateway/index.ts` | Add empty `identities` check after signup, return 409 with `USER_EXISTS` code |
-| `src/components/auth/SignUpForm.tsx` | Check `result.code === 'USER_EXISTS'` in error block instead of string matching |
+| `src/App.tsx` | Import and mount the Sonner Toaster component |
 
-## What does NOT change
+One file. Two lines added. Everything else stays exactly the same.
 
-- Sign-in form (inline errors already implemented)
-- Google Sign-In button
-- Email verification flow for genuinely new users
-- Rate limiting behavior
-- All other pages and components
+## Why this fixes the issue
+
+The auth gateway correctly returns 409 with `USER_EXISTS`. The SignUpForm correctly checks `result.code === 'USER_EXISTS'` and calls `toast.error(...)`. The only missing piece is the Sonner renderer to actually display the toast in the DOM.
 
