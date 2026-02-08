@@ -1,48 +1,40 @@
 
 
-# Hide Close Button + Update Header in Onboarding Mode
+# Add Required Field Indicators and Inline Validation to Profile Form
 
 ## Changes
 
-### 1. `src/components/ui/dialog.tsx` -- Add `hideCloseButton` prop to `DialogContent`
+### `src/components/profile/ProfileEditForm.tsx`
 
-Add an optional `hideCloseButton` boolean prop. When true, the `DialogPrimitive.Close` button (the X icon) is not rendered. This keeps the component reusable -- all existing dialogs are unaffected.
+**1. Red asterisks on required field labels**
 
-### 2. `src/components/profile/ProfileEditForm.tsx` -- Two small changes (onboarding only)
+Add `<span className="text-red-500">*</span>` after the label text for First Name, Last Name, and Username.
 
-- Pass `hideCloseButton` to `DialogContent` when `isOnboarding` is true
-- Change the `DialogTitle` text from `"Complete Your Profile"` to `"Almost there — complete your profile"` when in onboarding mode
+**2. react-hook-form validation rules on required FormFields**
 
-No other files or components are affected.
+Add `rules` prop to three FormField components:
 
-## Technical Details
+- `firstName`: `{ required: 'First name is required', validate: v => v.trim().length > 0 || 'First name is required' }`
+- `lastName`: `{ required: 'Last name is required', validate: v => v.trim().length > 0 || 'Last name is required' }`
+- `username`: `{ required: !isUsernameLocked && 'Username is required', validate: v => isUsernameLocked || v.trim().length >= 3 || 'Username must be at least 3 characters' }` -- conditional so it does not conflict with the locked/cooldown state in edit mode
 
-### dialog.tsx
+Errors display automatically via the existing `<FormMessage />` components already in each FormItem.
 
-```text
-// Add hideCloseButton to the props interface
-interface DialogContentProps extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
-  hideCloseButton?: boolean;
-}
+**3. Trim whitespace on submit**
 
-// Conditionally render the close button
-{!hideCloseButton && (
-  <DialogPrimitive.Close className="absolute right-4 top-4 ...">
-    <X className="h-4 w-4" />
-    <span className="sr-only">Close</span>
-  </DialogPrimitive.Close>
-)}
+In the `onSubmit` handler, add:
+```
+data.firstName = data.firstName.trim();
+data.lastName = data.lastName.trim();
 ```
 
-### ProfileEditForm.tsx
+**4. No other files changed**
 
-Line 232: Add `hideCloseButton={isOnboarding}`
-Line 234: Change title to `isOnboarding ? 'Almost there — complete your profile' : 'Edit Profile'`
+Location and Bio remain optional. Button stays always active. Toast remains for system/network errors only.
 
-## Files Modified
+## Summary
 
 | File | Change |
 |---|---|
-| `src/components/ui/dialog.tsx` | Add optional `hideCloseButton` prop to `DialogContent` |
-| `src/components/profile/ProfileEditForm.tsx` | Pass `hideCloseButton` in onboarding mode; update onboarding title text |
+| `src/components/profile/ProfileEditForm.tsx` | Add red asterisks to 3 labels, add `rules` to 3 FormFields (username conditional on lock state), trim names on submit |
 
