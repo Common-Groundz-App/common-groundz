@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 interface TurnstileWidgetProps {
   onVerify: (token: string) => void;
@@ -27,6 +28,14 @@ interface TurnstileOptions {
   size?: 'normal' | 'compact' | 'flexible';
   appearance?: 'always' | 'execute' | 'interaction-only';
 }
+
+const scheduleIdle = (cb: () => void) => {
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(cb);
+  } else {
+    setTimeout(cb, 150);
+  }
+};
 
 const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   onVerify,
@@ -68,18 +77,17 @@ const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   useEffect(() => {
     // Check if script is already loaded
     if (window.turnstile) {
-      initWidget();
+      scheduleIdle(initWidget);
       return;
     }
 
     // Check if script is already in DOM
     const existingScript = document.querySelector('script[src*="turnstile"]');
     if (existingScript && !scriptLoadedRef.current) {
-      // Script exists but not loaded yet, wait for it
       const checkInterval = setInterval(() => {
         if (window.turnstile) {
           clearInterval(checkInterval);
-          initWidget();
+          scheduleIdle(initWidget);
         }
       }, 100);
 
@@ -87,7 +95,6 @@ const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
     }
 
     if (!existingScript) {
-      // Load Turnstile script
       scriptLoadedRef.current = true;
       const script = document.createElement('script');
       script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
@@ -95,8 +102,7 @@ const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
       script.defer = true;
 
       script.onload = () => {
-        // Wait a bit for turnstile to initialize
-        setTimeout(initWidget, 100);
+        scheduleIdle(initWidget);
       };
 
       script.onerror = () => {
@@ -122,9 +128,17 @@ const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   // Re-initialize if callbacks change
   useEffect(() => {
     if (window.turnstile && containerRef.current && !widgetIdRef.current) {
-      initWidget();
+      scheduleIdle(initWidget);
     }
   }, [initWidget]);
+
+  const container = <div ref={containerRef} className="turnstile-container" />;
+
+  // Portal into #turnstile-root if available, otherwise render in-place with hidden fallback
+  const portalTarget = document.getElementById('turnstile-root');
+  if (portalTarget) {
+    return createPortal(container, portalTarget);
+  }
 
   return <div ref={containerRef} className="turnstile-container [&:empty]:hidden" />;
 };
