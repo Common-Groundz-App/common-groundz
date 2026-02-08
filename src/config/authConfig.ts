@@ -7,7 +7,7 @@
 
 export const AUTH_CONFIG = {
   /** Minimum password strength score (0-4) required for signup/reset */
-  MIN_PASSWORD_SCORE: 2,
+  MIN_PASSWORD_SCORE: 3,
   
   /** Minimum password length */
   MIN_PASSWORD_LENGTH: 8,
