@@ -30,6 +30,9 @@ const CredentialFields = ({
 }: CredentialFieldsProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [confirmTouched, setConfirmTouched] = useState(false);
+
+  const showMismatchError = showConfirmField && confirmTouched && !!confirmPassword && password !== confirmPassword;
 
   return (
     <>
@@ -87,6 +90,7 @@ const CredentialFields = ({
               type={showConfirmPassword ? 'text' : 'password'}
               value={confirmPassword || ''}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              onBlur={() => setConfirmTouched(true)}
               required
               className="pl-10 pr-10"
             />
@@ -102,6 +106,9 @@ const CredentialFields = ({
               )}
             </button>
           </div>
+          {showMismatchError && (
+            <p className="text-sm text-destructive">Passwords do not match</p>
+          )}
         </div>
       )}
 
