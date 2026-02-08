@@ -1,40 +1,29 @@
 
 
-# Minimize Turnstile Widget Visibility and Add Theme Support
+# Fix: Remove Extra Gap from Hidden Turnstile Widget
 
-## Context
+## Problem
 
-The visible "Success!" checkbox you see is the **Managed mode** widget from Cloudflare. Making Turnstile truly invisible (no widget at all) requires changing the **widget type in the Cloudflare dashboard** from "Managed" to "Invisible" -- it is NOT a code-side setting. However, per project history, invisible mode caused 401 crashes and initialization failures, so it was explicitly avoided.
+The `<div ref={containerRef} className="turnstile-container" />` in `TurnstileWidget.tsx` takes up space in the `space-y-4` layout of `CardContent` even when the widget is invisible (interaction-only mode). This creates a visible gap between the Username field and the Create Account button.
 
-**What we CAN do in code:**
+## Fix
 
-1. Use `appearance: 'interaction-only'` -- the widget only shows if Cloudflare needs to present an interactive challenge. For most users, nothing will be visible at all.
-2. Pass the app's current theme (`light` or `dark`) instead of `'auto'` so when the widget does appear, it matches the app theme.
+### `src/components/auth/TurnstileWidget.tsx`
 
-## Changes
+Change the container div to have no height/margin when empty:
 
-### 1. `src/components/auth/TurnstileWidget.tsx`
+```
+Before:  <div ref={containerRef} className="turnstile-container" />
+After:   <div ref={containerRef} className="turnstile-container [&:empty]:hidden" />
+```
 
-- Add `appearance: 'interaction-only'` to the render options. This hides the widget unless Cloudflare requires user interaction (rare). Most visitors will never see it.
-- Add `appearance` to the `TurnstileOptions` type interface.
-- Accept an optional `theme` prop so the parent can pass the resolved theme.
-- Update the type to include the `appearance` option.
-
-### 2. `src/components/auth/SignUpForm.tsx`
-
-- Import `useTheme` from `@/contexts/ThemeContext`.
-- Pass `theme={resolvedTheme}` to the `TurnstileWidget` component so it matches the app's current light/dark mode.
-
-## What this achieves
-
-- **For most users**: The widget will be completely invisible -- verification happens silently in the background, just like the sites you've seen.
-- **For flagged users**: If Cloudflare needs interaction, the challenge widget appears styled to match the current theme (light or dark).
-- **No dashboard changes needed**: This is purely a code-side improvement.
+The Tailwind `[&:empty]:hidden` utility hides the div entirely when it has no child elements (i.e., when the Turnstile widget is not rendered). When Cloudflare injects a challenge, the div gains children and automatically becomes visible.
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `src/components/auth/TurnstileWidget.tsx` | Add `appearance: 'interaction-only'` option, accept `theme` prop |
-| `src/components/auth/SignUpForm.tsx` | Pass `resolvedTheme` from `useTheme()` to TurnstileWidget |
+| `src/components/auth/TurnstileWidget.tsx` | Add `[&:empty]:hidden` class to container div |
+
+One file. One class added. No other changes.
 
