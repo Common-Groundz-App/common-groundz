@@ -200,20 +200,21 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
             isCheckingUsername={isCheckingUsername}
             setIsCheckingUsername={setIsCheckingUsername}
           />
-
-          {/* Invisible Turnstile CAPTCHA */}
-          <TurnstileWidget
-            onVerify={handleTurnstileVerify}
-            onError={handleTurnstileError}
-            onExpire={handleTurnstileExpire}
-            theme={resolvedTheme}
-          />
         </CardContent>
+
+        {/* Invisible Turnstile CAPTCHA - outside space-y-4 to avoid layout gap */}
+        <TurnstileWidget
+          onVerify={handleTurnstileVerify}
+          onError={handleTurnstileError}
+          onExpire={handleTurnstileExpire}
+          theme={resolvedTheme}
+        />
+
         <CardFooter>
           <Button 
             type="submit" 
             className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" 
-            disabled={isLoading || !!usernameError || isCheckingUsername || !turnstileToken}
+            disabled={isLoading || !!usernameError || isCheckingUsername}
           >
             {isLoading ? 'Creating Account...' : 'Create Account'}
           </Button>
