@@ -1,35 +1,48 @@
 
 
-# Fix: Sonner Toasts Not Rendering
+# Fix: Turnstile Widget Invalid Size Parameter
 
 ## Problem
 
-The gateway fix is working correctly — it returns 409 with `USER_EXISTS` code, and the frontend code handles it properly by calling `toast.error(...)`. However, **the toast never appears** because the Sonner `Toaster` component is not mounted in the app.
+The Turnstile widget uses `size: 'invisible'`, which is not a valid value in the current Cloudflare Turnstile API. Valid values are `'compact'`, `'flexible'`, or `'normal'`. This causes the widget to crash, which triggers the cascade of 401 errors from Cloudflare.
 
-**Root cause:** `App.tsx` imports `Toaster` from `@/components/ui/toaster` (radix/shadcn toaster), but all auth components (and many others across the app) use `toast()` from the `sonner` library. The Sonner renderer (`@/components/ui/sonner.tsx`) exists but is never mounted anywhere.
+## What about the other console errors?
 
-This means every `toast()` call from sonner across the entire app has been silently failing.
+- **CSP / script-src warnings**: These are browser-level Content Security Policy notices about Cloudflare's own scripts. Not controllable from app code.
+- **MetaMask**: The user has the MetaMask browser extension installed. This is MetaMask's own deprecation warning — not related to the app.
+- **AudioContext warnings**: Chrome's autoplay policy. Standard browser behavior, not a bug.
+- **401 errors on challenges.cloudflare.com**: These are a direct consequence of the Turnstile crash. Fixing the size parameter resolves these.
+
+**Only the Turnstile size parameter is an actual app bug. Everything else is external.**
 
 ## Fix
 
-### `src/App.tsx` — Add the Sonner Toaster
+### `src/components/auth/TurnstileWidget.tsx`
 
-Add the Sonner Toaster alongside the existing radix Toaster:
+One line change on line 56:
 
-- Import `Toaster as SonnerToaster` from `@/components/ui/sonner`
-- Add `<SonnerToaster />` next to the existing `<Toaster />` on line 225
+```
+Before:  size: 'invisible'
+After:   size: 'flexible'
+```
 
-This is a one-line import and one-line JSX addition. No other changes needed.
+`'flexible'` is the best replacement because:
+- It adapts to the container width automatically
+- It has the smallest visual footprint among valid options
+- It's the closest behavior to what "invisible" was intended to achieve
+
+Also update the `TurnstileOptions` type interface (line 29) to remove `'invisible'` from the size union type so this can't regress:
+
+```
+Before:  size?: 'normal' | 'compact' | 'invisible';
+After:   size?: 'normal' | 'compact' | 'flexible';
+```
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `src/App.tsx` | Import and mount the Sonner Toaster component |
+| `src/components/auth/TurnstileWidget.tsx` | Change `size: 'invisible'` to `size: 'flexible'` and update the type definition |
 
-One file. Two lines added. Everything else stays exactly the same.
-
-## Why this fixes the issue
-
-The auth gateway correctly returns 409 with `USER_EXISTS`. The SignUpForm correctly checks `result.code === 'USER_EXISTS'` and calls `toast.error(...)`. The only missing piece is the Sonner renderer to actually display the toast in the DOM.
+One file. Two lines. No other changes.
 
