@@ -229,9 +229,9 @@ const ProfileEditForm = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isOnboarding && onClose()}>
-      <DialogContent className="sm:max-w-[425px]" onPointerDownOutside={isOnboarding ? (e) => e.preventDefault() : undefined}>
+      <DialogContent className="sm:max-w-[425px]" onPointerDownOutside={isOnboarding ? (e) => e.preventDefault() : undefined} hideCloseButton={isOnboarding}>
         <DialogHeader>
-          <DialogTitle>{isOnboarding ? 'Complete Your Profile' : 'Edit Profile'}</DialogTitle>
+          <DialogTitle>{isOnboarding ? 'Almost there — complete your profile' : 'Edit Profile'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
