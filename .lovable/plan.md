@@ -1,48 +1,40 @@
 
 
-# Fix: Turnstile Widget Invalid Size Parameter
+# Minimize Turnstile Widget Visibility and Add Theme Support
 
-## Problem
+## Context
 
-The Turnstile widget uses `size: 'invisible'`, which is not a valid value in the current Cloudflare Turnstile API. Valid values are `'compact'`, `'flexible'`, or `'normal'`. This causes the widget to crash, which triggers the cascade of 401 errors from Cloudflare.
+The visible "Success!" checkbox you see is the **Managed mode** widget from Cloudflare. Making Turnstile truly invisible (no widget at all) requires changing the **widget type in the Cloudflare dashboard** from "Managed" to "Invisible" -- it is NOT a code-side setting. However, per project history, invisible mode caused 401 crashes and initialization failures, so it was explicitly avoided.
 
-## What about the other console errors?
+**What we CAN do in code:**
 
-- **CSP / script-src warnings**: These are browser-level Content Security Policy notices about Cloudflare's own scripts. Not controllable from app code.
-- **MetaMask**: The user has the MetaMask browser extension installed. This is MetaMask's own deprecation warning — not related to the app.
-- **AudioContext warnings**: Chrome's autoplay policy. Standard browser behavior, not a bug.
-- **401 errors on challenges.cloudflare.com**: These are a direct consequence of the Turnstile crash. Fixing the size parameter resolves these.
+1. Use `appearance: 'interaction-only'` -- the widget only shows if Cloudflare needs to present an interactive challenge. For most users, nothing will be visible at all.
+2. Pass the app's current theme (`light` or `dark`) instead of `'auto'` so when the widget does appear, it matches the app theme.
 
-**Only the Turnstile size parameter is an actual app bug. Everything else is external.**
+## Changes
 
-## Fix
+### 1. `src/components/auth/TurnstileWidget.tsx`
 
-### `src/components/auth/TurnstileWidget.tsx`
+- Add `appearance: 'interaction-only'` to the render options. This hides the widget unless Cloudflare requires user interaction (rare). Most visitors will never see it.
+- Add `appearance` to the `TurnstileOptions` type interface.
+- Accept an optional `theme` prop so the parent can pass the resolved theme.
+- Update the type to include the `appearance` option.
 
-One line change on line 56:
+### 2. `src/components/auth/SignUpForm.tsx`
 
-```
-Before:  size: 'invisible'
-After:   size: 'flexible'
-```
+- Import `useTheme` from `@/contexts/ThemeContext`.
+- Pass `theme={resolvedTheme}` to the `TurnstileWidget` component so it matches the app's current light/dark mode.
 
-`'flexible'` is the best replacement because:
-- It adapts to the container width automatically
-- It has the smallest visual footprint among valid options
-- It's the closest behavior to what "invisible" was intended to achieve
+## What this achieves
 
-Also update the `TurnstileOptions` type interface (line 29) to remove `'invisible'` from the size union type so this can't regress:
-
-```
-Before:  size?: 'normal' | 'compact' | 'invisible';
-After:   size?: 'normal' | 'compact' | 'flexible';
-```
+- **For most users**: The widget will be completely invisible -- verification happens silently in the background, just like the sites you've seen.
+- **For flagged users**: If Cloudflare needs interaction, the challenge widget appears styled to match the current theme (light or dark).
+- **No dashboard changes needed**: This is purely a code-side improvement.
 
 ## Files Modified
 
 | File | Change |
 |---|---|
-| `src/components/auth/TurnstileWidget.tsx` | Change `size: 'invisible'` to `size: 'flexible'` and update the type definition |
-
-One file. Two lines. No other changes.
+| `src/components/auth/TurnstileWidget.tsx` | Add `appearance: 'interaction-only'` option, accept `theme` prop |
+| `src/components/auth/SignUpForm.tsx` | Pass `resolvedTheme` from `useTheme()` to TurnstileWidget |
 
