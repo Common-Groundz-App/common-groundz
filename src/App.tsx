@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
+import { Toaster as SonnerToaster } from '@/components/ui/sonner';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ContentViewerProvider } from '@/contexts/ContentViewerContext';
 import AuthErrorBoundary from '@/components/AuthErrorBoundary';
@@ -223,6 +224,7 @@ function App() {
               </AuthInitializer>
             </Router>
             <Toaster />
+            <SonnerToaster />
           </AuthErrorBoundary>
         </ContentViewerProvider>
       </ThemeProvider>
