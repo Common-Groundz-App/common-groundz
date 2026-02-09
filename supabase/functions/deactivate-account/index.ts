@@ -64,29 +64,30 @@
        );
      }
  
-     // Soft delete: set deleted_at timestamp
-     const { error: updateError } = await supabaseClient
-       .from('profiles')
-       .update({ deleted_at: new Date().toISOString() })
-       .eq('id', user.id);
- 
-     if (updateError) {
-       console.error('Failed to update profile:', updateError);
-       return new Response(
-         JSON.stringify({ error: 'Failed to deactivate account', code: 'UPDATE_ERROR' }),
-         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-       );
-     }
- 
-     console.log('Account soft-deleted:', user.id);
- 
-     // Sign out all sessions using admin client
-     const adminClient = createClient(
-       Deno.env.get('SUPABASE_URL') ?? '',
-       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-     );
- 
-     const { error: signOutError } = await adminClient.auth.admin.signOut(user.id, 'global');
+      // Create admin client (bypasses RLS) for privileged operations
+      const adminClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      // Soft delete: set deleted_at timestamp (using admin client to bypass RLS)
+      const { error: updateError } = await adminClient
+        .from('profiles')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Failed to update profile:', updateError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to deactivate account', code: 'UPDATE_ERROR' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log('Account soft-deleted:', user.id);
+
+      // Sign out all sessions
+      const { error: signOutError } = await adminClient.auth.admin.signOut(user.id, 'global');
      
      if (signOutError) {
        console.error('Error signing out user (non-fatal):', signOutError);
