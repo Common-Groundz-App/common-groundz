@@ -40,12 +40,12 @@ const ProfileUserInfo = ({
 
   return (
     <div className="w-full text-center mb-6">
-      <div className="flex items-center justify-center">
+      <div className="flex items-center justify-center gap-1.5">
         <h2 className="text-xl md:text-2xl font-bold text-foreground">
           {displayName || username}
         </h2>
         {isVerified && (
-          <div className="ml-1 flex items-center">
+          <div className="flex items-center">
             <CheckCircle 
               size={16} 
               className="text-brand-orange fill-brand-orange" 
@@ -57,7 +57,7 @@ const ProfileUserInfo = ({
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-8 w-8 ml-1" 
+            className="h-8 w-8 opacity-60 hover:opacity-100" 
             onClick={onEditClick}
           >
             <Edit size={16} />
