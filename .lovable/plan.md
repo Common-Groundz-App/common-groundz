@@ -1,97 +1,88 @@
 
 
-# Onboarding Modal Visual Polish
+# Fix Profile Card Display: Real Name as Primary, Username as Secondary
 
-All changes are scoped to `src/components/profile/ProfileEditForm.tsx` only. No logic or validation changes.
+## Problem
+
+The profile card shows the **username** ("rishabhsr") as the primary bold name, even though first/last name ("Rishab Sr") is stored. This is because `transformToSafeProfile` prioritizes username over real name, which is backwards from industry standard (Instagram, Twitter/X, GitHub, LinkedIn all show real name as primary).
+
+Additionally, the `username` field in `SafeUserProfile` is incorrectly set to `displayName` instead of the actual username, causing data confusion downstream.
+
+## Root Cause
+
+In `src/types/profile.ts`, line 92-95:
+```text
+const displayName = profile.username ||        // <-- username wins
+    (first + last) ||
+    first_name ||
+    fallback;
+```
+
+And line 111:
+```text
+username: displayName,   // <-- actual username is lost
+```
 
 ## Changes
 
-### 1. Shorter header with subtitle (onboarding only)
+### 1. `src/types/profile.ts` -- Fix display name priority and preserve actual username
 
-Replace the long "Almost there — complete your profile" with:
-- Title: **"Complete your profile"**
-- Subtitle: *"This helps others recognize and trust you on Common Groundz."* in muted, smaller text
-
-In edit mode, the title stays "Edit Profile" with no subtitle.
-
-### 2. Warning icon top-alignment and reduced intensity (onboarding: hidden entirely)
-
-The 30-day cooldown warning (lines 337-340) is irrelevant during onboarding since the user is setting their username for the first time. Hide it when `isOnboarding` is true.
-
-In edit mode, fix the icon alignment:
-- Add `items-start` instead of the default center alignment on the flex container
-- Reduce icon size from `h-3 w-3` to `h-3 w-3` (already small, keep it) but add `mt-0.5` to top-align with text
-- Change text color from `text-amber-600` to `text-amber-500/80` for a softer, more informational tone
-
-### 3. Asterisk micro-polish
-
-Change the asterisk spans from:
-```
-<span className="text-destructive">*</span>
-```
-to:
-```
-<span className="text-destructive text-xs ml-0.5">*</span>
+**displayName priority** (line 92-95): Change to prefer full name over username:
+```text
+const displayName =
+    (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : '') ||
+    profile.first_name ||
+    profile.username ||
+    PROFILE_FALLBACKS.username;
 ```
 
-This makes them slightly smaller and adds a tiny left margin so they don't feel stuck to the label. Applied to all three required labels (First Name, Last Name, Username).
-
-### 4. Button area spacing
-
-Add a subtle top border and extra padding above the Continue button in onboarding mode by adding `className="pt-4 border-t"` to the `DialogFooter` when `isOnboarding` is true.
-
-### 5. Hide 30-day warning during onboarding (bonus)
-
-Since it's their first username, the "You can only change your username once every 30 days" warning adds unnecessary noise. Hide it when `isOnboarding` is true; show it only in edit mode.
-
-## Technical Details
-
-### File: `src/components/profile/ProfileEditForm.tsx`
-
-**Lines 235-237** -- Header change:
-```jsx
-<DialogHeader>
-  <DialogTitle>{isOnboarding ? 'Complete your profile' : 'Edit Profile'}</DialogTitle>
-  {isOnboarding && (
-    <p className="text-sm text-muted-foreground">
-      This helps others recognize and trust you on Common Groundz.
-    </p>
-  )}
-</DialogHeader>
+**username field** (line 111): Preserve the actual username instead of overwriting with displayName:
+```text
+username: profile.username || PROFILE_FALLBACKS.username,
 ```
 
-**Lines 247, 261, 280** -- Asterisk polish (3 locations):
-```jsx
-<span className="text-destructive text-xs ml-0.5">*</span>
+**initials** (line 97-103): Also flip priority to prefer real name initials:
+```text
+const initials = (profile.first_name && profile.last_name)
+    ? `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
+    : profile.first_name
+      ? profile.first_name.substring(0, 2).toUpperCase()
+      : profile.username
+        ? profile.username.substring(0, 2).toUpperCase()
+        : PROFILE_FALLBACKS.initials;
 ```
 
-**Lines 337-340** -- Warning conditional + style fix:
-```jsx
-{!isOnboarding && (
-  <p className="text-xs text-amber-500/80 flex items-start gap-1 mt-1">
-    <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
-    You can only change your username once every 30 days. Your old username will be permanently retired.
-  </p>
-)}
-```
+### 2. `src/components/profile/ProfileUserInfo.tsx` -- Center-align name + edit icon
 
-**Line 380** -- Footer spacing:
-```jsx
-<DialogFooter className={isOnboarding ? 'pt-4 border-t' : ''}>
-```
+The edit icon sitting in a flex row can pull the layout off-center. Fix:
 
-## Summary
+- Add `gap-1.5` to the flex container for consistent spacing
+- Reduce edit button opacity slightly (`opacity-60 hover:opacity-100`) so it doesn't visually compete with the name
 
-| Area | Change |
+### 3. No other files changed
+
+ProfileCard already passes `displayName` and `username` separately to ProfileUserInfo. The upstream data fix in `transformToSafeProfile` will flow correctly through the existing `useViewedProfile` hook and ProfileCard component.
+
+## Result
+
+| Element | Before | After |
+|---|---|---|
+| Bold primary name | `rishabhsr` (username) | `Rishab Sr` (first + last) |
+| Secondary text | `@rishabhsr` | `@rishabhsr` (unchanged) |
+| Initials in avatar | `RI` (from username) | `RS` (from real name) |
+| Name + edit alignment | Slightly off-center | Properly centered with balanced gap |
+
+## Files Modified
+
+| File | Change |
 |---|---|
-| Header | Shorter title + subtitle in onboarding mode |
-| Asterisks | Smaller size + slight left margin |
-| Username warning | Hidden in onboarding; top-aligned + softer color in edit mode |
-| Footer | Top border + padding in onboarding mode |
+| `src/types/profile.ts` | Fix displayName priority (full name first), preserve actual username, fix initials priority |
+| `src/components/profile/ProfileUserInfo.tsx` | Add gap spacing, reduce edit icon visual weight |
 
 ## What stays the same
 
-- All validation logic unchanged
-- Edit mode appearance unchanged (except warning icon alignment fix)
-- No other files modified
+- All validation, auth, and form logic unchanged
+- ProfileEditForm unchanged
+- Database schema unchanged -- this is presentation-only
+- Fallback behavior preserved (username used when no real name exists)
 
