@@ -233,7 +233,12 @@ const ProfileEditForm = ({
     <Dialog open={isOpen} onOpenChange={(open) => !open && !isOnboarding && onClose()}>
       <DialogContent className="sm:max-w-[425px]" onPointerDownOutside={isOnboarding ? (e) => e.preventDefault() : undefined} hideCloseButton={isOnboarding}>
         <DialogHeader>
-          <DialogTitle>{isOnboarding ? 'Almost there — complete your profile' : 'Edit Profile'}</DialogTitle>
+          <DialogTitle>{isOnboarding ? 'Complete your profile' : 'Edit Profile'}</DialogTitle>
+          {isOnboarding && (
+            <p className="text-sm text-muted-foreground">
+              This helps others recognize and trust you on Common Groundz.
+            </p>
+          )}
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -244,7 +249,7 @@ const ProfileEditForm = ({
                 rules={{ required: 'First name is required', validate: v => v.trim().length > 0 || 'First name is required' }}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>First Name <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>First Name <span className="text-destructive text-xs ml-0.5">*</span></FormLabel>
                     <FormControl>
                       <Input placeholder="First Name" {...field} />
                     </FormControl>
@@ -258,7 +263,7 @@ const ProfileEditForm = ({
                 rules={{ required: 'Last name is required', validate: v => v.trim().length > 0 || 'Last name is required' }}
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Last Name <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>Last Name <span className="text-destructive text-xs ml-0.5">*</span></FormLabel>
                     <FormControl>
                       <Input placeholder="Last Name" {...field} />
                     </FormControl>
@@ -277,7 +282,7 @@ const ProfileEditForm = ({
               }}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Username <span className="text-destructive">*</span></FormLabel>
+                  <FormLabel>Username <span className="text-destructive text-xs ml-0.5">*</span></FormLabel>
                   <FormControl>
                     {isUsernameLocked ? (
                       // LOCKED STATE
@@ -334,10 +339,12 @@ const ProfileEditForm = ({
                       <p className="text-xs text-muted-foreground">
                         3-20 characters. Letters, numbers, dots, and underscores only. Cannot start or end with dots/underscores.
                       </p>
-                      <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
-                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-                        You can only change your username once every 30 days. Your old username will be permanently retired.
-                      </p>
+                      {!isOnboarding && (
+                        <p className="text-xs text-amber-500/80 flex items-start gap-1 mt-1">
+                          <AlertTriangle className="h-3 w-3 flex-shrink-0 mt-0.5" />
+                          You can only change your username once every 30 days. Your old username will be permanently retired.
+                        </p>
+                      )}
                     </>
                   )}
                   <FormMessage />
@@ -377,7 +384,7 @@ const ProfileEditForm = ({
               )}
             />
             
-            <DialogFooter>
+            <DialogFooter className={isOnboarding ? 'pt-4 border-t' : ''}>
               {!isOnboarding && (
                 <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
               )}
