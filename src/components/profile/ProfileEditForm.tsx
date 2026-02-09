@@ -167,9 +167,11 @@ const ProfileEditForm = ({
       if (!user) throw new Error('User not authenticated');
       
       // Build update object - exclude username if locked
-      const profileUpdate: { bio: string; location: string; username?: string } = {
+      const profileUpdate: { bio: string; location: string; first_name: string; last_name: string; username?: string } = {
         bio: data.bio,
-        location: data.location
+        location: data.location,
+        first_name: data.firstName,
+        last_name: data.lastName
       };
       
       // Only include username if not locked
