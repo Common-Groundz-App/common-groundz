@@ -70,6 +70,15 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         setCurrentActiveTab('Product Relationships');
         onTabChange('product-relationships');
       }
+    },
+    {
+      name: 'User Management',
+      url: '#user-management',
+      icon: Users,
+      onClick: () => {
+        setCurrentActiveTab('User Management');
+        onTabChange('user-management');
+      }
     }
   ];
 
