@@ -83,7 +83,7 @@ export const ACCOUNT_RECOVERY_POLICY = {
   /** How users can request recovery */
   method: 'Contact support',
   /** Support contact email */
-  supportEmail: 'support@commongroundz.com',
+  supportEmail: 'support@commongroundz.co',
   /** User-facing description */
   description: 'Accounts can be restored within 30 days of deletion by contacting support.',
 } as const;
