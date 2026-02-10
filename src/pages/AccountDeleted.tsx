@@ -63,7 +63,7 @@ const AccountDeleted = () => {
         <Card className="border-border/60">
           <CardContent className="p-5">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
               <div className="text-sm space-y-1">
                 <p className="font-medium">Want to create a new account?</p>
                 <p className="text-muted-foreground">
