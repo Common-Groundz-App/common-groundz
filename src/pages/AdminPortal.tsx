@@ -139,6 +139,8 @@ const AdminPortal = () => {
         return renderBrandClaimsContent();
       case 'product-relationships':
         return renderProductRelationshipsContent();
+      case 'user-management':
+        return renderUserManagementContent();
       default:
         return renderOverviewContent();
     }
