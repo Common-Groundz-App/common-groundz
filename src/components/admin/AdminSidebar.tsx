@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Shield, BarChart3, Database, FileText, MessageSquare, Award, GitBranch } from 'lucide-react';
+import { Shield, BarChart3, Database, FileText, MessageSquare, Award, GitBranch, Users } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 
 interface AdminSidebarProps {
@@ -70,6 +70,15 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         setCurrentActiveTab('Product Relationships');
         onTabChange('product-relationships');
       }
+    },
+    {
+      name: 'User Management',
+      url: '#user-management',
+      icon: Users,
+      onClick: () => {
+        setCurrentActiveTab('User Management');
+        onTabChange('user-management');
+      }
     }
   ];
 
@@ -88,6 +97,8 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         return 'Brand Claims';
       case 'product-relationships':
         return 'Product Relationships';
+      case 'user-management':
+        return 'User Management';
       default:
         return 'Overview';
     }

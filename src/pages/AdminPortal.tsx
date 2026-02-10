@@ -16,6 +16,7 @@ import { AdminPhotoModerationPanel } from '@/components/admin/AdminPhotoModerati
 import { AdminSuggestionsPanel } from '@/components/admin/AdminSuggestionsPanel';
 import { AdminClaimsPanel } from '@/components/admin/AdminClaimsPanel';
 import { AdminProductRelationshipsPanel } from '@/components/admin/AdminProductRelationshipsPanel';
+import { AdminUserManagementPanel } from '@/components/admin/AdminUserManagementPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -114,8 +115,13 @@ const AdminPortal = () => {
 
   const renderProductRelationshipsContent = () => (
     <div className="space-y-6">
-      {/* Product Relationships Section */}
       <AdminProductRelationshipsPanel />
+    </div>
+  );
+
+  const renderUserManagementContent = () => (
+    <div className="space-y-6">
+      <AdminUserManagementPanel />
     </div>
   );
 
@@ -133,6 +139,8 @@ const AdminPortal = () => {
         return renderBrandClaimsContent();
       case 'product-relationships':
         return renderProductRelationshipsContent();
+      case 'user-management':
+        return renderUserManagementContent();
       default:
         return renderOverviewContent();
     }
@@ -222,6 +230,16 @@ const AdminPortal = () => {
                   }`}
                 >
                   Claims
+                </button>
+                <button
+                  onClick={() => setActiveTab('user-management')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'user-management'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Users
                 </button>
               </div>
             </div>
