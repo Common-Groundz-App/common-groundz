@@ -231,6 +231,16 @@ const AdminPortal = () => {
                 >
                   Claims
                 </button>
+                <button
+                  onClick={() => setActiveTab('user-management')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'user-management'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Users
+                </button>
               </div>
             </div>
 

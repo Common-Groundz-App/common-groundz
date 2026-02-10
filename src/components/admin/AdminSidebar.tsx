@@ -97,6 +97,8 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         return 'Brand Claims';
       case 'product-relationships':
         return 'Product Relationships';
+      case 'user-management':
+        return 'User Management';
       default:
         return 'Overview';
     }
