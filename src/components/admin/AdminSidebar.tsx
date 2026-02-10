@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Shield, BarChart3, Database, FileText, MessageSquare, Award, GitBranch } from 'lucide-react';
+import { Shield, BarChart3, Database, FileText, MessageSquare, Award, GitBranch, Users } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 
 interface AdminSidebarProps {
