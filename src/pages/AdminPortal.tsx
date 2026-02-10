@@ -115,8 +115,13 @@ const AdminPortal = () => {
 
   const renderProductRelationshipsContent = () => (
     <div className="space-y-6">
-      {/* Product Relationships Section */}
       <AdminProductRelationshipsPanel />
+    </div>
+  );
+
+  const renderUserManagementContent = () => (
+    <div className="space-y-6">
+      <AdminUserManagementPanel />
     </div>
   );
 
