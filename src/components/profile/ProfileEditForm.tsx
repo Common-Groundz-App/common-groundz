@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { useDebouncedCallback } from 'use-debounce';
 import { useProfileCacheActions } from '@/hooks/use-profile-cache';
+import { useQueryClient } from '@tanstack/react-query';
 import { AtSign, Lock, AlertTriangle } from 'lucide-react';
 import { calculateUsernameCooldown } from '@/utils/usernameCooldown';
 
@@ -54,6 +55,7 @@ const ProfileEditForm = ({
   const { user } = useAuth();
   const { isVerified } = useEmailVerification();
   const { invalidateProfile } = useProfileCacheActions();
+  const queryClient = useQueryClient();
   const [usernameError, setUsernameError] = useState('');
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [initialUsername, setInitialUsername] = useState('');
@@ -206,10 +208,12 @@ const ProfileEditForm = ({
         invalidateProfile(user.id);
       }
       
-      toast({
-        title: 'Profile updated',
-        description: 'Your profile has been successfully updated.'
-      });
+      if (!isOnboarding) {
+        toast({
+          title: 'Profile updated',
+          description: 'Your profile has been successfully updated.'
+        });
+      }
       
       // Refresh the UserMenu and other listeners with userId for targeted invalidation
       window.dispatchEvent(new CustomEvent('profile-updated', { 
@@ -217,6 +221,10 @@ const ProfileEditForm = ({
       }));
       
       if (isOnboarding) {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['profile-completion-check'] }),
+          queryClient.invalidateQueries({ queryKey: ['profile-for-completion'] }),
+        ]);
         navigate('/home', { replace: true });
       } else {
         onClose();
