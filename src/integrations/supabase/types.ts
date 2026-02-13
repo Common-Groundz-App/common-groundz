@@ -897,6 +897,7 @@ export type Database = {
           id: string
           priority: number | null
           processed_at: string | null
+          requested_by: string
           retry_count: number | null
           status: string | null
           updated_at: string | null
@@ -908,6 +909,7 @@ export type Database = {
           id?: string
           priority?: number | null
           processed_at?: string | null
+          requested_by?: string
           retry_count?: number | null
           status?: string | null
           updated_at?: string | null
@@ -919,6 +921,7 @@ export type Database = {
           id?: string
           priority?: number | null
           processed_at?: string | null
+          requested_by?: string
           retry_count?: number | null
           status?: string | null
           updated_at?: string | null
