@@ -1,71 +1,91 @@
 
 
-# Fix Duplicate Users in "Who to Follow" and Limit to 5
+# Security Fix Plan (Final Version + Hardening)
 
-## Problem
+## Summary
 
-The "Who to Follow" section shows the same user multiple times because:
-1. No `deleted_at IS NULL` filter -- soft-deleted test accounts still appear
-2. `UNION ALL` in `final_candidates` produces duplicates when a user qualifies for multiple pools
-3. UI requests only 3 results instead of 5
+This migration fixes function search path vulnerabilities and overly permissive RLS write policies. No frontend or edge function changes needed.
 
-## Changes
+---
 
-### 1. New database migration: Update `get_who_to_follow`
+## Changes to Implement
 
-Add `AND p.deleted_at IS NULL` to all 4 CTEs and replace `final_candidates` with deduplicated logic using `DISTINCT ON` with priority-aware ordering and NULL-safe tie-breakers.
+### 1. Fix Function Search Paths (7 functions)
 
-Additions per CTE:
-- **friends_of_friends** (after line 38): `AND p.deleted_at IS NULL`
-- **active_creators** (after line 65): `AND p.deleted_at IS NULL`
-- **fresh_creators** (after line 89): `AND p.deleted_at IS NULL`
-- **emergency_fallback** (after line 111): `AND p.deleted_at IS NULL`
+Recreate each function with `SET search_path = public, pg_temp`, preserving all original attributes (security mode, volatility, args, return type):
 
-Replace `final_candidates` CTE (lines 125-130) with:
+| Function | Security Mode |
+|----------|--------------|
+| `queue_entity_enrichment` | SECURITY DEFINER |
+| `cleanup_spaced_hashtags` | INVOKER |
+| `get_who_to_follow` | INVOKER |
+| `notify_entity_update` | INVOKER |
+| `prevent_parent_entity_deletion` | INVOKER |
+| `update_cached_photos_updated_at` | INVOKER |
+| `update_conversation_updated_at` | INVOKER |
 
-```sql
-final_candidates AS (
-  SELECT DISTINCT ON (combined.id) combined.*
-  FROM (
-    SELECT * FROM all_candidates
-    UNION ALL
-    SELECT * FROM emergency_fallback
-    WHERE (SELECT COUNT(*) FROM all_candidates) < p_limit
-  ) combined
-  ORDER BY combined.id,
-    CASE combined.source_type
-      WHEN 'fof' THEN 1
-      WHEN 'active' THEN 2
-      WHEN 'fresh' THEN 3
-      WHEN 'fallback' THEN 4
-    END,
-    COALESCE(combined.mutual_count, 0) DESC,
-    COALESCE(combined.activity_7d, 0) DESC
-)
-```
+### 2. Make `update_entity_slug()` SECURITY DEFINER + Revoke Direct Access
 
-### 2. Update `src/services/userRecommendationService.ts` (line ~64)
+- Convert to `SECURITY DEFINER` with `SET search_path = public, pg_temp`
+- **REVOKE EXECUTE** from `anon` and `authenticated` to prevent direct invocation
+- Only the trigger on `entities` should invoke this function -- no user should call it directly
+- This enables fully locking down `entity_slug_history` writes without breaking the trigger path
 
-Add `.is('deleted_at', null)` to the fallback query after `.not('username', 'is', null)`.
+### 3. Fix `entity_slug_history` RLS Policies
 
-### 3. Update `src/pages/Feed.tsx` (line 158)
+- KEEP the SELECT policy (`USING (true)`) -- needed for logged-out slug redirects
+- DROP the "System can manage slug history" FOR ALL policy (overly permissive)
+- No INSERT/UPDATE/DELETE policy needed -- the trigger function is now SECURITY DEFINER and bypasses RLS
 
-- Change `getUserRecommendations(user.id, 3)` to `getUserRecommendations(user.id, 5)`
-- Add `.slice(0, 5)` safety cap when rendering recommendations (line 717)
+### 4. Fix `entity_enrichment_queue` RLS Policies
+
+- DROP the 3 existing "Always True" INSERT/UPDATE/DELETE policies
+- New INSERT policy: `WITH CHECK (requested_by = auth.uid())` -- ties rows to the caller
+- No UPDATE/DELETE policy for authenticated/anon (service_role only)
+- REVOKE INSERT, UPDATE, DELETE from `anon`
+
+### 5. Mark Intentional Items as Acknowledged
+
+These are intentional design decisions, not vulnerabilities:
+
+- **Profiles public SELECT**: Required for `/u/:username`, search, suggestions (logged-out access)
+- **Notifications**: Already scoped with `auth.uid() = user_id` -- false positive
+- **Internal tables** (embedding_trigger_log, user_behavior_patterns, etc.): Intentionally RLS-locked, accessed only via service_role
+- **`cached_photos` public SELECT**: Needed for logged-out entity pages
+- **`entity_stats_view`**: Needed for explore/discovery metrics
+
+### 6. Dashboard Actions (Manual)
+
+- **Enable Leaked Password Protection**: Supabase Dashboard > Authentication > Settings
+- **Upgrade Postgres**: Supabase Dashboard > Settings > Infrastructure (if available)
+
+---
+
+## Post-Migration Verification
+
+1. **Logged out**: Visit `/u/:username` -- profile loads
+2. **Logged out**: Visit an old entity slug URL -- redirects correctly
+3. **Logged in**: Edit an entity name -- confirm `entity_slug_history` row created (tests SECURITY DEFINER trigger)
+4. **Logged in**: Trigger entity enrichment -- confirm queue row has correct `requested_by`
+5. **Supabase logs**: No new 403/406 permission errors
+
+---
 
 ## What Does NOT Change
 
-- No changes to UserRecommendationCard component
-- No changes to follow/unfollow logic
-- No RLS policy changes
+- No frontend code changes
 - No edge function changes
-- No other pages affected
+- No changes to `profiles`, `cached_photos`, or `entity_stats_view` policies
+- No extension schema migrations
 
 ## Technical Summary
 
-| File | Change |
-|------|--------|
-| New migration SQL | Add `deleted_at IS NULL` to all 4 CTEs; deduplicate with `DISTINCT ON` + source priority + COALESCE tie-breakers |
-| `userRecommendationService.ts` | Add `.is('deleted_at', null)` to fallback query |
-| `Feed.tsx` | Request 5 users; `.slice(0, 5)` safety cap |
+| Change | Type |
+|--------|------|
+| Fix 7 function search paths | Migration SQL |
+| Make `update_entity_slug()` SECURITY DEFINER + REVOKE EXECUTE | Migration SQL |
+| Lock down `entity_slug_history` writes (keep SELECT public) | Migration SQL |
+| Scope `entity_enrichment_queue` INSERT to `requested_by = auth.uid()` | Migration SQL |
+| Acknowledge intentional public exposure items | Security finding updates |
+| Enable Leaked Password Protection + Postgres upgrade | Dashboard manual |
 
