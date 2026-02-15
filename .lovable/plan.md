@@ -1,14 +1,14 @@
 
 
-# Fix Entity Enrichment Trigger — Final Plan
+# Apply the Entity Enrichment Trigger Fix
 
-## Root Cause
+## Current State
 
-The `queue_entity_enrichment()` trigger inserts into `entity_enrichment_queue` without explicitly setting `requested_by`. That column defaults to `auth.uid()`, which is NULL under service_role context, violating the NOT NULL constraint and rolling back the entire entity update (image refresh, metadata fix).
+The `queue_entity_enrichment()` trigger function still uses the old code — it inserts only `(entity_id, priority)` without setting `requested_by`. This confirms the migration was never executed.
 
-## Fix: One Database Migration
+## Action Required
 
-Modify the trigger function to explicitly provide `requested_by` using COALESCE with an explicit UUID cast:
+Run one database migration to replace the trigger function:
 
 ```sql
 CREATE OR REPLACE FUNCTION public.queue_entity_enrichment()
@@ -35,23 +35,18 @@ END;
 $$;
 ```
 
-## What Changes
+## What This Changes
 
-- The trigger now explicitly sets `requested_by` instead of relying on column default
-- Service-role operations get the nil UUID (consistent with Migration 4 backfill pattern)
-- User-triggered operations still record the real `auth.uid()`
-- The `::uuid` cast ensures no type ambiguity
+- Adds explicit `requested_by` column to the INSERT statement
+- Uses `COALESCE(auth.uid(), '00000000-...'::uuid)` so service-role operations get the nil UUID instead of NULL
+- Fixes image refresh and metadata refresh failures
 
-## What Does NOT Change
+## No Other Changes
 
-- No frontend code changes
-- No edge function changes
-- No RLS policy changes
-- The NOT NULL constraint stays in place
-- No UI changes
+No frontend, edge function, or RLS changes needed. Just this one migration.
 
-## Post-Fix Verification
+## After Approval
 
-1. Go to Admin, click image refresh on "Nagarjuna Chimney" -- should succeed
-2. Go to Edit Entity, Advanced tab, click "Fix Metadata" -- should succeed
-3. Check Supabase Postgres logs for zero NOT NULL violations
+1. Test image refresh on "Nagarjuna Chimney" in Admin
+2. Test "Fix Metadata" in Edit Entity Advanced tab
+3. Verify no more constraint errors in Postgres logs
