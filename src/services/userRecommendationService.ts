@@ -58,6 +58,7 @@ const getFallbackRecommendations = async (currentUserId: string, limit: number):
       .select('id, username, avatar_url, created_at')
       .neq('id', currentUserId)
       .not('username', 'is', null)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(limit);
 

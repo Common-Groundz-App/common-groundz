@@ -155,7 +155,7 @@ const Feed = React.memo(() => {
       
       try {
         setUsersLoading(true);
-        const users = await getUserRecommendations(user.id, 3);
+        const users = await getUserRecommendations(user.id, 5);
         setRecommendedUsers(users);
       } catch (error) {
         console.error('Error fetching user recommendations:', error);
@@ -714,7 +714,7 @@ const Feed = React.memo(() => {
                     </div>
                   ) : recommendedUsers.length > 0 ? (
                     <div className="space-y-3">
-                      {recommendedUsers.map((user) => (
+                      {recommendedUsers.slice(0, 5).map((user) => (
                         <UserRecommendationCard key={user.id} user={user} />
                       ))}
                     </div>
