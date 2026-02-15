@@ -29,6 +29,7 @@ export class AdvancedPersonalizationService {
     context: PersonalizationContext,
     limit: number = 6
   ): Promise<AdvancedRecommendation[]> {
+    if (!userId || userId === 'null' || userId === 'undefined') return [];
     try {
       // Get recommendations from multiple algorithms
       const [
@@ -77,14 +78,11 @@ export class AdvancedPersonalizationService {
     context: PersonalizationContext,
     limit: number
   ): Promise<PersonalizedEntity[]> {
+    if (!userId || userId === 'null' || userId === 'undefined') return [];
     try {
-      // Learn from user's historical context patterns
-      const { data: patterns } = await supabase
-        .from('user_behavior_patterns')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('pattern_type', 'contextual')
-        .gte('confidence_score', 0.3);
+      // user_behavior_patterns is service_role-only since security hardening Migration 1
+      // TODO: Move behavioral pattern reads to edge function
+      const patterns: any[] = [];
 
       // Get user's preferred entity types for current context
       let preferredTypes: string[] = [];
@@ -151,6 +149,7 @@ export class AdvancedPersonalizationService {
     context: PersonalizationContext,
     limit: number
   ): Promise<PersonalizedEntity[]> {
+    if (!userId || userId === 'null' || userId === 'undefined') return [];
     try {
       // Get user's activity patterns for current time
       const { data: timePatterns } = await supabase
@@ -272,30 +271,13 @@ export class AdvancedPersonalizationService {
   }
 
   // Store recommendation explanations for transparency
+  // recommendation_explanations is service_role-only since security hardening Migration 1
+  // TODO: Move to edge function
   private async storeRecommendationExplanations(
-    userId: string,
-    recommendations: AdvancedRecommendation[]
+    _userId: string,
+    _recommendations: AdvancedRecommendation[]
   ) {
-    try {
-      const explanations = recommendations.map(rec => ({
-        user_id: userId,
-        entity_id: rec.id,
-        explanation_type: rec.algorithm.includes('social') ? 'social' : 
-                         rec.algorithm.includes('collaborative') ? 'collaborative' :
-                         rec.algorithm.includes('contextual') ? 'contextual' : 'content',
-        explanation_text: rec.explanation,
-        confidence_score: rec.confidenceScore,
-        algorithm_used: rec.algorithm
-      }));
-
-      await supabase
-        .from('recommendation_explanations')
-        .upsert(explanations, {
-          onConflict: 'user_id,entity_id'
-        });
-    } catch (error) {
-      console.error('Error storing recommendation explanations:', error);
-    }
+    // No-op: table is locked to service_role
   }
 
   // Generate contextual reason based on context
@@ -343,33 +325,16 @@ export class AdvancedPersonalizationService {
   }
 
   // Learn from user feedback to improve recommendations
+  // user_behavior_patterns is service_role-only since security hardening Migration 1
+  // TODO: Move to edge function
   async learnFromFeedback(
     userId: string,
-    entityId: string,
-    feedback: 'like' | 'dislike' | 'not_interested',
-    algorithm: string
+    _entityId: string,
+    _feedback: 'like' | 'dislike' | 'not_interested',
+    _algorithm: string
   ) {
-    try {
-      // Update user behavior patterns based on feedback
-      const patternData = {
-        feedback_type: feedback,
-        entity_id: entityId,
-        algorithm: algorithm,
-        timestamp: new Date().toISOString()
-      };
-
-      await supabase
-        .from('user_behavior_patterns')
-        .upsert({
-          user_id: userId,
-          pattern_type: 'feedback',
-          pattern_data: patternData,
-          confidence_score: feedback === 'like' ? 0.8 : feedback === 'dislike' ? -0.8 : -0.3,
-          last_updated: new Date().toISOString()
-        });
-    } catch (error) {
-      console.error('Error learning from feedback:', error);
-    }
+    if (!userId || userId === 'null' || userId === 'undefined') return;
+    // No-op: table is locked to service_role
   }
 }
 

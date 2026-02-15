@@ -163,13 +163,18 @@ export class EnhancedExploreService {
   ) {
     try {
       // Check if user interest already exists
-      const { data: existing } = await supabase
+      const { data: existing, error: fetchError } = await supabase
         .from('user_interests')
         .select('*')
         .eq('user_id', userId)
         .eq('entity_type', entityType)
         .eq('category', category)
-        .single();
+        .maybeSingle();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching user interest:', fetchError);
+        return;
+      }
 
       if (existing) {
         // Update existing interest
@@ -234,7 +239,7 @@ export class EnhancedExploreService {
       });
 
       // Update existing pattern if it exists
-      const { data: existing } = await supabase
+      const { data: existing, error: fetchError } = await supabase
         .from('user_activity_patterns')
         .select('*')
         .eq('user_id', userId)
@@ -242,7 +247,12 @@ export class EnhancedExploreService {
         .eq('category', category)
         .eq('time_of_day', timeOfDay)
         .eq('day_of_week', dayOfWeek)
-        .single();
+        .maybeSingle();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error fetching activity pattern:', fetchError);
+        return;
+      }
 
       if (existing) {
         await supabase

@@ -108,7 +108,7 @@ export class SocialIntelligenceService {
         .eq('is_deleted', false)
         .in('recommendations.user_id', influencerIds)
         .gte('recommendations.rating', 4)
-        .not('id', 'in', `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})`)
+        .not('id', 'in', userRatedEntityIds.length > 0 ? `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})` : '()')
         .order('recommendations.created_at', { ascending: false })
         .limit(limit * 2);
 
@@ -194,7 +194,7 @@ export class SocialIntelligenceService {
         .eq('is_deleted', false)
         .in('recommendations.user_id', secondDegreeIds)
         .gte('recommendations.rating', 4.5) // Higher threshold for extended network
-        .not('id', 'in', `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})`)
+        .not('id', 'in', userRatedEntityIds.length > 0 ? `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})` : '()')
         .limit(limit * 2);
 
       if (!entities) return [];
@@ -285,7 +285,7 @@ export class SocialIntelligenceService {
         .eq('is_deleted', false)
         .in('recommendations.user_id', communityMembers)
         .gte('recommendations.rating', 4)
-        .not('id', 'in', `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})`)
+        .not('id', 'in', userRatedEntityIds.length > 0 ? `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})` : '()')
         .limit(limit * 2);
 
       if (!entities) return [];

@@ -118,7 +118,7 @@ export class CollaborativeFilteringService {
         .eq('is_deleted', false)
         .in('recommendations.user_id', similarUserIds)
         .gte('recommendations.rating', 4) // Only high-rated recommendations
-        .not('id', 'in', `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})`)
+        .not('id', 'in', userRatedEntityIds.length > 0 ? `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})` : '()')
         .order('recommendations.rating', { ascending: false })
         .limit(limit * 2);
 
@@ -202,7 +202,7 @@ export class CollaborativeFilteringService {
         `)
         .eq('is_deleted', false)
         .in('recommendations.user_id', similarUserIds)
-        .not('id', 'in', `(${likedEntityIds.map(id => `'${id}'`).join(',')})`) // Exclude already rated entities
+        .not('id', 'in', likedEntityIds.length > 0 ? `(${likedEntityIds.map(id => `'${id}'`).join(',')})` : '()') // Exclude already rated entities
         .gte('recommendations.rating', 4)
         .order('recommendations.rating', { ascending: false })
         .limit(limit * 2);
