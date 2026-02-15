@@ -1,52 +1,71 @@
 
 
-# Apply the Entity Enrichment Trigger Fix
+# Fix Duplicate Users in "Who to Follow" and Limit to 5
 
-## Current State
+## Problem
 
-The `queue_entity_enrichment()` trigger function still uses the old code — it inserts only `(entity_id, priority)` without setting `requested_by`. This confirms the migration was never executed.
+The "Who to Follow" section shows the same user multiple times because:
+1. No `deleted_at IS NULL` filter -- soft-deleted test accounts still appear
+2. `UNION ALL` in `final_candidates` produces duplicates when a user qualifies for multiple pools
+3. UI requests only 3 results instead of 5
 
-## Action Required
+## Changes
 
-Run one database migration to replace the trigger function:
+### 1. New database migration: Update `get_who_to_follow`
+
+Add `AND p.deleted_at IS NULL` to all 4 CTEs and replace `final_candidates` with deduplicated logic using `DISTINCT ON` with priority-aware ordering and NULL-safe tie-breakers.
+
+Additions per CTE:
+- **friends_of_friends** (after line 38): `AND p.deleted_at IS NULL`
+- **active_creators** (after line 65): `AND p.deleted_at IS NULL`
+- **fresh_creators** (after line 89): `AND p.deleted_at IS NULL`
+- **emergency_fallback** (after line 111): `AND p.deleted_at IS NULL`
+
+Replace `final_candidates` CTE (lines 125-130) with:
 
 ```sql
-CREATE OR REPLACE FUNCTION public.queue_entity_enrichment()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  IF NEW.last_enriched_at IS NULL OR NEW.last_enriched_at < (now() - interval '7 days') THEN
-    INSERT INTO public.entity_enrichment_queue (entity_id, priority, requested_by)
-    VALUES (
-      NEW.id,
-      CASE 
-        WHEN NEW.api_source IS NOT NULL THEN 3
-        ELSE 5 
-      END,
-      COALESCE(auth.uid(), '00000000-0000-0000-0000-000000000000'::uuid)
-    )
-    ON CONFLICT (entity_id) DO NOTHING;
-  END IF;
-  
-  RETURN NEW;
-END;
-$$;
+final_candidates AS (
+  SELECT DISTINCT ON (combined.id) combined.*
+  FROM (
+    SELECT * FROM all_candidates
+    UNION ALL
+    SELECT * FROM emergency_fallback
+    WHERE (SELECT COUNT(*) FROM all_candidates) < p_limit
+  ) combined
+  ORDER BY combined.id,
+    CASE combined.source_type
+      WHEN 'fof' THEN 1
+      WHEN 'active' THEN 2
+      WHEN 'fresh' THEN 3
+      WHEN 'fallback' THEN 4
+    END,
+    COALESCE(combined.mutual_count, 0) DESC,
+    COALESCE(combined.activity_7d, 0) DESC
+)
 ```
 
-## What This Changes
+### 2. Update `src/services/userRecommendationService.ts` (line ~64)
 
-- Adds explicit `requested_by` column to the INSERT statement
-- Uses `COALESCE(auth.uid(), '00000000-...'::uuid)` so service-role operations get the nil UUID instead of NULL
-- Fixes image refresh and metadata refresh failures
+Add `.is('deleted_at', null)` to the fallback query after `.not('username', 'is', null)`.
 
-## No Other Changes
+### 3. Update `src/pages/Feed.tsx` (line 158)
 
-No frontend, edge function, or RLS changes needed. Just this one migration.
+- Change `getUserRecommendations(user.id, 3)` to `getUserRecommendations(user.id, 5)`
+- Add `.slice(0, 5)` safety cap when rendering recommendations (line 717)
 
-## After Approval
+## What Does NOT Change
 
-1. Test image refresh on "Nagarjuna Chimney" in Admin
-2. Test "Fix Metadata" in Edit Entity Advanced tab
-3. Verify no more constraint errors in Postgres logs
+- No changes to UserRecommendationCard component
+- No changes to follow/unfollow logic
+- No RLS policy changes
+- No edge function changes
+- No other pages affected
+
+## Technical Summary
+
+| File | Change |
+|------|--------|
+| New migration SQL | Add `deleted_at IS NULL` to all 4 CTEs; deduplicate with `DISTINCT ON` + source priority + COALESCE tie-breakers |
+| `userRecommendationService.ts` | Add `.is('deleted_at', null)` to fallback query |
+| `Feed.tsx` | Request 5 users; `.slice(0, 5)` safety cap |
+
