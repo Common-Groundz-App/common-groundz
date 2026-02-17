@@ -1,33 +1,77 @@
 
 
-# Security Fix Plan — COMPLETED ✅
+# Fix: Record Slug History on Direct Slug Edits (Final)
 
-## Applied Changes (Migration ran successfully)
+## Problem
 
-### 1. Fixed Function Search Paths (7 functions)
-All 7 functions now have `SET search_path = public, pg_temp`:
-- `queue_entity_enrichment` (SECURITY DEFINER)
-- `cleanup_spaced_hashtags`, `get_who_to_follow`, `notify_entity_update`, `prevent_parent_entity_deletion`, `update_cached_photos_updated_at`, `update_conversation_updated_at` (INVOKER)
+The `update_entity_slug()` trigger only records slug history on name/parent changes. Direct slug edits lose old slugs permanently, breaking old URLs.
 
-### 2. Made `update_entity_slug()` SECURITY DEFINER + REVOKE EXECUTE
-- Converted to SECURITY DEFINER with `SET search_path = public, pg_temp`
-- REVOKE EXECUTE from `anon` and `authenticated` — only the trigger can invoke it
+## Solution
 
-### 3. Locked down `entity_slug_history` writes
-- Kept SELECT public (for logged-out slug redirects)
-- Dropped "System can manage slug history" FOR ALL policy
-- No write policies needed — trigger is now SECURITY DEFINER
+Restructure the trigger into three cases:
 
-### 4. Scoped `entity_enrichment_queue` INSERT
-- Dropped 3 overly permissive "Always True" policies (INSERT/UPDATE/DELETE)
-- Kept scoped INSERT: `WITH CHECK (requested_by = auth.uid())`
-- Revoked write access from `anon`
+1. **Name/parent changed** -- save old slug to history, auto-generate new slug
+2. **Slug changed directly to a valid value** -- save old slug to history, preserve user's new slug
+3. **Slug cleared/emptied directly** -- save old slug to history, regenerate slug from current name
 
-### 5. Acknowledged intentional items
-- Profiles public SELECT — intentional for social features
-- Notifications — already scoped by auth.uid()
-- cached_photos public SELECT — intentional for entity pages
+All history inserts guarded by `OLD.slug IS NOT NULL AND OLD.slug != ''`.
 
-## Remaining Manual Dashboard Actions
-- **Enable Leaked Password Protection**: Supabase Dashboard > Authentication > Settings
-- **Upgrade Postgres**: Supabase Dashboard > Settings > Infrastructure
+## Migration
+
+Single SQL migration recreating `update_entity_slug()` with all existing hardening preserved:
+- SECURITY DEFINER
+- SET search_path = public, pg_temp
+- REVOKE EXECUTE from anon and authenticated
+- ON CONFLICT (entity_id, old_slug) DO NOTHING
+
+No frontend changes. No edge function changes.
+
+## Technical Detail
+
+```text
+-- Case 1: Name or parent changed -> record history + regenerate slug
+IF (OLD.name IS DISTINCT FROM NEW.name) OR 
+   (OLD.parent_id IS DISTINCT FROM NEW.parent_id) THEN
+    IF OLD.slug IS NOT NULL AND OLD.slug != '' THEN
+      INSERT INTO entity_slug_history (entity_id, old_slug)
+        VALUES (NEW.id, OLD.slug)
+        ON CONFLICT DO NOTHING;
+    END IF;
+    NEW.slug := generate_entity_slug(NEW.name, NEW.id);
+
+-- Case 2: Slug changed directly to a valid value
+ELSIF (OLD.slug IS DISTINCT FROM NEW.slug)
+  AND NEW.slug IS NOT NULL AND NEW.slug != '' THEN
+    IF OLD.slug IS NOT NULL AND OLD.slug != '' THEN
+      INSERT INTO entity_slug_history (entity_id, old_slug)
+        VALUES (NEW.id, OLD.slug)
+        ON CONFLICT DO NOTHING;
+    END IF;
+    -- Preserve user's manually-set slug
+
+-- Case 3: Slug cleared/emptied -> regenerate from name
+ELSIF (NEW.slug IS NULL OR NEW.slug = '') THEN
+    IF OLD.slug IS NOT NULL AND OLD.slug != '' THEN
+      INSERT INTO entity_slug_history (entity_id, old_slug)
+        VALUES (NEW.id, OLD.slug)
+        ON CONFLICT DO NOTHING;
+    END IF;
+    NEW.slug := generate_entity_slug(NEW.name, NEW.id);
+
+END IF;
+```
+
+## What Changes vs Previous Plan
+
+- Added defensive guard (`NEW.slug IS NOT NULL AND NEW.slug != ''`) on the direct-edit case (ChatGPT's suggestion)
+- Added Case 3: if slug is cleared, regenerate from name instead of accepting empty slug
+- Separated the empty-slug check from Case 1 into its own case for clarity
+
+## Verification
+
+1. Create entity "lion"
+2. Rename to "lion1" -- `lion` appears in history, slug auto-generated
+3. Manually change slug to "lion100" -- `lion1` appears in history, slug preserved
+4. Clear the slug field -- `lion100` appears in history, slug regenerated from name
+5. Visit `/entity/lion`, `/entity/lion1`, `/entity/lion100` -- all resolve to the entity
+
