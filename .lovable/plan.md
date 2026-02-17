@@ -1,55 +1,21 @@
 
 
-# Migration: Slug History Uniqueness Check
+# Revised Migration: Slug History Uniqueness Check
 
-## Single SQL migration with 3 changes
+## What Changed From Previous Attempt
 
-### 1. Add standalone index on `entity_slug_history.old_slug`
-For performance of the new uniqueness checks.
+The previous SQL used `DROP FUNCTION` before recreating `generate_entity_slug(text, uuid)`. This is unnecessary and risky because:
 
-### 2. Update `generate_entity_slug(name text)` (1-arg version)
-Add history check after the entities table check in the loop:
-```text
-IF NOT slug_exists THEN
-  SELECT EXISTS(
-    SELECT 1 FROM public.entity_slug_history
-    WHERE old_slug = final_slug
-  ) INTO slug_exists;
-END IF;
-```
-Also sets `search_path = public, pg_temp`.
+- The existing function uses `entity_id uuid DEFAULT NULL::uuid`
+- We are not changing that default -- we only need to update the function body
+- `CREATE OR REPLACE` works fine when the signature (including defaults) stays the same
+- Dropping a core function mid-migration risks breaking dependent triggers
 
-### 3. Update `generate_entity_slug(name text, entity_id uuid)` (2-arg version)
-Same history check with self-exclusion guard:
-```text
-IF NOT slug_exists THEN
-  SELECT EXISTS(
-    SELECT 1 FROM public.entity_slug_history h
-    WHERE h.old_slug = final_slug
-    AND h.entity_id != generate_entity_slug.entity_id
-  ) INTO slug_exists;
-END IF;
-```
-Also sets `search_path = public, pg_temp`.
+## Fix
 
-### 4. Update `generate_entity_slug_on_insert()`
-History check added to its loop:
-```text
-IF NOT slug_exists THEN
-  SELECT EXISTS(
-    SELECT 1 FROM public.entity_slug_history
-    WHERE old_slug = final_slug
-  ) INTO slug_exists;
-END IF;
-```
-Also sets `search_path = public, pg_temp`.
+Simply use `CREATE OR REPLACE` for all three functions, preserving `DEFAULT NULL::uuid` on the 2-arg version. No `DROP FUNCTION` statement.
 
-## What does NOT change
-- `update_entity_slug()` trigger
-- `entity_slug_history` table structure
-- Frontend code, edge functions, RLS policies
-
-## Technical: Full Migration SQL
+## Migration SQL (Final)
 
 ```sql
 -- 1. Standalone index for fast history lookups
@@ -100,8 +66,8 @@ BEGIN
 END;
 $$;
 
--- 3. Update generate_entity_slug(name, entity_id) - 2 args
-CREATE OR REPLACE FUNCTION public.generate_entity_slug(name text, entity_id uuid)
+-- 3. Update generate_entity_slug(name, entity_id) - 2 args (DEFAULT preserved)
+CREATE OR REPLACE FUNCTION public.generate_entity_slug(name text, entity_id uuid DEFAULT NULL::uuid)
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -212,3 +178,16 @@ BEGIN
 END;
 $$;
 ```
+
+## What Does NOT Change
+
+- `update_entity_slug()` trigger -- untouched
+- `entity_slug_history` table structure -- untouched
+- Frontend code, edge functions, RLS policies -- untouched
+
+## Summary of Differences From Previous Attempt
+
+- No `DROP FUNCTION` statement
+- `DEFAULT NULL::uuid` preserved on the 2-arg function
+- Everything else (history checks, self-exclusion guard, `pg_temp`, index) remains the same
+
