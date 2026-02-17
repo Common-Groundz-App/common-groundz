@@ -1,81 +1,214 @@
 
 
-# Fix: Prevent Slug Collisions with Slug History (Updated)
+# Migration: Slug History Uniqueness Check
 
-## Problem
+## Single SQL migration with 3 changes
 
-When generating new slugs, the system only checks the `entities` table for uniqueness. It does not check `entity_slug_history`. A new entity can receive a slug previously used by another entity, silently breaking old URL redirects.
+### 1. Add standalone index on `entity_slug_history.old_slug`
+For performance of the new uniqueness checks.
 
-## Solution
-
-Single SQL migration with three changes:
-
-### 1. Add standalone index on `old_slug`
-
-The existing unique index is `(entity_id, old_slug)` -- composite. Slug generation queries `WHERE old_slug = X` without an `entity_id` filter, so that composite index does not help. A standalone index is needed for performance.
-
-```text
-CREATE INDEX IF NOT EXISTS idx_entity_slug_history_old_slug
-ON entity_slug_history (old_slug);
-```
-
-### 2. Update `generate_entity_slug(name, entity_id)`
-
-Inside the uniqueness loop, after checking `entities.slug`, add a second check against `entity_slug_history`:
-
+### 2. Update `generate_entity_slug(name text)` (1-arg version)
+Add history check after the entities table check in the loop:
 ```text
 IF NOT slug_exists THEN
   SELECT EXISTS(
-    SELECT 1 FROM entity_slug_history
-    WHERE old_slug = final_slug AND entity_id != current_entity_id
-  ) INTO slug_exists;
-END IF;
-```
-
-The `entity_id != current_entity_id` guard allows an entity to reclaim its own previous slug (e.g., reverting a rename).
-
-### 3. Update `generate_entity_slug_on_insert()`
-
-Same history check added to the INSERT trigger's uniqueness loop:
-
-```text
-IF NOT slug_exists THEN
-  SELECT EXISTS(
-    SELECT 1 FROM entity_slug_history
+    SELECT 1 FROM public.entity_slug_history
     WHERE old_slug = final_slug
   ) INTO slug_exists;
 END IF;
 ```
+Also sets `search_path = public, pg_temp`.
 
-No entity_id exclusion needed here since new entities have no history.
+### 3. Update `generate_entity_slug(name text, entity_id uuid)` (2-arg version)
+Same history check with self-exclusion guard:
+```text
+IF NOT slug_exists THEN
+  SELECT EXISTS(
+    SELECT 1 FROM public.entity_slug_history h
+    WHERE h.old_slug = final_slug
+    AND h.entity_id != generate_entity_slug.entity_id
+  ) INTO slug_exists;
+END IF;
+```
+Also sets `search_path = public, pg_temp`.
 
-## What Does NOT Change
+### 4. Update `generate_entity_slug_on_insert()`
+History check added to its loop:
+```text
+IF NOT slug_exists THEN
+  SELECT EXISTS(
+    SELECT 1 FROM public.entity_slug_history
+    WHERE old_slug = final_slug
+  ) INTO slug_exists;
+END IF;
+```
+Also sets `search_path = public, pg_temp`.
 
-- The `update_entity_slug()` trigger (already correct from previous migration)
-- The `entity_slug_history` table structure
-- Frontend code
-- Edge functions
-- RLS policies
+## What does NOT change
+- `update_entity_slug()` trigger
+- `entity_slug_history` table structure
+- Frontend code, edge functions, RLS policies
 
-## On the DB-Level Constraint Suggestion
+## Technical: Full Migration SQL
 
-ChatGPT suggested a cross-table unique constraint. PostgreSQL does not support this natively. The alternatives (materialized views, shadow tables) add significant complexity. The trigger-based approach is sufficient because:
+```sql
+-- 1. Standalone index for fast history lookups
+CREATE INDEX IF NOT EXISTS idx_entity_slug_history_old_slug
+ON public.entity_slug_history (old_slug);
 
-- All slug generation is funneled through these two `SECURITY DEFINER` functions
-- Execute is revoked from `anon` and `authenticated` roles
-- Direct SQL writes to `entities` are admin-only operations
+-- 2. Update generate_entity_slug(name) - 1 arg
+CREATE OR REPLACE FUNCTION public.generate_entity_slug(name text)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  base_slug text;
+  final_slug text;
+  counter integer := 0;
+  slug_exists boolean;
+BEGIN
+  base_slug := lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'));
+  base_slug := trim(both '-' from base_slug);
+  IF base_slug = '' THEN
+    base_slug := 'untitled';
+  END IF;
 
-If needed in the future, a `BEFORE INSERT OR UPDATE` trigger on `entities` could reject any slug found in history as a final safety net.
+  final_slug := base_slug;
 
-## On the "Resolve Old Slugs During Fetch" Suggestion
+  LOOP
+    SELECT EXISTS(
+      SELECT 1 FROM public.entities
+      WHERE slug = final_slug AND is_deleted = false
+    ) INTO slug_exists;
 
-This is the separate redirect fix already planned and approved. It is a frontend change (updating `fetchEntityBySlug` to check history before returning "not found") and is independent of this migration.
+    IF NOT slug_exists THEN
+      SELECT EXISTS(
+        SELECT 1 FROM public.entity_slug_history
+        WHERE old_slug = final_slug
+      ) INTO slug_exists;
+    END IF;
 
-## Verification
+    IF NOT slug_exists THEN
+      RETURN final_slug;
+    END IF;
 
-1. Create entity "Lion" (gets slug `lion`)
-2. Rename to "Tiger" -- `lion` goes to history, slug becomes `tiger`
-3. Create a new entity "Lion" -- should get `lion-1` (not `lion`, because `lion` is reserved in history)
-4. Visit `/entity/lion` -- should still redirect to the original entity ("Tiger") once the frontend redirect fix is also implemented
-5. Rename "Tiger" back to "Lion" -- should reclaim slug `lion` (self-exclusion guard)
+    counter := counter + 1;
+    final_slug := base_slug || '-' || counter::text;
+  END LOOP;
+END;
+$$;
 
+-- 3. Update generate_entity_slug(name, entity_id) - 2 args
+CREATE OR REPLACE FUNCTION public.generate_entity_slug(name text, entity_id uuid)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  base_slug text;
+  final_slug text;
+  counter integer := 0;
+  slug_exists boolean;
+  parent_slug text;
+  parent_id_val uuid;
+  parent_type entity_type;
+  current_type entity_type;
+BEGIN
+  base_slug := lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'));
+  base_slug := trim(both '-' from base_slug);
+  IF base_slug = '' THEN
+    base_slug := 'untitled';
+  END IF;
+
+  IF entity_id IS NOT NULL THEN
+    SELECT e.parent_id, e.type INTO parent_id_val, current_type
+    FROM public.entities e
+    WHERE e.id = generate_entity_slug.entity_id;
+
+    IF parent_id_val IS NOT NULL THEN
+      SELECT e.slug, e.type INTO parent_slug, parent_type
+      FROM public.entities e
+      WHERE e.id = parent_id_val AND e.is_deleted = false;
+
+      IF parent_slug IS NOT NULL AND parent_slug != '' AND
+         parent_type = 'brand' AND current_type = 'product' THEN
+        base_slug := parent_slug || '-' || base_slug;
+      END IF;
+    END IF;
+  END IF;
+
+  final_slug := base_slug;
+
+  LOOP
+    SELECT EXISTS(
+      SELECT 1 FROM public.entities
+      WHERE slug = final_slug AND is_deleted = false
+      AND (generate_entity_slug.entity_id IS NULL OR id != generate_entity_slug.entity_id)
+    ) INTO slug_exists;
+
+    IF NOT slug_exists THEN
+      SELECT EXISTS(
+        SELECT 1 FROM public.entity_slug_history h
+        WHERE h.old_slug = final_slug
+        AND h.entity_id != generate_entity_slug.entity_id
+      ) INTO slug_exists;
+    END IF;
+
+    IF NOT slug_exists THEN
+      RETURN final_slug;
+    END IF;
+
+    counter := counter + 1;
+    final_slug := base_slug || '-' || counter::text;
+  END LOOP;
+END;
+$$;
+
+-- 4. Update generate_entity_slug_on_insert()
+CREATE OR REPLACE FUNCTION public.generate_entity_slug_on_insert()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  base_slug text;
+  final_slug text;
+  counter integer := 0;
+  slug_exists boolean;
+BEGIN
+  IF NEW.slug IS NOT NULL AND NEW.slug != '' THEN
+    RETURN NEW;
+  END IF;
+
+  base_slug := public.generate_entity_slug(NEW.name);
+  final_slug := base_slug;
+
+  LOOP
+    SELECT EXISTS(
+      SELECT 1 FROM public.entities
+      WHERE slug = final_slug AND is_deleted = false
+      AND id != NEW.id
+    ) INTO slug_exists;
+
+    IF NOT slug_exists THEN
+      SELECT EXISTS(
+        SELECT 1 FROM public.entity_slug_history
+        WHERE old_slug = final_slug
+      ) INTO slug_exists;
+    END IF;
+
+    IF NOT slug_exists THEN
+      NEW.slug := final_slug;
+      RETURN NEW;
+    END IF;
+
+    counter := counter + 1;
+    final_slug := base_slug || '-' || counter::text;
+  END LOOP;
+END;
+$$;
+```
