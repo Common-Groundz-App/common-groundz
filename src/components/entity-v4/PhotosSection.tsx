@@ -558,7 +558,10 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
                       if (!fallback) {
                         const placeholder = document.createElement('div');
                         placeholder.className = 'fallback-placeholder w-full h-full bg-muted flex items-center justify-center';
-                        placeholder.innerHTML = '<div class="text-muted-foreground">📷</div>';
+                        const icon = document.createElement('div');
+                        icon.className = 'text-muted-foreground';
+                        icon.textContent = '📷';
+                        placeholder.appendChild(icon);
                         target.parentElement?.appendChild(placeholder);
                       }
                     }}

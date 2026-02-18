@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -65,7 +66,15 @@ const ReviewCard = ({
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
   
   const isOwner = user?.id === review.user_id;
-  const isAdmin = user?.email?.includes('@lovable.dev') || false; // Simple admin check
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  React.useEffect(() => {
+    if (!user?.email) { setIsAdmin(false); return; }
+    let cancelled = false;
+    supabase.rpc('is_admin_user', { user_email: user.email })
+      .then(({ data }) => { if (!cancelled) setIsAdmin(!!data); });
+    return () => { cancelled = true; };
+  }, [user?.email]);
   
   // Check if user can start timeline (owns review and has no timeline)
   const canStartTimeline = isOwner && (!review.has_timeline || !review.timeline_count || review.timeline_count === 0);
