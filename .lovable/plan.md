@@ -1,193 +1,80 @@
 
 
-# Revised Migration: Slug History Uniqueness Check
+# Fix: Entity Old-Slug Redirection
 
-## What Changed From Previous Attempt
+## What This Fixes
 
-The previous SQL used `DROP FUNCTION` before recreating `generate_entity_slug(text, uuid)`. This is unnecessary and risky because:
+When visiting an old entity URL (e.g., `/entity/the-terminator` after renaming), the page shows "Entity not found" instead of redirecting to the current slug. The slug history is recorded correctly in the database, but the frontend fetch layer doesn't check it.
 
-- The existing function uses `entity_id uuid DEFAULT NULL::uuid`
-- We are not changing that default -- we only need to update the function body
-- `CREATE OR REPLACE` works fine when the signature (including defaults) stays the same
-- Dropping a core function mid-migration risks breaking dependent triggers
+## Why It Matters
 
-## Fix
+- Shared links and bookmarks break after a rename
+- SEO ranking drops when old URLs return "not found"
+- The username system already handles this correctly -- entities should match
 
-Simply use `CREATE OR REPLACE` for all three functions, preserving `DEFAULT NULL::uuid` on the 2-arg version. No `DROP FUNCTION` statement.
+## Changes (5 files)
 
-## Migration SQL (Final)
+### 1. `src/services/entityService.ts` -- Make `fetchEntityBySlug` history-aware
 
-```sql
--- 1. Standalone index for fast history lookups
-CREATE INDEX IF NOT EXISTS idx_entity_slug_history_old_slug
-ON public.entity_slug_history (old_slug);
+Add a typed return interface:
 
--- 2. Update generate_entity_slug(name) - 1 arg
-CREATE OR REPLACE FUNCTION public.generate_entity_slug(name text)
-RETURNS text
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-  base_slug text;
-  final_slug text;
-  counter integer := 0;
-  slug_exists boolean;
-BEGIN
-  base_slug := lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'));
-  base_slug := trim(both '-' from base_slug);
-  IF base_slug = '' THEN
-    base_slug := 'untitled';
-  END IF;
-
-  final_slug := base_slug;
-
-  LOOP
-    SELECT EXISTS(
-      SELECT 1 FROM public.entities
-      WHERE slug = final_slug AND is_deleted = false
-    ) INTO slug_exists;
-
-    IF NOT slug_exists THEN
-      SELECT EXISTS(
-        SELECT 1 FROM public.entity_slug_history
-        WHERE old_slug = final_slug
-      ) INTO slug_exists;
-    END IF;
-
-    IF NOT slug_exists THEN
-      RETURN final_slug;
-    END IF;
-
-    counter := counter + 1;
-    final_slug := base_slug || '-' || counter::text;
-  END LOOP;
-END;
-$$;
-
--- 3. Update generate_entity_slug(name, entity_id) - 2 args (DEFAULT preserved)
-CREATE OR REPLACE FUNCTION public.generate_entity_slug(name text, entity_id uuid DEFAULT NULL::uuid)
-RETURNS text
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-  base_slug text;
-  final_slug text;
-  counter integer := 0;
-  slug_exists boolean;
-  parent_slug text;
-  parent_id_val uuid;
-  parent_type entity_type;
-  current_type entity_type;
-BEGIN
-  base_slug := lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'));
-  base_slug := trim(both '-' from base_slug);
-  IF base_slug = '' THEN
-    base_slug := 'untitled';
-  END IF;
-
-  IF entity_id IS NOT NULL THEN
-    SELECT e.parent_id, e.type INTO parent_id_val, current_type
-    FROM public.entities e
-    WHERE e.id = generate_entity_slug.entity_id;
-
-    IF parent_id_val IS NOT NULL THEN
-      SELECT e.slug, e.type INTO parent_slug, parent_type
-      FROM public.entities e
-      WHERE e.id = parent_id_val AND e.is_deleted = false;
-
-      IF parent_slug IS NOT NULL AND parent_slug != '' AND
-         parent_type = 'brand' AND current_type = 'product' THEN
-        base_slug := parent_slug || '-' || base_slug;
-      END IF;
-    END IF;
-  END IF;
-
-  final_slug := base_slug;
-
-  LOOP
-    SELECT EXISTS(
-      SELECT 1 FROM public.entities
-      WHERE slug = final_slug AND is_deleted = false
-      AND (generate_entity_slug.entity_id IS NULL OR id != generate_entity_slug.entity_id)
-    ) INTO slug_exists;
-
-    IF NOT slug_exists THEN
-      SELECT EXISTS(
-        SELECT 1 FROM public.entity_slug_history h
-        WHERE h.old_slug = final_slug
-        AND h.entity_id != generate_entity_slug.entity_id
-      ) INTO slug_exists;
-    END IF;
-
-    IF NOT slug_exists THEN
-      RETURN final_slug;
-    END IF;
-
-    counter := counter + 1;
-    final_slug := base_slug || '-' || counter::text;
-  END LOOP;
-END;
-$$;
-
--- 4. Update generate_entity_slug_on_insert()
-CREATE OR REPLACE FUNCTION public.generate_entity_slug_on_insert()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public, pg_temp
-AS $$
-DECLARE
-  base_slug text;
-  final_slug text;
-  counter integer := 0;
-  slug_exists boolean;
-BEGIN
-  IF NEW.slug IS NOT NULL AND NEW.slug != '' THEN
-    RETURN NEW;
-  END IF;
-
-  base_slug := public.generate_entity_slug(NEW.name);
-  final_slug := base_slug;
-
-  LOOP
-    SELECT EXISTS(
-      SELECT 1 FROM public.entities
-      WHERE slug = final_slug AND is_deleted = false
-      AND id != NEW.id
-    ) INTO slug_exists;
-
-    IF NOT slug_exists THEN
-      SELECT EXISTS(
-        SELECT 1 FROM public.entity_slug_history
-        WHERE old_slug = final_slug
-      ) INTO slug_exists;
-    END IF;
-
-    IF NOT slug_exists THEN
-      NEW.slug := final_slug;
-      RETURN NEW;
-    END IF;
-
-    counter := counter + 1;
-    final_slug := base_slug || '-' || counter::text;
-  END LOOP;
-END;
-$$;
+```typescript
+export interface EntityFetchResult {
+  entity: Entity | null;
+  matchedVia: 'current' | 'id' | 'history';
+  canonicalSlug: string | null;
+}
 ```
+
+Update `fetchEntityBySlug` to return `EntityFetchResult`:
+- Step 1: Try `entities.slug` -- return `matchedVia: 'current'`
+- Step 2: Try `entities.id` (if UUID) -- return `matchedVia: 'id'`
+- Step 3: Call `resolveSlugWithHistory()` from `entityRedirectService.ts` -- return `matchedVia: 'history'` with `canonicalSlug`
+- Step 4: Return `{ entity: null, matchedVia: 'current', canonicalSlug: null }`
+
+Keep a backward-compatible wrapper (`fetchEntityBySlugSimple`) returning `Entity | null` for callers like `fetchEntityWithParentContext` that don't need redirect info.
+
+### 2. `src/hooks/use-entity-detail.ts` -- Expose `redirectToSlug`
+
+- Use the new `EntityFetchResult` from `fetchEntityBySlug`
+- When `matchedVia === 'history'`: set entity normally, do NOT set error, store `canonicalSlug` as `redirectToSlug`
+- Add `redirectToSlug: string | null` to the return value
+
+### 3. `src/hooks/use-entity-detail-cached.ts` -- Expose `redirectToSlug`
+
+- Same adjustment: use `EntityFetchResult`, don't throw when matched via history
+- Add `redirectToSlug` to the `EntityDetailData` interface and return value
+
+### 4. `src/pages/EntityDetail.tsx` -- Redirect before "not found" render
+
+Before the existing "not found" check at line 201, add:
+
+```typescript
+if (redirectToSlug && redirectToSlug !== entitySlug) {
+  navigate(`/entity/${redirectToSlug}`, { replace: true });
+  return null;
+}
+```
+
+This runs after data is loaded, so there's no flash of "Entity not found."
+
+### 5. `src/components/entity-v4/EntityV4.tsx` -- Same redirect check
+
+Before the "not found" check at line 436, add the same redirect guard using `redirectToSlug` from `useEntityDetailCached`.
 
 ## What Does NOT Change
 
-- `update_entity_slug()` trigger -- untouched
-- `entity_slug_history` table structure -- untouched
-- Frontend code, edge functions, RLS policies -- untouched
+- Database functions or triggers (migration already applied)
+- `entityRedirectService.ts` (reused internally, not modified)
+- `entity_slug_history` table structure
+- RLS policies
+- Any other pages or components
 
-## Summary of Differences From Previous Attempt
+## Verification After Implementation
 
-- No `DROP FUNCTION` statement
-- `DEFAULT NULL::uuid` preserved on the 2-arg function
-- Everything else (history checks, self-exclusion guard, `pg_temp`, index) remains the same
+1. Create entity "test-redirect"
+2. Rename to "test-redirect-new" (old slug recorded in history)
+3. Visit `/entity/test-redirect` -- should load entity and URL changes to `/entity/test-redirect-new`
+4. No "Entity not found" flash at any point
+5. Visit `/entity/test-redirect-new` directly -- loads normally, no redirect
 
