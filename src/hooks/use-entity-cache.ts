@@ -1,6 +1,6 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchEntityBySlug } from '@/services/entityService';
+import { fetchEntityBySlugSimple } from '@/services/entityService';
 import { Entity } from '@/services/recommendation/types';
 
 interface UseEntityCacheProps {
@@ -18,7 +18,7 @@ export const useEntityCache = ({ slugOrId, enabled = true }: UseEntityCacheProps
     refetch
   } = useQuery({
     queryKey: ['entity', slugOrId],
-    queryFn: () => fetchEntityBySlug(slugOrId),
+    queryFn: () => fetchEntityBySlugSimple(slugOrId),
     enabled: !!slugOrId && enabled,
     staleTime: 1000 * 60 * 10, // 10 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes
@@ -37,7 +37,7 @@ export const useEntityCache = ({ slugOrId, enabled = true }: UseEntityCacheProps
   const prefetchEntity = (entitySlugOrId: string) => {
     queryClient.prefetchQuery({
       queryKey: ['entity', entitySlugOrId],
-      queryFn: () => fetchEntityBySlug(entitySlugOrId),
+      queryFn: () => fetchEntityBySlugSimple(entitySlugOrId),
       staleTime: 1000 * 60 * 10,
     });
   };
@@ -61,7 +61,7 @@ export const useEntityPrefetch = () => {
     entitySlugs.forEach(slug => {
       queryClient.prefetchQuery({
         queryKey: ['entity', slug],
-        queryFn: () => fetchEntityBySlug(slug),
+        queryFn: () => fetchEntityBySlugSimple(slug),
         staleTime: 1000 * 60 * 10,
       });
     });

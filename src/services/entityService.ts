@@ -3,14 +3,22 @@ import { Entity, RecommendationCategory } from '@/services/recommendation/types'
 import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
 import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
 import { MediaItem } from '@/types/common';
+import { resolveSlugWithHistory } from '@/services/entityRedirectService';
+
+export interface EntityFetchResult {
+  entity: Entity | null;
+  matchedVia: 'current' | 'id' | 'history';
+  canonicalSlug: string | null;
+}
 
 /**
- * Fetch an entity by its slug or ID
+ * Fetch an entity by its slug or ID, including slug history fallback.
+ * Returns structured result with redirect info.
  */
-export const fetchEntityBySlug = async (slugOrId: string): Promise<Entity | null> => {
+export const fetchEntityBySlug = async (slugOrId: string): Promise<EntityFetchResult> => {
   console.log('🔍 fetchEntityBySlug called with:', slugOrId);
   
-  // First try to fetch by slug
+  // Step 1: Try by current slug
   let { data, error } = await supabase
     .from('entities')
     .select('*')
@@ -22,8 +30,13 @@ export const fetchEntityBySlug = async (slugOrId: string): Promise<Entity | null
     console.error('Error fetching entity by slug:', error);
   }
 
-  // If not found by slug and the parameter looks like a UUID, try by ID
-  if (!data && isValidUUID(slugOrId)) {
+  if (data) {
+    console.log('✅ Entity found by slug:', data.name);
+    return { entity: data as Entity, matchedVia: 'current', canonicalSlug: data.slug };
+  }
+
+  // Step 2: Try by ID if UUID
+  if (isValidUUID(slugOrId)) {
     console.log('🔄 Slug lookup failed, trying by ID:', slugOrId);
     const result = await supabase
       .from('entities')
@@ -32,21 +45,36 @@ export const fetchEntityBySlug = async (slugOrId: string): Promise<Entity | null
       .eq('is_deleted', false)
       .maybeSingle();
     
-    data = result.data;
-    error = result.error;
-    
-    if (error) {
-      console.error('Error fetching entity by ID:', error);
+    if (result.error) {
+      console.error('Error fetching entity by ID:', result.error);
+    }
+
+    if (result.data) {
+      console.log('✅ Entity found by ID:', result.data.name);
+      return { entity: result.data as Entity, matchedVia: 'id', canonicalSlug: result.data.slug };
     }
   }
 
-  if (data) {
-    console.log('✅ Entity found:', data.name, 'with slug:', data.slug);
-  } else {
-    console.log('❌ Entity not found for:', slugOrId);
+  // Step 3: Check slug history for old slugs
+  console.log('🔄 Checking slug history for:', slugOrId);
+  const historyResult = await resolveSlugWithHistory(slugOrId);
+  if (historyResult.entity) {
+    console.log('✅ Entity found via slug history:', historyResult.entity.name, '→ canonical slug:', historyResult.currentSlug);
+    return { entity: historyResult.entity, matchedVia: 'history', canonicalSlug: historyResult.currentSlug };
   }
 
-  return data as Entity;
+  // Step 4: Not found
+  console.log('❌ Entity not found for:', slugOrId);
+  return { entity: null, matchedVia: 'current', canonicalSlug: null };
+};
+
+/**
+ * Backward-compatible wrapper returning just Entity | null.
+ * Used by callers that don't need redirect info (e.g. hierarchy, cache, parent context).
+ */
+export const fetchEntityBySlugSimple = async (slugOrId: string): Promise<Entity | null> => {
+  const result = await fetchEntityBySlug(slugOrId);
+  return result.entity;
 };
 
 /**
@@ -58,7 +86,7 @@ export const fetchEntityWithParentContext = async (slugOrId: string): Promise<{
 }> => {
   console.log('🔍 fetchEntityWithParentContext called with:', slugOrId);
   
-  const entity = await fetchEntityBySlug(slugOrId);
+  const entity = await fetchEntityBySlugSimple(slugOrId);
   
   if (!entity) {
     return { entity: null, parentEntity: null };
@@ -68,7 +96,7 @@ export const fetchEntityWithParentContext = async (slugOrId: string): Promise<{
   
   // If entity has a parent_id, fetch the parent
   if (entity.parent_id) {
-    parentEntity = await fetchEntityBySlug(entity.parent_id);
+    parentEntity = await fetchEntityBySlugSimple(entity.parent_id);
   }
   
   return { entity, parentEntity };

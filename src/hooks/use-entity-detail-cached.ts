@@ -17,6 +17,7 @@ export interface EntityDetailData {
   recommendations: RecommendationWithUser[];
   reviews: ReviewWithUser[];
   stats: EntityStats | null;
+  redirectToSlug: string | null;
   isLoading: boolean;          // Initial load only (no cached data)
   isFetching: boolean;          // Any fetch (initial + background)
   isRefetching: boolean;        // Background refetch only (has cached data)
@@ -36,26 +37,22 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     isFetching,
     error
   } = useQuery({
-    // IMPORTANT: Query key does NOT include user?.id to prevent cache invalidation
-    // during Supabase token refresh (which briefly sets user to null/undefined).
-    // User context is passed to fetchers for personalized data, and cache is
-    // explicitly invalidated via useEffect when user actually signs in/out.
     queryKey: ['entity-detail', slug],
     queryFn: async () => {
       console.log('🔍 Fetching entity detail for slug:', slug);
       
-      // Fetch entity first
-      let entity = await fetchEntityBySlug(slug);
-      if (!entity) {
+      // Fetch entity first using typed result
+      const fetchResult = await fetchEntityBySlug(slug);
+      if (!fetchResult.entity) {
         throw new Error('Entity not found');
       }
       
-      // REMOVED: Automatic staleness refresh
-      // Staleness refresh is now admin-only via the "Refresh" button in entity management
-      // This eliminates excessive Google Places API calls on every entity page load
+      const entity = fetchResult.entity;
+      const redirectToSlug = fetchResult.matchedVia === 'history' ? fetchResult.canonicalSlug : null;
+      
       const lastRefreshed = entity.metadata?.last_refreshed_at;
       if (lastRefreshed) {
-        const daysSinceRefresh = Math.round((Date.now() - new Date(lastRefreshed).getTime()) / (24 * 60 * 60 * 1000));
+        const daysSinceRefresh = Math.round((Date.now() - new Date(lastRefreshed as string).getTime()) / (24 * 60 * 60 * 1000));
         console.log(`✅ Entity loaded. Last refreshed: ${daysSinceRefresh} days ago (auto-refresh disabled)`);
       } else {
         console.log(`✅ Entity loaded. Never refreshed (auto-refresh disabled)`);
@@ -72,13 +69,14 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
         entity,
         recommendations,
         reviews,
-        stats
+        stats,
+        redirectToSlug
       };
     },
     enabled: !!slug,
-    staleTime: 1000 * 60 * 2, // 2 minutes (reduced for faster updates after claims)
+    staleTime: 1000 * 60 * 2, // 2 minutes
     gcTime: 1000 * 60 * 30, // 30 minutes
-    refetchOnWindowFocus: false, // Prevent flicker on tab switch
+    refetchOnWindowFocus: false,
   });
 
   // Invalidate cache when user actually changes (sign in/out)
@@ -86,14 +84,12 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     const currentUserId = user?.id || null;
     const previousUserId = previousUserIdRef.current;
     
-    // GUARDRAIL #2: Skip on initial mount (sentinel value)
     if (previousUserId === undefined) {
       console.log('🔧 Initial mount, recording user ID:', currentUserId);
       previousUserIdRef.current = currentUserId;
       return;
     }
     
-    // User changed (sign in/out) - invalidate to refetch with new permissions
     if (previousUserId !== currentUserId) {
       console.log('🔄 User changed, invalidating entity cache:', { 
         from: previousUserId, 
@@ -110,9 +106,10 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
     recommendations: data?.recommendations || [],
     reviews: data?.reviews || [],
     stats: data?.stats || null,
-    isLoading,                                    // Only true on initial load (no cache)
-    isFetching,                                   // True during any fetch
-    isRefetching: isFetching && !!data,          // True during background refetch (cache exists)
+    redirectToSlug: data?.redirectToSlug || null,
+    isLoading,
+    isFetching,
+    isRefetching: isFetching && !!data,
     error: error?.message || null
   };
 };

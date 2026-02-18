@@ -56,6 +56,7 @@ const EntityV4 = () => {
     stats,
     isLoading,       // Now only true on initial load
     isRefetching,    // True during background refetch
+    redirectToSlug,
     error
   } = useEntityDetailCached(entitySlug);
 
@@ -430,6 +431,12 @@ const EntityV4 = () => {
         entityType={entity?.type ?? 'product'}
       />
     );
+  }
+
+  // Redirect if matched via slug history
+  if (redirectToSlug && redirectToSlug !== entitySlug) {
+    navigate(`/entity/${redirectToSlug}`, { replace: true });
+    return null;
   }
 
   // Show error state

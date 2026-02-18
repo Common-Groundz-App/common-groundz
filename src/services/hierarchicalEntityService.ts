@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Entity } from '@/services/recommendation/types';
-import { fetchEntityBySlug } from '@/services/entityService';
+import { fetchEntityBySlugSimple } from '@/services/entityService';
 import { isUUID } from '@/utils/entityUrlUtils';
 
 /**
@@ -26,8 +26,8 @@ export const resolveHierarchicalEntity = async (
   try {
     // Fetch both entities in parallel
     const [parentEntity, childEntity] = await Promise.all([
-      fetchEntityBySlug(parentSlug),
-      fetchEntityBySlug(childSlug)
+      fetchEntityBySlugSimple(parentSlug),
+      fetchEntityBySlugSimple(childSlug)
     ]);
 
     if (!childEntity) {
@@ -73,7 +73,7 @@ export const resolveHierarchicalEntity = async (
  */
 export const resolveSingleEntity = async (slug: string): Promise<HierarchicalEntityResult> => {
   try {
-    const entity = await fetchEntityBySlug(slug);
+    const entity = await fetchEntityBySlugSimple(slug);
     
     return {
       entity,
