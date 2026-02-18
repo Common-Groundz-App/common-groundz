@@ -26,6 +26,7 @@ export const useEntityDetail = (slugOrId: string) => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [redirectToSlug, setRedirectToSlug] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchEntityData = async () => {
@@ -33,20 +34,29 @@ export const useEntityDetail = (slugOrId: string) => {
       setIsLoading(true);
       setLoadingStep(0);
       setError(null);
+      setRedirectToSlug(null);
 
       try {
         // Step 1: Fetch entity data first (required for entity ID)
         setLoadingStep(1);
-        const entityData = await fetchEntityBySlug(slugOrId);
-        if (!entityData) {
+        const fetchResult = await fetchEntityBySlug(slugOrId);
+        
+        if (!fetchResult.entity) {
           console.log('❌ Entity not found for:', slugOrId);
           setError('Entity not found');
           setIsLoading(false);
           return;
         }
 
+        const entityData = fetchResult.entity;
         console.log('✅ Found entity data:', entityData);
         setEntity(entityData);
+
+        // If matched via history, signal redirect needed
+        if (fetchResult.matchedVia === 'history' && fetchResult.canonicalSlug) {
+          console.log('🔄 Matched via history, redirect to:', fetchResult.canonicalSlug);
+          setRedirectToSlug(fetchResult.canonicalSlug);
+        }
 
         // Steps 2-4: Fetch recommendations, reviews, and stats in parallel
         setLoadingStep(2);
@@ -59,13 +69,6 @@ export const useEntityDetail = (slugOrId: string) => {
         ]);
 
         console.log('✅ Parallel fetch completed');
-        console.log('Entity recommendations fetched:', entityRecommendations.length);
-        console.log('Entity reviews fetched:', entityReviews.length);
-        console.log('Entity stats fetched:', entityStats);
-        
-        if (entityReviews && entityReviews.length > 0) {
-          console.log('Sample review structure:', JSON.stringify(entityReviews[0], null, 2));
-        }
 
         // Update all state at once after parallel fetch
         setRecommendations(entityRecommendations);
@@ -96,7 +99,6 @@ export const useEntityDetail = (slugOrId: string) => {
     
     try {
       setLoadingStep(2);
-      console.log('🚀 Starting parallel refresh for entity:', entity.id);
       
       const [refreshedRecommendations, refreshedReviews, refreshedStats] = await Promise.all([
         fetchEntityRecommendations(entity.id, user?.id || null),
@@ -104,15 +106,6 @@ export const useEntityDetail = (slugOrId: string) => {
         getEntityStats(entity.id)
       ]);
 
-      console.log('✅ Parallel refresh completed');
-      console.log('Refresh received recommendations:', refreshedRecommendations.length);
-      console.log('Refresh received reviews:', refreshedReviews.length);
-      
-      if (refreshedReviews && refreshedReviews.length > 0) {
-        console.log('Sample refreshed review structure:', JSON.stringify(refreshedReviews[0], null, 2));
-      }
-
-      // Update all state at once after parallel refresh  
       setRecommendations(refreshedRecommendations);
       setReviews(refreshedReviews);
       setStats(refreshedStats);
@@ -132,6 +125,7 @@ export const useEntityDetail = (slugOrId: string) => {
     isLoading,
     loadingStep,
     error,
+    redirectToSlug,
     refreshData
   };
 };

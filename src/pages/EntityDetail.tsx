@@ -86,6 +86,7 @@ const EntityDetailOriginal = () => {
     isLoading,
     loadingStep,
     error,
+    redirectToSlug,
     refreshData
   } = useEntityDetail(entitySlug);
 
@@ -197,6 +198,12 @@ const EntityDetailOriginal = () => {
       console.log('Contributors ready for display:', circleContributors);
     }
   }, [circleContributors]);
+
+  // Redirect if matched via slug history
+  if (redirectToSlug && redirectToSlug !== entitySlug) {
+    navigate(`/entity/${redirectToSlug}`, { replace: true });
+    return null;
+  }
 
   if (!isLoading && (error || !entity)) {
     return <NotFound />;
