@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.33.2";
 
@@ -7,13 +6,40 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Allowlist of permitted bucket names
+const ALLOWED_BUCKETS = ['entity-images', 'post_media'];
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // === Auth gate (before body parse) ===
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized', code: 'MISSING_AUTH' }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    const supabaseAnon = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAnon.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized', code: 'INVALID_TOKEN' }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // === Admin check via service_role ===
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
@@ -21,19 +47,35 @@ serve(async (req) => {
       throw new Error("Missing Supabase environment variables");
     }
 
-    // We need to use the service role key to manipulate policies
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Get request data
+    const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (roleError || !isAdmin) {
+      return new Response(JSON.stringify({ error: 'Forbidden', code: 'NOT_ADMIN' }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      });
+    }
+
+    // === Now parse body ===
     const { bucketName } = await req.json();
     
     if (!bucketName) {
       return new Response(
-        JSON.stringify({ error: "Bucket name is required" }),
-        { 
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
-        }
+        JSON.stringify({ error: "Bucket name is required", code: "INVALID_INPUT" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // === Bucket allowlist check ===
+    if (!ALLOWED_BUCKETS.includes(bucketName)) {
+      console.warn(`⚠️ Rejected bucket name not in allowlist: ${bucketName}`);
+      return new Response(
+        JSON.stringify({ error: "Bucket name not allowed", code: "BUCKET_NOT_ALLOWED" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -50,10 +92,9 @@ serve(async (req) => {
     const bucketExists = buckets.some(bucket => bucket.name === bucketName);
     
     if (!bucketExists) {
-      // Create the bucket if it doesn't exist
       const { error: createError } = await supabase.storage.createBucket(bucketName, {
         public: true,
-        fileSizeLimit: 10485760, // 10MB
+        fileSizeLimit: 10485760,
         allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
       });
       
@@ -72,7 +113,6 @@ serve(async (req) => {
 
     if (policyError) {
       console.error(`Error creating storage policies: ${policyError.message}`);
-      // Don't throw here as policies might already exist
       console.log(`Policy setup completed with warnings for bucket: ${bucketName}`);
     } else {
       console.log(`Storage policies created successfully for bucket: ${bucketName}`);
@@ -89,14 +129,8 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in ensure-bucket-policies function:", error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        success: false 
-      }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      }
+      JSON.stringify({ error: 'Internal error', code: 'INTERNAL_ERROR', success: false }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

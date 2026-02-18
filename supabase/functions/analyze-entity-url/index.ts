@@ -15,6 +15,48 @@ serve(async (req) => {
   }
 
   try {
+    // === Auth gate (before body parse) ===
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized', code: 'MISSING_AUTH' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const supabaseAnon = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAnon.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized', code: 'INVALID_TOKEN' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // === Admin check via service_role ===
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data: isAdmin, error: roleError } = await supabaseClient.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (roleError || !isAdmin) {
+      return new Response(JSON.stringify({ error: 'Forbidden', code: 'NOT_ADMIN' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // === Now parse body ===
     const { url } = await req.json();
     
     if (!url) {
@@ -25,12 +67,6 @@ serve(async (req) => {
     }
 
     console.log('🔍 [Phase2-URL-Context] Analyzing URL:', url);
-
-    // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
 
     // Use Gemini's URL Context API to analyze directly
     const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
@@ -59,16 +95,11 @@ serve(async (req) => {
           ],
           systemInstruction: {
             role: 'system',
-            parts: [{
-              text: systemPrompt
-            }]
+            parts: [{ text: systemPrompt }]
           },
           tools: [{ googleSearch: {} }],
           generationConfig: {
-            temperature: 0.2,
-            topP: 0.8,
-            topK: 40,
-            maxOutputTokens: 2048
+            temperature: 0.2, topP: 0.8, topK: 40, maxOutputTokens: 2048
           }
         })
       }
@@ -89,22 +120,11 @@ serve(async (req) => {
       console.warn('⚠️ Gemini returned empty text response');
       return new Response(
         JSON.stringify({
-          success: false,
-          predictions: null,
-          raw_text: '',
+          success: false, predictions: null, raw_text: '',
           message: 'Gemini returned empty text. Please apply metadata manually or try again.',
-          metadata: {
-            analyzed_url: url,
-            model: 'gemini-2.5-flash',
-            timestamp: new Date().toISOString(),
-            method: 'url_context_grounding',
-            gemini_empty: true
-          }
+          metadata: { analyzed_url: url, model: 'gemini-2.5-flash', timestamp: new Date().toISOString(), method: 'url_context_grounding', gemini_empty: true }
         }),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -112,28 +132,19 @@ serve(async (req) => {
     let aiPredictions;
     try {
       let jsonText = aiText.trim();
-      
-      // Handle markdown-wrapped JSON (e.g., ```json {...} ```)
       const jsonRegex = /```json\s*([\s\S]*?)\s*```/;
       const match = jsonText.match(jsonRegex);
       if (match && match[1]) {
         jsonText = match[1].trim();
       } else {
-        // Try plain ``` wrapping
         const plainCodeBlock = /```\s*([\s\S]*?)\s*```/;
         const plainMatch = jsonText.match(plainCodeBlock);
-        if (plainMatch && plainMatch[1]) {
-          jsonText = plainMatch[1].trim();
-        }
+        if (plainMatch && plainMatch[1]) { jsonText = plainMatch[1].trim(); }
       }
-      
       aiPredictions = JSON.parse(jsonText);
       console.log('✅ Parsed AI Predictions:', aiPredictions);
     } catch (parseError) {
       console.error('❌ Failed to parse AI response:', parseError);
-      console.error('Raw AI text:', aiText);
-      
-      // Final fallback: extract any JSON object
       try {
         const jsonMatch = aiText.match(/\{[\s\S]*\}/);
         const jsonText = jsonMatch ? jsonMatch[0] : aiText;
@@ -142,27 +153,16 @@ serve(async (req) => {
         console.error('❌ Final JSON parse failed:', finalError);
         return new Response(
           JSON.stringify({
-            success: false,
-            predictions: null,
-            raw_text: aiText,
+            success: false, predictions: null, raw_text: aiText,
             message: 'Failed to parse AI response. Please apply metadata manually.',
-            metadata: {
-              analyzed_url: url,
-              model: 'gemini-2.5-flash',
-              timestamp: new Date().toISOString(),
-              method: 'url_context_grounding',
-              parse_error: true
-            }
+            metadata: { analyzed_url: url, model: 'gemini-2.5-flash', timestamp: new Date().toISOString(), method: 'url_context_grounding', parse_error: true }
           }),
-          { 
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
 
-    // Match category to existing categories in database with path-based scoring
+    // Match category to existing categories in database
     let categoryId: string | null = null;
     let matchedCategoryName: string | null = null;
     const suggestedCategoryPath = aiPredictions.suggested_category || null;
@@ -170,67 +170,39 @@ serve(async (req) => {
     if (suggestedCategoryPath && aiPredictions.type) {
       console.log('🔍 Matching category:', suggestedCategoryPath, 'for type:', aiPredictions.type);
       
-      // Fetch all categories for this entity type
       const { data: categories, error: catError } = await supabaseClient
         .from('categories')
         .select('id, name, parent_id')
         .eq('entity_type', aiPredictions.type);
       
       if (!catError && categories && categories.length > 0) {
-        // Build hierarchy map for path reconstruction
         const categoryMap = new Map(categories.map(c => [c.id, c]));
-        
-        // Build full paths for all categories
         const categoryPaths = categories.map(cat => {
           const path: string[] = [];
           let current = cat;
-          while (current) {
-            path.unshift(current.name);
-            current = current.parent_id ? categoryMap.get(current.parent_id) : null;
-          }
+          while (current) { path.unshift(current.name); current = current.parent_id ? categoryMap.get(current.parent_id) : null; }
           return { id: cat.id, name: cat.name, fullPath: path };
         });
         
-        // Split AI suggestion into segments
-        const suggestedSegments = suggestedCategoryPath
-          .split('>')
-          .map(s => s.trim().toLowerCase());
-        
-        // Score each category based on path matching (leaf to root)
+        const suggestedSegments = suggestedCategoryPath.split('>').map(s => s.trim().toLowerCase());
         let bestMatch = null;
         let bestScore = 0;
         
         for (const catPath of categoryPaths) {
           const pathSegments = catPath.fullPath.map(p => p.toLowerCase());
           let score = 0;
-          
-          // Score from leaf (right) to root (left)
           const minLength = Math.min(suggestedSegments.length, pathSegments.length);
           for (let i = 0; i < minLength; i++) {
             const suggestedPart = suggestedSegments[suggestedSegments.length - 1 - i];
             const pathPart = pathSegments[pathSegments.length - 1 - i];
-            
-            // Exact match
-            if (suggestedPart === pathPart) {
-              score += (i + 2) * 10; // Weight deeper matches heavily
-            }
-            // Partial match (contains)
-            else if (suggestedPart.includes(pathPart) || pathPart.includes(suggestedPart)) {
-              score += (i + 1) * 5;
-            }
-            // Mismatch breaks the chain
-            else {
-              break;
-            }
+            if (suggestedPart === pathPart) { score += (i + 2) * 10; }
+            else if (suggestedPart.includes(pathPart) || pathPart.includes(suggestedPart)) { score += (i + 1) * 5; }
+            else { break; }
           }
-          
-          if (score > bestScore) {
-            bestScore = score;
-            bestMatch = catPath;
-          }
+          if (score > bestScore) { bestScore = score; bestMatch = catPath; }
         }
         
-        if (bestMatch && bestScore >= 10) { // Minimum threshold
+        if (bestMatch && bestScore >= 10) {
           categoryId = bestMatch.id;
           matchedCategoryName = bestMatch.fullPath.join(' > ');
           console.log('✅ Matched category:', matchedCategoryName, 'with score:', bestScore);
@@ -242,58 +214,32 @@ serve(async (req) => {
       }
     }
 
-    // Map single image_url from Gemini to images array format
-    const extractedImages = aiPredictions.image_url
-      ? [{ url: aiPredictions.image_url }]
-      : [];
+    const extractedImages = aiPredictions.image_url ? [{ url: aiPredictions.image_url }] : [];
 
-    // Return structured result with BOTH matched and suggested categories
     const result = {
       success: true,
       predictions: {
-        type: aiPredictions.type,
-        name: aiPredictions.name,
-        description: aiPredictions.description,
-        category_id: categoryId,
-        suggested_category_path: suggestedCategoryPath,
-        matched_category_name: matchedCategoryName,
-        tags: aiPredictions.tags || [],
-        confidence: aiPredictions.confidence || 0.5,
-        reasoning: aiPredictions.reasoning || 'No reasoning provided',
+        type: aiPredictions.type, name: aiPredictions.name, description: aiPredictions.description,
+        category_id: categoryId, suggested_category_path: suggestedCategoryPath,
+        matched_category_name: matchedCategoryName, tags: aiPredictions.tags || [],
+        confidence: aiPredictions.confidence || 0.5, reasoning: aiPredictions.reasoning || 'No reasoning provided',
         additional_data: aiPredictions.additional_data || {},
-        image_url: aiPredictions.image_url || null,
-        images: extractedImages
+        image_url: aiPredictions.image_url || null, images: extractedImages
       },
-      metadata: {
-        analyzed_url: url,
-        model: 'gemini-2.5-flash',
-        timestamp: new Date().toISOString(),
-        method: 'url_context_grounding'
-      }
+      metadata: { analyzed_url: url, model: 'gemini-2.5-flash', timestamp: new Date().toISOString(), method: 'url_context_grounding' }
     };
 
     console.log('✅ Final Result:', JSON.stringify(result, null, 2));
 
-    return new Response(
-      JSON.stringify(result),
-      { 
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    return new Response(JSON.stringify(result), { 
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
 
   } catch (error: any) {
     console.error('❌ analyze-entity-url error:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error.message,
-        details: error.stack 
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ success: false, error: 'Internal error', code: 'INTERNAL_ERROR' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
