@@ -103,3 +103,6 @@ verify_jwt = false
 
 [functions.admin-manage-account]
 verify_jwt = false
+
+[functions.refresh-entity-metadata]
+verify_jwt = false

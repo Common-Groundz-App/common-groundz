@@ -18,7 +18,47 @@ serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // === Auth gate (before body parse) ===
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Unauthorized', code: 'MISSING_AUTH' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const supabaseAnon = createClient(
+      supabaseUrl,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAnon.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized', code: 'INVALID_TOKEN' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // === Admin check via service_role ===
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+
+    const { data: isAdmin, error: roleError } = await supabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (roleError || !isAdmin) {
+      return new Response(JSON.stringify({ error: 'Forbidden', code: 'NOT_ADMIN' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // === Now parse body ===
     const { entityId } = await req.json();
 
     if (!entityId) {
@@ -70,7 +110,7 @@ serve(async (req) => {
             // Update metadata with fresh Google Places data
             updatedMetadata = {
               ...updatedMetadata,
-              place_id: entity.api_ref, // Ensure place_id is set
+              place_id: entity.api_ref,
               google_places: {
                 place_id: entity.api_ref,
                 name: result.name,
@@ -108,7 +148,7 @@ serve(async (req) => {
       }
     }
 
-    // Handle other entity types (books, movies, etc.) - can be extended later
+    // Handle other entity types - can be extended later
     if (entity.api_source === 'google_books' && entity.api_ref) {
       console.log(`Google Books metadata refresh for ${entity.api_ref} - functionality can be added here`);
     }
@@ -134,26 +174,18 @@ serve(async (req) => {
       );
     }
 
-    // Log admin action
-    const authHeader = req.headers.get('Authorization');
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      const { data: { user } } = await supabase.auth.getUser(token);
-      
-      if (user) {
-        await supabase.from('admin_actions').insert({
-          admin_user_id: user.id,
-          action_type: 'refresh_entity_metadata',
-          target_type: 'entity',
-          target_id: entityId,
-          details: {
-            entity_name: entity.name,
-            api_source: entity.api_source,
-            refreshed: refreshed
-          }
-        });
+    // Log admin action (userId already validated above)
+    await supabase.from('admin_actions').insert({
+      admin_user_id: userId,
+      action_type: 'refresh_entity_metadata',
+      target_type: 'entity',
+      target_id: entityId,
+      details: {
+        entity_name: entity.name,
+        api_source: entity.api_source,
+        refreshed: refreshed
       }
-    }
+    });
 
     return new Response(
       JSON.stringify({ 
@@ -168,7 +200,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in refresh-entity-metadata function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'Internal error', code: 'INTERNAL_ERROR' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
