@@ -1,50 +1,88 @@
 
 
-# Final Security Remediation Plan (No Changes Needed)
+# Security Remediation - Final Implementation
 
-Both external reviews confirmed the plan is correct. Their additional suggestions are either already addressed or out of scope:
+## Pre-flight Validation Complete
 
-- **Unique index on cached_photos** (ChatGPT): Already exists (`unique_entity_original_url` constraint on `entity_id, original_url`). No action needed.
-- **Harden cached_photos insert path** (Codex): The unique constraint already prevents spam. The table stores non-sensitive cache data. A justification note in the security dashboard is sufficient.
-- **Dependency vulnerability triage record** (Codex): This is a process/documentation task for a pre-launch checklist, not a code change. Noted for later.
-
----
+Audited all 24 frontend files and 8 edge functions that query `profiles`. Every frontend query uses explicit column lists. The only `select('*')` is `src/services/profileService.ts`. Edge functions using `profile_embedding` run with `service_role` (bypasses column grants). No frontend code reads `onboarding_completed`, `email`, or any unlisted column.
 
 ## Changes to Implement
 
-### 1. Harden `refresh-entity-metadata` Edge Function
+### 1. Code Fix: Replace `select('*')` in profileService.ts
 
-**File:** `supabase/functions/refresh-entity-metadata/index.ts`
+**File:** `src/services/profileService.ts` (line 12)
 
-Add the standard auth pattern before any request processing:
-- Extract and validate Authorization header after CORS check
-- Verify JWT via `supabase.auth.getUser(token)` (or `getClaims`)
-- Check admin role via `has_role` RPC using service_role client
-- Move `await req.json()` below auth checks so unauthenticated requests are rejected before body parsing
-- Replace `error.message` in the catch block with generic `{ error: 'Internal error', code: 'INTERNAL_ERROR' }`
+Replace `.select('*')` with explicit columns:
+```ts
+.select('id, username, avatar_url, first_name, last_name, bio, location, cover_url, is_verified, created_at, updated_at, deleted_at, username_changed_at, preferences')
+```
 
-### 2. Clean Up Security Findings Dashboard
+### 2. Database Migration: Entity Enrichment Queue SELECT Policy
 
-**Delete stale findings** (confirmed resolved in live database):
-- Entities table RLS (verified 5 active policies live)
-- Client-side admin checks (ReviewCard already uses server-side RPC)
+```sql
+DROP POLICY IF EXISTS "Allow system select" ON public.entity_enrichment_queue;
 
-**Ignore with justification:**
-- `pg_net` extension in public schema (Supabase limitation, cannot be moved)
-- Leaked Password Protection (requires Pro plan, deferred)
-- Postgres version (just upgraded to v17)
-- `entity_stats_view` materialized view (read-only public aggregate data, no PII)
-- Dependency vulnerabilities (transitive; explicit per-package triage deferred to pre-launch audit checklist)
-- RLS-enabled tables with no policies (internal tables secured via REVOKE)
-- `entity_slug_history` write policies (secured via SECURITY DEFINER triggers only)
-- `cached_photos` INSERT policy (correctly allows authenticated users for frontend photo caching; unique constraint prevents abuse; UPDATE/DELETE already admin-only)
+CREATE POLICY "Users can view own enrichment requests"
+  ON public.entity_enrichment_queue FOR SELECT
+  TO authenticated
+  USING (requested_by = auth.uid());
+
+CREATE POLICY "Admins can view all enrichment requests"
+  ON public.entity_enrichment_queue FOR SELECT
+  TO authenticated
+  USING (has_role(auth.uid(), 'admin'::app_role));
+```
+
+### 3. Database Migration: Profiles Column-Level Grants
+
+```sql
+REVOKE SELECT ON public.profiles FROM anon;
+REVOKE SELECT ON public.profiles FROM authenticated;
+
+GRANT SELECT (
+  id, username, avatar_url, bio, first_name, last_name,
+  location, is_verified, created_at, updated_at,
+  cover_url, deleted_at, username_changed_at
+) ON public.profiles TO anon;
+
+GRANT SELECT (
+  id, username, avatar_url, bio, first_name, last_name,
+  location, is_verified, created_at, updated_at,
+  cover_url, deleted_at, username_changed_at, preferences
+) ON public.profiles TO authenticated;
+```
+
+`embedding` and `embedding_updated_at` are NOT granted -- they remain accessible only via `service_role` (edge functions).
+
+### 4. Security Dashboard: Ignore Dependency Warnings
+
+Ignore high/medium dependency vulnerability findings with justification noting they are transitive and deferred to pre-launch audit with per-package triage.
+
+## Execution Order
+
+1. Fix `select('*')` in `profileService.ts`
+2. Run enrichment queue policy migration
+3. Run profiles column grant migration
+4. Update security dashboard findings
+5. Verify grants with `information_schema.column_privileges` query
+
+## Validated Column Coverage
+
+| Column | anon | authenticated | service_role |
+|--------|------|---------------|--------------|
+| id, username, avatar_url, bio | Yes | Yes | Yes |
+| first_name, last_name, location | Yes | Yes | Yes |
+| is_verified, created_at, updated_at | Yes | Yes | Yes |
+| cover_url, deleted_at, username_changed_at | Yes | Yes | Yes |
+| preferences | No | Yes | Yes |
+| embedding, embedding_updated_at | No | No | Yes |
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/refresh-entity-metadata/index.ts` | JWT auth + admin check before body parse + error sanitization |
-| Security Dashboard | Delete 2 stale findings, ignore ~8 non-actionable findings with justification |
-
-Nothing else changes.
+| `src/services/profileService.ts` | Replace `select('*')` with explicit columns |
+| Database migration 1 | Enrichment queue SELECT policy replacement |
+| Database migration 2 | Profiles column-level REVOKE + GRANT |
+| Security Dashboard | Ignore dependency findings with justification |
 
