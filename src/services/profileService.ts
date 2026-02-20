@@ -9,7 +9,7 @@ export const fetchUserProfile = async (userId: string) => {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('id, username, avatar_url, first_name, last_name, bio, location, cover_url, is_verified, created_at, updated_at, deleted_at, username_changed_at, preferences')
       .eq('id', userId)
       .single();
       
