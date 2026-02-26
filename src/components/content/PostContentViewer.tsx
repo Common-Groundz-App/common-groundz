@@ -62,6 +62,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
         if (error) throw error;
         if (!data) {
           setError('Post not found or has been deleted');
+          onPostLoaded?.(null);
           return;
         }
         
