@@ -54,6 +54,7 @@ const RecommendationContentViewer = ({
         if (error) throw error;
         if (!data) {
           setError('Recommendation not found or has been deleted');
+          onRecommendationLoaded?.(null);
           return;
         }
         
