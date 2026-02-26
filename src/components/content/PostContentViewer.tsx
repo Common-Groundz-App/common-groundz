@@ -124,6 +124,11 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
         };
         
         setPost(processedPost);
+        onPostLoaded?.({
+          title: data.title || '',
+          content: data.content || '',
+          visibility: data.visibility || 'private',
+        });
       } catch (err) {
         console.error('Error fetching post:', err);
         setError('Error loading post');
