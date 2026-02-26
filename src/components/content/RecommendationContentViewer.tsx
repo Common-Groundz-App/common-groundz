@@ -119,7 +119,7 @@ const RecommendationContentViewer = ({
         setRecommendation(processedRecommendation);
         onRecommendationLoaded?.({
           title: data.title || '',
-          content: data.content || '',
+          content: data.description || '',
           visibility: data.visibility || 'private',
           entityName: entity?.name,
         });
