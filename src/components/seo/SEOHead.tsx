@@ -8,6 +8,7 @@ interface SEOHeadProps {
   url?: string;
   canonical?: string;
   noindex?: boolean;
+  type?: string;
 }
 
 const DEFAULTS = {
