@@ -43,6 +43,8 @@ import { Eye, ArrowRight } from 'lucide-react';
 import { getContextualFieldLabel, getEntityTypeFallbackImage, getCanonicalType, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
 import { Helmet } from 'react-helmet-async';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
 import { handleSlugRedirect, handleHierarchicalRedirect } from '@/services/entityRedirectService';
 import { getEntityPageVersion } from '@/utils/entityVersionUtils';
