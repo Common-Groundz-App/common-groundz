@@ -19,7 +19,8 @@ interface RecommendationContentViewerProps {
 const RecommendationContentViewer = ({ 
   recommendationId, 
   highlightCommentId,
-  isInModal = false
+  isInModal = false,
+  onRecommendationLoaded
 }: RecommendationContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
