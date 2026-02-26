@@ -26,6 +26,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
   url,
   canonical,
   noindex = false,
+  type = 'website',
 }) => {
   const resolvedTitle = title || DEFAULTS.title;
   const resolvedDescription = description || DEFAULTS.description;
