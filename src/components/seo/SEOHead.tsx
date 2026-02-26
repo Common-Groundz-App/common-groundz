@@ -47,7 +47,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
       <meta property="og:image" content={resolvedImage} />
       {url && <meta property="og:url" content={url} />}
       <meta property="og:site_name" content={DEFAULTS.siteName} />
-      <meta property="og:type" content="profile" />
+      <meta property="og:type" content={type} />
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary" />

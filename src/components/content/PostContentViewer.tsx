@@ -132,6 +132,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
       } catch (err) {
         console.error('Error fetching post:', err);
         setError('Error loading post');
+        onPostLoaded?.(null);
         toast({
           variant: 'destructive',
           title: 'Error',

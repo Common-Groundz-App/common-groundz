@@ -126,6 +126,7 @@ const RecommendationContentViewer = ({
       } catch (err) {
         console.error('Error fetching recommendation:', err);
         setError('Error loading recommendation');
+        onRecommendationLoaded?.(null);
         toast({
           variant: 'destructive',
           title: 'Error',

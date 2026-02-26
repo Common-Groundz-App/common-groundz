@@ -495,7 +495,15 @@ const EntityV4 = () => {
 
   return <TooltipProvider delayDuration={0}>
     <div className="min-h-screen flex flex-col bg-background">
-      <NavBarComponent />
+      <SEOHead
+        title={entity ? `${entity.name} — Common Groundz` : 'Common Groundz'}
+        description={entity?.description ? entity.description.substring(0, 155) : 'Discover trusted recommendations on Common Groundz'}
+        image={entity?.image_url || undefined}
+        type="website"
+        noindex={false}
+        canonical={entity?.slug ? `${window.location.origin}/entity/${entity.slug}` : undefined}
+      />
+      {user ? <NavBarComponent /> : <GuestNavBar />}
       
       {/* Main Content */}
       <div className="flex-1 pt-8">
