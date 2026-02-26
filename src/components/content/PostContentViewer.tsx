@@ -16,7 +16,7 @@ interface PostContentViewerProps {
   onPostLoaded?: (meta: { title: string; content: string; visibility: string } | null) => void;
 }
 
-const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: PostContentViewerProps) => {
+const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPostLoaded }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [post, setPost] = React.useState<any>(null);
