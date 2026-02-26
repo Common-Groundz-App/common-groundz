@@ -2,7 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
+import GuestNavBar from '@/components/profile/GuestNavBar';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
+import SEOHead from '@/components/seo/SEOHead';
+import PublicContentNotFound from '@/components/content/PublicContentNotFound';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageSquare } from "lucide-react";
