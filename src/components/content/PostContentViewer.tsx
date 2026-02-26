@@ -13,6 +13,7 @@ interface PostContentViewerProps {
   postId: string;
   highlightCommentId: string | null;
   isInModal?: boolean;
+  onPostLoaded?: (meta: { title: string; content: string; visibility: string } | null) => void;
 }
 
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: PostContentViewerProps) => {
