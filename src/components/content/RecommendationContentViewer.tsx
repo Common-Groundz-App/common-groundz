@@ -13,6 +13,7 @@ interface RecommendationContentViewerProps {
   recommendationId: string;
   highlightCommentId: string | null;
   isInModal?: boolean;
+  onRecommendationLoaded?: (meta: { title: string; content: string; visibility: string; entityName?: string } | null) => void;
 }
 
 const RecommendationContentViewer = ({ 
