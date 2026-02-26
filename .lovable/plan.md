@@ -1,69 +1,96 @@
 
 
-# Phase 1: Public Profile Pages — Implementation Plan ✅ IMPLEMENTED
+# Phase 2: Public Entity, Post, and Recommendation Pages
 
 ## Overview
 
-**Problem:** Logged-out users visiting `/u/hana_li` get redirected to `/` instead of seeing the profile.
+Remove `AppProtectedRoute` from entity, post, and recommendation routes so logged-out users can view public content. Add guest-aware navigation, SEO tags, proper 404 handling, and idempotent tracking.
 
-**Solution:** Render a public profile page for guests with SEO tags for social sharing and discoverability.
+## New File
 
-## New Files (5)
+### `src/components/content/PublicContentNotFound.tsx`
+Reusable component rendering:
+- `SEOHead` with `noindex={true}`, NO canonical tag
+- Centered "Content Not Available" UI with customizable title and description
+- Used by EntityDetail, PostView, and RecommendationView
 
-### 1. `src/components/seo/SEOHead.tsx`
-Shared Helmet wrapper for all public pages.
-- Props: title, description, image, url, canonical, noindex (default `false`)
-- Always renders immediately with fallback values (never gated behind data loading)
-- Renders: og:title, og:description, og:image, og:url, og:site_name ("Common Groundz"), twitter:card ("summary"), twitter:site ("@commongroundz")
-- When `noindex={true}`: renders `<meta name="robots" content="noindex,nofollow" />`
-- Renders canonical `<link>` when provided
+---
 
-### 2. `src/hooks/use-public-profile.ts`
-- Calls existing `resolveUsername()` to map username to user ID
-- Queries `profiles` table with explicit safe columns (id, username, avatar_url, first_name, last_name, bio, location, cover_url, is_verified, created_at)
-- Calls existing `get_follower_count_by_user_id` and `get_following_count_by_user_id` RPCs
-- Returns: profile, followerCount, followingCount, isLoading, error, wasRedirected, currentUsername
+## Modified Files
 
-### 3. `src/components/profile/GuestNavBar.tsx`
-- Minimal top bar: Common Groundz logo (links to `/`), "Log In" button, "Sign Up" button
-- Reusable across all future public guest surfaces
+### 1. `src/App.tsx`
+Remove `AppProtectedRoute` wrapper from 4 routes:
+- `/entity/:slug`
+- `/entity/:parentSlug/:childSlug`
+- `/post/:postId`
+- `/recommendations/:recommendationId`
 
-### 4. `src/components/profile/PublicProfileView.tsx`
-- Cover image, avatar, display name, @username
-- Bio, location, "Joined [month year]"
-- Follower/following counts (read-only)
-- CTA card: "Join Common Groundz to see [Name]'s recommendations" with Sign Up and Log In buttons
+### 2. `src/components/seo/SEOHead.tsx`
+- Add optional `type` prop (default `"website"`) to control `og:type`
+- Currently hardcoded to `"profile"` -- make dynamic
 
-### 5. `src/utils/guestConversionTracker.ts`
-- `trackGuestEvent(eventName, metadata?)` utility
-- Console.log implementation, extensible to analytics provider later
+### 3. `src/pages/PostView.tsx`
+- Auth-aware nav: `GuestNavBar` for guests, `NavBarComponent` for authenticated
+- Add `postMeta` state + `loadComplete` boolean
+- Pass `onPostLoaded` callback to `PostContentViewer` -- sets both `postMeta` and `loadComplete = true` on success; sets only `loadComplete = true` on error/not-found (meta stays null, triggering Hard 404)
+- **Loading SEO**: `noindex={true}` while `!loadComplete`
+- Once loaded with `visibility === 'public'`: `noindex={false}` + canonical
+- **Hard 404**: `if (loadComplete && (!postMeta || postMeta.visibility !== 'public'))` for guests -- render `PublicContentNotFound` (no canonical)
+- **Route-param reset**: `useEffect` keyed on `postId` resets `postMeta`, `loadComplete`, and `hasTracked.current`
+- Idempotent `guest_viewed_post` tracking with `useRef` guard
+- `og:type = "article"`
 
-## Modified Files (2)
+### 4. `src/pages/RecommendationView.tsx`
+Same pattern as PostView:
+- Auth-aware nav, `recommendationMeta` state + `loadComplete` boolean
+- `onRecommendationLoaded` callback (fires on success AND error)
+- Conservative `noindex={true}` during loading
+- Hard 404 via `PublicContentNotFound` (no canonical)
+- Route-param reset on `recommendationId` change
+- Idempotent `guest_viewed_recommendation` tracking
+- `og:type = "article"`
 
-### 6. `src/pages/UserProfile.tsx`
-- Replace redirect-only logic with full page rendering
-- After resolving username:
-  - Authenticated users: `NavBarComponent` + `ProfileContent` (same as `/profile/:id`)
-  - Guests: `GuestNavBar` + `PublicProfileView`
-- `SEOHead` with profile data, canonical = self (`/u/:username`), noindex = false
-- **Not-found state**: When username resolution fails, show error page with `noindex={true}` (prevents indexing error pages)
-- **Idempotent guest tracking**: Fire `guest_viewed_profile` once per pageview using `useRef` guard, only when `!user && profile && !hasTracked.current`
+### 5. `src/components/content/PostContentViewer.tsx`
+- Add optional `onPostLoaded?: (meta: { title: string; content: string; visibility: string } | null) => void` prop
+- Call with metadata object on fetch success (after `setPost`)
+- Call with `null` on fetch error/not-found (in catch block and empty-data check)
+- No other changes
 
-### 7. `src/pages/Profile.tsx`
-- Add `SEOHead` with `noindex={true}` and canonical pointing to `/u/:username`
-- Client-side redirect to `/u/:username` when username resolves
-- **Loop prevention**: Only redirect if username is successfully resolved; if null, stay on `/profile/:id`
+### 6. `src/components/content/RecommendationContentViewer.tsx`
+- Add optional `onRecommendationLoaded?: (meta: { title: string; content: string; visibility: string; entityName?: string } | null) => void` prop
+- Call with metadata on success, `null` on error
+- No other changes
+
+### 7. `src/components/entity-v4/EntityV4.tsx`
+- Auth-aware nav (GuestNavBar for guests)
+- Replace existing Helmet with `SEOHead` (title=entity name, description=truncated description, image=entity image_url, canonical=entity URL, type="website", noindex=false)
+- Not-found: render `PublicContentNotFound` (no canonical)
+- Idempotent `guest_viewed_entity` tracking
+
+### 8. `src/pages/EntityDetail.tsx`
+- In `EntityDetailOriginal` (legacy V1 layout): auth-aware nav, replace Helmet block with `SEOHead`, not-found uses `PublicContentNotFound`, idempotent guest tracking
+- The `EntityDetail` wrapper component needs no changes
+
+---
+
+## Loading-State SEO Strategy
+
+```text
+Page Type       | During Loading  | After Public       | After Private/Missing/Error
+Entity          | noindex=false   | noindex=false      | noindex=true, no canonical
+Post            | noindex=true    | noindex=false      | noindex=true, no canonical
+Recommendation  | noindex=true    | noindex=false      | noindex=true, no canonical
+```
+
+## og:type Mapping
+- Profile pages: `"profile"`
+- Entity pages: `"website"`
+- Posts and recommendations: `"article"`
 
 ## What Is NOT Changed
-- App.tsx routing (the `/u/:username` route already exists without AppProtectedRoute)
-- No other pages or components
-- No database changes
-- No entity/post/recommendation pages (that is Phase 2)
-
-## Technical Notes
-- HelmetProvider already wraps the app in main.tsx
-- All profile queries use explicit column lists (column-level security restriction)
-- resolveUsername works for anonymous users
-- Follower/following RPCs are SECURITY DEFINER (accessible to anon)
-- useAuth() returns `{ user: null }` for guests safely
+- No database or RLS changes
+- No changes to `/home`, `/explore`, `/settings`, `/my-stuff`
+- No changes to `AppProtectedRoute` component itself
+- No changes to authenticated user experience
+- EntityV2 and EntityV3 (internal-only) -- no changes
 
