@@ -117,6 +117,12 @@ const RecommendationContentViewer = ({
         };
         
         setRecommendation(processedRecommendation);
+        onRecommendationLoaded?.({
+          title: data.title || '',
+          content: data.content || '',
+          visibility: data.visibility || 'private',
+          entityName: entity?.name,
+        });
       } catch (err) {
         console.error('Error fetching recommendation:', err);
         setError('Error loading recommendation');
