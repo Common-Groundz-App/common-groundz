@@ -13,7 +13,6 @@ import NotFound from './NotFound';
 import GuestNavBar from '@/components/profile/GuestNavBar';
 import SEOHead from '@/components/seo/SEOHead';
 import PublicContentNotFound from '@/components/content/PublicContentNotFound';
-import NotFound from './NotFound';
 import ReviewCard from '@/components/profile/reviews/ReviewCard';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { useToast } from '@/hooks/use-toast';
