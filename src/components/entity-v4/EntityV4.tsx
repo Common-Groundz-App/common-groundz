@@ -446,13 +446,11 @@ const EntityV4 = () => {
   if (!isLoading && (error || !entity)) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <NavBarComponent />
-        <div className="flex-1 pt-8 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-destructive mb-2">Entity Not Found</h2>
-            <p className="text-muted-foreground">The entity you're looking for doesn't exist or has been removed.</p>
-          </div>
-        </div>
+        {user ? <NavBarComponent /> : <GuestNavBar />}
+        <PublicContentNotFound
+          title="Entity Not Found"
+          description="The entity you're looking for doesn't exist or has been removed."
+        />
       </div>
     );
   }
