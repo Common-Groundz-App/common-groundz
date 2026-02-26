@@ -13,9 +13,10 @@ interface PostContentViewerProps {
   postId: string;
   highlightCommentId: string | null;
   isInModal?: boolean;
+  onPostLoaded?: (meta: { title: string; content: string; visibility: string } | null) => void;
 }
 
-const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: PostContentViewerProps) => {
+const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPostLoaded }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [post, setPost] = React.useState<any>(null);
@@ -61,6 +62,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
         if (error) throw error;
         if (!data) {
           setError('Post not found or has been deleted');
+          onPostLoaded?.(null);
           return;
         }
         
@@ -122,9 +124,15 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false }: Po
         };
         
         setPost(processedPost);
+        onPostLoaded?.({
+          title: data.title || '',
+          content: data.content || '',
+          visibility: data.visibility || 'private',
+        });
       } catch (err) {
         console.error('Error fetching post:', err);
         setError('Error loading post');
+        onPostLoaded?.(null);
         toast({
           variant: 'destructive',
           title: 'Error',

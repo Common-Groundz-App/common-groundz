@@ -2,7 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
+import GuestNavBar from '@/components/profile/GuestNavBar';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
+import SEOHead from '@/components/seo/SEOHead';
+import PublicContentNotFound from '@/components/content/PublicContentNotFound';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageSquare } from "lucide-react";
@@ -443,13 +446,11 @@ const EntityV4 = () => {
   if (!isLoading && (error || !entity)) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <NavBarComponent />
-        <div className="flex-1 pt-8 flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-destructive mb-2">Entity Not Found</h2>
-            <p className="text-muted-foreground">The entity you're looking for doesn't exist or has been removed.</p>
-          </div>
-        </div>
+        {user ? <NavBarComponent /> : <GuestNavBar />}
+        <PublicContentNotFound
+          title="Entity Not Found"
+          description="The entity you're looking for doesn't exist or has been removed."
+        />
       </div>
     );
   }
@@ -494,7 +495,15 @@ const EntityV4 = () => {
 
   return <TooltipProvider delayDuration={0}>
     <div className="min-h-screen flex flex-col bg-background">
-      <NavBarComponent />
+      <SEOHead
+        title={entity ? `${entity.name} — Common Groundz` : 'Common Groundz'}
+        description={entity?.description ? entity.description.substring(0, 155) : 'Discover trusted recommendations on Common Groundz'}
+        image={entity?.image_url || undefined}
+        type="website"
+        noindex={false}
+        canonical={entity?.slug ? `${window.location.origin}/entity/${entity.slug}` : undefined}
+      />
+      {user ? <NavBarComponent /> : <GuestNavBar />}
       
       {/* Main Content */}
       <div className="flex-1 pt-8">

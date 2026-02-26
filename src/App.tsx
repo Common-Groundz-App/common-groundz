@@ -148,26 +148,10 @@ function App() {
                       <Search />
                     </AppProtectedRoute>
                   } />
-                  <Route path="/entity/:slug" element={
-                    <AppProtectedRoute>
-                      <EntityDetail />
-                    </AppProtectedRoute>
-                  } />
-                  <Route path="/entity/:parentSlug/:childSlug" element={
-                    <AppProtectedRoute>
-                      <EntityDetail />
-                    </AppProtectedRoute>
-                  } />
-                  <Route path="/post/:postId" element={
-                    <AppProtectedRoute>
-                      <PostView />
-                    </AppProtectedRoute>
-                  } />
-                  <Route path="/recommendations/:recommendationId" element={
-                    <AppProtectedRoute>
-                      <RecommendationView />
-                    </AppProtectedRoute>
-                  } />
+                  <Route path="/entity/:slug" element={<EntityDetail />} />
+                  <Route path="/entity/:parentSlug/:childSlug" element={<EntityDetail />} />
+                  <Route path="/post/:postId" element={<PostView />} />
+                  <Route path="/recommendations/:recommendationId" element={<RecommendationView />} />
                   <Route path="/t/:hashtag" element={
                     <AppProtectedRoute>
                       <TagPage />

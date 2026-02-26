@@ -9,9 +9,10 @@ import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
-import { useAuth } from '@/contexts/AuthContext';
-import { useEmailVerification } from '@/hooks/useEmailVerification';
 import NotFound from './NotFound';
+import GuestNavBar from '@/components/profile/GuestNavBar';
+import SEOHead from '@/components/seo/SEOHead';
+import PublicContentNotFound from '@/components/content/PublicContentNotFound';
 import ReviewCard from '@/components/profile/reviews/ReviewCard';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { useToast } from '@/hooks/use-toast';
@@ -41,6 +42,8 @@ import { Eye, ArrowRight } from 'lucide-react';
 import { getContextualFieldLabel, getEntityTypeFallbackImage, getCanonicalType, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
 import { Helmet } from 'react-helmet-async';
+import { useAuth } from '@/contexts/AuthContext';
+import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
 import { handleSlugRedirect, handleHierarchicalRedirect } from '@/services/entityRedirectService';
 import { getEntityPageVersion } from '@/utils/entityVersionUtils';
@@ -206,7 +209,16 @@ const EntityDetailOriginal = () => {
   }
 
   if (!isLoading && (error || !entity)) {
-    return <NotFound />;
+    return (
+      <div className="min-h-screen flex flex-col">
+        {user ? <NavBarComponent /> : <GuestNavBar />}
+        <PublicContentNotFound
+          title="Entity Not Found"
+          description="The entity you're looking for doesn't exist or has been removed."
+        />
+        <Footer />
+      </div>
+    );
   }
 
   if (isLoading && loadingStep > 0) {
@@ -460,12 +472,17 @@ const EntityDetailOriginal = () => {
     <div className="min-h-screen flex flex-col animate-fade-in">
       {/* Add canonical meta tag for SEO */}
       {entity && entity.slug && (
-        <Helmet>
-          <link rel="canonical" href={`${window.location.origin}/entity/${entity.slug}`} />
-        </Helmet>
+        <SEOHead
+          title={`${entity.name} — Common Groundz`}
+          description={entity.description ? entity.description.substring(0, 155) : 'Discover trusted recommendations on Common Groundz'}
+          image={entity.image_url || undefined}
+          type="website"
+          noindex={false}
+          canonical={`${window.location.origin}/entity/${entity.slug}`}
+        />
       )}
       
-      <NavBarComponent />
+      {user ? <NavBarComponent /> : <GuestNavBar />}
       
       {/* Preview Toggle Banner */}
       <div className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-2 text-center text-sm font-medium mt-16">

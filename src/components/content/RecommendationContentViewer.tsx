@@ -13,12 +13,14 @@ interface RecommendationContentViewerProps {
   recommendationId: string;
   highlightCommentId: string | null;
   isInModal?: boolean;
+  onRecommendationLoaded?: (meta: { title: string; content: string; visibility: string; entityName?: string } | null) => void;
 }
 
 const RecommendationContentViewer = ({ 
   recommendationId, 
   highlightCommentId,
-  isInModal = false
+  isInModal = false,
+  onRecommendationLoaded
 }: RecommendationContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -52,6 +54,7 @@ const RecommendationContentViewer = ({
         if (error) throw error;
         if (!data) {
           setError('Recommendation not found or has been deleted');
+          onRecommendationLoaded?.(null);
           return;
         }
         
@@ -114,9 +117,16 @@ const RecommendationContentViewer = ({
         };
         
         setRecommendation(processedRecommendation);
+        onRecommendationLoaded?.({
+          title: data.title || '',
+          content: data.description || '',
+          visibility: data.visibility || 'private',
+          entityName: entity?.name,
+        });
       } catch (err) {
         console.error('Error fetching recommendation:', err);
         setError('Error loading recommendation');
+        onRecommendationLoaded?.(null);
         toast({
           variant: 'destructive',
           title: 'Error',
