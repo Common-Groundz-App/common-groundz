@@ -210,7 +210,16 @@ const EntityDetailOriginal = () => {
   }
 
   if (!isLoading && (error || !entity)) {
-    return <NotFound />;
+    return (
+      <div className="min-h-screen flex flex-col">
+        {user ? <NavBarComponent /> : <GuestNavBar />}
+        <PublicContentNotFound
+          title="Entity Not Found"
+          description="The entity you're looking for doesn't exist or has been removed."
+        />
+        <Footer />
+      </div>
+    );
   }
 
   if (isLoading && loadingStep > 0) {
