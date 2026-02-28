@@ -12,7 +12,7 @@ interface FollowersListProps {
   actionLoading: string | null;
   isOwnProfile: boolean;
   currentUserId?: string;
-  onNavigate?: (userId: string) => void;
+  onNavigate?: (userId: string, username?: string) => void;
 }
 
 const FollowersList = ({ 
