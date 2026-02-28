@@ -59,7 +59,7 @@ const FollowersList = ({
             isLoading={actionLoading === follower.id}
             isOwnProfile={isOwnProfile}
             currentUserId={currentUserId}
-            onNavigate={onNavigate ? () => onNavigate(follower.id) : undefined}
+            onNavigate={onNavigate ? () => onNavigate(follower.id, follower.username ?? undefined) : undefined}
           />
         </div>
       ))}
