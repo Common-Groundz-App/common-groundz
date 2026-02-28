@@ -136,7 +136,7 @@ const UserCard = ({
   const formattedUsername = username ? `@${username.toLowerCase().replace(/\s+/g, '')}` : '@user';
 
   return (
-    <Link to={`/profile/${id}`} className="block" onClick={handleCardClick}>
+    <Link to={username ? `/u/${username}` : `/profile/${id}`} className="block" onClick={handleCardClick}>
       <div className="py-3 px-4 flex items-center justify-between cursor-pointer hover:bg-accent/50 transition-colors">
         <div className="flex items-center">
           <Avatar className="h-9 w-9">

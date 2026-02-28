@@ -1,6 +1,7 @@
  import React, { useState, useEffect } from 'react';
  import { useNavigate } from 'react-router-dom';
  import { useAuth } from '@/contexts/AuthContext';
+ import SEOHead from '@/components/seo/SEOHead';
  import { useQuery } from '@tanstack/react-query';
  import { supabase } from '@/integrations/supabase/client';
  import { LoadingSpinner } from '@/components/ui/loading-spinner';
@@ -61,8 +62,9 @@
    }
  
    return (
-     <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
-       <div className="mb-8">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4">
+      <SEOHead noindex={true} title="Complete Profile — Common Groundz" />
+      <div className="mb-8">
          <Logo size="lg" />
        </div>
        

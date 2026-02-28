@@ -30,7 +30,7 @@ const getDisplayName = (follower: EntityFollowerProfile): string => {
 const FollowerAvatar: React.FC<{ follower: EntityFollowerProfile; index: number }> = React.memo(({ follower, index }) => {
   return (
     <Link 
-      to={`/profile/${follower.id}`}
+      to={follower.username ? `/u/${follower.username}` : `/profile/${follower.id}`}
       className="relative group animate-fade-in hover-scale transition-all duration-200"
       style={{ 
         animationDelay: `${index * 100}ms`,

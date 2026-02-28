@@ -98,7 +98,9 @@ export const EntityFollowerModal: React.FC<EntityFollowerModalProps> = ({
 
   const handleUserClick = (userId: string) => {
     onOpenChange(false);
-    navigate(`/profile/${userId}`);
+    const follower = followers.find(f => f.id === userId);
+    const username = follower?.username;
+    navigate(username ? `/u/${username}` : `/profile/${userId}`);
   };
 
   const handleFollowToggle = async (userId: string, isFollowing: boolean) => {

@@ -57,7 +57,9 @@ export const CircleContributorsPreview: React.FC<CircleContributorsPreviewProps>
 
   const handleAvatarClick = (userId: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    navigate(`/profile/${userId}`);
+    const profile = profiles?.[userId];
+    const username = profile?.username;
+    navigate(username ? `/u/${username}` : `/profile/${userId}`);
   };
 
   const handleViewAllClick = (event: React.MouseEvent) => {

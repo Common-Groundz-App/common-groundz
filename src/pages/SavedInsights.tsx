@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Bookmark, Trash2, ArrowRight, ExternalLink, StickyNote, ChevronDown, ChevronUp } from 'lucide-react';
+import SEOHead from '@/components/seo/SEOHead';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSavedInsights } from '@/hooks/use-saved-insights';
 import { SavedInsight } from '@/services/savedInsightsService';
@@ -199,6 +200,7 @@ const SavedInsights: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead noindex={true} title="Saved Insights — Common Groundz" />
       {/* Desktop Sidebar */}
       {!isMobile && <VerticalTubelightNavbar />}
 

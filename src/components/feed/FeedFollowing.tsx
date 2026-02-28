@@ -134,7 +134,7 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
               asChild
               className="px-6"
             >
-              <Link to={`/profile/${user?.id}`}>Find people to follow</Link>
+              <Link to="/explore">Find people to follow</Link>
             </Button>
           </CardContent>
         </Card>
