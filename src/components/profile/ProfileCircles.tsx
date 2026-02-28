@@ -33,8 +33,8 @@ const ProfileCircles = ({ profileUserId, isOwnProfile }: ProfileCirclesProps) =>
     handleFollowToggle
   } = useCircleData(profileUserId, user?.id);
 
-  const handleNavigateToProfile = (userId: string) => {
-    navigate(`/profile/${userId}`);
+  const handleNavigateToProfile = (userId: string, username?: string) => {
+    navigate(username ? `/u/${username}` : `/profile/${userId}`);
   };
 
   if (isLoading) {

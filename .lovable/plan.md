@@ -1,32 +1,18 @@
 
+# Phase 2: Public Entity, Post, and Recommendation Pages — IMPLEMENTED
 
-# Phase 3B Completion: Fix 3 Remaining `/profile/` Links
+## Status: ✅ Complete
 
-## What to Do
+All changes from the approved plan have been implemented.
 
-Fix 3 components that have username data available but still navigate to `/profile/${userId}`:
+## Changes Made
 
-### 1. `src/components/profile/modals/UserListModal.tsx`
-- `handleUserClick` (line ~140) currently does `navigate('/profile/${userId}')`
-- User objects have `.username` available (confirmed at line 174)
-- Fix: `navigate(user.username ? '/u/${user.username}' : '/profile/${userId}')`
-
-### 2. `src/components/entity/EntityRecommendationModal.tsx`
-- `handleUserClick` (line ~103) currently does `navigate('/profile/${userId}')`
-- Recommender objects have `.username` available (confirmed at line 214)
-- Fix: same pattern -- use `/u/${username}` when available
-
-### 3. `src/components/profile/ProfileCircles.tsx`
-- `handleNavigateToProfile` (line 36) currently does `navigate('/profile/${userId}')`
-- Update signature to accept optional username parameter: `(userId: string, username?: string)`
-- Fix: `navigate(username ? '/u/${username}' : '/profile/${userId}')`
-- Update `onNavigate` calls in FollowersList/FollowingList to pass username
-
-## What to Leave As-Is (Acceptable Fallback)
-
-- `NotificationDrawer.tsx` and `NotificationPopover.tsx` -- notification payloads only contain UUID, not username. The `/profile/${id}` fallback is correct; `Profile.tsx` handles the redirect.
-
-## Post-Fix: Repo-Wide Audit
-
-After the 3 fixes, search for remaining `/profile/` patterns and confirm only acceptable uses remain (fallbacks where username is unavailable, and the `Profile.tsx` redirect handler itself).
-
+1. **`src/components/content/PublicContentNotFound.tsx`** — NEW: Reusable 404 component with SEOHead noindex, no canonical
+2. **`src/components/seo/SEOHead.tsx`** — Added `type` prop (default `"website"`) for dynamic `og:type`
+3. **`src/App.tsx`** — Removed `AppProtectedRoute` from entity, post, and recommendation routes
+4. **`src/pages/PostView.tsx`** — Auth-aware nav, `loadComplete` + `postMeta` state, `onPostLoaded` callback, conservative SEO, hard 404, route-param reset, idempotent tracking
+5. **`src/pages/RecommendationView.tsx`** — Same pattern as PostView
+6. **`src/components/content/PostContentViewer.tsx`** — Added `onPostLoaded` callback prop, fires on success and error
+7. **`src/components/content/RecommendationContentViewer.tsx`** — Added `onRecommendationLoaded` callback prop, fires on success and error
+8. **`src/components/entity-v4/EntityV4.tsx`** — Auth-aware nav, SEOHead with entity metadata, PublicContentNotFound for 404
+9. **`src/pages/EntityDetail.tsx`** — Auth-aware nav in V1 layout, SEOHead replaces Helmet, PublicContentNotFound for 404

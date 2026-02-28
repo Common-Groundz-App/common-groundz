@@ -99,8 +99,9 @@ export const EntityRecommendationModal: React.FC<EntityRecommendationModalProps>
   }, [open]);
 
   const handleUserClick = (userId: string) => {
+    const recommender = recommenders.find(r => r.id === userId);
     onOpenChange(false);
-    navigate(`/profile/${userId}`);
+    navigate(recommender?.username ? `/u/${recommender.username}` : `/profile/${userId}`);
   };
 
   const handleFollowToggle = async (userId: string, isFollowing: boolean) => {

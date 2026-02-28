@@ -136,8 +136,9 @@ const UserListModal = ({
   };
 
   const handleUserClick = (userId: string) => {
-    onOpenChange(false); // Close the modal
-    navigate(`/profile/${userId}`); // Navigate to user profile
+    const userProfile = users.find(u => u.id === userId);
+    onOpenChange(false);
+    navigate(userProfile?.username ? `/u/${userProfile.username}` : `/profile/${userId}`);
   };
 
   return (
