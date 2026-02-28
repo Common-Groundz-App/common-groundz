@@ -7,6 +7,7 @@ import SignInForm from '@/components/auth/SignInForm';
 import SignUpForm from '@/components/auth/SignUpForm';
 import AuthBrandPanel from '@/components/auth/AuthBrandPanel';
 import Logo from '@/components/Logo';
+import SEOHead from '@/components/seo/SEOHead';
 
 const Auth = () => {
   const [activeTab, setActiveTab] = useState('signin');
