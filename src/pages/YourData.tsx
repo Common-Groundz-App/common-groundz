@@ -87,6 +87,7 @@ const YourData = () => {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <SEOHead noindex={true} title="Your Data — Common Groundz" />
       {/* Mobile Header */}
       <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
         <div className="container p-3 mx-auto flex items-center gap-3">

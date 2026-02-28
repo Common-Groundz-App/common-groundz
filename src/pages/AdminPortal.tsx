@@ -149,6 +149,7 @@ const AdminPortal = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead noindex={true} title="Admin — Common Groundz" />
       {/* Horizontal Navbar - Offset by sidebar width on xl+ screens */}
       <div className="xl:ml-64">
         <NavBarComponent />

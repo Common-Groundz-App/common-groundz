@@ -200,6 +200,7 @@ const SavedInsights: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      <SEOHead noindex={true} title="Saved Insights — Common Groundz" />
       {/* Desktop Sidebar */}
       {!isMobile && <VerticalTubelightNavbar />}
 

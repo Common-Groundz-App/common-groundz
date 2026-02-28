@@ -39,9 +39,10 @@ const UsernameLink: React.FC<UsernameLinkProps> = ({
   }
 
   if (children) {
+    const profilePath = username ? `/u/${username}` : `/profile/${userId}`;
     return (
       <Link
-        to={`/profile/${userId}`}
+        to={profilePath}
         className={cn(
           "transition-all", 
           isCurrentUser && "text-primary",
@@ -53,9 +54,10 @@ const UsernameLink: React.FC<UsernameLinkProps> = ({
     );
   }
 
+  const profilePath = username ? `/u/${username}` : `/profile/${userId}`;
   return (
     <Link
-      to={`/profile/${userId}`}
+      to={profilePath}
       className={cn(
         "font-medium hover:underline transition-all", 
         isCurrentUser && "text-primary",

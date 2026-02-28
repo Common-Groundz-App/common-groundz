@@ -52,6 +52,8 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
         openContent('recommendation', notification.entity_id, commentId);
         break;
       case 'profile':
+        // entity_id here is the user ID; action_url may contain username info
+        // Fall back to /profile/:id which will redirect to /u/:username
         navigate(`/profile/${notification.entity_id}`);
         break;
       default:

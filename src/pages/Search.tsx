@@ -575,6 +575,7 @@ const Search = () => {
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
+      <SEOHead noindex={true} title="Search — Common Groundz" />
       {/* Mobile Header - only show on screens smaller than xl */}
       <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
         <div className="container p-3 mx-auto flex justify-start min-w-0">

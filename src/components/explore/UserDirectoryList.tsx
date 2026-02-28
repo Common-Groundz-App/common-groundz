@@ -242,7 +242,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
                 <AvatarFallback>{getInitials(user.username)}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <Link to={`/profile/${user.id}`} className="font-medium hover:underline truncate block">
+                <Link to={user.username ? `/u/${user.username}` : `/profile/${user.id}`} className="font-medium hover:underline truncate block">
                   {user.username || 'Anonymous'}
                 </Link>
                 <p className="text-sm text-muted-foreground truncate">

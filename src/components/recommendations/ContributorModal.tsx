@@ -50,7 +50,9 @@ export const ContributorModal: React.FC<ContributorModalProps> = ({
   };
 
   const handleProfileClick = (userId: string) => {
-    navigate(`/profile/${userId}`);
+    const profile = profiles?.[userId];
+    const username = profile?.username;
+    navigate(username ? `/u/${username}` : `/profile/${userId}`);
     onClose();
   };
 

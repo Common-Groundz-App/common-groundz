@@ -12,7 +12,7 @@ interface UserResultItemProps {
 export function UserResultItem({ user, onClick }: UserResultItemProps) {
   return (
     <Link
-      to={`/profile/${user.id}`}
+      to={user.username ? `/u/${user.username}` : `/profile/${user.id}`}
       className="flex items-center gap-2 px-4 py-1.5 hover:bg-muted/30 transition-colors"
       onClick={onClick}
     >

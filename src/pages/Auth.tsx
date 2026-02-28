@@ -24,6 +24,7 @@ const Auth = () => {
 
   return (
     <div className="flex min-h-screen relative overflow-hidden">
+      <SEOHead noindex={true} title="Sign In — Common Groundz" />
       {/* Left side - Brand visuals and value proposition */}
       <AuthBrandPanel />
       
