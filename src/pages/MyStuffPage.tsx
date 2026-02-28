@@ -1,5 +1,6 @@
 import React from 'react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
+import SEOHead from '@/components/seo/SEOHead';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import MyStuffContent from '@/components/mystuff/MyStuffContent';
 import Logo from '@/components/Logo';
