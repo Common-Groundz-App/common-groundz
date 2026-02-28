@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import SEOHead from '@/components/seo/SEOHead';
 import { supabase } from '@/integrations/supabase/client';
 import { useLocation, setLocationStatus } from '@/contexts/LocationContext';
 import { usePreferences } from '@/contexts/PreferencesContext';
