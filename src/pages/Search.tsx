@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import SEOHead from '@/components/seo/SEOHead';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
