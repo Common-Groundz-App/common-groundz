@@ -504,6 +504,7 @@ const EntityV4 = () => {
         noindex={false}
         canonical={entity?.slug ? `${window.location.origin}/entity/${entity.slug}` : undefined}
       />
+      {entity && <EntityStructuredData entity={entity} stats={stats} />}
       {user ? <NavBarComponent /> : <GuestNavBar />}
       
       {/* Main Content */}

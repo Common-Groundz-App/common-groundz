@@ -473,14 +473,17 @@ const EntityDetailOriginal = () => {
     <div className="min-h-screen flex flex-col animate-fade-in">
       {/* Add canonical meta tag for SEO */}
       {entity && entity.slug && (
-        <SEOHead
-          title={`${entity.name} — Common Groundz`}
-          description={entity.description ? entity.description.substring(0, 155) : 'Discover trusted recommendations on Common Groundz'}
-          image={entity.image_url || undefined}
-          type="website"
-          noindex={false}
-          canonical={`${window.location.origin}/entity/${entity.slug}`}
-        />
+        <>
+          <SEOHead
+            title={`${entity.name} — Common Groundz`}
+            description={entity.description ? entity.description.substring(0, 155) : 'Discover trusted recommendations on Common Groundz'}
+            image={entity.image_url || undefined}
+            type="website"
+            noindex={false}
+            canonical={`${window.location.origin}/entity/${entity.slug}`}
+          />
+          <EntityStructuredData entity={entity} stats={stats} />
+        </>
       )}
       
       {user ? <NavBarComponent /> : <GuestNavBar />}
