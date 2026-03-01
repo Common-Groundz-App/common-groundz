@@ -5,6 +5,7 @@ import NavBarComponent from '@/components/NavBarComponent';
 import GuestNavBar from '@/components/profile/GuestNavBar';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
 import SEOHead from '@/components/seo/SEOHead';
+import EntityStructuredData from '@/components/seo/EntityStructuredData';
 import PublicContentNotFound from '@/components/content/PublicContentNotFound';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
@@ -503,6 +504,7 @@ const EntityV4 = () => {
         noindex={false}
         canonical={entity?.slug ? `${window.location.origin}/entity/${entity.slug}` : undefined}
       />
+      {entity && <EntityStructuredData entity={entity} stats={stats} />}
       {user ? <NavBarComponent /> : <GuestNavBar />}
       
       {/* Main Content */}
