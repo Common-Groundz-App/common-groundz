@@ -12,6 +12,7 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import NotFound from './NotFound';
 import GuestNavBar from '@/components/profile/GuestNavBar';
 import SEOHead from '@/components/seo/SEOHead';
+import EntityStructuredData from '@/components/seo/EntityStructuredData';
 import PublicContentNotFound from '@/components/content/PublicContentNotFound';
 import ReviewCard from '@/components/profile/reviews/ReviewCard';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
