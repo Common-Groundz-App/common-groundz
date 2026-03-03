@@ -14,6 +14,7 @@ interface RecommendationMeta {
   content: string;
   visibility: string;
   entityName?: string;
+  imageUrl?: string;
 }
 
 const RecommendationView = () => {
@@ -74,6 +75,7 @@ const RecommendationView = () => {
       <SEOHead
         title={seoTitle}
         description={seoDescription}
+        image={recMeta?.imageUrl}
         type="article"
         noindex={!loadComplete || !isPublic}
         canonical={isPublic ? `${window.location.origin}/recommendations/${recommendationId}` : undefined}

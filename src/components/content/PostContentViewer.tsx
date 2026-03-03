@@ -13,7 +13,7 @@ interface PostContentViewerProps {
   postId: string;
   highlightCommentId: string | null;
   isInModal?: boolean;
-  onPostLoaded?: (meta: { title: string; content: string; visibility: string } | null) => void;
+  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string } | null) => void;
 }
 
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPostLoaded }: PostContentViewerProps) => {
@@ -128,6 +128,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
           title: data.title || '',
           content: data.content || '',
           visibility: data.visibility || 'private',
+          imageUrl: data.media?.[0]?.url || undefined,
         });
       } catch (err) {
         console.error('Error fetching post:', err);

@@ -13,6 +13,7 @@ interface PostMeta {
   title: string;
   content: string;
   visibility: string;
+  imageUrl?: string;
 }
 
 const PostView = () => {
@@ -72,6 +73,7 @@ const PostView = () => {
       <SEOHead
         title={seoTitle}
         description={seoDescription}
+        image={postMeta?.imageUrl}
         type="article"
         noindex={!loadComplete || !isPublic}
         canonical={isPublic ? `${window.location.origin}/post/${postId}` : undefined}

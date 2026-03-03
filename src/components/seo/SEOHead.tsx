@@ -1,5 +1,14 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
+import { LEGAL_CONFIG } from '@/config/legalConfig';
+
+const baseUrl = LEGAL_CONFIG.websiteUrl;
+
+const ensureAbsoluteUrl = (url?: string): string | undefined => {
+  if (!url) return undefined;
+  if (url.startsWith('http')) return url;
+  return `${baseUrl}${url.startsWith('/') ? '' : '/'}${url}`;
+};
 
 interface SEOHeadProps {
   title?: string;
@@ -14,9 +23,9 @@ interface SEOHeadProps {
 const DEFAULTS = {
   title: 'Common Groundz',
   description: 'Discover trusted recommendations on Common Groundz',
-  image: '/og-default.png',
+  image: `${baseUrl}/og-default.png`,
   siteName: 'Common Groundz',
-  twitterSite: '@commongroundz',
+  twitterSite: '@commongroundzHQ',
 };
 
 const SEOHead: React.FC<SEOHeadProps> = ({
@@ -30,7 +39,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
 }) => {
   const resolvedTitle = title || DEFAULTS.title;
   const resolvedDescription = description || DEFAULTS.description;
-  const resolvedImage = image || DEFAULTS.image;
+  const resolvedImage = ensureAbsoluteUrl(image) || DEFAULTS.image;
 
   return (
     <Helmet>
@@ -50,7 +59,7 @@ const SEOHead: React.FC<SEOHeadProps> = ({
       <meta property="og:type" content={type} />
 
       {/* Twitter */}
-      <meta name="twitter:card" content="summary" />
+      <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:site" content={DEFAULTS.twitterSite} />
       <meta name="twitter:title" content={resolvedTitle} />
       <meta name="twitter:description" content={resolvedDescription} />

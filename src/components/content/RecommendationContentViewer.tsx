@@ -13,7 +13,7 @@ interface RecommendationContentViewerProps {
   recommendationId: string;
   highlightCommentId: string | null;
   isInModal?: boolean;
-  onRecommendationLoaded?: (meta: { title: string; content: string; visibility: string; entityName?: string } | null) => void;
+  onRecommendationLoaded?: (meta: { title: string; content: string; visibility: string; entityName?: string; imageUrl?: string } | null) => void;
 }
 
 const RecommendationContentViewer = ({ 
@@ -122,6 +122,7 @@ const RecommendationContentViewer = ({
           content: data.description || '',
           visibility: data.visibility || 'private',
           entityName: entity?.name,
+          imageUrl: data.image_url || entity?.image_url || undefined,
         });
       } catch (err) {
         console.error('Error fetching recommendation:', err);
