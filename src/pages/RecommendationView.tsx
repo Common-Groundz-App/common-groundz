@@ -75,6 +75,7 @@ const RecommendationView = () => {
       <SEOHead
         title={seoTitle}
         description={seoDescription}
+        image={recMeta?.imageUrl}
         type="article"
         noindex={!loadComplete || !isPublic}
         canonical={isPublic ? `${window.location.origin}/recommendations/${recommendationId}` : undefined}

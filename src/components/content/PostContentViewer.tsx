@@ -128,6 +128,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
           title: data.title || '',
           content: data.content || '',
           visibility: data.visibility || 'private',
+          imageUrl: data.media?.[0]?.url || undefined,
         });
       } catch (err) {
         console.error('Error fetching post:', err);

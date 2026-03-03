@@ -122,6 +122,7 @@ const RecommendationContentViewer = ({
           content: data.description || '',
           visibility: data.visibility || 'private',
           entityName: entity?.name,
+          imageUrl: data.image_url || entity?.image_url || undefined,
         });
       } catch (err) {
         console.error('Error fetching recommendation:', err);
