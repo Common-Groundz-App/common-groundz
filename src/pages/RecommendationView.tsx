@@ -14,6 +14,7 @@ interface RecommendationMeta {
   content: string;
   visibility: string;
   entityName?: string;
+  imageUrl?: string;
 }
 
 const RecommendationView = () => {
