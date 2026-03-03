@@ -13,6 +13,7 @@ interface PostMeta {
   title: string;
   content: string;
   visibility: string;
+  imageUrl?: string;
 }
 
 const PostView = () => {
