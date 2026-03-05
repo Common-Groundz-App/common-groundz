@@ -21,8 +21,8 @@ interface SEOHeadProps {
 }
 
 const DEFAULTS = {
-  title: 'Common Groundz',
-  description: 'Discover trusted recommendations on Common Groundz',
+  title: 'Common Groundz — Find Your Common Ground',
+  description: 'Discover better choices through shared taste. Real recommendations from your friends, family, and trusted circles.',
   image: `${baseUrl}/og-default.png`,
   siteName: 'Common Groundz',
   twitterSite: '@commongroundzHQ',
