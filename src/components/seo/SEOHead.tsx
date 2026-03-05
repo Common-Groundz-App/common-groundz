@@ -54,6 +54,8 @@ const SEOHead: React.FC<SEOHeadProps> = ({
       <meta property="og:title" content={resolvedTitle} />
       <meta property="og:description" content={resolvedDescription} />
       <meta property="og:image" content={resolvedImage} />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
       {url && <meta property="og:url" content={url} />}
       <meta property="og:site_name" content={DEFAULTS.siteName} />
       <meta property="og:type" content={type} />
