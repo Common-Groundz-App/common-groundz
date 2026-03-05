@@ -1,18 +1,22 @@
 
-# Phase 2: Public Entity, Post, and Recommendation Pages — IMPLEMENTED
 
-## Status: ✅ Complete
+# Why You Still See the Old Lovable Favicon
 
-All changes from the approved plan have been implemented.
+## Root Cause
 
-## Changes Made
+The old `public/favicon.ico` file still exists in your project. Many browsers and Google's crawler automatically check for `/favicon.ico` at the root **regardless of what your HTML specifies**. That file contains the old Lovable heart icon, so it takes priority in some contexts (especially search results and the view-source tab).
 
-1. **`src/components/content/PublicContentNotFound.tsx`** — NEW: Reusable 404 component with SEOHead noindex, no canonical
-2. **`src/components/seo/SEOHead.tsx`** — Added `type` prop (default `"website"`) for dynamic `og:type`
-3. **`src/App.tsx`** — Removed `AppProtectedRoute` from entity, post, and recommendation routes
-4. **`src/pages/PostView.tsx`** — Auth-aware nav, `loadComplete` + `postMeta` state, `onPostLoaded` callback, conservative SEO, hard 404, route-param reset, idempotent tracking
-5. **`src/pages/RecommendationView.tsx`** — Same pattern as PostView
-6. **`src/components/content/PostContentViewer.tsx`** — Added `onPostLoaded` callback prop, fires on success and error
-7. **`src/components/content/RecommendationContentViewer.tsx`** — Added `onRecommendationLoaded` callback prop, fires on success and error
-8. **`src/components/entity-v4/EntityV4.tsx`** — Auth-aware nav, SEOHead with entity metadata, PublicContentNotFound for 404
-9. **`src/pages/EntityDetail.tsx`** — Auth-aware nav in V1 layout, SEOHead replaces Helmet, PublicContentNotFound for 404
+Your `favicon.png` is correct (the orange Common Groundz logo), and `index.html` references it properly. The `.ico` file is simply overriding it silently.
+
+## Fix
+
+### 1. Replace `public/favicon.ico` with your Common Groundz logo
+We'll overwrite the old `favicon.ico` with your correct logo image. This way, any browser or crawler that auto-fetches `/favicon.ico` will get your branding instead of the Lovable heart.
+
+### 2. No other changes needed
+`index.html` is already correct. No other files are affected.
+
+## After Deploying
+- Google Search results may take days/weeks to update their cached favicon — this is normal.
+- For immediate verification, use Incognito + hard refresh on `commongroundz.co` and check the tab icon.
+
