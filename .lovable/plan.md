@@ -1,18 +1,31 @@
 
-# Phase 2: Public Entity, Post, and Recommendation Pages — IMPLEMENTED
 
-## Status: ✅ Complete
+# Fix: Consistent Navbar in EntityV4LoadingWrapper
 
-All changes from the approved plan have been implemented.
+## Both suggestions are valid. Here's the refined plan:
 
-## Changes Made
+### ChatGPT's auth-loading fallback — **Yes, include it.**
+Default to `GuestNavBar` while auth is resolving. This eliminates the flicker completely since most entity page visitors from shared links are guests anyway. The logic:
+- `isLoading` (auth) or no `user` → `GuestNavBar`
+- `user` exists → `NavBarComponent`
 
-1. **`src/components/content/PublicContentNotFound.tsx`** — NEW: Reusable 404 component with SEOHead noindex, no canonical
-2. **`src/components/seo/SEOHead.tsx`** — Added `type` prop (default `"website"`) for dynamic `og:type`
-3. **`src/App.tsx`** — Removed `AppProtectedRoute` from entity, post, and recommendation routes
-4. **`src/pages/PostView.tsx`** — Auth-aware nav, `loadComplete` + `postMeta` state, `onPostLoaded` callback, conservative SEO, hard 404, route-param reset, idempotent tracking
-5. **`src/pages/RecommendationView.tsx`** — Same pattern as PostView
-6. **`src/components/content/PostContentViewer.tsx`** — Added `onPostLoaded` callback prop, fires on success and error
-7. **`src/components/content/RecommendationContentViewer.tsx`** — Added `onRecommendationLoaded` callback prop, fires on success and error
-8. **`src/components/entity-v4/EntityV4.tsx`** — Auth-aware nav, SEOHead with entity metadata, PublicContentNotFound for 404
-9. **`src/pages/EntityDetail.tsx`** — Auth-aware nav in V1 layout, SEOHead replaces Helmet, PublicContentNotFound for 404
+### Codex's layout-shift point — **Already handled.**
+We already aligned `GuestNavBar` spacing to `py-4` matching the logged-in navbar in the previous change. No extra work needed.
+
+### Nothing else to add.
+The plan is tight as-is. One file, ~5 lines changed.
+
+## Change
+
+### `src/components/entity/EntityV4LoadingWrapper.tsx`
+- Import `useAuth` and `GuestNavBar`
+- Render `GuestNavBar` when `isLoading || !user`
+- Render `NavBarComponent` only when authenticated user confirmed
+
+```
+if (isLoading || !user) → <GuestNavBar />
+else → <NavBarComponent />
+```
+
+No other files change.
+
