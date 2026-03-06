@@ -1,18 +1,29 @@
 
-# Phase 2: Public Entity, Post, and Recommendation Pages — IMPLEMENTED
 
-## Status: ✅ Complete
+# Add Brand Logo to Guest NavBar
 
-All changes from the approved plan have been implemented.
+## Assessment of ChatGPT/Codex Suggestions
 
-## Changes Made
+Both are largely correct. Here's what matters:
 
-1. **`src/components/content/PublicContentNotFound.tsx`** — NEW: Reusable 404 component with SEOHead noindex, no canonical
-2. **`src/components/seo/SEOHead.tsx`** — Added `type` prop (default `"website"`) for dynamic `og:type`
-3. **`src/App.tsx`** — Removed `AppProtectedRoute` from entity, post, and recommendation routes
-4. **`src/pages/PostView.tsx`** — Auth-aware nav, `loadComplete` + `postMeta` state, `onPostLoaded` callback, conservative SEO, hard 404, route-param reset, idempotent tracking
-5. **`src/pages/RecommendationView.tsx`** — Same pattern as PostView
-6. **`src/components/content/PostContentViewer.tsx`** — Added `onPostLoaded` callback prop, fires on success and error
-7. **`src/components/content/RecommendationContentViewer.tsx`** — Added `onRecommendationLoaded` callback prop, fires on success and error
-8. **`src/components/entity-v4/EntityV4.tsx`** — Auth-aware nav, SEOHead with entity metadata, PublicContentNotFound for 404
-9. **`src/pages/EntityDetail.tsx`** — Auth-aware nav in V1 layout, SEOHead replaces Helmet, PublicContentNotFound for 404
+- **No extra `<Link>` wrapper** — Codex is right. The `Logo` component already contains a `<Link to="/">` internally, so we just use `<Logo size="md" />` directly. No nested anchor issues.
+- **Matching spacing** — Valid point. The logged-in navbar has `py-4` and uses `max-w-7xl`. The guest navbar currently uses `h-14` which is slightly different. We should align them.
+- **Theme check** — Logo is already theme-aware via `useTheme()`, so this works automatically. No action needed.
+
+One thing neither mentioned: the guest navbar uses a solid `border-b` style while the logged-in navbar uses a transparent-to-blurred style. That's fine to keep — they serve different contexts (full page vs. profile page overlay). No need to unify those.
+
+## Plan
+
+### Update `src/components/profile/GuestNavBar.tsx`
+
+1. Import `Logo` component
+2. Replace the `<Link>` text with `<Logo size="md" />` (no wrapper — Logo handles its own link)
+3. Adjust container height/padding to match logged-in navbar (`py-4` instead of `h-14`)
+
+Result:
+```
+[LOGO]                           Log In   Sign Up
+```
+
+Nothing else changes.
+
