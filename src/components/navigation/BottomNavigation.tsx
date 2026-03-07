@@ -4,6 +4,9 @@ import { Home, Search, User, PlusCircle, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { isExploreRelatedRoute } from '@/utils/navigation';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { getProfileUrl } from '@/utils/getProfileUrl';
 
 interface NavItem {
   name: string;
@@ -17,6 +20,21 @@ interface NavItem {
 export const BottomNavigation = () => {
   const location = useLocation();
   const { user } = useAuth();
+
+  const { data: username } = useQuery({
+    queryKey: ['profile-username', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user.id)
+        .single();
+      return data?.username || null;
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
   
   const navItems: NavItem[] = [
     { name: 'Home', path: '/home', icon: Home },
@@ -27,7 +45,6 @@ export const BottomNavigation = () => {
       icon: PlusCircle, 
       primary: true, 
       onClick: () => {
-        // Open the smart composer with the default post type
         const event = new CustomEvent('open-create-post-dialog', {
           detail: { contentType: 'post' }
         });
@@ -35,15 +52,16 @@ export const BottomNavigation = () => {
       }
     },
     { name: 'My Stuff', path: '/my-stuff', icon: Package },
-    { name: 'Profile', path: '/profile', icon: User }
+    { name: 'Profile', path: getProfileUrl(username), icon: User }
   ];
   
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t xl:hidden z-40 pb-[env(safe-area-inset-bottom)]">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
+          const isProfileItem = item.name === 'Profile';
           const isActive = location.pathname === item.path || 
-                          (item.path === '/profile' && location.pathname.startsWith('/profile')) ||
+                          (isProfileItem && (location.pathname.startsWith('/profile') || location.pathname.startsWith('/u/'))) ||
                           (item.path === '/explore' && isExploreRelatedRoute(location.pathname)) ||
                           (item.path === '/home' && (location.pathname === '/home' || location.pathname === '/feed'));
           
