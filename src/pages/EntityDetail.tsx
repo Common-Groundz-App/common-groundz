@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { formatSlugAsName } from '@/utils/formatSlug';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1067,9 +1068,9 @@ const EntityDetail = () => {
   const version = getEntityPageVersion(searchParams, isInternalUser);
   
   // Determine display name for loading state
-  const displayName = parentSlug && childSlug 
-    ? `${childSlug}` 
-    : slug || 'Entity';
+  const displayName = formatSlugAsName(
+    parentSlug && childSlug ? childSlug : slug || 'Entity'
+  );
 
   // Import EntityV3 and EntityV4 dynamically
   const EntityV3 = React.lazy(() => import('@/components/entity-v3/EntityV3'));
