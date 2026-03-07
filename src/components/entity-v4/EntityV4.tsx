@@ -24,6 +24,7 @@ import { useEntitySiblings } from '@/hooks/use-entity-siblings';
 import { useNavigate } from 'react-router-dom';
 import { EntityV4LoadingWrapper } from '@/components/entity/EntityV4LoadingWrapper';
 import { getHierarchicalEntityUrl, getEntityUrlWithParent } from '@/utils/entityUrlUtils';
+import { formatSlugAsName } from '@/utils/formatSlug';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
 import { useQueryClient } from '@tanstack/react-query';
 
