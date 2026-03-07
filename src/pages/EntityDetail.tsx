@@ -1068,9 +1068,9 @@ const EntityDetail = () => {
   const version = getEntityPageVersion(searchParams, isInternalUser);
   
   // Determine display name for loading state
-  const displayName = parentSlug && childSlug 
-    ? `${childSlug}` 
-    : slug || 'Entity';
+  const displayName = formatSlugAsName(
+    parentSlug && childSlug ? childSlug : slug || 'Entity'
+  );
 
   // Import EntityV3 and EntityV4 dynamically
   const EntityV3 = React.lazy(() => import('@/components/entity-v3/EntityV3'));

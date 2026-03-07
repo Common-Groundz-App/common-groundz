@@ -432,7 +432,7 @@ const EntityV4 = () => {
   if (isLoading && !entity) {
     return (
       <EntityV4LoadingWrapper 
-        entityName={entity?.name ?? entitySlug}
+        entityName={entity?.name ?? formatSlugAsName(entitySlug)}
         entityType={entity?.type ?? 'product'}
       />
     );
