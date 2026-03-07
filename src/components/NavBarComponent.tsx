@@ -66,7 +66,7 @@ export function NavBarComponent() {
   React.useEffect(() => {
     if (location.pathname === '/') {
       setActiveTab('Home');
-    } else if (location.pathname.startsWith('/profile')) {
+    } else if (location.pathname.startsWith('/profile') || location.pathname.startsWith('/u/')) {
       setActiveTab('Profile');
     } else if (location.pathname === '/home' || location.pathname === '/feed') {
       setActiveTab('Home');

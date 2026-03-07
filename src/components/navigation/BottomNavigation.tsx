@@ -59,8 +59,9 @@ export const BottomNavigation = () => {
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t xl:hidden z-40 pb-[env(safe-area-inset-bottom)]">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
+          const isProfileItem = item.name === 'Profile';
           const isActive = location.pathname === item.path || 
-                          (item.path === '/profile' && location.pathname.startsWith('/profile')) ||
+                          (isProfileItem && (location.pathname.startsWith('/profile') || location.pathname.startsWith('/u/'))) ||
                           (item.path === '/explore' && isExploreRelatedRoute(location.pathname)) ||
                           (item.path === '/home' && (location.pathname === '/home' || location.pathname === '/feed'));
           
