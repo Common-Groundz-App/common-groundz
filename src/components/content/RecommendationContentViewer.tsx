@@ -64,7 +64,6 @@ const RecommendationContentViewer = ({
           .eq('recommendation_id', recommendationId);
           
         let isLiked = false;
-        let isSaved = false;
         
         if (user) {
           const { data: likeData } = await supabase
@@ -75,15 +74,6 @@ const RecommendationContentViewer = ({
             .maybeSingle();
             
           isLiked = !!likeData;
-          
-          const { data: saveData } = await supabase
-            .from('recommendation_saves')
-            .select('*')
-            .eq('recommendation_id', recommendationId)
-            .eq('user_id', user.id)
-            .maybeSingle();
-            
-          isSaved = !!saveData;
         }
         
         const { count: commentCount } = await supabase
