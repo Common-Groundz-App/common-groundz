@@ -1,27 +1,18 @@
 
+# Phase 2: Public Entity, Post, and Recommendation Pages — IMPLEMENTED
 
-# Plan: Replace Share2 with Send (Paper Airplane)
+## Status: ✅ Complete
 
-## On ChatGPT's SharedIcon component suggestion
+All changes from the approved plan have been implemented.
 
-**Skip it.** Creating a wrapper component for a single icon import is over-engineering. If we ever change the icon again, a global find-and-replace takes 10 seconds. The 6 files are already identified. A wrapper adds indirection with no real benefit.
+## Changes Made
 
-## On Codex's audit suggestion
-
-**Already done.** The global search confirms exactly 6 files with `Share2` — no hidden usages in modals, admin views, or mobile-only components.
-
-## Changes (6 files, pure icon swap)
-
-Every file: replace `Share2` with `Send` in the import statement, then replace all `<Share2 .../>` JSX usages with `<Send .../>`. No size changes — keep existing sizes (`h-3 w-3`, `h-4 w-4`, `h-5 w-5`) to match sibling icons in each context.
-
-| File | Instances |
-|------|-----------|
-| `src/components/feed/PostFeedItem.tsx` | 1 |
-| `src/components/profile/ProfilePostItem.tsx` | 1 |
-| `src/components/profile/reviews/ReviewCard.tsx` | 2 |
-| `src/components/recommendations/RecommendationCard.tsx` | 2 |
-| `src/pages/EntityDetail.tsx` | 1 |
-| `src/pages/EntityDetailV2.tsx` | 1 |
-
-No logic changes. No new files.
-
+1. **`src/components/content/PublicContentNotFound.tsx`** — NEW: Reusable 404 component with SEOHead noindex, no canonical
+2. **`src/components/seo/SEOHead.tsx`** — Added `type` prop (default `"website"`) for dynamic `og:type`
+3. **`src/App.tsx`** — Removed `AppProtectedRoute` from entity, post, and recommendation routes
+4. **`src/pages/PostView.tsx`** — Auth-aware nav, `loadComplete` + `postMeta` state, `onPostLoaded` callback, conservative SEO, hard 404, route-param reset, idempotent tracking
+5. **`src/pages/RecommendationView.tsx`** — Same pattern as PostView
+6. **`src/components/content/PostContentViewer.tsx`** — Added `onPostLoaded` callback prop, fires on success and error
+7. **`src/components/content/RecommendationContentViewer.tsx`** — Added `onRecommendationLoaded` callback prop, fires on success and error
+8. **`src/components/entity-v4/EntityV4.tsx`** — Auth-aware nav, SEOHead with entity metadata, PublicContentNotFound for 404
+9. **`src/pages/EntityDetail.tsx`** — Auth-aware nav in V1 layout, SEOHead replaces Helmet, PublicContentNotFound for 404

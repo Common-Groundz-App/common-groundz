@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Star, Users, Calendar, Plus, Share2, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info, ArrowLeft, ArrowRight } from 'lucide-react';
+import { MapPin, Star, Users, Calendar, Plus, Send, Flag, MessageSquare, MessageSquareHeart, RefreshCw, Image, Info, ArrowLeft, ArrowRight } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';

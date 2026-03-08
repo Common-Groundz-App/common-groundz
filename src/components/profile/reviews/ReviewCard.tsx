@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share2, Clock, Plus } from 'lucide-react';
+import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Send, Clock, Plus } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -473,7 +473,7 @@ const getInitials = (name: string | null) => {
                 size="sm"
                 className="flex items-center gap-1 py-0 px-1 text-xs h-6"
               >
-                <Share2 className="h-3 w-3" />
+                <Send className="h-3 w-3" />
               </Button>
             </div>
           </CardContent>
@@ -771,7 +771,7 @@ const getInitials = (name: string | null) => {
               size="sm"
               className="flex items-center gap-1 py-0 px-2 sm:px-4"
             >
-              <Share2 className="h-5 w-5" />
+              <Send className="h-5 w-5" />
             </Button>
           </div>
         </CardContent>

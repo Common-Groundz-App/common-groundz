@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, MessageSquare, MessageSquareHeart, Plus, Share2, Flag, RefreshCw, Image, Info } from 'lucide-react';
+import { MapPin, MessageSquare, MessageSquareHeart, Plus, Send, Flag, RefreshCw, Image, Info } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import { useEntityDetail } from '@/hooks/use-entity-detail';
@@ -955,7 +955,7 @@ const EntityDetailOriginal = () => {
                     )}
 
                     <Button variant="outline" className="w-full gap-2">
-                      <Share2 className="h-4 w-4" />
+                      <Send className="h-4 w-4" />
                       Share
                     </Button>
                   </CardContent>
