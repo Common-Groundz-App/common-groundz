@@ -82,7 +82,6 @@ export const fetchUserRecommendations = async (
       
       let likeCountsData: any = null;
       let userLikesData: any = null;
-      let userSavesData: any = null;
       
       try {
         // Get like counts for all recommendations
