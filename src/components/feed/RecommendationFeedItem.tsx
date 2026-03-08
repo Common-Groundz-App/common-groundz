@@ -53,7 +53,7 @@ interface RecommendationFeedItemProps {
 export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({ 
   recommendation, 
   onLike, 
-  onSave,
+  
   onComment,
   onDelete,
   refreshFeed
