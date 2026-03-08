@@ -169,14 +169,6 @@ const RecommendationCard = ({
     }
   };
 
-  const handleSave = async () => {
-    if (!user) return;
-    setIsSaved(!isSaved);
-    if (onSave) {
-      onSave(recommendation.id);
-    }
-  };
-
   const handleDelete = async () => {
     if (!user) return;
     setIsDeleting(true);
