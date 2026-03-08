@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { fetchUserRecommendations, toggleReviewLike, toggleReviewSave, Review } from '@/services/reviewService';
+import { fetchUserRecommendations, toggleReviewLike, Review } from '@/services/reviewService';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 
 interface UseRecommendationsProps {
