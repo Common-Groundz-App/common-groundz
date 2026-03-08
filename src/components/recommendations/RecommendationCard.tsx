@@ -366,20 +366,6 @@ const RecommendationCard = ({
                 <span>{recommendation.comment_count || 0}</span>
               </Button>
               
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "flex items-center gap-1 py-0 px-1 text-xs h-6",
-                  isSaved && "text-primary"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSave();
-                }}
-              >
-                <Bookmark className={cn("h-3 w-3", isSaved && "fill-current")} />
-              </Button>
             </div>
             
             {/* Share button */}
