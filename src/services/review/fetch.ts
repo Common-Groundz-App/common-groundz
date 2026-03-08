@@ -207,16 +207,11 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
 
     // Get interaction data if user is logged in
     let likeData = [];
-    let saveData = [];
     let likeCounts = [];
 
     if (currentUserId) {
-      const [likesResponse, savesResponse, likeCountsResponse] = await Promise.all([
+      const [likesResponse, likeCountsResponse] = await Promise.all([
         supabase.rpc('get_user_review_likes', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_user_review_saves', { 
           p_review_ids: reviewIds, 
           p_user_id: currentUserId 
         }),
@@ -226,7 +221,6 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
       ]);
 
       likeData = likesResponse.data || [];
-      saveData = savesResponse.data || [];
       likeCounts = likeCountsResponse.data || [];
     }
 
