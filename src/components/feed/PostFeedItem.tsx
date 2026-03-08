@@ -209,23 +209,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }
   };
 
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: post.title || 'Check out this post!',
-        text: post.content ? post.content.substring(0, 50) + (post.content.length > 50 ? '...' : '') : 'Read more...',
-        url: `${window.location.origin}/post/${post.id}`,
-      }).then(() => {
-        console.log('Successful share');
-      })
-      .catch((error) => console.error('Error sharing:', error));
-    } else {
-      toast({
-        title: 'Web Share API not supported',
-        description: 'Please copy the link manually.',
-      });
-    }
-  };
+  const handleShare = () => sharePost(post.id, post.title);
 
   const getVisibilityIcon = () => {
     switch(post.visibility) {

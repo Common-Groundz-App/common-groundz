@@ -13,7 +13,6 @@ export const useEntityShare = () => {
   const shareEntity = async (entityData: ShareEntityData) => {
     const shareData = {
       title: `Check out ${entityData.name}`,
-      text: entityData.description || `Discover ${entityData.name} on Common Groundz`,
       url: entityData.url
     };
 
