@@ -44,7 +44,7 @@ const resetBodyPointerEvents = () => {
 interface RecommendationFeedItemProps {
   recommendation: FeedItem;
   onLike?: (id: string) => void;
-  onSave?: (id: string) => void;
+  
   onComment?: (id: string) => void;
   onDelete?: (id: string) => void;
   refreshFeed?: () => void;
