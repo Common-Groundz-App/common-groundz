@@ -47,12 +47,13 @@ export function VerticalTubelightNavbar({
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const { unreadCount } = useNotifications();
+  const { profileUrl } = useCanonicalProfileUrl();
 
   const defaultNavItems: NavItem[] = [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'My Stuff', url: '/my-stuff', icon: Package },
-    { name: 'Profile', url: '/profile', icon: User },
+    { name: 'Profile', url: profileUrl, icon: User },
     { 
       name: 'Notifications', 
       url: '#notifications', 
