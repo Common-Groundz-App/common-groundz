@@ -489,7 +489,7 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
             className="flex items-center gap-1 py-0 px-2 sm:px-4"
             onClick={handleShare}
           >
-            <Share2 className="h-5 w-5" />
+            <Send className="h-5 w-5" />
           </Button>
         </div>
       </CardContent>
