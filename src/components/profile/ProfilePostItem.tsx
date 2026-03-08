@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { sharePost } from '@/utils/sharePost';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
