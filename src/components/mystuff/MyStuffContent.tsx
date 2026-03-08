@@ -70,6 +70,10 @@ const MyStuffContent = () => {
         <TabsContent value="suggestions" className="mt-6">
           <JourneyRecommendationsSection />
         </TabsContent>
+
+        <TabsContent value="saved" className="mt-6">
+          <SavedItemsSection />
+        </TabsContent>
       </TubelightTabs>
     </div>
   );
