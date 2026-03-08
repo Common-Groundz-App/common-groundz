@@ -30,7 +30,6 @@ import { ProfileDisplay } from '@/components/common/ProfileDisplay';
 interface RecommendationCardProps {
   recommendation: any;
   onLike?: (id: string) => void;
-  onSave?: (id: string) => void;
   highlightCommentId?: string | null;
   onDeleted?: () => void;
   hideEntityFallbacks?: boolean;
@@ -40,7 +39,6 @@ interface RecommendationCardProps {
 const RecommendationCard = ({ 
   recommendation, 
   onLike, 
-  onSave, 
   highlightCommentId,
   onDeleted,
   hideEntityFallbacks = false,
@@ -49,7 +47,6 @@ const RecommendationCard = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isLiked, setIsLiked] = useState(recommendation.isLiked || false);
-  const [isSaved, setIsSaved] = useState(recommendation.isSaved || false);
   const [likes, setLikes] = useState(recommendation.likes || 0);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
