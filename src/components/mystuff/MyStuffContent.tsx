@@ -27,6 +27,11 @@ const MyStuffContent = () => {
       value: 'suggestions',
       label: 'Suggestions',
       icon: Sparkles
+    },
+    {
+      value: 'saved',
+      label: 'Saved',
+      icon: Bookmark
     }
   ];
 

@@ -37,7 +37,6 @@ const SavedPostCard = ({ item, onUnsave }: SavedPostCardProps) => {
                 userId={post.user_id || ''} 
                 username={post.username || 'User'}
                 className="hover:underline font-medium"
-                onClick={(e) => e.stopPropagation()}
               />
               <p className="text-xs text-muted-foreground">
                 Saved {format(new Date(item.saved_at), 'MMM d, yyyy')}

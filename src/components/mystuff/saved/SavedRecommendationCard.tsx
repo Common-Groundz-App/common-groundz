@@ -37,7 +37,6 @@ const SavedRecommendationCard = ({ item, onUnsave }: SavedRecommendationCardProp
                 userId={rec.user_id || ''} 
                 username={rec.username || 'User'}
                 className="hover:underline font-medium"
-                onClick={(e) => e.stopPropagation()}
               />
               <p className="text-xs text-muted-foreground">
                 Saved {format(new Date(item.saved_at), 'MMM d, yyyy')}
