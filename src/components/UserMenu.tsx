@@ -15,6 +15,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileAvatar } from "@/components/common/ProfileAvatar";
+import { useCanonicalProfileUrl } from "@/hooks/useCanonicalProfileUrl";
 
 export function UserMenu() {
   const { user, session, signOut } = useAuth();
