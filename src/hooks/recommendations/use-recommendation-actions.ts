@@ -118,7 +118,6 @@ export const useRecommendationActions = (
 
   return {
     handleLike,
-    handleSave,
     addRecommendation
   };
 };

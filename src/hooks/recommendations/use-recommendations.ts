@@ -122,7 +122,6 @@ export const useRecommendations = ({
     sortBy,
     setSortBy,
     handleLike,
-    handleSave,
     handleImageUpload,
     addRecommendation,
     clearFilters,

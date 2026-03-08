@@ -149,7 +149,6 @@ export const useRecommendations = ({
     isLoading,
     error,
     handleLike,
-    handleSave,
     refreshRecommendations
   };
 };

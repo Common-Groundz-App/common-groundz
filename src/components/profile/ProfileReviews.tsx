@@ -23,7 +23,6 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     isLoading,
     error,
     handleLike,
-    handleSave,
     refreshReviews,
     convertToRecommendation,
   } = useReviews({ profileUserId });

@@ -161,7 +161,6 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
     isLoading,
     error,
     handleLike,
-    handleSave,
     refreshReviews,
     convertToRecommendation
   };
