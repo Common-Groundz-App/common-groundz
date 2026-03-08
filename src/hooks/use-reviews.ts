@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   toggleReviewLike, 
-  toggleReviewSave,
   convertReviewToRecommendation,
   Review
 } from '@/services/reviewService';
