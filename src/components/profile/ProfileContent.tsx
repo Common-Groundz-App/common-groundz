@@ -46,7 +46,15 @@ const ProfileContent = React.memo(({ profileUserId, defaultActiveTab = 'posts' }
 
   // Handle tab change by updating URL parameter instead of state
   const handleTabChange = (value: string) => {
-    setSearchParams({ tab: value });
+    setSearchParams(prev => {
+      const params = new URLSearchParams(prev);
+      if (value === 'posts') {
+        params.delete('tab');
+      } else {
+        params.set('tab', value);
+      }
+      return params;
+    });
   };
 
   // Only use the specific userId being viewed - no fallback to current user
