@@ -15,21 +15,7 @@ export function NavBarComponent() {
   const [showSearchDialog, setShowSearchDialog] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('Home');
   const { user, isLoading } = useAuth();
-
-  const { data: username } = useQuery({
-    queryKey: ['profile-username', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', user.id)
-        .single();
-      return data?.username || null;
-    },
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { profileUrl } = useCanonicalProfileUrl();
 
   // HOIST: Compute values that are needed in both loading and loaded states
   const isAdminPage = location.pathname === '/admin';
