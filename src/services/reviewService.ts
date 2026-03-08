@@ -363,7 +363,6 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
 
     // Get interaction data if user is logged in
     let likeData = [];
-    let saveData = [];
     let likeCounts = [];
 
     if (currentUserId) {
