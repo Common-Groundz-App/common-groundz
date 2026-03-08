@@ -102,7 +102,6 @@ export const useCircleReviews = (entityId: string): CircleReviewsData => {
                 // Add required InteractionData fields
                 likes: 0,
                 isLiked: false,
-                isSaved: false,
                 // Handle media properly - ensure it matches MediaItem[] type
                 media: Array.isArray(review.media) ? review.media as any[] : [],
                 // Ensure correct types

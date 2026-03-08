@@ -121,16 +121,11 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
 
     // Get interaction data if user is logged in
     let likeData = [];
-    let saveData = [];
     let likeCounts = [];
 
     if (currentUserId) {
-      const [likesResponse, savesResponse, likeCountsResponse] = await Promise.all([
+      const [likesResponse, likeCountsResponse] = await Promise.all([
         supabase.rpc('get_user_review_likes', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_user_review_saves', { 
           p_review_ids: reviewIds, 
           p_user_id: currentUserId 
         }),
@@ -140,7 +135,6 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       ]);
 
       likeData = likesResponse.data || [];
-      saveData = savesResponse.data || [];
       likeCounts = likeCountsResponse.data || [];
     }
 
@@ -161,7 +155,6 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
         } : undefined,
         comment_count: 0,
         isLiked: likeData.some(like => like.review_id === review.id),
-        isSaved: saveData.some(save => save.review_id === review.id),
         likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
       };
     });
@@ -214,16 +207,11 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
 
     // Get interaction data if user is logged in
     let likeData = [];
-    let saveData = [];
     let likeCounts = [];
 
     if (currentUserId) {
-      const [likesResponse, savesResponse, likeCountsResponse] = await Promise.all([
+      const [likesResponse, likeCountsResponse] = await Promise.all([
         supabase.rpc('get_user_review_likes', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_user_review_saves', { 
           p_review_ids: reviewIds, 
           p_user_id: currentUserId 
         }),
@@ -233,7 +221,6 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
       ]);
 
       likeData = likesResponse.data || [];
-      saveData = savesResponse.data || [];
       likeCounts = likeCountsResponse.data || [];
     }
 
@@ -254,7 +241,6 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
         } : undefined,
         comment_count: 0,
         isLiked: likeData.some(like => like.review_id === review.id),
-        isSaved: saveData.some(save => save.review_id === review.id),
         likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
       };
     });

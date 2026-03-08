@@ -15,7 +15,7 @@ export interface WithUserProfile<T = {}> {
 export interface InteractionData {
   likes: number;
   isLiked: boolean;
-  isSaved: boolean;
+  isSaved?: boolean;
 }
 
 // Entity reference structure

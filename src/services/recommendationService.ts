@@ -27,9 +27,7 @@ export {
   getEntitiesByType 
 } from './recommendation/entityOperations';
 
-export { 
-  toggleSave
-} from './recommendation/interactionOperations';
+// toggleSave removed — saving is only supported for posts and entities
 
 // Export the fetchRecommendationById function
 export { fetchRecommendationById } from './recommendation/fetchRecommendationById';

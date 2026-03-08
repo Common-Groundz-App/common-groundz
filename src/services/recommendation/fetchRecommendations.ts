@@ -82,7 +82,6 @@ export const fetchUserRecommendations = async (
       
       let likeCountsData: any = null;
       let userLikesData: any = null;
-      let userSavesData: any = null;
       
       try {
         // Get like counts for all recommendations
@@ -93,24 +92,13 @@ export const fetchUserRecommendations = async (
         
         // Add user-specific queries if user is logged in
         if (userId) {
-          const [likesResult, savesResult] = await Promise.all([
-            // Get user likes
-            supabase
+          const likesResult = await supabase
               .from('recommendation_likes')
               .select('recommendation_id')
               .eq('user_id', userId)
-              .in('recommendation_id', recommendationIds),
-            
-            // Get user saves
-            supabase
-              .from('recommendation_saves')
-              .select('recommendation_id')
-              .eq('user_id', userId)
-              .in('recommendation_id', recommendationIds)
-          ]);
+              .in('recommendation_id', recommendationIds);
           
           userLikesData = likesResult;
-          userSavesData = savesResult;
         }
       } catch (batchError) {
         console.error('Error in batch operations:', batchError);
@@ -127,10 +115,6 @@ export const fetchUserRecommendations = async (
       const likedIds = new Set(
         userLikesData?.data?.map((like: any) => like.recommendation_id) || []
       );
-      
-      const savedIds = new Set(
-        userSavesData?.data?.map((save: any) => save.recommendation_id) || []
-      );
 
       // Process recommendations with all fetched data
       const processedRecommendations = recommendationsWithProfiles.map(rec => {
@@ -140,7 +124,6 @@ export const fetchUserRecommendations = async (
         // Get interaction data
         const likes = likeCountMap.get(rec.id) || 0;
         const isLiked = userId ? likedIds.has(rec.id) : false;
-        const isSaved = userId ? savedIds.has(rec.id) : false;
         
         // Transform to legacy format for backward compatibility
         const processed = {
@@ -148,7 +131,6 @@ export const fetchUserRecommendations = async (
           entity,
           likes,
           isLiked,
-          isSaved,
           // Legacy properties for backward compatibility
           username: rec.user.displayName,
           avatar_url: rec.user.avatar_url,

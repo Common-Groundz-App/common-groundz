@@ -25,7 +25,6 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
     isLoading,
     error,
     handleLike,
-    handleSave,
     refreshRecommendations
   } = useRecommendations({ 
     profileUserId

@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   toggleReviewLike, 
-  toggleReviewSave,
   convertReviewToRecommendation,
   Review
 } from '@/services/reviewService';
@@ -77,43 +76,6 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
     }
   };
 
-  const handleSave = async (id: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to save reviews",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      // Optimistic update
-      queryClient.setQueryData(['reviews', profileUserId, user.id], 
-        (old: Review[]) => old?.map((item: Review) => {
-          if (item.id === id) {
-            return {
-              ...item,
-              isSaved: !item.isSaved,
-            };
-          }
-          return item;
-        })
-      );
-
-      // Server update
-      await toggleReviewSave(id, user.id);
-    } catch (err) {
-      console.error('Error toggling save:', err);
-      // Revert on failure
-      refetch();
-      toast({
-        title: "Error",
-        description: "Failed to update save status",
-        variant: "destructive"
-      });
-    }
-  };
 
   const refreshReviews = useCallback(async () => {
     await refetch();
@@ -162,7 +124,6 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
     isLoading,
     error,
     handleLike,
-    handleSave,
     refreshReviews,
     convertToRecommendation
   };

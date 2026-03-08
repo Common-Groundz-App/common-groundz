@@ -83,24 +83,15 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
 
     // Fetch user's likes and saves if user is provided
     let userLikes = new Set<string>();
-    let userSaves = new Set<string>();
     
     if (params.userId) {
-      const [likesResult, savesResult] = await Promise.all([
-        supabase
+      const likesResult = await supabase
           .from('recommendation_likes')
           .select('recommendation_id')
           .eq('user_id', params.userId)
-          .in('recommendation_id', recommendationIds),
-        supabase
-          .from('recommendation_saves')
-          .select('recommendation_id')
-          .eq('user_id', params.userId)
-          .in('recommendation_id', recommendationIds)
-      ]);
+          .in('recommendation_id', recommendationIds);
 
       userLikes = new Set(likesResult.data?.map(l => l.recommendation_id) || []);
-      userSaves = new Set(savesResult.data?.map(s => s.recommendation_id) || []);
     }
 
     // Fetch comments count
@@ -141,7 +132,7 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
         likes: likesCount.get(rec.id) || 0,
         comment_count: commentsCount.get(rec.id) || 0,
         is_liked: userLikes.has(rec.id),
-        is_saved: userSaves.has(rec.id),
+        is_saved: false,
         entity: processedEntity
       };
     });
@@ -184,24 +175,15 @@ export const processRecommendations = async (
 
     // Fetch user's likes and saves if user is provided
     let userLikes = new Set<string>();
-    let userSaves = new Set<string>();
     
     if (userId) {
-      const [likesResult, savesResult] = await Promise.all([
-        supabase
+      const likesResult = await supabase
           .from('recommendation_likes')
           .select('recommendation_id')
           .eq('user_id', userId)
-          .in('recommendation_id', recommendationIds),
-        supabase
-          .from('recommendation_saves')
-          .select('recommendation_id')
-          .eq('user_id', userId)
-          .in('recommendation_id', recommendationIds)
-      ]);
+          .in('recommendation_id', recommendationIds);
 
       userLikes = new Set(likesResult.data?.map(l => l.recommendation_id) || []);
-      userSaves = new Set(savesResult.data?.map(s => s.recommendation_id) || []);
     }
 
     // Fetch comments count
@@ -242,7 +224,7 @@ export const processRecommendations = async (
         likes: likesCount.get(rec.id) || 0,
         comment_count: commentsCount.get(rec.id) || 0,
         is_liked: userLikes.has(rec.id),
-        is_saved: userSaves.has(rec.id),
+        is_saved: false,
         entity: processedEntity
       };
     });

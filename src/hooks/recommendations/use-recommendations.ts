@@ -4,7 +4,6 @@ import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   toggleLike, 
-  toggleSave,
   RecommendationCategory
 } from '@/services/recommendationService';
 import { useToast } from '@/hooks/use-toast';
@@ -103,44 +102,6 @@ export const useRecommendations = ({
     }
   };
 
-  const handleSave = async (id: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to save recommendations",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      // Optimistic update
-      queryClient.setQueryData(['recommendations', profileUserId, user.id], 
-        (old: any) => old?.map((item: any) => {
-          if (item.id === id) {
-            return {
-              ...item,
-              isSaved: !item.isSaved,
-            };
-          }
-          return item;
-        })
-      );
-
-      // Server update - Pass the current save status as the third argument
-      await toggleSave(id, user.id, !!(recommendations?.find(rec => rec.id === id)?.isSaved));
-    } catch (err) {
-      console.error('Error toggling save:', err);
-      // Revert on failure
-      refreshRecommendations();
-      toast({
-        title: "Error",
-        description: "Failed to update save status",
-        variant: "destructive"
-      });
-    }
-  };
-
   // Stub functions to satisfy the interface
   const handleImageUpload = async (file: File): Promise<string | null> => {
     // Implementation would go here
@@ -161,7 +122,6 @@ export const useRecommendations = ({
     sortBy,
     setSortBy,
     handleLike,
-    handleSave,
     handleImageUpload,
     addRecommendation,
     clearFilters,

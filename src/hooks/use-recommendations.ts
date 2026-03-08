@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { fetchUserRecommendations, toggleReviewLike, toggleReviewSave, Review } from '@/services/reviewService';
+import { fetchUserRecommendations, toggleReviewLike, Review } from '@/services/reviewService';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 
 interface UseRecommendationsProps {
@@ -100,41 +100,6 @@ export const useRecommendations = ({
     }
   };
 
-  const handleSave = async (id: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to save recommendations",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      // Optimistic update
-      setRecommendations(prev => prev.map(item => {
-        if (item.id === id) {
-          return {
-            ...item,
-            isSaved: !item.isSaved,
-          };
-        }
-        return item;
-      }));
-
-      // Server update
-      await toggleReviewSave(id, user.id);
-    } catch (err) {
-      console.error('Error toggling save:', err);
-      // Revert on failure
-      fetchRecommendations();
-      toast({
-        title: "Error",
-        description: "Failed to update save status",
-        variant: "destructive"
-      });
-    }
-  };
 
   const refreshRecommendations = () => {
     fetchRecommendations();
@@ -149,7 +114,6 @@ export const useRecommendations = ({
     isLoading,
     error,
     handleLike,
-    handleSave,
     refreshRecommendations
   };
 };

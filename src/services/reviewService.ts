@@ -35,7 +35,6 @@ export interface Review {
   ai_summary_model_used?: string;
   // Interaction states
   isLiked?: boolean;
-  isSaved?: boolean;
   likes?: number;
   // Additional fields for ReviewCard compatibility
   user?: {
@@ -276,16 +275,11 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
 
     // Get interaction data if user is logged in
     let likeData = [];
-    let saveData = [];
     let likeCounts = [];
 
     if (currentUserId) {
-      const [likesResponse, savesResponse, likeCountsResponse] = await Promise.all([
+      const [likesResponse, likeCountsResponse] = await Promise.all([
         supabase.rpc('get_user_review_likes', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_user_review_saves', { 
           p_review_ids: reviewIds, 
           p_user_id: currentUserId 
         }),
@@ -295,7 +289,6 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       ]);
 
       likeData = likesResponse.data || [];
-      saveData = savesResponse.data || [];
       likeCounts = likeCountsResponse.data || [];
     }
 
@@ -315,9 +308,8 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
           type: entity.type,
           image_url: entity.image_url
         } : undefined,
-        comment_count: 0, // Placeholder for future comment system
+        comment_count: 0,
         isLiked: likeData.some(like => like.review_id === review.id),
-        isSaved: saveData.some(save => save.review_id === review.id),
         likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
       };
     });
@@ -370,16 +362,11 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
 
     // Get interaction data if user is logged in
     let likeData = [];
-    let saveData = [];
     let likeCounts = [];
 
     if (currentUserId) {
-      const [likesResponse, savesResponse, likeCountsResponse] = await Promise.all([
+      const [likesResponse, likeCountsResponse] = await Promise.all([
         supabase.rpc('get_user_review_likes', { 
-          p_review_ids: reviewIds, 
-          p_user_id: currentUserId 
-        }),
-        supabase.rpc('get_user_review_saves', { 
           p_review_ids: reviewIds, 
           p_user_id: currentUserId 
         }),
@@ -389,7 +376,6 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
       ]);
 
       likeData = likesResponse.data || [];
-      saveData = savesResponse.data || [];
       likeCounts = likeCountsResponse.data || [];
     }
 
@@ -409,9 +395,8 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
           type: entity.type,
           image_url: entity.image_url
         } : undefined,
-        comment_count: 0, // Placeholder for future comment system
+        comment_count: 0,
         isLiked: likeData.some(like => like.review_id === review.id),
-        isSaved: saveData.some(save => save.review_id === review.id),
         likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
       };
     });
@@ -499,24 +484,6 @@ export const toggleReviewLike = async (reviewId: string, userId: string): Promis
   }
 };
 
-export const toggleReviewSave = async (reviewId: string, userId: string): Promise<boolean> => {
-  try {
-    const { data, error } = await supabase.rpc('toggle_review_save', {
-      p_review_id: reviewId,
-      p_user_id: userId
-    });
-
-    if (error) {
-      console.error('Error toggling review save:', error);
-      return false;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in toggleReviewSave:', error);
-    return false;
-  }
-};
 
 export const convertReviewToRecommendation = async (reviewId: string): Promise<boolean> => {
   try {

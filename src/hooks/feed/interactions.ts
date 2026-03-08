@@ -1,7 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toggleLike as toggleRecommendationLike } from '@/services/recommendationService';
-import { toggleSave as toggleRecommendationSave } from '@/services/recommendation/interactionOperations';
 import { toggleLike as togglePostLike, toggleSave as togglePostSave } from '@/services/postService';
 import { isItemPost } from './api/utils';
 import type { CombinedFeedItem } from './types';
@@ -26,23 +24,16 @@ export const toggleFeedItemLike = async (
   }
 };
 
-// Toggle save for feed item (post or recommendation)
+// Toggle save for feed item — only posts support saving
 export const toggleFeedItemSave = async (
   item: CombinedFeedItem, 
   userId: string
 ): Promise<boolean> => {
-  try {
-    // If the item is a post, use post save toggling
-    if (isItemPost(item)) {
-      return togglePostSave(item.id, userId);
-    }
-    
-    // Otherwise use recommendation save toggling
-    return toggleRecommendationSave(item.id, userId, !!item.is_saved);
-  } catch (error) {
-    console.error('Error toggling save for feed item:', error);
-    throw error;
+  if (!isItemPost(item)) {
+    console.error('Save attempted on unsupported item type:', (item as any).type);
+    return false;
   }
+  return togglePostSave(item.id, userId);
 };
 
 // Create a hook for interactions that can be used in components
@@ -80,20 +71,11 @@ export const useInteractions = () => {
     setIsLoading(true);
     setError(null);
     try {
-      if (itemType === 'post') {
-        return await togglePostSave(id, userId);
-      } else {
-        // For recommendations, we need to determine the current save state
-        const { data } = await supabase
-          .from('recommendation_saves')
-          .select('id')
-          .eq('recommendation_id', id)
-          .eq('user_id', userId)
-          .single();
-        
-        const isSaved = !!data;
-        return await toggleRecommendationSave(id, userId, isSaved);
+      if (itemType !== 'post') {
+        console.error('Save attempted on unsupported item type:', itemType);
+        return false;
       }
+      return await togglePostSave(id, userId);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to toggle save'));
       throw err;

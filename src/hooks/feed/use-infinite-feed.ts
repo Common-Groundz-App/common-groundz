@@ -157,6 +157,11 @@ export const useInfiniteFeed = (feedType: FeedVisibility) => {
       const item = allItems.find(item => item.id === id);
       if (!item) return;
 
+      // Only posts support saving
+      if (!isItemPost(item)) {
+        console.error('Save attempted on unsupported item type');
+        return;
+      }
       // Optimistic update
       queryClient.setQueryData(['infinite-feed', feedType, user.id], (oldData: any) => {
         if (!oldData) return oldData;
