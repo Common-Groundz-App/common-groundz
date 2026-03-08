@@ -73,48 +73,6 @@ export const useRecommendationActions = (
     }
   };
 
-  // Handle save action
-  const handleSave = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to save recommendations',
-        variant: 'destructive'
-      });
-      return;
-    }
-
-    try {
-      const item = recommendations.find(r => r.id === id);
-      if (!item) return;
-
-      // Optimistic update
-      setRecommendations(prev => 
-        prev.map(item => {
-          if (item.id === id) {
-            return {
-              ...item,
-              isSaved: !item.isSaved
-            };
-          }
-          return item;
-        })
-      );
-
-      // Server update
-      await toggleSave(id, user.id, !!item.isSaved);
-    } catch (err) {
-      console.error('Error toggling save:', err);
-      // Revert on failure
-      refreshRecommendations();
-      toast({
-        title: 'Error',
-        description: 'Failed to update save status. Please try again.',
-        variant: 'destructive'
-      });
-    }
-  };
-
   // Add recommendation
   const addRecommendation = async (recommendation: Omit<Recommendation, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'likes' | 'isLiked' | 'isSaved'>) => {
     if (!user) {
