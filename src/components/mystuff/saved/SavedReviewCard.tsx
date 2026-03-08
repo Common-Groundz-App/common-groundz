@@ -39,7 +39,6 @@ const SavedReviewCard = ({ item, onUnsave }: SavedReviewCardProps) => {
                 userId={review.user_id || ''} 
                 username={review.username || 'User'}
                 className="hover:underline font-medium"
-                onClick={(e) => e.stopPropagation()}
               />
               <p className="text-xs text-muted-foreground">
                 Saved {format(new Date(item.saved_at), 'MMM d, yyyy')}
