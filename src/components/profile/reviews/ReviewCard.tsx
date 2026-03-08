@@ -38,7 +38,6 @@ import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 interface ReviewCardProps {
   review: Review;
   onLike: (id: string) => void;
-  onSave: (id: string) => void;
   onConvert?: (id: string) => void;
   refreshReviews: () => Promise<void>;
   hideEntityFallbacks?: boolean;
@@ -50,7 +49,6 @@ interface ReviewCardProps {
 const ReviewCard = ({ 
   review, 
   onLike, 
-  onSave,
   onConvert,
   refreshReviews,
   hideEntityFallbacks = false,
