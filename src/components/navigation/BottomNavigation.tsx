@@ -4,9 +4,7 @@ import { Home, Search, User, PlusCircle, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { isExploreRelatedRoute } from '@/utils/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { getProfileUrl } from '@/utils/getProfileUrl';
+import { useCanonicalProfileUrl } from '@/hooks/useCanonicalProfileUrl';
 
 interface NavItem {
   name: string;
