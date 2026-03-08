@@ -115,10 +115,6 @@ export const fetchUserRecommendations = async (
       const likedIds = new Set(
         userLikesData?.data?.map((like: any) => like.recommendation_id) || []
       );
-      
-      const savedIds = new Set(
-        userSavesData?.data?.map((save: any) => save.recommendation_id) || []
-      );
 
       // Process recommendations with all fetched data
       const processedRecommendations = recommendationsWithProfiles.map(rec => {
