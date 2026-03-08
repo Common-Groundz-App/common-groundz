@@ -175,35 +175,6 @@ const RecommendationContentViewer = ({
     }
   };
   
-  const handleRecommendationSave = async () => {
-    if (!user || !recommendation) return;
-    
-    try {
-      if (recommendation.isSaved) {
-        await supabase
-          .from('recommendation_saves')
-          .delete()
-          .eq('recommendation_id', recommendation.id)
-          .eq('user_id', user.id);
-        
-        setRecommendation({
-          ...recommendation,
-          isSaved: false
-        });
-      } else {
-        await supabase
-          .from('recommendation_saves')
-          .insert({ recommendation_id: recommendation.id, user_id: user.id });
-        
-        setRecommendation({
-          ...recommendation,
-          isSaved: true
-        });
-      }
-    } catch (err) {
-      console.error('Error toggling save:', err);
-    }
-  };
   
   const handleRefresh = () => {
     if (recommendationId) {
