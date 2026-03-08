@@ -955,7 +955,7 @@ const EntityDetailOriginal = () => {
                     )}
 
                     <Button variant="outline" className="w-full gap-2">
-                      <Send className="h-4 w-4" />
+                      <Share className="h-4 w-4" />
                       Share
                     </Button>
                   </CardContent>

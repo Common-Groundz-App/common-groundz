@@ -498,7 +498,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             className="flex items-center gap-1 py-0 px-2 sm:px-4"
             onClick={handleShare}
           >
-            <Send className="h-5 w-5" />
+            <Share className="h-5 w-5" />
           </Button>
         </div>
       </CardContent>

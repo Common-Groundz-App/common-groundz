@@ -588,7 +588,7 @@ const RecommendationCard = ({
               handleShare();
             }}
           >
-            <Send className="h-5 w-5" />
+            <Share className="h-5 w-5" />
           </Button>
         </div>
       </CardContent>
