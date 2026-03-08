@@ -112,7 +112,7 @@ const ProfileRecommendations = ({ profileUserId, isOwnProfile = false }: Profile
             key={item.id}
             recommendation={item}
             onLike={handleLike}
-            onSave={handleSave}
+            
             onDeleted={handleRecommendationDeleted}
           />
         ))}
