@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Send, Clock, Plus } from 'lucide-react';
+import { Heart, Bookmark, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share, Clock, Plus } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
