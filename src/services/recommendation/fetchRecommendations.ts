@@ -93,24 +93,13 @@ export const fetchUserRecommendations = async (
         
         // Add user-specific queries if user is logged in
         if (userId) {
-          const [likesResult, savesResult] = await Promise.all([
-            // Get user likes
-            supabase
+          const likesResult = await supabase
               .from('recommendation_likes')
               .select('recommendation_id')
               .eq('user_id', userId)
-              .in('recommendation_id', recommendationIds),
-            
-            // Get user saves
-            supabase
-              .from('recommendation_saves')
-              .select('recommendation_id')
-              .eq('user_id', userId)
-              .in('recommendation_id', recommendationIds)
-          ]);
+              .in('recommendation_id', recommendationIds);
           
           userLikesData = likesResult;
-          userSavesData = savesResult;
         }
       } catch (batchError) {
         console.error('Error in batch operations:', batchError);
