@@ -25,6 +25,7 @@ export function UserMenu() {
   const { data: profile } = useProfile(user?.id);
   const { invalidateProfile } = useProfileCacheActions();
   const { toast } = useToast();
+  const { profileUrl } = useCanonicalProfileUrl();
 
   // Listen for profile update events
   React.useEffect(() => {
