@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
-import { Package, ListChecks, Sparkles } from 'lucide-react';
+import { Package, ListChecks, Sparkles, Bookmark } from 'lucide-react';
 import MyStuffFilters from './MyStuffFilters';
 import MyStuffItemsGrid from './MyStuffItemsGrid';
 import MyStuffRoutinesSection from './MyStuffRoutinesSection';
 import JourneyRecommendationsSection from './JourneyRecommendationsSection';
+import SavedItemsSection from './SavedItemsSection';
 
 const MyStuffContent = () => {
   const [activeTab, setActiveTab] = useState('items');
