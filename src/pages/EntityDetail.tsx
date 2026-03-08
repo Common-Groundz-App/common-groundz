@@ -833,7 +833,6 @@ const EntityDetailOriginal = () => {
                               <ReviewCard
                                 review={review}
                                 onLike={() => handleReviewAction('like', review.id)}
-                                onSave={() => handleReviewAction('save', review.id)}
                                 refreshReviews={refreshData}
                                 hideEntityFallbacks={true}
                                 compact={true}
@@ -909,7 +908,6 @@ const EntityDetailOriginal = () => {
                               key={review.id}
                               review={review}
                               onLike={() => handleReviewAction('like', review.id)}
-                              onSave={() => handleReviewAction('save', review.id)}
                               refreshReviews={refreshData}
                               hideEntityFallbacks={true}
                               compact={true}

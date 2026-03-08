@@ -5,15 +5,11 @@ import { useSavedItems, SavedItemType, SavedItem } from '@/hooks/use-saved-items
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import SavedPostCard from './saved/SavedPostCard';
-import SavedReviewCard from './saved/SavedReviewCard';
-import SavedRecommendationCard from './saved/SavedRecommendationCard';
 import SavedEntityCard from './saved/SavedEntityCard';
 
 const FILTER_OPTIONS: { value: SavedItemType; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'post', label: 'Posts' },
-  { value: 'review', label: 'Reviews' },
-  { value: 'recommendation', label: 'Recommendations' },
   { value: 'entity', label: 'Places & Products' },
 ];
 
@@ -42,10 +38,6 @@ const SavedItemsSection = () => {
     switch (item.type) {
       case 'post':
         return <SavedPostCard key={item.id} item={item} onUnsave={() => handleUnsave(item)} />;
-      case 'review':
-        return <SavedReviewCard key={item.id} item={item} onUnsave={() => handleUnsave(item)} />;
-      case 'recommendation':
-        return <SavedRecommendationCard key={item.id} item={item} onUnsave={() => handleUnsave(item)} />;
       case 'entity':
         return <SavedEntityCard key={item.id} item={item} onUnsave={() => handleUnsave(item)} />;
       default:
@@ -90,7 +82,7 @@ const SavedItemsSection = () => {
           
           <h3 className="text-xl font-semibold mb-2">No saved items yet</h3>
           <p className="text-muted-foreground max-w-sm">
-            Save posts, reviews, recommendations, and places to find them here.
+            Save posts and places to find them here.
           </p>
         </div>
       ) : (

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, Bookmark, MoreVertical, Share } from 'lucide-react';
+import { Heart, MessageCircle, MoreVertical, Share } from 'lucide-react';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -30,7 +30,6 @@ import { ProfileDisplay } from '@/components/common/ProfileDisplay';
 interface RecommendationCardProps {
   recommendation: any;
   onLike?: (id: string) => void;
-  onSave?: (id: string) => void;
   highlightCommentId?: string | null;
   onDeleted?: () => void;
   hideEntityFallbacks?: boolean;
@@ -40,7 +39,6 @@ interface RecommendationCardProps {
 const RecommendationCard = ({ 
   recommendation, 
   onLike, 
-  onSave, 
   highlightCommentId,
   onDeleted,
   hideEntityFallbacks = false,
@@ -49,7 +47,6 @@ const RecommendationCard = ({
   const navigate = useNavigate();
   const { user } = useAuth();
   const [isLiked, setIsLiked] = useState(recommendation.isLiked || false);
-  const [isSaved, setIsSaved] = useState(recommendation.isSaved || false);
   const [likes, setLikes] = useState(recommendation.likes || 0);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -169,14 +166,6 @@ const RecommendationCard = ({
     setLikes(isLiked ? likes - 1 : likes + 1);
     if (onLike) {
       onLike(recommendation.id);
-    }
-  };
-
-  const handleSave = async () => {
-    if (!user) return;
-    setIsSaved(!isSaved);
-    if (onSave) {
-      onSave(recommendation.id);
     }
   };
 
@@ -377,20 +366,6 @@ const RecommendationCard = ({
                 <span>{recommendation.comment_count || 0}</span>
               </Button>
               
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "flex items-center gap-1 py-0 px-1 text-xs h-6",
-                  isSaved && "text-primary"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSave();
-                }}
-              >
-                <Bookmark className={cn("h-3 w-3", isSaved && "fill-current")} />
-              </Button>
             </div>
             
             {/* Share button */}
@@ -562,20 +537,6 @@ const RecommendationCard = ({
               <span>{recommendation.comment_count || 0}</span>
             </Button>
             
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "flex items-center gap-1 py-0 px-2 sm:px-4",
-                isSaved && "text-primary"
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSave();
-              }}
-            >
-              <Bookmark className={cn("h-5 w-5", isSaved && "fill-current")} />
-            </Button>
           </div>
           
           {/* Share button */}

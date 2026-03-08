@@ -129,7 +129,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
             key={review.id}
             review={review}
             onLike={handleLike}
-            onSave={handleSave}
+            
             onConvert={isOwnProfile ? convertToRecommendation : undefined}
             refreshReviews={handleRefreshReviews}
             showTimelineFeatures={isOwnProfile && user?.id === review.user_id}

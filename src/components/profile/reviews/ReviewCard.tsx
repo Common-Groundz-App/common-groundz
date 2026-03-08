@@ -38,7 +38,6 @@ import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 interface ReviewCardProps {
   review: Review;
   onLike: (id: string) => void;
-  onSave: (id: string) => void;
   onConvert?: (id: string) => void;
   refreshReviews: () => Promise<void>;
   hideEntityFallbacks?: boolean;
@@ -50,7 +49,6 @@ interface ReviewCardProps {
 const ReviewCard = ({ 
   review, 
   onLike, 
-  onSave,
   onConvert,
   refreshReviews,
   hideEntityFallbacks = false,
@@ -450,21 +448,6 @@ const getInitials = (name: string | null) => {
                   <span>{review.comment_count || 0}</span>
                 </Button>
                 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "flex items-center gap-1 py-0 px-1 text-xs h-6",
-                    review.isSaved && "text-primary"
-                  )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    onSave(review.id);
-                  }}
-                >
-                  <Bookmark className={cn("h-3 w-3", review.isSaved && "fill-current")} />
-                </Button>
               </div>
               
               {/* Share button */}
@@ -748,21 +731,6 @@ const getInitials = (name: string | null) => {
                 <span>{review.comment_count || 0}</span>
               </Button>
               
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "flex items-center gap-1 py-0 px-2 sm:px-4",
-                  review.isSaved && "text-primary"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  onSave(review.id);
-                }}
-              >
-                <Bookmark className={cn("h-5 w-5", review.isSaved && "fill-current")} />
-              </Button>
             </div>
             
             {/* Share button */}

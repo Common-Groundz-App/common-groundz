@@ -64,7 +64,6 @@ const RecommendationContentViewer = ({
           .eq('recommendation_id', recommendationId);
           
         let isLiked = false;
-        let isSaved = false;
         
         if (user) {
           const { data: likeData } = await supabase
@@ -75,15 +74,6 @@ const RecommendationContentViewer = ({
             .maybeSingle();
             
           isLiked = !!likeData;
-          
-          const { data: saveData } = await supabase
-            .from('recommendation_saves')
-            .select('*')
-            .eq('recommendation_id', recommendationId)
-            .eq('user_id', user.id)
-            .maybeSingle();
-            
-          isSaved = !!saveData;
         }
         
         const { count: commentCount } = await supabase
@@ -112,7 +102,6 @@ const RecommendationContentViewer = ({
           likes: likeCount || 0,
           comment_count: commentCount || 0,
           isLiked: isLiked,
-          isSaved: isSaved,
           entity: entity
         };
         
@@ -186,35 +175,6 @@ const RecommendationContentViewer = ({
     }
   };
   
-  const handleRecommendationSave = async () => {
-    if (!user || !recommendation) return;
-    
-    try {
-      if (recommendation.isSaved) {
-        await supabase
-          .from('recommendation_saves')
-          .delete()
-          .eq('recommendation_id', recommendation.id)
-          .eq('user_id', user.id);
-        
-        setRecommendation({
-          ...recommendation,
-          isSaved: false
-        });
-      } else {
-        await supabase
-          .from('recommendation_saves')
-          .insert({ recommendation_id: recommendation.id, user_id: user.id });
-        
-        setRecommendation({
-          ...recommendation,
-          isSaved: true
-        });
-      }
-    } catch (err) {
-      console.error('Error toggling save:', err);
-    }
-  };
   
   const handleRefresh = () => {
     if (recommendationId) {
@@ -254,7 +214,6 @@ const RecommendationContentViewer = ({
       <RecommendationCard 
         recommendation={recommendation}
         onLike={() => handleRecommendationLike()}
-        onSave={() => handleRecommendationSave()}
         onDeleted={handleRefresh}
         highlightCommentId={highlightCommentId}
       />

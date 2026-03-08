@@ -42,7 +42,6 @@ const FeedItem: React.FC<FeedItemProps> = ({
     <RecommendationFeedItem 
       recommendation={item} 
       onLike={onLike} 
-      onSave={onSave} 
       onComment={onComment}
       onDelete={onDelete}
       refreshFeed={refreshFeed}

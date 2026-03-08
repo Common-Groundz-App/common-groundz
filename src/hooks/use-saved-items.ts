@@ -3,11 +3,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-export type SavedItemType = 'all' | 'post' | 'review' | 'recommendation' | 'entity';
+export type SavedItemType = 'all' | 'post' | 'entity';
 
 export interface SavedItem {
   id: string;
-  type: 'post' | 'review' | 'recommendation' | 'entity';
+  type: 'post' | 'entity';
   saved_at: string;
   content: any;
 }
@@ -28,7 +28,7 @@ export const useSavedItems = (typeFilter: SavedItemType = 'all') => {
     const results: SavedItem[] = [];
     const limit = ITEMS_PER_PAGE * (page + 1);
 
-    // Fetch based on filter
+    // Fetch saved posts
     if (typeFilter === 'all' || typeFilter === 'post') {
       const { data: postSaves, error: postError } = await supabase
         .from('post_saves')
@@ -58,7 +58,6 @@ export const useSavedItems = (typeFilter: SavedItemType = 'all') => {
         for (const save of postSaves) {
           const post = save.posts as any;
           if (post && !post.is_deleted) {
-            // Fetch profile separately to respect column restrictions
             const { data: profile } = await supabase
               .from('profiles')
               .select(PROFILE_COLUMNS)
@@ -80,120 +79,7 @@ export const useSavedItems = (typeFilter: SavedItemType = 'all') => {
       }
     }
 
-    if (typeFilter === 'all' || typeFilter === 'review') {
-      const { data: reviewSaves, error: reviewError } = await supabase
-        .from('review_saves')
-        .select(`
-          id,
-          created_at,
-          review_id,
-          reviews!inner (
-            id,
-            rating,
-            review_text,
-            created_at,
-            updated_at,
-            user_id,
-            entity_id,
-            is_deleted,
-            media
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (!reviewError && reviewSaves) {
-        for (const save of reviewSaves) {
-          const review = save.reviews as any;
-          if (review && !review.is_deleted) {
-            // Fetch profile and entity
-            const [{ data: profile }, { data: entity }] = await Promise.all([
-              supabase
-                .from('profiles')
-                .select(PROFILE_COLUMNS)
-                .eq('id', review.user_id)
-                .single(),
-              supabase
-                .from('entities')
-                .select('id, name, type, image_url, slug')
-                .eq('id', review.entity_id)
-                .single(),
-            ]);
-
-            results.push({
-              id: save.id,
-              type: 'review',
-              saved_at: save.created_at,
-              content: {
-                ...review,
-                username: profile?.username,
-                avatar_url: profile?.avatar_url,
-                entity,
-              },
-            });
-          }
-        }
-      }
-    }
-
-    if (typeFilter === 'all' || typeFilter === 'recommendation') {
-      const { data: recSaves, error: recError } = await supabase
-        .from('recommendation_saves')
-        .select(`
-          id,
-          created_at,
-          recommendation_id,
-          recommendations!inner (
-            id,
-            title,
-            description,
-            created_at,
-            updated_at,
-            user_id,
-            entity_id,
-            is_deleted,
-            media
-          )
-        `)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (!recError && recSaves) {
-        for (const save of recSaves) {
-          const rec = save.recommendations as any;
-          if (rec && !rec.is_deleted) {
-            // Fetch profile and entity
-            const [{ data: profile }, { data: entity }] = await Promise.all([
-              supabase
-                .from('profiles')
-                .select(PROFILE_COLUMNS)
-                .eq('id', rec.user_id)
-                .single(),
-              supabase
-                .from('entities')
-                .select('id, name, type, image_url, slug')
-                .eq('id', rec.entity_id)
-                .single(),
-            ]);
-
-            results.push({
-              id: save.id,
-              type: 'recommendation',
-              saved_at: save.created_at,
-              content: {
-                ...rec,
-                username: profile?.username,
-                avatar_url: profile?.avatar_url,
-                entity,
-              },
-            });
-          }
-        }
-      }
-    }
-
+    // Fetch saved entities
     if (typeFilter === 'all' || typeFilter === 'entity') {
       const { data: entitySaves, error: entityError } = await supabase
         .from('entity_saves')
@@ -265,32 +151,6 @@ export const useSavedItems = (typeFilter: SavedItemType = 'all') => {
     },
   });
 
-  const unsaveReview = useMutation({
-    mutationFn: async (saveId: string) => {
-      const { error } = await supabase
-        .from('review_saves')
-        .delete()
-        .eq('id', saveId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['saved-items'] });
-    },
-  });
-
-  const unsaveRecommendation = useMutation({
-    mutationFn: async (saveId: string) => {
-      const { error } = await supabase
-        .from('recommendation_saves')
-        .delete()
-        .eq('id', saveId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['saved-items'] });
-    },
-  });
-
   const unsaveEntity = useMutation({
     mutationFn: async (saveId: string) => {
       const { error } = await supabase
@@ -308,14 +168,10 @@ export const useSavedItems = (typeFilter: SavedItemType = 'all') => {
     switch (item.type) {
       case 'post':
         return unsavePost.mutateAsync(item.id);
-      case 'review':
-        return unsaveReview.mutateAsync(item.id);
-      case 'recommendation':
-        return unsaveRecommendation.mutateAsync(item.id);
       case 'entity':
         return unsaveEntity.mutateAsync(item.id);
     }
-  }, [unsavePost, unsaveReview, unsaveRecommendation, unsaveEntity]);
+  }, [unsavePost, unsaveEntity]);
 
   return {
     items: query.data ?? [],
@@ -324,6 +180,6 @@ export const useSavedItems = (typeFilter: SavedItemType = 'all') => {
     loadMore,
     hasMore,
     unsaveItem,
-    isUnsaving: unsavePost.isPending || unsaveReview.isPending || unsaveRecommendation.isPending || unsaveEntity.isPending,
+    isUnsaving: unsavePost.isPending || unsaveEntity.isPending,
   };
 };

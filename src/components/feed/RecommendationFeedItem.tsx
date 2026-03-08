@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Bookmark, Heart, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { FeedItem } from '@/hooks/feed/types';
@@ -44,7 +44,7 @@ const resetBodyPointerEvents = () => {
 interface RecommendationFeedItemProps {
   recommendation: FeedItem;
   onLike?: (id: string) => void;
-  onSave?: (id: string) => void;
+  
   onComment?: (id: string) => void;
   onDelete?: (id: string) => void;
   refreshFeed?: () => void;
@@ -53,7 +53,7 @@ interface RecommendationFeedItemProps {
 export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({ 
   recommendation, 
   onLike, 
-  onSave,
+  
   onComment,
   onDelete,
   refreshFeed
@@ -237,20 +237,6 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     setIsLightboxOpen(true);
   };
 
-  const handleSave = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (onSave) {
-      onSave(recommendation.id);
-      
-      // Provide haptic + sound feedback
-      try {
-        feedbackActions.save();
-      } catch (error) {
-        console.error('Feedback error:', error);
-      }
-    }
-  };
   
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
   
@@ -402,21 +388,6 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           </Button>
         </div>
         
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "flex items-center gap-1",
-            recommendation.is_saved && "text-brand-orange"
-          )}
-          onClick={handleSave}
-        >
-          <Bookmark 
-            size={18} 
-            className={cn(recommendation.is_saved && "fill-brand-orange")} 
-          />
-          Save
-        </Button>
       </CardFooter>
       
       {/* Add Lightbox component */}
