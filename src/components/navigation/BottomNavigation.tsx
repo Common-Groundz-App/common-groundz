@@ -18,21 +18,7 @@ interface NavItem {
 export const BottomNavigation = () => {
   const location = useLocation();
   const { user } = useAuth();
-
-  const { data: username } = useQuery({
-    queryKey: ['profile-username', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', user.id)
-        .single();
-      return data?.username || null;
-    },
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { profileUrl } = useCanonicalProfileUrl();
   
   const navItems: NavItem[] = [
     { name: 'Home', path: '/home', icon: Home },
