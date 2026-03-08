@@ -237,20 +237,6 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     setIsLightboxOpen(true);
   };
 
-  const handleSave = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (onSave) {
-      onSave(recommendation.id);
-      
-      // Provide haptic + sound feedback
-      try {
-        feedbackActions.save();
-      } catch (error) {
-        console.error('Feedback error:', error);
-      }
-    }
-  };
   
   const displayCommentCount = localCommentCount !== null ? localCommentCount : recommendation.comment_count;
   
