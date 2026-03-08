@@ -175,24 +175,15 @@ export const processRecommendations = async (
 
     // Fetch user's likes and saves if user is provided
     let userLikes = new Set<string>();
-    let userSaves = new Set<string>();
     
     if (userId) {
-      const [likesResult, savesResult] = await Promise.all([
-        supabase
+      const likesResult = await supabase
           .from('recommendation_likes')
           .select('recommendation_id')
           .eq('user_id', userId)
-          .in('recommendation_id', recommendationIds),
-        supabase
-          .from('recommendation_saves')
-          .select('recommendation_id')
-          .eq('user_id', userId)
-          .in('recommendation_id', recommendationIds)
-      ]);
+          .in('recommendation_id', recommendationIds);
 
       userLikes = new Set(likesResult.data?.map(l => l.recommendation_id) || []);
-      userSaves = new Set(savesResult.data?.map(s => s.recommendation_id) || []);
     }
 
     // Fetch comments count
