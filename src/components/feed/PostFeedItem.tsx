@@ -3,7 +3,7 @@ import { sharePost } from '@/utils/sharePost';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share2, Globe, Lock, Users, ChevronDown, MapPin } from 'lucide-react';
+import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Send, Globe, Lock, Users, ChevronDown, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
