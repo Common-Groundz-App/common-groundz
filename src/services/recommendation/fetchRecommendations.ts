@@ -124,7 +124,6 @@ export const fetchUserRecommendations = async (
         // Get interaction data
         const likes = likeCountMap.get(rec.id) || 0;
         const isLiked = userId ? likedIds.has(rec.id) : false;
-        const isSaved = userId ? savedIds.has(rec.id) : false;
         
         // Transform to legacy format for backward compatibility
         const processed = {
