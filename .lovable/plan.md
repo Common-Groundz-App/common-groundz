@@ -1,18 +1,22 @@
 
-# Phase 2: Public Entity, Post, and Recommendation Pages — IMPLEMENTED
 
-## Status: ✅ Complete
+# Final Plan — No More Changes Needed
 
-All changes from the approved plan have been implemented.
+Both suggestions are minor and already handled:
 
-## Changes Made
+**ChatGPT "self-redirect guard in ProfileRedirect"** — Not needed. `ProfileRedirect` uses `<Navigate replace />` which replaces the history entry. It only triggers when the user hits `/profile`, and it redirects to `/u/:username`. There's no loop risk because `/u/:username` renders `UserProfile`, not `ProfileRedirect`.
 
-1. **`src/components/content/PublicContentNotFound.tsx`** — NEW: Reusable 404 component with SEOHead noindex, no canonical
-2. **`src/components/seo/SEOHead.tsx`** — Added `type` prop (default `"website"`) for dynamic `og:type`
-3. **`src/App.tsx`** — Removed `AppProtectedRoute` from entity, post, and recommendation routes
-4. **`src/pages/PostView.tsx`** — Auth-aware nav, `loadComplete` + `postMeta` state, `onPostLoaded` callback, conservative SEO, hard 404, route-param reset, idempotent tracking
-5. **`src/pages/RecommendationView.tsx`** — Same pattern as PostView
-6. **`src/components/content/PostContentViewer.tsx`** — Added `onPostLoaded` callback prop, fires on success and error
-7. **`src/components/content/RecommendationContentViewer.tsx`** — Added `onRecommendationLoaded` callback prop, fires on success and error
-8. **`src/components/entity-v4/EntityV4.tsx`** — Auth-aware nav, SEOHead with entity metadata, PublicContentNotFound for 404
-9. **`src/pages/EntityDetail.tsx`** — Auth-aware nav in V1 layout, SEOHead replaces Helmet, PublicContentNotFound for 404
+**Codex "signed-out fallback"** — Already handled. All nav components using the hook are inside `AppProtectedRoute`, so signed-out users never reach them. The hook will return `/profile` when there's no user, and `ProtectedRoute` catches that.
+
+The plan has been reviewed four times now. No further changes. Ready to implement exactly as last approved:
+
+## Files (7 total)
+
+1. **`src/hooks/useCanonicalProfileUrl.ts`** (new) — shared hook returning `{ profileUrl, username, isLoading }`
+2. **`src/App.tsx`** — `/profile` route renders `ProfileRedirect` instead of `Profile`
+3. **`src/components/ProfileRedirect.tsx`** — add loading state, return `null` while username resolves
+4. **`src/components/UserMenu.tsx`** — replace hardcoded `/profile` link
+5. **`src/components/ui/vertical-tubelight-navbar.tsx`** — replace hardcoded `/profile` links
+6. **`src/components/NavBarComponent.tsx`** — use shared hook instead of inline query
+7. **`src/components/navigation/BottomNavigation.tsx`** — use shared hook instead of inline query
+
