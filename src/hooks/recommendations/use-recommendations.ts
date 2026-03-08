@@ -4,7 +4,6 @@ import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   toggleLike, 
-  toggleSave,
   RecommendationCategory
 } from '@/services/recommendationService';
 import { useToast } from '@/hooks/use-toast';
