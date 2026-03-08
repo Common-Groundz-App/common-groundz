@@ -35,7 +35,7 @@ export interface Review {
   ai_summary_model_used?: string;
   // Interaction states
   isLiked?: boolean;
-  isSaved?: boolean;
+  likes?: number;
   likes?: number;
   // Additional fields for ReviewCard compatibility
   user?: {
