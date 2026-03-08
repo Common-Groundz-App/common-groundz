@@ -8,30 +8,14 @@ import { useLocation } from 'react-router-dom';
 import { SearchDialog } from '@/components/SearchDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { isExploreRelatedRoute } from '@/utils/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { getProfileUrl } from '@/utils/getProfileUrl';
+import { useCanonicalProfileUrl } from '@/hooks/useCanonicalProfileUrl';
 
 export function NavBarComponent() {
   const location = useLocation();
   const [showSearchDialog, setShowSearchDialog] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState('Home');
   const { user, isLoading } = useAuth();
-
-  const { data: username } = useQuery({
-    queryKey: ['profile-username', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', user.id)
-        .single();
-      return data?.username || null;
-    },
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { profileUrl } = useCanonicalProfileUrl();
 
   // HOIST: Compute values that are needed in both loading and loaded states
   const isAdminPage = location.pathname === '/admin';
@@ -41,8 +25,8 @@ export function NavBarComponent() {
   const navItems = React.useMemo(() => [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
-    { name: 'Profile', url: getProfileUrl(username), icon: User }
-  ], [username]);
+    { name: 'Profile', url: profileUrl, icon: User }
+  ], [profileUrl]);
 
   // HOIST: Memoize right section (depends on user and isProfilePage, both available)
   const rightSection = React.useMemo(() => (

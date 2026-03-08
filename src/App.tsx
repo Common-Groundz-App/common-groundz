@@ -16,6 +16,7 @@ import Index from '@/pages/Index';
 import Feed from '@/pages/Feed';
 import Auth from '@/pages/Auth';
 import Profile from '@/pages/Profile';
+import ProfileRedirect from '@/components/ProfileRedirect';
 import Explore from '@/pages/Explore';
 import Settings from '@/pages/Settings';
 import MyStuffPage from '@/pages/MyStuffPage';
@@ -110,7 +111,7 @@ function App() {
                   } />
                   <Route path="/profile" element={
                     <AppProtectedRoute>
-                      <Profile />
+                      <ProfileRedirect />
                     </AppProtectedRoute>
                   } />
                   <Route path="/profile/:id" element={

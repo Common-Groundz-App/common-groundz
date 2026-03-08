@@ -21,6 +21,7 @@ import { SearchDialog } from "@/components/SearchDialog";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
 import { useProfile } from "@/hooks/use-profile-cache";
+import { useCanonicalProfileUrl } from "@/hooks/useCanonicalProfileUrl";
 
 interface NavItem {
   name: string;
@@ -46,12 +47,13 @@ export function VerticalTubelightNavbar({
   const [showSearchDialog, setShowSearchDialog] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const { unreadCount } = useNotifications();
+  const { profileUrl } = useCanonicalProfileUrl();
 
   const defaultNavItems: NavItem[] = [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
     { name: 'My Stuff', url: '/my-stuff', icon: Package },
-    { name: 'Profile', url: '/profile', icon: User },
+    { name: 'Profile', url: profileUrl, icon: User },
     { 
       name: 'Notifications', 
       url: '#notifications', 
@@ -234,7 +236,7 @@ export function VerticalTubelightNavbar({
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end">
                 <DropdownMenuItem asChild>
-                  <Link to="/profile" className="cursor-pointer">View Profile</Link>
+                  <Link to={profileUrl} className="cursor-pointer">View Profile</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/settings" className="cursor-pointer">Settings</Link>

@@ -15,6 +15,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useProfile, useProfileCacheActions } from "@/hooks/use-profile-cache";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileAvatar } from "@/components/common/ProfileAvatar";
+import { useCanonicalProfileUrl } from "@/hooks/useCanonicalProfileUrl";
 
 export function UserMenu() {
   const { user, session, signOut } = useAuth();
@@ -24,6 +25,7 @@ export function UserMenu() {
   const { data: profile } = useProfile(user?.id);
   const { invalidateProfile } = useProfileCacheActions();
   const { toast } = useToast();
+  const { profileUrl } = useCanonicalProfileUrl();
 
   // Listen for profile update events
   React.useEffect(() => {
@@ -126,7 +128,7 @@ export function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link to="/profile" className="flex items-center cursor-pointer">
+          <Link to={profileUrl} className="flex items-center cursor-pointer">
             <User className="mr-2 h-4 w-4" />
             <span>Profile</span>
           </Link>

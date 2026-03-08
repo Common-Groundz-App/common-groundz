@@ -4,9 +4,7 @@ import { Home, Search, User, PlusCircle, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { isExploreRelatedRoute } from '@/utils/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { getProfileUrl } from '@/utils/getProfileUrl';
+import { useCanonicalProfileUrl } from '@/hooks/useCanonicalProfileUrl';
 
 interface NavItem {
   name: string;
@@ -20,21 +18,7 @@ interface NavItem {
 export const BottomNavigation = () => {
   const location = useLocation();
   const { user } = useAuth();
-
-  const { data: username } = useQuery({
-    queryKey: ['profile-username', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', user.id)
-        .single();
-      return data?.username || null;
-    },
-    enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-  });
+  const { profileUrl } = useCanonicalProfileUrl();
   
   const navItems: NavItem[] = [
     { name: 'Home', path: '/home', icon: Home },
@@ -52,7 +36,7 @@ export const BottomNavigation = () => {
       }
     },
     { name: 'My Stuff', path: '/my-stuff', icon: Package },
-    { name: 'Profile', path: getProfileUrl(username), icon: User }
+    { name: 'Profile', path: profileUrl, icon: User }
   ];
   
   return (
