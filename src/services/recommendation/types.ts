@@ -122,7 +122,6 @@ export interface Recommendation {
   // Profile fields - these will be removed in Phase 4
   likes?: number;
   isLiked?: boolean;
-  isSaved?: boolean;
   media?: any[];
   username?: string | null;
   avatar_url?: string | null;

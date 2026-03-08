@@ -396,9 +396,8 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
           type: entity.type,
           image_url: entity.image_url
         } : undefined,
-        comment_count: 0, // Placeholder for future comment system
+        comment_count: 0,
         isLiked: likeData.some(like => like.review_id === review.id),
-        isSaved: saveData.some(save => save.review_id === review.id),
         likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
       };
     });

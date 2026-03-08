@@ -63,7 +63,6 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
       ...data,
       likes,
       isLiked,
-      isSaved,
       // Legacy properties for backward compatibility
       username: profile.displayName,
       avatar_url: profile.avatar_url

@@ -131,7 +131,6 @@ export const fetchUserRecommendations = async (
           entity,
           likes,
           isLiked,
-          isSaved,
           // Legacy properties for backward compatibility
           username: rec.user.displayName,
           avatar_url: rec.user.avatar_url,
