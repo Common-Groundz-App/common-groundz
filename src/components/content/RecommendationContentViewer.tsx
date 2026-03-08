@@ -102,7 +102,6 @@ const RecommendationContentViewer = ({
           likes: likeCount || 0,
           comment_count: commentCount || 0,
           isLiked: isLiked,
-          isSaved: isSaved,
           entity: entity
         };
         
