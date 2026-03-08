@@ -36,7 +36,6 @@ export interface Review {
   // Interaction states
   isLiked?: boolean;
   likes?: number;
-  likes?: number;
   // Additional fields for ReviewCard compatibility
   user?: {
     username?: string;
