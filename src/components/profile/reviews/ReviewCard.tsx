@@ -473,7 +473,7 @@ const getInitials = (name: string | null) => {
                 size="sm"
                 className="flex items-center gap-1 py-0 px-1 text-xs h-6"
               >
-                <Share2 className="h-3 w-3" />
+                <Send className="h-3 w-3" />
               </Button>
             </div>
           </CardContent>
