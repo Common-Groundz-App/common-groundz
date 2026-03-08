@@ -236,7 +236,7 @@ export function VerticalTubelightNavbar({
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end">
                 <DropdownMenuItem asChild>
-                  <Link to="/profile" className="cursor-pointer">View Profile</Link>
+                  <Link to={profileUrl} className="cursor-pointer">View Profile</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link to="/settings" className="cursor-pointer">Settings</Link>

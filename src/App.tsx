@@ -111,7 +111,7 @@ function App() {
                   } />
                   <Route path="/profile" element={
                     <AppProtectedRoute>
-                      <Profile />
+                      <ProfileRedirect />
                     </AppProtectedRoute>
                   } />
                   <Route path="/profile/:id" element={

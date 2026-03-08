@@ -36,7 +36,7 @@ export const BottomNavigation = () => {
       }
     },
     { name: 'My Stuff', path: '/my-stuff', icon: Package },
-    { name: 'Profile', path: getProfileUrl(username), icon: User }
+    { name: 'Profile', path: profileUrl, icon: User }
   ];
   
   return (

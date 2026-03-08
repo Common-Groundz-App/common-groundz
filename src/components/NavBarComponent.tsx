@@ -25,8 +25,8 @@ export function NavBarComponent() {
   const navItems = React.useMemo(() => [
     { name: 'Home', url: '/home', icon: Home },
     { name: 'Explore', url: '/explore', icon: Search },
-    { name: 'Profile', url: getProfileUrl(username), icon: User }
-  ], [username]);
+    { name: 'Profile', url: profileUrl, icon: User }
+  ], [profileUrl]);
 
   // HOIST: Memoize right section (depends on user and isProfilePage, both available)
   const rightSection = React.useMemo(() => (
