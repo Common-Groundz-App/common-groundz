@@ -29,7 +29,6 @@ export const fetchRecommendationById = async (id: string, userId?: string | null
     
     // Batch fetch user interaction data and like counts
     let isLiked = false;
-    let isSaved = false;
     let likes = 0;
     
     if (userId) {
