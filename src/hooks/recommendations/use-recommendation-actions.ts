@@ -5,7 +5,6 @@ import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   Recommendation,
   toggleLike,
-  toggleSave,
   createRecommendation
 } from '@/services/recommendationService';
 
