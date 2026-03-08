@@ -5,9 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface UserInteractionData {
   likedRecommendations: Set<string>;
-  savedRecommendations: Set<string>;
   likedReviews: Set<string>;
-  savedReviews: Set<string>;
   likedPosts: Set<string>;
   savedPosts: Set<string>;
 }
@@ -27,9 +25,7 @@ export const useUserInteractionsCache = () => {
       if (!user?.id) {
         return {
           likedRecommendations: new Set(),
-          savedRecommendations: new Set(),
           likedReviews: new Set(),
-          savedReviews: new Set(),
           likedPosts: new Set(),
           savedPosts: new Set(),
         };
@@ -37,25 +33,19 @@ export const useUserInteractionsCache = () => {
 
       const [
         recLikes,
-        recSaves,
         reviewLikes,
-        reviewSaves,
         postLikes,
         postSaves
       ] = await Promise.all([
         supabase.from('recommendation_likes').select('recommendation_id').eq('user_id', user.id),
-        supabase.from('recommendation_saves').select('recommendation_id').eq('user_id', user.id),
         supabase.from('review_likes').select('review_id').eq('user_id', user.id),
-        supabase.from('review_saves').select('review_id').eq('user_id', user.id),
         supabase.from('post_likes').select('post_id').eq('user_id', user.id),
         supabase.from('post_saves').select('post_id').eq('user_id', user.id),
       ]);
 
       return {
         likedRecommendations: new Set(recLikes.data?.map(item => item.recommendation_id) || []),
-        savedRecommendations: new Set(recSaves.data?.map(item => item.recommendation_id) || []),
         likedReviews: new Set(reviewLikes.data?.map(item => item.review_id) || []),
-        savedReviews: new Set(reviewSaves.data?.map(item => item.review_id) || []),
         likedPosts: new Set(postLikes.data?.map(item => item.post_id) || []),
         savedPosts: new Set(postSaves.data?.map(item => item.post_id) || []),
       };
@@ -81,6 +71,12 @@ export const useUserInteractionsCache = () => {
     },
     onMutate: async ({ type, itemId, action }) => {
       if (!user?.id || !interactions) return;
+
+      // Save is only supported for posts
+      if (action === 'save' && type !== 'post') {
+        console.error('Save attempted on unsupported type:', type);
+        return;
+      }
 
       // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['user-interactions', user.id] });
@@ -126,10 +122,9 @@ export const useUserInteractionsCache = () => {
     return (interactions[setKey] as Set<string>).has(itemId);
   };
 
-  const isSaved = (type: 'recommendation' | 'review' | 'post', itemId: string): boolean => {
+  const isSaved = (type: 'post', itemId: string): boolean => {
     if (!interactions) return false;
-    const setKey = `saved${type.charAt(0).toUpperCase() + type.slice(1)}s` as keyof UserInteractionData;
-    return (interactions[setKey] as Set<string>).has(itemId);
+    return interactions.savedPosts.has(itemId);
   };
 
   const invalidateInteractions = () => {
