@@ -8,9 +8,7 @@ import { useLocation } from 'react-router-dom';
 import { SearchDialog } from '@/components/SearchDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { isExploreRelatedRoute } from '@/utils/navigation';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { getProfileUrl } from '@/utils/getProfileUrl';
+import { useCanonicalProfileUrl } from '@/hooks/useCanonicalProfileUrl';
 
 export function NavBarComponent() {
   const location = useLocation();
