@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, Bookmark, MoreVertical, Send } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, MoreVertical, Share } from 'lucide-react';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -403,7 +403,7 @@ const RecommendationCard = ({
                 handleShare();
               }}
             >
-              <Send className="h-3 w-3" />
+              <Share className="h-3 w-3" />
             </Button>
           </div>
         </CardContent>
@@ -588,7 +588,7 @@ const RecommendationCard = ({
               handleShare();
             }}
           >
-            <Send className="h-5 w-5" />
+            <Share className="h-5 w-5" />
           </Button>
         </div>
       </CardContent>
