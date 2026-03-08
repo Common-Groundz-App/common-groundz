@@ -1,18 +1,40 @@
 
-# Phase 2: Public Entity, Post, and Recommendation Pages — IMPLEMENTED
 
-## Status: ✅ Complete
+# Plan: Remove Save from Reviews/Recommendations, Simplify Saved Tab
 
-All changes from the approved plan have been implemented.
+## Changes
 
-## Changes Made
+### 1. `src/hooks/use-saved-items.ts`
+- Remove all `review_saves` and `recommendation_saves` query logic
+- Remove `'review'` and `'recommendation'` from `SavedItemType`
+- Remove `unsaveReview` and `unsaveRecommendation` mutations
+- Only query `post_saves` and `entity_saves`
 
-1. **`src/components/content/PublicContentNotFound.tsx`** — NEW: Reusable 404 component with SEOHead noindex, no canonical
-2. **`src/components/seo/SEOHead.tsx`** — Added `type` prop (default `"website"`) for dynamic `og:type`
-3. **`src/App.tsx`** — Removed `AppProtectedRoute` from entity, post, and recommendation routes
-4. **`src/pages/PostView.tsx`** — Auth-aware nav, `loadComplete` + `postMeta` state, `onPostLoaded` callback, conservative SEO, hard 404, route-param reset, idempotent tracking
-5. **`src/pages/RecommendationView.tsx`** — Same pattern as PostView
-6. **`src/components/content/PostContentViewer.tsx`** — Added `onPostLoaded` callback prop, fires on success and error
-7. **`src/components/content/RecommendationContentViewer.tsx`** — Added `onRecommendationLoaded` callback prop, fires on success and error
-8. **`src/components/entity-v4/EntityV4.tsx`** — Auth-aware nav, SEOHead with entity metadata, PublicContentNotFound for 404
-9. **`src/pages/EntityDetail.tsx`** — Auth-aware nav in V1 layout, SEOHead replaces Helmet, PublicContentNotFound for 404
+### 2. `src/components/mystuff/SavedItemsSection.tsx`
+- Remove Reviews and Recommendations filter chips
+- Update filters to: All | Posts | Places & Products
+- Remove `SavedReviewCard` and `SavedRecommendationCard` imports and case branches
+- Update empty state text
+
+### 3. Delete unused components
+- Delete `src/components/mystuff/saved/SavedReviewCard.tsx`
+- Delete `src/components/mystuff/saved/SavedRecommendationCard.tsx`
+
+### 4. Remove save/bookmark button from ReviewCard
+- `src/components/profile/reviews/ReviewCard.tsx` — remove `onSave` prop, Bookmark button, related state
+
+### 5. Remove save/bookmark button from RecommendationCard
+- `src/components/recommendations/RecommendationCard.tsx` — remove `onSave` prop, `isSaved` state, `handleSave`, Bookmark button
+
+### 6. Remove save from RecommendationFeedItem
+- `src/components/feed/RecommendationFeedItem.tsx` — remove `onSave`, `handleSave`, Bookmark button
+
+### 7. Remove save from RecommendationContentViewer
+- `src/components/content/RecommendationContentViewer.tsx` — remove recommendation save logic and `onSave` prop passing
+
+### 8. Update callers passing `onSave` for reviews/recommendations
+- `src/pages/EntityDetailV2.tsx`, `src/pages/EntityDetail.tsx` — remove `onSave` from ReviewCard usage
+
+### No database changes
+Tables `review_saves` and `recommendation_saves` stay in DB (harmless), just no longer queried.
+
