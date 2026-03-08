@@ -1,18 +1,43 @@
 
-# Phase 2: Public Entity, Post, and Recommendation Pages — IMPLEMENTED
 
-## Status: ✅ Complete
+# Final Plan — Fix Post Share URL Corruption
 
-All changes from the approved plan have been implemented.
+## Summary
 
-## Changes Made
+Codex's concern about `toast` outside React doesn't apply here — the project's `toast` function uses a global dispatch pattern and works outside components. So we proceed with the plan as-is.
 
-1. **`src/components/content/PublicContentNotFound.tsx`** — NEW: Reusable 404 component with SEOHead noindex, no canonical
-2. **`src/components/seo/SEOHead.tsx`** — Added `type` prop (default `"website"`) for dynamic `og:type`
-3. **`src/App.tsx`** — Removed `AppProtectedRoute` from entity, post, and recommendation routes
-4. **`src/pages/PostView.tsx`** — Auth-aware nav, `loadComplete` + `postMeta` state, `onPostLoaded` callback, conservative SEO, hard 404, route-param reset, idempotent tracking
-5. **`src/pages/RecommendationView.tsx`** — Same pattern as PostView
-6. **`src/components/content/PostContentViewer.tsx`** — Added `onPostLoaded` callback prop, fires on success and error
-7. **`src/components/content/RecommendationContentViewer.tsx`** — Added `onRecommendationLoaded` callback prop, fires on success and error
-8. **`src/components/entity-v4/EntityV4.tsx`** — Auth-aware nav, SEOHead with entity metadata, PublicContentNotFound for 404
-9. **`src/pages/EntityDetail.tsx`** — Auth-aware nav in V1 layout, SEOHead replaces Helmet, PublicContentNotFound for 404
+## Changes
+
+### 1. New file: `src/utils/sharePost.ts`
+
+Shared utility with:
+- `navigator.share({ title, url })` — no `text` field
+- On failure (non-abort), fall back to clipboard
+- Clipboard copies **URL only** (Codex's recommendation)
+- Feature-detect `navigator.clipboard` + `isSecureContext`, legacy `textarea` fallback
+- Toast feedback on all paths
+- Uses the standalone `toast` function from `@/hooks/use-toast`
+
+### 2. Update `src/components/profile/ProfilePostItem.tsx`
+
+Replace the `handleShare` function (~15 lines) with:
+```ts
+import { sharePost } from '@/utils/sharePost';
+// ...
+const handleShare = () => sharePost(post.id, post.title);
+```
+
+Remove the now-unused `toast` import if no other usage remains in the component (it's still used for delete/edit, so it stays).
+
+### 3. Update `src/components/feed/PostFeedItem.tsx`
+
+Same replacement as above.
+
+### 4. Update `src/hooks/use-entity-share.ts`
+
+Remove `text` from the `shareData` object (line 16) to prevent the same URL corruption bug for entity sharing.
+
+## Files touched
+- 1 new: `src/utils/sharePost.ts`
+- 3 modified: `ProfilePostItem.tsx`, `PostFeedItem.tsx`, `use-entity-share.ts`
+
