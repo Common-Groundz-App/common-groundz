@@ -132,7 +132,7 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
         likes: likesCount.get(rec.id) || 0,
         comment_count: commentsCount.get(rec.id) || 0,
         is_liked: userLikes.has(rec.id),
-        is_saved: userSaves.has(rec.id),
+        is_saved: false,
         entity: processedEntity
       };
     });
