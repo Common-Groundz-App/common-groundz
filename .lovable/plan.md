@@ -1,18 +1,30 @@
 
-# Phase 2: Public Entity, Post, and Recommendation Pages — IMPLEMENTED
 
-## Status: ✅ Complete
+# Final Plan: Add "Saved" Tab to My Stuff
 
-All changes from the approved plan have been implemented.
+## Files
 
-## Changes Made
+### 1. New: `src/hooks/use-saved-items.ts`
+- Queries all 4 save tables for current user, each joining content data
+- Accepts `typeFilter`: `'all' | 'post' | 'review' | 'recommendation' | 'entity'`
+- Each result gets a `type` discriminator and `saved_at` from the save table's `created_at`
+- **When filter is "All": merge all types into one array, globally sort by `saved_at` DESC** — this is the cross-type sort contract both reviewers flagged
+- When filtering by type: only query that one table
+- Pagination: limit 20 per load, with `loadMore` function
+- Unsave mutations for each type with cache invalidation
 
-1. **`src/components/content/PublicContentNotFound.tsx`** — NEW: Reusable 404 component with SEOHead noindex, no canonical
-2. **`src/components/seo/SEOHead.tsx`** — Added `type` prop (default `"website"`) for dynamic `og:type`
-3. **`src/App.tsx`** — Removed `AppProtectedRoute` from entity, post, and recommendation routes
-4. **`src/pages/PostView.tsx`** — Auth-aware nav, `loadComplete` + `postMeta` state, `onPostLoaded` callback, conservative SEO, hard 404, route-param reset, idempotent tracking
-5. **`src/pages/RecommendationView.tsx`** — Same pattern as PostView
-6. **`src/components/content/PostContentViewer.tsx`** — Added `onPostLoaded` callback prop, fires on success and error
-7. **`src/components/content/RecommendationContentViewer.tsx`** — Added `onRecommendationLoaded` callback prop, fires on success and error
-8. **`src/components/entity-v4/EntityV4.tsx`** — Auth-aware nav, SEOHead with entity metadata, PublicContentNotFound for 404
-9. **`src/pages/EntityDetail.tsx`** — Auth-aware nav in V1 layout, SEOHead replaces Helmet, PublicContentNotFound for 404
+### 2. New: `src/components/mystuff/SavedItemsSection.tsx`
+- Filter chips: All | Posts | Reviews | Recommendations | Entities
+- Renders using existing card components (`ProfilePostItem`, `ReviewCard`, `RecommendationCard`, entity card/link)
+- Each item shows filled Bookmark icon for unsave
+- "Load more" button when more items exist
+- Empty state: Bookmark icon + "No saved items yet — Save posts, reviews, recommendations, and places to find them here."
+- Loading spinner while fetching
+
+### 3. Modified: `src/components/mystuff/MyStuffContent.tsx`
+- Add 4th tab: `{ value: 'saved', label: 'Saved', icon: Bookmark }`
+- Render `SavedItemsSection` inside new `TabsContent`
+
+### No database changes needed
+All 4 save tables + RLS policies already exist and work.
+
