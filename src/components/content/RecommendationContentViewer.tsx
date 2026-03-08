@@ -214,7 +214,6 @@ const RecommendationContentViewer = ({
       <RecommendationCard 
         recommendation={recommendation}
         onLike={() => handleRecommendationLike()}
-        onSave={() => handleRecommendationSave()}
         onDeleted={handleRefresh}
         highlightCommentId={highlightCommentId}
       />

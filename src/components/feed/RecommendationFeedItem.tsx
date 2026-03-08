@@ -388,21 +388,6 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
           </Button>
         </div>
         
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "flex items-center gap-1",
-            recommendation.is_saved && "text-brand-orange"
-          )}
-          onClick={handleSave}
-        >
-          <Bookmark 
-            size={18} 
-            className={cn(recommendation.is_saved && "fill-brand-orange")} 
-          />
-          Save
-        </Button>
       </CardFooter>
       
       {/* Add Lightbox component */}
