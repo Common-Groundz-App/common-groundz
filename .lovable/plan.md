@@ -1,48 +1,45 @@
 
-# Phase 3: Complete Cleanup of Review/Recommendation Save Logic — IMPLEMENTED
+# Fix Leaked Intervals Causing Chrome Battery Drain — IMPLEMENTED
 
 ## Status: ✅ Complete
 
-All review/recommendation save logic has been removed. Saving is now only supported for **posts** and **entities**.
+Replaced all leaked `setInterval` calls with guarded, self-rescheduling `setTimeout` chains to eliminate Chrome battery drain warnings.
 
-## Changes Made (17 files)
+## Pattern Applied
 
-### Group A: Removed `handleSave` from hooks
-1. **`src/hooks/use-reviews.ts`** — Removed `toggleReviewSave` import, deleted `handleSave`, removed from return
-2. **`src/hooks/use-recommendations.ts`** — Removed `toggleReviewSave` import, deleted `handleSave`, removed from return
-3. **`src/hooks/recommendations/use-recommendation-actions.ts`** — Removed `toggleSave` import, deleted `handleSave`, removed from return
-4. **`src/hooks/recommendations/use-recommendations.ts`** — Removed `toggleSave` import, deleted `handleSave`, removed from return
+All timers now use:
+- **State guard**: won't start if service is stopped
+- **Duplicate guard**: `if (this.timer) return;` prevents multiple loops
+- **Visibility guard**: `if (!document.hidden)` skips work when tab is backgrounded
+- **SSR guard**: `if (typeof window === 'undefined')` for non-browser environments
+- **Lazy start**: timers only begin on first service interaction, not at import time
 
-### Group B: Removed `handleSave` from callers
-5. **`src/components/profile/ProfileReviews.tsx`** — Removed `handleSave` from destructuring
-6. **`src/components/profile/ProfileRecommendations.tsx`** — Removed `handleSave` from destructuring
+## Changes Made (6 files)
 
-### Group C: Feed save guard — safe no-op
-7. **`src/hooks/feed/interactions.ts`** — Removed `toggleRecommendationSave` import. Added guard: only posts can be saved (`console.error` + `return false`)
-8. **`src/hooks/feed/use-infinite-feed.ts`** — Added early return in `handleSave` if item is not a post
+### 1. `src/services/performanceAnalyticsService.ts`
+- Added `flushTimer` and `memoryTimer` properties
+- Replaced flush `setInterval` with `scheduleFlush()` using `setTimeout` chain
+- Replaced memory check `setInterval` with `scheduleMemoryCheck()` using `setTimeout` chain
+- `stopMonitoring()` now clears both timers
 
-### Group D: Cleaned interaction cache
-9. **`src/hooks/use-user-interactions-cache.ts`** — Removed `savedRecommendations`, `savedReviews`, and their queries. `isSaved` now only accepts `'post'` type
+### 2. `src/services/cacheService.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` flag
+- Lazy-starts cleanup chain on first `set()` call
 
-### Group E: Unused import
-10. **`src/components/profile/reviews/ReviewCard.tsx`** — Removed `Bookmark` from lucide-react import
+### 3. `src/services/browserPhotoCache.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` flag
+- Lazy-starts cleanup chain on first `set()` call
 
-### Group F: Stopped fetching `isSaved` in services
-11. **`src/services/review/fetch.ts`** — Removed `get_user_review_saves` RPC, removed `isSaved` mapping
-12. **`src/services/reviewService.ts`** — Removed `toggleReviewSave` function, removed save queries, removed `isSaved` from Review interface
-13. **`src/services/review/interactions.ts`** — Deleted `toggleReviewSave` function
-14. **`src/services/recommendation/fetchRecommendations.ts`** — Removed `recommendation_saves` query, `isSaved` mapping
-15. **`src/services/recommendation/fetchRecommendationById.ts`** — Removed `recommendation_saves` query, `isSaved` mapping
-16. **`src/services/recommendation/interactionOperations.ts`** — Deleted `toggleSave`/`toggleRecommendationSave`
-17. **`src/hooks/feed/api/recommendations.ts`** — Removed `recommendation_saves` queries
-18. **`src/hooks/feed/api/recommendations/interactions.ts`** — Deleted `toggleRecommendationSave`
-19. **`src/services/recommendationService.ts`** — Removed `toggleSave` export
+### 4. `src/services/imagePerformanceService.ts`
+- Removed module-level `setInterval` block entirely (diagnostic-only, not needed)
 
-### Group G: Type cleanup
-- **`src/services/reviewService.ts`** — Removed `isSaved` from `Review` interface
-- **`src/services/recommendation/types.ts`** — Removed `isSaved` from `Recommendation` interface
-- **`src/types/common.ts`** — Made `isSaved` optional in `InteractionData` interface
-- **`src/hooks/useCircleReviews.ts`** — Removed `isSaved: false` from mapping
+### 5. `src/services/enhancedUnifiedProfileService.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` on `ProfileCache` class
+- Lazy-starts cleanup chain on first `setCache()` call
 
-### No database changes
-Tables `review_saves` and `recommendation_saves` remain in DB (harmless, no longer queried).
+### 6. `src/services/advancedCacheManager.ts`
+- Replaced `setInterval` in `startBackgroundMaintenance()` with guarded `setTimeout` chain
+- Added `maintenanceTimer` + `maintenanceStarted` properties
