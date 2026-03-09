@@ -65,6 +65,7 @@ export class BrowserPhotoCacheService {
    * Set photo URL in browser cache
    */
   set(photoReference: string, maxWidth: number, url: string, quality: string, ttl?: number): void {
+    this.scheduleCleanup();
     try {
       const cacheKey = this.getCacheKey(photoReference, maxWidth);
       const cacheData: BrowserCachedPhoto = {
