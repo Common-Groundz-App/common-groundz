@@ -7,7 +7,7 @@ const FeedSkeleton = ({ count = 3 }: { count?: number }) => {
   return (
     <div className="space-y-6">
       {Array.from({ length: count }, (_, i) => (
-        <Card key={item} className="overflow-hidden">
+        <Card key={i} className="overflow-hidden">
           <CardHeader className="p-6 pb-0">
             <div className="flex items-center gap-3">
               <Skeleton className="h-10 w-10 rounded-full" />
