@@ -54,6 +54,18 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
 }) => {
   const { user, isLoading: authLoading } = useAuth();
   const { circleReviews, circleUserIds, isLoading: circleLoading } = useCircleReviews(entityId);
+  const location = useLocation();
+  const hasTrackedNetworkTeaser = useRef(false);
+
+  const isAuthenticated = !!user && !authLoading;
+
+  // Track network recommendations teaser impression for guests
+  useEffect(() => {
+    if (!isAuthenticated && !hasTrackedNetworkTeaser.current) {
+      trackGuestEvent('guest_saw_network_reco_teaser', { entityId, surface: 'network_reco_teaser' });
+      hasTrackedNetworkTeaser.current = true;
+    }
+  }, [isAuthenticated, entityId]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'mostRecent' | 'highestRated' | 'lowestRated'>('mostRecent');
   const [activeFilters, setActiveFilters] = useState({
