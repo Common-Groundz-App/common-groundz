@@ -1,29 +1,45 @@
 
+# Fix Leaked Intervals Causing Chrome Battery Drain — IMPLEMENTED
 
-# Final Plan: Post Page Loading Screen
+## Status: ✅ Complete
 
-Both suggestions are already covered:
+Replaced all leaked `setInterval` calls with guarded, self-rescheduling `setTimeout` chains to eliminate Chrome battery drain warnings.
 
-1. **React keys** — The current `FeedSkeleton` uses `[1, 2, 3].map((item) => <Card key={item}>...)`, so switching to `Array.from({ length: count }, (_, i) => ...)` with `key={i}` maintains stable keys. Will include.
+## Pattern Applied
 
-2. **Spacing/margins for single card** — `FeedSkeleton` wraps cards in `<div className="space-y-6">`. With `count={1}`, `space-y-6` has no effect (only one child), so no extra gaps. No issue.
+All timers now use:
+- **State guard**: won't start if service is stopped
+- **Duplicate guard**: `if (this.timer) return;` prevents multiple loops
+- **Visibility guard**: `if (!document.hidden)` skips work when tab is backgrounded
+- **SSR guard**: `if (typeof window === 'undefined')` for non-browser environments
+- **Lazy start**: timers only begin on first service interaction, not at import time
 
-Nothing else to add — the plan is solid and ready to implement.
+## Changes Made (6 files)
 
-## Changes (2 files)
+### 1. `src/services/performanceAnalyticsService.ts`
+- Added `flushTimer` and `memoryTimer` properties
+- Replaced flush `setInterval` with `scheduleFlush()` using `setTimeout` chain
+- Replaced memory check `setInterval` with `scheduleMemoryCheck()` using `setTimeout` chain
+- `stopMonitoring()` now clears both timers
 
-### `src/components/feed/FeedSkeleton.tsx`
-- Add optional `count` prop defaulting to `3`
-- Replace `[1, 2, 3].map(...)` with `Array.from({ length: count }, (_, i) => <Card key={i}>...)`
+### 2. `src/services/cacheService.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` flag
+- Lazy-starts cleanup chain on first `set()` call
 
-### `src/components/content/PostContentViewer.tsx`
-- Import `FeedSkeleton`, remove `Shell` import
-- Replace loading block with:
-```tsx
-<div className="p-4 sm:p-6">
-  <FeedSkeleton count={1} />
-</div>
-```
+### 3. `src/services/browserPhotoCache.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` flag
+- Lazy-starts cleanup chain on first `set()` call
 
-No other files changed.
+### 4. `src/services/imagePerformanceService.ts`
+- Removed module-level `setInterval` block entirely (diagnostic-only, not needed)
 
+### 5. `src/services/enhancedUnifiedProfileService.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` on `ProfileCache` class
+- Lazy-starts cleanup chain on first `setCache()` call
+
+### 6. `src/services/advancedCacheManager.ts`
+- Replaced `setInterval` in `startBackgroundMaintenance()` with guarded `setTimeout` chain
+- Added `maintenanceTimer` + `maintenanceStarted` properties

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import PostFeedItem from '@/components/feed/PostFeedItem';
-import { Shell } from 'lucide-react';
+import FeedSkeleton from '@/components/feed/FeedSkeleton';
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { useSearchParams } from 'react-router-dom';
@@ -235,11 +235,8 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-2">
-          <Shell className="h-8 w-8 animate-pulse text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Loading content...</p>
-        </div>
+      <div className="p-4 sm:p-6">
+        <FeedSkeleton count={1} />
       </div>
     );
   }
