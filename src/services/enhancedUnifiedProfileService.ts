@@ -28,6 +28,21 @@ class ProfileCache {
   private inFlightRequests = new Map<string, Promise<SafeUserProfile>>();
   private pendingBatches: BatchRequest[] = [];
   private batchTimeout: NodeJS.Timeout | null = null;
+  private cleanupTimer?: number;
+  private cleanupStarted = false;
+
+  private scheduleCleanup() {
+    if (typeof window === 'undefined' || this.cleanupStarted) return;
+    this.cleanupStarted = true;
+    const run = () => {
+      this.cleanupTimer = window.setTimeout(() => {
+        this.cleanupTimer = undefined;
+        if (!document.hidden) this.clearExpired();
+        run();
+      }, 5 * 60 * 1000);
+    };
+    run();
+  }
 
   // Get profile from cache if still valid
   getFromCache(userId: string): SafeUserProfile | null {
