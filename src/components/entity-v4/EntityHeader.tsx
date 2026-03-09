@@ -66,6 +66,16 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
 }) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const hasTrackedCircleTeaser = useRef(false);
+
+  // Track circle rating teaser impression for guests
+  useEffect(() => {
+    if (!user && !hasTrackedCircleTeaser.current) {
+      trackGuestEvent('guest_saw_circle_rating_teaser', { entityId: entity?.id, surface: 'circle_rating_teaser' });
+      hasTrackedCircleTeaser.current = true;
+    }
+  }, [user, entity?.id]);
   
   // State for image refresh functionality
   const [isImageExpired, setIsImageExpired] = useState(false);
