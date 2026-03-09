@@ -21,6 +21,8 @@ class AdvancedCacheManager {
   private metrics = new Map<string, CacheMetrics>();
   private refreshPromises = new Map<string, Promise<any>>();
   private backgroundRefreshEnabled = true;
+  private maintenanceTimer?: number;
+  private maintenanceStarted = false;
 
   constructor() {
     this.initializeDefaultStrategies();
