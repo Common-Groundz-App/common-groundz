@@ -74,7 +74,7 @@ export const useRecommendationActions = (
   };
 
   // Add recommendation
-  const addRecommendation = async (recommendation: Omit<Recommendation, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'likes' | 'isLiked' | 'isSaved'>) => {
+  const addRecommendation = async (recommendation: Omit<Recommendation, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'likes' | 'isLiked'>) => {
     if (!user) {
       toast({
         title: 'Authentication required',

@@ -336,7 +336,6 @@ export const fetchEntityReviews = async (
         latest_rating: latestRatingsMap.get(rev.id),
         likes: likeCountMap.get(rev.id) || 0,
         isLiked: likedIds.has(rev.id),
-        isSaved: savedIds.has(rev.id),
         comment_count: 0, // Default value since field doesn't exist in DB
         view_count: 0, // Default value since field doesn't exist in DB
         visibility: rev.visibility as any,
