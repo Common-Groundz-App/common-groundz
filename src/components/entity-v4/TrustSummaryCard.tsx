@@ -1,5 +1,8 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Lock } from 'lucide-react';
+import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { Award, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
