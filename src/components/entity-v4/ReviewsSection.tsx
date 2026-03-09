@@ -79,7 +79,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
 
-  const isAuthenticated = !!user && !authLoading;
   const hasCircleData = isAuthenticated && !circleLoading && circleUserIds.length > 0;
 
   const filteredReviews = filterReviews(reviews, {
