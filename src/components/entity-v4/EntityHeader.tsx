@@ -355,7 +355,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   </div>
                   
                   {/* Circle Rating */}
-                  {user && (
+                  {user ? (
                     circleRating !== null ? (
                       <div className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
                         <div 
@@ -481,6 +481,29 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                         </div>
                       </div>
                     )
+                  ) : (
+                    /* Guest teaser for Circle Rating */
+                    <div className={`flex items-center gap-3 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
+                      <div className="flex items-center gap-2 opacity-50">
+                        <Lock className="w-5 h-5 text-brand-orange" />
+                      </div>
+                      <div className="leading-tight">
+                        <div className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} text-brand-orange flex items-center gap-1`}>
+                          Circle Rating
+                          <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          See what people in your circle think
+                        </div>
+                        <Link
+                          to={`/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
+                          className="text-xs text-brand-orange hover:text-brand-orange/80 font-medium hover:underline transition-colors"
+                          onClick={() => trackGuestEvent('guest_clicked_signup_from_entity', { entityId: entity?.id, surface: 'circle_rating_teaser' })}
+                        >
+                          Sign up to see →
+                        </Link>
+                      </div>
+                    </div>
                   )}
                 </div>
 
