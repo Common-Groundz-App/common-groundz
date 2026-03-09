@@ -1,5 +1,8 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Lock } from 'lucide-react';
+import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { Award, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -20,6 +23,16 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
   userId 
 }) => {
   const { data: trustMetrics, isLoading, error } = useTrustMetrics(entityId, userId);
+  const location = useLocation();
+  const hasTrackedTrustTeaser = useRef(false);
+
+  // Track trust summary teaser impression for guests
+  useEffect(() => {
+    if (!userId && !hasTrackedTrustTeaser.current) {
+      trackGuestEvent('guest_saw_trust_summary_teaser', { entityId, surface: 'trust_summary_teaser' });
+      hasTrackedTrustTeaser.current = true;
+    }
+  }, [userId, entityId]);
 
   if (isLoading) {
     return (
@@ -80,7 +93,7 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
 
   // Format Circle Certified display
   const getCircleCertifiedDisplay = () => {
-    if (!userId) return { value: "Sign In", color: "text-muted-foreground" };
+    if (!userId) return { value: "locked", color: "text-muted-foreground" };
     if (trustMetrics?.circleCertified === null) return { value: "No circle data", color: "text-muted-foreground" };
     return { value: `${trustMetrics.circleCertified}%`, color: "text-green-600" };
   };
@@ -121,13 +134,24 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
                 <span className="text-sm font-medium">Circle Certified</span>
                 <InfoTooltip content="Percentage of people you follow who rated this 4 or more circles." />
               </div>
-              <span className={`text-sm font-semibold ${circleCertifiedDisplay.color}`}>
-                {circleCertifiedDisplay.value}
-              </span>
+              {circleCertifiedDisplay.value === "locked" ? (
+                <Link
+                  to={`/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
+                  className="flex items-center gap-1 text-xs text-brand-orange hover:text-brand-orange/80 font-medium hover:underline transition-colors"
+                  onClick={() => trackGuestEvent('guest_clicked_signup_from_entity', { entityId, surface: 'trust_summary_teaser' })}
+                >
+                  <Lock className="w-3 h-3" />
+                  Sign up to unlock
+                </Link>
+              ) : (
+                <span className={`text-sm font-semibold ${circleCertifiedDisplay.color}`}>
+                  {circleCertifiedDisplay.value}
+                </span>
+              )}
             </div>
             <Progress 
               value={trustMetrics?.circleCertified || 0} 
-              className={`mb-4 ${trustMetrics?.circleCertified === null ? 'opacity-50' : ''}`} 
+              className={`mb-4 ${!userId || trustMetrics?.circleCertified === null ? 'opacity-50' : ''}`} 
             />
             
             {/* Repurchase Rate - Coming Soon */}

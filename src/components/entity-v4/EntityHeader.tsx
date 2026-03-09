@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
@@ -10,7 +10,9 @@ import { useEntitySave } from '@/hooks/use-entity-save';
 import { useEntityShare } from '@/hooks/use-entity-share';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useTapDetection } from '@/hooks/use-tap-detection';
-import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
+import { Share, Bookmark, Users, ThumbsUp, CheckCircle, AlertTriangle, Globe, Navigation, MoreHorizontal, RefreshCw, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { Link, useLocation } from 'react-router-dom';
+import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -64,6 +66,16 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
 }) => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const location = useLocation();
+  const hasTrackedCircleTeaser = useRef(false);
+
+  // Track circle rating teaser impression for guests
+  useEffect(() => {
+    if (!user && !hasTrackedCircleTeaser.current) {
+      trackGuestEvent('guest_saw_circle_rating_teaser', { entityId: entity?.id, surface: 'circle_rating_teaser' });
+      hasTrackedCircleTeaser.current = true;
+    }
+  }, [user, entity?.id]);
   
   // State for image refresh functionality
   const [isImageExpired, setIsImageExpired] = useState(false);
@@ -343,7 +355,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                   </div>
                   
                   {/* Circle Rating */}
-                  {user && (
+                  {user ? (
                     circleRating !== null ? (
                       <div className={`flex items-center gap-4 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
                         <div 
@@ -469,6 +481,29 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                         </div>
                       </div>
                     )
+                  ) : (
+                    /* Guest teaser for Circle Rating */
+                    <div className={`flex items-center gap-3 flex-shrink-0 ${isMobile ? '' : 'sm:min-w-0'}`}>
+                      <div className="flex items-center gap-2 opacity-50">
+                        <Lock className="w-5 h-5 text-brand-orange" />
+                      </div>
+                      <div className="leading-tight">
+                        <div className={`font-semibold ${isMobile ? 'text-xs' : 'text-sm'} text-brand-orange flex items-center gap-1`}>
+                          Circle Rating
+                          <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          See what people in your circle think
+                        </div>
+                        <Link
+                          to={`/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
+                          className="text-xs text-brand-orange hover:text-brand-orange/80 font-medium hover:underline transition-colors"
+                          onClick={() => trackGuestEvent('guest_clicked_signup_from_entity', { entityId: entity?.id, surface: 'circle_rating_teaser' })}
+                        >
+                          Sign up to see →
+                        </Link>
+                      </div>
+                    </div>
                   )}
                 </div>
 
@@ -509,6 +544,25 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
 Only recent ratings are counted to keep things current and relevant.`}
                           side="top"
                         />
+                      </div>
+                    )}
+                    {/* Guest teaser for circle recommendation insights */}
+                    {stats && stats.recommendationCount > 0 && !user && (
+                      <div className="flex items-center gap-2">
+                        <ThumbsUp className="h-4 w-4" />
+                        <button
+                          onClick={onRecommendationModalOpen}
+                          className="text-foreground hover:text-brand-orange hover:underline font-medium cursor-pointer transition-colors"
+                        >
+                          <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> Recommending
+                        </button>
+                        <Link
+                          to={`/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
+                          className="text-xs text-brand-orange hover:text-brand-orange/80 font-medium hover:underline transition-colors"
+                          onClick={() => trackGuestEvent('guest_clicked_signup_from_entity', { entityId: entity?.id, surface: 'circle_reco_teaser' })}
+                        >
+                          Sign up for circle insights
+                        </Link>
                       </div>
                     )}
                   </div>

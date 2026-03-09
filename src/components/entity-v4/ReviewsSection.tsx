@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown, X } from "lucide-react";
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { trackGuestEvent } from '@/utils/guestConversionTracker';
+import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown, X, Lock } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { RatingRingIcon } from "@/components/ui/rating-ring-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,6 +54,18 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
 }) => {
   const { user, isLoading: authLoading } = useAuth();
   const { circleReviews, circleUserIds, isLoading: circleLoading } = useCircleReviews(entityId);
+  const location = useLocation();
+  const hasTrackedNetworkTeaser = useRef(false);
+
+  const isAuthenticated = !!user && !authLoading;
+
+  // Track network recommendations teaser impression for guests
+  useEffect(() => {
+    if (!isAuthenticated && !hasTrackedNetworkTeaser.current) {
+      trackGuestEvent('guest_saw_network_reco_teaser', { entityId, surface: 'network_reco_teaser' });
+      hasTrackedNetworkTeaser.current = true;
+    }
+  }, [isAuthenticated, entityId]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'mostRecent' | 'highestRated' | 'lowestRated'>('mostRecent');
   const [activeFilters, setActiveFilters] = useState({
@@ -64,7 +79,6 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
   const [selectedTimelineReview, setSelectedTimelineReview] = useState<ReviewWithUser | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
 
-  const isAuthenticated = !!user && !authLoading;
   const hasCircleData = isAuthenticated && !circleLoading && circleUserIds.length > 0;
 
   const filteredReviews = filterReviews(reviews, {
@@ -535,14 +549,37 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
           )}
         </div>
 
-        {/* Network-Based Recommendations - Only show if authenticated */}
-        {isAuthenticated && (
+        {/* Network-Based Recommendations */}
+        {isAuthenticated ? (
           <div className="mt-8">
             <NetworkRecommendations 
               entityId={entityId}
               userFollowingIds={circleUserIds}
             />
           </div>
+        ) : (
+          <Card className="mt-8 border-dashed border-2 border-brand-orange/30 bg-brand-orange/5">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Lock className="w-5 h-5 text-brand-orange" />
+                <h3 className="font-semibold text-foreground">Recommended by Your Network</h3>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Sign up to discover what people in your circle recommend
+              </p>
+              <div className="space-y-3 mb-4">
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+              </div>
+              <Link
+                to={`/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
+                className="inline-flex items-center justify-center rounded-md text-sm font-medium h-10 px-6 bg-brand-orange hover:bg-brand-orange/90 text-white transition-colors"
+                onClick={() => trackGuestEvent('guest_clicked_signup_from_entity', { entityId, surface: 'network_reco_teaser' })}
+              >
+                Sign Up to Unlock
+              </Link>
+            </CardContent>
+          </Card>
         )}
 
         {/* Meet the Founders */}

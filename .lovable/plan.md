@@ -1,58 +1,45 @@
 
+# Fix Leaked Intervals Causing Chrome Battery Drain — IMPLEMENTED
 
-# Plan: Guest Entity Page Conversion Teasers
+## Status: ✅ Complete
 
-## Overview
-Replace hidden Circle Intelligence sections with locked teasers that build curiosity and drive signups. 5 files changed.
+Replaced all leaked `setInterval` calls with guarded, self-rescheduling `setTimeout` chains to eliminate Chrome battery drain warnings.
 
-## Changes
+## Pattern Applied
 
-### 1. `src/components/entity-v4/EntityHeader.tsx`
+All timers now use:
+- **State guard**: won't start if service is stopped
+- **Duplicate guard**: `if (this.timer) return;` prevents multiple loops
+- **Visibility guard**: `if (!document.hidden)` skips work when tab is backgrounded
+- **SSR guard**: `if (typeof window === 'undefined')` for non-browser environments
+- **Lazy start**: timers only begin on first service interaction, not at import time
 
-**Circle Rating teaser (lines 345-472):** Replace `{user && (` gate. When `!user`, render a compact locked teaser instead of hiding entirely:
-- Lock icon + "Circle Rating" label + "See what people in your circle think" subtext
-- `<Link to="/auth?tab=signup&returnTo=...">Sign up to see</Link>`
-- Keep existing `user` branch unchanged
+## Changes Made (6 files)
 
-**Circle recommendation count (lines 495-504):** When `!user` and `stats.recommendationCount > 0`, replace the hidden circle count with a "Sign up for circle insights" link.
+### 1. `src/services/performanceAnalyticsService.ts`
+- Added `flushTimer` and `memoryTimer` properties
+- Replaced flush `setInterval` with `scheduleFlush()` using `setTimeout` chain
+- Replaced memory check `setInterval` with `scheduleMemoryCheck()` using `setTimeout` chain
+- `stopMonitoring()` now clears both timers
 
-**Imports:** Add `Lock` from lucide, `Link` from react-router-dom, `useRef` for tracking, `useLocation` for returnTo, `trackGuestEvent`.
+### 2. `src/services/cacheService.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` flag
+- Lazy-starts cleanup chain on first `set()` call
 
-**Tracking:** `useEffect` + `useRef(false)` guard for impression; `onClick` for click. Payload: `{ entityId: entity.id, surface: 'circle_rating_teaser' }`.
+### 3. `src/services/browserPhotoCache.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` flag
+- Lazy-starts cleanup chain on first `set()` call
 
-### 2. `src/components/entity-v4/ReviewsSection.tsx`
+### 4. `src/services/imagePerformanceService.ts`
+- Removed module-level `setInterval` block entirely (diagnostic-only, not needed)
 
-**Network Recommendations teaser (lines 538-546):** Replace `{isAuthenticated && (` gate. When `!isAuthenticated`, render:
-- Card with Lock icon + "Recommended by Your Network" title
-- "Sign up to discover what people in your circle recommend" text
-- 2 Skeleton placeholder rows
-- Primary orange "Sign Up to Unlock" button → `/auth?tab=signup&returnTo=...`
+### 5. `src/services/enhancedUnifiedProfileService.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` on `ProfileCache` class
+- Lazy-starts cleanup chain on first `setCache()` call
 
-When `isAuthenticated`, keep existing `NetworkRecommendations` unchanged.
-
-**Imports:** Add `Lock` from lucide, `Link` from react-router-dom, `Skeleton`, `useRef`, `useEffect`, `useLocation`, `trackGuestEvent`.
-
-### 3. `src/components/entity-v4/TrustSummaryCard.tsx`
-
-**Circle Certified guest display (line 83):** Change from `{ value: "Sign In", color: "text-muted-foreground" }` to rendering a lock icon + "Sign up to unlock circle trust" link. Update the JSX at lines 119-131 to render the link when `!userId` instead of plain text.
-
-**Imports:** Add `Lock` from lucide, `Link` from react-router-dom, `useRef`, `useEffect`, `useLocation`, `trackGuestEvent`.
-
-### 4. `src/hooks/use-entity-save.ts`
-
-**Guest save attempt (lines 82-89):** Add `trackGuestEvent('guest_attempted_save', { entityId })` before the toast. Update toast description to "Sign up to save entities and build your collection".
-
-**Import:** Add `trackGuestEvent`.
-
-### 5. `src/components/entity/EntityFollowButton.tsx`
-
-**Guest follow attempt (lines 28-35):** Add `trackGuestEvent('guest_attempted_follow', { entityId })` before the toast. Update toast description to "Sign up to follow entities and get updates".
-
-**Import:** Add `trackGuestEvent`.
-
-## Cross-cutting patterns
-- All auth links: `/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`
-- All impressions: `useEffect` + `useRef(false)` guard, fire once per mount, only when `!user`
-- All clicks: `trackGuestEvent('guest_clicked_signup_from_entity', { entityId, surface })` on link `onClick`
-- "Sign Up" = primary orange styling; accessible `<Link>` elements throughout
-
+### 6. `src/services/advancedCacheManager.ts`
+- Replaced `setInterval` in `startBackgroundMaintenance()` with guarded `setTimeout` chain
+- Added `maintenanceTimer` + `maintenanceStarted` properties

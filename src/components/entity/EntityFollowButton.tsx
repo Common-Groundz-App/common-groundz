@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { UserPlus, UserMinus, UserCheck } from 'lucide-react';
 import { useEntityFollow } from '@/hooks/use-entity-follow';
 import { useToast } from '@/hooks/use-toast';
+import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EntityFollowButtonProps {
@@ -26,9 +27,10 @@ export const EntityFollowButton: React.FC<EntityFollowButtonProps> = ({
 
   const handleFollow = async () => {
     if (!canFollow) {
+      trackGuestEvent('guest_attempted_follow', { entityId });
       toast({
         title: "Authentication required",
-        description: "Please sign in to follow entities",
+        description: "Sign up to follow entities and get updates",
         variant: "destructive",
       });
       return;
