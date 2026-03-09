@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
-import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown, X } from "lucide-react";
+import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown, X, Lock } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { RatingRingIcon } from "@/components/ui/rating-ring-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
