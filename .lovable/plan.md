@@ -1,48 +1,65 @@
 
-# Phase 3: Complete Cleanup of Review/Recommendation Save Logic — IMPLEMENTED
 
-## Status: ✅ Complete
+# Fix Leaked Intervals — Final Plan
 
-All review/recommendation save logic has been removed. Saving is now only supported for **posts** and **entities**.
+Both suggestions are valid and minor to incorporate. Here's the final version.
 
-## Changes Made (17 files)
+## Timer Pattern (applied to all 6 files)
 
-### Group A: Removed `handleSave` from hooks
-1. **`src/hooks/use-reviews.ts`** — Removed `toggleReviewSave` import, deleted `handleSave`, removed from return
-2. **`src/hooks/use-recommendations.ts`** — Removed `toggleReviewSave` import, deleted `handleSave`, removed from return
-3. **`src/hooks/recommendations/use-recommendation-actions.ts`** — Removed `toggleSave` import, deleted `handleSave`, removed from return
-4. **`src/hooks/recommendations/use-recommendations.ts`** — Removed `toggleSave` import, deleted `handleSave`, removed from return
+```text
+private timer?: number;
+private isRunning = false;
 
-### Group B: Removed `handleSave` from callers
-5. **`src/components/profile/ProfileReviews.tsx`** — Removed `handleSave` from destructuring
-6. **`src/components/profile/ProfileRecommendations.tsx`** — Removed `handleSave` from destructuring
+private scheduleX() {
+  if (!this.isRunning || this.timer) return;   // state + duplicate guard
 
-### Group C: Feed save guard — safe no-op
-7. **`src/hooks/feed/interactions.ts`** — Removed `toggleRecommendationSave` import. Added guard: only posts can be saved (`console.error` + `return false`)
-8. **`src/hooks/feed/use-infinite-feed.ts`** — Added early return in `handleSave` if item is not a post
+  this.timer = window.setTimeout(() => {
+    this.timer = undefined;
+    if (!this.isRunning) return;                // post-stop guard
+    if (!document.hidden) this.doWork();        // visibility guard
+    this.scheduleX();                           // reschedule
+  }, interval);
+}
 
-### Group D: Cleaned interaction cache
-9. **`src/hooks/use-user-interactions-cache.ts`** — Removed `savedRecommendations`, `savedReviews`, and their queries. `isSaved` now only accepts `'post'` type
+stop() {
+  this.isRunning = false;
+  if (this.timer) { clearTimeout(this.timer); this.timer = undefined; }
+}
+```
 
-### Group E: Unused import
-10. **`src/components/profile/reviews/ReviewCard.tsx`** — Removed `Bookmark` from lucide-react import
+All module-level code guarded with `if (typeof window !== 'undefined')` where not already present.
 
-### Group F: Stopped fetching `isSaved` in services
-11. **`src/services/review/fetch.ts`** — Removed `get_user_review_saves` RPC, removed `isSaved` mapping
-12. **`src/services/reviewService.ts`** — Removed `toggleReviewSave` function, removed save queries, removed `isSaved` from Review interface
-13. **`src/services/review/interactions.ts`** — Deleted `toggleReviewSave` function
-14. **`src/services/recommendation/fetchRecommendations.ts`** — Removed `recommendation_saves` query, `isSaved` mapping
-15. **`src/services/recommendation/fetchRecommendationById.ts`** — Removed `recommendation_saves` query, `isSaved` mapping
-16. **`src/services/recommendation/interactionOperations.ts`** — Deleted `toggleSave`/`toggleRecommendationSave`
-17. **`src/hooks/feed/api/recommendations.ts`** — Removed `recommendation_saves` queries
-18. **`src/hooks/feed/api/recommendations/interactions.ts`** — Deleted `toggleRecommendationSave`
-19. **`src/services/recommendationService.ts`** — Removed `toggleSave` export
+## Files (6)
 
-### Group G: Type cleanup
-- **`src/services/reviewService.ts`** — Removed `isSaved` from `Review` interface
-- **`src/services/recommendation/types.ts`** — Removed `isSaved` from `Recommendation` interface
-- **`src/types/common.ts`** — Made `isSaved` optional in `InteractionData` interface
-- **`src/hooks/useCircleReviews.ts`** — Removed `isSaved: false` from mapping
+### 1. `src/services/performanceAnalyticsService.ts`
+- Add `flushTimer`, `memoryTimer` properties
+- Replace both `setInterval` with `scheduleFlush()` / `scheduleMemoryCheck()` using pattern above
+- `stopMonitoring()` clears both and sets `isMonitoring = false`
+- Callback checks `this.isMonitoring` before rescheduling
 
-### No database changes
-Tables `review_saves` and `recommendation_saves` remain in DB (harmless, no longer queried).
+### 2. `src/services/cacheService.ts`
+- Remove module-level `setInterval`
+- Add `cleanupTimer` + `cleanupStarted` flag on `CacheService`
+- Lazy-start on first `set()` call
+
+### 3. `src/services/browserPhotoCache.ts`
+- Remove module-level `setInterval`
+- Add `cleanupTimer` + `cleanupStarted` flag
+- Lazy-start on first `set()` call
+
+### 4. `src/services/imagePerformanceService.ts`
+- Remove module-level `setInterval` block entirely
+
+### 5. `src/services/enhancedUnifiedProfileService.ts`
+- Remove module-level `setInterval`
+- Add lazy `setTimeout` chain on `ProfileCache`, started from first cache write
+
+### 6. `src/services/advancedCacheManager.ts`
+- Replace `setInterval` in `startBackgroundMaintenance()` with `setTimeout` chain
+- Add `maintenanceTimer` + state guard
+
+## Not changed
+- React hooks with `useEffect` cleanup — already correct
+- `CacheProvider.tsx` — already cleans up
+- `backgroundService.ts` — production-only, has proper stop method
+
