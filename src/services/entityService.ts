@@ -146,19 +146,12 @@ export const fetchEntityRecommendations = async (
     
     // Fetch interaction data if user is logged in
     let likedIds = new Set<string>();
-    let savedIds = new Set<string>();
     let likeCountMap = new Map<string, number>();
     
     if (userId && recommendationIds.length > 0) {
-      const [likesData, savesData, likeCountsData] = await Promise.all([
+      const [likesData, likeCountsData] = await Promise.all([
         supabase
           .from('recommendation_likes')
-          .select('recommendation_id')
-          .eq('user_id', userId)
-          .in('recommendation_id', recommendationIds),
-        
-        supabase
-          .from('recommendation_saves')
           .select('recommendation_id')
           .eq('user_id', userId)
           .in('recommendation_id', recommendationIds),
@@ -169,7 +162,6 @@ export const fetchEntityRecommendations = async (
       ]);
       
       likedIds = new Set((likesData.data || []).map(like => like.recommendation_id));
-      savedIds = new Set((savesData.data || []).map(save => save.recommendation_id));
       likeCountMap = new Map(
         (likeCountsData.data || []).map(item => [item.recommendation_id, item.like_count])
       );
