@@ -222,11 +222,6 @@ class ProfileCache {
 // Global cache instance
 const profileCache = new ProfileCache();
 
-// Clean up expired cache entries every 5 minutes
-setInterval(() => {
-  profileCache.clearExpired();
-}, 5 * 60 * 1000);
-
 export interface ProfileFetchResult {
   profiles: Record<string, SafeUserProfile>;
   errors: string[];

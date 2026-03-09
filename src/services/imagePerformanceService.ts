@@ -249,10 +249,3 @@ class ImagePerformanceService {
 }
 
 export const imagePerformanceService = new ImagePerformanceService();
-
-// Auto-log performance summary every 15 minutes
-if (typeof window !== 'undefined') {
-  setInterval(() => {
-    imagePerformanceService.logPerformanceSummary();
-  }, 15 * 60 * 1000);
-}

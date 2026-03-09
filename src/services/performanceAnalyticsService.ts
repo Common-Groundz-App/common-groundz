@@ -176,9 +176,18 @@ class PerformanceAnalyticsService {
       });
     };
 
-    // Check memory every 30 seconds
-    setInterval(checkMemory, 30000);
     checkMemory(); // Initial check
+    this.scheduleMemoryCheck(checkMemory);
+  }
+
+  private scheduleMemoryCheck(checkMemory: () => void) {
+    if (!this.isMonitoring || this.memoryTimer) return;
+    this.memoryTimer = window.setTimeout(() => {
+      this.memoryTimer = undefined;
+      if (!this.isMonitoring) return;
+      if (!document.hidden) checkMemory();
+      this.scheduleMemoryCheck(checkMemory);
+    }, 30000);
   }
 
   // Monitor network performance

@@ -268,8 +268,3 @@ export class BrowserPhotoCacheService {
 
 // Export singleton instance
 export const browserPhotoCache = BrowserPhotoCacheService.getInstance();
-
-// Auto-cleanup expired entries every 5 minutes
-setInterval(() => {
-  browserPhotoCache.cleanup();
-}, 5 * 60 * 1000);

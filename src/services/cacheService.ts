@@ -105,8 +105,3 @@ export class CacheService {
 }
 
 export const cacheService = new CacheService();
-
-// Cleanup expired entries every 5 minutes
-setInterval(() => {
-  cacheService.cleanup();
-}, 5 * 60 * 1000);
