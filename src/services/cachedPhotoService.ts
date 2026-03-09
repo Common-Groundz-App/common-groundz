@@ -36,34 +36,45 @@ export class CachedPhotoService {
   // Lazy updates for access tracking (reduce DB load)
   private pendingUpdates = new Map<string, { id: string; lastAccess: number }>();
   private readonly UPDATE_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  private cleanupTimer?: number;
+  private cleanupStarted = false;
   
   static getInstance(): CachedPhotoService {
     if (!CachedPhotoService.instance) {
       CachedPhotoService.instance = new CachedPhotoService();
-      CachedPhotoService.instance.startPeriodicCleanup();
+      CachedPhotoService.instance.scheduleCleanup();
     }
     return CachedPhotoService.instance;
   }
 
   /**
-   * Start periodic cleanup of in-memory cache to prevent memory leaks
+   * Guarded setTimeout chain for in-memory cache cleanup (no leaked intervals)
    */
-  private startPeriodicCleanup(): void {
-    setInterval(() => {
-      const now = Date.now();
-      let cleanedCount = 0;
-      
-      for (const [key, value] of this.inMemoryCache.entries()) {
-        if (now - value.timestamp > this.IN_MEMORY_TTL) {
-          this.inMemoryCache.delete(key);
-          cleanedCount++;
+  private scheduleCleanup(): void {
+    if (typeof window === 'undefined' || this.cleanupStarted) return;
+    this.cleanupStarted = true;
+
+    const run = () => {
+      if (!this.cleanupStarted) return;
+
+      if (!document.hidden) {
+        const now = Date.now();
+        let cleanedCount = 0;
+        for (const [key, value] of this.inMemoryCache.entries()) {
+          if (now - value.timestamp > this.IN_MEMORY_TTL) {
+            this.inMemoryCache.delete(key);
+            cleanedCount++;
+          }
+        }
+        if (cleanedCount > 0) {
+          console.log(`🧹 [PhotoCache] Cleaned ${cleanedCount} expired in-memory cache entries`);
         }
       }
-      
-      if (cleanedCount > 0) {
-        console.log(`🧹 [PhotoCache] Cleaned ${cleanedCount} expired in-memory cache entries`);
-      }
-    }, 60 * 1000); // Run cleanup every minute
+
+      this.cleanupTimer = window.setTimeout(run, 60 * 1000);
+    };
+
+    this.cleanupTimer = window.setTimeout(run, 60 * 1000);
   }
 
   /**
