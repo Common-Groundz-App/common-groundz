@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { trackGuestEvent } from '@/utils/guestConversionTracker';
 
 interface UseEntitySaveProps {
   entityId: string;
