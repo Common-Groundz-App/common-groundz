@@ -23,6 +23,16 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
   userId 
 }) => {
   const { data: trustMetrics, isLoading, error } = useTrustMetrics(entityId, userId);
+  const location = useLocation();
+  const hasTrackedTrustTeaser = useRef(false);
+
+  // Track trust summary teaser impression for guests
+  useEffect(() => {
+    if (!userId && !hasTrackedTrustTeaser.current) {
+      trackGuestEvent('guest_saw_trust_summary_teaser', { entityId, surface: 'trust_summary_teaser' });
+      hasTrackedTrustTeaser.current = true;
+    }
+  }, [userId, entityId]);
 
   if (isLoading) {
     return (
