@@ -60,6 +60,7 @@ class ProfileCache {
 
   // Store profile in cache
   setCache(userId: string, profile: SafeUserProfile): void {
+    this.scheduleCleanup();
     this.cache.set(userId, {
       profile,
       timestamp: Date.now()
