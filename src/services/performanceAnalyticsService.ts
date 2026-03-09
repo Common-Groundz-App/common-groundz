@@ -28,6 +28,8 @@ class PerformanceAnalyticsService {
   private isMonitoring = false;
   private batchSize = 50;
   private flushInterval = 30000; // 30 seconds
+  private flushTimer?: number;
+  private memoryTimer?: number;
 
   // Start performance monitoring
   startMonitoring() {
@@ -43,9 +45,7 @@ class PerformanceAnalyticsService {
     this.startNetworkMonitoring();
     
     // Batch flush metrics periodically
-    setInterval(() => {
-      this.flushMetrics();
-    }, this.flushInterval);
+    this.scheduleFlush();
 
     // Monitor Core Web Vitals
     this.monitorCoreWebVitals();
@@ -54,8 +54,20 @@ class PerformanceAnalyticsService {
   // Stop performance monitoring
   stopMonitoring() {
     this.isMonitoring = false;
+    if (this.flushTimer) { clearTimeout(this.flushTimer); this.flushTimer = undefined; }
+    if (this.memoryTimer) { clearTimeout(this.memoryTimer); this.memoryTimer = undefined; }
     this.flushMetrics();
     console.log('📊 Performance monitoring stopped');
+  }
+
+  private scheduleFlush() {
+    if (!this.isMonitoring || this.flushTimer) return;
+    this.flushTimer = window.setTimeout(() => {
+      this.flushTimer = undefined;
+      if (!this.isMonitoring) return;
+      if (!document.hidden) this.flushMetrics();
+      this.scheduleFlush();
+    }, this.flushInterval);
   }
 
   // Track page view with performance metrics
