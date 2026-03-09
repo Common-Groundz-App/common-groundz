@@ -93,7 +93,7 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
 
   // Format Circle Certified display
   const getCircleCertifiedDisplay = () => {
-    if (!userId) return { value: "Sign In", color: "text-muted-foreground" };
+    if (!userId) return { value: "locked", color: "text-muted-foreground" };
     if (trustMetrics?.circleCertified === null) return { value: "No circle data", color: "text-muted-foreground" };
     return { value: `${trustMetrics.circleCertified}%`, color: "text-green-600" };
   };
