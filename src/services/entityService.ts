@@ -146,19 +146,12 @@ export const fetchEntityRecommendations = async (
     
     // Fetch interaction data if user is logged in
     let likedIds = new Set<string>();
-    let savedIds = new Set<string>();
     let likeCountMap = new Map<string, number>();
     
     if (userId && recommendationIds.length > 0) {
-      const [likesData, savesData, likeCountsData] = await Promise.all([
+      const [likesData, likeCountsData] = await Promise.all([
         supabase
           .from('recommendation_likes')
-          .select('recommendation_id')
-          .eq('user_id', userId)
-          .in('recommendation_id', recommendationIds),
-        
-        supabase
-          .from('recommendation_saves')
           .select('recommendation_id')
           .eq('user_id', userId)
           .in('recommendation_id', recommendationIds),
@@ -169,7 +162,6 @@ export const fetchEntityRecommendations = async (
       ]);
       
       likedIds = new Set((likesData.data || []).map(like => like.recommendation_id));
-      savedIds = new Set((savesData.data || []).map(save => save.recommendation_id));
       likeCountMap = new Map(
         (likeCountsData.data || []).map(item => [item.recommendation_id, item.like_count])
       );
@@ -208,7 +200,6 @@ export const fetchEntityRecommendations = async (
         category: categoryMap[rec.category as string] || RecommendationCategory.Product,
         likes: likeCountMap.get(rec.id) || 0,
         isLiked: likedIds.has(rec.id),
-        isSaved: savedIds.has(rec.id),
         comment_count: rec.comment_count || 0,
         view_count: rec.view_count || 0,
         visibility: rec.visibility as any,
@@ -287,19 +278,12 @@ export const fetchEntityReviews = async (
     
     // Fetch interaction data if user is logged in
     let likedIds = new Set<string>();
-    let savedIds = new Set<string>();
     let likeCountMap = new Map<string, number>();
     
     if (userId && reviewIds.length > 0) {
-      const [likesData, savesData, likeCountsData] = await Promise.all([
+      const [likesData, likeCountsData] = await Promise.all([
         supabase
           .from('review_likes')
-          .select('review_id')
-          .eq('user_id', userId)
-          .in('review_id', reviewIds),
-        
-        supabase
-          .from('review_saves')
           .select('review_id')
           .eq('user_id', userId)
           .in('review_id', reviewIds),
@@ -310,7 +294,6 @@ export const fetchEntityReviews = async (
       ]);
       
       likedIds = new Set((likesData.data || []).map(like => like.review_id));
-      savedIds = new Set((savesData.data || []).map(save => save.review_id));
       likeCountMap = new Map(
         (likeCountsData.data || []).map(item => [item.review_id, item.like_count])
       );
@@ -353,7 +336,6 @@ export const fetchEntityReviews = async (
         latest_rating: latestRatingsMap.get(rev.id),
         likes: likeCountMap.get(rev.id) || 0,
         isLiked: likedIds.has(rev.id),
-        isSaved: savedIds.has(rev.id),
         comment_count: 0, // Default value since field doesn't exist in DB
         view_count: 0, // Default value since field doesn't exist in DB
         visibility: rev.visibility as any,
