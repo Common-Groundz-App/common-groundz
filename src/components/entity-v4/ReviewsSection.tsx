@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { MessageCircle, Camera, Eye, Star, Users, Search, ChevronDown, X } from "lucide-react";
 import { RatingRingIcon } from "@/components/ui/rating-ring-icon";
 import { Button } from "@/components/ui/button";
