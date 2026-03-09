@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import PostFeedItem from '@/components/feed/PostFeedItem';
-import { Shell } from 'lucide-react';
+import FeedSkeleton from '@/components/feed/FeedSkeleton';
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { useSearchParams } from 'react-router-dom';
