@@ -12,6 +12,21 @@ export class BrowserPhotoCacheService {
   private readonly CACHE_PREFIX = 'photo_cache_';
   private readonly DEFAULT_TTL = 30 * 60 * 1000; // 30 minutes
   private readonly MAX_CACHE_SIZE = 200; // Maximum cache entries
+  private cleanupTimer?: number;
+  private cleanupStarted = false;
+
+  private scheduleCleanup() {
+    if (typeof window === 'undefined' || this.cleanupStarted) return;
+    this.cleanupStarted = true;
+    const run = () => {
+      this.cleanupTimer = window.setTimeout(() => {
+        this.cleanupTimer = undefined;
+        if (!document.hidden) this.cleanup();
+        run();
+      }, 5 * 60 * 1000);
+    };
+    run();
+  }
 
   static getInstance(): BrowserPhotoCacheService {
     if (!BrowserPhotoCacheService.instance) {
@@ -50,6 +65,7 @@ export class BrowserPhotoCacheService {
    * Set photo URL in browser cache
    */
   set(photoReference: string, maxWidth: number, url: string, quality: string, ttl?: number): void {
+    this.scheduleCleanup();
     try {
       const cacheKey = this.getCacheKey(photoReference, maxWidth);
       const cacheData: BrowserCachedPhoto = {
@@ -252,8 +268,3 @@ export class BrowserPhotoCacheService {
 
 // Export singleton instance
 export const browserPhotoCache = BrowserPhotoCacheService.getInstance();
-
-// Auto-cleanup expired entries every 5 minutes
-setInterval(() => {
-  browserPhotoCache.cleanup();
-}, 5 * 60 * 1000);

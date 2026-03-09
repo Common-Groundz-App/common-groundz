@@ -21,6 +21,8 @@ class AdvancedCacheManager {
   private metrics = new Map<string, CacheMetrics>();
   private refreshPromises = new Map<string, Promise<any>>();
   private backgroundRefreshEnabled = true;
+  private maintenanceTimer?: number;
+  private maintenanceStarted = false;
 
   constructor() {
     this.initializeDefaultStrategies();
@@ -289,10 +291,16 @@ class AdvancedCacheManager {
 
   // Start background maintenance
   private startBackgroundMaintenance() {
-    // Clean up expired entries every 5 minutes
-    setInterval(() => {
-      this.performMaintenance();
-    }, 5 * 60 * 1000);
+    if (typeof window === 'undefined' || this.maintenanceStarted) return;
+    this.maintenanceStarted = true;
+    const run = () => {
+      this.maintenanceTimer = window.setTimeout(() => {
+        this.maintenanceTimer = undefined;
+        if (!document.hidden) this.performMaintenance();
+        run();
+      }, 5 * 60 * 1000);
+    };
+    run();
   }
 
   // Perform cache maintenance

@@ -8,8 +8,24 @@ interface CacheItem<T> {
 export class CacheService {
   private cache = new Map<string, CacheItem<any>>();
   private maxSize = 100; // Maximum number of cache entries
+  private cleanupTimer?: number;
+  private cleanupStarted = false;
+
+  private scheduleCleanup() {
+    if (typeof window === 'undefined' || this.cleanupStarted) return;
+    this.cleanupStarted = true;
+    const run = () => {
+      this.cleanupTimer = window.setTimeout(() => {
+        this.cleanupTimer = undefined;
+        if (!document.hidden) this.cleanup();
+        run();
+      }, 5 * 60 * 1000);
+    };
+    run();
+  }
 
   set<T>(key: string, data: T, ttlMs: number = 5 * 60 * 1000): void {
+    this.scheduleCleanup();
     // Remove oldest entries if cache is full
     if (this.cache.size >= this.maxSize) {
       const oldestKey = this.cache.keys().next().value;
@@ -89,8 +105,3 @@ export class CacheService {
 }
 
 export const cacheService = new CacheService();
-
-// Cleanup expired entries every 5 minutes
-setInterval(() => {
-  cacheService.cleanup();
-}, 5 * 60 * 1000);
