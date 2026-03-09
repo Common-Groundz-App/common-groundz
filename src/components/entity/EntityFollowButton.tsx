@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { UserPlus, UserMinus, UserCheck } from 'lucide-react';
 import { useEntityFollow } from '@/hooks/use-entity-follow';
 import { useToast } from '@/hooks/use-toast';
+import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EntityFollowButtonProps {
