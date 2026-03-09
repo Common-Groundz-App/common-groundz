@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { EntityParentBreadcrumb } from '@/components/entity/EntityParentBreadcrumb';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { useEntityHierarchy } from '@/hooks/use-entity-hierarchy';
