@@ -278,19 +278,12 @@ export const fetchEntityReviews = async (
     
     // Fetch interaction data if user is logged in
     let likedIds = new Set<string>();
-    let savedIds = new Set<string>();
     let likeCountMap = new Map<string, number>();
     
     if (userId && reviewIds.length > 0) {
-      const [likesData, savesData, likeCountsData] = await Promise.all([
+      const [likesData, likeCountsData] = await Promise.all([
         supabase
           .from('review_likes')
-          .select('review_id')
-          .eq('user_id', userId)
-          .in('review_id', reviewIds),
-        
-        supabase
-          .from('review_saves')
           .select('review_id')
           .eq('user_id', userId)
           .in('review_id', reviewIds),
@@ -301,7 +294,6 @@ export const fetchEntityReviews = async (
       ]);
       
       likedIds = new Set((likesData.data || []).map(like => like.review_id));
-      savedIds = new Set((savesData.data || []).map(save => save.review_id));
       likeCountMap = new Map(
         (likeCountsData.data || []).map(item => [item.review_id, item.like_count])
       );
