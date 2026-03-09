@@ -200,7 +200,6 @@ export const fetchEntityRecommendations = async (
         category: categoryMap[rec.category as string] || RecommendationCategory.Product,
         likes: likeCountMap.get(rec.id) || 0,
         isLiked: likedIds.has(rec.id),
-        isSaved: savedIds.has(rec.id),
         comment_count: rec.comment_count || 0,
         view_count: rec.view_count || 0,
         visibility: rec.visibility as any,
