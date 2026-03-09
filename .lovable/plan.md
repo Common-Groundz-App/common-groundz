@@ -1,45 +1,22 @@
 
-# Fix Leaked Intervals Causing Chrome Battery Drain — IMPLEMENTED
 
-## Status: ✅ Complete
+# Fix `cachedPhotoService.ts` — Last Leaked Interval
 
-Replaced all leaked `setInterval` calls with guarded, self-rescheduling `setTimeout` chains to eliminate Chrome battery drain warnings.
+## What
+Replace the bare `setInterval` in `startPeriodicCleanup()` (line 52) with the same guarded `setTimeout` chain used in the other 5 services.
 
-## Pattern Applied
+## Changes (1 file)
 
-All timers now use:
-- **State guard**: won't start if service is stopped
-- **Duplicate guard**: `if (this.timer) return;` prevents multiple loops
-- **Visibility guard**: `if (!document.hidden)` skips work when tab is backgrounded
-- **SSR guard**: `if (typeof window === 'undefined')` for non-browser environments
-- **Lazy start**: timers only begin on first service interaction, not at import time
+### `src/services/cachedPhotoService.ts`
 
-## Changes Made (6 files)
+1. Add properties: `private cleanupTimer?: number` and `private cleanupStarted = false`
+2. Replace `startPeriodicCleanup()` with `scheduleCleanup()` using the standard pattern:
+   - **SSR guard**: `if (typeof window === 'undefined') return`
+   - **Duplicate guard**: `if (this.cleanupStarted) return`
+   - **State guard inside callback**: `if (!this.cleanupStarted) return`
+   - **Visibility guard**: `if (!document.hidden)` before doing work
+   - Self-rescheduling `setTimeout`
+3. Update `getInstance()` to call `scheduleCleanup()` instead of `startPeriodicCleanup()`
 
-### 1. `src/services/performanceAnalyticsService.ts`
-- Added `flushTimer` and `memoryTimer` properties
-- Replaced flush `setInterval` with `scheduleFlush()` using `setTimeout` chain
-- Replaced memory check `setInterval` with `scheduleMemoryCheck()` using `setTimeout` chain
-- `stopMonitoring()` now clears both timers
+No other files changed.
 
-### 2. `src/services/cacheService.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` flag
-- Lazy-starts cleanup chain on first `set()` call
-
-### 3. `src/services/browserPhotoCache.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` flag
-- Lazy-starts cleanup chain on first `set()` call
-
-### 4. `src/services/imagePerformanceService.ts`
-- Removed module-level `setInterval` block entirely (diagnostic-only, not needed)
-
-### 5. `src/services/enhancedUnifiedProfileService.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` on `ProfileCache` class
-- Lazy-starts cleanup chain on first `setCache()` call
-
-### 6. `src/services/advancedCacheManager.ts`
-- Replaced `setInterval` in `startBackgroundMaintenance()` with guarded `setTimeout` chain
-- Added `maintenanceTimer` + `maintenanceStarted` properties
