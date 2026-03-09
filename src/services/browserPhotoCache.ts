@@ -12,6 +12,21 @@ export class BrowserPhotoCacheService {
   private readonly CACHE_PREFIX = 'photo_cache_';
   private readonly DEFAULT_TTL = 30 * 60 * 1000; // 30 minutes
   private readonly MAX_CACHE_SIZE = 200; // Maximum cache entries
+  private cleanupTimer?: number;
+  private cleanupStarted = false;
+
+  private scheduleCleanup() {
+    if (typeof window === 'undefined' || this.cleanupStarted) return;
+    this.cleanupStarted = true;
+    const run = () => {
+      this.cleanupTimer = window.setTimeout(() => {
+        this.cleanupTimer = undefined;
+        if (!document.hidden) this.cleanup();
+        run();
+      }, 5 * 60 * 1000);
+    };
+    run();
+  }
 
   static getInstance(): BrowserPhotoCacheService {
     if (!BrowserPhotoCacheService.instance) {
