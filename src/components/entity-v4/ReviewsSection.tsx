@@ -568,8 +568,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                 Sign up to discover what people in your circle recommend
               </p>
               <div className="space-y-3 mb-4">
-                <Skeleton className="h-12 w-full rounded-lg" />
-                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg bg-muted-foreground/10" />
+                <Skeleton className="h-12 w-full rounded-lg bg-muted-foreground/10" />
               </div>
               <Link
                 to={`/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`}

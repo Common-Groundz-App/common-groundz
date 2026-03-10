@@ -517,7 +517,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                     </div>
                     
                     {/* Recommendations */}
-                    {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
+                    {stats && user && (stats.recommendationCount > 0 || stats.circleRecommendationCount > 0) && (
                       <div className="flex items-center gap-2">
                         <ThumbsUp className="h-4 w-4" />
                         <button
