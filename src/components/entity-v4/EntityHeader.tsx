@@ -548,7 +548,7 @@ Only recent ratings are counted to keep things current and relevant.`}
                     )}
                     {/* Guest teaser for circle recommendation insights */}
                     {stats && stats.recommendationCount > 0 && !user && (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <ThumbsUp className="h-4 w-4" />
                         <button
                           onClick={onRecommendationModalOpen}
@@ -556,12 +556,13 @@ Only recent ratings are counted to keep things current and relevant.`}
                         >
                           <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> Recommending
                         </button>
+                        <span className="text-muted-foreground text-sm">·</span>
                         <Link
                           to={`/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
                           className="text-xs text-brand-orange hover:text-brand-orange/80 font-medium hover:underline transition-colors"
                           onClick={() => trackGuestEvent('guest_clicked_signup_from_entity', { entityId: entity?.id, surface: 'circle_reco_teaser' })}
                         >
-                          Sign up for circle insights
+                          See what your circle recommends &rarr; Sign up
                         </Link>
                       </div>
                     )}
