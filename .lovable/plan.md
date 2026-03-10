@@ -1,45 +1,21 @@
 
-# Fix Leaked Intervals Causing Chrome Battery Drain — IMPLEMENTED
 
-## Status: ✅ Complete
+## Plan: Fix Duplicate Recommending Row + Skeleton Visibility
 
-Replaced all leaked `setInterval` calls with guarded, self-rescheduling `setTimeout` chains to eliminate Chrome battery drain warnings.
+Two small fixes, both ready to implement.
 
-## Pattern Applied
+### 1. `src/components/entity-v4/EntityHeader.tsx` (line 520)
+Change the condition to gate the full recommendation block behind `user`:
+```
+{stats && user && (stats.recommendationCount > 0 || stats.circleRecommendationCount > 0) && (
+```
 
-All timers now use:
-- **State guard**: won't start if service is stopped
-- **Duplicate guard**: `if (this.timer) return;` prevents multiple loops
-- **Visibility guard**: `if (!document.hidden)` skips work when tab is backgrounded
-- **SSR guard**: `if (typeof window === 'undefined')` for non-browser environments
-- **Lazy start**: timers only begin on first service interaction, not at import time
+### 2. `src/components/entity-v4/ReviewsSection.tsx` (lines 571-572)
+Use `bg-muted-foreground/10` for the skeletons — ChatGPT is right that neutral tones work better than brand colors for skeleton placeholders. This stays visible against the `bg-brand-orange/5` card background while looking like a proper loading state in both light and dark themes:
+```
+<Skeleton className="h-12 w-full rounded-lg bg-muted-foreground/10" />
+<Skeleton className="h-12 w-full rounded-lg bg-muted-foreground/10" />
+```
 
-## Changes Made (6 files)
+Two lines changed across two files. No other modifications needed.
 
-### 1. `src/services/performanceAnalyticsService.ts`
-- Added `flushTimer` and `memoryTimer` properties
-- Replaced flush `setInterval` with `scheduleFlush()` using `setTimeout` chain
-- Replaced memory check `setInterval` with `scheduleMemoryCheck()` using `setTimeout` chain
-- `stopMonitoring()` now clears both timers
-
-### 2. `src/services/cacheService.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` flag
-- Lazy-starts cleanup chain on first `set()` call
-
-### 3. `src/services/browserPhotoCache.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` flag
-- Lazy-starts cleanup chain on first `set()` call
-
-### 4. `src/services/imagePerformanceService.ts`
-- Removed module-level `setInterval` block entirely (diagnostic-only, not needed)
-
-### 5. `src/services/enhancedUnifiedProfileService.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` on `ProfileCache` class
-- Lazy-starts cleanup chain on first `setCache()` call
-
-### 6. `src/services/advancedCacheManager.ts`
-- Replaced `setInterval` in `startBackgroundMaintenance()` with guarded `setTimeout` chain
-- Added `maintenanceTimer` + `maintenanceStarted` properties
