@@ -1,39 +1,45 @@
 
+# Fix Leaked Intervals Causing Chrome Battery Drain — IMPLEMENTED
 
-## Analysis
+## Status: ✅ Complete
 
-ChatGPT's suggestion is better here. The current text is too long for mobile and creates visual clutter. The short `🔒 From your circle` pattern is clean, compact, and stays on one line — matching the polish of the logged-in version.
+Replaced all leaked `setInterval` calls with guarded, self-rescheduling `setTimeout` chains to eliminate Chrome battery drain warnings.
 
-However, I'd recommend a slight variation: use the `Lock` icon (already imported in the file) instead of the 🔒 emoji for visual consistency with the rest of the guest teasers (e.g., the Trust Summary card uses `<Lock>` from lucide-react).
+## Pattern Applied
 
-Also, making "From your circle" a clickable link to signup keeps the conversion path without needing the verbose "→ Sign up" suffix — the lock icon already implies gated content.
+All timers now use:
+- **State guard**: won't start if service is stopped
+- **Duplicate guard**: `if (this.timer) return;` prevents multiple loops
+- **Visibility guard**: `if (!document.hidden)` skips work when tab is backgrounded
+- **SSR guard**: `if (typeof window === 'undefined')` for non-browser environments
+- **Lazy start**: timers only begin on first service interaction, not at import time
 
-## Proposed Change
+## Changes Made (6 files)
 
-**`src/components/entity-v4/EntityHeader.tsx` (lines 559-566)**
+### 1. `src/services/performanceAnalyticsService.ts`
+- Added `flushTimer` and `memoryTimer` properties
+- Replaced flush `setInterval` with `scheduleFlush()` using `setTimeout` chain
+- Replaced memory check `setInterval` with `scheduleMemoryCheck()` using `setTimeout` chain
+- `stopMonitoring()` now clears both timers
 
-Replace the `·` separator and long CTA link with:
+### 2. `src/services/cacheService.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` flag
+- Lazy-starts cleanup chain on first `set()` call
 
-```jsx
-<Link
-  to={`/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`}
-  className="flex items-center gap-1 text-xs text-brand-orange hover:text-brand-orange/80 font-medium hover:underline transition-colors"
-  onClick={() => trackGuestEvent('guest_clicked_signup_from_entity', { entityId: entity?.id, surface: 'circle_reco_teaser' })}
->
-  <Lock className="w-3 h-3" />
-  From your circle
-</Link>
-```
+### 3. `src/services/browserPhotoCache.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` flag
+- Lazy-starts cleanup chain on first `set()` call
 
-Remove the `·` separator — the lock icon provides enough visual separation.
+### 4. `src/services/imagePerformanceService.ts`
+- Removed module-level `setInterval` block entirely (diagnostic-only, not needed)
 
-### Result on mobile
+### 5. `src/services/enhancedUnifiedProfileService.ts`
+- Removed module-level `setInterval`
+- Added `cleanupTimer` + `cleanupStarted` on `ProfileCache` class
+- Lazy-starts cleanup chain on first `setCache()` call
 
-```
-👍 2 Recommending 🔒 From your circle
-```
-
-One line, compact, consistent with the Lock icon pattern used in the Trust Summary card above.
-
-One file, lines 559-566 replaced. Nothing else changes.
-
+### 6. `src/services/advancedCacheManager.ts`
+- Replaced `setInterval` in `startBackgroundMaintenance()` with guarded `setTimeout` chain
+- Added `maintenanceTimer` + `maintenanceStarted` properties
