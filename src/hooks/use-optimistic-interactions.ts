@@ -29,6 +29,7 @@ export const useOptimisticInteractions = ({
 }: UseOptimisticInteractionsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
   const [optimisticState, setOptimisticState] = useState(initialState);
 
