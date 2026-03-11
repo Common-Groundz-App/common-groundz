@@ -10,6 +10,7 @@ import PublicContentNotFound from '@/components/content/PublicContentNotFound';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageSquare } from "lucide-react";
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
