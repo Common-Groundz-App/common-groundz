@@ -38,7 +38,8 @@ export const useFollow = (profileUserId?: string) => {
   }, [user, profileUserId]);
 
   const handleFollowToggle = async () => {
-    if (!user || !profileUserId) return;
+    if (!profileUserId) return;
+    if (!requireAuth({ action: 'follow', surface: 'profile_header' })) return;
     
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canFollowUsers')) {

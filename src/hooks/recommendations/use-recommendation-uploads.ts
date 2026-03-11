@@ -13,14 +13,7 @@ export const useRecommendationUploads = () => {
 
   // Handle image upload
   const handleImageUpload = async (file: File) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to upload images',
-        variant: 'destructive'
-      });
-      return null;
-    }
+    if (!requireAuth({ action: 'upload', surface: 'recommendation_upload' })) return null;
 
     try {
       // Check file type

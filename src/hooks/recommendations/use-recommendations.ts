@@ -60,14 +60,7 @@ export const useRecommendations = ({
   } = useRecommendationFilters(recommendations);
 
   const handleLike = async (id: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to like recommendations",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'recommendation_card' })) return;
 
     try {
       // Optimistic update

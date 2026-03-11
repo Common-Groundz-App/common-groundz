@@ -77,14 +77,7 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   }, [refetch]);
 
   const convertToRecommendation = async (reviewId: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to convert reviews",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'recommend', surface: 'review_card' })) return;
 
     try {
       const success = await convertReviewToRecommendation(reviewId);
