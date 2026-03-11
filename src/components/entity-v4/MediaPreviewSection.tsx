@@ -17,6 +17,7 @@ import { fetchEntityPhotos, deleteEntityPhoto, EntityPhoto } from '@/services/en
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { SimpleMediaUploadModal } from './SimpleMediaUploadModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 
