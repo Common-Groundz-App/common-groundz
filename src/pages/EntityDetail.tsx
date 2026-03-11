@@ -309,14 +309,7 @@ const EntityDetailOriginal = () => {
   const contextualField = getContextualFieldInfo();
 
   const handleAddRecommendation = () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to add a recommendation",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'recommend', entityName: entity?.name, entityId: entity?.id, surface: 'entity_detail' })) return;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canCreateRecommendations')) {
