@@ -17,16 +17,10 @@ export const useRecommendationActions = (
   const { user } = useAuth();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+  const { requireAuth } = useAuthPrompt();
 
   const handleLike = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to like recommendations',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'recommendation_card' })) return;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
