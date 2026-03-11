@@ -1,45 +1,63 @@
 
-# Fix Leaked Intervals Causing Chrome Battery Drain — IMPLEMENTED
 
-## Status: ✅ Complete
+# Final Plan: Auth Prompt Modal System
 
-Replaced all leaked `setInterval` calls with guarded, self-rescheduling `setTimeout` chains to eliminate Chrome battery drain warnings.
+All feedback is valid. Here's the final plan with all improvements incorporated.
 
-## Pattern Applied
+## What's New vs Last Version
 
-All timers now use:
-- **State guard**: won't start if service is stopped
-- **Duplicate guard**: `if (this.timer) return;` prevents multiple loops
-- **Visibility guard**: `if (!document.hidden)` skips work when tab is backgrounded
-- **SSR guard**: `if (typeof window === 'undefined')` for non-browser environments
-- **Lazy start**: timers only begin on first service interaction, not at import time
+| Addition | Source | Status |
+|---|---|---|
+| `requireAuth()` helper | ChatGPT | Adopted — cleaner than repeating `if (!user) { showAuthPrompt(); return }` everywhere |
+| Mandatory `surface` param | ChatGPT | Adopted |
+| Mobile width constraint `max-w-md w-[90vw]` | ChatGPT | Adopted |
+| Fix label: "9 files" not "8 files" | Codex | Adopted |
 
-## Changes Made (6 files)
+No other changes needed. The plan is solid — time to build.
 
-### 1. `src/services/performanceAnalyticsService.ts`
-- Added `flushTimer` and `memoryTimer` properties
-- Replaced flush `setInterval` with `scheduleFlush()` using `setTimeout` chain
-- Replaced memory check `setInterval` with `scheduleMemoryCheck()` using `setTimeout` chain
-- `stopMonitoring()` now clears both timers
+## Files to Create (4)
 
-### 2. `src/services/cacheService.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` flag
-- Lazy-starts cleanup chain on first `set()` call
+### 1. `src/utils/authUrlBuilder.ts`
+Builds `/auth?tab=signup&returnTo=...` using existing encoding convention.
 
-### 3. `src/services/browserPhotoCache.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` flag
-- Lazy-starts cleanup chain on first `set()` call
+### 2. `src/contexts/AuthPromptContext.tsx`
+Provider + hook. Renders single `AuthPromptModal` instance. Exposes `showAuthPrompt()` and `requireAuth()`. Spam-safe (no-op if already open).
 
-### 4. `src/services/imagePerformanceService.ts`
-- Removed module-level `setInterval` block entirely (diagnostic-only, not needed)
+```ts
+// requireAuth helper — returns true if authenticated, false if not (opens modal)
+requireAuth({ action: 'follow', entityName: 'Pizza Place', surface: 'entity_header' })
+```
 
-### 5. `src/services/enhancedUnifiedProfileService.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` on `ProfileCache` class
-- Lazy-starts cleanup chain on first `setCache()` call
+### 3. `src/components/auth/AuthPromptModal.tsx`
+Radix AlertDialog. Mobile-safe with `max-w-md w-[90vw]`. Contains:
+- Dynamic title: "Sign up to follow **Pizza Place**"
+- Contextual description
+- `GoogleSignInButton` (existing component)
+- "Continue with Email" link → `/auth?tab=signup&returnTo=...`
+- "Already have an account? Log in" link
+- "Not now" dismiss
+- Analytics on every interaction with mandatory `surface`
 
-### 6. `src/services/advancedCacheManager.ts`
-- Replaced `setInterval` in `startBackgroundMaintenance()` with guarded `setTimeout` chain
-- Added `maintenanceTimer` + `maintenanceStarted` properties
+### 4. `src/hooks/useAuthPrompt.ts`
+Thin re-export of context hook.
+
+## Files to Modify
+
+### `src/App.tsx`
+Wrap with `AuthPromptProvider` inside `Router`, outside `Routes`.
+
+### Phase 1 Migration (9 files)
+Replace `if (!user) { toast({...}); return; }` with `if (!requireAuth({...})) return;`
+
+1. `src/components/entity/EntityFollowButton.tsx` — follow
+2. `src/hooks/use-entity-save.ts` — save
+3. `src/hooks/use-optimistic-interactions.ts` — like/save
+4. `src/hooks/recommendations/use-recommendation-actions.ts` — like recommendation
+5. `src/pages/EntityDetail.tsx` — recommend/review
+6. `src/pages/EntityDetailV2.tsx` — recommend/review
+7. `src/components/entity-v4/EntityV4.tsx` — review/timeline
+8. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
+9. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
+
+Each is a simple swap — existing `trackGuestEvent` calls stay, `requireAuth` handles the modal + analytics.
+
