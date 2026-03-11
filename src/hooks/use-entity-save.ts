@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface UseEntitySaveProps {
   entityId: string;
@@ -13,6 +14,7 @@ interface UseEntitySaveProps {
 export const useEntitySave = ({ entityId, enabled = true }: UseEntitySaveProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [isSaved, setIsSaved] = useState(false);
   const [saveCount, setSaveCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -83,11 +85,7 @@ export const useEntitySave = ({ entityId, enabled = true }: UseEntitySaveProps) 
   const toggleSave = async () => {
     if (!user) {
       trackGuestEvent('guest_attempted_save', { entityId });
-      toast({
-        title: "Sign in required",
-        description: "Sign up to save entities and build your collection",
-      });
-      return;
+      if (!requireAuth({ action: 'save', entityId, surface: 'entity_detail' })) return;
     }
 
     if (isLoading) return;

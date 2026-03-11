@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface OptimisticInteractionState {
   isLiked: boolean;
@@ -28,6 +29,7 @@ export const useOptimisticInteractions = ({
 }: UseOptimisticInteractionsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
   const [optimisticState, setOptimisticState] = useState(initialState);
 
@@ -105,28 +107,16 @@ export const useOptimisticInteractions = ({
   });
 
   const handleLike = useCallback(() => {
-    if (!user) {
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to like items',
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'content_card' })) return;
     
     likeMutation.mutate(!optimisticState.isLiked);
-  }, [user, optimisticState.isLiked, likeMutation, toast]);
+  }, [requireAuth, optimisticState.isLiked, likeMutation]);
 
   const handleSave = useCallback(() => {
-    if (!user) {
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to save items',
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'save', surface: 'content_card' })) return;
     
     saveMutation.mutate(!optimisticState.isSaved);
-  }, [user, optimisticState.isSaved, saveMutation, toast]);
+  }, [requireAuth, optimisticState.isSaved, saveMutation]);
 
   return {
     ...optimisticState,

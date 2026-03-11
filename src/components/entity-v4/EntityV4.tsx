@@ -10,6 +10,7 @@ import PublicContentNotFound from '@/components/content/PublicContentNotFound';
 import { getEntityTypeFallbackImage } from '@/services/entityTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
 import { MessageSquare } from "lucide-react";
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { TooltipProvider } from "@/components/ui/tooltip";
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { ReviewTimelineViewer } from '@/components/profile/reviews/ReviewTimelineViewer';
@@ -139,6 +140,7 @@ const EntityV4 = () => {
 
   // Fetch circle rating data and user following data
   const { user, isLoading: authLoading } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   
   // Initialize image refresh hook (queryClient and toast already declared above)
   const { refreshEntityImage, isRefreshing } = useEntityImageRefresh();
@@ -252,27 +254,13 @@ const EntityV4 = () => {
   };
 
   const handleAddReview = () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to add a review",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'review', entityName: entity?.name, entityId: entity?.id, surface: 'entity_v4' })) return;
     
     setIsReviewFormOpen(true);
   };
 
   const handleStartTimeline = (reviewId: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to start a timeline",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'timeline', entityName: entity?.name, entityId: entity?.id, surface: 'entity_v4' })) return;
     
     setTimelineReviewId(reviewId);
     setIsTimelineViewerOpen(true);

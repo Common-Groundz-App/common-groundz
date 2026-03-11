@@ -45,6 +45,7 @@ import TermsOfService from '@/pages/TermsOfService';
 import CookiePolicy from '@/pages/CookiePolicy';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
+import { AuthPromptProvider } from '@/contexts/AuthPromptContext';
 
 // Create a client
 const queryClient = new QueryClient();
@@ -80,6 +81,7 @@ function App() {
           <AuthErrorBoundary>
             <Router>
               <AuthInitializer>
+              <AuthPromptProvider>
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
@@ -206,6 +208,7 @@ function App() {
                   <Route path="/u/:username" element={<UserProfile />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+              </AuthPromptProvider>
               </AuthInitializer>
             </Router>
             <Toaster />

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionModal } from './EntitySuggestionModal';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface EntitySuggestionButtonProps {
   entity: Entity;
@@ -18,19 +17,11 @@ export const EntitySuggestionButton: React.FC<EntitySuggestionButtonProps> = ({
   size = "sm",
   className = "w-full"
 }) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleClick = () => {
-    if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to suggest edits to entities",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'suggest_edit', entityName: entity.name, entityId: entity.id, surface: 'entity_sidebar' })) return;
 
     setIsModalOpen(true);
   };

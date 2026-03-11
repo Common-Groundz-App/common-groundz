@@ -47,6 +47,7 @@ import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { handleSlugRedirect, handleHierarchicalRedirect } from '@/services/entityRedirectService';
 import { getEntityPageVersion } from '@/utils/entityVersionUtils';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
@@ -63,6 +64,7 @@ const EntityDetailOriginal = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+  const { requireAuth } = useAuthPrompt();
   const [activeTab, setActiveTab] = useState('reviews');
   const { handleImageUpload } = useRecommendationUploads();
 
@@ -307,14 +309,7 @@ const EntityDetailOriginal = () => {
   const contextualField = getContextualFieldInfo();
 
   const handleAddRecommendation = () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to add a recommendation",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'recommend', entityName: entity?.name, entityId: entity?.id, surface: 'entity_detail' })) return;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canCreateRecommendations')) {
@@ -326,27 +321,13 @@ const EntityDetailOriginal = () => {
   };
 
   const handleAddReview = () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to add a review",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'review', entityName: entity?.name, entityId: entity?.id, surface: 'entity_detail' })) return;
 
     setIsReviewFormOpen(true);
   };
 
   const handleStartTimeline = (reviewId: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to start a timeline",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'timeline', entityName: entity?.name, entityId: entity?.id, surface: 'entity_detail' })) return;
 
     setTimelineReviewId(reviewId);
     setIsTimelineViewerOpen(true);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
   Recommendation,
   toggleLike,
@@ -16,16 +17,10 @@ export const useRecommendationActions = (
   const { user } = useAuth();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+  const { requireAuth } = useAuthPrompt();
 
   const handleLike = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to like recommendations',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'recommendation_card' })) return;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
@@ -75,14 +70,7 @@ export const useRecommendationActions = (
 
   // Add recommendation
   const addRecommendation = async (recommendation: Omit<Recommendation, 'id' | 'created_at' | 'updated_at' | 'user_id' | 'likes' | 'isLiked'>) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to add recommendations',
-        variant: 'destructive'
-      });
-      return null;
-    }
+    if (!requireAuth({ action: 'recommend', surface: 'recommendation_form' })) return null;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canCreateRecommendations')) {

@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Award } from "lucide-react";
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 import { ClaimBusinessModal } from './ClaimBusinessModal';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface ClaimBusinessButtonProps {
   entity: Entity;
@@ -19,19 +18,11 @@ export const ClaimBusinessButton: React.FC<ClaimBusinessButtonProps> = ({
   size = "sm",
   className = "w-full gap-2"
 }) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleClick = () => {
-    if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to claim this business",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'claim', entityName: entity.name, entityId: entity.id, surface: 'entity_sidebar' })) return;
     setIsModalOpen(true);
   };
 
