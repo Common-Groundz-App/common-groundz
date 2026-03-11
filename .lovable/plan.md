@@ -1,45 +1,38 @@
 
-# Fix Leaked Intervals Causing Chrome Battery Drain — IMPLEMENTED
+# Auth Prompt Modal System — IMPLEMENTED
 
-## Status: ✅ Complete
+## Status: ✅ Phase 1 Complete
 
-Replaced all leaked `setInterval` calls with guarded, self-rescheduling `setTimeout` chains to eliminate Chrome battery drain warnings.
+Replaced all guest auth toasts with a professional, Glassdoor-style modal across 9 high-intent action points.
 
-## Pattern Applied
+## Architecture
 
-All timers now use:
-- **State guard**: won't start if service is stopped
-- **Duplicate guard**: `if (this.timer) return;` prevents multiple loops
-- **Visibility guard**: `if (!document.hidden)` skips work when tab is backgrounded
-- **SSR guard**: `if (typeof window === 'undefined')` for non-browser environments
-- **Lazy start**: timers only begin on first service interaction, not at import time
+- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
+- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
+- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
+- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
 
-## Changes Made (6 files)
+## Files Created (4)
 
-### 1. `src/services/performanceAnalyticsService.ts`
-- Added `flushTimer` and `memoryTimer` properties
-- Replaced flush `setInterval` with `scheduleFlush()` using `setTimeout` chain
-- Replaced memory check `setInterval` with `scheduleMemoryCheck()` using `setTimeout` chain
-- `stopMonitoring()` now clears both timers
+1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
+2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
+3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
+4. `src/hooks/useAuthPrompt.ts` — Thin re-export
 
-### 2. `src/services/cacheService.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` flag
-- Lazy-starts cleanup chain on first `set()` call
+## Files Modified (10)
 
-### 3. `src/services/browserPhotoCache.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` flag
-- Lazy-starts cleanup chain on first `set()` call
+1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
+2. `src/components/entity/EntityFollowButton.tsx` — follow
+3. `src/hooks/use-entity-save.ts` — save
+4. `src/hooks/use-optimistic-interactions.ts` — like/save
+5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
+6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
+7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
+8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
+9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
+10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
 
-### 4. `src/services/imagePerformanceService.ts`
-- Removed module-level `setInterval` block entirely (diagnostic-only, not needed)
+## Phase 2 (Future)
 
-### 5. `src/services/enhancedUnifiedProfileService.ts`
-- Removed module-level `setInterval`
-- Added `cleanupTimer` + `cleanupStarted` on `ProfileCache` class
-- Lazy-starts cleanup chain on first `setCache()` call
-
-### 6. `src/services/advancedCacheManager.ts`
-- Replaced `setInterval` in `startBackgroundMaintenance()` with guarded `setTimeout` chain
-- Added `maintenanceTimer` + `maintenanceStarted` properties
+- Feed interactions, comments, photo uploads, profile page CTAs
+- Remaining ~19 files with auth toasts
