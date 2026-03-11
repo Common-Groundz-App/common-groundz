@@ -9,6 +9,7 @@ import { useEmailVerification } from '@/hooks/useEmailVerification';
 export const useFollow = (profileUserId?: string) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
   const [followLoading, setFollowLoading] = useState<boolean>(false);
