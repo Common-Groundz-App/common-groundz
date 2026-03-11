@@ -81,6 +81,7 @@ function App() {
           <AuthErrorBoundary>
             <Router>
               <AuthInitializer>
+              <AuthPromptProvider>
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
