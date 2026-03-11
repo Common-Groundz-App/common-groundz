@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface OptimisticInteractionState {
   isLiked: boolean;
