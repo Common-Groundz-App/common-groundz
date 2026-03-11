@@ -55,6 +55,7 @@ export const EntitySuggestionModal: React.FC<EntitySuggestionModalProps> = ({
   entity
 }) => {
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);

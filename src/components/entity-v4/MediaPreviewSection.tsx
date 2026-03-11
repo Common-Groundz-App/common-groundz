@@ -31,6 +31,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   onViewAllClick 
 }) => {
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { toast } = useToast();
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
   const [loading, setLoading] = useState(true);

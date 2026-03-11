@@ -36,6 +36,7 @@ interface PhotosSectionProps {
 
 export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { toast } = useToast();
   const tabsListRef = useRef<HTMLDivElement>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);

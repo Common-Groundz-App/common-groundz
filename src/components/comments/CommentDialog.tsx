@@ -51,6 +51,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   const commentToDeleteRef = useRef<string | null>(null);
   
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
 
