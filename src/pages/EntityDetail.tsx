@@ -64,6 +64,7 @@ const EntityDetailOriginal = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+  const { requireAuth } = useAuthPrompt();
   const [activeTab, setActiveTab] = useState('reviews');
   const { handleImageUpload } = useRecommendationUploads();
 
