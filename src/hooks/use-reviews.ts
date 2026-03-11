@@ -19,6 +19,7 @@ interface UseReviewsProps {
 export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const queryClient = useQueryClient();
   
