@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useReviewsFetch } from './reviews/use-reviews-fetch';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   toggleReviewLike, 
