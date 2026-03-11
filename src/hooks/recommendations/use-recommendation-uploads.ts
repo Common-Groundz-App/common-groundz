@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { uploadRecommendationImage } from '@/services/recommendationService';
 import { ensureHttps } from '@/utils/urlUtils';
