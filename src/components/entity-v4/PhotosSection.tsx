@@ -24,6 +24,7 @@ import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { SimpleMediaUploadModal } from './SimpleMediaUploadModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 
 
