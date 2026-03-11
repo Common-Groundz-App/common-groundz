@@ -6,6 +6,7 @@ import { useEntityFollow } from '@/hooks/use-entity-follow';
 import { useToast } from '@/hooks/use-toast';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface EntityFollowButtonProps {
   entityId: string;
