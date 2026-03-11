@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 import { EntitySuggestionModal } from './EntitySuggestionModal';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface EntitySuggestionButtonProps {
   entity: Entity;
