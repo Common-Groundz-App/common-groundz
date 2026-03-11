@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { fetchUserRecommendations, toggleReviewLike, Review } from '@/services/reviewService';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
