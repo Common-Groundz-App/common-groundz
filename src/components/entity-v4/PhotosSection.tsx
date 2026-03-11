@@ -761,14 +761,7 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onSave={async (media) => {
-          if (!user) {
-            toast({
-              title: 'Authentication required',
-              description: 'Please log in to upload media.',
-              variant: 'destructive',
-            });
-            return;
-          }
+          if (!requireAuth({ action: 'upload', entityName: entity.name, surface: 'entity_photos' })) return;
 
           try {
             const uploadedPhotos = await uploadEntityMediaBatch(

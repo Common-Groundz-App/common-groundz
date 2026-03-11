@@ -591,14 +591,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onSave={async (mediaItems) => {
-          if (!user) {
-            toast({
-              title: "Authentication required",
-              description: "Please sign in to upload media.",
-              variant: "destructive",
-            });
-            return;
-          }
+          if (!requireAuth({ action: 'upload', entityName: entity.name, surface: 'entity_media' })) return;
 
           try {
             await uploadEntityMediaBatch(mediaItems, entity.id, user.id);

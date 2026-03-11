@@ -123,14 +123,7 @@ export const EntitySuggestionModal: React.FC<EntitySuggestionModalProps> = ({
   };
 
   const onSubmit = async (data: SuggestionFormData) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to suggest edits",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'suggest_edit', entityName: entity.name, surface: 'entity_suggestion_modal' })) return;
 
     setIsSubmitting(true);
     

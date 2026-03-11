@@ -122,14 +122,7 @@ export const ClaimBusinessModal: React.FC<ClaimBusinessModalProps> = ({
   };
 
   const onSubmit = async (data: ClaimFormData) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to claim this business",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'claim', entityName: entity.name, surface: 'claim_business_modal' })) return;
 
     setIsSubmitting(true);
     

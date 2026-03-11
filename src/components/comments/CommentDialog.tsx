@@ -128,14 +128,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   };
 
   const handleAddComment = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to comment",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'comment', surface: 'comment_dialog' })) return;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canComment')) {
