@@ -8,6 +8,7 @@ import { ensureHttps } from '@/utils/urlUtils';
 
 export const useRecommendationUploads = () => {
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { toast } = useToast();
 
   // Handle image upload
