@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Award } from "lucide-react";
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 import { ClaimBusinessModal } from './ClaimBusinessModal';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface ClaimBusinessButtonProps {
   entity: Entity;
