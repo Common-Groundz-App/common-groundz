@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface UseEntitySaveProps {
   entityId: string;
