@@ -31,14 +31,7 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   } = useReviewsFetch({ profileUserId });
 
   const handleLike = async (id: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to like reviews",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'review_card' })) return;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
