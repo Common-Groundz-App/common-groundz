@@ -85,11 +85,7 @@ export const useEntitySave = ({ entityId, enabled = true }: UseEntitySaveProps) 
   const toggleSave = async () => {
     if (!user) {
       trackGuestEvent('guest_attempted_save', { entityId });
-      toast({
-        title: "Sign in required",
-        description: "Sign up to save entities and build your collection",
-      });
-      return;
+      if (!requireAuth({ action: 'save', entityId, surface: 'entity_detail' })) return;
     }
 
     if (isLoading) return;

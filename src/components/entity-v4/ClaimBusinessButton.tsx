@@ -18,19 +18,11 @@ export const ClaimBusinessButton: React.FC<ClaimBusinessButtonProps> = ({
   size = "sm",
   className = "w-full gap-2"
 }) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleClick = () => {
-    if (!user) {
-      toast({
-        title: "Sign in required",
-        description: "Please sign in to claim this business",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'claim', entityName: entity.name, entityId: entity.id, surface: 'entity_sidebar' })) return;
     setIsModalOpen(true);
   };
 

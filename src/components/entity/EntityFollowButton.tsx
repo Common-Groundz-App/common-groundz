@@ -25,16 +25,12 @@ export const EntityFollowButton: React.FC<EntityFollowButtonProps> = ({
   const [isHovering, setIsHovering] = useState(false);
   const { isFollowing, isLoading, toggleFollow, canFollow } = useEntityFollow(entityId);
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
 
   const handleFollow = async () => {
     if (!canFollow) {
       trackGuestEvent('guest_attempted_follow', { entityId });
-      toast({
-        title: "Authentication required",
-        description: "Sign up to follow entities and get updates",
-        variant: "destructive",
-      });
-      return;
+      if (!requireAuth({ action: 'follow', entityName, entityId, surface: 'entity_header' })) return;
     }
 
     try {

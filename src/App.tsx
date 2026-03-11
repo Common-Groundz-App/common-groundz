@@ -208,6 +208,7 @@ function App() {
                   <Route path="/u/:username" element={<UserProfile />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+              </AuthPromptProvider>
               </AuthInitializer>
             </Router>
             <Toaster />

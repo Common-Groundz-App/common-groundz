@@ -321,27 +321,13 @@ const EntityDetailOriginal = () => {
   };
 
   const handleAddReview = () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to add a review",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'review', entityName: entity?.name, entityId: entity?.id, surface: 'entity_detail' })) return;
 
     setIsReviewFormOpen(true);
   };
 
   const handleStartTimeline = (reviewId: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to start a timeline",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'timeline', entityName: entity?.name, entityId: entity?.id, surface: 'entity_detail' })) return;
 
     setTimelineReviewId(reviewId);
     setIsTimelineViewerOpen(true);
