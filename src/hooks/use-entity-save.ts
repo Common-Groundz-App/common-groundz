@@ -14,6 +14,7 @@ interface UseEntitySaveProps {
 export const useEntitySave = ({ entityId, enabled = true }: UseEntitySaveProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [isSaved, setIsSaved] = useState(false);
   const [saveCount, setSaveCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
