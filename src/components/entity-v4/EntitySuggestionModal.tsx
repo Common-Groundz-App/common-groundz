@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useForm, Controller } from "react-hook-form";
 import { Clock, MapPin, Phone, Globe, ChevronLeft, ChevronRight, AlertCircle, Building, User } from "lucide-react";
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { usePersistedForm } from '@/hooks/usePersistedForm';
