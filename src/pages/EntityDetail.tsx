@@ -47,6 +47,7 @@ import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { getEntityUrl, isUUID } from '@/utils/entityUrlUtils';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { handleSlugRedirect, handleHierarchicalRedirect } from '@/services/entityRedirectService';
 import { getEntityPageVersion } from '@/utils/entityVersionUtils';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
