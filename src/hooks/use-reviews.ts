@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { useReviewsFetch } from './reviews/use-reviews-fetch';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   toggleReviewLike, 
@@ -18,6 +19,7 @@ interface UseReviewsProps {
 export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const queryClient = useQueryClient();
   
@@ -29,14 +31,7 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   } = useReviewsFetch({ profileUserId });
 
   const handleLike = async (id: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to like reviews",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'review_card' })) return;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
@@ -82,14 +77,7 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
   }, [refetch]);
 
   const convertToRecommendation = async (reviewId: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to convert reviews",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'recommend', surface: 'review_card' })) return;
 
     try {
       const success = await convertReviewToRecommendation(reviewId);

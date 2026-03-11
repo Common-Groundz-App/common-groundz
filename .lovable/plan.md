@@ -1,55 +1,38 @@
 
+# Auth Prompt Modal System — IMPLEMENTED
 
-# Complete Auth Prompt Modal Migration — Phase 1 Closure
+## Status: ✅ Phase 1 Complete
 
-## Summary
+Replaced all guest auth toasts with a professional, Glassdoor-style modal across 9 high-intent action points.
 
-The auth modal infrastructure works, but migration was incomplete. 13 files still use legacy `toast("Authentication required")`. This plan migrates all **public-facing entity/profile page** actions (11 files). Admin/feed pages stay as-is (correct pattern or Phase 2).
+## Architecture
 
-## Files to Migrate (11)
+- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
+- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
+- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
+- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
 
-| # | File | Action | Surface |
-|---|---|---|---|
-| 1 | `src/hooks/use-reviews.ts` (line 32) | like | `review_card` |
-| 2 | `src/hooks/use-reviews.ts` (line 85) | convert review | `review_card` |
-| 3 | `src/hooks/use-recommendations.ts` (line 58) | like | `recommendation_card` |
-| 4 | `src/hooks/recommendations/use-recommendations.ts` (line 61) | like | `recommendation_card` |
-| 5 | `src/components/entity-v4/EntitySuggestionModal.tsx` (line 125) | suggest_edit | `entity_suggestion_modal` |
-| 6 | `src/components/entity-v4/ClaimBusinessModal.tsx` (line 124) | claim | `claim_business_modal` |
-| 7 | `src/components/entity-v4/PhotosSection.tsx` (line 763) | upload | `entity_photos` |
-| 8 | `src/components/entity-v4/MediaPreviewSection.tsx` (line 593) | upload | `entity_media` |
-| 9 | `src/components/comments/CommentDialog.tsx` (line 130) | comment | `comment_dialog` |
-| 10 | `src/hooks/recommendations/use-recommendation-uploads.ts` (line 14) | upload | `recommendation_upload` |
-| 11 | `src/hooks/use-follow.ts` (line 39) | follow | `profile_header` |
+## Files Created (4)
 
-**Note on `src/hooks/use-recommendations.ts`**: Only used by `ProfileRecommendations.tsx` — it's active code, not dead. Both recommendation hooks need migration.
+1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
+2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
+3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
+4. `src/hooks/useAuthPrompt.ts` — Thin re-export
 
-## NOT migrated (correct)
+## Files Modified (10)
 
-- Admin pages (`AdminEntityManagementPanel`, `AdminEntityEdit`) — redirect-based auth
-- Feed page (`Feed.tsx`, `FeedForYou.tsx`) — login-required pages
-- `CreateEntityDialog` — Phase 2
-- `EnhancedCreatePostForm` — Phase 2
-- `use-feed.ts` — Phase 2
-- `use-entity-operations.ts` — Phase 2
+1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
+2. `src/components/entity/EntityFollowButton.tsx` — follow
+3. `src/hooks/use-entity-save.ts` — save
+4. `src/hooks/use-optimistic-interactions.ts` — like/save
+5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
+6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
+7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
+8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
+9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
+10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
 
-## Pattern
+## Phase 2 (Future)
 
-Each file: replace `if (!user) { toast({...}); return; }` with:
-
-```ts
-const { requireAuth } = useAuthPrompt();
-
-if (!requireAuth({ action: 'like', surface: 'review_card' })) return;
-```
-
-Include `entityName`/`entityId` where available in the component scope.
-
-Place `requireAuth()` as the **first check** in each handler, before any state updates or async calls.
-
-Keep submit-level guards in modal components (ClaimBusinessModal, EntitySuggestionModal) as defensive backup — just switch them from toast to `requireAuth()`.
-
-## Post-migration verification
-
-Run a final search for `"Authentication required"` — only admin/feed pages should remain.
-
+- Feed interactions, comments, photo uploads, profile page CTAs
+- Remaining ~19 files with auth toasts

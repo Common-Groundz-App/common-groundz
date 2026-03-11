@@ -1,24 +1,19 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { uploadRecommendationImage } from '@/services/recommendationService';
 import { ensureHttps } from '@/utils/urlUtils';
 
 export const useRecommendationUploads = () => {
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { toast } = useToast();
 
   // Handle image upload
   const handleImageUpload = async (file: File) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to upload images',
-        variant: 'destructive'
-      });
-      return null;
-    }
+    if (!requireAuth({ action: 'upload', surface: 'recommendation_upload' })) return null;
 
     try {
       // Check file type

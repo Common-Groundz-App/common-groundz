@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
   toggleLike, 
   RecommendationCategory
@@ -30,6 +31,7 @@ export const useRecommendations = ({
 }: UseRecommendationsProps = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
   
   console.log('useRecommendations called with profileUserId:', profileUserId);
@@ -58,14 +60,7 @@ export const useRecommendations = ({
   } = useRecommendationFilters(recommendations);
 
   const handleLike = async (id: string) => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to like recommendations",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'recommendation_card' })) return;
 
     try {
       // Optimistic update

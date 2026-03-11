@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { formatDistanceToNow } from 'date-fns';
@@ -50,6 +51,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   const commentToDeleteRef = useRef<string | null>(null);
   
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
 
@@ -127,14 +129,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   };
 
   const handleAddComment = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to comment",
-        variant: "destructive"
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'comment', surface: 'comment_dialog' })) return;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canComment')) {

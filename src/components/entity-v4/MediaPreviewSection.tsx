@@ -17,6 +17,7 @@ import { fetchEntityPhotos, deleteEntityPhoto, EntityPhoto } from '@/services/en
 import { uploadEntityMediaBatch } from '@/services/entityMediaService';
 import { SimpleMediaUploadModal } from './SimpleMediaUploadModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { Entity } from '@/services/recommendation/types';
 
@@ -30,6 +31,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
   onViewAllClick 
 }) => {
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { toast } = useToast();
   const [photos, setPhotos] = useState<PhotoWithMetadata[]>([]);
   const [loading, setLoading] = useState(true);
@@ -590,14 +592,7 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
         onSave={async (mediaItems) => {
-          if (!user) {
-            toast({
-              title: "Authentication required",
-              description: "Please sign in to upload media.",
-              variant: "destructive",
-            });
-            return;
-          }
+          if (!requireAuth({ action: 'upload', entityName: entity.name, surface: 'entity_media' })) return;
 
           try {
             await uploadEntityMediaBatch(mediaItems, entity.id, user.id);
