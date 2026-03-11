@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useRecommendationsFetch } from './use-recommendations-fetch';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
   toggleLike, 
   RecommendationCategory
