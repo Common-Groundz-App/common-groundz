@@ -19,6 +19,7 @@ export const useRecommendations = ({
 }: UseRecommendationsProps = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const [recommendations, setRecommendations] = useState<Review[]>([]);
   const [isLoading, setIsLoading] = useState(true);
