@@ -140,6 +140,7 @@ const EntityV4 = () => {
 
   // Fetch circle rating data and user following data
   const { user, isLoading: authLoading } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   
   // Initialize image refresh hook (queryClient and toast already declared above)
   const { refreshEntityImage, isRefreshing } = useEntityImageRefresh();
