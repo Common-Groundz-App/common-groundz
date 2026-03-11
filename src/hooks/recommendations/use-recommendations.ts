@@ -31,6 +31,7 @@ export const useRecommendations = ({
 }: UseRecommendationsProps = {}) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
   
   console.log('useRecommendations called with profileUserId:', profileUserId);
