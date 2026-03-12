@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { createReview, updateReview, Review } from '@/services/reviewService';
 import { EntityType, Entity as RecommendationEntity } from '@/services/recommendation/types'; 
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
