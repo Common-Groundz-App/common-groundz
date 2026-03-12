@@ -13,6 +13,7 @@ import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users } from
 import { v4 as uuidv4 } from 'uuid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
