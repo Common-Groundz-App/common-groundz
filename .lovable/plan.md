@@ -1,9 +1,9 @@
 
-# Auth Prompt Modal System — IMPLEMENTED
+# Auth Prompt Modal System — FULLY IMPLEMENTED
 
-## Status: ✅ Phase 1 Complete
+## Status: ✅ Phase 1 + Phase 2 Complete
 
-Replaced all guest auth toasts with a professional, Glassdoor-style modal across 9 high-intent action points.
+Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
 
 ## Architecture
 
@@ -19,7 +19,7 @@ Replaced all guest auth toasts with a professional, Glassdoor-style modal across
 3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
 4. `src/hooks/useAuthPrompt.ts` — Thin re-export
 
-## Files Modified (10)
+## Phase 1 — Files Modified (10)
 
 1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
 2. `src/components/entity/EntityFollowButton.tsx` — follow
@@ -32,7 +32,21 @@ Replaced all guest auth toasts with a professional, Glassdoor-style modal across
 9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
 10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
 
-## Phase 2 (Future)
+## Phase 2 — Files Modified (5)
 
-- Feed interactions, comments, photo uploads, profile page CTAs
-- Remaining ~19 files with auth toasts
+| File | Action | Surface |
+|---|---|---|
+| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
+| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
+| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
+
+## Verification
+
+Searched `"Authentication required"` across `src/` — remaining hits are only:
+- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
+- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
+- Edge function auth errors (use-entity-refresh)
+
+No public interaction toasts remain. Migration complete.
