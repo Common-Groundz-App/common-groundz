@@ -44,6 +44,7 @@ const mapVisibilityToDatabase = (visibility: VisibilityOption): 'public' | 'priv
 export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: EnhancedCreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [media, setMedia] = useState<MediaItem[]>([]);
