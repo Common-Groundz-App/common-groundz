@@ -14,6 +14,7 @@ const ITEMS_PER_PAGE = 10;
 export const useFeed = (feedType: FeedVisibility) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
