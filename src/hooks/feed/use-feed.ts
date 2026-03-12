@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { FeedVisibility, FeedState } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { toggleFeedItemLike, toggleFeedItemSave, useInteractions } from './interactions';
