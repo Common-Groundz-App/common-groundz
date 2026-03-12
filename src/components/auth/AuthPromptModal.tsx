@@ -23,6 +23,7 @@ const ACTION_COPY: Record<string, { verb: string; description: string }> = {
   comment: { verb: 'join the conversation', description: 'Share your thoughts with the community.' },
   claim: { verb: 'claim', description: 'Manage your business on Common Groundz.' },
   suggest_edit: { verb: 'suggest edits', description: 'Help keep information accurate.' },
+  upload_media: { verb: 'add photos', description: 'Share your photos with the community.' },
   timeline: { verb: 'start a timeline', description: 'Track how your experience evolves over time.' },
   generic: { verb: 'continue', description: 'Unlock all features on Common Groundz.' },
 };
