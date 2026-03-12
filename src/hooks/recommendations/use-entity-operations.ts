@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 export const useEntityOperations = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [isLoading, setIsLoading] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
 
