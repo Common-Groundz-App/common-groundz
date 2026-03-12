@@ -17,6 +17,7 @@ export const useInfiniteFeed = (feedType: FeedVisibility) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+  const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
 
   // Use infinite query for seamless pagination
