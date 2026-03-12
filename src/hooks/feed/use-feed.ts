@@ -117,14 +117,7 @@ export const useFeed = (feedType: FeedVisibility) => {
   const { handleLike: interactionLike, handleSave: interactionSave } = useInteractions();
 
   const handleLike = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to like content',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'feed_like' })) return;
 
     try {
       const item = allItems.find(r => r.id === id);
