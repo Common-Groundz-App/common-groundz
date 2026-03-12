@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { FeedVisibility, FeedState } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { toggleFeedItemLike, toggleFeedItemSave, useInteractions } from './interactions';
@@ -13,6 +14,7 @@ const ITEMS_PER_PAGE = 10;
 export const useFeed = (feedType: FeedVisibility) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -115,14 +117,7 @@ export const useFeed = (feedType: FeedVisibility) => {
   const { handleLike: interactionLike, handleSave: interactionSave } = useInteractions();
 
   const handleLike = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to like content',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'feed_like' })) return;
 
     try {
       const item = allItems.find(r => r.id === id);
@@ -166,14 +161,7 @@ export const useFeed = (feedType: FeedVisibility) => {
   };
 
   const handleSave = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to save content',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'save', surface: 'feed_save' })) return;
 
     try {
       const item = allItems.find(r => r.id === id);

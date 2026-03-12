@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { FeedVisibility, CombinedFeedItem } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { toggleFeedItemLike, toggleFeedItemSave } from './interactions';
@@ -16,6 +17,7 @@ export const useInfiniteFeed = (feedType: FeedVisibility) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+  const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
 
   // Use infinite query for seamless pagination
@@ -85,14 +87,7 @@ export const useInfiniteFeed = (feedType: FeedVisibility) => {
   }, [user, feedType, queryClient]);
 
   const handleLike = useCallback(async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to like content',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'like', surface: 'feed_like' })) return;
 
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
@@ -144,14 +139,7 @@ export const useInfiniteFeed = (feedType: FeedVisibility) => {
   }, [user, allItems, feedType, queryClient, toast]);
 
   const handleSave = useCallback(async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to save content',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'save', surface: 'feed_save' })) return;
 
     try {
       const item = allItems.find(item => item.id === id);

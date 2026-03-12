@@ -13,6 +13,7 @@ import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users } from
 import { v4 as uuidv4 } from 'uuid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
@@ -43,6 +44,7 @@ const mapVisibilityToDatabase = (visibility: VisibilityOption): 'public' | 'priv
 export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: EnhancedCreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [media, setMedia] = useState<MediaItem[]>([]);
@@ -226,14 +228,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   };
 
   const handleSubmit = async () => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to create posts',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'create_post', surface: 'create_post_form' })) return;
 
     if (!content.trim() && media.length === 0) {
       toast({

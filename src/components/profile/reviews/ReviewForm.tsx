@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { createReview, updateReview, Review } from '@/services/reviewService';
 import { EntityType, Entity as RecommendationEntity } from '@/services/recommendation/types'; 
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
@@ -56,6 +57,7 @@ const ReviewForm = ({
 }: ReviewFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const { handleImageUpload } = useRecommendationUploads();
   
   // Form state
@@ -513,13 +515,7 @@ const ReviewForm = ({
   };
   
   const handleFormSubmit = async () => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to add reviews'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'review', surface: 'review_form', entityId, entityName: contentName || foodName })) return;
     
     setIsSubmitting(true);
     

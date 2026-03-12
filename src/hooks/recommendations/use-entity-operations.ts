@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
   Entity,
   EntityType,
@@ -13,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 export const useEntityOperations = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [isLoading, setIsLoading] = useState(false);
   const [entities, setEntities] = useState<Entity[]>([]);
 
@@ -63,14 +65,7 @@ export const useEntityOperations = () => {
     metadata: any | null = null,
     websiteUrl: string | null = null
   ): Promise<Entity | null> => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to create entities',
-        variant: 'destructive'
-      });
-      return null;
-    }
+    if (!requireAuth({ action: 'create_entity', surface: 'entity_creation', entityName: name })) return null;
 
     try {
       setIsLoading(true);
