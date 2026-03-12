@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { FeedVisibility, CombinedFeedItem } from './types';
 import { fetchForYouFeed, fetchFollowingFeed } from './api/feed';
 import { toggleFeedItemLike, toggleFeedItemSave } from './interactions';
