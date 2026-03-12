@@ -401,7 +401,10 @@ export const PhotosSection: React.FC<PhotosSectionProps> = ({ entity }) => {
             <Button
               size="sm"
               variant="default"
-              onClick={() => setShowUploadModal(true)}
+              onClick={() => {
+                if (!requireAuth({ action: 'upload_media', surface: 'entity_photos_tab', entityId: entity.id, entityName: entity.name })) return;
+                setShowUploadModal(true);
+              }}
               className="h-8"
             >
               <Plus className="h-4 w-4 mr-2" />

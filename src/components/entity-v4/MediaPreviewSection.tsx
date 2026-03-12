@@ -273,7 +273,10 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
               <Button
                 size="sm"
                 variant="default"
-                onClick={() => setShowUploadModal(true)}
+                onClick={() => {
+                  if (!requireAuth({ action: 'upload_media', surface: 'entity_media_gallery', entityId: entity.id, entityName: entity.name })) return;
+                  setShowUploadModal(true);
+                }}
                 className="h-8 w-full min-[400px]:w-auto"
               >
                 <Plus className="h-4 w-4 mr-2" />
