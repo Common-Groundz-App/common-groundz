@@ -57,6 +57,7 @@ const ReviewForm = ({
 }: ReviewFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const { handleImageUpload } = useRecommendationUploads();
   
   // Form state
