@@ -515,13 +515,7 @@ const ReviewForm = ({
   };
   
   const handleFormSubmit = async () => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to add reviews'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'review', surface: 'review_form', entityId, entityName: contentName || foodName })) return;
     
     setIsSubmitting(true);
     

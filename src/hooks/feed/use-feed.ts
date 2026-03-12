@@ -161,14 +161,7 @@ export const useFeed = (feedType: FeedVisibility) => {
   };
 
   const handleSave = async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to save content',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'save', surface: 'feed_save' })) return;
 
     try {
       const item = allItems.find(r => r.id === id);

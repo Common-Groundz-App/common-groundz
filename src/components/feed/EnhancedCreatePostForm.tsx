@@ -228,14 +228,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   };
 
   const handleSubmit = async () => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to create posts',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'create_post', surface: 'create_post_form' })) return;
 
     if (!content.trim() && media.length === 0) {
       toast({

@@ -139,14 +139,7 @@ export const useInfiniteFeed = (feedType: FeedVisibility) => {
   }, [user, allItems, feedType, queryClient, toast]);
 
   const handleSave = useCallback(async (id: string) => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to save content',
-        variant: 'destructive'
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'save', surface: 'feed_save' })) return;
 
     try {
       const item = allItems.find(item => item.id === id);

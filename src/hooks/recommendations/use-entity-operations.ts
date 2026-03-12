@@ -65,14 +65,7 @@ export const useEntityOperations = () => {
     metadata: any | null = null,
     websiteUrl: string | null = null
   ): Promise<Entity | null> => {
-    if (!user) {
-      toast({
-        title: 'Authentication required',
-        description: 'Please sign in to create entities',
-        variant: 'destructive'
-      });
-      return null;
-    }
+    if (!requireAuth({ action: 'create_entity', surface: 'entity_creation', entityName: name })) return null;
 
     try {
       setIsLoading(true);
