@@ -65,6 +65,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+  const { requireAuth } = useAuthPrompt();
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(!!highlightCommentId);
