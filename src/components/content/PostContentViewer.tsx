@@ -163,7 +163,8 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
   }, [post, authorProfile]);
 
   const handlePostLike = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'like', surface: 'post_detail', postId: post?.id })) return;
+    if (!post) return;
     
     try {
       if (post.is_liked) {
