@@ -17,6 +17,7 @@ import UsernameLink from '@/components/common/UsernameLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
   DropdownMenu,
   DropdownMenuContent,
