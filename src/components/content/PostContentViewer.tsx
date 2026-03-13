@@ -8,6 +8,7 @@ import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { useSearchParams } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface PostContentViewerProps {
   postId: string;
