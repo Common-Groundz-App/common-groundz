@@ -543,14 +543,14 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                   className={cn(
                     "rounded-full h-8 w-8 flex-shrink-0 transition-colors",
                     newComment.trim()
-                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      ? "bg-foreground text-background hover:bg-foreground/90"
                       : "bg-muted text-muted-foreground"
                   )}
                   onClick={handleAddComment}
                   disabled={!newComment.trim() || isSending}
                 >
-                  <Send size={16} className={isSending ? "animate-pulse" : ""} />
-                  <span className="sr-only">Send comment</span>
+                  <ArrowUp size={16} className={isSending ? "animate-pulse" : ""} />
+                  <span className="sr-only">Post comment</span>
                 </Button>
               </div>
             </div>
