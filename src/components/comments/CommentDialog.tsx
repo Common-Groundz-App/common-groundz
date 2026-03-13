@@ -49,6 +49,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   
   const commentToDeleteRef = useRef<string | null>(null);
+  const hasPromptedRef = useRef(false);
   
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
