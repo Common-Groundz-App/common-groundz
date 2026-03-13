@@ -95,7 +95,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   }, [post.id, post.comment_count]);
 
   const handleLikeClick = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'like', surface: 'post_feed_item', postId: post?.id })) return;
+    if (!post) return;
     
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
