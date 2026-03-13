@@ -1,10 +1,12 @@
 import React from 'react';
 import {
   AlertDialog,
-  AlertDialogContent,
+  AlertDialogPortal,
+  AlertDialogOverlay,
   AlertDialogTitle,
   AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
+import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
