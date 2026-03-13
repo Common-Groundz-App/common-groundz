@@ -97,6 +97,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
       }, 300);
       return () => clearTimeout(timeout);
     } else {
+      hasPromptedRef.current = false;
       if (!initialLoadDone) {
         setInitialLoadDone(false);
       }
