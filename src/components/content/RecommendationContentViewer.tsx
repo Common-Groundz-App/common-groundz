@@ -25,6 +25,7 @@ const RecommendationContentViewer = ({
 }: RecommendationContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [recommendation, setRecommendation] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
