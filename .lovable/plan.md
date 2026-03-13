@@ -1,27 +1,52 @@
 
+# Auth Prompt Modal System — FULLY IMPLEMENTED
 
-# Auth Prompt Modal — Final Plan
+## Status: ✅ Phase 1 + Phase 2 Complete
 
-ChatGPT's tweaks are reasonable. Here's my take:
+Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
 
-**`h-[2px] bg-brand-orange/80` instead of `3px`** — Agree. 2px at 80% opacity is more refined for a modal. 3px risks looking like a validation/warning bar.
+## Architecture
 
-**`h-6` logo instead of `h-8`** — Agree. `h-8` (32px) is what we use in the navbar; inside a compact modal, `h-6` (24px) keeps better proportion.
+- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
+- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
+- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
+- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
 
-No other changes needed. The plan is tight as-is.
+## Files Created (4)
 
-## Final Changes — `src/components/auth/AuthPromptModal.tsx`
+1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
+2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
+3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
+4. `src/hooks/useAuthPrompt.ts` — Thin re-export
 
-1. **Import** `useTheme` from `@/contexts/ThemeContext` for themed logo
-2. **Add `2px` brand accent bar** at top of modal content (`h-[2px] bg-brand-orange/80`)
-3. **Add themed logo** (`h-6 w-auto mx-auto mb-2`)
-4. **Split headline** — verb phrase on line 1 (smaller), entity name on line 2 (bold) when `entityName` exists
-5. **Update microcopy** for circle/trust messaging:
-   - `follow` → "See what people in your circle recommend."
-   - `review` → "Share your experience with people you trust."
-   - `recommend` → "Help people you trust discover great things."
-   - `like` → "Show your appreciation and shape recommendations."
-   - `comment` → "Join the conversation with your circle."
+## Phase 1 — Files Modified (10)
 
-One file, five edits.
+1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
+2. `src/components/entity/EntityFollowButton.tsx` — follow
+3. `src/hooks/use-entity-save.ts` — save
+4. `src/hooks/use-optimistic-interactions.ts` — like/save
+5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
+6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
+7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
+8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
+9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
+10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
 
+## Phase 2 — Files Modified (5)
+
+| File | Action | Surface |
+|---|---|---|
+| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
+| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
+| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
+
+## Verification
+
+Searched `"Authentication required"` across `src/` — remaining hits are only:
+- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
+- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
+- Edge function auth errors (use-entity-refresh)
+
+No public interaction toasts remain. Migration complete.
