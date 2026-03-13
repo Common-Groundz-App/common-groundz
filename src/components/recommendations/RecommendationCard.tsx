@@ -163,7 +163,7 @@ const RecommendationCard = ({
   };
 
   const handleLike = async () => {
-    if (!user) return;
+    if (!requireAuth({ action: 'like', surface: 'recommendation_card', recommendationId: recommendation?.id, entityName: recommendation?.entity?.name })) return;
     setIsLiked(!isLiked);
     setLikes(isLiked ? likes - 1 : likes + 1);
     if (onLike) {

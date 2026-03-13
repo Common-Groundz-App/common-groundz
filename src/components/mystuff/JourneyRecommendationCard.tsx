@@ -67,14 +67,7 @@ const JourneyRecommendationCard: React.FC<JourneyRecommendationCardProps> = ({
   const handleBookmark = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (!user) {
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to save insights',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'save_insight', surface: 'journey_card' })) return;
 
     setIsSaving(true);
     try {

@@ -214,6 +214,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
     e.stopPropagation();
     e.preventDefault();
     
+    if (!requireAuth({ action: 'like', surface: 'recommendation_feed_item', recommendationId: recommendation?.id })) return;
+    
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
       showVerificationRequired('canLikeContent');

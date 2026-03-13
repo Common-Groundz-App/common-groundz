@@ -196,7 +196,8 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
   };
   
   const handlePostSave = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'save', surface: 'post_detail', postId: post?.id })) return;
+    if (!post) return;
     
     try {
       if (post.is_saved) {

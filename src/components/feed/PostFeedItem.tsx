@@ -135,7 +135,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   };
   
   const handleSaveClick = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'save', surface: 'post_feed_item', postId: post?.id })) return;
+    if (!post) return;
     
     try {
       if (localIsSaved) {

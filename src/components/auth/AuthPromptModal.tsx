@@ -51,6 +51,8 @@ const AuthPromptModal: React.FC<AuthPromptModalProps> = ({ isOpen, config, onClo
     action: config.action,
     entityId: config.entityId,
     entityName: config.entityName,
+    postId: config.postId,
+    recommendationId: config.recommendationId,
     surface: config.surface,
   };
 

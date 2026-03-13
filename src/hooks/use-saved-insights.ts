@@ -34,14 +34,7 @@ export function useSavedInsights() {
   }, [fetchInsights]);
 
   const saveInsight = async (params: SaveInsightParams) => {
-    if (!user) {
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to save insights',
-        variant: 'destructive',
-      });
-      return null;
-    }
+    if (!requireAuth({ action: 'save_insight', surface: 'saved_insights' })) return null;
 
     try {
       const saved = await savedInsightsService.saveInsight(params);

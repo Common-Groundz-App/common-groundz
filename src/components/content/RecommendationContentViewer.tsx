@@ -146,7 +146,8 @@ const RecommendationContentViewer = ({
   }, [recommendation, authorProfile]);
 
   const handleRecommendationLike = async () => {
-    if (!user || !recommendation) return;
+    if (!requireAuth({ action: 'like', surface: 'recommendation_detail', recommendationId: recommendation?.id, entityName: recommendation?.entity?.name })) return;
+    if (!recommendation) return;
     
     try {
       if (recommendation.isLiked) {

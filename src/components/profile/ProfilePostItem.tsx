@@ -174,7 +174,8 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   };
   
   const handleSaveClick = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'save', surface: 'profile_post_item', postId: post?.id })) return;
+    if (!post) return;
     
     try {
       if (localIsSaved) {
