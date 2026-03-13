@@ -8,6 +8,7 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { getEntityTypeLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
 import { 
@@ -46,6 +47,7 @@ const RecommendationCard = ({
 }: RecommendationCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const [isLiked, setIsLiked] = useState(recommendation.isLiked || false);
   const [likes, setLikes] = useState(recommendation.likes || 0);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -161,7 +163,7 @@ const RecommendationCard = ({
   };
 
   const handleLike = async () => {
-    if (!user) return;
+    if (!requireAuth({ action: 'like', surface: 'recommendation_card', recommendationId: recommendation?.id, entityName: recommendation?.entity?.name })) return;
     setIsLiked(!isLiked);
     setLikes(isLiked ? likes - 1 : likes + 1);
     if (onLike) {

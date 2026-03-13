@@ -8,6 +8,7 @@ import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { useSearchParams } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface PostContentViewerProps {
   postId: string;
@@ -19,6 +20,7 @@ interface PostContentViewerProps {
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPostLoaded }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [post, setPost] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -161,7 +163,8 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
   }, [post, authorProfile]);
 
   const handlePostLike = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'like', surface: 'post_detail', postId: post?.id })) return;
+    if (!post) return;
     
     try {
       if (post.is_liked) {
@@ -193,7 +196,8 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
   };
   
   const handlePostSave = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'save', surface: 'post_detail', postId: post?.id })) return;
+    if (!post) return;
     
     try {
       if (post.is_saved) {

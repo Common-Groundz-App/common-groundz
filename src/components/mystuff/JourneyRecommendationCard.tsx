@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { savedInsightsService } from '@/services/savedInsightsService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface JourneyRecommendationCardProps {
   recommendation: JourneyRecommendation;
@@ -21,6 +22,7 @@ const JourneyRecommendationCard: React.FC<JourneyRecommendationCardProps> = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { fromEntity, toEntity, transitionType, story, confidence, consensusCount } = recommendation;
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -65,14 +67,7 @@ const JourneyRecommendationCard: React.FC<JourneyRecommendationCardProps> = ({
   const handleBookmark = async (e: React.MouseEvent) => {
     e.stopPropagation();
     
-    if (!user) {
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to save insights',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!requireAuth({ action: 'save_insight', surface: 'journey_card' })) return;
 
     setIsSaving(true);
     try {

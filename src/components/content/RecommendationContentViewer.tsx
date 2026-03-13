@@ -8,6 +8,7 @@ import CommentDialog from '@/components/comments/CommentDialog';
 import { Shell } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface RecommendationContentViewerProps {
   recommendationId: string;
@@ -24,6 +25,7 @@ const RecommendationContentViewer = ({
 }: RecommendationContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [recommendation, setRecommendation] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -144,7 +146,8 @@ const RecommendationContentViewer = ({
   }, [recommendation, authorProfile]);
 
   const handleRecommendationLike = async () => {
-    if (!user || !recommendation) return;
+    if (!requireAuth({ action: 'like', surface: 'recommendation_detail', recommendationId: recommendation?.id, entityName: recommendation?.entity?.name })) return;
+    if (!recommendation) return;
     
     try {
       if (recommendation.isLiked) {

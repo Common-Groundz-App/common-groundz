@@ -12,6 +12,7 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +63,7 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+  const { requireAuth } = useAuthPrompt();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -139,7 +141,8 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   };
 
   const handleLikeClick = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'like', surface: 'profile_post_item', postId: post?.id })) return;
+    if (!post) return;
     
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
@@ -171,7 +174,8 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   };
   
   const handleSaveClick = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'save', surface: 'profile_post_item', postId: post?.id })) return;
+    if (!post) return;
     
     try {
       if (localIsSaved) {

@@ -1,60 +1,52 @@
 
+# Auth Prompt Modal System — FULLY IMPLEMENTED
 
-# Complete Guest Auth Prompt Migration — Final Plan
+## Status: ✅ Phase 1 + Phase 2 Complete
 
-## Problem
-Guest users on public pages experience broken interactions: Like/Save buttons do nothing (silent `if (!user) return`), comment input is disabled with no feedback, and some flows still show legacy "Sign in required" toasts.
+Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
 
-## Scope: 11 Files
+## Architecture
 
-### 1. `src/contexts/AuthPromptContext.tsx`
-Add `postId?: string` and `recommendationId?: string` to `AuthPromptConfig`. Pass them to `trackGuestEvent`.
+- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
+- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
+- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
+- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
 
-### 2. `src/components/auth/AuthPromptModal.tsx`
-- Add 3 ACTION_COPY entries: `save_insight`, `create_post`, `create_entity`
-- Include `postId`/`recommendationId` in `analyticsPayload`
+## Files Created (4)
 
-### 3–4. `src/components/content/PostContentViewer.tsx` and `RecommendationContentViewer.tsx`
-Replace `if (!user || !post) return` / `if (!user || !recommendation) return` in like/save handlers with:
-```ts
-if (!requireAuth({ action: 'like', surface: 'post_detail', postId: post?.id })) return;
-if (!post) return;
-```
+1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
+2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
+3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
+4. `src/hooks/useAuthPrompt.ts` — Thin re-export
 
-### 5. `src/components/feed/PostFeedItem.tsx`
-Guard `handleLikeClick` and `handleSaveClick` with `requireAuth()`. Leave `handleDeleteConfirm` unchanged (owner-only).
+## Phase 1 — Files Modified (10)
 
-### 6. `src/components/profile/ProfilePostItem.tsx`
-Same pattern as PostFeedItem for like/save. Leave delete unchanged.
+1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
+2. `src/components/entity/EntityFollowButton.tsx` — follow
+3. `src/hooks/use-entity-save.ts` — save
+4. `src/hooks/use-optimistic-interactions.ts` — like/save
+5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
+6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
+7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
+8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
+9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
+10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
 
-### 7. `src/components/recommendations/RecommendationCard.tsx`
-Guard `handleLike` with `requireAuth()`. Leave `handleDelete` unchanged.
+## Phase 2 — Files Modified (5)
 
-### 8. `src/components/feed/RecommendationFeedItem.tsx`
-Add `requireAuth()` as first line of `handleLike` (before email verification check), with `recommendationId`.
+| File | Action | Surface |
+|---|---|---|
+| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
+| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
+| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
 
-### 9. `src/components/comments/CommentDialog.tsx`
-- Remove `!user` from textarea and send button `disabled` props
-- Add `hasPromptedRef = useRef(false)` (reset on dialog open)
-- Add `onFocus` on textarea: if guest and not yet prompted, call `requireAuth()`, blur, set ref true
-- Existing `requireAuth` in `handleAddComment` (line 132) serves as send-button safety net
+## Verification
 
-### 10. `src/hooks/use-saved-insights.ts`
-Replace "Sign in required" toast with `requireAuth({ action: 'save_insight', surface: 'saved_insights' })`.
+Searched `"Authentication required"` across `src/` — remaining hits are only:
+- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
+- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
+- Edge function auth errors (use-entity-refresh)
 
-### 11. `src/components/mystuff/JourneyRecommendationCard.tsx`
-Replace "Sign in required" toast with `requireAuth({ action: 'save_insight', surface: 'journey_card' })`.
-
-## Implementation Rules
-1. `requireAuth()` is always the **first line** in every handler — before analytics, optimistic updates, or email verification
-2. Null-safety (`if (!post) return`) comes **after** the auth guard
-3. Pass `postId`/`recommendationId`/`entityId`/`entityName` where available
-4. Existing `isOpen` guard in AuthPromptProvider prevents duplicate modals on rapid clicks
-5. `hasPromptedRef` in CommentDialog prevents repeated popups on dismiss + refocus
-
-## Not Changed (intentionally)
-- Admin routes (`AdminEntityManagementPanel`, `AdminEntityEdit`)
-- Protected routes (`Feed.tsx`, `FeedForYou.tsx`, `CreateEntityDialog`, etc.)
-- Owner-only actions (`handleDeleteConfirm` in PostFeedItem/RecommendationCard/ProfilePostItem)
-- `handleEditSave`/`handleDeleteConfirm` in CommentDialog (already behind auth)
-
+No public interaction toasts remain. Migration complete.

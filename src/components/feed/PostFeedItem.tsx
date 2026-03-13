@@ -17,6 +17,7 @@ import UsernameLink from '@/components/common/UsernameLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +65,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const { user } = useAuth();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+  const { requireAuth } = useAuthPrompt();
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(false);
   const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(!!highlightCommentId);
@@ -93,7 +95,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   }, [post.id, post.comment_count]);
 
   const handleLikeClick = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'like', surface: 'post_feed_item', postId: post?.id })) return;
+    if (!post) return;
     
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
@@ -132,7 +135,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   };
   
   const handleSaveClick = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'save', surface: 'post_feed_item', postId: post?.id })) return;
+    if (!post) return;
     
     try {
       if (localIsSaved) {

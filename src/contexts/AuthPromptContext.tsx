@@ -7,6 +7,8 @@ export interface AuthPromptConfig {
   action: string;
   entityName?: string;
   entityId?: string;
+  postId?: string;
+  recommendationId?: string;
   description?: string;
   surface: string;
 }
@@ -36,6 +38,8 @@ export const AuthPromptProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       action: cfg.action,
       entityId: cfg.entityId,
       entityName: cfg.entityName,
+      postId: cfg.postId,
+      recommendationId: cfg.recommendationId,
       surface: cfg.surface,
     });
   }, [isOpen]);

@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { savedInsightsService, SavedInsight, SaveInsightParams } from '@/services/savedInsightsService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 export function useSavedInsights() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [insights, setInsights] = useState<SavedInsight[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -32,14 +34,7 @@ export function useSavedInsights() {
   }, [fetchInsights]);
 
   const saveInsight = async (params: SaveInsightParams) => {
-    if (!user) {
-      toast({
-        title: 'Sign in required',
-        description: 'Please sign in to save insights',
-        variant: 'destructive',
-      });
-      return null;
-    }
+    if (!requireAuth({ action: 'save_insight', surface: 'saved_insights' })) return null;
 
     try {
       const saved = await savedInsightsService.saveInsight(params);

@@ -49,6 +49,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   
   const commentToDeleteRef = useRef<string | null>(null);
+  const hasPromptedRef = useRef(false);
   
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
@@ -96,6 +97,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
       }, 300);
       return () => clearTimeout(timeout);
     } else {
+      hasPromptedRef.current = false;
       if (!initialLoadDone) {
         setInitialLoadDone(false);
       }
@@ -518,15 +520,23 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                   placeholder="Add a comment..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  disabled={!user || isSending}
+                  disabled={isSending}
                   className="min-h-[60px] pr-10 resize-none bg-gray-50 border border-gray-200 focus:border-primary focus:ring-0 focus-visible:ring-0 rounded-lg"
+                  onFocus={() => {
+                    if (!user && !hasPromptedRef.current) {
+                      hasPromptedRef.current = true;
+                      if (!requireAuth({ action: 'comment', surface: 'comment_dialog' })) {
+                        (document.activeElement as HTMLElement)?.blur();
+                      }
+                    }
+                  }}
                 />
                 <Button
                   size="icon"
                   variant="ghost"
                   className="absolute right-2 bottom-2 text-primary hover:text-primary hover:bg-primary/10"
                   onClick={handleAddComment}
-                  disabled={!newComment.trim() || isSending || !user}
+                  disabled={!newComment.trim() || isSending}
                 >
                   <Send size={18} className={isSending ? "animate-pulse" : ""} />
                   <span className="sr-only">Send comment</span>
