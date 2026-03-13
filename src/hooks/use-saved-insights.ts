@@ -7,6 +7,7 @@ import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 export function useSavedInsights() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [insights, setInsights] = useState<SavedInsight[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
