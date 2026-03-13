@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { savedInsightsService } from '@/services/savedInsightsService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface JourneyRecommendationCardProps {
   recommendation: JourneyRecommendation;
