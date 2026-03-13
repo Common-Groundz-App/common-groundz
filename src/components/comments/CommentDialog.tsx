@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -507,29 +508,28 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
               )}
             </ScrollArea>
             
-            <Separator className="my-3" />
-            
-            <div className="relative flex gap-2 items-start">
-              <Avatar className="h-8 w-8 mt-1">
-                {user ? (
-                  <>
-                    <AvatarImage src={userProfile?.avatar_url} />
-                    <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
-                  </>
-                ) : (
-                  <AvatarFallback className="bg-muted text-muted-foreground">
-                    <User className="h-4 w-4" />
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <div className="flex-1 relative">
+            <div className="border-t border-border pt-3">
+              <div className="flex gap-3 items-center">
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  {user ? (
+                    <>
+                      <AvatarImage src={userProfile?.avatar_url} />
+                      <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
+                    </>
+                  ) : (
+                    <AvatarFallback className="bg-muted text-muted-foreground">
+                      <User className="h-4 w-4" />
+                    </AvatarFallback>
+                  )}
+                </Avatar>
                 <Textarea
                   ref={textareaRef}
                   placeholder="Add a comment..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   disabled={isSending}
-                  className="min-h-[60px] pr-10 resize-none bg-gray-50 border border-gray-200 focus:border-primary focus:ring-0 focus-visible:ring-0 rounded-lg"
+                  rows={1}
+                  className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
                   onFocus={() => {
                     if (!user) {
                       setNewComment('');
@@ -540,12 +540,16 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                 />
                 <Button
                   size="icon"
-                  variant="ghost"
-                  className="absolute right-2 bottom-2 text-primary hover:text-primary hover:bg-primary/10"
+                  className={cn(
+                    "rounded-full h-8 w-8 flex-shrink-0 transition-colors",
+                    newComment.trim()
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-muted text-muted-foreground"
+                  )}
                   onClick={handleAddComment}
                   disabled={!newComment.trim() || isSending}
                 >
-                  <Send size={18} className={isSending ? "animate-pulse" : ""} />
+                  <Send size={16} className={isSending ? "animate-pulse" : ""} />
                   <span className="sr-only">Send comment</span>
                 </Button>
               </div>
