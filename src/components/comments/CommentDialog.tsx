@@ -12,7 +12,7 @@ import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { formatDistanceToNow } from 'date-fns';
 import { fetchComments, addComment, deleteComment, updateComment, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, MessageCircle, Send, X } from 'lucide-react';
+import { MoreHorizontal, MessageCircle, Send, X, User } from 'lucide-react';
 import { fetchUserProfile } from '@/services/profileService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import UsernameLink from '@/components/common/UsernameLink';
@@ -511,8 +511,16 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
             
             <div className="relative flex gap-2 items-start">
               <Avatar className="h-8 w-8 mt-1">
-                <AvatarImage src={userProfile?.avatar_url} />
-                <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
+                {user ? (
+                  <>
+                    <AvatarImage src={userProfile?.avatar_url} />
+                    <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
+                  </>
+                ) : (
+                  <AvatarFallback className="bg-muted text-muted-foreground">
+                    <User className="h-4 w-4" />
+                  </AvatarFallback>
+                )}
               </Avatar>
               <div className="flex-1 relative">
                 <Textarea
