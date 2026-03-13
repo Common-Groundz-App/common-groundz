@@ -22,6 +22,7 @@ const JourneyRecommendationCard: React.FC<JourneyRecommendationCardProps> = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const { fromEntity, toEntity, transitionType, story, confidence, consensusCount } = recommendation;
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
