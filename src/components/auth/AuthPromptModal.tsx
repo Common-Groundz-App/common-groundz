@@ -25,6 +25,9 @@ const ACTION_COPY: Record<string, { verb: string; description: string }> = {
   suggest_edit: { verb: 'suggest edits', description: 'Help keep information accurate.' },
   upload_media: { verb: 'add photos', description: 'Share your photos with the community.' },
   timeline: { verb: 'start a timeline', description: 'Track how your experience evolves over time.' },
+  save_insight: { verb: 'save this', description: 'Keep track of insights that matter to you.' },
+  create_post: { verb: 'create a post', description: 'Share your thoughts with the community.' },
+  create_entity: { verb: 'add a place', description: 'Help the community discover new places.' },
   generic: { verb: 'continue', description: 'Unlock all features on Common Groundz.' },
 };
 
