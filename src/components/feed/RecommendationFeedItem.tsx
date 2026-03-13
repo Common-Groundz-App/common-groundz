@@ -11,6 +11,7 @@ import { fetchCommentCount } from '@/services/commentsService';
 import UsernameLink from '@/components/common/UsernameLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
   DropdownMenu,
   DropdownMenuContent,
