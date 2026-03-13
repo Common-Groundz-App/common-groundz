@@ -13,7 +13,7 @@ import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { formatDistanceToNow } from 'date-fns';
 import { fetchComments, addComment, deleteComment, updateComment, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, MessageCircle, Send, X, User } from 'lucide-react';
+import { MoreHorizontal, MessageCircle, ArrowUp, X, User } from 'lucide-react';
 import { fetchUserProfile } from '@/services/profileService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import UsernameLink from '@/components/common/UsernameLink';
