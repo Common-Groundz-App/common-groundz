@@ -1,55 +1,52 @@
 
+# Auth Prompt Modal System — FULLY IMPLEMENTED
 
-# Fix: AuthPromptModal z-index for nested dialog stacking
+## Status: ✅ Phase 1 + Phase 2 Complete
 
-## What's happening
-The `AuthPromptModal` uses `AlertDialogContent` which renders overlay and content at `z-50`. The `CommentDialog` is at `z-[101]`. So the auth modal opens *behind* the comment dialog — darkening the screen but invisible and trapping focus.
+Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
 
-## Fix (1 file)
+## Architecture
 
-**`src/components/auth/AuthPromptModal.tsx`**
+- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
+- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
+- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
+- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
 
-Replace the `AlertDialogContent` import with the lower-level primitives (`AlertDialogPortal`, `AlertDialogOverlay`) and manually compose them with elevated z-indexes:
+## Files Created (4)
 
-- Import `AlertDialogPortal`, `AlertDialogOverlay` alongside existing imports
-- Replace `<AlertDialogContent className="...">` with:
-  ```tsx
-  <AlertDialogPortal>
-    <AlertDialogOverlay className="fixed inset-0 z-[109] bg-black/50 ..." />
-    <div className="fixed left-[50%] top-[50%] z-[110] ... (same animation/positioning classes as AlertDialogContent)" role="alertdialog">
-  ```
-  Wait — actually simpler: just keep `AlertDialogContent` but pass explicit z-index classes to both the overlay and content. Looking at `alert-dialog.tsx`, the `AlertDialogContent` component internally renders `AlertDialogOverlay` with no way to pass it a custom className.
+1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
+2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
+3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
+4. `src/hooks/useAuthPrompt.ts` — Thin re-export
 
-  So the correct approach: **stop using the compound `AlertDialogContent`** and manually compose the portal:
+## Phase 1 — Files Modified (10)
 
-```tsx
-import {
-  AlertDialog,
-  AlertDialogPortal,
-  AlertDialogOverlay,
-  AlertDialogTitle,
-  AlertDialogDescription,
-} from '@/components/ui/alert-dialog';
-import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
-```
+1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
+2. `src/components/entity/EntityFollowButton.tsx` — follow
+3. `src/hooks/use-entity-save.ts` — save
+4. `src/hooks/use-optimistic-interactions.ts` — like/save
+5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
+6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
+7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
+8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
+9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
+10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
 
-Then in the JSX, replace line 83-138 with:
-```tsx
-<AlertDialogPortal>
-  <AlertDialogOverlay className="z-[109]" />
-  <AlertDialogPrimitive.Content
-    className="fixed left-[50%] top-[50%] z-[110] grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] border bg-background shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg w-[90vw] p-0 gap-0 overflow-hidden"
-  >
-    {/* ... all existing children unchanged ... */}
-  </AlertDialogPrimitive.Content>
-</AlertDialogPortal>
-```
+## Phase 2 — Files Modified (5)
 
-This preserves all accessibility attributes (Radix's `AlertDialogPrimitive.Content` handles `role="alertdialog"`, focus trap, etc.) and all animation classes from the original `AlertDialogContent`, while elevating both overlay and content above any other dialog.
+| File | Action | Surface |
+|---|---|---|
+| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
+| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
+| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
 
-## Regarding ChatGPT's z-index constants suggestion
-Nice idea in theory but premature — there are only 3 dialog layers today. Not worth adding abstraction now; a comment documenting the hierarchy is sufficient.
+## Verification
 
-## Regarding Codex's accessibility note
-Valid — using `AlertDialogPrimitive.Content` (not a raw `div`) preserves all Radix accessibility and focus-trap behavior. The animation classes are copied from the existing `AlertDialogContent` component. No regression.
+Searched `"Authentication required"` across `src/` — remaining hits are only:
+- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
+- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
+- Edge function auth errors (use-entity-refresh)
 
+No public interaction toasts remain. Migration complete.
