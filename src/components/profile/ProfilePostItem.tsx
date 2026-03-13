@@ -12,6 +12,7 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
   DropdownMenu,
   DropdownMenuContent,
