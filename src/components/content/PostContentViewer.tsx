@@ -20,6 +20,7 @@ interface PostContentViewerProps {
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPostLoaded }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { requireAuth } = useAuthPrompt();
   const [post, setPost] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
