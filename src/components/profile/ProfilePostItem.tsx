@@ -141,7 +141,8 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   };
 
   const handleLikeClick = async () => {
-    if (!user || !post) return;
+    if (!requireAuth({ action: 'like', surface: 'profile_post_item', postId: post?.id })) return;
+    if (!post) return;
     
     // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
