@@ -7,6 +7,8 @@ export interface AuthPromptConfig {
   action: string;
   entityName?: string;
   entityId?: string;
+  postId?: string;
+  recommendationId?: string;
   description?: string;
   surface: string;
 }
