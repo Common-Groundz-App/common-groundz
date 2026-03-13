@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { savedInsightsService, SavedInsight, SaveInsightParams } from '@/services/savedInsightsService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 export function useSavedInsights() {
   const { user } = useAuth();
