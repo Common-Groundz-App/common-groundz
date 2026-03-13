@@ -47,6 +47,7 @@ const RecommendationCard = ({
 }: RecommendationCardProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { requireAuth } = useAuthPrompt();
   const [isLiked, setIsLiked] = useState(recommendation.isLiked || false);
   const [likes, setLikes] = useState(recommendation.likes || 0);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
