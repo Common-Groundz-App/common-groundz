@@ -8,6 +8,7 @@ import CommentDialog from '@/components/comments/CommentDialog';
 import { Shell } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
+import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 
 interface RecommendationContentViewerProps {
   recommendationId: string;
