@@ -49,7 +49,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   
   const commentToDeleteRef = useRef<string | null>(null);
-  const hasPromptedRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
@@ -97,7 +97,6 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
       }, 300);
       return () => clearTimeout(timeout);
     } else {
-      hasPromptedRef.current = false;
       if (!initialLoadDone) {
         setInitialLoadDone(false);
       }
@@ -517,17 +516,17 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
               </Avatar>
               <div className="flex-1 relative">
                 <Textarea
+                  ref={textareaRef}
                   placeholder="Add a comment..."
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   disabled={isSending}
                   className="min-h-[60px] pr-10 resize-none bg-gray-50 border border-gray-200 focus:border-primary focus:ring-0 focus-visible:ring-0 rounded-lg"
                   onFocus={() => {
-                    if (!user && !hasPromptedRef.current) {
-                      hasPromptedRef.current = true;
-                      if (!requireAuth({ action: 'comment', surface: 'comment_dialog' })) {
-                        (document.activeElement as HTMLElement)?.blur();
-                      }
+                    if (!user) {
+                      setNewComment('');
+                      requireAuth({ action: 'comment', surface: 'comment_dialog' });
+                      textareaRef.current?.blur();
                     }
                   }}
                 />
