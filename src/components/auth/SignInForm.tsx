@@ -38,6 +38,7 @@ const SignInForm = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
   const [formError, setFormError] = useState('');
+  const [lastMethod] = useState(() => getLastAuthMethod());
   const navigate = useNavigate();
 
   // Clear inline error when user types
