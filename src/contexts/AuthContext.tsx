@@ -57,6 +57,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('User validated successfully');
           setSession(data.session);
           setUser(userData.user);
+
+          // Consume pending Google OAuth intent flag on initial load
+          // (the SIGNED_IN event fires before the listener is attached on OAuth return)
+          if (consumePendingGoogleAuth()) {
+            setLastAuthMethod('google');
+          }
         } else {
           console.log('No cached session found');
           setSession(null);
