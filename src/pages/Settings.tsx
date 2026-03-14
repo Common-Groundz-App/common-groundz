@@ -512,6 +512,7 @@ const Settings = () => {
                       <Button 
                         variant="outline" 
                         size="sm" 
+                        className="border-amber-500 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950"
                         onClick={handleLogoutAllDevices}
                         disabled={isLoggingOutAll}
                       >
