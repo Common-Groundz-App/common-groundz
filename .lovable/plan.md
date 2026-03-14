@@ -1,52 +1,47 @@
 
-# Auth Prompt Modal System — FULLY IMPLEMENTED
 
-## Status: ✅ Phase 1 + Phase 2 Complete
+# "Last Used" Auth Method Badge — Final Plan
 
-Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
+## New file: `src/lib/lastAuthMethod.ts`
+- `setLastAuthMethod(method: 'email' | 'google')` — stores `{ method, timestamp: Date.now() }` as JSON in localStorage key `cg_last_auth_method`
+- `getLastAuthMethod(): 'email' | 'google' | null` — parses stored JSON, returns `null` if:
+  - No value exists
+  - Older than 30 days
+  - `method` is not `'email'` or `'google'` (corruption guard)
 
-## Architecture
+## `src/contexts/AuthContext.tsx`
+- Import `setLastAuthMethod`
+- In the `onAuthStateChange` listener, when `event === 'SIGNED_IN'`:
+  - Check `currentSession?.user?.app_metadata?.provider`
+  - **Only** if provider is `'google'`, call `setLastAuthMethod('google')`
+  - This guards against overwriting email logins that also trigger `SIGNED_IN`
 
-- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
-- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
-- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
-- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
+## `src/components/auth/SignInForm.tsx`
+- Import `getLastAuthMethod` and `setLastAuthMethod`
+- On mount, read `getLastAuthMethod()` into state
+- After successful email login (before `navigate('/home')`), call `setLastAuthMethod('email')`
+- If `lastMethod === 'email'`, render a "Last used" badge inline next to the Sign In button
+- Pass `lastMethod === 'google'` as `showLastUsed` prop to `GoogleSignInButton`
 
-## Files Created (4)
+## `src/components/auth/GoogleSignInButton.tsx`
+- Add optional `showLastUsed?: boolean` prop
+- If true, render "Last used" badge inline after the button text
+- No localStorage logic in this component
 
-1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
-2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
-3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
-4. `src/hooks/useAuthPrompt.ts` — Thin re-export
+## `src/components/auth/SignUpForm.tsx`
+- Same pattern: read `getLastAuthMethod()` on mount, pass `showLastUsed` to `GoogleSignInButton`
 
-## Phase 1 — Files Modified (10)
+## Badge styling
+```tsx
+<span className="text-[10px] font-medium text-brand-orange border border-brand-orange/50 rounded-full px-2 py-0.5">
+  Last used
+</span>
+```
 
-1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
-2. `src/components/entity/EntityFollowButton.tsx` — follow
-3. `src/hooks/use-entity-save.ts` — save
-4. `src/hooks/use-optimistic-interactions.ts` — like/save
-5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
-6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
-7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
-8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
-9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
-10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
+## Summary of refinements incorporated
+- Store only after confirmed auth success (not on click)
+- 30-day TTL expiry
+- Provider guard in AuthContext (only write `'google'` when provider is Google)
+- Corruption guard in `getLastAuthMethod()`
+- No method reordering (badge only)
 
-## Phase 2 — Files Modified (5)
-
-| File | Action | Surface |
-|---|---|---|
-| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
-| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
-| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
-| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
-| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
-
-## Verification
-
-Searched `"Authentication required"` across `src/` — remaining hits are only:
-- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
-- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
-- Edge function auth errors (use-entity-refresh)
-
-No public interaction toasts remain. Migration complete.
