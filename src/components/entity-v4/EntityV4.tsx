@@ -641,7 +641,7 @@ const EntityV4 = () => {
       <Footer />
       
       {/* Bottom Navigation */}
-      <BottomNavigation />
+      {user && <BottomNavigation />}
     </div>
   </TooltipProvider>;
 };
