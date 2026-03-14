@@ -3,11 +3,12 @@
  import { supabase } from '@/integrations/supabase/client';
  import { toast } from 'sonner';
  
- interface GoogleSignInButtonProps {
-   className?: string;
- }
+interface GoogleSignInButtonProps {
+  className?: string;
+  showLastUsed?: boolean;
+}
  
- const GoogleSignInButton = ({ className }: GoogleSignInButtonProps) => {
+ const GoogleSignInButton = ({ className, showLastUsed }: GoogleSignInButtonProps) => {
    const [isLoading, setIsLoading] = useState(false);
  
    const handleGoogleSignIn = async () => {
@@ -61,8 +62,13 @@
            />
          </svg>
        )}
-       {isLoading ? 'Signing in...' : 'Continue with Google'}
-     </Button>
+        {isLoading ? 'Signing in...' : 'Continue with Google'}
+        {showLastUsed && !isLoading && (
+          <span className="text-[10px] font-medium text-brand-orange border border-brand-orange/50 rounded-full px-2 py-0.5 ml-1">
+            Last used
+          </span>
+        )}
+      </Button>
    );
  };
  
