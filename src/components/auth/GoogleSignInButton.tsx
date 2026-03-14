@@ -3,9 +3,10 @@
  import { supabase } from '@/integrations/supabase/client';
  import { toast } from 'sonner';
  
- interface GoogleSignInButtonProps {
-   className?: string;
- }
+interface GoogleSignInButtonProps {
+  className?: string;
+  showLastUsed?: boolean;
+}
  
  const GoogleSignInButton = ({ className }: GoogleSignInButtonProps) => {
    const [isLoading, setIsLoading] = useState(false);
