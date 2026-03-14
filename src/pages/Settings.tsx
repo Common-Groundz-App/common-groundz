@@ -503,7 +503,7 @@ const Settings = () => {
                     
                     <div>
                       <h3 className="text-lg font-medium flex items-center gap-2">
-                        <LogOut className="h-4 w-4" />
+                        <Monitor className="h-4 w-4" />
                         Active Sessions
                       </h3>
                       <p className="text-sm text-muted-foreground mb-2">
