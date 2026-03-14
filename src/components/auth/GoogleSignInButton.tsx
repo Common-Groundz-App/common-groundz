@@ -12,11 +12,12 @@ interface GoogleSignInButtonProps {
  const GoogleSignInButton = ({ className, showLastUsed }: GoogleSignInButtonProps) => {
    const [isLoading, setIsLoading] = useState(false);
  
-   const handleGoogleSignIn = async () => {
-     setIsLoading(true);
-     
-     try {
-       const { error } = await supabase.auth.signInWithOAuth({
+    const handleGoogleSignIn = async () => {
+      setIsLoading(true);
+      setPendingGoogleAuth();
+      
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
          provider: 'google',
          options: {
            redirectTo: `${window.location.origin}/`,
