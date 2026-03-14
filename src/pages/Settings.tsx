@@ -9,7 +9,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { TubelightTabs } from '@/components/ui/tubelight-tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Bell, User, Shield, Palette, MapPin, Info, AlertTriangle, Mail, Route, Sparkles, Download, Key, LogOut, CheckCircle2, XCircle } from 'lucide-react';
+import { Bell, User, Shield, Palette, MapPin, Info, AlertTriangle, Mail, Route, Sparkles, Download, Key, LogOut, Monitor, CheckCircle2, XCircle } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
