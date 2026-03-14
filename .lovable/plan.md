@@ -1,52 +1,26 @@
+# Add Settings Gear Icon to Profile Card (Mobile/Tablet)
 
-# Auth Prompt Modal System — FULLY IMPLEMENTED
+## Change
 
-## Status: ✅ Phase 1 + Phase 2 Complete
+**File**: `src/components/profile/ProfileCard.tsx`
 
-Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
+Add a Settings gear icon button positioned at the top-right corner of the profile card. It will:
 
-## Architecture
+- Only render when `isOwnProfile` is true
+- Only be visible on mobile/tablet (`xl:hidden`) — the screens where bottom navigation is used
+- Navigate to `/settings` on click
+- Use Lucide's `Settings` icon with ghost styling, matching the existing edit button's visual treatment
 
-- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
-- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
-- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
-- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
+**Placement**: Inside the `<Card>` element, as an absolutely positioned button at `top-right`, before the card content. This keeps it out of the flow and avoids cluttering the centered layout.
 
-## Files Created (4)
+```tsx
+{isOwnProfile && (
+  <Link to="/settings" className="absolute top-4 right-4 xl:hidden z-10">
+    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-60 hover:opacity-100">
+      <Settings size={18} />
+    </Button>
+  </Link>
+)}
+```
 
-1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
-2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
-3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
-4. `src/hooks/useAuthPrompt.ts` — Thin re-export
-
-## Phase 1 — Files Modified (10)
-
-1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
-2. `src/components/entity/EntityFollowButton.tsx` — follow
-3. `src/hooks/use-entity-save.ts` — save
-4. `src/hooks/use-optimistic-interactions.ts` — like/save
-5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
-6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
-7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
-8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
-9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
-10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
-
-## Phase 2 — Files Modified (5)
-
-| File | Action | Surface |
-|---|---|---|
-| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
-| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
-| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
-| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
-| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
-
-## Verification
-
-Searched `"Authentication required"` across `src/` — remaining hits are only:
-- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
-- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
-- Edge function auth errors (use-entity-refresh)
-
-No public interaction toasts remain. Migration complete.
+Imports to add: `Settings` from `lucide-react`, `Link` from `react-router-dom`.
