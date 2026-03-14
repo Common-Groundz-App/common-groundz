@@ -4,7 +4,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType } from '@/types/auth';
 import { toast } from '@/hooks/use-toast';
-import { setLastAuthMethod } from '@/lib/lastAuthMethod';
+import { setLastAuthMethod, consumePendingGoogleAuth } from '@/lib/lastAuthMethod';
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
