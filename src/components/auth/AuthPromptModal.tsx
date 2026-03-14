@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import Logo from '@/components/Logo';
 import { buildAuthUrl } from '@/utils/authUrlBuilder';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import type { AuthPromptConfig } from '@/contexts/AuthPromptContext';
@@ -88,6 +89,9 @@ const AuthPromptModal: React.FC<AuthPromptModalProps> = ({ isOpen, config, onClo
         <AlertDialogPrimitive.Content
           className="fixed left-[50%] top-[50%] z-[110] grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] border bg-background shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg w-[90vw] p-0 gap-0 overflow-hidden"
         >
+        {/* Brand accent bar */}
+        <div className="h-[2px] bg-brand-orange/80 w-full" />
+
         {/* Close button */}
         <button
           onClick={handleDismiss}
@@ -97,7 +101,10 @@ const AuthPromptModal: React.FC<AuthPromptModalProps> = ({ isOpen, config, onClo
           <X className="h-4 w-4" />
         </button>
 
-        <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
+        <div className="px-6 pt-6 pb-6 flex flex-col items-center text-center gap-4">
+          {/* Brand logo */}
+          <Logo size="sm" className="h-6" />
+
           {/* Title */}
           <AlertDialogTitle className="text-xl font-semibold leading-tight">
             {title}
