@@ -13,6 +13,7 @@ import TurnstileWidget from './TurnstileWidget';
 import { signUpViaGateway, formatRateLimitError } from '@/lib/authGateway';
 import GoogleSignInButton from './GoogleSignInButton';
 import { Separator } from '@/components/ui/separator';
+import { getLastAuthMethod } from '@/lib/lastAuthMethod';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface SignUpFormProps {
