@@ -38,3 +38,39 @@ export function getLastAuthMethod(): AuthMethod | null {
     return null;
   }
 }
+
+// --- Pending Google OAuth intent flag ---
+const PENDING_KEY = 'cg_pending_google_auth';
+const PENDING_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+export function setPendingGoogleAuth(): void {
+  try {
+    window.localStorage.setItem(PENDING_KEY, JSON.stringify({ timestamp: Date.now() }));
+  } catch {
+    // silently ignore
+  }
+}
+
+export function consumePendingGoogleAuth(): boolean {
+  try {
+    const raw = window.localStorage.getItem(PENDING_KEY);
+    if (!raw) return false;
+
+    window.localStorage.removeItem(PENDING_KEY);
+
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > PENDING_TTL_MS) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function clearPendingGoogleAuth(): void {
+  try {
+    window.localStorage.removeItem(PENDING_KEY);
+  } catch {
+    // silently ignore
+  }
+}

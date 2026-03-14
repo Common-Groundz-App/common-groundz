@@ -13,7 +13,7 @@ import { loginViaGateway, formatRateLimitError } from '@/lib/authGateway';
 import { supabase } from '@/integrations/supabase/client';
 import GoogleSignInButton from './GoogleSignInButton';
 import { Separator } from '@/components/ui/separator';
-import { getLastAuthMethod, setLastAuthMethod } from '@/lib/lastAuthMethod';
+import { getLastAuthMethod, setLastAuthMethod, clearPendingGoogleAuth } from '@/lib/lastAuthMethod';
 
 const getFriendlyAuthError = (message: string): string => {
   const lower = message.toLowerCase();
@@ -40,6 +40,11 @@ const SignInForm = () => {
   const [formError, setFormError] = useState('');
   const [lastMethod] = useState(() => getLastAuthMethod());
   const navigate = useNavigate();
+
+  // Clear any stale pending Google auth flag on mount
+  useEffect(() => {
+    clearPendingGoogleAuth();
+  }, []);
 
   // Clear inline error when user types
   useEffect(() => {
@@ -196,7 +201,7 @@ const SignInForm = () => {
                 ? 'Signing In...' 
                 : 'Sign In'}
             {lastMethod === 'email' && !isLoading && retryCountdown === null && (
-              <span className="text-[10px] font-medium text-brand-orange border border-brand-orange/50 rounded-full px-2 py-0.5 ml-1">
+              <span className="text-[10px] font-medium text-white border border-white/50 rounded-full px-2 py-0.5 ml-1">
                 Last used
               </span>
             )}

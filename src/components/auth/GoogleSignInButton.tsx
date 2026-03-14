@@ -1,7 +1,8 @@
  import React, { useState } from 'react';
  import { Button } from '@/components/ui/button';
- import { supabase } from '@/integrations/supabase/client';
- import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { setPendingGoogleAuth, clearPendingGoogleAuth } from '@/lib/lastAuthMethod';
  
 interface GoogleSignInButtonProps {
   className?: string;
@@ -11,11 +12,12 @@ interface GoogleSignInButtonProps {
  const GoogleSignInButton = ({ className, showLastUsed }: GoogleSignInButtonProps) => {
    const [isLoading, setIsLoading] = useState(false);
  
-   const handleGoogleSignIn = async () => {
-     setIsLoading(true);
-     
-     try {
-       const { error } = await supabase.auth.signInWithOAuth({
+    const handleGoogleSignIn = async () => {
+      setIsLoading(true);
+      setPendingGoogleAuth();
+      
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
          provider: 'google',
          options: {
            redirectTo: `${window.location.origin}/`,
@@ -25,11 +27,12 @@ interface GoogleSignInButtonProps {
        if (error) {
          throw error;
        }
-     } catch (error: any) {
-       console.error('Google sign-in error:', error);
-       toast.error(error.message || 'Failed to sign in with Google');
-       setIsLoading(false);
-     }
+      } catch (error: any) {
+        console.error('Google sign-in error:', error);
+        clearPendingGoogleAuth();
+        toast.error(error.message || 'Failed to sign in with Google');
+        setIsLoading(false);
+      }
    };
  
    return (
