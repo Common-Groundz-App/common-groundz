@@ -92,6 +92,7 @@ const SignInForm = () => {
         if (sessionError) throw sessionError;
       }
       
+      setLastAuthMethod('email');
       toast.success('Successfully signed in!');
       navigate('/home');
     } catch (error: any) {
