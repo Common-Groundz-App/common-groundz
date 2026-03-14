@@ -8,7 +8,7 @@ interface GoogleSignInButtonProps {
   showLastUsed?: boolean;
 }
  
- const GoogleSignInButton = ({ className }: GoogleSignInButtonProps) => {
+ const GoogleSignInButton = ({ className, showLastUsed }: GoogleSignInButtonProps) => {
    const [isLoading, setIsLoading] = useState(false);
  
    const handleGoogleSignIn = async () => {
