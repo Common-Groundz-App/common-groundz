@@ -238,7 +238,7 @@ const EntityDetailOriginal = () => {
           </div>
         </div>
         <Footer />
-        <BottomNavigation />
+        {user && <BottomNavigation />}
       </div>
     );
   }
