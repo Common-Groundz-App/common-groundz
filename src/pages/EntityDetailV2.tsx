@@ -195,7 +195,7 @@ const EntityDetailV2 = () => {
           </div>
         </div>
         <Footer />
-        <BottomNavigation />
+        {user && <BottomNavigation />}
       </div>
     );
   }
