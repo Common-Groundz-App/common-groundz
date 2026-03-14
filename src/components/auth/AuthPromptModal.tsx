@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import Logo from '@/components/Logo';
 import { buildAuthUrl } from '@/utils/authUrlBuilder';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
 import type { AuthPromptConfig } from '@/contexts/AuthPromptContext';
