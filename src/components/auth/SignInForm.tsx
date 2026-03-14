@@ -41,6 +41,11 @@ const SignInForm = () => {
   const [lastMethod] = useState(() => getLastAuthMethod());
   const navigate = useNavigate();
 
+  // Clear any stale pending Google auth flag on mount
+  useEffect(() => {
+    clearPendingGoogleAuth();
+  }, []);
+
   // Clear inline error when user types
   useEffect(() => {
     if (formError) setFormError('');
