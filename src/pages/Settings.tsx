@@ -515,7 +515,22 @@ const Settings = () => {
                         onClick={handleLogoutAllDevices}
                         disabled={isLoggingOutAll}
                       >
-                        {isLoggingOutAll ? 'Logging out...' : 'Logout from all devices'}
+                      {isLoggingOutAll ? 'Logging out...' : 'Logout from all devices'}
+                      </Button>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div>
+                      <h3 className="text-lg font-medium flex items-center gap-2">
+                        <LogOut className="h-4 w-4" />
+                        Log Out
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        Sign out of your account on this device.
+                      </p>
+                      <Button variant="outline" size="sm" onClick={signOut}>
+                        Log Out
                       </Button>
                     </div>
                   </CardContent>
