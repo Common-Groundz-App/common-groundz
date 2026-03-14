@@ -13,7 +13,7 @@ import { loginViaGateway, formatRateLimitError } from '@/lib/authGateway';
 import { supabase } from '@/integrations/supabase/client';
 import GoogleSignInButton from './GoogleSignInButton';
 import { Separator } from '@/components/ui/separator';
-import { getLastAuthMethod, setLastAuthMethod } from '@/lib/lastAuthMethod';
+import { getLastAuthMethod, setLastAuthMethod, clearPendingGoogleAuth } from '@/lib/lastAuthMethod';
 
 const getFriendlyAuthError = (message: string): string => {
   const lower = message.toLowerCase();
