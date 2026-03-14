@@ -195,7 +195,7 @@ const EntityDetailV2 = () => {
           </div>
         </div>
         <Footer />
-        <BottomNavigation />
+        {user && <BottomNavigation />}
       </div>
     );
   }
@@ -208,7 +208,7 @@ const EntityDetailV2 = () => {
           <EntityDetailSkeleton />
         </div>
         <Footer />
-        <BottomNavigation />
+        {user && <BottomNavigation />}
       </div>
     );
   }
@@ -1093,7 +1093,7 @@ const EntityDetailV2 = () => {
       )}
       
       <Footer />
-      <BottomNavigation />
+      {user && <BottomNavigation />}
     </div>
   );
 };
