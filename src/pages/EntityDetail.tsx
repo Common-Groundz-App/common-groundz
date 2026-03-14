@@ -1026,7 +1026,7 @@ const EntityDetailOriginal = () => {
       )}
 
       <Footer />
-      <BottomNavigation />
+      {user && <BottomNavigation />}
     </div>
   );
 };

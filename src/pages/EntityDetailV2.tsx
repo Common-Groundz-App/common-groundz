@@ -1093,7 +1093,7 @@ const EntityDetailV2 = () => {
       )}
       
       <Footer />
-      <BottomNavigation />
+      {user && <BottomNavigation />}
     </div>
   );
 };
