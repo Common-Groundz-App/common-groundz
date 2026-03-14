@@ -13,24 +13,23 @@ import { useNavigate } from 'react-router-dom';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
 import { buildAuthUrl } from '@/utils/authUrlBuilder';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
-import { useTheme } from '@/contexts/ThemeContext';
 import type { AuthPromptConfig } from '@/contexts/AuthPromptContext';
 
 /** Copy mapping per action */
 const ACTION_COPY: Record<string, { verb: string; description: string }> = {
-  follow: { verb: 'follow', description: 'See what people in your circle recommend.' },
+  follow: { verb: 'follow', description: 'Get updates and see what your circle recommends.' },
   save: { verb: 'save', description: 'Build your personal collection.' },
-  like: { verb: 'like this', description: 'Show your appreciation and shape recommendations.' },
-  review: { verb: 'write a review', description: 'Share your experience with people you trust.' },
-  recommend: { verb: 'recommend', description: 'Help people you trust discover great things.' },
-  comment: { verb: 'join the conversation', description: 'Join the conversation with your circle.' },
+  like: { verb: 'like this', description: 'Show your appreciation to the community.' },
+  review: { verb: 'write a review', description: 'Share your experience with the community.' },
+  recommend: { verb: 'recommend', description: 'Help your circle discover great things.' },
+  comment: { verb: 'join the conversation', description: 'Share your thoughts with the community.' },
   claim: { verb: 'claim', description: 'Manage your business on Common Groundz.' },
   suggest_edit: { verb: 'suggest edits', description: 'Help keep information accurate.' },
   upload_media: { verb: 'add photos', description: 'Share your photos with the community.' },
   timeline: { verb: 'start a timeline', description: 'Track how your experience evolves over time.' },
   save_insight: { verb: 'save this', description: 'Keep track of insights that matter to you.' },
-  create_post: { verb: 'create a post', description: 'Share your thoughts with your circle.' },
-  create_entity: { verb: 'add a place', description: 'Help your circle discover new places.' },
+  create_post: { verb: 'create a post', description: 'Share your thoughts with the community.' },
+  create_entity: { verb: 'add a place', description: 'Help the community discover new places.' },
   generic: { verb: 'continue', description: 'Unlock all features on Common Groundz.' },
 };
 
@@ -42,17 +41,13 @@ interface AuthPromptModalProps {
 
 const AuthPromptModal: React.FC<AuthPromptModalProps> = ({ isOpen, config, onClose }) => {
   const navigate = useNavigate();
-  const { getThemedValue } = useTheme();
 
   if (!config) return null;
 
   const copy = ACTION_COPY[config.action] ?? ACTION_COPY.generic;
+  const entityLabel = config.entityName ? ` ${config.entityName}` : '';
+  const title = `Sign up to ${copy.verb}${entityLabel}`;
   const description = config.description || copy.description;
-
-  const logoSrc = getThemedValue(
-    "/lovable-uploads/87c43c69-609c-4783-9425-7a25bb42926e.png",
-    "/lovable-uploads/d4621fe6-4a75-45d1-a171-c55f4ad5fa28.png"
-  );
 
   const analyticsPayload = {
     action: config.action,
@@ -65,6 +60,7 @@ const AuthPromptModal: React.FC<AuthPromptModalProps> = ({ isOpen, config, onClo
 
   const handleGoogleClick = () => {
     trackGuestEvent('auth_prompt_google_clicked', analyticsPayload);
+    // GoogleSignInButton handles its own OAuth flow — modal stays open until redirect
   };
 
   const handleEmailClick = () => {
@@ -86,14 +82,12 @@ const AuthPromptModal: React.FC<AuthPromptModalProps> = ({ isOpen, config, onClo
 
   return (
     <AlertDialog open={isOpen} onOpenChange={(open) => !open && handleDismiss()}>
+      {/* z-[109]/z-[110] to stack above CommentDialog (z-[101]) and other dialogs */}
       <AlertDialogPortal>
         <AlertDialogOverlay className="z-[109]" />
         <AlertDialogPrimitive.Content
           className="fixed left-[50%] top-[50%] z-[110] grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] border bg-background shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg w-[90vw] p-0 gap-0 overflow-hidden"
         >
-        {/* Brand accent bar */}
-        <div className="h-[2px] bg-brand-orange/80 w-full" />
-
         {/* Close button */}
         <button
           onClick={handleDismiss}
@@ -103,30 +97,11 @@ const AuthPromptModal: React.FC<AuthPromptModalProps> = ({ isOpen, config, onClo
           <X className="h-4 w-4" />
         </button>
 
-        <div className="px-6 pt-6 pb-6 flex flex-col items-center text-center gap-4">
-          {/* Brand logo */}
-          <img
-            src={logoSrc}
-            alt="Common Groundz"
-            className="h-6 w-auto mx-auto mb-2"
-            loading="eager"
-          />
-
-          {/* Title — split hierarchy when entityName exists */}
-          {config.entityName ? (
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-base font-medium text-muted-foreground">
-                {copy.verb.charAt(0).toUpperCase() + copy.verb.slice(1)} for
-              </span>
-              <AlertDialogTitle className="text-xl font-semibold leading-tight">
-                {config.entityName}
-              </AlertDialogTitle>
-            </div>
-          ) : (
-            <AlertDialogTitle className="text-xl font-semibold leading-tight">
-              Sign up to {copy.verb}
-            </AlertDialogTitle>
-          )}
+        <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
+          {/* Title */}
+          <AlertDialogTitle className="text-xl font-semibold leading-tight">
+            {title}
+          </AlertDialogTitle>
 
           {/* Description */}
           <AlertDialogDescription className="text-sm text-muted-foreground">
