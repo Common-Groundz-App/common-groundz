@@ -82,6 +82,13 @@ const ProfileCard = ({ profileUserId }: ProfileCardProps) => {
   return (
     <>
       <Card className="relative shadow-lg rounded-lg overflow-hidden">
+        {isOwnProfile && (
+          <Link to="/settings" className="absolute top-4 right-4 xl:hidden z-10">
+            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-60 hover:opacity-100">
+              <Settings size={18} />
+            </Button>
+          </Link>
+        )}
         <div className="p-6 flex flex-col items-center">
           <ProfileAvatar 
             userId={profileUserId}
