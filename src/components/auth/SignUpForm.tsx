@@ -22,6 +22,7 @@ interface SignUpFormProps {
 
 const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
   const { resolvedTheme } = useTheme();
+  const [lastMethod] = useState(() => getLastAuthMethod());
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
