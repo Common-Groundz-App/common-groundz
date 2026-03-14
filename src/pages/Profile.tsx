@@ -53,9 +53,11 @@ const Profile = () => {
       <Footer />
 
       {/* Mobile Bottom Navigation - Only show on mobile screens */}
-      <div className="xl:hidden">
-        <BottomNavigation />
-      </div>
+      {user && (
+        <div className="xl:hidden">
+          <BottomNavigation />
+        </div>
+      )}
     </div>
   );
 };
