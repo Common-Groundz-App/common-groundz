@@ -71,6 +71,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               
               if (!mounted) return;
               
+              // Track last-used auth method for Google OAuth
+              if (event === 'SIGNED_IN' && currentSession?.user?.app_metadata?.provider === 'google') {
+                setLastAuthMethod('google');
+              }
+
               // Handle sign out event specifically
               if (event === 'SIGNED_OUT') {
                 console.log('User signed out - clearing all state');

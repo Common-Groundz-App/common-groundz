@@ -215,7 +215,7 @@ const SignInForm = () => {
             </span>
           </div>
         </div>
-        <GoogleSignInButton />
+        <GoogleSignInButton showLastUsed={lastMethod === 'google'} />
       </div>
     </Card>
   );

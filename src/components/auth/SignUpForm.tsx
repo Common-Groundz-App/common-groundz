@@ -234,7 +234,7 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
             </span>
           </div>
         </div>
-        <GoogleSignInButton />
+        <GoogleSignInButton showLastUsed={lastMethod === 'google'} />
       </div>
     </Card>
   );

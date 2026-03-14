@@ -62,8 +62,13 @@ interface GoogleSignInButtonProps {
            />
          </svg>
        )}
-       {isLoading ? 'Signing in...' : 'Continue with Google'}
-     </Button>
+        {isLoading ? 'Signing in...' : 'Continue with Google'}
+        {showLastUsed && !isLoading && (
+          <span className="text-[10px] font-medium text-brand-orange border border-brand-orange/50 rounded-full px-2 py-0.5 ml-1">
+            Last used
+          </span>
+        )}
+      </Button>
    );
  };
  
