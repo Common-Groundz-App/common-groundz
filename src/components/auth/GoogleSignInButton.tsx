@@ -27,11 +27,12 @@ interface GoogleSignInButtonProps {
        if (error) {
          throw error;
        }
-     } catch (error: any) {
-       console.error('Google sign-in error:', error);
-       toast.error(error.message || 'Failed to sign in with Google');
-       setIsLoading(false);
-     }
+      } catch (error: any) {
+        console.error('Google sign-in error:', error);
+        clearPendingGoogleAuth();
+        toast.error(error.message || 'Failed to sign in with Google');
+        setIsLoading(false);
+      }
    };
  
    return (

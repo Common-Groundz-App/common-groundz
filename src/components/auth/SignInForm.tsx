@@ -201,7 +201,7 @@ const SignInForm = () => {
                 ? 'Signing In...' 
                 : 'Sign In'}
             {lastMethod === 'email' && !isLoading && retryCountdown === null && (
-              <span className="text-[10px] font-medium text-brand-orange border border-brand-orange/50 rounded-full px-2 py-0.5 ml-1">
+              <span className="text-[10px] font-medium text-white border border-white/50 rounded-full px-2 py-0.5 ml-1">
                 Last used
               </span>
             )}
