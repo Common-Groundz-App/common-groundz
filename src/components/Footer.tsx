@@ -7,9 +7,9 @@ const Footer = () => {
   return (
     <footer className="border-t border-border bg-background py-8">
       <div className="container mx-auto px-4">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <Logo size="sm" />
-          <div className="flex flex-col md:flex-row items-center gap-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             <nav className="flex items-center gap-1 text-sm text-muted-foreground">
               <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
               <span>·</span>
@@ -30,8 +30,8 @@ const Footer = () => {
             </div>
           </div>
         </div>
-        <div className="border-t border-border mt-6 pt-6 text-center md:text-left">
-          <p className="text-xs text-muted-foreground">© 2025 Common Groundz. All rights reserved.</p>
+        <div className="border-t border-border mt-6 pt-6 text-left">
+          <p className="text-xs text-muted-foreground">© 2026 Common Groundz. All rights reserved.</p>
         </div>
       </div>
     </footer>
