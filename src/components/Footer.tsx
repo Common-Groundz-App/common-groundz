@@ -18,13 +18,13 @@ const Footer = () => {
               <Link to="/cookies" className="hover:text-foreground transition-colors">Cookies</Link>
             </nav>
             <div className="flex items-center gap-4">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Twitter">
+              <a href="https://x.com/commongroundzHQ" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Common Groundz on X">
                 <Twitter className="h-4 w-4" />
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Instagram">
+              <a href="https://www.instagram.com/thecommongroundz" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Common Groundz on Instagram">
                 <Instagram className="h-4 w-4" />
               </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="LinkedIn">
+              <a href="https://www.linkedin.com/company/common-groundz" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Common Groundz on LinkedIn">
                 <Linkedin className="h-4 w-4" />
               </a>
             </div>
