@@ -1,57 +1,41 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Heart } from 'lucide-react';
+import { Twitter, Instagram, Linkedin } from 'lucide-react';
 import Logo from './Logo';
+
 const Footer = () => {
-  return <footer className="bg-muted/30 border-t py-12">
+  return (
+    <footer className="border-t border-border bg-background py-8">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div>
-            <Link to="/" className="flex items-center gap-2 mb-4 inline-block">
-              <Logo size="lg" />
-            </Link>
-            <p className="text-muted-foreground">
-              Recommendations from people you actually trust.
-            </p>
-          </div>
-          
-          <div>
-            <h3 className="font-semibold mb-3">Product</h3>
-            <ul className="space-y-2">
-              <li><a href="#features" className="text-muted-foreground hover:text-primary transition-colors">Features</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">Pricing</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">FAQ</a></li>
-            </ul>
-          </div>
-          
-          <div>
-            <h3 className="font-semibold mb-3">Company</h3>
-            <ul className="space-y-2">
-              <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">About</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">Blog</a></li>
-              <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors">Careers</a></li>
-            </ul>
-          </div>
-          
-          <div>
-            <h3 className="font-semibold mb-3">Legal</h3>
-            <ul className="space-y-2">
-              <li><Link to="/privacy" className="text-muted-foreground hover:text-primary transition-colors">Privacy</Link></li>
-              <li><Link to="/terms" className="text-muted-foreground hover:text-primary transition-colors">Terms</Link></li>
-              <li><Link to="/cookies" className="text-muted-foreground hover:text-primary transition-colors">Cookie Policy</Link></li>
-            </ul>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <Logo size="sm" />
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            <nav className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+              <span>·</span>
+              <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+              <span>·</span>
+              <Link to="/cookies" className="hover:text-foreground transition-colors">Cookies</Link>
+            </nav>
+            <div className="flex items-center gap-4">
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Twitter">
+                <Twitter className="h-4 w-4" />
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="Instagram">
+                <Instagram className="h-4 w-4" />
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors" aria-label="LinkedIn">
+                <Linkedin className="h-4 w-4" />
+              </a>
+            </div>
           </div>
         </div>
-        
-        <div className="border-t mt-8 pt-8 flex flex-col md:flex-row items-center justify-between text-muted-foreground">
-          <p>© 2025 Common Groundz. All rights reserved.</p>
-          <div className="flex space-x-4 mt-4 md:mt-0">
-            <a href="#" className="hover:text-primary transition-colors">Twitter</a>
-            <a href="#" className="hover:text-primary transition-colors">Instagram</a>
-            <a href="#" className="hover:text-primary transition-colors">LinkedIn</a>
-          </div>
+        <div className="border-t border-border mt-6 pt-6 text-center md:text-left">
+          <p className="text-xs text-muted-foreground">© 2025 Common Groundz. All rights reserved.</p>
         </div>
       </div>
-    </footer>;
+    </footer>
+  );
 };
+
 export default Footer;
