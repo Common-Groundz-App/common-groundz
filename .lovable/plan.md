@@ -1,52 +1,39 @@
 
-# Auth Prompt Modal System — FULLY IMPLEMENTED
 
-## Status: ✅ Phase 1 + Phase 2 Complete
+# Footer Cleanup: Remove from Product Pages
 
-Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
+ChatGPT's analysis is correct. The footer belongs on public/marketing pages, not inside the logged-in product experience. Your app already has navbar + bottom nav for product pages — adding a footer creates redundant navigation.
 
-## Architecture
+## Current State
 
-- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
-- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
-- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
-- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
+**Already correct (keep footer):**
+- `Index.tsx` — landing page
+- `PrivacyPolicy.tsx`, `TermsOfService.tsx`, `CookiePolicy.tsx` — legal
+- `AccountDeleted.tsx` — terminal page
+- `PostView.tsx`, `RecommendationView.tsx` — public content (guest view)
+- `UserProfile.tsx` — public profile (guest view)
 
-## Files Created (4)
+**Need footer removed:**
+- `Profile.tsx` — logged-in profile, already has BottomNavigation
+- `EntityDetail.tsx` — product page
+- `EntityDetailV2.tsx` — product page
+- `EntityV4.tsx` — product page
 
-1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
-2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
-3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
-4. `src/hooks/useAuthPrompt.ts` — Thin re-export
+## Conditional Logic for Shared Pages
 
-## Phase 1 — Files Modified (10)
+`PostView.tsx`, `RecommendationView.tsx`, and `UserProfile.tsx` serve both guests and logged-in users. For these, the footer should only render when the user is **not** authenticated (guest view). When logged in, these pages should behave like product pages without a footer.
 
-1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
-2. `src/components/entity/EntityFollowButton.tsx` — follow
-3. `src/hooks/use-entity-save.ts` — save
-4. `src/hooks/use-optimistic-interactions.ts` — like/save
-5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
-6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
-7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
-8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
-9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
-10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
+## Changes
 
-## Phase 2 — Files Modified (5)
+| File | Action |
+|------|--------|
+| `Profile.tsx` | Remove Footer import and usage |
+| `EntityDetail.tsx` | Remove Footer import and usage |
+| `EntityDetailV2.tsx` | Remove Footer import and usage |
+| `EntityV4.tsx` | Remove Footer import and usage |
+| `PostView.tsx` | Conditionally render Footer only when `!user` |
+| `RecommendationView.tsx` | Conditionally render Footer only when `!user` |
+| `UserProfile.tsx` | Conditionally render Footer only when `!user` |
 
-| File | Action | Surface |
-|---|---|---|
-| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
-| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
-| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
-| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
-| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
+Simple, clean changes — no new components needed.
 
-## Verification
-
-Searched `"Authentication required"` across `src/` — remaining hits are only:
-- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
-- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
-- Edge function auth errors (use-entity-refresh)
-
-No public interaction toasts remain. Migration complete.
