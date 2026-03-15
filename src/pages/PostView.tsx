@@ -86,7 +86,7 @@ const PostView = () => {
           onPostLoaded={handlePostLoaded}
         />
       </div>
-      <Footer />
+      {!user && <Footer />}
     </div>
   );
 };

@@ -22,7 +22,7 @@ import RecommendationForm from '@/components/recommendations/RecommendationForm'
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import NavBarComponent from '@/components/NavBarComponent';
-import Footer from '@/components/Footer';
+
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { DynamicReviewsSummary } from '@/components/profile/reviews/DynamicReviewsSummary';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -220,7 +220,6 @@ const EntityDetailOriginal = () => {
           title="Entity Not Found"
           description="The entity you're looking for doesn't exist or has been removed."
         />
-        <Footer />
       </div>
     );
   }
@@ -237,7 +236,6 @@ const EntityDetailOriginal = () => {
             />
           </div>
         </div>
-        <Footer />
         {user && <BottomNavigation />}
       </div>
     );
@@ -250,7 +248,6 @@ const EntityDetailOriginal = () => {
         <div className="flex-1 pt-16">
           <EntityDetailSkeleton />
         </div>
-        <Footer />
         {user && <BottomNavigation />}
       </div>
     );
@@ -1025,7 +1022,6 @@ const EntityDetailOriginal = () => {
         />
       )}
 
-      <Footer />
       {user && <BottomNavigation />}
     </div>
   );

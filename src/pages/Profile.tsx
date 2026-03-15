@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import ProfileContent from '@/components/profile/ProfileContent';
-import Footer from '@/components/Footer';
+
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import SEOHead from '@/components/seo/SEOHead';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,7 +50,7 @@ const Profile = () => {
       <div className="flex-1">
         <ProfileContent profileUserId={profileUserId} defaultActiveTab={activeTab} />
       </div>
-      <Footer />
+      
 
       {/* Mobile Bottom Navigation - Only show on mobile screens */}
       {user && (

@@ -20,7 +20,7 @@ import RecommendationForm from '@/components/recommendations/RecommendationForm'
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
 import NavBarComponent from '@/components/NavBarComponent';
-import Footer from '@/components/Footer';
+
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { useEntityImageRefresh } from '@/hooks/recommendations/use-entity-refresh';
@@ -194,7 +194,6 @@ const EntityDetailV2 = () => {
             />
           </div>
         </div>
-        <Footer />
         {user && <BottomNavigation />}
       </div>
     );
@@ -207,7 +206,6 @@ const EntityDetailV2 = () => {
         <div className="flex-1 pt-16">
           <EntityDetailSkeleton />
         </div>
-        <Footer />
         {user && <BottomNavigation />}
       </div>
     );
@@ -1092,7 +1090,6 @@ const EntityDetailV2 = () => {
         />
       )}
       
-      <Footer />
       {user && <BottomNavigation />}
     </div>
   );
