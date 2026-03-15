@@ -1,34 +1,52 @@
 
+# Auth Prompt Modal System — FULLY IMPLEMENTED
 
-# Final Plan: Two-Button Sign-In with Refinements
+## Status: ✅ Phase 1 + Phase 2 Complete
 
-Both ChatGPT suggestions are correct and worth adopting:
+Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
 
-1. **Smooth transition** — use `animate-fade-in` (already available in the project) when the email form appears, instead of an instant swap.
-2. **No ring highlight on the expanded form** — only highlight the "Continue with Email" *button* in the initial view. Once the form expands, show a clean form with no ring/badge.
+## Architecture
 
-One additional improvement I'd add:
+- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
+- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
+- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
+- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
 
-3. **"← Back to all sign in options" as a subtle link, not a button** — use a small `text-sm text-muted-foreground hover:text-foreground` link with an arrow icon, positioned below the Sign In button. This keeps the form clean and doesn't compete visually with the primary action.
+## Files Created (4)
 
-## Changes: `src/components/auth/SignInForm.tsx`
+1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
+2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
+3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
+4. `src/hooks/useAuthPrompt.ts` — Thin re-export
 
-- Add `showEmailForm` state (default `false`)
-- **Initial view** (`!showEmailForm`):
-  - Google button (with Last used badge if `lastMethod === 'google'`)
-  - "Continue with Email" outline button with `MailIcon` (with Last used badge + ring if `lastMethod === 'email'`)
-  - No separator, no input fields
-- **Email form view** (`showEmailForm`):
-  - Hide Google button
-  - Show email input, password input, forgot password link, Sign In button — all visible, no progressive disclosure
-  - Auto-focus email input
-  - No ring highlight or badge on the form itself
-  - "← Back to all sign in options" subtle link at bottom
-  - Wrap in `animate-fade-in` for smooth entrance
+## Phase 1 — Files Modified (10)
 
-## No changes needed
-- `GoogleSignInButton.tsx` — already has floating badge + ring support
+1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
+2. `src/components/entity/EntityFollowButton.tsx` — follow
+3. `src/hooks/use-entity-save.ts` — save
+4. `src/hooks/use-optimistic-interactions.ts` — like/save
+5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
+6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
+7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
+8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
+9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
+10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
 
-## Files changed
-- `src/components/auth/SignInForm.tsx`
+## Phase 2 — Files Modified (5)
 
+| File | Action | Surface |
+|---|---|---|
+| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
+| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
+| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
+
+## Verification
+
+Searched `"Authentication required"` across `src/` — remaining hits are only:
+- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
+- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
+- Edge function auth errors (use-entity-refresh)
+
+No public interaction toasts remain. Migration complete.

@@ -6,12 +6,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { UserIcon, KeyIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
+import { KeyIcon, EyeIcon, EyeOffIcon, MailIcon, ArrowLeftIcon, UserIcon } from 'lucide-react';
 import ForgotPasswordForm from './ForgotPasswordForm';
 import { loginViaGateway, formatRateLimitError } from '@/lib/authGateway';
 import { supabase } from '@/integrations/supabase/client';
 import GoogleSignInButton from './GoogleSignInButton';
-import { Separator } from '@/components/ui/separator';
 import { getLastAuthMethod, setLastAuthMethod, clearPendingGoogleAuth } from '@/lib/lastAuthMethod';
 
 const getFriendlyAuthError = (message: string): string => {
@@ -35,23 +34,23 @@ const SignInForm = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
   const [formError, setFormError] = useState('');
   const [lastMethod] = useState(() => getLastAuthMethod());
   const emailInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  // Clear any stale pending Google auth flag on mount
   useEffect(() => {
     clearPendingGoogleAuth();
   }, []);
 
-  // Auto-focus email input if email was last used method
+  // Auto-focus email input when email form is shown
   useEffect(() => {
-    if (lastMethod === 'email' && emailInputRef.current) {
+    if (showEmailForm && emailInputRef.current) {
       emailInputRef.current.focus();
     }
-  }, [lastMethod]);
+  }, [showEmailForm]);
 
   // Clear inline error when user types
   useEffect(() => {
@@ -142,34 +141,32 @@ const SignInForm = () => {
         </CardDescription>
       </CardHeader>
 
-      {/* Google sign-in — always on top */}
-      <div className="px-6">
-        <GoogleSignInButton showLastUsed={lastMethod === 'google'} />
-      </div>
+      {!showEmailForm ? (
+        /* ── Initial view: two method buttons ── */
+        <CardContent className="space-y-3 pt-0">
+          <GoogleSignInButton showLastUsed={lastMethod === 'google'} />
 
-      {/* Separator */}
-      <div className="px-6">
-        <div className="relative my-4">
-          <div className="absolute inset-0 flex items-center">
-            <Separator className="w-full" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">
-              Or continue with
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Email form */}
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4 pt-0">
-          <div className={`relative ${isEmailLastUsed ? 'ring-2 ring-brand-orange ring-offset-2 rounded-lg p-4' : ''}`}>
+          <div className="relative">
             {isEmailLastUsed && (
               <span className="absolute -top-3 -right-3 z-10 bg-brand-orange text-white text-xs font-semibold px-2.5 py-0.5 rounded-full shadow-sm animate-scale-in">
                 Last used
               </span>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              className={`w-full gap-2 ${isEmailLastUsed ? 'ring-2 ring-brand-orange ring-offset-2' : ''}`}
+              onClick={() => setShowEmailForm(true)}
+            >
+              <MailIcon className="h-5 w-5" />
+              Continue with Email
+            </Button>
+          </div>
+        </CardContent>
+      ) : (
+        /* ── Email form view ── */
+        <form onSubmit={handleSubmit} className="animate-fade-in">
+          <CardContent className="space-y-4 pt-0">
             <div className="space-y-2">
               <Label htmlFor="signin-email">Email</Label>
               <div className="relative">
@@ -187,53 +184,46 @@ const SignInForm = () => {
                 />
               </div>
             </div>
-          </div>
 
-          {/* Progressive disclosure: password appears after email input */}
-          {email.length > 0 && (
-            <div className="space-y-4 animate-fade-in">
-              <div className="space-y-2">
-                <Label htmlFor="signin-password">Password</Label>
-                <div className="relative">
-                  <KeyIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
-                    id="signin-password" 
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    className={`pl-10 pr-10 ${formError ? 'border-destructive' : ''}`}
-                    disabled={retryCountdown !== null}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPassword ? (
-                      <EyeOffIcon className="h-4 w-4" />
-                    ) : (
-                      <EyeIcon className="h-4 w-4" />
-                    )}
-                  </button>
-                </div>
-                {formError && (
-                  <p className="text-sm text-destructive">{formError}</p>
-                )}
+            <div className="space-y-2">
+              <Label htmlFor="signin-password">Password</Label>
+              <div className="relative">
+                <KeyIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  id="signin-password" 
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className={`pl-10 pr-10 ${formError ? 'border-destructive' : ''}`}
+                  disabled={retryCountdown !== null}
+                />
                 <button
                   type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  className="text-sm text-brand-orange hover:text-brand-orange/80 hover:underline"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  Forgot password?
+                  {showPassword ? (
+                    <EyeOffIcon className="h-4 w-4" />
+                  ) : (
+                    <EyeIcon className="h-4 w-4" />
+                  )}
                 </button>
               </div>
+              {formError && (
+                <p className="text-sm text-destructive">{formError}</p>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowForgotPassword(true)}
+                className="text-sm text-brand-orange hover:text-brand-orange/80 hover:underline"
+              >
+                Forgot password?
+              </button>
             </div>
-          )}
-        </CardContent>
+          </CardContent>
 
-        {email.length > 0 && (
-          <CardFooter className="animate-fade-in">
+          <CardFooter className="flex flex-col gap-3">
             <Button 
               type="submit" 
               className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" 
@@ -245,9 +235,18 @@ const SignInForm = () => {
                   ? 'Signing In...' 
                   : 'Sign In'}
             </Button>
+
+            <button
+              type="button"
+              onClick={() => setShowEmailForm(false)}
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeftIcon className="h-3.5 w-3.5" />
+              Back to all sign in options
+            </button>
           </CardFooter>
-        )}
-      </form>
+        </form>
+      )}
     </Card>
   );
 };
