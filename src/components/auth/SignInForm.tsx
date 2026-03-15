@@ -1,7 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -39,12 +38,20 @@ const SignInForm = () => {
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
   const [formError, setFormError] = useState('');
   const [lastMethod] = useState(() => getLastAuthMethod());
+  const emailInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   // Clear any stale pending Google auth flag on mount
   useEffect(() => {
     clearPendingGoogleAuth();
   }, []);
+
+  // Auto-focus email input if email was last used method
+  useEffect(() => {
+    if (lastMethod === 'email' && emailInputRef.current) {
+      emailInputRef.current.focus();
+    }
+  }, [lastMethod]);
 
   // Clear inline error when user types
   useEffect(() => {
@@ -55,7 +62,6 @@ const SignInForm = () => {
     e.preventDefault();
     setFormError('');
     
-    // Client-side validation
     if (!email.trim()) {
       setFormError('Please enter your email address.');
       return;
@@ -121,10 +127,11 @@ const SignInForm = () => {
     }, 1000);
   };
 
-  // Show forgot password form
   if (showForgotPassword) {
     return <ForgotPasswordForm onBackToSignIn={() => setShowForgotPassword(false)} />;
   }
+
+  const isEmailLastUsed = lastMethod === 'email';
 
   return (
     <Card className="border-none shadow-lg">
@@ -134,82 +141,14 @@ const SignInForm = () => {
           Sign in to access your personalized recommendations
         </CardDescription>
       </CardHeader>
-      <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="signin-email">Email</Label>
-            <div className="relative">
-              <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                id="signin-email" 
-                type="email" 
-                placeholder="your@email.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="pl-10"
-                disabled={retryCountdown !== null}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="signin-password">Password</Label>
-            <div className="relative">
-              <KeyIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input 
-                id="signin-password" 
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className={`pl-10 pr-10 ${formError ? 'border-destructive' : ''}`}
-                disabled={retryCountdown !== null}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                {showPassword ? (
-                  <EyeOffIcon className="h-4 w-4" />
-                ) : (
-                  <EyeIcon className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-            {formError && (
-              <p className="text-sm text-destructive">{formError}</p>
-            )}
-            <button
-              type="button"
-              onClick={() => setShowForgotPassword(true)}
-              className="text-sm text-brand-orange hover:text-brand-orange/80 hover:underline"
-            >
-              Forgot password?
-            </button>
-          </div>
-        </CardContent>
-        <CardFooter>
-          <Button 
-            type="submit" 
-            className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" 
-            disabled={isLoading || retryCountdown !== null}
-          >
-            {retryCountdown !== null 
-              ? `Try again in ${retryCountdown}s`
-              : isLoading 
-                ? 'Signing In...' 
-                : 'Sign In'}
-            {lastMethod === 'email' && !isLoading && retryCountdown === null && (
-              <span className="text-[10px] font-medium text-white border border-white/50 rounded-full px-2 py-0.5 ml-1">
-                Last used
-              </span>
-            )}
-          </Button>
-        </CardFooter>
-      </form>
-      
-      <div className="px-6 pb-6">
+
+      {/* Google sign-in — always on top */}
+      <div className="px-6">
+        <GoogleSignInButton showLastUsed={lastMethod === 'google'} />
+      </div>
+
+      {/* Separator */}
+      <div className="px-6">
         <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
             <Separator className="w-full" />
@@ -220,8 +159,95 @@ const SignInForm = () => {
             </span>
           </div>
         </div>
-        <GoogleSignInButton showLastUsed={lastMethod === 'google'} />
       </div>
+
+      {/* Email form */}
+      <form onSubmit={handleSubmit}>
+        <CardContent className="space-y-4 pt-0">
+          <div className={`relative ${isEmailLastUsed ? 'ring-2 ring-brand-orange ring-offset-2 rounded-lg p-4' : ''}`}>
+            {isEmailLastUsed && (
+              <span className="absolute -top-3 -right-3 z-10 bg-brand-orange text-white text-xs font-semibold px-2.5 py-0.5 rounded-full shadow-sm animate-scale-in">
+                Last used
+              </span>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="signin-email">Email</Label>
+              <div className="relative">
+                <UserIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  id="signin-email" 
+                  ref={emailInputRef}
+                  type="email" 
+                  placeholder="your@email.com" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="pl-10"
+                  disabled={retryCountdown !== null}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Progressive disclosure: password appears after email input */}
+          {email.length > 0 && (
+            <div className="space-y-4 animate-fade-in">
+              <div className="space-y-2">
+                <Label htmlFor="signin-password">Password</Label>
+                <div className="relative">
+                  <KeyIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    id="signin-password" 
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className={`pl-10 pr-10 ${formError ? 'border-destructive' : ''}`}
+                    disabled={retryCountdown !== null}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? (
+                      <EyeOffIcon className="h-4 w-4" />
+                    ) : (
+                      <EyeIcon className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {formError && (
+                  <p className="text-sm text-destructive">{formError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-brand-orange hover:text-brand-orange/80 hover:underline"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+
+        {email.length > 0 && (
+          <CardFooter className="animate-fade-in">
+            <Button 
+              type="submit" 
+              className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white" 
+              disabled={isLoading || retryCountdown !== null}
+            >
+              {retryCountdown !== null 
+                ? `Try again in ${retryCountdown}s`
+                : isLoading 
+                  ? 'Signing In...' 
+                  : 'Sign In'}
+            </Button>
+          </CardFooter>
+        )}
+      </form>
     </Card>
   );
 };
