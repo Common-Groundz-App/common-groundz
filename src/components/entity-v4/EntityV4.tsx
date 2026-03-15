@@ -36,7 +36,7 @@ import { TrustSummaryCard } from './TrustSummaryCard';
 import { ReviewsSection } from './ReviewsSection';
 import { EntitySidebar } from './EntitySidebar';
 import { EntityTabsContent } from './EntityTabsContent';
-import Footer from '@/components/Footer';
+
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 
 const EntityV4 = () => {
@@ -637,9 +637,6 @@ const EntityV4 = () => {
         />
       )}
 
-      {/* Footer */}
-      <Footer />
-      
       {/* Bottom Navigation */}
       {user && <BottomNavigation />}
     </div>

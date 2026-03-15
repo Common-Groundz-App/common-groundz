@@ -88,7 +88,7 @@ const RecommendationView = () => {
           onRecommendationLoaded={handleRecommendationLoaded}
         />
       </div>
-      <Footer />
+      {!user && <Footer />}
     </div>
   );
 };

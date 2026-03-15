@@ -133,7 +133,6 @@ const UserProfile = () => {
           <div className="flex-1">
             <ProfileContent profileUserId={profile.id} />
           </div>
-          <Footer />
           <div className="xl:hidden">
             <BottomNavigation />
           </div>
