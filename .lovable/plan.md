@@ -1,48 +1,52 @@
 
+# Auth Prompt Modal System — FULLY IMPLEMENTED
 
-# Final Plan: "Last Used" Badge UI Refinement
+## Status: ✅ Phase 1 + Phase 2 Complete
 
-Both ChatGPT suggestions are good. Here's the refined plan incorporating them:
+Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
 
-## Changes
+## Architecture
 
-### 1. `src/components/auth/GoogleSignInButton.tsx`
-- Wrap button in `<div className="relative">` container
-- When `showLastUsed`: add `ring-2 ring-brand-orange ring-offset-2` to the button
-- Move badge **outside** the button as absolutely positioned element: `absolute -top-3 -right-3 z-10`
-- Badge styling: **`bg-brand-orange text-white text-xs font-semibold px-2.5 py-0.5 rounded-full shadow-sm`** (ChatGPT's refinement — orange bg is more visible on white card)
-- Remove the inline badge from inside the button text
-- Add subtle `animate-scale-in` entrance animation instead of bounce
+- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
+- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
+- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
+- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
 
-### 2. `src/components/auth/SignInForm.tsx`
-- **Reorder layout**: Google button → separator → email form (Google on top)
-- **Progressive disclosure**: hide password field + Sign In button until `email.length > 0`
-- **Remove "Last used" badge from Sign In button entirely**
-- When `lastMethod === 'email'`: wrap email section in `relative` container with `ring-2 ring-brand-orange ring-offset-2 rounded-lg p-4`, place corner badge at `absolute -top-3 -right-3 z-10` with same `bg-brand-orange text-white` styling
-- **Auto-focus**: if `lastMethod === 'email'`, auto-focus email input via ref
+## Files Created (4)
 
-### Layout result
+1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
+2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
+3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
+4. `src/hooks/useAuthPrompt.ts` — Thin re-export
 
-```text
-┌─────────────────────────────────┐
-│        Welcome Back!            │
-│                                 │
-│  ┌───────────────────────┐      │
-│  │ Continue with Google  │ [Last used]  ← floating corner badge
-│  └───────────────────────┘      │
-│     ring-2 ring-brand-orange    │
-│                                 │
-│  ──── Or continue with ─────   │
-│                                 │
-│  Email                          │
-│  [ your@email.com           ]   │
-│                                 │
-│  (password + sign in appear     │
-│   after typing email)           │
-└─────────────────────────────────┘
-```
+## Phase 1 — Files Modified (10)
 
-## Files changed
-- `src/components/auth/GoogleSignInButton.tsx`
-- `src/components/auth/SignInForm.tsx`
+1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
+2. `src/components/entity/EntityFollowButton.tsx` — follow
+3. `src/hooks/use-entity-save.ts` — save
+4. `src/hooks/use-optimistic-interactions.ts` — like/save
+5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
+6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
+7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
+8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
+9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
+10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
 
+## Phase 2 — Files Modified (5)
+
+| File | Action | Surface |
+|---|---|---|
+| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
+| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
+| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
+| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
+
+## Verification
+
+Searched `"Authentication required"` across `src/` — remaining hits are only:
+- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
+- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
+- Edge function auth errors (use-entity-refresh)
+
+No public interaction toasts remain. Migration complete.
