@@ -1,52 +1,46 @@
 
-# Auth Prompt Modal System — FULLY IMPLEMENTED
 
-## Status: ✅ Phase 1 + Phase 2 Complete
+# Refined Plan: Minimal Footer Redesign
 
-Replaced all guest auth toasts with a professional, Glassdoor-style modal across all public interaction points.
+ChatGPT's three suggestions are all good calls. Here's my take on each, plus one addition:
 
-## Architecture
+**1. Links right-aligned, not centered — Agree.** Logo left, links + socials right is the standard product footer pattern. Centered links work for marketing pages but feel off in a product UI.
 
-- `AuthPromptProvider` wraps app inside `Router` (single modal instance)
-- `requireAuth({ action, entityName?, entityId?, surface })` — returns `true` if authenticated, opens modal + returns `false` if not
-- `AuthPromptModal` — Radix AlertDialog with Google OAuth, email signup, login link, "Not now" dismiss
-- `trackGuestEvent` analytics on every interaction (shown, google_clicked, email_clicked, login_clicked, dismissed)
+**2. Border divider — Already exists** (`border-t` is on line 6), but the `bg-muted/30` background tint makes the footer look like a separate block. Removing the background tint and keeping just `border-t border-border bg-background` will make it feel cleaner and more integrated.
 
-## Files Created (4)
+**3. Smaller logo — Agree.** The footer currently uses `size="lg"` (`h-12`). Dropping to `size="sm"` (`h-8`) is the right call for a minimal footer.
 
-1. `src/utils/authUrlBuilder.ts` — Centralized `/auth?tab=...&returnTo=...` builder
-2. `src/contexts/AuthPromptContext.tsx` — Provider, state, `showAuthPrompt()`, `requireAuth()`
-3. `src/components/auth/AuthPromptModal.tsx` — Modal UI with action-to-copy mapping
-4. `src/hooks/useAuthPrompt.ts` — Thin re-export
+**4. My addition: Drop the tagline.** In a minimal single-row footer, the tagline ("Recommendations from people you actually trust") adds clutter. The logo alone is sufficient.
 
-## Phase 1 — Files Modified (10)
+## Final Layout
 
-1. `src/App.tsx` — Wrapped with `AuthPromptProvider`
-2. `src/components/entity/EntityFollowButton.tsx` — follow
-3. `src/hooks/use-entity-save.ts` — save
-4. `src/hooks/use-optimistic-interactions.ts` — like/save
-5. `src/hooks/recommendations/use-recommendation-actions.ts` — like/recommend
-6. `src/pages/EntityDetail.tsx` — recommend/review/timeline
-7. `src/pages/EntityDetailV2.tsx` — recommend/review/timeline
-8. `src/components/entity-v4/EntityV4.tsx` — review/timeline
-9. `src/components/entity-v4/EntitySuggestionButton.tsx` — suggest edit
-10. `src/components/entity-v4/ClaimBusinessButton.tsx` — claim business
+```text
+Desktop:
+─────────────────────────────────────────────────────────
+[Logo sm]          Privacy · Terms · Cookies       [X] [IG] [In]
+                   © 2025 Common Groundz
+─────────────────────────────────────────────────────────
 
-## Phase 2 — Files Modified (5)
+Mobile:
+─────────────────────────────────────────────────────────
+              [Logo sm]
+        Privacy · Terms · Cookies
+            [X]  [IG]  [In]
+     © 2025 Common Groundz
+─────────────────────────────────────────────────────────
+```
 
-| File | Action | Surface |
-|---|---|---|
-| `src/components/profile/reviews/ReviewForm.tsx` | `review` | `review_form` |
-| `src/hooks/feed/use-infinite-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
-| `src/hooks/feed/use-feed.ts` | `like` / `save` | `feed_like` / `feed_save` |
-| `src/components/feed/EnhancedCreatePostForm.tsx` | `create_post` | `create_post_form` |
-| `src/hooks/recommendations/use-entity-operations.ts` | `create_entity` | `entity_creation` |
+## Changes: `src/components/Footer.tsx`
 
-## Verification
+- **Remove** 4-column grid, tagline, and all placeholder `#` links (Pricing, FAQ, About, Blog, Careers)
+- **Top row**: `flex justify-between items-center`
+  - Left: `Logo size="sm"`
+  - Right: `flex items-center gap-6` containing links (Privacy, Terms, Cookies as dot-separated) and social icons (`Twitter`, `Instagram`, `Linkedin` from lucide-react, `h-4 w-4`)
+- **Bottom row**: Copyright in `text-xs text-muted-foreground`, separated by `border-t border-border mt-6 pt-6`
+- **Footer wrapper**: `border-t border-border bg-background py-8` (no `bg-muted/30`)
+- **Mobile**: Stack vertically with `flex-col items-center gap-4 text-center`
+- **Remove** unused `Star`, `Heart` imports
 
-Searched `"Authentication required"` across `src/` — remaining hits are only:
-- Admin pages (AdminEntityManagementPanel, AdminEntityEdit, CreateEntityDialog)
-- Protected route placeholders (Feed, FeedForYou, FeedFollowing, etc.)
-- Edge function auth errors (use-entity-refresh)
+## Files changed
+- `src/components/Footer.tsx`
 
-No public interaction toasts remain. Migration complete.
