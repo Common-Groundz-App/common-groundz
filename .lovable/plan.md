@@ -1,39 +1,25 @@
 
 
-# Footer Cleanup: Remove from Product Pages
+# Footer Social Links — Plan
 
-ChatGPT's analysis is correct. The footer belongs on public/marketing pages, not inside the logged-in product experience. Your app already has navbar + bottom nav for product pages — adding a footer creates redundant navigation.
+Looking at the existing `Footer.tsx` code, both of ChatGPT's suggestions are **already implemented**:
 
-## Current State
+1. **aria-labels** — already present (`aria-label="Twitter"`, `aria-label="Instagram"`, `aria-label="LinkedIn"`)
+2. **hover transitions** — already present (`text-muted-foreground hover:text-foreground transition-colors`)
 
-**Already correct (keep footer):**
-- `Index.tsx` — landing page
-- `PrivacyPolicy.tsx`, `TermsOfService.tsx`, `CookiePolicy.tsx` — legal
-- `AccountDeleted.tsx` — terminal page
-- `PostView.tsx`, `RecommendationView.tsx` — public content (guest view)
-- `UserProfile.tsx` — public profile (guest view)
+So those aren't new changes. The only real change needed is updating the `href` values and adding `target="_blank" rel="noopener noreferrer"`.
 
-**Need footer removed:**
-- `Profile.tsx` — logged-in profile, already has BottomNavigation
-- `EntityDetail.tsx` — product page
-- `EntityDetailV2.tsx` — product page
-- `EntityV4.tsx` — product page
+One minor improvement: update the aria-labels to be more descriptive (e.g., "Common Groundz on X" instead of just "Twitter").
 
-## Conditional Logic for Shared Pages
+## Changes — `src/components/Footer.tsx`
 
-`PostView.tsx`, `RecommendationView.tsx`, and `UserProfile.tsx` serve both guests and logged-in users. For these, the footer should only render when the user is **not** authenticated (guest view). When logged in, these pages should behave like product pages without a footer.
+Update the three social icon `<a>` tags:
 
-## Changes
+| Icon | href | aria-label |
+|------|------|------------|
+| Twitter | `https://x.com/commongroundzHQ` | `Common Groundz on X` |
+| Instagram | `https://www.instagram.com/thecommongroundz` | `Common Groundz on Instagram` |
+| LinkedIn | `https://www.linkedin.com/company/common-groundz` | `Common Groundz on LinkedIn` |
 
-| File | Action |
-|------|--------|
-| `Profile.tsx` | Remove Footer import and usage |
-| `EntityDetail.tsx` | Remove Footer import and usage |
-| `EntityDetailV2.tsx` | Remove Footer import and usage |
-| `EntityV4.tsx` | Remove Footer import and usage |
-| `PostView.tsx` | Conditionally render Footer only when `!user` |
-| `RecommendationView.tsx` | Conditionally render Footer only when `!user` |
-| `UserProfile.tsx` | Conditionally render Footer only when `!user` |
-
-Simple, clean changes — no new components needed.
+All three get `target="_blank" rel="noopener noreferrer"`. That's it — everything else in the footer is already correct.
 
