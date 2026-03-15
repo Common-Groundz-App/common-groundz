@@ -30,8 +30,8 @@ const Footer = () => {
             </div>
           </div>
         </div>
-        <div className="border-t border-border mt-6 pt-6 text-center md:text-left">
-          <p className="text-xs text-muted-foreground">© 2025 Common Groundz. All rights reserved.</p>
+        <div className="border-t border-border mt-6 pt-6 text-left">
+          <p className="text-xs text-muted-foreground">© 2026 Common Groundz. All rights reserved.</p>
         </div>
       </div>
     </footer>
