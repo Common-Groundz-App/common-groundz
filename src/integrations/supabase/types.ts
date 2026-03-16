@@ -3943,6 +3943,7 @@ export type Database = {
           entity_id: string
           entity_image_url: string
           entity_name: string
+          entity_slug: string
           entity_type: string
           recommendation_count: number
         }[]
