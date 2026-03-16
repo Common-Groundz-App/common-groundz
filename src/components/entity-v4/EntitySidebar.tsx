@@ -63,9 +63,7 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
   });
 
   const handleEntityClick = (relatedEntity: Entity) => {
-    if (relatedEntity.slug) {
-      navigate(getEntityUrlWithParent(relatedEntity));
-    }
+    navigate(getEntityUrlWithParent(relatedEntity));
   };
 
   const shouldShowMetadata = (entity: Entity): boolean => {
