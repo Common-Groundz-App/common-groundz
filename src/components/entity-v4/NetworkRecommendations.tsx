@@ -160,7 +160,7 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
         image_url: rec.entity_image_url,
         averageRating: rec.avg_rating || 0,
         recommendedBy: [],
-        slug: undefined,
+        slug: rec.entity_slug || undefined,
         reason: rec.display_reason
       }))
     : [];
