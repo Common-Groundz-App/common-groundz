@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 
 import { analytics } from '@/services/analytics';
