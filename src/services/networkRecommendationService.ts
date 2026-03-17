@@ -271,12 +271,16 @@ export const getNetworkEntityRecommendationsWithCache = async (
       };
     });
 
-    // Cache the results
-    cacheNetworkRecommendations(userId, entityId, processedData);
+    // Apply quality filtering and recency-weighted ranking
+    const filtered = applyQualityFiltering(processedData);
+    const ranked = applyRecencyWeighting(filtered);
 
-    console.log(`[NetworkRecs] Processed ${processedData.length} aggregated recommendations for user ${userId}, entity ${entityId}`);
+    // Cache the results
+    cacheNetworkRecommendations(userId, entityId, ranked);
+
+    console.log(`[NetworkRecs] Processed ${ranked.length} aggregated recommendations (${processedData.length} raw, ${filtered.length} after quality filter) for user ${userId}, entity ${entityId}`);
     
-    return processedData;
+    return ranked;
   } catch (error) {
     console.error('[NetworkRecs] Error fetching aggregated network recommendations:', error);
     return [];
@@ -303,16 +307,18 @@ const applyQualityFiltering = (recommendations: ProcessedNetworkRecommendation[]
  */
 const applyRecencyWeighting = (recommendations: ProcessedNetworkRecommendation[]): ProcessedNetworkRecommendation[] => {
   const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   
   return recommendations.map(rec => {
     const recDate = new Date(rec.latest_recommendation_date || rec.created_at);
-    const isRecent = recDate > thirtyDaysAgo;
+    const ageInDays = (now.getTime() - recDate.getTime()) / (1000 * 60 * 60 * 24);
     
-    // Boost score for recent recommendations
-    if (isRecent) {
-      rec.average_rating = Math.min(rec.average_rating * 1.1, 5); // Cap at 5
-    }
+    // Tiered recency boost
+    let recencyBoost = 1.0;
+    if (ageInDays < 7) recencyBoost = 1.3;
+    else if (ageInDays < 30) recencyBoost = 1.15;
+    else if (ageInDays < 180) recencyBoost = 1.05;
+    
+    rec.average_rating = Math.min(rec.average_rating * recencyBoost, 5); // Cap at 5
     
     return rec;
   }).sort((a, b) => {
