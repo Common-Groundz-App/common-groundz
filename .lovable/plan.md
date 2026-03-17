@@ -1,39 +1,24 @@
 
 
-# Footer Cleanup: Remove from Product Pages
+# Assessment: Tiered Recency Weighting
 
-ChatGPT's analysis is correct. The footer belongs on public/marketing pages, not inside the logged-in product experience. Your app already has navbar + bottom nav for product pages — adding a footer creates redundant navigation.
+ChatGPT's suggestion is a good improvement. The existing `applyRecencyWeighting` function has a binary approach (recent = +10%, old = nothing), which is too simplistic. A tiered decay is more natural and barely adds complexity since we're already touching this function.
 
-## Current State
+**Accept the suggestion.** Update `applyRecencyWeighting` to use tiered boosts:
 
-**Already correct (keep footer):**
-- `Index.tsx` — landing page
-- `PrivacyPolicy.tsx`, `TermsOfService.tsx`, `CookiePolicy.tsx` — legal
-- `AccountDeleted.tsx` — terminal page
-- `PostView.tsx`, `RecommendationView.tsx` — public content (guest view)
-- `UserProfile.tsx` — public profile (guest view)
+| Age | Boost |
+|-----|-------|
+| < 7 days | 1.3x |
+| < 30 days | 1.15x |
+| < 180 days | 1.05x |
+| 180+ days | 1.0x (no boost) |
 
-**Need footer removed:**
-- `Profile.tsx` — logged-in profile, already has BottomNavigation
-- `EntityDetail.tsx` — product page
-- `EntityDetailV2.tsx` — product page
-- `EntityV4.tsx` — product page
+This replaces the current binary 30-day / 1.1x logic. No other changes to the plan.
 
-## Conditional Logic for Shared Pages
+## Final 4-step plan (unchanged except step 4 refinement)
 
-`PostView.tsx`, `RecommendationView.tsx`, and `UserProfile.tsx` serve both guests and logged-in users. For these, the footer should only render when the user is **not** authenticated (guest view). When logged in, these pages should behave like product pages without a footer.
-
-## Changes
-
-| File | Action |
-|------|--------|
-| `Profile.tsx` | Remove Footer import and usage |
-| `EntityDetail.tsx` | Remove Footer import and usage |
-| `EntityDetailV2.tsx` | Remove Footer import and usage |
-| `EntityV4.tsx` | Remove Footer import and usage |
-| `PostView.tsx` | Conditionally render Footer only when `!user` |
-| `RecommendationView.tsx` | Conditionally render Footer only when `!user` |
-| `UserProfile.tsx` | Conditionally render Footer only when `!user` |
-
-Simple, clean changes — no new components needed.
+1. **Database migration** — Fix `has_network_activity` to query `reviews` table, remove time filter
+2. **Database migration** — Add `entity_slug` to `get_aggregated_network_recommendations_discovery`
+3. **Frontend** — Propagate `entity_slug` in `NetworkRecommendations.tsx` mapping
+4. **Frontend** — Wire up `applyQualityFiltering` + `applyRecencyWeighting` in `getNetworkEntityRecommendationsWithCache`, and update `applyRecencyWeighting` to use tiered decay instead of flat 10%
 
