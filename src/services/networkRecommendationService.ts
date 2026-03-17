@@ -253,7 +253,7 @@ export const getNetworkEntityRecommendationsWithCache = async (
         user_id: anyRec.recommender_user_ids?.[0] || '',
         username: anyRec.recommender_usernames?.[0] || 'Unknown User',
         avatar_url: anyRec.recommender_avatars?.[0] || null,
-        created_at: new Date().toISOString(), // Use current date as fallback
+        created_at: anyRec.latest_recommendation_date ?? undefined,
         
         // Aggregated data
         userProfiles,
