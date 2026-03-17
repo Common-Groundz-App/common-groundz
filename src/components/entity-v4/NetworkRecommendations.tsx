@@ -222,7 +222,7 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
       <Card className="transition-all duration-200 hover:shadow-md">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle className="text-base font-semibold">
-            {showNetworkRecommendations ? "Recommended by Your Network" : "You Might Also Consider"}
+            {showNetworkRecommendations ? "Recommended by Your Circle" : "You Might Also Consider"}
           </CardTitle>
           {showSeeAllButton && (
             <Button 

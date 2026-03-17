@@ -562,7 +562,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             <CardContent className="p-6">
               <div className="flex items-center gap-2 mb-3">
                 <Lock className="w-5 h-5 text-brand-orange" />
-                <h3 className="font-semibold text-foreground">Recommended by Your Network</h3>
+                <h3 className="font-semibold text-foreground">Recommended by Your Circle</h3>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
                 Sign up to discover what people in your circle recommend

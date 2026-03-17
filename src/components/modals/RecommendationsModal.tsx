@@ -34,7 +34,7 @@ export const RecommendationsModal: React.FC<RecommendationsModalProps> = ({
   const [sortBy, setSortBy] = useState<'relevance' | 'rating' | 'recent' | 'popularity'>('relevance');
 
   const title = hasNetworkData 
-    ? `Recommended by Your Network`
+    ? `Recommended by Your Circle`
     : `Similar to ${entityName}`;
 
   // Combine and normalize all recommendations

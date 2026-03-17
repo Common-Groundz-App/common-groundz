@@ -54,19 +54,21 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
     navigate(getEntityUrlWithParent(recommendation));
   };
 
-  const formatRecommendedBy = (users: string[], count?: number): string => {
-    if (users.length === 0) return 'Unknown';
-    if (users.length === 1) return `${users[0]} recommends this`;
-    if (users.length === 2) return `${users[0]} and ${users[1]} recommend this`;
-    if (users.length === 3) return `${users[0]}, ${users[1]} and ${users[2]} recommend this`;
-    
-    // If we have a count and it's different from users.length, use the count
-    const totalCount = count || users.length;
-    const othersCount = totalCount - 2;
-    return `${users[0]}, ${users[1]} and ${othersCount} others recommend this`;
+  const truncateName = (name: string, max = 12): string => {
+    if (!name || name.length <= max) return name || 'Unknown';
+    return name.slice(0, max).trimEnd() + '…';
   };
 
-  const formatTimeAgo = (dateString?: string): string => {
+  const formatRecommendedBy = (users: string[], count?: number): string => {
+    const validUsers = users.filter(u => u && u.trim());
+    if (validUsers.length === 0) return '';
+    const totalCount = count || validUsers.length;
+    if (totalCount === 1) return `${truncateName(validUsers[0])} recommends this`;
+    if (totalCount === 2) return `${truncateName(validUsers[0])} & ${truncateName(validUsers[1] || validUsers[0])} recommend this`;
+    return `${truncateName(validUsers[0])} & ${totalCount - 1} others recommend this`;
+  };
+
+  const formatShortTimeAgo = (dateString?: string): string => {
     if (!dateString) return '';
     
     const date = new Date(dateString);
@@ -77,15 +79,12 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
     const diffInWeeks = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 7));
     const diffInMonths = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 30));
     
-    if (diffInHours < 1) return 'recommended recently';
-    if (diffInHours < 24) return `recommended ${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
-    if (diffInDays === 1) return 'recommended yesterday';
-    if (diffInDays < 7) return `recommended ${diffInDays} days ago`;
-    if (diffInWeeks === 1) return 'recommended 1 week ago';
-    if (diffInWeeks < 4) return `recommended ${diffInWeeks} weeks ago`;
-    if (diffInMonths === 1) return 'recommended 1 month ago';
-    if (diffInMonths < 12) return `recommended ${diffInMonths} months ago`;
-    return 'recommended over a year ago';
+    if (diffInHours < 1) return 'just now';
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
+    if (diffInMonths < 12) return `${diffInMonths}mo ago`;
+    return '1y+ ago';
   };
 
   const getInitials = (name: string) => {
@@ -142,17 +141,13 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
         
         {/* Attribution */}
         {isNetworkRecommendation && recommendation.recommendedBy.length > 0 && (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1">
-              {/* Show multiple avatars */}
+          <div className="flex items-center gap-1">
+              {/* Show max 2 avatars */}
               <div className="flex -space-x-1">
                 {(recommendation.recommendedByAvatars || recommendation.recommendedBy)
-                  .slice(0, 3)
+                  .slice(0, 2)
                   .map((avatar, index) => {
                     const isUrl = typeof avatar === 'string' && avatar.startsWith('http');
-                    const userId = Array.isArray(recommendation.recommendedByUserId) 
-                      ? recommendation.recommendedByUserId[index] 
-                      : recommendation.recommendedByUserId;
                     
                     return (
                       <Avatar key={index} className="h-4 w-4 border border-background">
@@ -163,24 +158,21 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
                       </Avatar>
                     );
                   })}
-                {(recommendation.recommendationCount || recommendation.recommendedBy.length) > 3 && (
+                {(recommendation.recommendationCount || recommendation.recommendedBy.length) > 2 && (
                   <div className="h-4 w-4 rounded-full bg-muted border border-background flex items-center justify-center">
-                    <span className="text-xs font-medium">
-                      +{(recommendation.recommendationCount || recommendation.recommendedBy.length) - 3}
+                    <span className="text-[8px] font-medium">
+                      +{(recommendation.recommendationCount || recommendation.recommendedBy.length) - 2}
                     </span>
                   </div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground line-clamp-1">
                 {formatRecommendedBy(recommendation.recommendedBy, recommendation.recommendationCount)}
+                {recommendation.latestRecommendationDate && (
+                  <span className="text-muted-foreground/70"> · {formatShortTimeAgo(recommendation.latestRecommendationDate)}</span>
+                )}
               </p>
             </div>
-            {recommendation.latestRecommendationDate && (
-              <p className="text-xs text-muted-foreground/70">
-                {formatTimeAgo(recommendation.latestRecommendationDate)}
-              </p>
-            )}
-          </div>
         )}
         
         {!isNetworkRecommendation && (
