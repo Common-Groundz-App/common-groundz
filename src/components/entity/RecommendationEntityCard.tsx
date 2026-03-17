@@ -62,9 +62,10 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
     const validUsers = users.filter(u => u && u.trim());
     if (validUsers.length === 0) return 'Recommended by your circle';
     const totalCount = count || validUsers.length;
-    if (totalCount === 1) return `${truncateName(validUsers[0])} recommended this`;
-    if (totalCount === 2) return `${truncateName(validUsers[0])} & ${truncateName(validUsers[1] || validUsers[0])} recommended this`;
-    return `${truncateName(validUsers[0])} & ${totalCount - 1} others recommended this`;
+    const nameMax = totalCount >= 2 ? 10 : 12;
+    if (totalCount === 1) return `${truncateName(validUsers[0], nameMax)} recommended this`;
+    if (totalCount === 2) return `${truncateName(validUsers[0], nameMax)} & ${truncateName(validUsers[1] || validUsers[0], nameMax)} recommended this`;
+    return `${truncateName(validUsers[0], nameMax)} & ${totalCount - 1} others recommended this`;
   };
 
   const formatShortTimeAgo = (dateString?: string): string => {
@@ -137,43 +138,43 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
         
         {/* Attribution */}
         {isNetworkRecommendation && (
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-1">
-              {/* Show max 2 avatars */}
-              <div className="flex -space-x-1">
-                {(() => {
-                  const userIds = Array.isArray(recommendation.recommendedByUserId)
-                    ? recommendation.recommendedByUserId
-                    : recommendation.recommendedByUserId
-                      ? [recommendation.recommendedByUserId]
-                      : [];
-                  return userIds.slice(0, 2).map((userId, index) => (
-                    <ProfileAvatar
-                      key={userId || index}
-                      userId={userId}
-                      size="xs"
-                      className="h-4 w-4 ring-1 ring-background"
-                      showSkeleton={false}
-                    />
-                  ));
-                })()}
-                {(recommendation.recommendationCount || recommendation.recommendedBy.length) > 2 && (
-                  <div className="h-4 w-4 rounded-full bg-brand-orange/20 border border-background flex items-center justify-center">
-                    <span className="text-[8px] font-medium text-brand-orange">
-                      +{(recommendation.recommendationCount || recommendation.recommendedBy.length) - 2}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground line-clamp-1">
+          <div className="flex items-start gap-1">
+            {/* Show max 2 avatars */}
+            <div className="flex -space-x-1 flex-shrink-0 mt-0.5">
+              {(() => {
+                const userIds = Array.isArray(recommendation.recommendedByUserId)
+                  ? recommendation.recommendedByUserId
+                  : recommendation.recommendedByUserId
+                    ? [recommendation.recommendedByUserId]
+                    : [];
+                return userIds.slice(0, 2).map((userId, index) => (
+                  <ProfileAvatar
+                    key={userId || index}
+                    userId={userId}
+                    size="xs"
+                    className="h-4 w-4 ring-1 ring-background"
+                    showSkeleton={false}
+                  />
+                ));
+              })()}
+              {(recommendation.recommendationCount || recommendation.recommendedBy.length) > 2 && (
+                <div className="h-4 w-4 rounded-full bg-brand-orange/20 border border-background flex items-center justify-center">
+                  <span className="text-[8px] font-medium text-brand-orange">
+                    +{(recommendation.recommendationCount || recommendation.recommendedBy.length) - 2}
+                  </span>
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground line-clamp-2">
                 {formatRecommendedBy(recommendation.recommendedBy, recommendation.recommendationCount)}
               </p>
+              {recommendation.latestRecommendationDate && (
+                <p className="text-[10px] text-muted-foreground/70">
+                  · {formatShortTimeAgo(recommendation.latestRecommendationDate)}
+                </p>
+              )}
             </div>
-            {recommendation.latestRecommendationDate && (
-              <p className="text-[10px] text-muted-foreground/70 ml-0.5">
-                · {formatShortTimeAgo(recommendation.latestRecommendationDate)}
-              </p>
-            )}
           </div>
         )}
         

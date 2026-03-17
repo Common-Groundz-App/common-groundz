@@ -1,37 +1,39 @@
 
 
-# Recommendation Card Attribution — Final Refinements
+# Footer Cleanup: Remove from Product Pages
 
-## Agreement with ChatGPT's feedback
+ChatGPT's analysis is correct. The footer belongs on public/marketing pages, not inside the logged-in product experience. Your app already has navbar + bottom nav for product pages — adding a footer creates redundant navigation.
 
-Yes, the flex-based alignment approach is better than hardcoded `ml-7`. The current code (lines 140-177) already has avatars and text in a flex row, but the timestamp sits outside that row. The fix is to restructure so the timestamp nests under the text, not under the whole block.
+## Current State
 
-## Changes — `src/components/entity/RecommendationEntityCard.tsx`
+**Already correct (keep footer):**
+- `Index.tsx` — landing page
+- `PrivacyPolicy.tsx`, `TermsOfService.tsx`, `CookiePolicy.tsx` — legal
+- `AccountDeleted.tsx` — terminal page
+- `PostView.tsx`, `RecommendationView.tsx` — public content (guest view)
+- `UserProfile.tsx` — public profile (guest view)
 
-### 1. Restructure attribution layout (lines 140-177)
-Replace `space-y-0.5` wrapper with a `flex items-start gap-1` layout where avatars are one flex child and a `div` containing both the attribution text and timestamp is the other. This auto-aligns the timestamp under the text without magic margins.
+**Need footer removed:**
+- `Profile.tsx` — logged-in profile, already has BottomNavigation
+- `EntityDetail.tsx` — product page
+- `EntityDetailV2.tsx` — product page
+- `EntityV4.tsx` — product page
 
-```text
-Before:
-┌─────────────────────────────┐
-│ [👤👤] name & name rec...   │  ← flex row
-│ · 9mo ago                   │  ← separate element with ml-0.5
-└─────────────────────────────┘
+## Conditional Logic for Shared Pages
 
-After:
-┌─────────────────────────────┐
-│ [👤👤]  name & name         │  ← flex row
-│          recommended this   │
-│          · 9mo ago          │  ← nested under text div
-└─────────────────────────────┘
-```
+`PostView.tsx`, `RecommendationView.tsx`, and `UserProfile.tsx` serve both guests and logged-in users. For these, the footer should only render when the user is **not** authenticated (guest view). When logged in, these pages should behave like product pages without a footer.
 
-### 2. Change `line-clamp-1` → `line-clamp-2` (line 168)
-Allow the attribution sentence to wrap to a second line so the full meaning is preserved.
+## Changes
 
-### 3. Smarter name truncation in `formatRecommendedBy`
-When 2+ users, reduce truncation max from 12 → 10 chars to give more room for the sentence.
+| File | Action |
+|------|--------|
+| `Profile.tsx` | Remove Footer import and usage |
+| `EntityDetail.tsx` | Remove Footer import and usage |
+| `EntityDetailV2.tsx` | Remove Footer import and usage |
+| `EntityV4.tsx` | Remove Footer import and usage |
+| `PostView.tsx` | Conditionally render Footer only when `!user` |
+| `RecommendationView.tsx` | Conditionally render Footer only when `!user` |
+| `UserProfile.tsx` | Conditionally render Footer only when `!user` |
 
-### Summary
-Three small changes, all in one file. No hardcoded margins, future-proof layout, full sentence preserved.
+Simple, clean changes — no new components needed.
 
