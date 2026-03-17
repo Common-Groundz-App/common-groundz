@@ -140,27 +140,30 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
         </div>
         
         {/* Attribution */}
-        {isNetworkRecommendation && recommendation.recommendedBy.length > 0 && (
-          <div className="flex items-center gap-1">
+        {isNetworkRecommendation && (
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1">
               {/* Show max 2 avatars */}
               <div className="flex -space-x-1">
-                {(recommendation.recommendedByAvatars || recommendation.recommendedBy)
-                  .slice(0, 2)
-                  .map((avatar, index) => {
-                    const isUrl = typeof avatar === 'string' && avatar.startsWith('http');
-                    
-                    return (
-                      <Avatar key={index} className="h-4 w-4 border border-background">
-                        <AvatarImage src={isUrl ? avatar : ''} />
-                        <AvatarFallback className="text-xs">
-                          {getInitials(recommendation.recommendedBy[index] || 'Unknown')}
-                        </AvatarFallback>
-                      </Avatar>
-                    );
-                  })}
+                {(() => {
+                  const userIds = Array.isArray(recommendation.recommendedByUserId)
+                    ? recommendation.recommendedByUserId
+                    : recommendation.recommendedByUserId
+                      ? [recommendation.recommendedByUserId]
+                      : [];
+                  return userIds.slice(0, 2).map((userId, index) => (
+                    <ProfileAvatar
+                      key={userId || index}
+                      userId={userId}
+                      size="xs"
+                      className="h-4 w-4 ring-1 ring-background"
+                      showSkeleton={false}
+                    />
+                  ));
+                })()}
                 {(recommendation.recommendationCount || recommendation.recommendedBy.length) > 2 && (
-                  <div className="h-4 w-4 rounded-full bg-muted border border-background flex items-center justify-center">
-                    <span className="text-[8px] font-medium">
+                  <div className="h-4 w-4 rounded-full bg-brand-orange/20 border border-background flex items-center justify-center">
+                    <span className="text-[8px] font-medium text-brand-orange">
                       +{(recommendation.recommendationCount || recommendation.recommendedBy.length) - 2}
                     </span>
                   </div>
@@ -168,11 +171,14 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
               </div>
               <p className="text-xs text-muted-foreground line-clamp-1">
                 {formatRecommendedBy(recommendation.recommendedBy, recommendation.recommendationCount)}
-                {recommendation.latestRecommendationDate && (
-                  <span className="text-muted-foreground/70"> · {formatShortTimeAgo(recommendation.latestRecommendationDate)}</span>
-                )}
               </p>
             </div>
+            {recommendation.latestRecommendationDate && (
+              <p className="text-[10px] text-muted-foreground/70 ml-0.5">
+                · {formatShortTimeAgo(recommendation.latestRecommendationDate)}
+              </p>
+            )}
+          </div>
         )}
         
         {!isNetworkRecommendation && (
