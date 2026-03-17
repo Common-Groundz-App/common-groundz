@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, Users } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { analytics } from '@/services/analytics';
