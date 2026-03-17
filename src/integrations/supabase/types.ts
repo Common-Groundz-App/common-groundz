@@ -3731,7 +3731,10 @@ export type Database = {
               entity_image_url: string
               entity_name: string
               entity_slug: string
-              entity_type: string
+              entity_type: Database["public"]["Enums"]["entity_type"]
+              latest_recommendation_date: string
+              network_score: number
+              parent_id: string
               parent_slug: string
               recommendation_count: number
               recommender_avatars: string[]
@@ -3757,25 +3760,6 @@ export type Database = {
               recommender_avatars: string[]
               recommender_user_ids: string[]
               recommender_usernames: string[]
-            }[]
-          }
-        | {
-            Args: { p_limit?: number; p_user_id: string }
-            Returns: {
-              average_rating: number
-              entity_id: string
-              entity_image_url: string
-              entity_name: string
-              entity_slug: string
-              entity_type: Database["public"]["Enums"]["entity_type"]
-              latest_recommendation_date: string
-              network_score: number
-              parent_id: string
-              parent_slug: string
-              recommendation_count: number
-              recommender_avatars: string[]
-              recommender_ids: string[]
-              recommender_names: string[]
             }[]
           }
       get_cached_products: {
