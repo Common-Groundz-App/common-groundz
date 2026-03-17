@@ -271,8 +271,12 @@ export const getNetworkEntityRecommendationsWithCache = async (
       };
     });
 
+    // Apply quality filtering and recency-weighted ranking
+    const filtered = applyQualityFiltering(processedData);
+    const ranked = applyRecencyWeighting(filtered);
+
     // Cache the results
-    cacheNetworkRecommendations(userId, entityId, processedData);
+    cacheNetworkRecommendations(userId, entityId, ranked);
 
     console.log(`[NetworkRecs] Processed ${processedData.length} aggregated recommendations for user ${userId}, entity ${entityId}`);
     

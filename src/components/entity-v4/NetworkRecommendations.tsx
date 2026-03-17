@@ -142,11 +142,11 @@ export const NetworkRecommendations: React.FC<NetworkRecommendationsProps> = ({
     recommendedByUserId: rec.recommendedByUserId,
     recommendedByAvatars: rec.displayAvatars,
     recommendationCount: rec.recommendation_count,
-    slug: rec.entity_slug,
+    slug: rec.entity_slug || undefined,
     parent_id: rec.parent_id,
     parent_slug: rec.parent_slug,
-    reason: undefined, // No reason field in network recommendations
-    is_same_category: undefined, // No category field in network recommendations
+    reason: undefined,
+    is_same_category: undefined,
     latestRecommendationDate: rec.latest_recommendation_date,
     hasTimelineUpdates: rec.has_timeline_updates
   }));
