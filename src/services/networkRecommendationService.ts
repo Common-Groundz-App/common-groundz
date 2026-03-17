@@ -309,14 +309,18 @@ const applyRecencyWeighting = (recommendations: ProcessedNetworkRecommendation[]
   const now = new Date();
   
   return recommendations.map(rec => {
-    const recDate = new Date(rec.latest_recommendation_date || rec.created_at);
-    const ageInDays = (now.getTime() - recDate.getTime()) / (1000 * 60 * 60 * 24);
+    const recDate = rec.latest_recommendation_date
+      ? new Date(rec.latest_recommendation_date)
+      : null;
     
-    // Tiered recency boost
+    // No date = no boost (treat as old)
     let recencyBoost = 1.0;
-    if (ageInDays < 7) recencyBoost = 1.3;
-    else if (ageInDays < 30) recencyBoost = 1.15;
-    else if (ageInDays < 180) recencyBoost = 1.05;
+    if (recDate) {
+      const ageInDays = (now.getTime() - recDate.getTime()) / (1000 * 60 * 60 * 24);
+      if (ageInDays < 7) recencyBoost = 1.3;
+      else if (ageInDays < 30) recencyBoost = 1.15;
+      else if (ageInDays < 180) recencyBoost = 1.05;
+    }
     
     rec.average_rating = Math.min(rec.average_rating * recencyBoost, 5); // Cap at 5
     
