@@ -51,7 +51,7 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
       'main'
     );
     
-    navigate(`${getEntityUrlWithParent(recommendation)}?v=4`);
+    navigate(getEntityUrlWithParent(recommendation));
   };
 
   const formatRecommendedBy = (users: string[], count?: number): string => {

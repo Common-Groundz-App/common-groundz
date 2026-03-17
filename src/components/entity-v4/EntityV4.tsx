@@ -571,9 +571,9 @@ const EntityV4 = () => {
                   onViewSibling={(sibling) => {
                     if (parentEntity && sibling.slug) {
                       const hierarchicalUrl = getHierarchicalEntityUrl(parentEntity, sibling);
-                      navigate(`${hierarchicalUrl}?v=4`);
+                      navigate(hierarchicalUrl);
                     } else {
-                      navigate(`/entity/${sibling.slug || sibling.id}?v=4`);
+                      navigate(`/entity/${sibling.slug || sibling.id}`);
                     }
                   }}
                 />

@@ -204,7 +204,7 @@ export const UserSuggestionHistory: React.FC = () => {
                           size="sm"
                           onClick={() => {
                             // Navigate to entity page - you can implement this based on your routing
-                            window.open(`/entity/${suggestion.entity.slug || suggestion.entity_id}?v=4`, '_blank');
+                            window.open(`/entity/${suggestion.entity.slug || suggestion.entity_id}`, '_blank');
                           }}
                         >
                           <ExternalLink className="w-4 h-4" />

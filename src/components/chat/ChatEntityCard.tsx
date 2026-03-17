@@ -213,9 +213,9 @@ export function ChatEntityCard({
   // Handle click to navigate to entity page
   const handleClick = () => {
     if (entity?.slug) {
-      navigate(`/entity/${entity.slug}?v=4`);
+      navigate(`/entity/${entity.slug}`);
     } else if (entityId) {
-      navigate(`/entity/${entityId}?v=4`);
+      navigate(`/entity/${entityId}`);
     }
   };
   
