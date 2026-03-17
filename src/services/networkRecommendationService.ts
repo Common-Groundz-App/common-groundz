@@ -265,7 +265,7 @@ export const getNetworkEntityRecommendationsWithCache = async (
         recommendation_count: anyRec.recommendation_count,
         circle_rating: anyRec.average_rating,
         overall_rating: anyRec.average_rating,
-        latest_recommendation_date: new Date().toISOString(), // Use current date as fallback
+        latest_recommendation_date: anyRec.latest_recommendation_date ?? undefined,
         has_timeline_updates: false, // Default to false since property not available
         is_mutual_connection: false // Not applicable for aggregated data
       };
