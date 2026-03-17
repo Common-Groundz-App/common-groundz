@@ -1,37 +1,39 @@
 
 
-# Final Plan: Fix RPC Type Mismatch + Timestamp Handling
+# Footer Cleanup: Remove from Product Pages
 
-ChatGPT is correct — `created_at` should also use `undefined` not `new Date()`. Both fields must be consistent to avoid the fake freshness bug.
+ChatGPT's analysis is correct. The footer belongs on public/marketing pages, not inside the logged-in product experience. Your app already has navbar + bottom nav for product pages — adding a footer creates redundant navigation.
 
-## Step 1: SQL Migration
-Single migration file:
-- Drop stale overload `(uuid, uuid[], integer)`
-- Drop and recreate `(uuid, uuid, integer)` with `ad.net_score::double precision as network_score`
+## Current State
 
-## Step 2: Fix `src/services/networkRecommendationService.ts`
+**Already correct (keep footer):**
+- `Index.tsx` — landing page
+- `PrivacyPolicy.tsx`, `TermsOfService.tsx`, `CookiePolicy.tsx` — legal
+- `AccountDeleted.tsx` — terminal page
+- `PostView.tsx`, `RecommendationView.tsx` — public content (guest view)
+- `UserProfile.tsx` — public profile (guest view)
 
-**2a) Lines 256 and 268** — remove `new Date()` fallbacks:
-```typescript
-created_at: anyRec.latest_recommendation_date ?? undefined,
-// ...
-latest_recommendation_date: anyRec.latest_recommendation_date ?? undefined,
-```
+**Need footer removed:**
+- `Profile.tsx` — logged-in profile, already has BottomNavigation
+- `EntityDetail.tsx` — product page
+- `EntityDetailV2.tsx` — product page
+- `EntityV4.tsx` — product page
 
-**2b) `applyRecencyWeighting`** — handle missing dates as "no boost":
-```typescript
-const recDate = rec.latest_recommendation_date
-  ? new Date(rec.latest_recommendation_date)
-  : null;
+## Conditional Logic for Shared Pages
 
-let recencyBoost = 1.0;
-if (recDate) {
-  const ageInDays = (now.getTime() - recDate.getTime()) / (1000 * 60 * 60 * 24);
-  if (ageInDays < 7) recencyBoost = 1.3;
-  else if (ageInDays < 30) recencyBoost = 1.15;
-  else if (ageInDays < 180) recencyBoost = 1.05;
-}
-```
+`PostView.tsx`, `RecommendationView.tsx`, and `UserProfile.tsx` serve both guests and logged-in users. For these, the footer should only render when the user is **not** authenticated (guest view). When logged in, these pages should behave like product pages without a footer.
 
-Nothing else to add. This is the complete fix.
+## Changes
+
+| File | Action |
+|------|--------|
+| `Profile.tsx` | Remove Footer import and usage |
+| `EntityDetail.tsx` | Remove Footer import and usage |
+| `EntityDetailV2.tsx` | Remove Footer import and usage |
+| `EntityV4.tsx` | Remove Footer import and usage |
+| `PostView.tsx` | Conditionally render Footer only when `!user` |
+| `RecommendationView.tsx` | Conditionally render Footer only when `!user` |
+| `UserProfile.tsx` | Conditionally render Footer only when `!user` |
+
+Simple, clean changes — no new components needed.
 
