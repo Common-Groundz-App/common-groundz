@@ -484,7 +484,7 @@ const EntityV4 = () => {
   });
 
   return <TooltipProvider delayDuration={0}>
-    <div className="min-h-screen flex flex-col bg-background">
+    <div className="min-h-screen flex flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
       <SEOHead
         title={entity ? `${entity.name} — Common Groundz` : 'Common Groundz'}
         description={entity?.description ? entity.description.substring(0, 155) : 'Discover trusted recommendations on Common Groundz'}

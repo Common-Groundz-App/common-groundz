@@ -1,21 +1,39 @@
 
 
-# Add Bottom Navigation Spacing to Entity V4 Page
+# Footer Cleanup: Remove from Product Pages
 
-## Problem
-The Entity V4 page (`src/components/entity-v4/EntityV4.tsx`) is missing the standardized bottom padding used by Feed, My Stuff, and Settings pages, causing content to be obscured by the fixed bottom navigation bar on mobile/tablet.
+ChatGPT's analysis is correct. The footer belongs on public/marketing pages, not inside the logged-in product experience. Your app already has navbar + bottom nav for product pages — adding a footer creates redundant navigation.
 
-## Change — `src/components/entity-v4/EntityV4.tsx`
+## Current State
 
-**Line 487**: Add `pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0` to the root div.
+**Already correct (keep footer):**
+- `Index.tsx` — landing page
+- `PrivacyPolicy.tsx`, `TermsOfService.tsx`, `CookiePolicy.tsx` — legal
+- `AccountDeleted.tsx` — terminal page
+- `PostView.tsx`, `RecommendationView.tsx` — public content (guest view)
+- `UserProfile.tsx` — public profile (guest view)
 
-```
-// Before
-<div className="min-h-screen flex flex-col bg-background">
+**Need footer removed:**
+- `Profile.tsx` — logged-in profile, already has BottomNavigation
+- `EntityDetail.tsx` — product page
+- `EntityDetailV2.tsx` — product page
+- `EntityV4.tsx` — product page
 
-// After
-<div className="min-h-screen flex flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
-```
+## Conditional Logic for Shared Pages
 
-One-line change, consistent with all other pages.
+`PostView.tsx`, `RecommendationView.tsx`, and `UserProfile.tsx` serve both guests and logged-in users. For these, the footer should only render when the user is **not** authenticated (guest view). When logged in, these pages should behave like product pages without a footer.
+
+## Changes
+
+| File | Action |
+|------|--------|
+| `Profile.tsx` | Remove Footer import and usage |
+| `EntityDetail.tsx` | Remove Footer import and usage |
+| `EntityDetailV2.tsx` | Remove Footer import and usage |
+| `EntityV4.tsx` | Remove Footer import and usage |
+| `PostView.tsx` | Conditionally render Footer only when `!user` |
+| `RecommendationView.tsx` | Conditionally render Footer only when `!user` |
+| `UserProfile.tsx` | Conditionally render Footer only when `!user` |
+
+Simple, clean changes — no new components needed.
 
