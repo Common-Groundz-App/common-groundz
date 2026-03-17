@@ -246,7 +246,7 @@ export const ClaimReviewModal: React.FC<ClaimReviewModalProps> = ({
                         {getEntityTypeLabel(entity.type)}
                       </Badge>
                       <Link
-                        to={`/entity/${entity.id}?v=4`}
+                        to={`/entity/${entity.id}`}
                         className="text-blue-600 hover:text-blue-800"
                         target="_blank"
                       >

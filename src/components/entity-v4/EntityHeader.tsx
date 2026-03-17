@@ -130,7 +130,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
   const handleShare = async () => {
     if (!entity) return;
 
-    const entityUrl = `${window.location.origin}/entity/${entity.slug || entity.id}?v=4`;
+    const entityUrl = `${window.location.origin}/entity/${entity.slug || entity.id}`;
     
     await shareEntity({
       name: entity.name,

@@ -1,21 +1,39 @@
 
 
-# Remove `?v=4` from entity navigation URLs
+# Footer Cleanup: Remove from Product Pages
 
-No changes to the plan. Both reviewer suggestions (manual version override, internal testing mechanism) are already handled by `getEntityPageVersion()` in `entityVersionUtils.ts`, which reads `?v=` from the URL for internal users. We're only removing hardcoded `?v=4` from navigation links across 6 files — the version system remains fully functional.
+ChatGPT's analysis is correct. The footer belongs on public/marketing pages, not inside the logged-in product experience. Your app already has navbar + bottom nav for product pages — adding a footer creates redundant navigation.
+
+## Current State
+
+**Already correct (keep footer):**
+- `Index.tsx` — landing page
+- `PrivacyPolicy.tsx`, `TermsOfService.tsx`, `CookiePolicy.tsx` — legal
+- `AccountDeleted.tsx` — terminal page
+- `PostView.tsx`, `RecommendationView.tsx` — public content (guest view)
+- `UserProfile.tsx` — public profile (guest view)
+
+**Need footer removed:**
+- `Profile.tsx` — logged-in profile, already has BottomNavigation
+- `EntityDetail.tsx` — product page
+- `EntityDetailV2.tsx` — product page
+- `EntityV4.tsx` — product page
+
+## Conditional Logic for Shared Pages
+
+`PostView.tsx`, `RecommendationView.tsx`, and `UserProfile.tsx` serve both guests and logged-in users. For these, the footer should only render when the user is **not** authenticated (guest view). When logged in, these pages should behave like product pages without a footer.
 
 ## Changes
 
-Remove `?v=4` string from navigation calls in:
+| File | Action |
+|------|--------|
+| `Profile.tsx` | Remove Footer import and usage |
+| `EntityDetail.tsx` | Remove Footer import and usage |
+| `EntityDetailV2.tsx` | Remove Footer import and usage |
+| `EntityV4.tsx` | Remove Footer import and usage |
+| `PostView.tsx` | Conditionally render Footer only when `!user` |
+| `RecommendationView.tsx` | Conditionally render Footer only when `!user` |
+| `UserProfile.tsx` | Conditionally render Footer only when `!user` |
 
-| File | What to change |
-|------|---------------|
-| `RecommendationEntityCard.tsx` | Line 54: remove `?v=4` from navigate call |
-| `EntityV4.tsx` | Lines 349, 352, 574, 576: remove `?v=4` from child/sibling navigation |
-| `EntityHeader.tsx` | Line 133: remove `?v=4` from share URL |
-| `ChatEntityCard.tsx` | Lines 216, 218: remove `?v=4` from navigate |
-| `UserSuggestionHistory.tsx` | Line 207: remove `?v=4` from window.open |
-| `ClaimReviewModal.tsx` | Line 249: remove `?v=4` from admin link |
-
-Pure string removal — no logic changes.
+Simple, clean changes — no new components needed.
 

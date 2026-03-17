@@ -346,10 +346,10 @@ const EntityV4 = () => {
     if (entityWithChildren) {
       // Use hierarchical URL when viewing child from parent page
       const hierarchicalUrl = getHierarchicalEntityUrl(entityWithChildren, child);
-      navigate(`${hierarchicalUrl}?v=4`);
+      navigate(hierarchicalUrl);
     } else {
       // Fallback to single entity URL
-      navigate(`${getEntityUrlWithParent(child)}?v=4`);
+      navigate(getEntityUrlWithParent(child));
     }
   };
 
@@ -571,9 +571,9 @@ const EntityV4 = () => {
                   onViewSibling={(sibling) => {
                     if (parentEntity && sibling.slug) {
                       const hierarchicalUrl = getHierarchicalEntityUrl(parentEntity, sibling);
-                      navigate(`${hierarchicalUrl}?v=4`);
+                      navigate(hierarchicalUrl);
                     } else {
-                      navigate(`/entity/${sibling.slug || sibling.id}?v=4`);
+                      navigate(`/entity/${sibling.slug || sibling.id}`);
                     }
                   }}
                 />
