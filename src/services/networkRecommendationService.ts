@@ -278,9 +278,9 @@ export const getNetworkEntityRecommendationsWithCache = async (
     // Cache the results
     cacheNetworkRecommendations(userId, entityId, ranked);
 
-    console.log(`[NetworkRecs] Processed ${processedData.length} aggregated recommendations for user ${userId}, entity ${entityId}`);
+    console.log(`[NetworkRecs] Processed ${ranked.length} aggregated recommendations (${processedData.length} raw, ${filtered.length} after quality filter) for user ${userId}, entity ${entityId}`);
     
-    return processedData;
+    return ranked;
   } catch (error) {
     console.error('[NetworkRecs] Error fetching aggregated network recommendations:', error);
     return [];
