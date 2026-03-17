@@ -87,9 +87,6 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
     return '1y+ ago';
   };
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
 
   return (
     <div 
