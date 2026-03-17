@@ -68,7 +68,7 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
     return `${truncateName(validUsers[0])} & ${totalCount - 1} others recommend this`;
   };
 
-  const formatTimeAgo = (dateString?: string): string => {
+  const formatShortTimeAgo = (dateString?: string): string => {
     if (!dateString) return '';
     
     const date = new Date(dateString);
@@ -79,15 +79,12 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
     const diffInWeeks = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 7));
     const diffInMonths = Math.floor(diffInMs / (1000 * 60 * 60 * 24 * 30));
     
-    if (diffInHours < 1) return 'recommended recently';
-    if (diffInHours < 24) return `recommended ${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
-    if (diffInDays === 1) return 'recommended yesterday';
-    if (diffInDays < 7) return `recommended ${diffInDays} days ago`;
-    if (diffInWeeks === 1) return 'recommended 1 week ago';
-    if (diffInWeeks < 4) return `recommended ${diffInWeeks} weeks ago`;
-    if (diffInMonths === 1) return 'recommended 1 month ago';
-    if (diffInMonths < 12) return `recommended ${diffInMonths} months ago`;
-    return 'recommended over a year ago';
+    if (diffInHours < 1) return 'just now';
+    if (diffInHours < 24) return `${diffInHours}h ago`;
+    if (diffInDays < 7) return `${diffInDays}d ago`;
+    if (diffInWeeks < 4) return `${diffInWeeks}w ago`;
+    if (diffInMonths < 12) return `${diffInMonths}mo ago`;
+    return '1y+ ago';
   };
 
   const getInitials = (name: string) => {

@@ -258,7 +258,7 @@ export const getNetworkEntityRecommendationsWithCache = async (
         // Aggregated data
         userProfiles,
         displayUsernames: anyRec.recommender_usernames || ['Unknown User'],
-        displayAvatars: anyRec.recommender_avatars?.filter(Boolean) || [],
+        displayAvatars: anyRec.recommender_avatars || [],
         recommendedByUserId: anyRec.recommender_user_ids || [],
         
         // Enhanced fields
