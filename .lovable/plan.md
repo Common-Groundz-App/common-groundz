@@ -1,39 +1,43 @@
 
 
-# Footer Cleanup: Remove from Product Pages
+# Circle Recommendations UI Polish
 
-ChatGPT's analysis is correct. The footer belongs on public/marketing pages, not inside the logged-in product experience. Your app already has navbar + bottom nav for product pages — adding a footer creates redundant navigation.
-
-## Current State
-
-**Already correct (keep footer):**
-- `Index.tsx` — landing page
-- `PrivacyPolicy.tsx`, `TermsOfService.tsx`, `CookiePolicy.tsx` — legal
-- `AccountDeleted.tsx` — terminal page
-- `PostView.tsx`, `RecommendationView.tsx` — public content (guest view)
-- `UserProfile.tsx` — public profile (guest view)
-
-**Need footer removed:**
-- `Profile.tsx` — logged-in profile, already has BottomNavigation
-- `EntityDetail.tsx` — product page
-- `EntityDetailV2.tsx` — product page
-- `EntityV4.tsx` — product page
-
-## Conditional Logic for Shared Pages
-
-`PostView.tsx`, `RecommendationView.tsx`, and `UserProfile.tsx` serve both guests and logged-in users. For these, the footer should only render when the user is **not** authenticated (guest view). When logged in, these pages should behave like product pages without a footer.
+Both ChatGPT and Codex agree — the plan is ready. Their additions (clean truncation, blank username fallback) are minor but worth including.
 
 ## Changes
 
-| File | Action |
-|------|--------|
-| `Profile.tsx` | Remove Footer import and usage |
-| `EntityDetail.tsx` | Remove Footer import and usage |
-| `EntityDetailV2.tsx` | Remove Footer import and usage |
-| `EntityV4.tsx` | Remove Footer import and usage |
-| `PostView.tsx` | Conditionally render Footer only when `!user` |
-| `RecommendationView.tsx` | Conditionally render Footer only when `!user` |
-| `UserProfile.tsx` | Conditionally render Footer only when `!user` |
+### 1. Branding — 3 files
+Update "Recommended by Your Network" → **"Recommended by Your Circle"** in:
+- `src/components/entity-v4/NetworkRecommendations.tsx` (line 225)
+- `src/components/modals/RecommendationsModal.tsx` (line 37)
+- `src/components/entity-v4/ReviewsSection.tsx` (line 565)
 
-Simple, clean changes — no new components needed.
+### 2. Avatar alignment fix — `src/services/networkRecommendationService.ts`
+Line 261: Remove `.filter(Boolean)` so avatar array stays index-aligned with usernames:
+```typescript
+displayAvatars: anyRec.recommender_avatars || []
+```
+
+### 3. Card polish — `src/components/entity/RecommendationEntityCard.tsx`
+
+**a) Smarter `formatRecommendedBy` (lines 57-66)**
+
+Add a `truncateName` helper (max 12 chars, clean ellipsis). Update logic:
+- 0 users: empty string (guard)
+- 1 user: `{name} recommends this`
+- 2 users: `{name} & {name} recommend this`
+- 3+: `{name} & {N-1} others recommend this`
+
+Filter out blank/falsy usernames before formatting.
+
+**b) Cap avatars at 2, update +N badge (lines 148-172)**
+- `.slice(0, 2)` instead of `.slice(0, 3)`
+- `+N` threshold: `> 2` instead of `> 3`
+- Null avatar URLs already handled by `AvatarFallback` showing initials
+
+**c) Inline time-ago (lines 174-182)**
+Remove the separate `<p>` block for time-ago. Instead, append ` · {shortTimeAgo}` to the attribution text line. Shorten time labels (e.g. "9mo ago", "2d ago", "3w ago") for compact display.
+
+## Summary
+4 files touched. Pure UI/branding polish — no backend or SQL changes.
 
