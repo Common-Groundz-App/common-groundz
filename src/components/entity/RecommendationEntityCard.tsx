@@ -141,17 +141,13 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
         
         {/* Attribution */}
         {isNetworkRecommendation && recommendation.recommendedBy.length > 0 && (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1">
-              {/* Show multiple avatars */}
+          <div className="flex items-center gap-1">
+              {/* Show max 2 avatars */}
               <div className="flex -space-x-1">
                 {(recommendation.recommendedByAvatars || recommendation.recommendedBy)
-                  .slice(0, 3)
+                  .slice(0, 2)
                   .map((avatar, index) => {
                     const isUrl = typeof avatar === 'string' && avatar.startsWith('http');
-                    const userId = Array.isArray(recommendation.recommendedByUserId) 
-                      ? recommendation.recommendedByUserId[index] 
-                      : recommendation.recommendedByUserId;
                     
                     return (
                       <Avatar key={index} className="h-4 w-4 border border-background">
@@ -162,24 +158,21 @@ export const RecommendationEntityCard: React.FC<RecommendationEntityCardProps> =
                       </Avatar>
                     );
                   })}
-                {(recommendation.recommendationCount || recommendation.recommendedBy.length) > 3 && (
+                {(recommendation.recommendationCount || recommendation.recommendedBy.length) > 2 && (
                   <div className="h-4 w-4 rounded-full bg-muted border border-background flex items-center justify-center">
-                    <span className="text-xs font-medium">
-                      +{(recommendation.recommendationCount || recommendation.recommendedBy.length) - 3}
+                    <span className="text-[8px] font-medium">
+                      +{(recommendation.recommendationCount || recommendation.recommendedBy.length) - 2}
                     </span>
                   </div>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground line-clamp-1">
                 {formatRecommendedBy(recommendation.recommendedBy, recommendation.recommendationCount)}
+                {recommendation.latestRecommendationDate && (
+                  <span className="text-muted-foreground/70"> · {formatShortTimeAgo(recommendation.latestRecommendationDate)}</span>
+                )}
               </p>
             </div>
-            {recommendation.latestRecommendationDate && (
-              <p className="text-xs text-muted-foreground/70">
-                {formatTimeAgo(recommendation.latestRecommendationDate)}
-              </p>
-            )}
-          </div>
         )}
         
         {!isNetworkRecommendation && (
