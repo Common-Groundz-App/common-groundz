@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useFeed } from '@/hooks/feed/use-feed';
 import { useFeed } from '@/hooks/feed/use-feed';
 import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
