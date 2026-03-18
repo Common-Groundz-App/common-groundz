@@ -18,7 +18,7 @@ interface NotificationPopoverProps {
 }
 
 export function NotificationPopover({ trigger, align = "end" }: NotificationPopoverProps) {
-  const { notifications, unreadNotifications, markAsRead, loading, markingAsRead } = useNotifications();
+  const { notifications, unreadNotifications, markAsRead, loading, markingAsRead, lastRefresh, isOnline, fetchAll } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
