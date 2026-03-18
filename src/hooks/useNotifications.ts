@@ -24,6 +24,7 @@ export function useNotifications(pollInterval = 10000) {
     try {
       const data = await fetchNotifications();
       setNotifications(data);
+      setLastRefresh(new Date());
       networkStatusService.reportSuccess();
     } catch (e) {
       setError(e);
