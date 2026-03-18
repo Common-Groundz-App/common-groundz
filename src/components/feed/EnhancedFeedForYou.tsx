@@ -1,6 +1,5 @@
 
 import React, { useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
 import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
 import { useEnhancedInfiniteScroll } from '@/hooks/useEnhancedInfiniteScroll';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -21,7 +20,6 @@ interface EnhancedFeedForYouProps {
 
 const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = false }) => {
   const { user, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
   const { startRender, endRender } = usePerformanceMonitor('FeedForYou');
   
   // Memory optimization
@@ -59,15 +57,12 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
     startRender();
     
     if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load feed. Please try again.',
-        variant: 'destructive'
-      });
+      // Background fetch — fail silently (no destructive toast)
+      console.error('Feed load error:', error);
     }
     
     endRender();
-  }, [error, toast, startRender, endRender]);
+  }, [error, startRender, endRender]);
 
   useEffect(() => {
     const handleRefresh = () => refreshFeed();

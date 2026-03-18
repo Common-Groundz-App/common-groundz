@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import { 
   Recommendation,
   fetchUserRecommendations,
@@ -21,7 +20,6 @@ export const useRecommendationsFetch = ({
   limit
 }: UseRecommendationsFetchProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [error, setError] = useState<Error | null>(null);
   
@@ -64,18 +62,13 @@ export const useRecommendationsFetch = ({
     }
   }, [data]);
   
-  // Handle errors
+  // Handle errors — background fetch, fail silently (no destructive toast)
   useEffect(() => {
     if (queryError) {
       console.error('Error in useRecommendationsFetch:', queryError);
       setError(queryError instanceof Error ? queryError : new Error('Failed to fetch recommendations'));
-      toast({
-        title: 'Error',
-        description: 'Failed to load recommendations. Please try again.',
-        variant: 'destructive'
-      });
     }
-  }, [queryError, toast]);
+  }, [queryError]);
 
   // Refresh recommendations function
   const refreshRecommendations = async () => {

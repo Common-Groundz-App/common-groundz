@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import PostFeedItem from '@/components/feed/PostFeedItem';
 import FeedSkeleton from '@/components/feed/FeedSkeleton';
 import CommentsPreview from '@/components/comments/CommentsPreview';
@@ -19,7 +18,6 @@ interface PostContentViewerProps {
 
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPostLoaded }: PostContentViewerProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
   const [post, setPost] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -133,14 +131,10 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
           imageUrl: data.media?.[0]?.url || undefined,
         });
       } catch (err) {
+        // Background fetch — fail silently (no destructive toast)
         console.error('Error fetching post:', err);
         setError('Error loading post');
         onPostLoaded?.(null);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load post content'
-        });
       } finally {
         setLoading(false);
       }

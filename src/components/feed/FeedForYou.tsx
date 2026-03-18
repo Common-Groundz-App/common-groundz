@@ -1,6 +1,5 @@
 
 import React, { useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
 import { useFeed } from '@/hooks/feed/use-feed';
 import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
@@ -17,7 +16,6 @@ interface FeedForYouProps {
 
 const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
   const { user, isLoading } = useAuth();
-  const { toast } = useToast();
 
   // CRITICAL: Don't render feed logic until auth is ready
   if (isLoading) {
@@ -50,13 +48,10 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
 
   useEffect(() => {
     if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load feed. Please try again.',
-        variant: 'destructive'
-      });
+      // Background fetch — fail silently (no destructive toast)
+      console.error('Feed load error:', error);
     }
-  }, [error, toast]);
+  }, [error]);
 
   useEffect(() => {
     const handleRefresh = () => refreshFeed();

@@ -1,6 +1,5 @@
 
 import React, { useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
 import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import FeedItem from './FeedItem';
@@ -20,7 +19,6 @@ interface FeedFollowingProps {
 
 const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => {
   const { user, isLoading } = useAuth();
-  const { toast } = useToast();
 
   // CRITICAL: Don't render feed logic until auth is ready
   if (isLoading) {
@@ -66,13 +64,10 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
 
   useEffect(() => {
     if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load feed. Please try again.',
-        variant: 'destructive'
-      });
+      // Background fetch — fail silently (no destructive toast)
+      console.error('Feed load error:', error);
     }
-  }, [error, toast]);
+  }, [error]);
   
   useEffect(() => {
     const handleRefresh = () => refreshFeed();

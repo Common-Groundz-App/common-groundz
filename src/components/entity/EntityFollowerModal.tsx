@@ -11,7 +11,6 @@ import EmptyState from '@/components/profile/circles/EmptyState';
 import { useFollowActions } from '@/components/profile/circles/hooks/useFollowActions';
 import { getEntityFollowersWithContext, type EntityFollowerWithContext } from '@/services/entityFollowService';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
 interface EntityFollowerModalProps {
@@ -36,7 +35,6 @@ export const EntityFollowerModal: React.FC<EntityFollowerModalProps> = ({
   totalFollowersCount
 }) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
   const { actionLoading, handleFollowToggle: toggleFollow } = useFollowActions(user?.id);
   
@@ -71,12 +69,8 @@ export const EntityFollowerModal: React.FC<EntityFollowerModalProps> = ({
       });
       setFollowers(data);
     } catch (error) {
+      // Background fetch — fail silently (no destructive toast)
       console.error('Error fetching followers:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load followers. Please try again.',
-        variant: 'destructive'
-      });
     } finally {
       setIsLoading(false);
     }

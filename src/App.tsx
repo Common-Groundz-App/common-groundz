@@ -1,6 +1,7 @@
 
 import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { onlineManager } from '@tanstack/react-query';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as SonnerToaster } from '@/components/ui/sonner';
@@ -43,12 +44,40 @@ import AccountDeleted from '@/pages/AccountDeleted';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import TermsOfService from '@/pages/TermsOfService';
 import CookiePolicy from '@/pages/CookiePolicy';
+import OfflineBanner from '@/components/OfflineBanner';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
 import { AuthPromptProvider } from '@/contexts/AuthPromptContext';
+import { networkStatusService } from '@/services/networkStatusService';
 
-// Create a client
-const queryClient = new QueryClient();
+/**
+ * Global Error & Network Policy:
+ * 1. Background queries fail silently — no destructive toasts
+ * 2. User mutations (like, follow, post, delete) can show error toasts
+ * 3. Never clear UI data on fetch failure — stale-while-revalidate
+ * 4. All polling respects shared network state via useNetworkStatus()
+ * 5. navigator.onLine only checked inside networkStatusService
+ * 6. Only transport failures count toward offline detection
+ */
+
+// Wire React Query's online manager to our shared singleton
+onlineManager.setEventListener((setOnline) => {
+  return networkStatusService.subscribe(() => {
+    setOnline(networkStatusService.getSnapshot().isOnline);
+  });
+});
+
+// Create a client with global defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      staleTime: 30_000,
+      refetchOnReconnect: true,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function App() {
   useEffect(() => {
@@ -82,6 +111,7 @@ function App() {
             <Router>
               <AuthInitializer>
               <AuthPromptProvider>
+                <OfflineBanner />
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
