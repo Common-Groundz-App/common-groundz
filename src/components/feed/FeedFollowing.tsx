@@ -66,13 +66,10 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
 
   useEffect(() => {
     if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load feed. Please try again.',
-        variant: 'destructive'
-      });
+      // Background fetch — fail silently (no destructive toast)
+      console.error('Feed load error:', error);
     }
-  }, [error, toast]);
+  }, [error]);
   
   useEffect(() => {
     const handleRefresh = () => refreshFeed();

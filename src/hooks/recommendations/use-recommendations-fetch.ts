@@ -64,18 +64,13 @@ export const useRecommendationsFetch = ({
     }
   }, [data]);
   
-  // Handle errors
+  // Handle errors — background fetch, fail silently (no destructive toast)
   useEffect(() => {
     if (queryError) {
       console.error('Error in useRecommendationsFetch:', queryError);
       setError(queryError instanceof Error ? queryError : new Error('Failed to fetch recommendations'));
-      toast({
-        title: 'Error',
-        description: 'Failed to load recommendations. Please try again.',
-        variant: 'destructive'
-      });
     }
-  }, [queryError, toast]);
+  }, [queryError]);
 
   // Refresh recommendations function
   const refreshRecommendations = async () => {

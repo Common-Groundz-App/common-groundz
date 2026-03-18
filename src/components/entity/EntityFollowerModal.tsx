@@ -71,12 +71,8 @@ export const EntityFollowerModal: React.FC<EntityFollowerModalProps> = ({
       });
       setFollowers(data);
     } catch (error) {
+      // Background fetch — fail silently (no destructive toast)
       console.error('Error fetching followers:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load followers. Please try again.',
-        variant: 'destructive'
-      });
     } finally {
       setIsLoading(false);
     }

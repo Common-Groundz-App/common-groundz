@@ -133,14 +133,10 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
           imageUrl: data.media?.[0]?.url || undefined,
         });
       } catch (err) {
+        // Background fetch — fail silently (no destructive toast)
         console.error('Error fetching post:', err);
         setError('Error loading post');
         onPostLoaded?.(null);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load post content'
-        });
       } finally {
         setLoading(false);
       }

@@ -111,6 +111,7 @@ function App() {
             <Router>
               <AuthInitializer>
               <AuthPromptProvider>
+                <OfflineBanner />
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />

@@ -59,15 +59,12 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
     startRender();
     
     if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load feed. Please try again.',
-        variant: 'destructive'
-      });
+      // Background fetch — fail silently (no destructive toast)
+      console.error('Feed load error:', error);
     }
     
     endRender();
-  }, [error, toast, startRender, endRender]);
+  }, [error, startRender, endRender]);
 
   useEffect(() => {
     const handleRefresh = () => refreshFeed();

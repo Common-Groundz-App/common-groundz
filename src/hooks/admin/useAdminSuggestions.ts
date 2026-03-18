@@ -163,12 +163,8 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
       setTotalCount(count || 0);
       setCurrentPage(page);
     } catch (error) {
+      // Background/auto-refresh fetch — fail silently (no destructive toast)
       console.error('Error fetching suggestions:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch suggestions',
-        variant: 'destructive'
-      });
     } finally {
       setIsLoading(false);
     }
