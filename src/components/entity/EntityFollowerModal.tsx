@@ -12,7 +12,6 @@ import { useFollowActions } from '@/components/profile/circles/hooks/useFollowAc
 import { getEntityFollowersWithContext, type EntityFollowerWithContext } from '@/services/entityFollowService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useNavigate } from 'react-router-dom';
 
 interface EntityFollowerModalProps {
   open: boolean;
