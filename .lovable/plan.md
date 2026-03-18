@@ -1,7 +1,7 @@
 
 # Global Offline/Network Handling System — COMPLETE ✅
 
-Initiative closed after Phase 1, Phase 2, and final QA sweep.
+Initiative closed after Phase 1, Phase 2, final QA sweep, and Phase 3 (Offline Snackbar).
 
 ## Phase 1 — Network layer & silent background failures
 
@@ -51,6 +51,21 @@ Initiative closed after Phase 1, Phase 2, and final QA sweep.
 
 ### Confirmed clean (no action needed)
 - `PostContentViewer.tsx`, `use-search.ts`, `EntityRecommendationModal.tsx`, `ReviewTimelineViewer.tsx`, `ChatInterface.tsx`, `AdminPhotoModerationPanel.tsx`
+
+## Phase 3 — Offline Snackbar Rewrite
+
+### `src/services/networkStatusService.ts`
+- Added `probeConnectivity()` — lightweight GET to Supabase REST with 4s AbortController timeout, `cache: 'no-store'`, transport-aware (any HTTP response = online)
+
+### `src/components/OfflineBanner.tsx` — Full rewrite
+- **Mobile (< xl)**: Fixed bottom pill above bottom nav (`bottom-[calc(4.5rem+env(safe-area-inset-bottom))]`), `z-[41]`, `rounded-full`, slide-up animation
+- **Desktop (xl+)**: Fixed top bar with height-collapse animation
+- **Retry**: Real connectivity probe → `reportSuccess()` → `refetchQueries({ type: 'active' })`, 5s cooldown with spinner, "Still offline" flash on failure, concurrent tap guard via ref
+- **Back online**: Green pill, auto-dismiss via existing `wasOffline` logic
+
+### Inline copy simplified (~6 files)
+- Feed surfaces → "Showing cached posts"
+- Notification surfaces → "Showing recent notifications"
 
 ## Rules (documented in App.tsx)
 1. Background queries fail silently — no destructive toasts
