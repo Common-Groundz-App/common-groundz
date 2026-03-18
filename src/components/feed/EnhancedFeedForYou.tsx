@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
 import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
 import { useEnhancedInfiniteScroll } from '@/hooks/useEnhancedInfiniteScroll';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
