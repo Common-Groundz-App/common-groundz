@@ -133,7 +133,8 @@
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   .animate-bounce,
-  .animate-pulse {
+  .animate-pulse,
+  .animate-spin {
     animation: none !important;
   }
 }
