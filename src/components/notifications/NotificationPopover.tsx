@@ -109,8 +109,8 @@ export function NotificationPopover({ trigger, align = "end" }: NotificationPopo
               {!isOnline && (
                 <div className="mb-2">
                   <OfflineInlineState
-                    message="Showing recent notifications"
-                    onRetry={fetchAll}
+                    message={notifications.length > 0 ? "Showing recent notifications" : "Can't load notifications while offline"}
+                    onRetry={notifications.length === 0 ? fetchAll : undefined}
                     lastRefresh={lastRefresh}
                   />
                 </div>
