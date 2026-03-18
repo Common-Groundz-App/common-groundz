@@ -11,7 +11,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 interface FeedFollowingProps {
   refreshing?: boolean;
