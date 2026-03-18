@@ -101,7 +101,7 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
     <div className="space-y-6">
       {!isOnline && items.length > 0 ? (
         <>
-          <OfflineInlineState message="Showing cached posts" onRetry={refreshFeed} />
+          <OfflineInlineState message="Showing cached posts" />
           <motion.div className="space-y-8">
             {items.map((item) => (
               <FeedItem
