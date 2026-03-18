@@ -118,6 +118,15 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
               </TabsList>
             
               <TabsContent value="all" className="mt-2">
+                {!isOnline && (
+                  <div className="mb-2">
+                    <OfflineInlineState
+                      message="You're offline — showing recent notifications"
+                      onRetry={fetchAll}
+                      lastRefresh={lastRefresh}
+                    />
+                  </div>
+                )}
                 <NotificationList 
                   notifications={notifications}
                   loading={loading}

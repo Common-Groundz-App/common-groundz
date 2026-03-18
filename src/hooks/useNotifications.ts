@@ -101,6 +101,8 @@ export function useNotifications(pollInterval = 10000) {
     loading, 
     markingAsRead,
     error, 
+    lastRefresh,
+    isOnline,
     fetchAll 
   };
 }

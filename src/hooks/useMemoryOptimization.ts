@@ -14,8 +14,8 @@ export const useMemoryOptimization = ({
   componentName
 }: MemoryOptimizationOptions) => {
   const { startRender, endRender } = usePerformanceMonitor(componentName);
-  const cleanupTimerRef = useRef<NodeJS.Timeout>();
-  const memoryCheckRef = useRef<NodeJS.Timeout>();
+  const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const memoryCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Memory cleanup function
   const performCleanup = useCallback(() => {
@@ -53,17 +53,41 @@ export const useMemoryOptimization = ({
     }
   }, [maxMemoryUsage, componentName, performCleanup]);
 
-  // Set up cleanup intervals
+  // Self-rescheduling setTimeout pattern with visibility guard
   useEffect(() => {
-    cleanupTimerRef.current = setInterval(performCleanup, cleanupInterval);
-    memoryCheckRef.current = setInterval(checkMemoryUsage, cleanupInterval / 2);
+    const scheduleCleanup = () => {
+      cleanupTimerRef.current = setTimeout(() => {
+        if (document.hidden) {
+          scheduleCleanup();
+          return;
+        }
+        performCleanup();
+        scheduleCleanup();
+      }, cleanupInterval);
+    };
+
+    const scheduleMemoryCheck = () => {
+      memoryCheckTimerRef.current = setTimeout(() => {
+        if (document.hidden) {
+          scheduleMemoryCheck();
+          return;
+        }
+        checkMemoryUsage();
+        scheduleMemoryCheck();
+      }, cleanupInterval / 2);
+    };
+
+    scheduleCleanup();
+    scheduleMemoryCheck();
 
     return () => {
       if (cleanupTimerRef.current) {
-        clearInterval(cleanupTimerRef.current);
+        clearTimeout(cleanupTimerRef.current);
+        cleanupTimerRef.current = null;
       }
-      if (memoryCheckRef.current) {
-        clearInterval(memoryCheckRef.current);
+      if (memoryCheckTimerRef.current) {
+        clearTimeout(memoryCheckTimerRef.current);
+        memoryCheckTimerRef.current = null;
       }
     };
   }, [cleanupInterval, performCleanup, checkMemoryUsage]);

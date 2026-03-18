@@ -55,8 +55,21 @@ export const useCacheAnalytics = () => {
 
   useEffect(() => {
     calculateMetrics();
-    const interval = setInterval(calculateMetrics, 5000); // Update every 5 seconds
-    return () => clearInterval(interval);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleNext = () => {
+      timer = setTimeout(() => {
+        if (document.hidden) {
+          scheduleNext();
+          return;
+        }
+        calculateMetrics();
+        scheduleNext();
+      }, 5000);
+    };
+    scheduleNext();
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
   }, [queryClient]);
 
   const clearCache = () => {

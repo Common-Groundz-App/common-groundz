@@ -1,9 +1,10 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { discoveryService, DiscoveryCollection } from '@/services/discoveryService';
 import { enhancedDiscoveryService } from '@/services/enhancedDiscoveryService';
 import { PersonalizedEntity } from '@/services/enhancedExploreService';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 interface UseDiscoveryProps {
   autoRefresh?: boolean;
@@ -17,18 +18,21 @@ export const useDiscovery = ({
   useAdvancedAlgorithms = true
 }: UseDiscoveryProps = {}) => {
   const { user } = useAuth();
+  const { isOnline } = useNetworkStatus();
   const [discoveryCollections, setDiscoveryCollections] = useState<DiscoveryCollection[]>([]);
   const [newThisWeek, setNewThisWeek] = useState<PersonalizedEntity[]>([]);
   const [forYou, setForYou] = useState<PersonalizedEntity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchDiscoveryData = async () => {
+    if (!isOnline) return;
+    
     try {
       setIsLoading(true);
       
       if (user?.id && useAdvancedAlgorithms) {
-        // Use enhanced discovery service for authenticated users
         const [collections, newEntities, forYouEntities] = await Promise.all([
           enhancedDiscoveryService.getEnhancedDiscoveryCollections(user.id),
           enhancedDiscoveryService.getQualityNewThisWeek(6),
@@ -38,9 +42,7 @@ export const useDiscovery = ({
         setDiscoveryCollections(collections);
         setNewThisWeek(newEntities);
         setForYou(forYouEntities);
-        
       } else {
-        // Fall back to basic discovery service
         const [collections, newEntities, forYouEntities] = await Promise.all([
           discoveryService.getAllDiscoveryCollections(user?.id),
           discoveryService.getNewThisWeek(6),
@@ -63,15 +65,27 @@ export const useDiscovery = ({
   useEffect(() => {
     fetchDiscoveryData();
     
-    let intervalId: NodeJS.Timeout | null = null;
     if (autoRefresh) {
-      intervalId = setInterval(fetchDiscoveryData, refreshInterval);
+      const scheduleNext = () => {
+        timerRef.current = setTimeout(async () => {
+          if (document.hidden || !isOnline) {
+            scheduleNext();
+            return;
+          }
+          await fetchDiscoveryData();
+          scheduleNext();
+        }, refreshInterval);
+      };
+      scheduleNext();
     }
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [user?.id, autoRefresh, refreshInterval, useAdvancedAlgorithms]);
+  }, [user?.id, autoRefresh, refreshInterval, useAdvancedAlgorithms, isOnline]);
 
   const refreshDiscovery = () => {
     fetchDiscoveryData();

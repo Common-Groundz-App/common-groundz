@@ -102,7 +102,32 @@ const InfiniteFeedForYou: React.FC<InfiniteFeedForYouProps> = ({ refreshing = fa
 
   return (
     <div className="space-y-6">
-      {error ? (
+      {!isOnline && items.length > 0 ? (
+        <>
+          <OfflineInlineState message="You're offline — showing last updated posts" onRetry={refreshFeed} />
+          <motion.div className="space-y-8">
+            {items.map((item, index) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <FeedItem 
+                  item={item} 
+                  onLike={handleLike}
+                  onSave={handleSave}
+                  onComment={(id) => console.log('Comment on', id)}
+                  onDelete={handleDelete}
+                  refreshFeed={refreshFeed}
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+        </>
+      ) : !isOnline && items.length === 0 ? (
+        <OfflineInlineState message="You're offline — showing last updated posts" onRetry={refreshFeed} />
+      ) : error ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>

@@ -79,18 +79,32 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
 
   return (
     <div className="space-y-6">
-      {error ? (
+      {!isOnline && items.length > 0 ? (
+        <>
+          <OfflineInlineState message="You're offline — showing last updated posts" onRetry={refreshFeed} />
+          <motion.div className="space-y-8">
+            {items.map(item => (
+              <FeedItem 
+                key={item.id} 
+                item={item} 
+                onLike={handleLike}
+                onSave={handleSave}
+                onComment={(id) => console.log('Comment on', id)}
+                onDelete={handleDelete}
+                refreshFeed={refreshFeed}
+              />
+            ))}
+          </motion.div>
+        </>
+      ) : !isOnline && items.length === 0 ? (
+        <OfflineInlineState message="You're offline — showing last updated posts" onRetry={refreshFeed} />
+      ) : error ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>
             There was a problem loading the feed.
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={refreshFeed}
-              className="ml-2"
-            >
+            <Button variant="outline" size="sm" onClick={refreshFeed} className="ml-2">
               Try again
             </Button>
           </AlertDescription>
