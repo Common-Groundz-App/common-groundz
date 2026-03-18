@@ -121,7 +121,7 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
                 {!isOnline && (
                   <div className="mb-2">
                     <OfflineInlineState
-                      message="You're offline — showing recent notifications"
+                      message="Showing recent notifications"
                       onRetry={fetchAll}
                       lastRefresh={lastRefresh}
                     />

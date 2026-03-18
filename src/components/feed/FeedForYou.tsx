@@ -81,7 +81,7 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
     <div className="space-y-6">
       {!isOnline && items.length > 0 ? (
         <>
-          <OfflineInlineState message="You're offline — showing last updated posts" onRetry={refreshFeed} />
+          <OfflineInlineState message="Showing cached posts" onRetry={refreshFeed} />
           <motion.div className="space-y-8">
             {items.map(item => (
               <FeedItem 
@@ -97,7 +97,7 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
           </motion.div>
         </>
       ) : !isOnline && items.length === 0 ? (
-        <OfflineInlineState message="You're offline — showing last updated posts" onRetry={refreshFeed} />
+        <OfflineInlineState message="Showing cached posts" onRetry={refreshFeed} />
       ) : error ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />

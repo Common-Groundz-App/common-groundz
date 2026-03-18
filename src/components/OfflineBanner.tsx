@@ -1,47 +1,147 @@
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { networkStatusService } from '@/services/networkStatusService';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WifiOff, Wifi } from 'lucide-react';
+import { WifiOff, Wifi, RefreshCw, Loader2 } from 'lucide-react';
+import { useState, useRef, useCallback } from 'react';
 
 /**
  * Global offline/reconnected banner. Mount once in App.tsx.
- * 
- * - Offline: persistent dark banner
- * - Back online: green banner, auto-dismisses after 3s
- *   (only shown if offline lasted 2+ seconds — prevents flicker)
+ *
+ * - Mobile (< xl): fixed bottom pill above bottom nav
+ * - Desktop (xl+): fixed top bar
+ * - Retry: real connectivity probe → refetch active queries
+ * - Back online: green pill, auto-dismisses via wasOffline logic
  */
+const RETRY_COOLDOWN = 5000;
+
 const OfflineBanner = () => {
   const { isOnline, wasOffline } = useNetworkStatus();
+  const queryClient = useQueryClient();
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [stillOffline, setStillOffline] = useState(false);
+  const retryingRef = useRef(false);
+  const cooldownRef = useRef(false);
 
   const showOffline = !isOnline;
   const showReconnected = isOnline && wasOffline;
 
+  const handleRetry = useCallback(async () => {
+    if (retryingRef.current || cooldownRef.current) return;
+    retryingRef.current = true;
+    setIsRetrying(true);
+    setStillOffline(false);
+
+    const online = await networkStatusService.probeConnectivity();
+
+    if (online) {
+      networkStatusService.reportSuccess();
+      queryClient.refetchQueries({ type: 'active' });
+    } else {
+      setStillOffline(true);
+      setTimeout(() => setStillOffline(false), 1500);
+    }
+
+    retryingRef.current = false;
+    setIsRetrying(false);
+
+    // Cooldown
+    cooldownRef.current = true;
+    setTimeout(() => {
+      cooldownRef.current = false;
+    }, RETRY_COOLDOWN);
+  }, [queryClient]);
+
+  const offlineLabel = stillOffline ? "Still offline" : "You're offline";
+
   return (
     <AnimatePresence>
       {showOffline && (
-        <motion.div
-          key="offline"
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.3 }}
-          className="bg-muted border-b border-border text-muted-foreground text-center text-sm py-2 px-4 flex items-center justify-center gap-2 z-50"
-        >
-          <WifiOff className="h-4 w-4" />
-          <span>You're offline. Showing cached data.</span>
-        </motion.div>
+        <>
+          {/* Mobile: bottom pill */}
+          <motion.div
+            key="offline-mobile"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed left-1/2 -translate-x-1/2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[41] max-w-sm w-auto xl:hidden"
+          >
+            <div className="flex items-center gap-2 rounded-full bg-muted border border-border/60 shadow-lg px-4 py-2.5 text-sm text-muted-foreground">
+              <WifiOff className="h-4 w-4 shrink-0" />
+              <span className="whitespace-nowrap">{offlineLabel}</span>
+              <button
+                onClick={handleRetry}
+                disabled={isRetrying || cooldownRef.current}
+                className="flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-1"
+              >
+                {isRetrying ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-3.5 w-3.5" />
+                )}
+                Retry
+              </button>
+            </div>
+          </motion.div>
+
+          {/* Desktop: top bar */}
+          <motion.div
+            key="offline-desktop"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="hidden xl:flex bg-muted border-b border-border text-muted-foreground text-center text-sm py-2 px-4 items-center justify-center gap-2 z-50"
+          >
+            <WifiOff className="h-4 w-4" />
+            <span>{offlineLabel}</span>
+            <button
+              onClick={handleRetry}
+              disabled={isRetrying || cooldownRef.current}
+              className="flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-2"
+            >
+              {isRetrying ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              Retry
+            </button>
+          </motion.div>
+        </>
       )}
+
       {showReconnected && (
-        <motion.div
-          key="reconnected"
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.3 }}
-          className="bg-green-600 text-white text-center text-sm py-2 px-4 flex items-center justify-center gap-2 z-50"
-        >
-          <Wifi className="h-4 w-4" />
-          <span>Back online</span>
-        </motion.div>
+        <>
+          {/* Mobile: bottom pill */}
+          <motion.div
+            key="reconnected-mobile"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 20, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed left-1/2 -translate-x-1/2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[41] max-w-sm w-auto xl:hidden"
+          >
+            <div className="flex items-center gap-2 rounded-full bg-green-600 shadow-lg px-4 py-2.5 text-sm text-white">
+              <Wifi className="h-4 w-4" />
+              <span>Back online</span>
+            </div>
+          </motion.div>
+
+          {/* Desktop: top bar */}
+          <motion.div
+            key="reconnected-desktop"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="hidden xl:flex bg-green-600 text-white text-center text-sm py-2 px-4 items-center justify-center gap-2 z-50"
+          >
+            <Wifi className="h-4 w-4" />
+            <span>Back online</span>
+          </motion.div>
+        </>
       )}
     </AnimatePresence>
   );
