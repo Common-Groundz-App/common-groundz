@@ -2,7 +2,6 @@ import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import PostFeedItem from '@/components/feed/PostFeedItem';
-import PostFeedItem from '@/components/feed/PostFeedItem';
 import FeedSkeleton from '@/components/feed/FeedSkeleton';
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';

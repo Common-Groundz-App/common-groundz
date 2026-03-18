@@ -1,7 +1,6 @@
 
 import React, { useEffect } from 'react';
 import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
-import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import FeedItem from './FeedItem';
 import { FeedItemSkeleton } from '@/components/ui/enhanced-skeleton';

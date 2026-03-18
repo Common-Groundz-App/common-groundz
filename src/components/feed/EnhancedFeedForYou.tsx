@@ -1,7 +1,6 @@
 
 import React, { useEffect } from 'react';
 import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
-import { useInfiniteFeed } from '@/hooks/feed/use-infinite-feed';
 import { useEnhancedInfiniteScroll } from '@/hooks/useEnhancedInfiniteScroll';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useMemoryOptimization } from '@/hooks/useMemoryOptimization';

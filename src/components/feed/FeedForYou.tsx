@@ -1,7 +1,6 @@
 
 import React, { useEffect } from 'react';
 import { useFeed } from '@/hooks/feed/use-feed';
-import { useFeed } from '@/hooks/feed/use-feed';
 import FeedItem from './FeedItem';
 import FeedSkeleton from './FeedSkeleton';
 import FeedEmptyState from './FeedEmptyState';
