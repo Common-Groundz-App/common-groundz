@@ -119,6 +119,8 @@ function isTransportError(error: unknown): boolean {
   return false;
 }
 
+const SUPABASE_URL = "https://uyjtgybbktgapspodajy.supabase.co";
+
 export const networkStatusService = {
   /**
    * Report a fetch/network failure. Only transport-level errors
