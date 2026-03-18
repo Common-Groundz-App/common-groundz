@@ -87,7 +87,10 @@ export function NotificationPopover({ trigger, align = "end" }: NotificationPopo
       >
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50">
           <div className="flex items-center justify-between p-4">
-            <h4 className="text-sm font-semibold" id="notifications-title">Notifications</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-semibold" id="notifications-title">Notifications</h4>
+              {lastRefresh && <LastUpdatedIndicator date={lastRefresh} />}
+            </div>
             <X 
               className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
               onClick={() => setOpen(false)}
