@@ -22,6 +22,7 @@ interface EnhancedFeedForYouProps {
 
 const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = false }) => {
   const { user, isLoading: authLoading } = useAuth();
+  const { isOnline } = useNetworkStatus();
   const { startRender, endRender } = usePerformanceMonitor('FeedForYou');
   
   // Memory optimization
