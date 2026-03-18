@@ -3,26 +3,52 @@ import { networkStatusService } from '@/services/networkStatusService';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { WifiOff, Wifi, RefreshCw, Loader2 } from 'lucide-react';
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
-/**
- * Global offline/reconnected banner. Mount once in App.tsx.
- *
- * - Mobile (< xl): fixed bottom pill above bottom nav
- * - Desktop (xl+): fixed top bar
- * - Retry: real connectivity probe → refetch active queries
- * - Back online: green pill, auto-dismisses via wasOffline logic
- */
+type PillVisual = 'offline' | 'reconnecting' | 'still-offline';
+
 const RETRY_COOLDOWN = 5000;
+const MIN_RECONNECTING_MS = 800;
+const STILL_OFFLINE_MS = 1500;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const OfflineBanner = () => {
   const { isOnline, wasOffline } = useNetworkStatus();
   const queryClient = useQueryClient();
   const prefersReducedMotion = useReducedMotion();
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [stillOffline, setStillOffline] = useState(false);
+
+  const [pillState, setPillState] = useState<PillVisual>('offline');
+  const [isCoolingDown, setIsCoolingDown] = useState(false);
+
   const retryingRef = useRef(false);
-  const cooldownRef = useRef(false);
+  const cycleRef = useRef(0);
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const revertTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const clearTimers = useCallback(() => {
+    clearTimeout(cooldownTimerRef.current);
+    clearTimeout(revertTimerRef.current);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cycleRef.current += 1;
+      clearTimers();
+    };
+  }, [clearTimers]);
+
+  // Reset when coming back online
+  useEffect(() => {
+    if (isOnline) {
+      cycleRef.current += 1;
+      clearTimers();
+      setPillState('offline');
+      setIsCoolingDown(false);
+      retryingRef.current = false;
+    }
+  }, [isOnline, clearTimers]);
 
   const showOffline = !isOnline;
   const showReconnected = isOnline && wasOffline;
@@ -32,58 +58,75 @@ const OfflineBanner = () => {
     : { duration: 0.3, ease: 'easeOut' as const };
 
   const handleRetry = useCallback(async () => {
-    if (retryingRef.current || cooldownRef.current) return;
-    retryingRef.current = true;
-    setIsRetrying(true);
-    setStillOffline(false);
+    if (retryingRef.current || isCoolingDown) return;
 
-    const online = await networkStatusService.probeConnectivity();
+    cycleRef.current += 1;
+    const cycle = cycleRef.current;
+    clearTimers();
+
+    retryingRef.current = true;
+    setPillState('reconnecting');
+
+    const [online] = await Promise.all([
+      networkStatusService.probeConnectivity(),
+      sleep(MIN_RECONNECTING_MS),
+    ]);
+
+    if (cycle !== cycleRef.current) return;
 
     if (online) {
       networkStatusService.reportSuccess();
       queryClient.refetchQueries({ type: 'active' });
     } else {
-      setStillOffline(true);
-      setTimeout(() => setStillOffline(false), 1500);
+      setPillState('still-offline');
+      revertTimerRef.current = setTimeout(() => {
+        if (cycle !== cycleRef.current) return;
+        setPillState('offline');
+      }, STILL_OFFLINE_MS);
     }
 
     retryingRef.current = false;
-    setIsRetrying(false);
 
-    // Cooldown
-    cooldownRef.current = true;
-    setTimeout(() => {
-      cooldownRef.current = false;
+    setIsCoolingDown(true);
+    cooldownTimerRef.current = setTimeout(() => {
+      if (cycle !== cycleRef.current) return;
+      setIsCoolingDown(false);
     }, RETRY_COOLDOWN);
-  }, [queryClient]);
+  }, [isCoolingDown, queryClient, clearTimers]);
 
-  const offlineLabel = stillOffline ? 'Still offline' : "You're offline";
-
-  // Pill content for offline state
-  const renderOfflineContent = () => {
-    if (isRetrying) {
-      return (
-        <>
-          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
-          <span className="whitespace-nowrap">Reconnecting…</span>
-        </>
-      );
+  const renderPillContent = () => {
+    switch (pillState) {
+      case 'reconnecting':
+        return (
+          <>
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+            <span className="whitespace-nowrap">Reconnecting…</span>
+          </>
+        );
+      case 'still-offline':
+        return (
+          <>
+            <WifiOff className="h-4 w-4 shrink-0" />
+            <span className="whitespace-nowrap">Still offline</span>
+          </>
+        );
+      case 'offline':
+      default:
+        return (
+          <>
+            <WifiOff className="h-4 w-4 shrink-0" />
+            <span className="whitespace-nowrap">You're offline</span>
+            <button
+              onClick={handleRetry}
+              disabled={isCoolingDown}
+              className="flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary active:scale-95 transition-transform disabled:cursor-not-allowed disabled:opacity-50 ml-1"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Retry
+            </button>
+          </>
+        );
     }
-
-    return (
-      <>
-        <WifiOff className="h-4 w-4 shrink-0" />
-        <span className="whitespace-nowrap">{offlineLabel}</span>
-        <button
-          onClick={handleRetry}
-          disabled={cooldownRef.current}
-          className="flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary active:scale-95 transition-transform disabled:cursor-not-allowed ml-1"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-          Retry
-        </button>
-      </>
-    );
   };
 
   return (
@@ -102,9 +145,9 @@ const OfflineBanner = () => {
             <div
               role="status"
               aria-live="polite"
-              className={`pointer-events-auto min-w-[200px] max-w-[calc(100vw-2rem)] flex items-center justify-center gap-2 rounded-full bg-muted border border-border/60 shadow-lg px-4 py-2.5 text-sm text-muted-foreground transition-all duration-200 ease-out ${isRetrying ? 'animate-pulse' : ''}`}
+              className={`pointer-events-auto min-w-[200px] max-w-[calc(100vw-2rem)] flex items-center justify-center gap-2 rounded-full bg-muted border border-border/60 shadow-lg px-4 py-2.5 text-sm text-muted-foreground transition-all duration-200 ease-out ${pillState === 'reconnecting' ? 'animate-pulse' : ''}`}
             >
-              {renderOfflineContent()}
+              {renderPillContent()}
             </div>
           </motion.div>
 
@@ -119,25 +162,7 @@ const OfflineBanner = () => {
             role="status"
             aria-live="polite"
           >
-            {isRetrying ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Reconnecting…</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="h-4 w-4" />
-                <span>{offlineLabel}</span>
-                <button
-                  onClick={handleRetry}
-                  disabled={cooldownRef.current}
-                  className="flex items-center gap-1 text-xs font-medium text-foreground hover:text-primary active:scale-95 transition-transform disabled:cursor-not-allowed ml-2"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Retry
-                </button>
-              </>
-            )}
+            {renderPillContent()}
           </motion.div>
         </>
       )}
