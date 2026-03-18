@@ -117,7 +117,7 @@ const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = fa
           </motion.div>
         </>
       ) : !isOnline && items.length === 0 ? (
-        <OfflineInlineState message="You're offline — showing last updated posts" onRetry={refreshFeed} />
+        <OfflineInlineState message="Showing cached posts" onRetry={refreshFeed} />
       ) : error ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
