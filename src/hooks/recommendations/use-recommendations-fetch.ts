@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Recommendation,
-  Recommendation,
   fetchUserRecommendations,
   RecommendationCategory
 } from '@/services/recommendationService';
