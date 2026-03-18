@@ -4,6 +4,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { Check, Loader2, X } from 'lucide-react';
+import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
+import { LastUpdatedIndicator } from '@/components/ui/LastUpdatedIndicator';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
