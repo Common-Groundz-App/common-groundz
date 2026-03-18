@@ -97,12 +97,12 @@ const OfflineBanner = () => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 20, opacity: 0 }}
             transition={motionTransition}
-            className="fixed left-1/2 -translate-x-1/2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[41] min-w-[200px] max-w-[calc(100vw-2rem)] xl:hidden"
+            className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[41] flex justify-center px-4 pointer-events-none xl:hidden"
           >
             <div
               role="status"
               aria-live="polite"
-              className={`flex items-center justify-center gap-2 rounded-full bg-muted border border-border/60 shadow-lg px-4 py-2.5 text-sm text-muted-foreground transition-all duration-200 ease-out ${isRetrying ? 'animate-pulse' : ''}`}
+              className={`pointer-events-auto min-w-[200px] max-w-[calc(100vw-2rem)] flex items-center justify-center gap-2 rounded-full bg-muted border border-border/60 shadow-lg px-4 py-2.5 text-sm text-muted-foreground transition-all duration-200 ease-out ${isRetrying ? 'animate-pulse' : ''}`}
             >
               {renderOfflineContent()}
             </div>
@@ -151,12 +151,12 @@ const OfflineBanner = () => {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 20, opacity: 0 }}
             transition={motionTransition}
-            className="fixed left-1/2 -translate-x-1/2 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[41] min-w-[200px] max-w-[calc(100vw-2rem)] xl:hidden"
+            className="fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-[41] flex justify-center px-4 pointer-events-none xl:hidden"
           >
             <div
               role="status"
               aria-live="polite"
-              className="flex items-center justify-center gap-2 rounded-full bg-green-600 shadow-lg px-4 py-2.5 text-sm text-white transition-all duration-200 ease-out"
+              className="pointer-events-auto min-w-[200px] max-w-[calc(100vw-2rem)] flex items-center justify-center gap-2 rounded-full bg-green-600 shadow-lg px-4 py-2.5 text-sm text-white transition-all duration-200 ease-out"
             >
               <Wifi className="h-4 w-4" />
               <span>Back online</span>
