@@ -17,7 +17,6 @@ interface FeedForYouProps {
 
 const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
   const { user, isLoading } = useAuth();
-  const { toast } = useToast();
 
   // CRITICAL: Don't render feed logic until auth is ready
   if (isLoading) {

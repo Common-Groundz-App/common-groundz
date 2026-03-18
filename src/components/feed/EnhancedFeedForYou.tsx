@@ -21,7 +21,6 @@ interface EnhancedFeedForYouProps {
 
 const EnhancedFeedForYou: React.FC<EnhancedFeedForYouProps> = ({ refreshing = false }) => {
   const { user, isLoading: authLoading } = useAuth();
-  const { toast } = useToast();
   const { startRender, endRender } = usePerformanceMonitor('FeedForYou');
   
   // Memory optimization

@@ -20,7 +20,6 @@ interface FeedFollowingProps {
 
 const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => {
   const { user, isLoading } = useAuth();
-  const { toast } = useToast();
 
   // CRITICAL: Don't render feed logic until auth is ready
   if (isLoading) {
