@@ -125,7 +125,7 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
           </motion.div>
         </>
       ) : !isOnline && items.length === 0 ? (
-        <OfflineInlineState message="Showing cached posts" onRetry={refreshFeed} />
+        <OfflineInlineState message="Can't load posts while offline" onRetry={refreshFeed} />
       ) : error ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
