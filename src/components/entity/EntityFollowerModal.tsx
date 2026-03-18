@@ -11,7 +11,7 @@ import EmptyState from '@/components/profile/circles/EmptyState';
 import { useFollowActions } from '@/components/profile/circles/hooks/useFollowActions';
 import { getEntityFollowersWithContext, type EntityFollowerWithContext } from '@/services/entityFollowService';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 
 interface EntityFollowerModalProps {
