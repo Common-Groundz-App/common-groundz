@@ -10,9 +10,11 @@ import FeedEmptyState from './FeedEmptyState';
 import FeedEndState from './FeedEndState';
 import FeedLoadingMore from './FeedLoadingMore';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
 import { AlertCircle, Loader } from "lucide-react";
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 interface EnhancedFeedForYouProps {
   refreshing?: boolean;
