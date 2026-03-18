@@ -171,4 +171,25 @@ export const networkStatusService = {
   getServerSnapshot(): NetworkState {
     return { isOnline: true, wasOffline: false, failureCount: 0 };
   },
+
+  /**
+   * Lightweight connectivity probe. Uses a real fetch with timeout.
+   * Any HTTP response (even 4xx/5xx) = online. Only transport failures = offline.
+   */
+  async probeConnectivity(): Promise<boolean> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/`, {
+        signal: controller.signal,
+        method: 'GET',
+        cache: 'no-store',
+      });
+      return true;
+    } catch {
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
 };
