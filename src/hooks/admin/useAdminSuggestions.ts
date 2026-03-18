@@ -470,16 +470,30 @@ export const useAdminSuggestions = (options: UseAdminSuggestionsOptions = {}) =>
     }
   }, [toast, fetchSuggestions, fetchStats]);
 
-  // Auto-refresh functionality
+  // Auto-refresh functionality — self-rescheduling setTimeout
   useEffect(() => {
-    if (autoRefresh) {
-      const interval = setInterval(() => {
-        fetchSuggestions();
-        fetchStats();
-      }, refreshInterval);
+    if (!autoRefresh) return;
 
-      return () => clearInterval(interval);
-    }
+    let timerRef: ReturnType<typeof setTimeout> | null = null;
+    const scheduleNext = () => {
+      timerRef = setTimeout(async () => {
+        if (document.hidden) {
+          scheduleNext();
+          return;
+        }
+        await fetchSuggestions();
+        await fetchStats();
+        scheduleNext();
+      }, refreshInterval);
+    };
+    scheduleNext();
+
+    return () => {
+      if (timerRef) {
+        clearTimeout(timerRef);
+        timerRef = null;
+      }
+    };
   }, [autoRefresh, refreshInterval, fetchSuggestions, fetchStats]);
 
   // Initial load

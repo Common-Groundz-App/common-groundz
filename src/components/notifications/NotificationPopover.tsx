@@ -4,6 +4,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { Check, Loader2, X } from 'lucide-react';
+import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
+import { LastUpdatedIndicator } from '@/components/ui/LastUpdatedIndicator';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -16,7 +18,7 @@ interface NotificationPopoverProps {
 }
 
 export function NotificationPopover({ trigger, align = "end" }: NotificationPopoverProps) {
-  const { notifications, unreadNotifications, markAsRead, loading, markingAsRead } = useNotifications();
+  const { notifications, unreadNotifications, markAsRead, loading, markingAsRead, lastRefresh, isOnline, fetchAll } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -85,7 +87,10 @@ export function NotificationPopover({ trigger, align = "end" }: NotificationPopo
       >
         <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50">
           <div className="flex items-center justify-between p-4">
-            <h4 className="text-sm font-semibold" id="notifications-title">Notifications</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-sm font-semibold" id="notifications-title">Notifications</h4>
+              {lastRefresh && <LastUpdatedIndicator date={lastRefresh} />}
+            </div>
             <X 
               className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
               onClick={() => setOpen(false)}
@@ -101,6 +106,15 @@ export function NotificationPopover({ trigger, align = "end" }: NotificationPopo
             </TabsList>
             
             <TabsContent value="all" className="mt-2">
+              {!isOnline && (
+                <div className="mb-2">
+                  <OfflineInlineState
+                    message="You're offline — showing recent notifications"
+                    onRetry={fetchAll}
+                    lastRefresh={lastRefresh}
+                  />
+                </div>
+              )}
               <NotificationList 
                 notifications={notifications}
                 loading={loading}

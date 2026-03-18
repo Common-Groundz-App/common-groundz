@@ -13,6 +13,7 @@ export function useNotifications(pollInterval = 10000) {
   const [loading, setLoading] = useState<boolean>(false);
   const [markingAsRead, setMarkingAsRead] = useState<boolean>(false);
   const [error, setError] = useState<any>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchAll = useCallback(async () => {
@@ -23,6 +24,7 @@ export function useNotifications(pollInterval = 10000) {
     try {
       const data = await fetchNotifications();
       setNotifications(data);
+      setLastRefresh(new Date());
       networkStatusService.reportSuccess();
     } catch (e) {
       setError(e);
@@ -99,6 +101,8 @@ export function useNotifications(pollInterval = 10000) {
     loading, 
     markingAsRead,
     error, 
+    lastRefresh,
+    isOnline,
     fetchAll 
   };
 }

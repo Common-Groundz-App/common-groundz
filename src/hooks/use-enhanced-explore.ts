@@ -1,7 +1,8 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { enhancedExploreService, PersonalizedEntity } from '@/services/enhancedExploreService';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 interface UseEnhancedExploreProps {
   category?: string;
@@ -17,19 +18,22 @@ export const useEnhancedExplore = ({
   enableTemporalPersonalization = true
 }: UseEnhancedExploreProps = {}) => {
   const { user } = useAuth();
+  const { isOnline } = useNetworkStatus();
   const [featuredEntities, setFeaturedEntities] = useState<PersonalizedEntity[]>([]);
   const [trendingEntities, setTrendingEntities] = useState<PersonalizedEntity[]>([]);
   const [hiddenGems, setHiddenGems] = useState<PersonalizedEntity[]>([]);
   const [curatedCollections, setCuratedCollections] = useState<{ [key: string]: PersonalizedEntity[] }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const fetchEnhancedData = async () => {
+      if (!isOnline) return;
+      
       try {
         setIsLoading(true);
         
-        // Fetch all data in parallel with enhanced algorithms
         const [featured, trending, gems, collections] = await Promise.all([
           enhancedExploreService.getPersonalizedFeaturedEntities(user?.id, 3),
           enhancedExploreService.getTrendingEntitiesByCategory(category, limit),
@@ -51,18 +55,28 @@ export const useEnhancedExplore = ({
 
     fetchEnhancedData();
     
-    // Auto-refresh data every 10 minutes if temporal personalization is enabled
-    let intervalId: NodeJS.Timeout | null = null;
     if (enableTemporalPersonalization && user?.id) {
-      intervalId = setInterval(fetchEnhancedData, 10 * 60 * 1000);
+      const scheduleNext = () => {
+        timerRef.current = setTimeout(async () => {
+          if (document.hidden || !isOnline) {
+            scheduleNext();
+            return;
+          }
+          await fetchEnhancedData();
+          scheduleNext();
+        }, 10 * 60 * 1000);
+      };
+      scheduleNext();
     }
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
     };
-  }, [user?.id, category, limit, enableTemporalPersonalization]);
+  }, [user?.id, category, limit, enableTemporalPersonalization, isOnline]);
 
-  // Enhanced function to track entity interactions with temporal context
   const trackEntityInteraction = async (
     entityId: string,
     entityType: string,
@@ -80,7 +94,6 @@ export const useEnhancedExplore = ({
         interactionType
       );
       
-      // Soft refresh featured entities after interaction to reflect changes
       if (interactionType === 'like' || interactionType === 'save') {
         setTimeout(() => {
           refreshFeaturedEntities();
@@ -91,7 +104,6 @@ export const useEnhancedExplore = ({
     }
   };
 
-  // Refresh only featured entities (faster than full refresh)
   const refreshFeaturedEntities = async () => {
     if (!user?.id) return;
     
@@ -103,7 +115,6 @@ export const useEnhancedExplore = ({
     }
   };
 
-  // Force refresh all data
   const refreshData = async () => {
     setIsLoading(true);
     

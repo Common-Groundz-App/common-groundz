@@ -11,7 +11,9 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 
 interface FeedFollowingProps {
   refreshing?: boolean;
@@ -19,6 +21,7 @@ interface FeedFollowingProps {
 
 const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => {
   const { user, isLoading } = useAuth();
+  const { isOnline } = useNetworkStatus();
 
   // CRITICAL: Don't render feed logic until auth is ready
   if (isLoading) {
@@ -98,18 +101,38 @@ const FeedFollowing: React.FC<FeedFollowingProps> = ({ refreshing = false }) => 
 
   return (
     <div className="space-y-6">
-      {error ? (
+      {!isOnline && items.length > 0 ? (
+        <>
+          <OfflineInlineState message="You're offline — showing last updated posts" onRetry={refreshFeed} />
+          <motion.div className="space-y-8">
+            {items.map((item, index) => (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <FeedItem 
+                  item={item} 
+                  onLike={handleLike}
+                  onSave={handleSave}
+                  onComment={(id) => console.log('Comment on', id)}
+                  onDelete={handleDelete}
+                  refreshFeed={refreshFeed}
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+        </>
+      ) : !isOnline && items.length === 0 ? (
+        <OfflineInlineState message="You're offline — showing last updated posts" onRetry={refreshFeed} />
+      ) : error ? (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>
             There was a problem loading the feed.
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={refreshFeed}
-              className="ml-2"
-            >
+            <Button variant="outline" size="sm" onClick={refreshFeed} className="ml-2">
               Try again
             </Button>
           </AlertDescription>

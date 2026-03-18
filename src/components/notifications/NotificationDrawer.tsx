@@ -4,6 +4,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
 import { Check, Loader2, X } from 'lucide-react';
+import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
+import { LastUpdatedIndicator } from '@/components/ui/LastUpdatedIndicator';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -16,7 +18,7 @@ interface NotificationDrawerProps {
 }
 
 export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerProps) {
-  const { notifications, unreadNotifications, markAsRead, loading, markingAsRead } = useNotifications();
+  const { notifications, unreadNotifications, markAsRead, loading, markingAsRead, lastRefresh, isOnline, fetchAll } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -80,7 +82,10 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
         <div className="flex h-full flex-col">
           <SheetHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50 p-4">
             <div className="flex items-center justify-between">
-              <SheetTitle className="text-sm font-semibold">Notifications</SheetTitle>
+              <div className="flex items-center gap-2">
+                <SheetTitle className="text-sm font-semibold">Notifications</SheetTitle>
+                {lastRefresh && <LastUpdatedIndicator date={lastRefresh} />}
+              </div>
               <X 
                 className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" 
                 onClick={() => onOpenChange(false)}
@@ -113,6 +118,15 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
               </TabsList>
             
               <TabsContent value="all" className="mt-2">
+                {!isOnline && (
+                  <div className="mb-2">
+                    <OfflineInlineState
+                      message="You're offline — showing recent notifications"
+                      onRetry={fetchAll}
+                      lastRefresh={lastRefresh}
+                    />
+                  </div>
+                )}
                 <NotificationList 
                   notifications={notifications}
                   loading={loading}
