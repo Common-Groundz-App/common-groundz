@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+
 import RecommendationCard from '@/components/recommendations/RecommendationCard';
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
@@ -24,7 +24,6 @@ const RecommendationContentViewer = ({
   onRecommendationLoaded
 }: RecommendationContentViewerProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
   const [recommendation, setRecommendation] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
@@ -119,11 +118,6 @@ const RecommendationContentViewer = ({
         console.error('Error fetching recommendation:', err);
         setError('Error loading recommendation');
         onRecommendationLoaded?.(null);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load recommendation content'
-        });
       } finally {
         setLoading(false);
       }

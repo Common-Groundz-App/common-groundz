@@ -45,18 +45,6 @@ export const useFeed = (feedType: FeedVisibility) => {
   const allItems = feedData?.items || [];
   const hasMore = feedData?.hasMore || false;
 
-  // Handle errors
-  useEffect(() => {
-    if (feedError) {
-      console.error('Feed error:', feedError);
-      toast({
-        title: 'Feed Error',
-        description: feedError instanceof Error ? feedError.message : 'Failed to load feed items',
-        variant: 'destructive'
-      });
-    }
-  }, [feedError, toast]);
-
   // Load more data
   const loadMore = useCallback(async () => {
     if (isLoadingMore || !hasMore || isFeedLoading) return;
