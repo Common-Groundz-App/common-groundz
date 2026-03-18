@@ -1,33 +1,23 @@
+# Phase 2 Plan — Final Assessment
 
-# Global Offline/Network Handling System — IMPLEMENTED
+Both of ChatGPT's suggestions are valid and easy to incorporate. Neither requires structural changes — they're styling and copy decisions.
 
-## What was built
+## What to add
 
-### New files
-- `src/services/networkStatusService.ts` — Singleton managing network state with transport-only failure counting, pub/sub, browser event listeners
-- `src/hooks/useNetworkStatus.ts` — React hook via `useSyncExternalStore` consuming the singleton
-- `src/components/OfflineBanner.tsx` — Animated offline/reconnected banner (framer-motion)
+**1. OfflineInlineState stays compact and non-blocking**
+Already implied by the "calm muted card" design, but worth making explicit: the component should be a single-line banner-style element (not a large card), rendered above content — never replacing it. Think toast-height, not alert-height. No padding-heavy card layout.
 
-### Modified files
-- `src/App.tsx` — React Query `onlineManager` wired to singleton, global defaults (`retry: 2`, `staleTime: 30s`, `refetchOnReconnect: true`), `OfflineBanner` mounted, error policy documented
-- `src/hooks/useNotifications.ts` — `setInterval` → self-rescheduling `setTimeout`, polling guarded by shared network state, background toast removed
-- `src/hooks/recommendations/use-recommendations-fetch.ts` — Background toast removed
-- `src/components/feed/FeedForYou.tsx` — Background toast removed
-- `src/components/feed/EnhancedFeedForYou.tsx` — Background toast removed
-- `src/components/feed/FeedFollowing.tsx` — Background toast removed
-- `src/components/entity/EntityFollowerModal.tsx` — Background toast removed
-- `src/components/content/PostContentViewer.tsx` — Background toast removed
-- `src/hooks/admin/useAdminSuggestions.ts` — Initial fetch toast silenced
+**2. Standardized copy across all surfaces**
+Define one canonical message pattern used everywhere:
 
-### Rules (documented in App.tsx)
-1. Background queries fail silently — no destructive toasts
-2. User mutations can show error toasts
-3. Never clear UI data on fetch failure
-4. All polling respects shared network state via `useNetworkStatus()`
-5. `navigator.onLine` only checked inside networkStatusService
-6. Only transport failures count toward offline detection
+- Feed: "You're offline — showing last updated posts"
+- Notifications: "You're offline — showing recent notifications"
+- Explore/Discovery: "You're offline — showing recent results"
 
-## Phase 2 (later)
-- Inline offline states per surface
-- Migrate `setInterval` hooks to React Query `refetchInterval`
-- "Last updated" indicators
+Same structure, same tone, surface-specific noun. This is just a copy convention applied during implementation.
+
+## Verdict
+
+Both items are small refinements to the existing plan — no new files, no architectural changes. They should be noted as implementation guidelines when building `OfflineInlineState.tsx` and wiring it into each surface.
+
+**No other additions needed. The Phase 2 plan is complete and ready to implement.**
