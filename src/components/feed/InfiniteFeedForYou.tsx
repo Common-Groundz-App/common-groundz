@@ -21,6 +21,7 @@ interface InfiniteFeedForYouProps {
 const InfiniteFeedForYou: React.FC<InfiniteFeedForYouProps> = ({ refreshing = false }) => {
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
+  const { isOnline } = useNetworkStatus();
 
   // Don't render until auth is ready
   if (isLoading) {
