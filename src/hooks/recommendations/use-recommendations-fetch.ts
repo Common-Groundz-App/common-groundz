@@ -20,7 +20,6 @@ export const useRecommendationsFetch = ({
   limit
 }: UseRecommendationsFetchProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [error, setError] = useState<Error | null>(null);
   
