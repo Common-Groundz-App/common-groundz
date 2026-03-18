@@ -118,11 +118,6 @@ const RecommendationContentViewer = ({
         console.error('Error fetching recommendation:', err);
         setError('Error loading recommendation');
         onRecommendationLoaded?.(null);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load recommendation content'
-        });
       } finally {
         setLoading(false);
       }
