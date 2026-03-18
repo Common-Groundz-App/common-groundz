@@ -36,7 +36,6 @@ export const EntityFollowerModal: React.FC<EntityFollowerModalProps> = ({
   totalFollowersCount
 }) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
   const { actionLoading, handleFollowToggle: toggleFollow } = useFollowActions(user?.id);
   
