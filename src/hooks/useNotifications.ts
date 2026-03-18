@@ -13,6 +13,7 @@ export function useNotifications(pollInterval = 10000) {
   const [loading, setLoading] = useState<boolean>(false);
   const [markingAsRead, setMarkingAsRead] = useState<boolean>(false);
   const [error, setError] = useState<any>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchAll = useCallback(async () => {
