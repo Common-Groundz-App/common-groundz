@@ -1,39 +1,33 @@
 
+# Global Offline/Network Handling System — IMPLEMENTED
 
-# Footer Cleanup: Remove from Product Pages
+## What was built
 
-ChatGPT's analysis is correct. The footer belongs on public/marketing pages, not inside the logged-in product experience. Your app already has navbar + bottom nav for product pages — adding a footer creates redundant navigation.
+### New files
+- `src/services/networkStatusService.ts` — Singleton managing network state with transport-only failure counting, pub/sub, browser event listeners
+- `src/hooks/useNetworkStatus.ts` — React hook via `useSyncExternalStore` consuming the singleton
+- `src/components/OfflineBanner.tsx` — Animated offline/reconnected banner (framer-motion)
 
-## Current State
+### Modified files
+- `src/App.tsx` — React Query `onlineManager` wired to singleton, global defaults (`retry: 2`, `staleTime: 30s`, `refetchOnReconnect: true`), `OfflineBanner` mounted, error policy documented
+- `src/hooks/useNotifications.ts` — `setInterval` → self-rescheduling `setTimeout`, polling guarded by shared network state, background toast removed
+- `src/hooks/recommendations/use-recommendations-fetch.ts` — Background toast removed
+- `src/components/feed/FeedForYou.tsx` — Background toast removed
+- `src/components/feed/EnhancedFeedForYou.tsx` — Background toast removed
+- `src/components/feed/FeedFollowing.tsx` — Background toast removed
+- `src/components/entity/EntityFollowerModal.tsx` — Background toast removed
+- `src/components/content/PostContentViewer.tsx` — Background toast removed
+- `src/hooks/admin/useAdminSuggestions.ts` — Initial fetch toast silenced
 
-**Already correct (keep footer):**
-- `Index.tsx` — landing page
-- `PrivacyPolicy.tsx`, `TermsOfService.tsx`, `CookiePolicy.tsx` — legal
-- `AccountDeleted.tsx` — terminal page
-- `PostView.tsx`, `RecommendationView.tsx` — public content (guest view)
-- `UserProfile.tsx` — public profile (guest view)
+### Rules (documented in App.tsx)
+1. Background queries fail silently — no destructive toasts
+2. User mutations can show error toasts
+3. Never clear UI data on fetch failure
+4. All polling respects shared network state via `useNetworkStatus()`
+5. `navigator.onLine` only checked inside networkStatusService
+6. Only transport failures count toward offline detection
 
-**Need footer removed:**
-- `Profile.tsx` — logged-in profile, already has BottomNavigation
-- `EntityDetail.tsx` — product page
-- `EntityDetailV2.tsx` — product page
-- `EntityV4.tsx` — product page
-
-## Conditional Logic for Shared Pages
-
-`PostView.tsx`, `RecommendationView.tsx`, and `UserProfile.tsx` serve both guests and logged-in users. For these, the footer should only render when the user is **not** authenticated (guest view). When logged in, these pages should behave like product pages without a footer.
-
-## Changes
-
-| File | Action |
-|------|--------|
-| `Profile.tsx` | Remove Footer import and usage |
-| `EntityDetail.tsx` | Remove Footer import and usage |
-| `EntityDetailV2.tsx` | Remove Footer import and usage |
-| `EntityV4.tsx` | Remove Footer import and usage |
-| `PostView.tsx` | Conditionally render Footer only when `!user` |
-| `RecommendationView.tsx` | Conditionally render Footer only when `!user` |
-| `UserProfile.tsx` | Conditionally render Footer only when `!user` |
-
-Simple, clean changes — no new components needed.
-
+## Phase 2 (later)
+- Inline offline states per surface
+- Migrate `setInterval` hooks to React Query `refetchInterval`
+- "Last updated" indicators
