@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
 import { 
+  Recommendation,
   Recommendation,
   fetchUserRecommendations,
   RecommendationCategory
