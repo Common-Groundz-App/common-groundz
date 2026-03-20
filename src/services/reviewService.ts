@@ -138,8 +138,9 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
     const combinedData = {
       ...reviewWithProfile,
       user: {
-        username: reviewWithProfile.user.displayName,
-        avatar_url: reviewWithProfile.user.avatar_url
+        username: reviewWithProfile.user.username,
+        avatar_url: reviewWithProfile.user.avatar_url,
+        displayName: reviewWithProfile.user.displayName
       }
     };
 
