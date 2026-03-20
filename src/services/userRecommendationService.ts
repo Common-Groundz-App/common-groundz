@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 export interface RecommendedUser {
   id: string;
   username: string | null;
+  first_name: string | null;
+  last_name: string | null;
   avatar_url: string | null;
   displayName?: string;
   initials?: string;
