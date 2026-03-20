@@ -1,43 +1,69 @@
 
 
-# Fix: Display Real Names in Circles — Final Plan
+# Fix: Centralize Display-Name Logic — Final Plan
 
-Previous plan plus one addition from both reviewers:
+Both reviewers approve. Adding one verification step they both flagged.
 
-## Addition: Explicit fallback rule in `UserCard.tsx`
+## Changes
 
-```text
-Display name logic:
-1. first_name + last_name (if either exists) → "Hana Li" or "Hana"
-2. else username → "hana.li"
-3. else "User"
+### 1. Fix `src/utils/profileUtils.ts` — flip name priority + fix username corruption
 
-Secondary line:
-- @username if username exists
-- hidden if no username
+**`getDisplayName` (line 86-92):** Change priority from `username → real name` to `real name → username`:
+```
+[first_name, last_name].filter(Boolean).join(' ') || username || 'Anonymous User'
 ```
 
-Filter out `null`/empty strings before concatenation to prevent "Hana null" or " Li".
+**`transformToSafeProfile` (line 29-48):**
+- Same priority fix for `displayName`
+- **Critical fix line 48:** `username: displayName` → `username: profile.username || PROFILE_FALLBACKS.username` — preserves the real handle for routing
+- Fix initials to prioritize real name over username (lines 34-40)
 
-## Everything else unchanged
+**`getUserInitials` (line 98+):** Same priority flip — real name initials first.
 
-1. **Migration**: Add `first_name`, `last_name` to both `get_followers_with_profiles` and `get_following_with_profiles` RPCs
-2. **`types.ts`**: Add `first_name`, `last_name` to `UserProfile`
-3. **`circleService.ts`**: Map the new fields
-4. **`UserCard.tsx`**: Accept `firstName`/`lastName`, apply fallback rule above
-5. **Callers** (`FollowersList`, `FollowingList`, `UserListModal`): Pass new props
-6. **Supabase types**: Update RPC return types
+### 2. Migration: Add `first_name`, `last_name` to `get_who_to_follow` RPC
+
+DROP + CREATE with updated RETURNS TABLE adding `first_name text, last_name text`. Add `p.first_name, p.last_name` to all CTE SELECT branches (friends_of_friends, active_creators, new_users, popular_users, fallback).
+
+### 3. Update `src/services/userRecommendationService.ts`
+
+- Add `first_name`, `last_name` to `RecommendedUser` interface
+- Map from RPC response
+- Fix `displayName`: `[user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Anonymous User'`
+- Same fix in `getFallbackRecommendations` — add `first_name, last_name` to profiles SELECT
+
+### 4. Update `src/components/explore/UserDirectoryList.tsx`
+
+- Add `first_name, last_name` to profiles SELECT and `User` type
+- Card title: real name with fallback
+- Add `@username` as secondary text below the name
+
+### 5. Update `src/integrations/supabase/types.ts`
+
+Add `first_name`, `last_name` to `get_who_to_follow` return type.
+
+### 6. Verification step (post-implementation)
+
+Confirm these routing/linking paths still use the real username handle (not displayName):
+- `UserListModal.tsx` line 141: `/u/${userProfile.username}`
+- `MutualConnectionsProof.tsx` line 101: `/u/${mutual.username}`
+- `FollowersList.tsx` / `FollowingList.tsx`: `onNavigate` callbacks
+- `UsernameLink.tsx`: receives username prop
+
+The `transformToSafeProfile` fix on line 48 is the key — once `username` preserves the real handle, all downstream routing stays correct.
 
 ## Files
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/[new].sql` | Add columns to both RPCs |
-| `src/components/profile/circles/types.ts` | Add name fields |
-| `src/components/profile/circles/api/circleService.ts` | Map name fields |
-| `src/components/profile/circles/UserCard.tsx` | Fallback display logic |
-| `src/components/profile/circles/FollowersList.tsx` | Pass props |
-| `src/components/profile/circles/FollowingList.tsx` | Pass props |
-| `src/components/profile/modals/UserListModal.tsx` | Pass props |
+| `src/utils/profileUtils.ts` | Fix priority + username corruption |
+| `supabase/migrations/[new].sql` | Add name fields to `get_who_to_follow` |
+| `src/services/userRecommendationService.ts` | Map name fields, fix displayName |
+| `src/components/explore/UserDirectoryList.tsx` | Fetch + display real names |
 | `src/integrations/supabase/types.ts` | Update RPC types |
+
+## Not changing
+- `UserCard.tsx` — already fixed
+- Circles RPCs — already fixed in previous migration
+- Entity surfaces — already correct
+- `UserRecommendationCard.tsx` — already uses `displayName` from service
 
