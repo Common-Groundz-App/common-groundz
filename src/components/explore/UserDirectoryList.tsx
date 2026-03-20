@@ -40,6 +40,7 @@ interface UserDirectoryListProps {
 
 export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
   const [users, setUsers] = useState<User[]>([]);
+  const [mutualPreviewsMap, setMutualPreviewsMap] = useState<Map<string, MutualData>>(new Map());
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
