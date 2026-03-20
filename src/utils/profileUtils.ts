@@ -26,26 +26,23 @@ export const transformToSafeProfile = (profile: BaseUserProfile | null): SafeUse
     };
   }
 
-  const displayName = profile.username || 
-    (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : '') ||
-    profile.first_name || 
-    PROFILE_FALLBACKS.username;
+  const displayName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
+    profile.username || 
+    PROFILE_FALLBACKS.displayName;
 
-  const initials = profile.username 
-    ? profile.username.substring(0, 2).toUpperCase()
-    : (profile.first_name && profile.last_name)
-      ? `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
-      : profile.first_name
-        ? profile.first_name.substring(0, 2).toUpperCase()
+  const initials = (profile.first_name && profile.last_name)
+    ? `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase()
+    : profile.first_name
+      ? profile.first_name.substring(0, 2).toUpperCase()
+      : profile.username
+        ? profile.username.substring(0, 2).toUpperCase()
         : PROFILE_FALLBACKS.initials;
 
-  const fullName = profile.first_name && profile.last_name 
-    ? `${profile.first_name} ${profile.last_name}`
-    : profile.first_name || null;
+  const fullName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || null;
 
   return {
     id: profile.id,
-    username: displayName,
+    username: profile.username || PROFILE_FALLBACKS.username,
     avatar_url: profile.avatar_url,
     displayName,
     initials,
