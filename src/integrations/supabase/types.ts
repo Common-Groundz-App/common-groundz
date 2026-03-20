@@ -4123,6 +4123,8 @@ export type Database = {
         Returns: {
           activity_count: number
           avatar_url: string
+          first_name: string
+          last_name: string
           mutuals: number
           profile_quality: number
           reason: string
