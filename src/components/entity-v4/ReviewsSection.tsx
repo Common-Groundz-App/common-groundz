@@ -524,7 +524,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
               review={review}
               onTimelineClick={handleTimelineClick}
               isCircleReview={false}
-              circleUserName={review.user.username}
+              circleUserName={review.user.displayName || review.user.username}
             />
           ))}
 

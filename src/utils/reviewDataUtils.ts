@@ -4,7 +4,7 @@ import { ReviewWithUser } from '@/types/entities';
 // Transform ReviewWithUser to format expected by UI components
 export const transformReviewForUI = (review: ReviewWithUser) => ({
   id: parseInt(review.id.slice(-8), 16) || Math.floor(Math.random() * 1000000), // Convert UUID to number for UI compatibility
-  name: review.user.username || 'Unknown User',
+  name: review.user.displayName || review.user.username || 'Unknown User',
   avatar: review.user.avatar_url || `https://images.unsplash.com/photo-1494790108755-2616b612b515?w=50&h=50&fit=crop`,
   rating: review.rating,
   date: new Date(review.created_at).toLocaleDateString('en-US', { 

@@ -61,7 +61,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
   // Transform ReviewWithUser to match the expected UI format
   const transformedReview = 'user' in review ? {
     id: review.id,
-    name: review.user.username || 'Unknown User',
+    name: review.user.displayName || review.user.username || 'Unknown User',
     avatar: review.user.avatar_url || '',
     rating: review.rating,
     date: new Date(review.created_at).toLocaleDateString(),
