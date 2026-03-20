@@ -67,7 +67,7 @@ const formatFollowerMessage = (
   if (followers.length === 1) {
     if (remainingCount > 0) {
       return { 
-        text: `Followed by ${names[0]} and ${remainingCount} other${remainingCount === 1 ? '' : 's'}`, 
+        text: `Followed by ${names[0]} and ${remainingCount} other${remainingCount === 1 ? '' : 's'} you follow`, 
         remainingCount 
       };
     }
@@ -77,7 +77,7 @@ const formatFollowerMessage = (
   if (followers.length === 2) {
     if (remainingCount > 0) {
       return { 
-        text: `Followed by ${names[0]}, ${names[1]} and ${remainingCount} other${remainingCount === 1 ? '' : 's'}`, 
+        text: `Followed by ${names[0]}, ${names[1]} and ${remainingCount} other${remainingCount === 1 ? '' : 's'} you follow`, 
         remainingCount 
       };
     }
@@ -88,13 +88,13 @@ const formatFollowerMessage = (
   const firstTwo = names.slice(0, 2).join(', ');
   if (remainingCount > 0) {
     return { 
-      text: `Followed by ${firstTwo} and ${remainingCount} other${remainingCount === 1 ? '' : 's'}`, 
+      text: `Followed by ${firstTwo} and ${remainingCount} other${remainingCount === 1 ? '' : 's'} you follow`, 
       remainingCount 
     };
   }
   
   return { 
-    text: `Followed by ${firstTwo} and ${names.length - 2} other${names.length - 2 === 1 ? '' : 's'}`, 
+    text: `Followed by ${firstTwo} and ${names.length - 2} other${names.length - 2 === 1 ? '' : 's'} you follow`, 
     remainingCount 
   };
 };

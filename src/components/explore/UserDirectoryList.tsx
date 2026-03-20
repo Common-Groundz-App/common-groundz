@@ -19,6 +19,7 @@ type User = {
   recommendation_count: number;
   follower_count: number;
   is_following: boolean;
+  mutual_count: number;
 };
 
 interface UserDirectoryListProps {
@@ -73,6 +74,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
         let recommendationCountsMap = new Map();
         let followerCountsMap = new Map();
         let followingData: any[] = [];
+        let mutualCountsMap = new Map<string, number>();
         
         // Get recommendation counts
         const { data: recommendationData, error: recError } = await supabase
@@ -120,6 +122,36 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
             followingData = following || [];
           }
         }
+
+        // Batch mutual count enrichment
+        if (currentUser) {
+          try {
+            const { data: mutualData } = await supabase
+              .from('follows')
+              .select('following_id')
+              .eq('follower_id', currentUser.id);
+
+            if (mutualData) {
+              const viewerFollowingIds = new Set(mutualData.map(f => f.following_id));
+              
+              // For each listed user, count how many people the viewer follows also follow that user
+              const { data: allFollowsToUsers } = await supabase
+                .from('follows')
+                .select('following_id, follower_id')
+                .in('following_id', userIds);
+
+              if (allFollowsToUsers) {
+                for (const row of allFollowsToUsers) {
+                  if (viewerFollowingIds.has(row.follower_id) && row.follower_id !== currentUser.id) {
+                    mutualCountsMap.set(row.following_id, (mutualCountsMap.get(row.following_id) || 0) + 1);
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching mutual counts:', err);
+          }
+        }
         
         // Combine all data
         const enhancedUsers = data.map(user => {
@@ -131,7 +163,8 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
             ...user,
             recommendation_count: recCount,
             follower_count: followers,
-            is_following: isFollowing
+            is_following: isFollowing,
+            mutual_count: mutualCountsMap.get(user.id) || 0
           };
         });
         
@@ -254,6 +287,12 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
             <p className="text-sm mt-3 line-clamp-2 min-h-[2.5rem]">
               {user.bio || 'No bio provided.'}
             </p>
+            
+            {user.mutual_count > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Followed by {user.mutual_count} {user.mutual_count === 1 ? 'person' : 'people'} you follow
+              </p>
+            )}
             
             <div className="flex justify-between items-center mt-3">
               <span className="text-sm text-muted-foreground">

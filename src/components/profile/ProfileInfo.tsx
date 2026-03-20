@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { MapPin, Calendar, Users } from 'lucide-react';
 import UserListModal from './modals/UserListModal';
+import MutualConnectionsProof from './MutualConnectionsProof';
 
 interface ProfileInfoProps {
   location: string;
@@ -65,6 +66,11 @@ const ProfileInfo = ({
             <span className="font-medium">{followerCount}</span> Followers
           </div>
         </div>
+
+        <MutualConnectionsProof
+          profileUserId={profileUserId || ''}
+          isOwnProfile={isOwnProfile}
+        />
       </div>
 
       {profileUserId && (
