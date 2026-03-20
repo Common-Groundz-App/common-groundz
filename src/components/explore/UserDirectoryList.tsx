@@ -314,11 +314,38 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
               {user.bio || 'No bio provided.'}
             </p>
             
-            {user.mutual_count > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Followed by {user.mutual_count} {user.mutual_count === 1 ? 'person' : 'people'} you follow
-              </p>
-            )}
+            {(() => {
+              const mutual = mutualPreviewsMap.get(user.id);
+              if (!mutual || mutual.total_count === 0) return null;
+              const getName = (p: MutualPreview) => p.first_name || p.username || 'Someone';
+              const previews = mutual.previews;
+              const total = mutual.total_count;
+              const others = total - previews.length;
+              return (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <div className="flex -space-x-1.5 shrink-0">
+                    {previews.slice(0, 2).map((p) => (
+                      <Avatar key={p.mutual_user_id} className="h-5 w-5 text-[10px] border border-background">
+                        <AvatarImage src={p.avatar_url || undefined} />
+                        <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
+                          {(p.first_name || p.username || 'U').charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    Followed by{' '}
+                    <span className="truncate max-w-[80px] inline-block align-bottom">{getName(previews[0])}</span>
+                    {previews.length === 2 && others === 0 && (
+                      <> and <span className="truncate max-w-[80px] inline-block align-bottom">{getName(previews[1])}</span></>
+                    )}
+                    {others > 0 && (
+                      <> and {others} {others === 1 ? 'other' : 'others'}</>
+                    )}
+                  </p>
+                </div>
+              );
+            })()}
             
             <div className="flex justify-between items-center mt-3">
               <span className="text-sm text-muted-foreground">
