@@ -3762,6 +3762,13 @@ export type Database = {
               recommender_usernames: string[]
             }[]
           }
+      get_batch_mutual_counts: {
+        Args: { target_user_ids: string[]; viewer_id: string }
+        Returns: {
+          mutual_count: number
+          user_id: string
+        }[]
+      }
       get_cached_products: {
         Args: { query_text: string }
         Returns: {
