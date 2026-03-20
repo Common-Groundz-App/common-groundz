@@ -137,7 +137,9 @@ const UserCard = ({
     }
   };
 
-  const formattedUsername = username ? `@${username.toLowerCase().replace(/\s+/g, '')}` : '@user';
+  // Build display name with fallback: first+last → username → "User"
+  const displayName = [firstName, lastName].filter(Boolean).join(' ') || username || 'User';
+  const formattedUsername = username ? `@${username.toLowerCase().replace(/\s+/g, '')}` : null;
 
   return (
     <Link to={username ? `/u/${username}` : `/profile/${id}`} className="block" onClick={handleCardClick}>
@@ -145,16 +147,18 @@ const UserCard = ({
         <div className="flex items-center">
           <Avatar className="h-9 w-9">
             {avatarUrl ? (
-              <AvatarImage src={avatarUrl} alt={username || 'User'} />
+              <AvatarImage src={avatarUrl} alt={displayName} />
             ) : (
               <AvatarFallback className="bg-brand-orange text-white text-xs">
-                {getUserInitials(username)}
+                {getUserInitials(displayName !== 'User' ? displayName : username)}
               </AvatarFallback>
             )}
           </Avatar>
           <div className="ml-3">
-            <div className="font-medium text-foreground">{username || 'User'}</div>
-            <div className="text-xs text-muted-foreground">{formattedUsername}</div>
+            <div className="font-medium text-foreground">{displayName}</div>
+            {formattedUsername && (
+              <div className="text-xs text-muted-foreground">{formattedUsername}</div>
+            )}
           </div>
         </div>
         
