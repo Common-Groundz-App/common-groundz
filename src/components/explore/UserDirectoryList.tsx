@@ -26,6 +26,8 @@ type MutualData = {
 type User = {
   id: string;
   username: string | null;
+  first_name: string | null;
+  last_name: string | null;
   avatar_url: string | null;
   bio: string | null;
   recommendation_count: number;
@@ -55,6 +57,8 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
           .select(`
             id, 
             username, 
+            first_name,
+            last_name,
             avatar_url, 
             bio
           `);
@@ -302,8 +306,13 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
               </Avatar>
               <div className="flex-1 min-w-0">
                 <Link to={user.username ? `/u/${user.username}` : `/profile/${user.id}`} className="font-medium hover:underline truncate block">
-                  {user.username || 'Anonymous'}
+                  {[user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Anonymous'}
                 </Link>
+                {user.username && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    @{user.username}
+                  </p>
+                )}
                 <p className="text-sm text-muted-foreground truncate">
                   {user.recommendation_count} recommendations
                 </p>

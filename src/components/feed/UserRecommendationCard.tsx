@@ -53,13 +53,17 @@ export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({
         />
         <div className="flex-1 min-w-0">
           <UsernameLink 
-            username={user.displayName} 
+            username={user.username} 
             userId={user.id}
             className="font-medium text-sm block truncate"
-          />
-          <div className="text-xs text-muted-foreground truncate">
-            @{user.username}
-          </div>
+          >
+            {user.displayName}
+          </UsernameLink>
+          {user.username && (
+            <div className="text-xs text-muted-foreground truncate">
+              @{user.username}
+            </div>
+          )}
           {user.reason && (
             <div className="text-xs text-muted-foreground/80 truncate mt-0.5">
               {user.reason}
