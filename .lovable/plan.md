@@ -1,107 +1,38 @@
 
 
-# Mutual Connections — Final Implementation Plan
+# Fix: SECURITY INVOKER → SECURITY DEFINER + Explore batch RPC
 
-## 1. New RPC: `get_profile_mutual_connections`
+## Root cause (confirmed)
 
-**Migration file.** Uses CTE for correct total count.
+The `follows` table RLS only allows users to see rows where they are the `follower_id` or `following_id`. So when the profile mutual RPC tries to read `hana → linda`, the logged-in user (rishab) can't see that row. Same issue in Explore's client-side mutual counting.
 
-```sql
-CREATE OR REPLACE FUNCTION public.get_profile_mutual_connections(
-  viewer_id uuid,
-  profile_user_id uuid,
-  result_limit int DEFAULT 3
-)
-RETURNS TABLE(
-  id uuid,
-  username text,
-  first_name text,
-  avatar_url text,
-  total_count bigint
-)
-LANGUAGE sql
-STABLE
-SECURITY INVOKER
-SET search_path = 'public'
-AS $$
-  WITH matching_mutuals AS (
-    SELECT DISTINCT ON (p.id)
-      p.id,
-      p.username,
-      p.first_name,
-      p.avatar_url,
-      f1.created_at AS follow_date
-    FROM follows f1
-    JOIN follows f2 ON f1.following_id = f2.follower_id
-    JOIN profiles p ON p.id = f1.following_id
-    WHERE f1.follower_id = viewer_id
-      AND f2.following_id = profile_user_id
-      AND f1.following_id != viewer_id
-      AND f1.following_id != profile_user_id
-  )
-  SELECT
-    m.id,
-    m.username,
-    m.first_name,
-    m.avatar_url,
-    (SELECT count(*) FROM matching_mutuals) AS total_count
-  FROM matching_mutuals m
-  ORDER BY m.follow_date DESC
-  LIMIT result_limit;
-$$;
-```
+## Changes
 
-Key details: CTE guarantees accurate `total_count` independent of LIMIT. `DISTINCT ON` prevents duplicate rows. Excludes viewer and profile owner. Lists safe profile columns only (per memory constraint).
+### 1. New migration: Fix profile RPC + add batch mutual counts RPC
 
-## 2. Profile Header: `MutualConnectionsProof.tsx`
+**Profile RPC** — change `SECURITY INVOKER` to `SECURITY DEFINER`, use `SET search_path = ''`, and explicitly schema-qualify all tables (`public.follows`, `public.profiles`). Same logic, same safe columns, same CTE pattern.
 
-New component placed in `ProfileInfo.tsx` below follower/following counts.
+**New batch RPC** `get_batch_mutual_counts(viewer_id uuid, target_user_ids uuid[])` — `SECURITY DEFINER`, returns `(user_id uuid, mutual_count bigint)`. Replaces the client-side follows joins in Explore.
 
-**Render conditions:** authenticated AND not own profile AND count > 0. On error/loading failure → render nothing silently.
+### 2. Update `UserDirectoryList.tsx`
 
-**Copy rules:**
-- 1 mutual: "Followed by Hana"
-- 2 mutuals: "Followed by Hana and Ali"
-- 3+: "Followed by Hana, Ali and 7 others you follow"
+Replace the client-side mutual counting block (lines 126-153) with a single call to `get_batch_mutual_counts`. Remove the two direct `follows` table queries that can't see third-party edges.
 
-Shows up to 3 stacked avatars. Text is clickable → opens `UserListModal`. Analytics: `mutual_proof_shown` fires once per mount via `useRef` guard.
+### 3. Update `src/integrations/supabase/types.ts`
 
-## 3. Entity Copy Upgrade: `EntitySocialFollowers.tsx`
+Add the new `get_batch_mutual_counts` RPC type and update `get_profile_mutual_connections` if needed.
 
-Update `formatFollowerMessage` to append "you follow" when displayed followers are from viewer's network. Copy change only — "Followed by Hana and 2 others" → "Followed by Hana and 2 others you follow".
+### Files
 
-## 4. Explore Batch Enrichment: `UserDirectoryList.tsx`
-
-Single batch query for all visible user IDs (not per-card):
-
-```sql
-SELECT f2.following_id AS user_id, count(*) AS mutual_count
-FROM follows f1
-JOIN follows f2 ON f1.following_id = f2.follower_id
-WHERE f1.follower_id = viewer_id
-  AND f2.following_id = ANY(visible_user_ids)
-  AND f1.following_id != viewer_id
-GROUP BY f2.following_id;
-```
-
-**Copy:** 0 = hidden, 1 = "Followed by 1 person you follow", 2+ = "Followed by 3 people you follow". Only when authenticated.
-
-## 5. Analytics
-
-`mutual_proof_shown` and `mutual_proof_clicked` using existing `analytics.track()`. `useRef` guard to fire once per mount.
-
-## Files
-
-| File | Action |
+| File | Change |
 |------|--------|
-| `supabase/migrations/[new].sql` | New RPC |
-| `src/components/profile/MutualConnectionsProof.tsx` | New component |
-| `src/components/profile/ProfileInfo.tsx` | Add MutualConnectionsProof |
-| `src/components/entity/EntitySocialFollowers.tsx` | Copy change in formatFollowerMessage |
-| `src/components/explore/UserDirectoryList.tsx` | Batch mutual enrichment + display |
-| `src/integrations/supabase/types.ts` | Auto-updated by Supabase |
+| `supabase/migrations/[new].sql` | Fix profile RPC security + new batch RPC |
+| `src/components/explore/UserDirectoryList.tsx` | Use batch RPC instead of client-side follows |
+| `src/integrations/supabase/types.ts` | Add new RPC type |
 
-## Not doing
+### Not changing
 
-Mutual count badges, feed card labels, anti-flicker delays, semantic naming cleanup, circle-weighted mutuals, feed ranking changes, mutual tab in circles modal.
+- Entity copy ("you follow" suffix) — already implemented, data source is `useEntityFollowerNames` which uses a `SECURITY DEFINER` RPC, so it's correct
+- `MutualConnectionsProof.tsx` — no changes needed, just needs the RPC fix
+- No anti-flicker delays
 
