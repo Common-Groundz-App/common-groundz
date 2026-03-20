@@ -4,6 +4,8 @@ export type UserProfile = {
   username: string | null;
   avatar_url: string | null;
   isFollowing?: boolean;
+  first_name?: string | null;
+  last_name?: string | null;
 };
 
 export interface EntityAdapter {

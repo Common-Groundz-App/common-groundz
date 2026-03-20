@@ -63,7 +63,9 @@ export const fetchFollowing = async (profileUserId: string, currentUserId?: stri
       id: following.id,
       username: following.username,
       avatar_url: following.avatar_url,
-      isFollowing: following.is_following
+      isFollowing: following.isFollowing,
+      first_name: following.first_name,
+      last_name: following.last_name,
     })) || [];
     
     console.log('Processed following data with optimized query:', mappedData.length);
