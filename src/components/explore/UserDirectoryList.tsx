@@ -19,6 +19,7 @@ type User = {
   recommendation_count: number;
   follower_count: number;
   is_following: boolean;
+  mutual_count: number;
 };
 
 interface UserDirectoryListProps {
