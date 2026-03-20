@@ -122,6 +122,36 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
             followingData = following || [];
           }
         }
+
+        // Batch mutual count enrichment
+        if (currentUser) {
+          try {
+            const { data: mutualData } = await supabase
+              .from('follows')
+              .select('following_id')
+              .eq('follower_id', currentUser.id);
+
+            if (mutualData) {
+              const viewerFollowingIds = new Set(mutualData.map(f => f.following_id));
+              
+              // For each listed user, count how many people the viewer follows also follow that user
+              const { data: allFollowsToUsers } = await supabase
+                .from('follows')
+                .select('following_id, follower_id')
+                .in('following_id', userIds);
+
+              if (allFollowsToUsers) {
+                for (const row of allFollowsToUsers) {
+                  if (viewerFollowingIds.has(row.follower_id) && row.follower_id !== currentUser.id) {
+                    mutualCountsMap.set(row.following_id, (mutualCountsMap.get(row.following_id) || 0) + 1);
+                  }
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Error fetching mutual counts:', err);
+          }
+        }
         
         // Combine all data
         const enhancedUsers = data.map(user => {
@@ -133,7 +163,8 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
             ...user,
             recommendation_count: recCount,
             follower_count: followers,
-            is_following: isFollowing
+            is_following: isFollowing,
+            mutual_count: mutualCountsMap.get(user.id) || 0
           };
         });
         
