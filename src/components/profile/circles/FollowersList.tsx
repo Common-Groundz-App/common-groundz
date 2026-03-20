@@ -53,6 +53,8 @@ const FollowersList = ({
             id={follower.id}
             username={follower.username}
             avatarUrl={follower.avatar_url}
+            firstName={follower.first_name}
+            lastName={follower.last_name}
             isFollowing={follower.isFollowing}
             relationshipType="follower"
             onFollowToggle={() => onFollowToggle(follower.id, follower.isFollowing)}
