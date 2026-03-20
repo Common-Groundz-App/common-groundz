@@ -9,6 +9,8 @@ interface UserCardProps {
   id: string;
   username: string | null;
   avatarUrl: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   isFollowing?: boolean;
   relationshipType?: 'follower' | 'following';
   onFollowToggle: (userId: string, isFollowing: boolean) => void;
