@@ -73,6 +73,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
         let recommendationCountsMap = new Map();
         let followerCountsMap = new Map();
         let followingData: any[] = [];
+        let mutualCountsMap = new Map<string, number>();
         
         // Get recommendation counts
         const { data: recommendationData, error: recError } = await supabase
