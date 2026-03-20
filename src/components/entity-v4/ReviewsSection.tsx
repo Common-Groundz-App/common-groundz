@@ -507,7 +507,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   </Badge>
                   <Eye className="w-4 h-4 text-blue-600" />
                   <span className="text-sm text-blue-600 font-medium">
-                    {review.user.username || 'Someone'} you follow reviewed this
+                    {review.user.displayName || review.user.username || 'Someone'} you follow reviewed this
                   </span>
                 </div>
                 <ReviewCard 
