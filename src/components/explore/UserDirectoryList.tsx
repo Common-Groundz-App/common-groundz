@@ -123,29 +123,20 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
           }
         }
 
-        // Batch mutual count enrichment
+        // Batch mutual count enrichment via SECURITY DEFINER RPC
         if (currentUser) {
           try {
-            const { data: mutualData } = await supabase
-              .from('follows')
-              .select('following_id')
-              .eq('follower_id', currentUser.id);
+            const { data: mutualData, error: mutualError } = await supabase
+              .rpc('get_batch_mutual_counts', {
+                viewer_id: currentUser.id,
+                target_user_ids: userIds
+              });
 
-            if (mutualData) {
-              const viewerFollowingIds = new Set(mutualData.map(f => f.following_id));
-              
-              // For each listed user, count how many people the viewer follows also follow that user
-              const { data: allFollowsToUsers } = await supabase
-                .from('follows')
-                .select('following_id, follower_id')
-                .in('following_id', userIds);
-
-              if (allFollowsToUsers) {
-                for (const row of allFollowsToUsers) {
-                  if (viewerFollowingIds.has(row.follower_id) && row.follower_id !== currentUser.id) {
-                    mutualCountsMap.set(row.following_id, (mutualCountsMap.get(row.following_id) || 0) + 1);
-                  }
-                }
+            if (mutualError) {
+              console.error('Error fetching mutual counts:', mutualError);
+            } else if (mutualData) {
+              for (const row of mutualData) {
+                mutualCountsMap.set(row.user_id, Number(row.mutual_count));
               }
             }
           } catch (err) {
