@@ -4027,6 +4027,20 @@ export type Database = {
           post_id: string
         }[]
       }
+      get_profile_mutual_connections: {
+        Args: {
+          profile_user_id: string
+          result_limit?: number
+          viewer_id: string
+        }
+        Returns: {
+          avatar_url: string
+          first_name: string
+          id: string
+          total_count: number
+          username: string
+        }[]
+      }
       get_recommendation_count: {
         Args: { p_entity_id: string }
         Returns: number
