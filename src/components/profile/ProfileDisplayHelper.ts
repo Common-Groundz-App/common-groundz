@@ -10,9 +10,7 @@ export const getFormattedDisplayName = (
 ): string => {
   // For own profile, use first/last name if available
   if (isOwnProfile) {
-    return firstName || lastName 
-      ? `${firstName} ${lastName}`.trim() 
-      : username;
+    return [firstName, lastName].filter(Boolean).join(' ') || username;
   }
   
   // For other user's profile, use SafeUserProfile displayName consistently

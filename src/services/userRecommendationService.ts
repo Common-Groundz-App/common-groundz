@@ -29,7 +29,7 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
 
     // Transform the data and add display properties
     const enhancedRecommendations: RecommendedUser[] = (recommendations || [])
-      .map(user => {
+      .map((user: any) => {
         const realName = [user.first_name, user.last_name].filter(Boolean).join(' ');
         return {
           id: user.user_id,
