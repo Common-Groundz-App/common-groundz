@@ -40,6 +40,7 @@ export interface Review {
   user?: {
     username?: string;
     avatar_url?: string;
+    displayName?: string;
   };
   entity?: {
     id: string;
