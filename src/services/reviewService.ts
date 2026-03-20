@@ -389,8 +389,9 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
       return {
         ...review,
         user: {
-          username: review.user.displayName,
-          avatar_url: review.user.avatar_url
+          username: review.user.username,
+          avatar_url: review.user.avatar_url,
+          displayName: review.user.displayName
         },
         entity: entity ? {
           id: entity.id,
