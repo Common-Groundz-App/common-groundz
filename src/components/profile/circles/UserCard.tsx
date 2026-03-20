@@ -34,7 +34,9 @@ export const getUserInitials = (username: string | null) => {
 const UserCard = ({ 
   id, 
   username, 
-  avatarUrl, 
+  avatarUrl,
+  firstName,
+  lastName,
   isFollowing, 
   relationshipType,
   onFollowToggle, 
