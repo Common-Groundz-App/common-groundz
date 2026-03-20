@@ -11,6 +11,18 @@ import { useToast } from '@/hooks/use-toast';
 import { UserCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
+type MutualPreview = {
+  mutual_user_id: string;
+  username: string | null;
+  first_name: string | null;
+  avatar_url: string | null;
+};
+
+type MutualData = {
+  previews: MutualPreview[];
+  total_count: number;
+};
+
 type User = {
   id: string;
   username: string | null;
