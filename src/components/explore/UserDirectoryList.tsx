@@ -57,6 +57,8 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
           .select(`
             id, 
             username, 
+            first_name,
+            last_name,
             avatar_url, 
             bio
           `);
