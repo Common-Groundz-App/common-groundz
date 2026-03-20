@@ -64,6 +64,7 @@ const ProfileInfo = ({
             onClick={handleShowFollowers}
           >
             <span className="font-medium">{followerCount}</span> Followers
+          </div>
         </div>
 
         <MutualConnectionsProof
