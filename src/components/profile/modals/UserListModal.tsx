@@ -174,6 +174,8 @@ const UserListModal = ({
                     id={userProfile.id}
                     username={userProfile.username}
                     avatarUrl={userProfile.avatar_url}
+                    firstName={userProfile.first_name}
+                    lastName={userProfile.last_name}
                     isFollowing={userProfile.isFollowing}
                     relationshipType={listType === 'followers' ? 'follower' : 'following'}
                     onFollowToggle={() => handleFollowToggle(userProfile.id, userProfile.isFollowing)}

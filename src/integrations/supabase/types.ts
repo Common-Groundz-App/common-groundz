@@ -3958,8 +3958,10 @@ export type Database = {
         Args: { current_user_id: string; profile_user_id: string }
         Returns: {
           avatar_url: string
+          first_name: string
           id: string
-          is_following: boolean
+          isFollowing: boolean
+          last_name: string
           username: string
         }[]
       }
@@ -3971,8 +3973,10 @@ export type Database = {
         Args: { current_user_id: string; profile_user_id: string }
         Returns: {
           avatar_url: string
+          first_name: string
           id: string
-          is_following: boolean
+          isFollowing: boolean
+          last_name: string
           username: string
         }[]
       }
