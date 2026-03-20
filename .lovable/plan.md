@@ -1,69 +1,60 @@
 
 
-# Fix: Centralize Display-Name Logic — Final Plan
+# Verification: Centralize Display-Name Logic
 
-Both reviewers approve. Adding one verification step they both flagged.
+## Plan Implementation Status: ✅ Correctly Implemented
 
-## Changes
+All 5 planned changes were applied correctly:
 
-### 1. Fix `src/utils/profileUtils.ts` — flip name priority + fix username corruption
+| Planned Change | Status |
+|---|---|
+| `profileUtils.ts` — priority flipped, username preserved | ✅ Done correctly |
+| `get_who_to_follow` RPC — `first_name`, `last_name` added | ✅ Migration applied |
+| `userRecommendationService.ts` — real name display | ✅ Done correctly |
+| `UserDirectoryList.tsx` — real name + @username | ✅ Done correctly |
+| `UserRecommendationCard.tsx` — displayName + @username | ✅ Done correctly |
 
-**`getDisplayName` (line 86-92):** Change priority from `username → real name` to `real name → username`:
-```
-[first_name, last_name].filter(Boolean).join(' ') || username || 'Anonymous User'
-```
+## Remaining Surfaces Still Using Username as Display Name
 
-**`transformToSafeProfile` (line 29-48):**
-- Same priority fix for `displayName`
-- **Critical fix line 48:** `username: displayName` → `username: profile.username || PROFILE_FALLBACKS.username` — preserves the real handle for routing
-- Fix initials to prioritize real name over username (lines 34-40)
+These were NOT part of the plan but still have the old pattern:
 
-**`getUserInitials` (line 98+):** Same priority flip — real name initials first.
+### 1. `ReviewTimelineViewer.tsx` (lines 283, 347)
+Shows `username || 'User'` as the author name on review timeline entries. Should use `first_name`/`last_name` from the joined profiles data.
 
-### 2. Migration: Add `first_name`, `last_name` to `get_who_to_follow` RPC
+### 2. `networkRecommendationService.ts` (line 231)
+Sets `displayName: username` — the network recommendation RPC only returns usernames, not real names. The displayed recommender names in network-sourced feed items will be handles, not real names.
 
-DROP + CREATE with updated RETURNS TABLE adding `first_name text, last_name text`. Add `p.first_name, p.last_name` to all CTE SELECT branches (friends_of_friends, active_creators, new_users, popular_users, fallback).
+### 3. `posts/processor.ts` (line 37)
+Uses `profile?.displayName || profile?.username` — this one is actually fine since `displayName` from `SafeUserProfile` now has the correct priority. ✅ No fix needed.
 
-### 3. Update `src/services/userRecommendationService.ts`
+### 4. `RecommendationContentViewer.tsx` (line 136) + `PostContentViewer.tsx` (line 153)
+Both set `username: authorProfile.displayName || authorProfile.username` — these are also fine since `authorProfile.displayName` now correctly prioritizes real names via the fixed `transformToSafeProfile`. ✅ No fix needed.
 
-- Add `first_name`, `last_name` to `RecommendedUser` interface
-- Map from RPC response
-- Fix `displayName`: `[user.first_name, user.last_name].filter(Boolean).join(' ') || user.username || 'Anonymous User'`
-- Same fix in `getFallbackRecommendations` — add `first_name, last_name` to profiles SELECT
+### 5. `CircleContributorsPreview.tsx` (line 96) + `ContributorModal.tsx` (line 120)
+Use `profile?.displayName || profile?.username` — fine since these use `SafeUserProfile`. ✅ No fix needed.
 
-### 4. Update `src/components/explore/UserDirectoryList.tsx`
+## Actual Fixes Needed
 
-- Add `first_name, last_name` to profiles SELECT and `User` type
-- Card title: real name with fallback
-- Add `@username` as secondary text below the name
+Only **2 surfaces** still need fixing:
 
-### 5. Update `src/integrations/supabase/types.ts`
+### Fix 1: `ReviewTimelineViewer.tsx`
+The review and timeline update queries join `profiles` but only use `.username`. Need to also pull `first_name`/`last_name` and display real names.
 
-Add `first_name`, `last_name` to `get_who_to_follow` return type.
+### Fix 2: `networkRecommendationService.ts`
+The network recommendation RPC returns `recommender_usernames` but no real name fields. The service sets `displayName: username`. This needs the RPC to also return `first_name`/`last_name` arrays, or at minimum the service should look up names from the profile data it already has.
 
-### 6. Verification step (post-implementation)
+## Verification Checklist
 
-Confirm these routing/linking paths still use the real username handle (not displayName):
-- `UserListModal.tsx` line 141: `/u/${userProfile.username}`
-- `MutualConnectionsProof.tsx` line 101: `/u/${mutual.username}`
-- `FollowersList.tsx` / `FollowingList.tsx`: `onNavigate` callbacks
-- `UsernameLink.tsx`: receives username prop
+Test these as logged-in user (rishab.devp):
 
-The `transformToSafeProfile` fix on line 48 is the key — once `username` preserves the real handle, all downstream routing stays correct.
-
-## Files
-
-| File | Change |
-|------|--------|
-| `src/utils/profileUtils.ts` | Fix priority + username corruption |
-| `supabase/migrations/[new].sql` | Add name fields to `get_who_to_follow` |
-| `src/services/userRecommendationService.ts` | Map name fields, fix displayName |
-| `src/components/explore/UserDirectoryList.tsx` | Fetch + display real names |
-| `src/integrations/supabase/types.ts` | Update RPC types |
-
-## Not changing
-- `UserCard.tsx` — already fixed
-- Circles RPCs — already fixed in previous migration
-- Entity surfaces — already correct
-- `UserRecommendationCard.tsx` — already uses `displayName` from service
+1. **Home page — Who to Follow sidebar**: Cards should show "Hana Li" (not "hana.li") with @hana.li below
+2. **Explore — People tab**: Cards should show real names with @username below + mutual avatars
+3. **Profile — Followers modal**: Real name primary, @username secondary
+4. **Profile — Following modal**: Same
+5. **Profile — Circles tab**: Same
+6. **Profile header — Mutual proof**: "Followed by Hana" (not "hana.li")
+7. **Entity page — Social followers**: "Followed by Hana and 2 others you follow"
+8. **Routing**: Clicking any name should navigate to `/u/{username}` (not `/u/{display name}`)
+9. **Users without real names**: Should gracefully show username as primary, no @username secondary line
+10. **Own profile**: Should show your real name, not username
 
