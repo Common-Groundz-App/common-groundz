@@ -29,17 +29,22 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
 
     // Transform the data and add display properties
     const enhancedRecommendations: RecommendedUser[] = (recommendations || [])
-      .map(user => ({
-        id: user.user_id, // Updated field name
-        username: user.username,
-        avatar_url: user.avatar_url,
-        displayName: user.username || 'Anonymous User',
-        initials: getInitials(user.username),
-        isFollowing: false,
-        reason: user.reason,
-        source: user.source,
-        score: user.score
-      }));
+      .map(user => {
+        const realName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+        return {
+          id: user.user_id,
+          username: user.username,
+          first_name: user.first_name ?? null,
+          last_name: user.last_name ?? null,
+          avatar_url: user.avatar_url,
+          displayName: realName || user.username || 'Anonymous User',
+          initials: getInitials(realName || user.username),
+          isFollowing: false,
+          reason: user.reason,
+          source: user.source,
+          score: user.score
+        };
+      });
 
     // Only return recommendations without logging impressions
     // Impressions will be logged only when user actually follows someone
