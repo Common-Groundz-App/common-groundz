@@ -1,38 +1,46 @@
 
 
-# Fix: SECURITY INVOKER → SECURITY DEFINER + Explore batch RPC
+# Updated Plan: Explore Cards — Mutual Avatars + Names
 
-## Root cause (confirmed)
+Incorporates ChatGPT's feedback. Here's what I agree with and what I'd adjust:
 
-The `follows` table RLS only allows users to see rows where they are the `follower_id` or `following_id`. So when the profile mutual RPC tries to read `hana → linda`, the logged-in user (rishab) can't see that row. Same issue in Explore's client-side mutual counting.
+**Agree with:**
+- Max 2 avatars — already planned, now a hard rule
+- Short text — use first names only, truncate if needed
+- Mobile awareness — single-column cards on mobile have enough space, but we'll use `truncate` on text to prevent overflow
 
-## Changes
+**Don't need:**
+- Fallback to count-only on mobile — cards are full-width on mobile (1 column), plenty of room
+- Performance concerns are already handled — preview limit is 2, batch RPC, single query
 
-### 1. New migration: Fix profile RPC + add batch mutual counts RPC
+## Changes to the plan
 
-**Profile RPC** — change `SECURITY INVOKER` to `SECURITY DEFINER`, use `SET search_path = ''`, and explicitly schema-qualify all tables (`public.follows`, `public.profiles`). Same logic, same safe columns, same CTE pattern.
+### 1. New RPC: `get_batch_mutual_previews`
 
-**New batch RPC** `get_batch_mutual_counts(viewer_id uuid, target_user_ids uuid[])` — `SECURITY DEFINER`, returns `(user_id uuid, mutual_count bigint)`. Replaces the client-side follows joins in Explore.
+Same as before. Returns up to 2 preview rows per target user with `target_user_id`, `mutual_user_id`, `username`, `first_name`, `avatar_url`, `total_count`. `SECURITY DEFINER`.
 
 ### 2. Update `UserDirectoryList.tsx`
 
-Replace the client-side mutual counting block (lines 126-153) with a single call to `get_batch_mutual_counts`. Remove the two direct `follows` table queries that can't see third-party edges.
+Replace `get_batch_mutual_counts` call with `get_batch_mutual_previews`. Store preview data as a Map keyed by target user ID.
 
-### 3. Update `src/integrations/supabase/types.ts`
+**Display rules (strict):**
+- Max 2 tiny overlapping avatars (size `xs`, 24px)
+- Copy uses `first_name` (falls back to `username`), single line, truncated
+- 1 mutual: `[av] Followed by Hana`
+- 2 mutuals: `[av][av] Followed by Hana and Ali`
+- 3+: `[av][av] Followed by Hana and 3 others`
+- 0: hidden
+- Whole line wrapped in `truncate` to prevent overflow
 
-Add the new `get_batch_mutual_counts` RPC type and update `get_profile_mutual_connections` if needed.
+### 3. Types update
 
-### Files
+Add `get_batch_mutual_previews` RPC signature.
+
+## Files
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/[new].sql` | Fix profile RPC security + new batch RPC |
-| `src/components/explore/UserDirectoryList.tsx` | Use batch RPC instead of client-side follows |
-| `src/integrations/supabase/types.ts` | Add new RPC type |
-
-### Not changing
-
-- Entity copy ("you follow" suffix) — already implemented, data source is `useEntityFollowerNames` which uses a `SECURITY DEFINER` RPC, so it's correct
-- `MutualConnectionsProof.tsx` — no changes needed, just needs the RPC fix
-- No anti-flicker delays
+| `supabase/migrations/[new].sql` | New `get_batch_mutual_previews` RPC |
+| `src/components/explore/UserDirectoryList.tsx` | Avatars + named copy |
+| `src/integrations/supabase/types.ts` | New RPC type |
 
