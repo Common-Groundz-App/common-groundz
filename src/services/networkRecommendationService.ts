@@ -219,24 +219,49 @@ export const getNetworkEntityRecommendationsWithCache = async (
       return [];
     }
 
-    // Process the aggregated data
+    // Collect all recommender user IDs for batch profile fetch
+    const allRecommenderIds: string[] = [];
+    rawData.forEach(rec => {
+      const anyRec = rec as any;
+      if (anyRec.recommender_user_ids) {
+        allRecommenderIds.push(...anyRec.recommender_user_ids);
+      }
+    });
+    const uniqueRecommenderIds = [...new Set(allRecommenderIds)];
+
+    // Batch fetch real profiles with names
+    const { profiles: profileMap } = uniqueRecommenderIds.length > 0
+      ? await fetchProfilesBatch(uniqueRecommenderIds)
+      : { profiles: {} as Record<string, SafeUserProfile> };
+
+    // Process the aggregated data with real profile names
     const processedData: ProcessedNetworkRecommendation[] = rawData.map(rec => {
-      const anyRec = rec as any; // Type cast to handle new RPC return fields
-      const userProfiles = anyRec.recommender_user_ids?.map((id: string, index: number) => {
+      const anyRec = rec as any;
+      const recommenderIds: string[] = anyRec.recommender_user_ids || [];
+      
+      const userProfiles: SafeUserProfile[] = recommenderIds.map((id: string, index: number) => {
+        const profile = profileMap[id];
+        if (profile) return profile;
+        // Fallback if profile not found
         const username = anyRec.recommender_usernames?.[index] || 'Unknown User';
         return {
           id,
           username,
           avatar_url: anyRec.recommender_avatars?.[index] || null,
           displayName: username,
-          initials: username.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
+          initials: username.substring(0, 2).toUpperCase(),
           fullName: null,
           first_name: null,
           last_name: null,
           bio: null,
-          location: null
+          location: null,
+          username_changed_at: null,
+          deleted_at: null,
         };
-      }) || [];
+      });
+
+      const displayUsernames = userProfiles.map(p => p.displayName);
+      const displayAvatars = userProfiles.map(p => p.avatar_url || '');
 
       return {
         // Core entity data
@@ -250,24 +275,24 @@ export const getNetworkEntityRecommendationsWithCache = async (
         average_rating: anyRec.average_rating || 0,
         
         // Primary recommender data (first in list)
-        user_id: anyRec.recommender_user_ids?.[0] || '',
-        username: anyRec.recommender_usernames?.[0] || 'Unknown User',
-        avatar_url: anyRec.recommender_avatars?.[0] || null,
+        user_id: recommenderIds[0] || '',
+        username: userProfiles[0]?.username || 'Unknown User',
+        avatar_url: userProfiles[0]?.avatar_url || null,
         created_at: anyRec.latest_recommendation_date ?? undefined,
         
         // Aggregated data
         userProfiles,
-        displayUsernames: anyRec.recommender_usernames || ['Unknown User'],
-        displayAvatars: anyRec.recommender_avatars || [],
-        recommendedByUserId: anyRec.recommender_user_ids || [],
+        displayUsernames,
+        displayAvatars,
+        recommendedByUserId: recommenderIds,
         
         // Enhanced fields
         recommendation_count: anyRec.recommendation_count,
         circle_rating: anyRec.average_rating,
         overall_rating: anyRec.average_rating,
         latest_recommendation_date: anyRec.latest_recommendation_date ?? undefined,
-        has_timeline_updates: false, // Default to false since property not available
-        is_mutual_connection: false // Not applicable for aggregated data
+        has_timeline_updates: false,
+        is_mutual_connection: false
       };
     });
 
