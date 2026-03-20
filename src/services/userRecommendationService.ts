@@ -62,7 +62,7 @@ const getFallbackRecommendations = async (currentUserId: string, limit: number):
   try {
     const { data: users, error } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, created_at')
+      .select('id, username, first_name, last_name, avatar_url, created_at')
       .neq('id', currentUserId)
       .not('username', 'is', null)
       .is('deleted_at', null)
@@ -71,17 +71,22 @@ const getFallbackRecommendations = async (currentUserId: string, limit: number):
 
     if (error) throw error;
 
-    return (users || []).map(user => ({
-      id: user.id,
-      username: user.username,
-      avatar_url: user.avatar_url,
-      displayName: user.username || 'Anonymous User',
-      initials: getInitials(user.username),
-      isFollowing: false,
-      reason: 'Suggested for you',
-      source: 'fallback',
-      score: 0.5
-    }));
+    return (users || []).map(user => {
+      const realName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+      return {
+        id: user.id,
+        username: user.username,
+        first_name: user.first_name ?? null,
+        last_name: user.last_name ?? null,
+        avatar_url: user.avatar_url,
+        displayName: realName || user.username || 'Anonymous User',
+        initials: getInitials(realName || user.username),
+        isFollowing: false,
+        reason: 'Suggested for you',
+        source: 'fallback',
+        score: 0.5
+      };
+    });
   } catch (fallbackError) {
     console.error('Fallback recommendations failed:', fallbackError);
     return [];

@@ -83,9 +83,8 @@ export const isProfileComplete = (profile: BaseUserProfile | null): boolean => {
 export const getDisplayName = (profile: BaseUserProfile | null): string => {
   if (!profile) return PROFILE_FALLBACKS.displayName;
   
-  return profile.username || 
-    (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : '') ||
-    profile.first_name || 
+  return [profile.first_name, profile.last_name].filter(Boolean).join(' ') ||
+    profile.username || 
     PROFILE_FALLBACKS.displayName;
 };
 
@@ -95,16 +94,16 @@ export const getDisplayName = (profile: BaseUserProfile | null): string => {
 export const getUserInitials = (profile: BaseUserProfile | null): string => {
   if (!profile) return PROFILE_FALLBACKS.initials;
   
-  if (profile.username) {
-    return profile.username.substring(0, 2).toUpperCase();
-  }
-  
   if (profile.first_name && profile.last_name) {
     return `${profile.first_name[0]}${profile.last_name[0]}`.toUpperCase();
   }
   
   if (profile.first_name) {
     return profile.first_name.substring(0, 2).toUpperCase();
+  }
+  
+  if (profile.username) {
+    return profile.username.substring(0, 2).toUpperCase();
   }
   
   return PROFILE_FALLBACKS.initials;
