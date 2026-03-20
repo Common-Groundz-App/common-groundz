@@ -3769,6 +3769,17 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_batch_mutual_previews: {
+        Args: { target_user_ids: string[]; viewer_id: string }
+        Returns: {
+          avatar_url: string
+          first_name: string
+          mutual_user_id: string
+          target_user_id: string
+          total_count: number
+          username: string
+        }[]
+      }
       get_cached_products: {
         Args: { query_text: string }
         Returns: {
