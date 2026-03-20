@@ -136,26 +136,48 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
           }
         }
 
-        // Batch mutual count enrichment via SECURITY DEFINER RPC
+        // Batch mutual preview enrichment via SECURITY DEFINER RPC
+        let mutualPreviews = new Map<string, MutualData>();
         if (currentUser) {
           try {
             const { data: mutualData, error: mutualError } = await supabase
-              .rpc('get_batch_mutual_counts', {
+              .rpc('get_batch_mutual_previews', {
                 viewer_id: currentUser.id,
                 target_user_ids: userIds
               });
 
             if (mutualError) {
-              console.error('Error fetching mutual counts:', mutualError);
+              console.error('Error fetching mutual previews:', mutualError);
             } else if (mutualData) {
-              for (const row of mutualData) {
-                mutualCountsMap.set(row.user_id, Number(row.mutual_count));
+              for (const row of mutualData as any[]) {
+                const targetId = row.target_user_id as string;
+                const existing = mutualPreviews.get(targetId);
+                const preview: MutualPreview = {
+                  mutual_user_id: row.mutual_user_id,
+                  username: row.username,
+                  first_name: row.first_name,
+                  avatar_url: row.avatar_url,
+                };
+                if (existing) {
+                  existing.previews.push(preview);
+                  existing.total_count = Number(row.total_count);
+                } else {
+                  mutualPreviews.set(targetId, {
+                    previews: [preview],
+                    total_count: Number(row.total_count),
+                  });
+                }
+              }
+              // Also populate mutualCountsMap for sorting compatibility
+              for (const [uid, data] of mutualPreviews) {
+                mutualCountsMap.set(uid, data.total_count);
               }
             }
           } catch (err) {
-            console.error('Error fetching mutual counts:', err);
+            console.error('Error fetching mutual previews:', err);
           }
         }
+        setMutualPreviewsMap(mutualPreviews);
         
         // Combine all data
         const enhancedUsers = data.map(user => {
