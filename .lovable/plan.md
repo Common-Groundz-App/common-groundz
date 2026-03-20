@@ -1,29 +1,43 @@
 
 
-# Explore Cards: Mutual Avatars + Names (Final)
+# Fix: Display Real Names in Circles — Final Plan
 
-## Migration: `get_batch_mutual_previews` RPC
+Previous plan plus one addition from both reviewers:
 
-`SECURITY DEFINER`, `SET search_path = ''`. Uses a lateral join limited to 2 preview rows per target user. Returns `target_user_id`, `mutual_user_id`, `username`, `first_name`, `avatar_url`, `total_count`.
+## Addition: Explicit fallback rule in `UserCard.tsx`
 
-## `UserDirectoryList.tsx`
+```text
+Display name logic:
+1. first_name + last_name (if either exists) → "Hana Li" or "Hana"
+2. else username → "hana.li"
+3. else "User"
 
-- Replace `get_batch_mutual_counts` call with `get_batch_mutual_previews`
-- Group results into a `Map<string, { previews: [...], total_count: number }>`
-- Render: max 2 overlapping `xs` avatars (24px, `-ml-1` overlap on second) + truncated text
-- Copy: `Followed by {Name}` / `Followed by {Name} and {Name}` / `Followed by {Name} and {N} others`
-- Names use `first_name || username`, displayed in a `truncate max-w-[80px] inline-block` span to handle long names
-- 0 mutuals: row hidden entirely
+Secondary line:
+- @username if username exists
+- hidden if no username
+```
 
-## Types
+Filter out `null`/empty strings before concatenation to prevent "Hana null" or " Li".
 
-Add `get_batch_mutual_previews` to `src/integrations/supabase/types.ts`.
+## Everything else unchanged
+
+1. **Migration**: Add `first_name`, `last_name` to both `get_followers_with_profiles` and `get_following_with_profiles` RPCs
+2. **`types.ts`**: Add `first_name`, `last_name` to `UserProfile`
+3. **`circleService.ts`**: Map the new fields
+4. **`UserCard.tsx`**: Accept `firstName`/`lastName`, apply fallback rule above
+5. **Callers** (`FollowersList`, `FollowingList`, `UserListModal`): Pass new props
+6. **Supabase types**: Update RPC return types
 
 ## Files
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/[new].sql` | New RPC |
-| `src/components/explore/UserDirectoryList.tsx` | Avatars + named copy |
-| `src/integrations/supabase/types.ts` | New RPC type |
+| `supabase/migrations/[new].sql` | Add columns to both RPCs |
+| `src/components/profile/circles/types.ts` | Add name fields |
+| `src/components/profile/circles/api/circleService.ts` | Map name fields |
+| `src/components/profile/circles/UserCard.tsx` | Fallback display logic |
+| `src/components/profile/circles/FollowersList.tsx` | Pass props |
+| `src/components/profile/circles/FollowingList.tsx` | Pass props |
+| `src/components/profile/modals/UserListModal.tsx` | Pass props |
+| `src/integrations/supabase/types.ts` | Update RPC types |
 
