@@ -40,6 +40,7 @@ export interface Review {
   user?: {
     username?: string;
     avatar_url?: string;
+    displayName?: string;
   };
   entity?: {
     id: string;
@@ -137,8 +138,9 @@ export const fetchReviewWithSummary = async (reviewId: string): Promise<Review |
     const combinedData = {
       ...reviewWithProfile,
       user: {
-        username: reviewWithProfile.user.displayName,
-        avatar_url: reviewWithProfile.user.avatar_url
+        username: reviewWithProfile.user.username,
+        avatar_url: reviewWithProfile.user.avatar_url,
+        displayName: reviewWithProfile.user.displayName
       }
     };
 
@@ -299,8 +301,9 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
       return {
         ...review,
         user: {
-          username: review.user.displayName,
-          avatar_url: review.user.avatar_url
+          username: review.user.username,
+          avatar_url: review.user.avatar_url,
+          displayName: review.user.displayName
         },
         entity: entity ? {
           id: entity.id,
@@ -386,8 +389,9 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
       return {
         ...review,
         user: {
-          username: review.user.displayName,
-          avatar_url: review.user.avatar_url
+          username: review.user.username,
+          avatar_url: review.user.avatar_url,
+          displayName: review.user.displayName
         },
         entity: entity ? {
           id: entity.id,

@@ -361,11 +361,11 @@ const getInitials = (name: string | null) => {
                 className="hover:opacity-80 transition-opacity"
               >
                 <Avatar className="border h-5 w-5">
-                  <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
-                  <AvatarFallback className="text-xs">{getInitials(review.user?.username)}</AvatarFallback>
+                  <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.displayName || review.user?.username || 'User'} />
+                  <AvatarFallback className="text-xs">{getInitials(review.user?.displayName || review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
-              <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline text-xs" />
+              <UsernameLink userId={review.user_id} username={review.user?.username} fallback={review.user?.displayName || review.user?.username || 'User'} className="font-medium hover:underline text-xs" />
               <span className="text-xs text-muted-foreground">
                 {formatRelativeDate(review.created_at)}
               </span>
@@ -513,13 +513,13 @@ const getInitials = (name: string | null) => {
                 className="hover:opacity-80 transition-opacity"
               >
                 <Avatar className="border h-10 w-10">
-                  <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.username || 'User'} />
-                  <AvatarFallback>{getInitials(review.user?.username)}</AvatarFallback>
+                  <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.displayName || review.user?.username || 'User'} />
+                  <AvatarFallback>{getInitials(review.user?.displayName || review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
               <div>
                 <div className="flex items-center flex-col items-start">
-                  <UsernameLink userId={review.user_id} username={review.user?.username} className="font-medium hover:underline" />
+                  <UsernameLink userId={review.user_id} username={review.user?.username} fallback={review.user?.displayName || review.user?.username || 'User'} className="font-medium hover:underline" />
                   <div className="text-muted-foreground text-xs mt-0.5">
                     <span>{formatRelativeDate(review.created_at)}</span>
                   </div>
