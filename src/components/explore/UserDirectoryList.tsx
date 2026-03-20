@@ -288,6 +288,12 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
               {user.bio || 'No bio provided.'}
             </p>
             
+            {user.mutual_count > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Followed by {user.mutual_count} {user.mutual_count === 1 ? 'person' : 'people'} you follow
+              </p>
+            )}
+            
             <div className="flex justify-between items-center mt-3">
               <span className="text-sm text-muted-foreground">
                 {user.follower_count} follower{user.follower_count !== 1 ? 's' : ''}
