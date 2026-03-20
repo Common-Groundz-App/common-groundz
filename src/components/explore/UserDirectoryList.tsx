@@ -26,6 +26,8 @@ type MutualData = {
 type User = {
   id: string;
   username: string | null;
+  first_name: string | null;
+  last_name: string | null;
   avatar_url: string | null;
   bio: string | null;
   recommendation_count: number;
