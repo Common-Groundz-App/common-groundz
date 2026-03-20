@@ -11,6 +11,18 @@ import { useToast } from '@/hooks/use-toast';
 import { UserCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
+type MutualPreview = {
+  mutual_user_id: string;
+  username: string | null;
+  first_name: string | null;
+  avatar_url: string | null;
+};
+
+type MutualData = {
+  previews: MutualPreview[];
+  total_count: number;
+};
+
 type User = {
   id: string;
   username: string | null;
@@ -28,6 +40,7 @@ interface UserDirectoryListProps {
 
 export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
   const [users, setUsers] = useState<User[]>([]);
+  const [mutualPreviewsMap, setMutualPreviewsMap] = useState<Map<string, MutualData>>(new Map());
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
@@ -123,26 +136,48 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
           }
         }
 
-        // Batch mutual count enrichment via SECURITY DEFINER RPC
+        // Batch mutual preview enrichment via SECURITY DEFINER RPC
+        let mutualPreviews = new Map<string, MutualData>();
         if (currentUser) {
           try {
             const { data: mutualData, error: mutualError } = await supabase
-              .rpc('get_batch_mutual_counts', {
+              .rpc('get_batch_mutual_previews', {
                 viewer_id: currentUser.id,
                 target_user_ids: userIds
               });
 
             if (mutualError) {
-              console.error('Error fetching mutual counts:', mutualError);
+              console.error('Error fetching mutual previews:', mutualError);
             } else if (mutualData) {
-              for (const row of mutualData) {
-                mutualCountsMap.set(row.user_id, Number(row.mutual_count));
+              for (const row of mutualData as any[]) {
+                const targetId = row.target_user_id as string;
+                const existing = mutualPreviews.get(targetId);
+                const preview: MutualPreview = {
+                  mutual_user_id: row.mutual_user_id,
+                  username: row.username,
+                  first_name: row.first_name,
+                  avatar_url: row.avatar_url,
+                };
+                if (existing) {
+                  existing.previews.push(preview);
+                  existing.total_count = Number(row.total_count);
+                } else {
+                  mutualPreviews.set(targetId, {
+                    previews: [preview],
+                    total_count: Number(row.total_count),
+                  });
+                }
+              }
+              // Also populate mutualCountsMap for sorting compatibility
+              for (const [uid, data] of mutualPreviews) {
+                mutualCountsMap.set(uid, data.total_count);
               }
             }
           } catch (err) {
-            console.error('Error fetching mutual counts:', err);
+            console.error('Error fetching mutual previews:', err);
           }
         }
+        setMutualPreviewsMap(mutualPreviews);
         
         // Combine all data
         const enhancedUsers = data.map(user => {
@@ -279,11 +314,38 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
               {user.bio || 'No bio provided.'}
             </p>
             
-            {user.mutual_count > 0 && (
-              <p className="text-xs text-muted-foreground mt-1">
-                Followed by {user.mutual_count} {user.mutual_count === 1 ? 'person' : 'people'} you follow
-              </p>
-            )}
+            {(() => {
+              const mutual = mutualPreviewsMap.get(user.id);
+              if (!mutual || mutual.total_count === 0) return null;
+              const getName = (p: MutualPreview) => p.first_name || p.username || 'Someone';
+              const previews = mutual.previews;
+              const total = mutual.total_count;
+              const others = total - previews.length;
+              return (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <div className="flex -space-x-1.5 shrink-0">
+                    {previews.slice(0, 2).map((p) => (
+                      <Avatar key={p.mutual_user_id} className="h-5 w-5 text-[10px] border border-background">
+                        <AvatarImage src={p.avatar_url || undefined} />
+                        <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
+                          {(p.first_name || p.username || 'U').charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    Followed by{' '}
+                    <span className="truncate max-w-[80px] inline-block align-bottom">{getName(previews[0])}</span>
+                    {previews.length === 2 && others === 0 && (
+                      <> and <span className="truncate max-w-[80px] inline-block align-bottom">{getName(previews[1])}</span></>
+                    )}
+                    {others > 0 && (
+                      <> and {others} {others === 1 ? 'other' : 'others'}</>
+                    )}
+                  </p>
+                </div>
+              );
+            })()}
             
             <div className="flex justify-between items-center mt-3">
               <span className="text-sm text-muted-foreground">
