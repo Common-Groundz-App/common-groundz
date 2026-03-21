@@ -168,12 +168,12 @@ class ProfileCache {
         this.setCache(profile.id, safeProfile);
       });
 
-      // Add fallback profiles for missing user IDs
+      // Add fallback profiles for missing user IDs (don't cache them)
       uniqueUserIds.forEach(userId => {
         if (!profileMap[userId]) {
           const fallbackProfile = transformToSafeProfile(null);
           profileMap[userId] = fallbackProfile;
-          this.setCache(userId, fallbackProfile);
+          // Don't cache anonymous fallbacks — allow retry on next request
         }
       });
 
