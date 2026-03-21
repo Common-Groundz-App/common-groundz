@@ -1,42 +1,46 @@
 
 
-# Fix: Reviews Still Showing Username Instead of Real Name
+# Fix: ProfileCache Race Condition — Final Plan
 
-## Problem
+Both reviewers approve. Incorporating their additions.
 
-The `ReviewWithUser.user` is a `SafeUserProfile` which now has a correct `displayName` field (real name first). But several review components still reference `.username` directly instead of `.displayName`.
+## Core Fix: `src/services/enhancedUnifiedProfileService.ts`
 
-## Affected locations
+**`processBatch()` method** — snapshot batches before async work:
 
-### 1. `src/utils/reviewDataUtils.ts` (line 7)
+```text
+processBatch() {
+  const batchesToProcess = [...this.pendingBatches];
+  this.pendingBatches.length = 0;
+  this.batchTimeout = null;
+
+  if (batchesToProcess.length === 0) return;  // ChatGPT: empty guard
+
+  const allUserIds = new Set<string>();
+  batchesToProcess.forEach(b => b.userIds.forEach(id => allUserIds.add(id)));
+  const uniqueUserIds = Array.from(allUserIds);  // Already deduped via Set
+
+  // fetch + resolve only batchesToProcess
+}
 ```
-name: review.user.username || 'Unknown User'
-```
-Should be: `review.user.displayName || review.user.username || 'Unknown User'`
 
-### 2. `src/components/ReviewCard.tsx` (line 64)
-```
-name: review.user.username || 'Unknown User'
-```
-Same fix.
+**`setCache()` — don't cache fallback profiles** (Codex's point): Skip caching when profile has `id === ''` (the anonymous fallback). This prevents a failed batch from poisoning the cache for subsequent correct fetches.
 
-### 3. `src/components/entity-v4/ReviewsSection.tsx` (lines 496, 510, 527)
-Uses `review.user.username` for `circleUserName` prop and "you follow reviewed this" copy. Should use `review.user.displayName`.
+Apply this in both `fetchProfilesBatchDirect` and `fetchSingleProfileDirect` — don't cache fallback profiles with empty IDs.
 
-### 4. `src/components/entity-v4/TimelineReviewCard.tsx` (line 221)
-Uses `circleUserName` (which receives username from above). Already fixed once the prop is fixed upstream.
-
-### 5. `src/components/profile/reviews/ReviewCard.tsx` (lines 368, 517, 522)
-Uses `review.user?.username` for `UsernameLink` label and avatar alt text. The `UsernameLink` should show `displayName` as label text while keeping `username` for routing.
-
-## Changes
+## Files
 
 | File | Change |
 |------|--------|
-| `src/utils/reviewDataUtils.ts` | Line 7: use `displayName` |
-| `src/components/ReviewCard.tsx` | Line 64: use `displayName` |
-| `src/components/entity-v4/ReviewsSection.tsx` | Lines 496, 510, 527: use `displayName` for display, keep `username` only for routing |
-| `src/components/profile/reviews/ReviewCard.tsx` | Lines 368, 517, 522: use `displayName` for visible text, keep `username` for `UsernameLink` routing |
+| `src/services/enhancedUnifiedProfileService.ts` | Snapshot batches, empty guard, skip caching anonymous fallbacks |
 
-No migration needed. No new files. Pure frontend fix using data already available in `SafeUserProfile`.
+One file, ~15 lines changed. No migration. No component changes.
+
+## Verification
+
+1. Guest entity page — all review authors show real names
+2. Logged-in entity page — same
+3. Timeline modal — names match review cards
+4. Quick navigation between entities — no stale anonymous profiles
+5. Cold refresh — profiles load correctly
 
