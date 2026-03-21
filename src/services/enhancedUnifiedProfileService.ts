@@ -99,11 +99,18 @@ class ProfileCache {
 
   // Process all pending batch requests
   private async processBatch(): Promise<void> {
-    if (this.pendingBatches.length === 0) return;
+    // Snapshot current batches and clear queue BEFORE async work
+    // This prevents race conditions where new batches added during fetch
+    // get resolved with incomplete data from the current fetch
+    const batchesToProcess = [...this.pendingBatches];
+    this.pendingBatches.length = 0;
+    this.batchTimeout = null;
 
-    // Collect all unique user IDs from pending batches
+    if (batchesToProcess.length === 0) return;
+
+    // Collect all unique user IDs from snapshotted batches
     const allUserIds = new Set<string>();
-    this.pendingBatches.forEach(batch => {
+    batchesToProcess.forEach(batch => {
       batch.userIds.forEach(id => allUserIds.add(id));
     });
 
@@ -113,8 +120,8 @@ class ProfileCache {
       // Fetch all profiles at once
       const profiles = await this.fetchProfilesBatchDirect(uniqueUserIds);
       
-      // Resolve all pending requests
-      this.pendingBatches.forEach(batch => {
+      // Resolve only the snapshotted batches
+      batchesToProcess.forEach(batch => {
         const requestedProfiles: Record<string, SafeUserProfile> = {};
         batch.userIds.forEach(userId => {
           requestedProfiles[userId] = profiles[userId];
@@ -122,15 +129,11 @@ class ProfileCache {
         batch.resolve(requestedProfiles);
       });
     } catch (error) {
-      // Reject all pending requests
-      this.pendingBatches.forEach(batch => {
+      // Reject only the snapshotted batches
+      batchesToProcess.forEach(batch => {
         batch.reject(error);
       });
     }
-
-    // Clear processed batches
-    this.pendingBatches.length = 0;
-    this.batchTimeout = null;
   }
 
   // Direct database fetch for batch processing
@@ -165,12 +168,12 @@ class ProfileCache {
         this.setCache(profile.id, safeProfile);
       });
 
-      // Add fallback profiles for missing user IDs
+      // Add fallback profiles for missing user IDs (don't cache them)
       uniqueUserIds.forEach(userId => {
         if (!profileMap[userId]) {
           const fallbackProfile = transformToSafeProfile(null);
           profileMap[userId] = fallbackProfile;
-          this.setCache(userId, fallbackProfile);
+          // Don't cache anonymous fallbacks — allow retry on next request
         }
       });
 
@@ -178,12 +181,11 @@ class ProfileCache {
     } catch (err) {
       console.error('Exception in fetchProfilesBatchDirect:', err);
       
-      // Create fallback profiles for all user IDs
+      // Create fallback profiles for all user IDs (don't cache them)
       const fallbackProfiles: Record<string, SafeUserProfile> = {};
       uniqueUserIds.forEach(userId => {
         const fallbackProfile = transformToSafeProfile(null);
         fallbackProfiles[userId] = fallbackProfile;
-        this.setCache(userId, fallbackProfile);
       });
       
       return fallbackProfiles;
@@ -319,9 +321,8 @@ const fetchSingleProfileDirect = async (userId: string): Promise<SafeUserProfile
 
     if (error) {
       console.error('Error fetching single profile:', error);
-      const fallbackProfile = transformToSafeProfile(null);
-      profileCache.setCache(userId, fallbackProfile);
-      return fallbackProfile;
+      // Don't cache anonymous fallbacks — allow retry on next request
+      return transformToSafeProfile(null);
     }
 
     const safeProfile = transformToSafeProfile(data as BaseUserProfile);
@@ -329,9 +330,8 @@ const fetchSingleProfileDirect = async (userId: string): Promise<SafeUserProfile
     return safeProfile;
   } catch (error) {
     console.error('Exception in fetchSingleProfileDirect:', error);
-    const fallbackProfile = transformToSafeProfile(null);
-    profileCache.setCache(userId, fallbackProfile);
-    return fallbackProfile;
+    // Don't cache anonymous fallbacks — allow retry on next request
+    return transformToSafeProfile(null);
   }
 };
 
