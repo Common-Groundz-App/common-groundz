@@ -99,11 +99,18 @@ class ProfileCache {
 
   // Process all pending batch requests
   private async processBatch(): Promise<void> {
-    if (this.pendingBatches.length === 0) return;
+    // Snapshot current batches and clear queue BEFORE async work
+    // This prevents race conditions where new batches added during fetch
+    // get resolved with incomplete data from the current fetch
+    const batchesToProcess = [...this.pendingBatches];
+    this.pendingBatches.length = 0;
+    this.batchTimeout = null;
 
-    // Collect all unique user IDs from pending batches
+    if (batchesToProcess.length === 0) return;
+
+    // Collect all unique user IDs from snapshotted batches
     const allUserIds = new Set<string>();
-    this.pendingBatches.forEach(batch => {
+    batchesToProcess.forEach(batch => {
       batch.userIds.forEach(id => allUserIds.add(id));
     });
 
@@ -113,8 +120,8 @@ class ProfileCache {
       // Fetch all profiles at once
       const profiles = await this.fetchProfilesBatchDirect(uniqueUserIds);
       
-      // Resolve all pending requests
-      this.pendingBatches.forEach(batch => {
+      // Resolve only the snapshotted batches
+      batchesToProcess.forEach(batch => {
         const requestedProfiles: Record<string, SafeUserProfile> = {};
         batch.userIds.forEach(userId => {
           requestedProfiles[userId] = profiles[userId];
@@ -122,15 +129,11 @@ class ProfileCache {
         batch.resolve(requestedProfiles);
       });
     } catch (error) {
-      // Reject all pending requests
-      this.pendingBatches.forEach(batch => {
+      // Reject only the snapshotted batches
+      batchesToProcess.forEach(batch => {
         batch.reject(error);
       });
     }
-
-    // Clear processed batches
-    this.pendingBatches.length = 0;
-    this.batchTimeout = null;
   }
 
   // Direct database fetch for batch processing
