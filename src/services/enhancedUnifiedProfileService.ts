@@ -181,12 +181,11 @@ class ProfileCache {
     } catch (err) {
       console.error('Exception in fetchProfilesBatchDirect:', err);
       
-      // Create fallback profiles for all user IDs
+      // Create fallback profiles for all user IDs (don't cache them)
       const fallbackProfiles: Record<string, SafeUserProfile> = {};
       uniqueUserIds.forEach(userId => {
         const fallbackProfile = transformToSafeProfile(null);
         fallbackProfiles[userId] = fallbackProfile;
-        this.setCache(userId, fallbackProfile);
       });
       
       return fallbackProfiles;
