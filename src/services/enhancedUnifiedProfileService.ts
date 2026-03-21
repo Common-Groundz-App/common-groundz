@@ -321,9 +321,8 @@ const fetchSingleProfileDirect = async (userId: string): Promise<SafeUserProfile
 
     if (error) {
       console.error('Error fetching single profile:', error);
-      const fallbackProfile = transformToSafeProfile(null);
-      profileCache.setCache(userId, fallbackProfile);
-      return fallbackProfile;
+      // Don't cache anonymous fallbacks — allow retry on next request
+      return transformToSafeProfile(null);
     }
 
     const safeProfile = transformToSafeProfile(data as BaseUserProfile);
@@ -331,9 +330,8 @@ const fetchSingleProfileDirect = async (userId: string): Promise<SafeUserProfile
     return safeProfile;
   } catch (error) {
     console.error('Exception in fetchSingleProfileDirect:', error);
-    const fallbackProfile = transformToSafeProfile(null);
-    profileCache.setCache(userId, fallbackProfile);
-    return fallbackProfile;
+    // Don't cache anonymous fallbacks — allow retry on next request
+    return transformToSafeProfile(null);
   }
 };
 
