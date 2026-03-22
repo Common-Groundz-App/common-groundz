@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { TimelineBadge } from './TimelineBadge';
 import { ReviewTimelineViewer } from './ReviewTimelineViewer';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { RatingEvolutionDisplay } from './RatingEvolutionDisplay';
 import { getEntityTypeLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
