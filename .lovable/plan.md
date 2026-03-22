@@ -1,46 +1,34 @@
 
 
-# Fix: ProfileCache Race Condition — Final Plan
+# Fix: Timeline Modal Display Names — Final Plan (No Changes Needed)
 
-Both reviewers approve. Incorporating their additions.
+Both reviewers approve. ChatGPT's suggestion to add `first_name`/`last_name` fallback in `updateName` is **not applicable** — `ReviewUpdate.profiles` only contains `username` and `avatar_url`, no name fields. The `update.user.displayName` already resolves correctly via `transformToSafeProfile`.
 
-## Core Fix: `src/services/enhancedUnifiedProfileService.ts`
+The plan stands as previously approved. Implement it as-is.
 
-**`processBatch()` method** — snapshot batches before async work:
+## Changes: `src/components/profile/reviews/ReviewTimelineViewer.tsx`
 
-```text
-processBatch() {
-  const batchesToProcess = [...this.pendingBatches];
-  this.pendingBatches.length = 0;
-  this.batchTimeout = null;
+### Local variables for clean fallback
 
-  if (batchesToProcess.length === 0) return;  // ChatGPT: empty guard
-
-  const allUserIds = new Set<string>();
-  batchesToProcess.forEach(b => b.userIds.forEach(id => allUserIds.add(id)));
-  const uniqueUserIds = Array.from(allUserIds);  // Already deduped via Set
-
-  // fetch + resolve only batchesToProcess
-}
+**Initial review (before line ~270):**
+```ts
+const initialReviewName = reviewData?.user?.displayName || reviewData?.user?.username || 'User';
 ```
 
-**`setCache()` — don't cache fallback profiles** (Codex's point): Skip caching when profile has `id === ''` (the anonymous fallback). This prevents a failed batch from poisoning the cache for subsequent correct fetches.
+**Update entries (inside map, before line ~337):**
+```ts
+const updateName = update.user?.displayName || update.profiles?.username || 'User';
+```
 
-Apply this in both `fetchProfilesBatchDirect` and `fetchSingleProfileDirect` — don't cache fallback profiles with empty IDs.
+### Line changes
 
-## Files
+| Line | Current | New |
+|------|---------|-----|
+| 276 | `getInitials(reviewData?.user?.username \|\| null)` | `getInitials(initialReviewName)` |
+| 283 | `reviewData?.user?.username \|\| 'User'` | `initialReviewName` |
+| 338 | `update.profiles?.avatar_url` | `update.user?.avatar_url \|\| update.profiles?.avatar_url` |
+| 340 | `getInitials(update.profiles?.username \|\| null)` | `getInitials(updateName)` |
+| 347 | `update.profiles?.username \|\| 'User'` | `updateName` |
 
-| File | Change |
-|------|--------|
-| `src/services/enhancedUnifiedProfileService.ts` | Snapshot batches, empty guard, skip caching anonymous fallbacks |
-
-One file, ~15 lines changed. No migration. No component changes.
-
-## Verification
-
-1. Guest entity page — all review authors show real names
-2. Logged-in entity page — same
-3. Timeline modal — names match review cards
-4. Quick navigation between entities — no stale anonymous profiles
-5. Cold refresh — profiles load correctly
+One file. ~10 lines changed. No migration.
 
