@@ -15,6 +15,7 @@ export interface Post {
   user_id: string;
   username?: string;
   avatar_url?: string;
+  displayName?: string;
   tagged_entities?: Entity[];
   media?: MediaItem[];
 }
