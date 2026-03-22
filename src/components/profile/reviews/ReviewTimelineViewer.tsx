@@ -273,7 +273,7 @@ export const ReviewTimelineViewer = ({
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={reviewData?.user?.avatar_url || undefined} />
                     <AvatarFallback className="text-xs">
-                      {getInitials(reviewData?.user?.username || null)}
+                      {getInitials(initialReviewName)}
                     </AvatarFallback>
                   </Avatar>
                   
