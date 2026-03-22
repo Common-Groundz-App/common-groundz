@@ -6,6 +6,7 @@ import { Bookmark } from 'lucide-react';
 import { format } from 'date-fns';
 import { SavedItem } from '@/hooks/use-saved-items';
 import UsernameLink from '@/components/common/UsernameLink';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { useNavigate } from 'react-router-dom';
 
