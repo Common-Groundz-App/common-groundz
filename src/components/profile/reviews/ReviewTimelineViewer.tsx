@@ -268,6 +268,10 @@ export const ReviewTimelineViewer = ({
               )}
 
               {/* Initial Review Entry - Enhanced with user info */}
+              {(() => {
+                const initialReviewName = reviewData?.user?.displayName || reviewData?.user?.username || 'User';
+                return null;
+              })()}
               <div className="p-4 border-2 border-blue-200 rounded-lg bg-blue-50/30">
                 <div className="flex items-start gap-3">
                   <Avatar className="h-8 w-8">
