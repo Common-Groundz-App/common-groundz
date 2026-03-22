@@ -257,10 +257,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
     }
   };
   
-  const getInitials = (username: string | null) => {
-    if (!username) return 'U';
-    return username.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
   
   if (loading) {
     return (
