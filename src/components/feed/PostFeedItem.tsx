@@ -233,10 +233,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }
   };
 
-  const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
