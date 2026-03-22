@@ -359,7 +359,7 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border">
               <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
-              <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.username)}</AvatarFallback>
+              <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.displayName || post.username)}</AvatarFallback>
             </Avatar>
             <div>
               <UsernameLink 
