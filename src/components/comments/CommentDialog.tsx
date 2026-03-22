@@ -47,7 +47,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   const [editCommentContent, setEditCommentContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [dialogClosing, setDialogClosing] = useState(false);
-  const [userProfile, setUserProfile] = useState<{ avatar_url?: string; username?: string }>({});
+  const [userProfile, setUserProfile] = useState<{ avatar_url?: string; username?: string; first_name?: string; last_name?: string }>({});
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   
   const commentToDeleteRef = useRef<string | null>(null);
