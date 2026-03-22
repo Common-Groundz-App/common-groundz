@@ -13,6 +13,7 @@ import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { HashtagRenderer } from '@/components/hashtag/HashtagRenderer';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import UsernameLink from '@/components/common/UsernameLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -232,10 +233,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }
   };
 
-  const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -366,7 +364,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border">
               <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
-              <AvatarFallback>{(post.username || 'U')[0].toUpperCase()}</AvatarFallback>
+              <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.username)}</AvatarFallback>
             </Avatar>
             <div>
               <UsernameLink 

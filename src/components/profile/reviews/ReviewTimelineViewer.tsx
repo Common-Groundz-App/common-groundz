@@ -15,6 +15,7 @@ import { formatRelativeDate } from '@/utils/dateUtils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AISummaryCard } from '@/components/ui/ai-summary-card';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaUploader } from '@/components/media/MediaUploader';
@@ -197,10 +198,7 @@ export const ReviewTimelineViewer = ({
     return []; // No user media to display
   };
 
-  const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
 
   // Enhanced conditional check with detailed logging
   const shouldShowAISummary = () => {
@@ -273,8 +271,8 @@ export const ReviewTimelineViewer = ({
                 <div className="flex items-start gap-3">
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={reviewData?.user?.avatar_url || undefined} />
-                    <AvatarFallback className="text-xs">
-                      {getInitials(initialReviewName)}
+                    <AvatarFallback className="text-xs bg-brand-orange text-white">
+                      {getInitialsFromName(initialReviewName)}
                     </AvatarFallback>
                   </Avatar>
                   
@@ -339,8 +337,8 @@ export const ReviewTimelineViewer = ({
                   <div className="flex items-start gap-3">
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={update.user?.avatar_url || update.profiles?.avatar_url || undefined} />
-                      <AvatarFallback className="text-xs">
-                        {getInitials(updateName)}
+                      <AvatarFallback className="text-xs bg-brand-orange text-white">
+                        {getInitialsFromName(updateName)}
                       </AvatarFallback>
                     </Avatar>
                     

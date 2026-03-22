@@ -18,6 +18,7 @@ import { fetchUserProfile } from '@/services/profileService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import UsernameLink from '@/components/common/UsernameLink';
 import { feedbackActions } from '@/services/feedbackService';
+import { getInitialsFromName } from '@/utils/profileUtils';
 
 interface CommentDialogProps {
   isOpen: boolean;
@@ -350,10 +351,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
     return user && user.id === userId;
   };
   
-  const getInitials = (name: string | undefined) => {
-    if (!name) return user?.email?.substring(0, 1).toUpperCase() || '?';
-    return name.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
 
   return (
     <>
@@ -405,7 +403,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                     >
                       <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarImage src={comment.avatar_url || undefined} />
-                        <AvatarFallback>{getInitials(comment.username)}</AvatarFallback>
+                        <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(comment.username)}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start">
@@ -514,7 +512,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                   {user ? (
                     <>
                       <AvatarImage src={userProfile?.avatar_url} />
-                      <AvatarFallback>{getInitials(userProfile?.username)}</AvatarFallback>
+                      <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(userProfile?.username)}</AvatarFallback>
                     </>
                   ) : (
                     <AvatarFallback className="bg-muted text-muted-foreground">

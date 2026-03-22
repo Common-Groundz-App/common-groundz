@@ -15,6 +15,7 @@ import { ReviewWithUser } from '@/types/entities';
 import { ReviewUpdate } from '@/services/review/types';
 import { fetchReviewUpdates } from '@/services/review/timeline';
 import { transformReviewForUI } from '@/utils/reviewDataUtils';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
@@ -62,10 +63,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
   
   const isOwner = user?.id === review.user_id;
 
-  const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
 
   // Filter and sort media
   const validMedia: MediaItem[] = (review.media || [])
@@ -226,7 +224,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
           <Avatar className="w-12 h-12 flex-shrink-0">
             <AvatarImage src={transformedReview.avatar || undefined} alt="Timeline reviewer" />
             <AvatarFallback className="bg-brand-orange text-white">
-              {getInitials(transformedReview.name)}
+              {getInitialsFromName(transformedReview.name)}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">

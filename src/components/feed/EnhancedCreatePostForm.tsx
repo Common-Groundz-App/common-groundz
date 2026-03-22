@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -376,7 +377,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         <Avatar className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity">
           <AvatarImage src={avatarUrl || ''} alt={userDisplayName} />
           <AvatarFallback className="bg-brand-orange text-white font-semibold">
-            {userDisplayName?.[0]?.toUpperCase() || 'U'}
+            {getInitialsFromName(userDisplayName)}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 space-y-1">

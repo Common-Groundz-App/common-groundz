@@ -108,3 +108,17 @@ export const getUserInitials = (profile: BaseUserProfile | null): string => {
   
   return PROFILE_FALLBACKS.initials;
 };
+
+/**
+ * Get 2-character initials from a display name string.
+ * Uses first + last word initials for multi-word names (e.g. "Rishabh Kumar Sr" → "RS").
+ * Falls back to first 2 characters for single-word names.
+ */
+export const getInitialsFromName = (name: string | null | undefined): string => {
+  if (!name) return PROFILE_FALLBACKS.initials;
+  const parts = name.split(' ').filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};

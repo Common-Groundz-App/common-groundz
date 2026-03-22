@@ -224,7 +224,7 @@ export function VerticalTubelightNavbar({
                   <div className="flex items-center w-full">
                     <Avatar className="h-9 w-9 flex-shrink-0">
                       <AvatarImage src={profile?.avatar_url || ""} />
-                      <AvatarFallback>{getInitials()}</AvatarFallback>
+                      <AvatarFallback className="bg-brand-orange text-white">{getInitials()}</AvatarFallback>
                     </Avatar>
                     <div className="ml-3 flex-1 min-w-0 hidden xl:block text-left">
                       <p className="text-sm font-medium truncate">{displayName}</p>

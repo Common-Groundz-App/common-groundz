@@ -30,6 +30,7 @@ import { Separator } from "@/components/ui/separator";
 import { TimelineBadge } from './TimelineBadge';
 import { ReviewTimelineViewer } from './ReviewTimelineViewer';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { RatingEvolutionDisplay } from './RatingEvolutionDisplay';
 import { getEntityTypeLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
@@ -245,10 +246,7 @@ const ReviewCard = ({
     return null;
   };
 
-const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
+// Using shared getInitialsFromName from profileUtils
 
   const handleStartTimelineClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -362,7 +360,7 @@ const getInitials = (name: string | null) => {
               >
                 <Avatar className="border h-5 w-5">
                   <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.displayName || review.user?.username || 'User'} />
-                  <AvatarFallback className="text-xs">{getInitials(review.user?.displayName || review.user?.username)}</AvatarFallback>
+                  <AvatarFallback className="text-xs bg-brand-orange text-white">{getInitialsFromName(review.user?.displayName || review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
               <UsernameLink userId={review.user_id} username={review.user?.username} fallback={review.user?.displayName || review.user?.username || 'User'} className="font-medium hover:underline text-xs" />
@@ -514,7 +512,7 @@ const getInitials = (name: string | null) => {
               >
                 <Avatar className="border h-10 w-10">
                   <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.displayName || review.user?.username || 'User'} />
-                  <AvatarFallback>{getInitials(review.user?.displayName || review.user?.username)}</AvatarFallback>
+                  <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(review.user?.displayName || review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
               <div>

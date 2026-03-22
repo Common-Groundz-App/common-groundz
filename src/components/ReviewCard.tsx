@@ -7,6 +7,7 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
+import { getInitialsFromName } from '@/utils/profileUtils';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
@@ -28,10 +29,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
-  const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
 
   // Filter and sort media
   const validMedia: MediaItem[] = (review.media || [])
@@ -87,7 +85,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
         <Avatar className="w-12 h-12 flex-shrink-0">
           <AvatarImage src={transformedReview.avatar || undefined} alt={transformedReview.name} />
           <AvatarFallback className="bg-brand-orange text-white">
-            {getInitials(transformedReview.name)}
+            {getInitialsFromName(transformedReview.name)}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">

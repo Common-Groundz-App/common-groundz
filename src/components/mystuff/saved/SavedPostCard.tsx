@@ -6,6 +6,7 @@ import { Bookmark } from 'lucide-react';
 import { format } from 'date-fns';
 import { SavedItem } from '@/hooks/use-saved-items';
 import UsernameLink from '@/components/common/UsernameLink';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { useNavigate } from 'react-router-dom';
 
@@ -30,7 +31,7 @@ const SavedPostCard = ({ item, onUnsave }: SavedPostCardProps) => {
           <div className="flex items-center gap-3 min-w-0">
             <Avatar className="h-10 w-10 border flex-shrink-0">
               <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
-              <AvatarFallback>{(post.username || 'U')[0].toUpperCase()}</AvatarFallback>
+              <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.username)}</AvatarFallback>
             </Avatar>
             <div className="min-w-0">
               <UsernameLink 

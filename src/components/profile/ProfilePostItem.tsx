@@ -11,6 +11,7 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { useAuth } from '@/contexts/AuthContext';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 
@@ -357,7 +358,7 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border">
               <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
-              <AvatarFallback>{(post.username || 'U')[0].toUpperCase()}</AvatarFallback>
+              <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.username)}</AvatarFallback>
             </Avatar>
             <div>
               <UsernameLink 

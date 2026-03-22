@@ -10,6 +10,7 @@ import { useFollow } from '@/hooks/use-follow';
 import { useToast } from '@/hooks/use-toast';
 import { UserCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getInitialsFromName } from '@/utils/profileUtils';
 
 type MutualPreview = {
   mutual_user_id: string;
@@ -256,10 +257,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
     }
   };
   
-  const getInitials = (username: string | null) => {
-    if (!username) return 'U';
-    return username.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
   
   if (loading) {
     return (
@@ -302,7 +300,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarImage src={user.avatar_url || undefined} />
-                <AvatarFallback>{getInitials(user.username)}</AvatarFallback>
+                <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName([user.first_name, user.last_name].filter(Boolean).join(' ') || user.username)}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <Link to={user.username ? `/u/${user.username}` : `/profile/${user.id}`} className="font-medium hover:underline truncate block">
