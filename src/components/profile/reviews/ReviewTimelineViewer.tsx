@@ -197,10 +197,7 @@ export const ReviewTimelineViewer = ({
     return []; // No user media to display
   };
 
-  const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
 
   // Enhanced conditional check with detailed logging
   const shouldShowAISummary = () => {
