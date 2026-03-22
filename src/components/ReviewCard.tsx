@@ -7,6 +7,7 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
+import { getInitialsFromName } from '@/utils/profileUtils';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
