@@ -11,6 +11,7 @@ import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { useAuth } from '@/contexts/AuthContext';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { 

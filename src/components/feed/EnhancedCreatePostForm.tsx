@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
