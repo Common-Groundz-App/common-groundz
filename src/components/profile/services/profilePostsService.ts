@@ -120,10 +120,12 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
           }));
         }
 
+        const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.username || null;
         return {
           ...post,
           username: profile?.username || null,
           avatar_url: profile?.avatar_url || null,
+          displayName,
           media: mediaItems
         };
       }) as Post[];

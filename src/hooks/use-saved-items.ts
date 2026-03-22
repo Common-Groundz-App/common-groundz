@@ -64,6 +64,8 @@ export const useSavedItems = (typeFilter: SavedItemType = 'all') => {
               .eq('id', post.user_id)
               .single();
 
+            const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.username;
+
             results.push({
               id: save.id,
               type: 'post',
@@ -72,6 +74,7 @@ export const useSavedItems = (typeFilter: SavedItemType = 'all') => {
                 ...post,
                 username: profile?.username,
                 avatar_url: profile?.avatar_url,
+                displayName,
               },
             });
           }

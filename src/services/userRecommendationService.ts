@@ -108,13 +108,3 @@ export const logUserImpression = async (viewerId: string, suggestedUserId: strin
     // Don't throw - this is non-critical
   }
 };
-
-const getInitials = (username: string | null): string => {
-  if (!username) return 'AU';
-  
-  const parts = username.split(' ').filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return username.substring(0, 2).toUpperCase();
-};

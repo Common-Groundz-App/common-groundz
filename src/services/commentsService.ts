@@ -28,15 +28,21 @@ export const fetchComments = async (itemId: string, itemType: 'recommendation' |
 
     if (error) throw error;
 
-    return Array.isArray(data) ? data.map(comment => ({
-      id: comment.id,
-      content: comment.content,
-      created_at: comment.created_at,
-      user_id: comment.user_id,
-      username: comment.username || 'Unknown user',
-      avatar_url: comment.avatar_url,
-      edited_at: comment.edited_at
-    })) : [];
+    return Array.isArray(data) ? data.map(comment => {
+      const displayName = [comment.first_name, comment.last_name].filter(Boolean).join(' ') || comment.username || 'Unknown user';
+      return {
+        id: comment.id,
+        content: comment.content,
+        created_at: comment.created_at,
+        user_id: comment.user_id,
+        username: comment.username || 'Unknown user',
+        avatar_url: comment.avatar_url,
+        displayName,
+        first_name: comment.first_name,
+        last_name: comment.last_name,
+        edited_at: comment.edited_at
+      };
+    }) : [];
   } catch (error) {
     console.error(`Error fetching ${itemType} comments:`, error);
     return [];
