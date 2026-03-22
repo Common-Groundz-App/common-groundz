@@ -512,7 +512,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                   {user ? (
                     <>
                       <AvatarImage src={userProfile?.avatar_url} />
-                      <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(userProfile?.username)}</AvatarFallback>
+                      <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName([userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(' ') || userProfile?.username)}</AvatarFallback>
                     </>
                   ) : (
                     <AvatarFallback className="bg-muted text-muted-foreground">
