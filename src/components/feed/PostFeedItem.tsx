@@ -364,7 +364,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border">
               <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
-              <AvatarFallback>{(post.username || 'U')[0].toUpperCase()}</AvatarFallback>
+              <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.username)}</AvatarFallback>
             </Avatar>
             <div>
               <UsernameLink 

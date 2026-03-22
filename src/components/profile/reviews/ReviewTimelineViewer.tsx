@@ -337,8 +337,8 @@ export const ReviewTimelineViewer = ({
                   <div className="flex items-start gap-3">
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={update.user?.avatar_url || update.profiles?.avatar_url || undefined} />
-                      <AvatarFallback className="text-xs">
-                        {getInitials(updateName)}
+                      <AvatarFallback className="text-xs bg-brand-orange text-white">
+                        {getInitialsFromName(updateName)}
                       </AvatarFallback>
                     </Avatar>
                     

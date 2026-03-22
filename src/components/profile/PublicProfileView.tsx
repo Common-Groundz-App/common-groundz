@@ -59,7 +59,7 @@ const PublicProfileView: React.FC<PublicProfileViewProps> = ({ profile, follower
         <div className="-mt-12 sm:-mt-16 mb-4">
           <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-background shadow-lg">
             <AvatarImage src={profile.avatar_url || ''} alt={displayName} />
-            <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-semibold">
+            <AvatarFallback className="bg-brand-orange text-white text-2xl font-semibold">
               {initials}
             </AvatarFallback>
           </Avatar>

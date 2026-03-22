@@ -300,7 +300,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
             <div className="flex items-center gap-3">
               <Avatar>
                 <AvatarImage src={user.avatar_url || undefined} />
-                <AvatarFallback>{getInitials(user.username)}</AvatarFallback>
+                <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName([user.first_name, user.last_name].filter(Boolean).join(' ') || user.username)}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <Link to={user.username ? `/u/${user.username}` : `/profile/${user.id}`} className="font-medium hover:underline truncate block">

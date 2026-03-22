@@ -224,7 +224,7 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
           <Avatar className="w-12 h-12 flex-shrink-0">
             <AvatarImage src={transformedReview.avatar || undefined} alt="Timeline reviewer" />
             <AvatarFallback className="bg-brand-orange text-white">
-              {getInitials(transformedReview.name)}
+              {getInitialsFromName(transformedReview.name)}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">

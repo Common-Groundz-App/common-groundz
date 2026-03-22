@@ -512,7 +512,7 @@ const ReviewCard = ({
               >
                 <Avatar className="border h-10 w-10">
                   <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.displayName || review.user?.username || 'User'} />
-                  <AvatarFallback>{getInitials(review.user?.displayName || review.user?.username)}</AvatarFallback>
+                  <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(review.user?.displayName || review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
               <div>

@@ -376,7 +376,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
         <Avatar className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity">
           <AvatarImage src={avatarUrl || ''} alt={userDisplayName} />
           <AvatarFallback className="bg-brand-orange text-white font-semibold">
-            {userDisplayName?.[0]?.toUpperCase() || 'U'}
+            {getInitialsFromName(userDisplayName)}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 space-y-1">
