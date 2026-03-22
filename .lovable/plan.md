@@ -1,46 +1,43 @@
 
 
-# Fix: Initials Using Wrong Input Data — Final Plan
+# Implement Plan: Fix Initials Using Wrong Input Data
 
-Plan is approved by both reviewers. No changes needed. The defensive fallback `getInitialsFromName(x.displayName || x.username)` is already part of the plan.
+All reviews complete. Proceeding with the approved 9-file plan, using the security-hardened SQL from ChatGPT's review.
 
-## Changes
+## Step 1: Migration — hardened `get_comments_with_profiles`
 
-### 1. Migration: Update `get_comments_with_profiles` RPC
-Add `first_name text` and `last_name text` to RETURNS TABLE and SELECT.
+Use ChatGPT's corrected SQL exactly:
+- `SET search_path = public`
+- `public.%I` / `public.profiles` schema-qualified references
+- `first_name text`, `last_name text` added to RETURNS TABLE + SELECT
+- `AND (p.deleted_at IS NULL OR p.id IS NULL)` filter added
 
-### 2. `src/services/commentsService.ts`
-- Add `displayName` and optionally `first_name`/`last_name` to `CommentData` interface
-- Build `displayName: [comment.first_name, comment.last_name].filter(Boolean).join(' ') || comment.username || 'Unknown user'`
+## Step 2: `src/services/commentsService.ts`
+- Add `displayName`, `first_name`, `last_name` to `CommentData` interface
+- Build `displayName` from name fields in `fetchComments`
 
-### 3. `src/components/comments/CommentDialog.tsx`
-- Expand `userProfile` state type to include `first_name`, `last_name`
-- Composer avatar: `getInitialsFromName([userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(' ') || userProfile?.username)`
-- Comment list: `getInitialsFromName(comment.displayName || comment.username)`
+## Step 3: `src/components/comments/CommentDialog.tsx`
+- Use `comment.displayName || comment.username` for initials in comment list
+- Build composer display name from `userProfile` first/last name fields
 
-### 4. `src/hooks/feed/api/profiles.ts`
-Add `first_name, last_name` to the SELECT query.
+## Step 4: `src/hooks/feed/api/profiles.ts`
+- Add `first_name, last_name` to SELECT query
 
-### 5. `src/components/profile/services/profilePostsService.ts`
+## Step 5: `src/components/profile/services/profilePostsService.ts`
 - Add `displayName?: string` to `Post` interface
-- Populate: `displayName: [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.username || null`
-- Keep `username` as raw handle
+- Populate `displayName` from profile name fields, keep `username` as handle
 
-### 6. `src/components/profile/ProfilePostItem.tsx`
-- Use `getInitialsFromName(post.displayName || post.username)` for avatar fallback
+## Step 6: `src/components/profile/ProfilePostItem.tsx`
+- Use `getInitialsFromName(post.displayName || post.username)` for avatar
 
-### 7. `src/hooks/use-saved-items.ts`
-- Add `displayName` to saved post content: `[profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.username`
+## Step 7: `src/hooks/use-saved-items.ts`
+- Add `displayName` to saved post content from profile name fields
 
-### 8. `src/components/mystuff/saved/SavedPostCard.tsx`
-- Use `getInitialsFromName(post.displayName || post.username)` for avatar fallback
+## Step 8: `src/components/mystuff/saved/SavedPostCard.tsx`
+- Use `getInitialsFromName(post.displayName || post.username)` for avatar
 
-### 9. `src/services/userRecommendationService.ts`
-- Delete local `getInitials` function (lines 111-119)
-- Import `getInitialsFromName` from `@/utils/profileUtils`
-- Replace calls on lines 41 and 83
+## Step 9: `src/services/userRecommendationService.ts`
+- Delete local `getInitials`, import shared `getInitialsFromName`
 
-## Summary
-
-9 files, 1 migration. `username` is never overwritten. All initials derived from `displayName || username`.
+9 files + 1 migration. `username` never overwritten. Security-hardened RPC.
 
