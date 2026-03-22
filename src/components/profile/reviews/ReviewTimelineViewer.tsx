@@ -15,6 +15,7 @@ import { formatRelativeDate } from '@/utils/dateUtils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AISummaryCard } from '@/components/ui/ai-summary-card';
 import { getSentimentColor } from '@/utils/ratingColorUtils';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaUploader } from '@/components/media/MediaUploader';
