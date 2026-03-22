@@ -360,7 +360,7 @@ const ReviewCard = ({
               >
                 <Avatar className="border h-5 w-5">
                   <AvatarImage src={review.user?.avatar_url || undefined} alt={review.user?.displayName || review.user?.username || 'User'} />
-                  <AvatarFallback className="text-xs">{getInitials(review.user?.displayName || review.user?.username)}</AvatarFallback>
+                  <AvatarFallback className="text-xs bg-brand-orange text-white">{getInitialsFromName(review.user?.displayName || review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
               <UsernameLink userId={review.user_id} username={review.user?.username} fallback={review.user?.displayName || review.user?.username || 'User'} className="font-medium hover:underline text-xs" />
