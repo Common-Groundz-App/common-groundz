@@ -7,6 +7,6 @@ export const fetchProfiles = async (userIds: string[]) => {
   
   return await supabase
     .from('profiles')
-    .select('id, username, avatar_url')
+    .select('id, username, avatar_url, first_name, last_name')
     .in('id', userIds);
 };

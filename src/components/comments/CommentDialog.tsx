@@ -47,7 +47,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   const [editCommentContent, setEditCommentContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [dialogClosing, setDialogClosing] = useState(false);
-  const [userProfile, setUserProfile] = useState<{ avatar_url?: string; username?: string }>({});
+  const [userProfile, setUserProfile] = useState<{ avatar_url?: string; username?: string; first_name?: string; last_name?: string }>({});
   const [initialLoadDone, setInitialLoadDone] = useState(false);
   
   const commentToDeleteRef = useRef<string | null>(null);
@@ -403,7 +403,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                     >
                       <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarImage src={comment.avatar_url || undefined} />
-                        <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(comment.username)}</AvatarFallback>
+                        <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(comment.displayName || comment.username)}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start">
@@ -512,7 +512,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                   {user ? (
                     <>
                       <AvatarImage src={userProfile?.avatar_url} />
-                      <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(userProfile?.username)}</AvatarFallback>
+                      <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName([userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(' ') || userProfile?.username)}</AvatarFallback>
                     </>
                   ) : (
                     <AvatarFallback className="bg-muted text-muted-foreground">

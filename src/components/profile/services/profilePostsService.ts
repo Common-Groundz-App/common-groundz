@@ -15,6 +15,7 @@ export interface Post {
   user_id: string;
   username?: string;
   avatar_url?: string;
+  displayName?: string;
   tagged_entities?: Entity[];
   media?: MediaItem[];
 }
@@ -87,10 +88,12 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
           }));
         }
 
+        const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.username || null;
         return {
           ...post,
           username: profile?.username || null,
           avatar_url: profile?.avatar_url || null,
+          displayName,
           tagged_entities: entitiesByPostId[post.id] || [],
           media: mediaItems
         };
@@ -117,10 +120,12 @@ export const fetchUserPosts = async (profileUserId: string, isOwnProfile: boolea
           }));
         }
 
+        const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.username || null;
         return {
           ...post,
           username: profile?.username || null,
           avatar_url: profile?.avatar_url || null,
+          displayName,
           media: mediaItems
         };
       }) as Post[];

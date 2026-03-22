@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getInitialsFromName } from '@/utils/profileUtils';
 
 export interface RecommendedUser {
   id: string;
@@ -38,7 +39,7 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
           last_name: user.last_name ?? null,
           avatar_url: user.avatar_url,
           displayName: realName || user.username || 'Anonymous User',
-          initials: getInitials(realName || user.username),
+          initials: getInitialsFromName(realName || user.username),
           isFollowing: false,
           reason: user.reason,
           source: user.source,
@@ -80,7 +81,7 @@ const getFallbackRecommendations = async (currentUserId: string, limit: number):
         last_name: user.last_name ?? null,
         avatar_url: user.avatar_url,
         displayName: realName || user.username || 'Anonymous User',
-        initials: getInitials(realName || user.username),
+        initials: getInitialsFromName(realName || user.username),
         isFollowing: false,
         reason: 'Suggested for you',
         source: 'fallback',
@@ -106,14 +107,4 @@ export const logUserImpression = async (viewerId: string, suggestedUserId: strin
     console.error('Error logging impression:', error);
     // Don't throw - this is non-critical
   }
-};
-
-const getInitials = (username: string | null): string => {
-  if (!username) return 'AU';
-  
-  const parts = username.split(' ').filter(Boolean);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return username.substring(0, 2).toUpperCase();
 };

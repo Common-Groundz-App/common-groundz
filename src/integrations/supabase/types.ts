@@ -3873,8 +3873,9 @@ export type Database = {
           avatar_url: string
           content: string
           created_at: string
-          edited_at: string
+          first_name: string
           id: string
+          last_name: string
           user_id: string
           username: string
         }[]
