@@ -351,10 +351,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
     return user && user.id === userId;
   };
   
-  const getInitials = (name: string | undefined) => {
-    if (!name) return user?.email?.substring(0, 1).toUpperCase() || '?';
-    return name.charAt(0).toUpperCase();
-  };
+  // Using shared getInitialsFromName from profileUtils
 
   return (
     <>
