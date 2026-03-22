@@ -18,6 +18,7 @@ import { fetchUserProfile } from '@/services/profileService';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import UsernameLink from '@/components/common/UsernameLink';
 import { feedbackActions } from '@/services/feedbackService';
+import { getInitialsFromName } from '@/utils/profileUtils';
 
 interface CommentDialogProps {
   isOpen: boolean;
