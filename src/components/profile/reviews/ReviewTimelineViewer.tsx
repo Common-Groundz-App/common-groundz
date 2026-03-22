@@ -223,6 +223,7 @@ export const ReviewTimelineViewer = ({
   };
 
   const showAISummary = shouldShowAISummary();
+  const initialReviewName = reviewData?.user?.displayName || reviewData?.user?.username || 'User';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
