@@ -1,53 +1,46 @@
 
 
-# Standardize Avatar Fallbacks: Color + Initials — Final Plan
+# Fix: Initials Using Wrong Input Data — Final Plan
 
-Both reviewers approve. One valid refinement from Codex incorporated.
+Plan is approved by both reviewers. No changes needed. The defensive fallback `getInitialsFromName(x.displayName || x.username)` is already part of the plan.
 
-## Codex's refinement: first + last word initials ✅ Adding
+## Changes
 
-Good catch. For "Rishabh Kumar Sr" → should be "RS" (first+last), not "RK" (first+second). Updated helper:
+### 1. Migration: Update `get_comments_with_profiles` RPC
+Add `first_name text` and `last_name text` to RETURNS TABLE and SELECT.
 
-```ts
-export const getInitialsFromName = (name: string | null | undefined): string => {
-  if (!name) return PROFILE_FALLBACKS.initials;
-  const parts = name.split(' ').filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  return name.substring(0, 2).toUpperCase();
-};
-```
+### 2. `src/services/commentsService.ts`
+- Add `displayName` and optionally `first_name`/`last_name` to `CommentData` interface
+- Build `displayName: [comment.first_name, comment.last_name].filter(Boolean).join(' ') || comment.username || 'Unknown user'`
 
-Only change: `parts[1]` → `parts[parts.length - 1]`.
+### 3. `src/components/comments/CommentDialog.tsx`
+- Expand `userProfile` state type to include `first_name`, `last_name`
+- Composer avatar: `getInitialsFromName([userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(' ') || userProfile?.username)`
+- Comment list: `getInitialsFromName(comment.displayName || comment.username)`
 
-## ChatGPT's suggestions — not adding
+### 4. `src/hooks/feed/api/profiles.ts`
+Add `first_name, last_name` to the SELECT query.
 
-- **`<AvatarFallbackStandard>` wrapper**: Unnecessary abstraction. The pattern is simple enough (`getInitialsFromName` + two CSS classes). A wrapper for two props adds indirection without meaningful protection.
-- **Lint rule**: Good idea in theory but not actionable right now — ESLint can't easily distinguish "raw AvatarFallback that should use ProfileAvatar" from intentional usage. Not worth the effort.
+### 5. `src/components/profile/services/profilePostsService.ts`
+- Add `displayName?: string` to `Post` interface
+- Populate: `displayName: [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.username || null`
+- Keep `username` as raw handle
 
-## Everything else unchanged from previous plan
+### 6. `src/components/profile/ProfilePostItem.tsx`
+- Use `getInitialsFromName(post.displayName || post.username)` for avatar fallback
 
-### Step 1: Add `getInitialsFromName` to `src/utils/profileUtils.ts`
+### 7. `src/hooks/use-saved-items.ts`
+- Add `displayName` to saved post content: `[profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || profile?.username`
 
-With the first+last word fix above.
+### 8. `src/components/mystuff/saved/SavedPostCard.tsx`
+- Use `getInitialsFromName(post.displayName || post.username)` for avatar fallback
 
-### Step 2: Fix 13 files
+### 9. `src/services/userRecommendationService.ts`
+- Delete local `getInitials` function (lines 111-119)
+- Import `getInitialsFromName` from `@/utils/profileUtils`
+- Replace calls on lines 41 and 83
 
-| File | Initials Fix | Color Fix |
-|------|-------------|-----------|
-| `ReviewTimelineViewer.tsx` | Swap to `getInitialsFromName` | Add `bg-brand-orange text-white` |
-| `profile/reviews/ReviewCard.tsx` | Swap to helper | Add orange |
-| `ReviewCard.tsx` (entity) | Swap to helper | Already orange ✅ |
-| `TimelineReviewCard.tsx` | Swap to helper | Already orange ✅ |
-| `PostFeedItem.tsx` | Swap to helper | Add orange |
-| `ProfilePostItem.tsx` | Swap to helper | Add orange |
-| `SavedPostCard.tsx` | Swap to helper | Add orange |
-| `CommentDialog.tsx` | Swap to helper | Add orange |
-| `UserDirectoryList.tsx` | Swap to helper | Add orange |
-| `EnhancedCreatePostForm.tsx` | Swap to helper | Already orange ✅ |
-| `PublicProfileView.tsx` | Already 2-char | `bg-primary` → `bg-brand-orange text-white` |
-| `vertical-tubelight-navbar.tsx` | Already 2-char | Add orange |
+## Summary
 
-### Step 3: Remove all local `getInitials` functions
-
-No migration. Pure frontend. 13 files + 1 utility.
+9 files, 1 migration. `username` is never overwritten. All initials derived from `displayName || username`.
 
