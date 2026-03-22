@@ -280,7 +280,7 @@ export const ReviewTimelineViewer = ({
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="font-medium text-sm">
-                        {reviewData?.user?.username || 'User'}
+                        {initialReviewName}
                       </span>
                       <Badge variant="outline" className="bg-blue-100 text-blue-700 text-xs border-blue-300">
                         Initial Review
