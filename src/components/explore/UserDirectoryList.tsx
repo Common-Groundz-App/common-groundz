@@ -10,6 +10,7 @@ import { useFollow } from '@/hooks/use-follow';
 import { useToast } from '@/hooks/use-toast';
 import { UserCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { getInitialsFromName } from '@/utils/profileUtils';
 
 type MutualPreview = {
   mutual_user_id: string;
