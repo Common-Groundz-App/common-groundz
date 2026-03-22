@@ -246,10 +246,7 @@ const ReviewCard = ({
     return null;
   };
 
-const getInitials = (name: string | null) => {
-    if (!name) return 'U';
-    return name.charAt(0).toUpperCase();
-  };
+// Using shared getInitialsFromName from profileUtils
 
   const handleStartTimelineClick = (e: React.MouseEvent) => {
     e.stopPropagation();
