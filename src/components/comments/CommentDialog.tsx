@@ -403,7 +403,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                     >
                       <Avatar className="h-8 w-8 flex-shrink-0">
                         <AvatarImage src={comment.avatar_url || undefined} />
-                        <AvatarFallback>{getInitials(comment.username)}</AvatarFallback>
+                        <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(comment.username)}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start">
