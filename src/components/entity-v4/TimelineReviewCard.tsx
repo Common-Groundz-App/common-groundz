@@ -15,6 +15,7 @@ import { ReviewWithUser } from '@/types/entities';
 import { ReviewUpdate } from '@/services/review/types';
 import { fetchReviewUpdates } from '@/services/review/timeline';
 import { transformReviewForUI } from '@/utils/reviewDataUtils';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview';
