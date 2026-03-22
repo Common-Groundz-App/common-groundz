@@ -223,6 +223,7 @@ export const ReviewTimelineViewer = ({
   };
 
   const showAISummary = shouldShowAISummary();
+  const initialReviewName = reviewData?.user?.displayName || reviewData?.user?.username || 'User';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -273,14 +274,14 @@ export const ReviewTimelineViewer = ({
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={reviewData?.user?.avatar_url || undefined} />
                     <AvatarFallback className="text-xs">
-                      {getInitials(reviewData?.user?.username || null)}
+                      {getInitials(initialReviewName)}
                     </AvatarFallback>
                   </Avatar>
                   
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="font-medium text-sm">
-                        {reviewData?.user?.username || 'User'}
+                        {initialReviewName}
                       </span>
                       <Badge variant="outline" className="bg-blue-100 text-blue-700 text-xs border-blue-300">
                         Initial Review
@@ -331,20 +332,22 @@ export const ReviewTimelineViewer = ({
               </div>
 
               {/* Timeline Updates */}
-              {timelineUpdates.map((update, index) => (
+              {timelineUpdates.map((update, index) => {
+                const updateName = update.user?.displayName || update.profiles?.username || 'User';
+                return (
                 <div key={update.id} className="p-4 border rounded-lg bg-card">
                   <div className="flex items-start gap-3">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={update.profiles?.avatar_url || undefined} />
+                      <AvatarImage src={update.user?.avatar_url || update.profiles?.avatar_url || undefined} />
                       <AvatarFallback className="text-xs">
-                        {getInitials(update.profiles?.username || null)}
+                        {getInitials(updateName)}
                       </AvatarFallback>
                     </Avatar>
                     
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="font-medium text-sm">
-                          {update.profiles?.username || 'User'}
+                          {updateName}
                         </span>
                         <Badge variant="outline" className="text-xs">
                           Update #{timelineUpdates.length - index}
@@ -390,7 +393,8 @@ export const ReviewTimelineViewer = ({
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               {timelineUpdates.length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
