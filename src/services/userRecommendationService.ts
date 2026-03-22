@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getInitialsFromName } from '@/utils/profileUtils';
 
 export interface RecommendedUser {
   id: string;
