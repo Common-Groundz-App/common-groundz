@@ -39,7 +39,7 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
           last_name: user.last_name ?? null,
           avatar_url: user.avatar_url,
           displayName: realName || user.username || 'Anonymous User',
-          initials: getInitials(realName || user.username),
+          initials: getInitialsFromName(realName || user.username),
           isFollowing: false,
           reason: user.reason,
           source: user.source,
