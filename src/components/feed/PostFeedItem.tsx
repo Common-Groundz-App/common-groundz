@@ -13,6 +13,7 @@ import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { HashtagRenderer } from '@/components/hashtag/HashtagRenderer';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
+import { getInitialsFromName } from '@/utils/profileUtils';
 import UsernameLink from '@/components/common/UsernameLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
