@@ -53,6 +53,7 @@ interface Post {
   tags?: string[];
   username?: string;
   avatar_url?: string;
+  displayName?: string;
 }
 
 interface ProfilePostItemProps {
