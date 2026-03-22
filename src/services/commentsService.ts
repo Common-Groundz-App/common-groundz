@@ -8,6 +8,9 @@ export interface CommentData {
   user_id: string;
   username?: string;
   avatar_url?: string;
+  displayName?: string;
+  first_name?: string;
+  last_name?: string;
   edited_at?: string;
 }
 
