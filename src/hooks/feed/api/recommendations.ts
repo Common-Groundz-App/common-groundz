@@ -124,10 +124,11 @@ export const fetchRecommendations = async (params: FeedQueryParams): Promise<Rec
       
       return {
         ...rec,
-        category: mapDatabaseCategoryToEnum(rec.category), // Convert database category to enum
-        visibility: mapDatabaseVisibilityToEnum(rec.visibility), // Convert database visibility to enum
+        category: mapDatabaseCategoryToEnum(rec.category),
+        visibility: mapDatabaseVisibilityToEnum(rec.visibility),
         is_post: false,
-        username: profile?.displayName || profile?.username || null,
+        username: profile?.username || null,
+        displayName: profile?.displayName || profile?.username || null,
         avatar_url: profile?.avatar_url || null,
         likes: likesCount.get(rec.id) || 0,
         comment_count: commentsCount.get(rec.id) || 0,
