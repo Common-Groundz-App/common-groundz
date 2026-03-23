@@ -33,6 +33,7 @@ export interface PostFeedItem {
   created_at: string;
   updated_at: string;
   username: string | null;
+  displayName: string | null;
   avatar_url: string | null;
   is_post: boolean;
   likes: number;

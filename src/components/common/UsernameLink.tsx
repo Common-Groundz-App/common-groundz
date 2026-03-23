@@ -11,14 +11,21 @@ interface UsernameLinkProps {
   fallback?: string;
   isCurrentUser?: boolean;
   children?: React.ReactNode;
-  isLoading?: boolean; // New loading state prop
+  isLoading?: boolean;
+  displayName?: string | null;
+  showHandle?: boolean;
 }
 
 /**
- * A component that renders a username as a clickable link to the user's profile.
- * Falls back to the provided fallback text if no username is available.
- * Can also accept children to wrap them in a link to the user's profile.
- * Now includes loading state handling.
+ * Twitter/X-style identity link component.
+ * 
+ * When `displayName` is provided:
+ * - Shows displayName as bold primary text
+ * - Shows @username as muted secondary text (controlled by showHandle)
+ * - Uses username for routing only
+ * 
+ * When `displayName` is NOT provided:
+ * - Falls back to current behavior (shows username as the label)
  */
 const UsernameLink: React.FC<UsernameLinkProps> = ({ 
   username, 
@@ -27,7 +34,9 @@ const UsernameLink: React.FC<UsernameLinkProps> = ({
   fallback = 'Anonymous',
   isCurrentUser = false,
   children,
-  isLoading = false
+  isLoading = false,
+  displayName,
+  showHandle = true
 }) => {
   // Show skeleton loader during loading state
   if (isLoading) {
@@ -55,6 +64,33 @@ const UsernameLink: React.FC<UsernameLinkProps> = ({
   }
 
   const profilePath = username ? `/u/${username}` : `/profile/${userId}`;
+  
+  // Twitter/X model: displayName as primary, @username as secondary
+  if (displayName) {
+    return (
+      <div className={cn("flex flex-col", className)}>
+        <Link
+          to={profilePath}
+          className={cn(
+            "font-semibold hover:underline transition-all text-sm leading-tight",
+            isCurrentUser && "text-primary"
+          )}
+        >
+          {displayName}{isCurrentUser ? ' (You)' : ''}
+        </Link>
+        {showHandle && username && (
+          <Link
+            to={profilePath}
+            className="text-xs text-muted-foreground hover:underline leading-tight"
+          >
+            @{username}
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  // Legacy fallback: show username as the label
   return (
     <Link
       to={profilePath}
