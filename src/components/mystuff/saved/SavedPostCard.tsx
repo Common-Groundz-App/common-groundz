@@ -30,13 +30,15 @@ const SavedPostCard = ({ item, onUnsave }: SavedPostCardProps) => {
         <div className="flex justify-between items-start gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <Avatar className="h-10 w-10 border flex-shrink-0">
-              <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
+              <AvatarImage src={post.avatar_url || undefined} alt={post.displayName || post.username || 'User'} />
               <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.displayName || post.username)}</AvatarFallback>
             </Avatar>
             <div className="min-w-0">
               <UsernameLink 
                 userId={post.user_id || ''} 
                 username={post.username || 'User'}
+                displayName={post.displayName}
+                showHandle={true}
                 className="hover:underline font-medium"
               />
               <p className="text-xs text-muted-foreground">

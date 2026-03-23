@@ -363,13 +363,15 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border">
-              <AvatarImage src={post.avatar_url || undefined} alt={post.username || 'User'} />
-              <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.username)}</AvatarFallback>
+              <AvatarImage src={post.avatar_url || undefined} alt={post.displayName || post.username || 'User'} />
+              <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.displayName || post.username)}</AvatarFallback>
             </Avatar>
             <div>
               <UsernameLink 
                 userId={post.user_id} 
                 username={post.username}
+                displayName={post.displayName}
+                showHandle={true}
                 className="hover:underline"
               />
               <div className="flex items-center text-muted-foreground text-xs gap-1">

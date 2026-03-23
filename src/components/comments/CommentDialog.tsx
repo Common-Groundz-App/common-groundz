@@ -412,6 +412,8 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                               <UsernameLink 
                                 username={comment.username}
                                 userId={comment.user_id}
+                                displayName={comment.displayName}
+                                showHandle={false}
                                 className="text-sm"
                               />
                               <div className="flex items-center gap-1 text-xs text-muted-foreground">
