@@ -231,7 +231,13 @@ export const TimelineReviewCard: React.FC<TimelineReviewCardProps> = ({
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <h4 className="font-semibold text-gray-900">{transformedReview.name}</h4>
+                <UsernameLink
+                  userId={review.user_id}
+                  username={review.user?.username}
+                  displayName={review.user?.displayName || null}
+                  showHandle={true}
+                  className="text-sm"
+                />
                 <Badge className="bg-blue-100 text-blue-800 border-blue-200">
                   <Clock className="w-3 h-3 mr-1" />
                   Timeline Review

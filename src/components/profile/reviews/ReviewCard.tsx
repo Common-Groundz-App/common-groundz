@@ -516,8 +516,8 @@ const ReviewCard = ({
                 </Avatar>
               </UsernameLink>
               <div>
-                <div className="flex items-center flex-col items-start">
-                  <UsernameLink userId={review.user_id} username={review.user?.username} fallback={review.user?.displayName || review.user?.username || 'User'} className="font-medium hover:underline" />
+                <div className="flex flex-col items-start">
+                  <UsernameLink userId={review.user_id} username={review.user?.username} displayName={review.user?.displayName || null} showHandle={true} className="text-sm" />
                   <div className="text-muted-foreground text-xs mt-0.5">
                     <span>{formatRelativeDate(review.created_at)}</span>
                   </div>

@@ -349,9 +349,13 @@ export const ReviewTimelineViewer = ({
                     
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-sm">
-                          {updateName}
-                        </span>
+                        <UsernameLink
+                          userId={update.user_id || reviewData?.user_id}
+                          username={update.profiles?.username || reviewData?.user?.username}
+                          displayName={update.user?.displayName || null}
+                          showHandle={false}
+                          className="text-sm"
+                        />
                         <Badge variant="outline" className="text-xs">
                           Update #{timelineUpdates.length - index}
                         </Badge>
