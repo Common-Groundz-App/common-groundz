@@ -17,7 +17,6 @@ import {
 import ReviewCard from "@/components/ReviewCard";
 import { ReviewWithUser } from '@/types/entities';
 import { 
-  transformReviewForUI, 
   filterReviews, 
   getTimelineReviews
 } from '@/utils/reviewDataUtils';
