@@ -1,23 +1,28 @@
 
 
-# Fix: Entity Page Normal Reviews — Final
+# Fix: Date Format — Using Shared Utility
 
-## ChatGPT's Suggestion: Add first_name/last_name fallback in ReviewCard
+ChatGPT's suggestion is reasonable. You already have `formatRelativeDate` in `dateUtils.ts` — adding a `formatDateLong` helper keeps date logic centralized.
 
-**My assessment: Not needed.** Line 63 already has a solid fallback chain:
+## Changes
+
+### 1. `src/utils/dateUtils.ts`
+Add:
+```ts
+export const formatDateLong = (dateString: string | Date): string => {
+  return format(new Date(dateString), 'MMM d, yyyy');
+};
 ```
-review.user.displayName || review.user.username || 'Unknown User'
+
+### 2. `src/components/ReviewCard.tsx` — line 66
+```ts
+// Before
+date: new Date(review.created_at).toLocaleDateString(),
+// After
+date: formatDateLong(review.created_at),
 ```
 
-The `displayName` is built upstream in services from `first_name + last_name`. Adding raw `first_name`/`last_name` handling inside ReviewCard would duplicate service-layer logic and couple the component to database schema. The defensive fallback to `username` is already there.
+Import `formatDateLong` from `@/utils/dateUtils`.
 
-## Plan (unchanged — ready to implement)
-
-### `src/components/entity-v4/ReviewsSection.tsx` — 1 file
-
-1. **Line ~157**: Replace `regularReviews.slice(0, 3).map(transformReviewForUI)` with `regularReviews.slice(0, 3)` (raw data)
-2. **Line ~514**: Pass `review` instead of `transformReviewForUI(review)` for circle reviews
-3. **Lines ~531-538**: Update variable name from `transformedRegularReviews` to `displayRegularReviews`
-
-No hover changes. No other files. Pure frontend.
+2 files. Minimal change.
 
