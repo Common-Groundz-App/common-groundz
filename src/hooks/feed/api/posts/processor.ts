@@ -58,6 +58,7 @@ export const processPosts = async (
       return {
         ...post,
         username,
+        displayName,
         avatar_url,
         is_post: true,
         likes,
