@@ -17,7 +17,6 @@ import {
 import ReviewCard from "@/components/ReviewCard";
 import { ReviewWithUser } from '@/types/entities';
 import { 
-  transformReviewForUI, 
   filterReviews, 
   getTimelineReviews
 } from '@/utils/reviewDataUtils';
@@ -154,7 +153,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     displayReviews = [...hybridReviews, ...circleOnlyReviews, ...timelineOnlyReviews, ...regularReviews];
   }
 
-  const transformedRegularReviews = regularReviews.slice(0, 3).map(transformReviewForUI);
+  const displayRegularReviews = regularReviews.slice(0, 3);
 
   const toggleFilter = (filter: keyof typeof activeFilters) => {
     if (filter === 'starRating') return;
@@ -511,7 +510,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   </span>
                 </div>
                 <ReviewCard 
-                  review={transformReviewForUI(review)} 
+                  review={review} 
                   onHelpfulClick={onHelpfulClick}
                 />
               </CardContent>
@@ -528,8 +527,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             />
           ))}
 
-          {transformedRegularReviews.length > 0 ? (
-            transformedRegularReviews.map(review => (
+          {displayRegularReviews.length > 0 ? (
+            displayRegularReviews.map(review => (
               <ReviewCard 
                 key={review.id} 
                 review={review} 
