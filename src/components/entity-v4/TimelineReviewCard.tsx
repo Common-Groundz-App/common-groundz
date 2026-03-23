@@ -25,6 +25,7 @@ import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog
 import { deleteReview } from '@/services/review/core';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface TimelineReviewCardProps {
   review: ReviewWithUser;
