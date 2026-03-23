@@ -8,6 +8,10 @@ import { format, differenceInDays } from 'date-fns';
  * - "X days ago" if the date is less than 7 days ago
  * - "MMM d, yyyy" format for dates older than 7 days
  */
+export const formatDateLong = (dateString: string | Date): string => {
+  return format(new Date(dateString), 'MMM d, yyyy');
+};
+
 export const formatRelativeDate = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
