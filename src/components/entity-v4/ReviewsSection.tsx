@@ -154,7 +154,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
     displayReviews = [...hybridReviews, ...circleOnlyReviews, ...timelineOnlyReviews, ...regularReviews];
   }
 
-  const transformedRegularReviews = regularReviews.slice(0, 3).map(transformReviewForUI);
+  const displayRegularReviews = regularReviews.slice(0, 3);
 
   const toggleFilter = (filter: keyof typeof activeFilters) => {
     if (filter === 'starRating') return;
