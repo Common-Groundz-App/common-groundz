@@ -8,6 +8,7 @@ import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview'
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { getInitialsFromName } from '@/utils/profileUtils';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
