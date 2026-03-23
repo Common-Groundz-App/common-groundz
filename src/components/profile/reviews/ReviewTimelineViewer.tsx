@@ -21,6 +21,7 @@ import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { MediaItem } from '@/types/media';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface ReviewTimelineViewerProps {
   isOpen: boolean;
@@ -278,9 +279,13 @@ export const ReviewTimelineViewer = ({
                   
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="font-medium text-sm">
-                        {initialReviewName}
-                      </span>
+                      <UsernameLink
+                        userId={reviewData?.user_id}
+                        username={reviewData?.user?.username}
+                        displayName={reviewData?.user?.displayName || null}
+                        showHandle={false}
+                        className="text-sm"
+                      />
                       <Badge variant="outline" className="bg-blue-100 text-blue-700 text-xs border-blue-300">
                         Initial Review
                       </Badge>
@@ -344,9 +349,13 @@ export const ReviewTimelineViewer = ({
                     
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <span className="font-medium text-sm">
-                          {updateName}
-                        </span>
+                        <UsernameLink
+                          userId={update.user_id || reviewData?.user_id}
+                          username={update.profiles?.username || reviewData?.user?.username}
+                          displayName={update.user?.displayName || null}
+                          showHandle={false}
+                          className="text-sm"
+                        />
                         <Badge variant="outline" className="text-xs">
                           Update #{timelineUpdates.length - index}
                         </Badge>

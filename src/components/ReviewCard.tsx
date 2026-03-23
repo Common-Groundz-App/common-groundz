@@ -8,6 +8,7 @@ import { YelpStyleMediaPreview } from '@/components/media/YelpStyleMediaPreview'
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { getInitialsFromName } from '@/utils/profileUtils';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
@@ -88,9 +89,19 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
             {getInitialsFromName(transformedReview.name)}
           </AvatarFallback>
         </Avatar>
-        <div className="flex-1">
+          <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <h4 className="font-semibold text-gray-900">{transformedReview.name}</h4>
+            {'user' in review ? (
+              <UsernameLink
+                userId={review.user_id}
+                username={review.user?.username}
+                displayName={review.user?.displayName || null}
+                showHandle={true}
+                className="text-sm"
+              />
+            ) : (
+              <h4 className="font-semibold text-gray-900">{transformedReview.name}</h4>
+            )}
             {transformedReview.verified && (
               <Badge variant="secondary" className="text-xs">Verified</Badge>
             )}

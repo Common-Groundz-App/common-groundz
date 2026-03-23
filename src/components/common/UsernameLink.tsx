@@ -65,10 +65,10 @@ const UsernameLink: React.FC<UsernameLinkProps> = ({
 
   const profilePath = username ? `/u/${username}` : `/profile/${userId}`;
   
-  // Twitter/X model: displayName as primary, @username as secondary
+  // Twitter/X model: displayName as primary, @username as secondary (inline)
   if (displayName) {
     return (
-      <div className={cn("flex flex-col", className)}>
+      <div className={cn("flex items-baseline gap-1.5 flex-wrap", className)}>
         <Link
           to={profilePath}
           className={cn(
