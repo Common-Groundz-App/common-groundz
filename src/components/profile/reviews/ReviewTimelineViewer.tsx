@@ -21,6 +21,7 @@ import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { MediaItem } from '@/types/media';
+import UsernameLink from '@/components/common/UsernameLink';
 
 interface ReviewTimelineViewerProps {
   isOpen: boolean;
