@@ -91,8 +91,10 @@ const ProfileDisplayContent: React.FC<ProfileDisplayProps> = ({
         <div className={cn('min-w-0 flex-1', usernameClassName)}>
           {showLink ? (
             <UsernameLink
-              username={profile?.displayName} // Use displayName consistently
+              username={profile?.username}
               userId={userId}
+              displayName={profile?.displayName}
+              showHandle={false}
               className="truncate"
               fallback="Unknown User"
               isLoading={isLoading}

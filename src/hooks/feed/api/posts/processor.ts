@@ -34,7 +34,8 @@ export const processPosts = async (
     const processedPosts = postsData.map(post => {
       // Get profile data from enhanced service
       const profile = profilesMap[post.user_id];
-      const username = profile?.displayName || profile?.username || null;
+      const username = profile?.username || null;
+      const displayName = profile?.displayName || profile?.username || null;
       const avatar_url = profile?.avatar_url || null;
       
       // Process media properly with type safety
@@ -57,6 +58,7 @@ export const processPosts = async (
       return {
         ...post,
         username,
+        displayName,
         avatar_url,
         is_post: true,
         likes,

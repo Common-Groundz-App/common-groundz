@@ -258,6 +258,8 @@ export const RecommendationFeedItem: React.FC<RecommendationFeedItemProps> = ({
             <UsernameLink 
               username={recommendation.username} 
               userId={recommendation.user_id}
+              displayName={recommendation.displayName}
+              showHandle={true}
               className="font-medium"
               isCurrentUser={isOwner}
             />

@@ -16,6 +16,7 @@ export interface FeedItem extends Recommendation {
   is_liked: boolean;
   is_saved: boolean;
   username: string | null;
+  displayName: string | null;
   avatar_url: string | null;
   comment_count: number;
 }
@@ -32,6 +33,7 @@ export interface PostFeedItem {
   created_at: string;
   updated_at: string;
   username: string | null;
+  displayName: string | null;
   avatar_url: string | null;
   is_post: boolean;
   likes: number;
