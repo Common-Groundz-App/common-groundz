@@ -9,6 +9,7 @@ import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import UsernameLink from '@/components/common/UsernameLink';
+import { formatDateLong } from '@/utils/dateUtils';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
@@ -63,7 +64,7 @@ const ReviewCard: React.FC<ReviewCardProps> = ({ review, onHelpfulClick }) => {
     name: review.user.displayName || review.user.username || 'Unknown User',
     avatar: review.user.avatar_url || '',
     rating: review.rating,
-    date: new Date(review.created_at).toLocaleDateString(),
+    date: formatDateLong(review.created_at),
     title: review.subtitle,
     content: review.description || '',
     verified: review.is_verified || false,
