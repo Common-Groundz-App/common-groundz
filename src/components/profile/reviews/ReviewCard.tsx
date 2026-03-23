@@ -363,7 +363,7 @@ const ReviewCard = ({
                   <AvatarFallback className="text-xs bg-brand-orange text-white">{getInitialsFromName(review.user?.displayName || review.user?.username)}</AvatarFallback>
                 </Avatar>
               </UsernameLink>
-              <UsernameLink userId={review.user_id} username={review.user?.username} fallback={review.user?.displayName || review.user?.username || 'User'} className="font-medium hover:underline text-xs" />
+              <UsernameLink userId={review.user_id} username={review.user?.username} displayName={review.user?.displayName || null} showHandle={false} className="text-xs" />
               <span className="text-xs text-muted-foreground">
                 {formatRelativeDate(review.created_at)}
               </span>
