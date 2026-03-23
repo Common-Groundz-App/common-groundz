@@ -511,7 +511,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
                   </span>
                 </div>
                 <ReviewCard 
-                  review={transformReviewForUI(review)} 
+                  review={review} 
                   onHelpfulClick={onHelpfulClick}
                 />
               </CardContent>
