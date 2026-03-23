@@ -9,6 +9,7 @@ import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { MediaItem } from '@/types/media';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import UsernameLink from '@/components/common/UsernameLink';
+import { formatDateLong } from '@/utils/dateUtils';
 
 interface ReviewCardProps {
   review: ReviewWithUser | {
