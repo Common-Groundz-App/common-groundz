@@ -528,8 +528,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({
             />
           ))}
 
-          {transformedRegularReviews.length > 0 ? (
-            transformedRegularReviews.map(review => (
+          {displayRegularReviews.length > 0 ? (
+            displayRegularReviews.map(review => (
               <ReviewCard 
                 key={review.id} 
                 review={review} 
