@@ -1,16 +1,12 @@
 
 
-# Refined Mutual Proof UI (Final)
+# Add Keyboard Focus Ring to Mutual Avatars
 
-## Changes — 1 file: `src/components/feed/UserRecommendationCard.tsx`
+## 1 file: `src/components/feed/UserRecommendationCard.tsx`
 
-### MutualProofLine component updates:
+Update the `<Link>` wrapping each mutual `ProfileAvatar` in `MutualProofLine`:
 
-1. **Avatars → clickable Links** with `e.stopPropagation()` to prevent bubbling to parent card/follow actions. Wrap each `ProfileAvatar` in `<Link to={profilePath}>` with `onClick={e => e.stopPropagation()}`.
+Add: `focus-visible:ring-2 focus-visible:ring-brand-orange focus-visible:ring-offset-2 ring-offset-background rounded-full outline-none`
 
-2. **Names → plain text** — replace `UsernameLink` with `<span className="font-medium">` for consistent, non-interactive text styling.
-
-3. **Accessibility** — add `aria-label` to the avatar container describing the mutual connection (e.g., "Mutual followers: Hana, Anitha"), so screen readers convey meaning even though the text itself isn't interactive.
-
-That's it — small, focused change.
+The `ring-offset-background` ensures visibility across light/dark themes. `ring-offset-2` gives slightly more breathing room than `1`. Everything else stays as-is.
 
