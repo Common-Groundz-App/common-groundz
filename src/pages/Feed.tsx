@@ -158,8 +158,48 @@ const Feed = React.memo(() => {
       
       try {
         setUsersLoading(true);
+        setMutualDataMap(new Map()); // Clear stale data
         const users = await getUserRecommendations(user.id, 5);
         setRecommendedUsers(users);
+
+        // Batch fetch mutual previews for all recommended users
+        if (users.length > 0) {
+          try {
+            const userIds = users.map(u => u.id);
+            const { data: mutualRows, error: mutualError } = await supabase
+              .rpc('get_batch_mutual_previews', {
+                viewer_id: user.id,
+                target_user_ids: userIds
+              });
+
+            if (!mutualError && mutualRows) {
+              const map = new Map<string, MutualData>();
+              for (const row of mutualRows as any[]) {
+                const targetId = row.target_user_id as string;
+                const preview = {
+                  mutual_user_id: row.mutual_user_id,
+                  username: row.username,
+                  first_name: row.first_name,
+                  avatar_url: row.avatar_url,
+                };
+                const existing = map.get(targetId);
+                if (existing) {
+                  existing.previews.push(preview);
+                  existing.total_count = Number(row.total_count);
+                } else {
+                  map.set(targetId, {
+                    previews: [preview],
+                    total_count: Number(row.total_count),
+                  });
+                }
+              }
+              setMutualDataMap(map);
+            }
+          } catch (mutualErr) {
+            console.error('Error fetching mutual previews:', mutualErr);
+            // Leave map empty — cards fall back gracefully
+          }
+        }
       } catch (error) {
         console.error('Error fetching user recommendations:', error);
         setRecommendedUsers([]);
