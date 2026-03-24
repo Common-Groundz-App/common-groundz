@@ -13,6 +13,7 @@ export interface RecommendedUser {
   reason?: string;
   source?: string;
   score?: number;
+  mutuals?: number;
 }
 
 export const getUserRecommendations = async (currentUserId?: string, limit: number = 5): Promise<RecommendedUser[]> => {
@@ -43,7 +44,8 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
           isFollowing: false,
           reason: user.reason,
           source: user.source,
-          score: user.score
+          score: user.score,
+          mutuals: user.mutuals ?? 0
         };
       });
 
