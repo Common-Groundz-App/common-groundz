@@ -142,7 +142,7 @@ const MutualProofLine: React.FC<{ mutualData: MutualData }> = ({ mutualData }) =
               to={profilePath}
               onClick={e => e.stopPropagation()}
               style={{ marginLeft: index > 0 ? '-0.25rem' : '0' }}
-              className="relative z-10 hover:z-20 transition-transform hover:scale-110"
+              className="relative z-10 hover:z-20 transition-transform hover:scale-110 focus-visible:ring-2 focus-visible:ring-brand-orange focus-visible:ring-offset-2 ring-offset-background rounded-full outline-none"
             >
               <ProfileAvatar
                 userId={preview.mutual_user_id}
