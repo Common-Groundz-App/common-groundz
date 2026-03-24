@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { RecommendedUser, logUserImpression } from '@/services/userRecommendationService';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import UsernameLink from '@/components/common/UsernameLink';
@@ -127,38 +128,39 @@ export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({
 
 const MutualProofLine: React.FC<{ mutualData: MutualData }> = ({ mutualData }) => {
   const { names, suffix } = formatMutualProofText(mutualData.previews, mutualData.total_count);
+  const ariaLabel = `Mutual followers: ${names.map(n => n.name).join(', ')}`;
 
   return (
     <div className="flex items-center gap-1.5 mt-0.5">
-      {/* Stacked tiny avatars */}
-      <div className="flex items-center shrink-0" aria-hidden="true">
-        {mutualData.previews.slice(0, 2).map((preview, index) => (
-          <div
-            key={preview.mutual_user_id}
-            style={{ marginLeft: index > 0 ? '-0.25rem' : '0' }}
-          >
-            <ProfileAvatar
-              userId={preview.mutual_user_id}
-              size="xs"
-              className="border-2 border-background"
-              showSkeleton={false}
-            />
-          </div>
-        ))}
+      {/* Stacked clickable avatars */}
+      <div className="flex items-center shrink-0" aria-label={ariaLabel}>
+        {mutualData.previews.slice(0, 2).map((preview, index) => {
+          const profilePath = preview.username ? `/u/${preview.username}` : `/profile/${preview.mutual_user_id}`;
+          return (
+            <Link
+              key={preview.mutual_user_id}
+              to={profilePath}
+              onClick={e => e.stopPropagation()}
+              style={{ marginLeft: index > 0 ? '-0.25rem' : '0' }}
+              className="relative z-10 hover:z-20 transition-transform hover:scale-110"
+            >
+              <ProfileAvatar
+                userId={preview.mutual_user_id}
+                size="xs"
+                className="border-2 border-background"
+                showSkeleton={false}
+              />
+            </Link>
+          );
+        })}
       </div>
-      {/* Text */}
+      {/* Non-interactive text */}
       <span className="text-xs text-muted-foreground/70 truncate">
         Followed by{' '}
         {names.map((n, i) => (
           <React.Fragment key={n.userId}>
             {i > 0 && (mutualData.total_count === 2 && i === 1 ? ' and ' : ', ')}
-            <UsernameLink
-              username={n.username}
-              userId={n.userId}
-              className="font-medium text-muted-foreground hover:text-foreground inline"
-            >
-              {n.name}
-            </UsernameLink>
+            <span className="font-medium">{n.name}</span>
           </React.Fragment>
         ))}
         {suffix && <> {suffix}</>}
