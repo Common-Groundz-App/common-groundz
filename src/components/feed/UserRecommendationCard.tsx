@@ -6,13 +6,53 @@ import { useFollow } from '@/hooks/use-follow';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 
+export type MutualPreview = {
+  mutual_user_id: string;
+  username: string | null;
+  first_name: string | null;
+  avatar_url: string | null;
+};
+
+export type MutualData = {
+  previews: MutualPreview[];
+  total_count: number;
+};
+
 interface UserRecommendationCardProps {
   user: RecommendedUser;
+  mutualData?: MutualData;
   onFollowSuccess?: () => void;
 }
 
+const getSourceFallbackText = (source?: string): string => {
+  switch (source) {
+    case 'active': return 'Popular this week';
+    case 'fresh': return 'New on Common Groundz';
+    case 'fof': return 'Followed by people you follow';
+    default: return 'Suggested for you';
+  }
+};
+
+const formatMutualProofText = (previews: MutualPreview[], totalCount: number): { names: { name: string; userId: string; username: string | null }[]; suffix: string } => {
+  const names = previews.slice(0, 2).map(p => ({
+    name: p.first_name || p.username || 'someone',
+    userId: p.mutual_user_id,
+    username: p.username,
+  }));
+
+  if (totalCount === 1) {
+    return { names, suffix: '' };
+  }
+  if (totalCount === 2) {
+    return { names, suffix: '' };
+  }
+  const remaining = totalCount - 2;
+  return { names, suffix: `and ${remaining} other${remaining === 1 ? '' : 's'} you follow` };
+};
+
 export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({ 
   user, 
+  mutualData,
   onFollowSuccess 
 }) => {
   const { user: currentUser } = useAuth();
@@ -20,28 +60,26 @@ export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({
   const [isHidden, setIsHidden] = useState(false);
 
   const handleOptimisticFollow = async () => {
-    // Optimistic UI - hide the card immediately
     setIsHidden(true);
     
     try {
       await handleFollowToggle();
       
-      // Log impression only after successful follow
       if (currentUser?.id) {
         await logUserImpression(currentUser.id, user.id);
       }
       
       onFollowSuccess?.();
     } catch (error) {
-      // Restore the card if follow failed
       setIsHidden(false);
     }
   };
 
-  // Hide the card if user followed successfully
   if (isHidden || isFollowing) {
     return null;
   }
+
+  const hasMutuals = mutualData && mutualData.total_count > 0;
 
   return (
     <div className="flex items-center justify-between py-2">
@@ -64,9 +102,12 @@ export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({
               @{user.username}
             </div>
           )}
-          {user.reason && (
-            <div className="text-xs text-muted-foreground/80 truncate mt-0.5">
-              {user.reason}
+          {/* Mutual proof or fallback reason */}
+          {hasMutuals ? (
+            <MutualProofLine mutualData={mutualData} />
+          ) : (
+            <div className="text-xs text-muted-foreground/70 truncate mt-0.5">
+              {getSourceFallbackText(user.source)}
             </div>
           )}
         </div>
@@ -80,6 +121,48 @@ export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({
       >
         {followLoading ? 'Following...' : 'Follow'}
       </Button>
+    </div>
+  );
+};
+
+const MutualProofLine: React.FC<{ mutualData: MutualData }> = ({ mutualData }) => {
+  const { names, suffix } = formatMutualProofText(mutualData.previews, mutualData.total_count);
+
+  return (
+    <div className="flex items-center gap-1.5 mt-0.5">
+      {/* Stacked tiny avatars */}
+      <div className="flex items-center shrink-0" aria-hidden="true">
+        {mutualData.previews.slice(0, 2).map((preview, index) => (
+          <div
+            key={preview.mutual_user_id}
+            style={{ marginLeft: index > 0 ? '-0.25rem' : '0' }}
+          >
+            <ProfileAvatar
+              userId={preview.mutual_user_id}
+              size="xs"
+              className="border-2 border-background"
+              showSkeleton={false}
+            />
+          </div>
+        ))}
+      </div>
+      {/* Text */}
+      <span className="text-xs text-muted-foreground/70 truncate">
+        Followed by{' '}
+        {names.map((n, i) => (
+          <React.Fragment key={n.userId}>
+            {i > 0 && (mutualData.total_count === 2 && i === 1 ? ' and ' : ', ')}
+            <UsernameLink
+              username={n.username}
+              userId={n.userId}
+              className="font-medium text-muted-foreground hover:text-foreground inline"
+            >
+              {n.name}
+            </UsernameLink>
+          </React.Fragment>
+        ))}
+        {suffix && <> {suffix}</>}
+      </span>
     </div>
   );
 };

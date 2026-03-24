@@ -44,7 +44,8 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
           isFollowing: false,
           reason: user.reason,
           source: user.source,
-          score: user.score
+          score: user.score,
+          mutuals: user.mutuals ?? 0
         };
       });
 

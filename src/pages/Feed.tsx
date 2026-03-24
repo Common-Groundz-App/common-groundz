@@ -758,8 +758,12 @@ const Feed = React.memo(() => {
                     </div>
                   ) : recommendedUsers.length > 0 ? (
                     <div className="space-y-3">
-                      {recommendedUsers.slice(0, 5).map((user) => (
-                        <UserRecommendationCard key={user.id} user={user} />
+                      {recommendedUsers.slice(0, 5).map((recUser) => (
+                        <UserRecommendationCard 
+                          key={recUser.id} 
+                          user={recUser} 
+                          mutualData={mutualDataMap.get(recUser.id)}
+                        />
                       ))}
                     </div>
                   ) : (
