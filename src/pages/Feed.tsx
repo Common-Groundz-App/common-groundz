@@ -38,6 +38,7 @@ const Feed = React.memo(() => {
   const [hashtagsLoading, setHashtagsLoading] = useState(true);
   const [recommendedUsers, setRecommendedUsers] = useState<RecommendedUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(true);
+  const [mutualDataMap, setMutualDataMap] = useState<Map<string, MutualData>>(new Map());
   
   // Performance optimization
   useMemoryOptimization({
