@@ -110,6 +110,7 @@ function App() {
         <ContentViewerProvider>
           <AuthErrorBoundary>
             <Router>
+              <ScrollToTop />
               <AuthInitializer>
               <AuthPromptProvider>
                 <OfflineBanner />
