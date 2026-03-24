@@ -357,7 +357,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                 username={post.username}
                 displayName={post.displayName}
                 showHandle={true}
-                className="hover:underline"
               />
               <div className="flex items-center text-muted-foreground text-xs gap-1">
                 <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
