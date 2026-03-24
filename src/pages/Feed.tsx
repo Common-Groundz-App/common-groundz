@@ -40,6 +40,36 @@ const Feed = React.memo(() => {
   const [usersLoading, setUsersLoading] = useState(true);
   const [mutualDataMap, setMutualDataMap] = useState<Map<string, MutualData>>(new Map());
   
+  // Keep useIsMobile only for logic, not layout rendering
+  const isMobile = useIsMobile();
+  const location = useLocation();
+  const [activeTab, setActiveTab] = React.useState("for-you");
+  const { unreadCount } = useNotifications();
+  const [refreshing, setRefreshing] = useState(false);
+  const [pullProgress, setPullProgress] = useState(0);
+  const [pullIntent, setPullIntent] = useState(false);
+  const [isActive, setIsActive] = useState(false);
+  const [startY, setStartY] = useState(0);
+  
+  // New content detection state
+  const [newContentAvailable, setNewContentAvailable] = useState(false);
+  const [newPostCount, setNewPostCount] = useState(0);
+  const [hasScrolledDown, setHasScrolledDown] = useState(false);
+  const [showNewPosts, setShowNewPosts] = useState(false);
+  
+  // Refs
+  const lastScrollTop = useRef(0);
+  const frameId = useRef(0);
+  const lastUpdateTime = useRef(0);
+  const contentCheckInterval = useRef<NodeJS.Timeout>();
+  const lastFetchedAtRef = useRef<number>(0);
+  
+  // Constants
+  const pullThreshold = 80;
+  const startThreshold = 10;
+  const contentCheckIntervalMs = 3 * 60 * 1000; // 3 minutes
+  const RECOMMENDATIONS_STALE_TIME = 5 * 60 * 1000; // 5 minutes
+
   // Performance optimization
   useMemoryOptimization({
     componentName: 'Feed',
@@ -80,34 +110,6 @@ const Feed = React.memo(() => {
   }
 
   console.log('✅ [Feed] Auth ready, rendering feed content...');
-
-  // Keep useIsMobile only for logic, not layout rendering
-  const isMobile = useIsMobile();
-  const location = useLocation();
-  const [activeTab, setActiveTab] = React.useState("for-you");
-  const { unreadCount } = useNotifications();
-  const [refreshing, setRefreshing] = useState(false);
-  const [pullProgress, setPullProgress] = useState(0);
-  const [pullIntent, setPullIntent] = useState(false);
-  const [isActive, setIsActive] = useState(false);
-  const [startY, setStartY] = useState(0);
-  
-  // New content detection state
-  const [newContentAvailable, setNewContentAvailable] = useState(false);
-  const [newPostCount, setNewPostCount] = useState(0);
-  const [hasScrolledDown, setHasScrolledDown] = useState(false);
-  const [showNewPosts, setShowNewPosts] = useState(false);
-  
-  // Add missing refs
-  const lastScrollTop = useRef(0);
-  const frameId = useRef(0);
-  const lastUpdateTime = useRef(0);
-  const contentCheckInterval = useRef<NodeJS.Timeout>();
-  
-  // Add missing constants
-  const pullThreshold = 80;
-  const startThreshold = 10;
-  const contentCheckIntervalMs = 3 * 60 * 1000; // 3 minutes
 
   // Performance Analytics
   useEffect(() => {
