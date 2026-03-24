@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share, Globe, Lock, Users, ChevronDown, MapPin } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDateLong } from '@/utils/dateUtils';
 import { cn } from '@/lib/utils';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
 import { Entity } from '@/services/recommendation/types';
@@ -235,21 +235,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
 
   // Using shared getInitialsFromName from profileUtils
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-    
-    if (diffInDays === 0) {
-      return 'Today';
-    } else if (diffInDays === 1) {
-      return 'Yesterday';
-    } else if (diffInDays < 7) {
-      return `${diffInDays} days ago`;
-    } else {
-      return format(date, 'MMM d, yyyy');
-    }
-  };
 
   const getEntityTypeColor = (type: string): string => {
     switch(type) {
@@ -372,15 +357,18 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                 username={post.username}
                 displayName={post.displayName}
                 showHandle={true}
-                className="hover:underline"
               />
               <div className="flex items-center text-muted-foreground text-xs gap-1">
-                <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
-                <span>·</span>
-                <div className="flex items-center gap-1">
-                  {getVisibilityIcon()}
-                  <span>{getVisibilityLabel()}</span>
-                </div>
+                <span>{formatDateLong(post.created_at)}</span>
+                {post.visibility !== 'public' && (
+                  <>
+                    <span>·</span>
+                    <div className="flex items-center gap-1">
+                      {getVisibilityIcon()}
+                      <span>{getVisibilityLabel()}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
