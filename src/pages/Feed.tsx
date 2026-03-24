@@ -28,7 +28,8 @@ import { getUserRecommendations, RecommendedUser } from '@/services/userRecommen
 import { useFollow } from '@/hooks/use-follow';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import UsernameLink from '@/components/common/UsernameLink';
-import { UserRecommendationCard } from '@/components/feed/UserRecommendationCard';
+import { UserRecommendationCard, MutualData } from '@/components/feed/UserRecommendationCard';
+import { supabase } from '@/integrations/supabase/client';
 
 const Feed = React.memo(() => {
   const { user, isLoading } = useAuth();
