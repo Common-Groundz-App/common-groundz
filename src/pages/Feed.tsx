@@ -153,16 +153,38 @@ const Feed = React.memo(() => {
     fetchTrendingHashtags();
   }, []);
 
-  // User Recommendations
+  // User Recommendations — guarded with TTL + race condition safety
   useEffect(() => {
+    // Reset on logout/user change
+    if (!user?.id) {
+      setRecommendedUsers([]);
+      setMutualDataMap(new Map());
+      lastFetchedAtRef.current = 0;
+      return;
+    }
+
+    const now = Date.now();
+    const isStale = now - lastFetchedAtRef.current > RECOMMENDATIONS_STALE_TIME;
+
+    // Skip if fresh data exists
+    if (recommendedUsers.length > 0 && !isStale) return;
+
+    // Race condition guard
+    let cancelled = false;
+
     const fetchUserRecommendations = async () => {
-      if (!user) return;
-      
-      try {
+      // Only show skeleton on first load (no data yet)
+      if (recommendedUsers.length === 0) {
         setUsersLoading(true);
-        setMutualDataMap(new Map()); // Clear stale data
+      }
+      // Don't clear mutualDataMap — keeps proof-line visible during background refresh
+
+      try {
         const users = await getUserRecommendations(user.id, 5);
+        if (cancelled) return;
+
         setRecommendedUsers(users);
+        lastFetchedAtRef.current = Date.now();
 
         // Batch fetch mutual previews for all recommended users
         if (users.length > 0) {
@@ -173,6 +195,8 @@ const Feed = React.memo(() => {
                 viewer_id: user.id,
                 target_user_ids: userIds
               });
+
+            if (cancelled) return;
 
             if (!mutualError && mutualRows) {
               const map = new Map<string, MutualData>();
@@ -195,23 +219,25 @@ const Feed = React.memo(() => {
                   });
                 }
               }
-              setMutualDataMap(map);
+              if (!cancelled) setMutualDataMap(map);
             }
           } catch (mutualErr) {
             console.error('Error fetching mutual previews:', mutualErr);
-            // Leave map empty — cards fall back gracefully
+            // Leave map as-is — cards fall back gracefully
           }
         }
       } catch (error) {
+        if (cancelled) return;
         console.error('Error fetching user recommendations:', error);
-        setRecommendedUsers([]);
+        if (recommendedUsers.length === 0) setRecommendedUsers([]);
       } finally {
-        setUsersLoading(false);
+        if (!cancelled) setUsersLoading(false);
       }
     };
 
     fetchUserRecommendations();
-  }, [user]);
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   // Smart Prefetching
   useEffect(() => {
