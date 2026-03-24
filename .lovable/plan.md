@@ -1,34 +1,14 @@
 
 
-# Fix: Scroll Position Retained Across Routes — Final Plan
+# Top-align avatar in Who to Follow cards
 
-The try/catch is unnecessary. `window.scrollTo` does not throw — if a browser doesn't recognize `"instant"`, it silently falls back to default behavior. Adding a try/catch around a non-throwing API is cargo-cult defensiveness.
+Fair point — drop the `mt-0.5`. `items-start` alone should be sufficient. If alignment feels off after implementation, we can adjust text leading rather than adding margin to the avatar.
 
-**Plan is unchanged. Implementing as-is.**
+## Change
 
-## Changes
+**`src/components/feed/UserRecommendationCard.tsx`, line 87:**
 
-### 1. Create `src/components/ScrollToTop.tsx`
+Change `flex items-center gap-3` → `flex items-start gap-3`
 
-```typescript
-import { useEffect } from "react";
-import { useLocation, useNavigationType } from "react-router-dom";
-
-export default function ScrollToTop() {
-  const { pathname } = useLocation();
-  const navigationType = useNavigationType();
-
-  useEffect(() => {
-    if (navigationType === "PUSH" || navigationType === "REPLACE") {
-      window.scrollTo({ top: 0, behavior: "instant" });
-    }
-  }, [pathname, navigationType]);
-
-  return null;
-}
-```
-
-### 2. Edit `src/App.tsx`
-
-Import `ScrollToTop` and render `<ScrollToTop />` just inside `<Router>`, before `<AuthInitializer>`.
+That's it. One class change.
 
