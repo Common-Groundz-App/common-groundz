@@ -1,17 +1,34 @@
 
 
-# Fix "Who to Follow" Skeleton Flash — IMPLEMENTED ✅
+# Fix: Scroll Position Retained Across Routes — Final Plan
 
-## Changes applied to `src/pages/Feed.tsx`
+The try/catch is unnecessary. `window.scrollTo` does not throw — if a browser doesn't recognize `"instant"`, it silently falls back to default behavior. Adding a try/catch around a non-throwing API is cargo-cult defensiveness.
 
-### 1. Moved all hooks above early returns ✅
-All `useState`, `useIsMobile`, `useLocation`, `useNotifications`, `useRef` declarations moved before the `if (isLoading)` and `if (!user)` early returns.
+**Plan is unchanged. Implementing as-is.**
 
-### 2. Rewrote recommendations `useEffect` ✅
-- `[user?.id]` dependency — stable string, no spurious refetches
-- TTL guard (5 min) via `lastFetchedAtRef` — skips fetch if data is fresh
-- Conditional skeleton — only when `recommendedUsers.length === 0`
-- No `mutualDataMap` clearing before fetch — prevents proof-line flicker
-- Race condition guard — `let cancelled = false` with cleanup
-- Reset on logout — clears state and timestamp when `!user?.id`
-- `cancelled` check before every state update
+## Changes
+
+### 1. Create `src/components/ScrollToTop.tsx`
+
+```typescript
+import { useEffect } from "react";
+import { useLocation, useNavigationType } from "react-router-dom";
+
+export default function ScrollToTop() {
+  const { pathname } = useLocation();
+  const navigationType = useNavigationType();
+
+  useEffect(() => {
+    if (navigationType === "PUSH" || navigationType === "REPLACE") {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+  }, [pathname, navigationType]);
+
+  return null;
+}
+```
+
+### 2. Edit `src/App.tsx`
+
+Import `ScrollToTop` and render `<ScrollToTop />` just inside `<Router>`, before `<AuthInitializer>`.
+
