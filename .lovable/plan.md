@@ -1,12 +1,17 @@
 
 
-# Add Keyboard Focus Ring to Mutual Avatars
+# Fix "Who to Follow" Skeleton Flash — IMPLEMENTED ✅
 
-## 1 file: `src/components/feed/UserRecommendationCard.tsx`
+## Changes applied to `src/pages/Feed.tsx`
 
-Update the `<Link>` wrapping each mutual `ProfileAvatar` in `MutualProofLine`:
+### 1. Moved all hooks above early returns ✅
+All `useState`, `useIsMobile`, `useLocation`, `useNotifications`, `useRef` declarations moved before the `if (isLoading)` and `if (!user)` early returns.
 
-Add: `focus-visible:ring-2 focus-visible:ring-brand-orange focus-visible:ring-offset-2 ring-offset-background rounded-full outline-none`
-
-The `ring-offset-background` ensures visibility across light/dark themes. `ring-offset-2` gives slightly more breathing room than `1`. Everything else stays as-is.
-
+### 2. Rewrote recommendations `useEffect` ✅
+- `[user?.id]` dependency — stable string, no spurious refetches
+- TTL guard (5 min) via `lastFetchedAtRef` — skips fetch if data is fresh
+- Conditional skeleton — only when `recommendedUsers.length === 0`
+- No `mutualDataMap` clearing before fetch — prevents proof-line flicker
+- Race condition guard — `let cancelled = false` with cleanup
+- Reset on logout — clears state and timestamp when `!user?.id`
+- `cancelled` check before every state update
