@@ -1,59 +1,33 @@
 
 
-# Feed Card Polish
+# Who to Follow — Batch Mutual Proof (Final)
 
-## Changes
+## 3 Files
 
-### 1. Fix hover behavior — `PostFeedItem.tsx`
+### 1. `src/services/userRecommendationService.ts`
+- Add `mutuals?: number` to `RecommendedUser` interface
+- Map `user.mutuals` from RPC response
 
-**Line 375**: Remove `className="hover:underline"` from UsernameLink. The component already has independent hover:underline on display name and @handle internally. The outer class is redundant and can cause the wrapper div itself to underline.
+### 2. `src/pages/Feed.tsx`
+- After fetching recommendations, ONE call to `get_batch_mutual_previews` with all user IDs
+- Build `Map<userId, { previews, total_count }>`, store in state
+- Clear map when recommendations refresh (no stale data)
+- Pass each user's entry to `UserRecommendationCard` as `mutualData` prop
+- On error → empty map → cards fall back gracefully
+- Fetch tied to recommendation list changes only
 
-```tsx
-// Before
-className="hover:underline"
-// After
-(remove className prop entirely, or leave empty)
-```
+### 3. `src/components/feed/UserRecommendationCard.tsx`
+Accept optional `mutualData` prop. Replace `user.reason` with:
 
-### 2. Remove "Public" visibility badge — `PostFeedItem.tsx`
+**Priority (strict):**
+1. **Mutuals > 0**: Tiny stacked avatars (`ProfileAvatar` xs, `-0.25rem` margin, `border-2 border-background`) + text:
+   - 1: "Followed by **Hana**"
+   - 2: "Followed by **Hana** and **Anitha**"
+   - 3+: "Followed by **Hana** and N others you follow" (pluralized)
+   - Names = `first_name || username || 'someone'`, max 2 shown
+   - Names are clickable `UsernameLink` components → route to profile
+2. **`fof` source, no mutual data yet**: "Followed by people you follow"
+3. **Source fallback**: `active` → "Popular this week", `fresh` → "New on Common Groundz", default → "Suggested for you"
 
-**Lines 377-384**: Remove the visibility indicator row (Globe icon + "Public" label) for public posts. Everything visible in the feed is public — showing it is noise. Keep the icon only for non-public posts (private/circle_only) as a meaningful signal.
-
-```tsx
-// Before: always shows visibility
-<div className="flex items-center text-muted-foreground text-xs gap-1">
-  <span>{format(...)}</span>
-  <span>·</span>
-  <div className="flex items-center gap-1">
-    {getVisibilityIcon()}
-    <span>{getVisibilityLabel()}</span>
-  </div>
-</div>
-
-// After: only show visibility for non-public
-<div className="flex items-center text-muted-foreground text-xs gap-1">
-  <span>{format(...)}</span>
-  {post.visibility !== 'public' && (
-    <>
-      <span>·</span>
-      <div className="flex items-center gap-1">
-        {getVisibilityIcon()}
-        <span>{getVisibilityLabel()}</span>
-      </div>
-    </>
-  )}
-</div>
-```
-
-### 3. Use `formatDateLong` utility — `PostFeedItem.tsx`
-
-**Line 378**: Replace inline `format(new Date(post.created_at), 'MMM d, yyyy')` with the shared `formatDateLong` utility we just created, for consistency across the app.
-
-### 4. Clean up unused date function — `PostFeedItem.tsx`
-
-**Lines 238-252**: The local `formatDate` function is defined but never used in the render. Remove dead code.
-
----
-
-**Summary**: 1 file (`PostFeedItem.tsx`), 4 small changes. Cleaner, more professional feed cards. RecommendationFeedItem already has correct hover behavior and no visibility badge — no changes needed there.
+Avatar stack: `aria-hidden="true"`. Loading/error → source fallback (no flicker).
 
