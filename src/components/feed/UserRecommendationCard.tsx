@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { RecommendedUser, logUserImpression } from '@/services/userRecommendationService';
 import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import UsernameLink from '@/components/common/UsernameLink';
