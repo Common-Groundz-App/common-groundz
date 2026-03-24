@@ -359,12 +359,16 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                 showHandle={true}
               />
               <div className="flex items-center text-muted-foreground text-xs gap-1">
-                <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
-                <span>·</span>
-                <div className="flex items-center gap-1">
-                  {getVisibilityIcon()}
-                  <span>{getVisibilityLabel()}</span>
-                </div>
+                <span>{formatDateLong(post.created_at)}</span>
+                {post.visibility !== 'public' && (
+                  <>
+                    <span>·</span>
+                    <div className="flex items-center gap-1">
+                      {getVisibilityIcon()}
+                      <span>{getVisibilityLabel()}</span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
