@@ -84,7 +84,7 @@ export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({
 
   return (
     <div className="flex items-center justify-between py-2">
-      <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="flex items-start gap-3 flex-1 min-w-0">
         <ProfileAvatar 
           userId={user.id} 
           size="sm"
