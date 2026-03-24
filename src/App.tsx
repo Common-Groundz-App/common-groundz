@@ -45,6 +45,7 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import TermsOfService from '@/pages/TermsOfService';
 import CookiePolicy from '@/pages/CookiePolicy';
 import OfflineBanner from '@/components/OfflineBanner';
+import ScrollToTop from '@/components/ScrollToTop';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
 import { AuthPromptProvider } from '@/contexts/AuthPromptContext';
@@ -109,6 +110,7 @@ function App() {
         <ContentViewerProvider>
           <AuthErrorBoundary>
             <Router>
+              <ScrollToTop />
               <AuthInitializer>
               <AuthPromptProvider>
                 <OfflineBanner />
