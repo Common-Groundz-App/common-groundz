@@ -94,9 +94,15 @@ export const UserRecommendationCard: React.FC<UserRecommendationCardProps> = ({
           <UsernameLink 
             username={user.username} 
             userId={user.id}
-            displayName={user.displayName}
-            showHandle={true}
-          />
+            className="font-medium text-sm block truncate"
+          >
+            {user.displayName}
+          </UsernameLink>
+          {user.username && (
+            <div className="text-xs text-muted-foreground truncate">
+              @{user.username}
+            </div>
+          )}
           {/* Mutual proof or fallback reason */}
           {hasMutuals ? (
             <MutualProofLine mutualData={mutualData} />
