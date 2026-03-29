@@ -1,29 +1,21 @@
 
 
-# Refinements to PostFeedItem
+# Fix: Top Row Click Isolation
 
-Two changes to `src/components/feed/PostFeedItem.tsx`:
+## What's wrong
+Line 349 has `onClick={e => e.stopPropagation()}` on the full-width outer `div` (`flex justify-between`). This swallows clicks on all empty space in the top row.
 
-## 1. Make entire card clickable (Reddit-style)
+## Fix (single file, ~5 lines changed)
 
-Currently only the content area div (lines 395-444) is the click target. Change to make the whole `Card` the click target:
+**`src/components/feed/PostFeedItem.tsx`**
 
-- Move `onClick={handleContentAreaClick}` and `cursor-pointer` to the outer `<Card>` element (line 340)
-- Add keyboard accessibility (`role="link"`, `tabIndex={0}`, `onKeyDown`) to the Card
-- Remove the inner clickable div wrapper (lines 395-401, 444) — just render the content directly
-- Keep `e.stopPropagation()` on: author row (line 343), dropdown menu, action buttons row (line 447), media (line 434), entity tag clicks, location tag clicks
-- **Comment button** keeps its own navigate to `?focus=comment` (already isolated)
-- **Media** already has `e.stopPropagation()` (line 434) so lightbox opens instead of navigation
-- **Like, Save, Share buttons** already isolated — they perform their action, no navigation
+1. **Line 349**: Remove `onClick={e => e.stopPropagation()}` from the outer row div
+2. **Line 350**: Add `onClick={e => e.stopPropagation()}` to the avatar+username group div (`<div className="flex items-center gap-3">`)
+3. **Lines 378-396**: Wrap the `DropdownMenu` block in `<div onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>` (Codex's suggestion is valid — Radix dropdowns use pointer events)
 
-## 2. Move entity tags back below content (original position)
+## On the feedback
 
-Currently entity tags render above content (lines 402-407). Move them back to after the content and media, restoring the original look from `entity_tags.png`:
-
-- Move the entity tags block (lines 402-407) and location tags block (lines 409-414) to after the media section (after line 443)
-- This restores: content first, then media, then entity/location tags at the bottom (before the action bar)
-
-### Technical detail
-
-The Card gets: `className="overflow-hidden cursor-pointer hover:bg-muted/30 transition-colors"` with `onClick={handleContentAreaClick}` and keyboard handlers. The inner content div loses its click wrapper and just renders content naturally.
+- **ChatGPT's suggestions**: All valid but already covered. Hover effect is already on the Card (line 341). Testing zones is good advice but not a code change.
+- **Codex's `onPointerDown` addition**: Yes, adopt this. Radix UI (which powers shadcn DropdownMenu) uses pointer events internally. Adding `onPointerDown={e => e.stopPropagation()}` to the dropdown wrapper prevents edge-case bubbling.
+- **Nothing else to add**. The fix is minimal and correct.
 
