@@ -14,6 +14,8 @@ import { useFollow } from '@/hooks/use-follow';
 import FollowButton from '@/components/profile/actions/FollowButton';
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, MessageSquare, ThumbsUp, Users, Calendar } from 'lucide-react';
+import { InfoTooltip } from '@/components/ui/info-tooltip';
+import { EntityFollowButton } from '@/components/entity/EntityFollowButton';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
@@ -51,10 +53,6 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
 
   const { circleRating, circleRatingCount, circleContributors, isLoading: circleLoading } = useCircleRating(entity.id);
 
-  const entityTypeLabel = entity.type
-    ? entity.type.charAt(0).toUpperCase() + entity.type.slice(1).replace(/_/g, ' ')
-    : '';
-
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
       {/* Hero image */}
@@ -74,19 +72,21 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
       )}
 
       <CardContent className="p-5">
-        {/* Entity name + type badge */}
+        {/* Entity name + follow button */}
         <div className="flex items-start justify-between gap-2">
           <button
             onClick={() => navigate(entityUrl)}
-            className="font-semibold text-sm hover:underline text-left leading-tight"
+            className="font-semibold text-sm hover:underline text-left leading-tight min-w-0 flex-1"
           >
             {entity.name}
           </button>
-          {entityTypeLabel && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent text-accent-foreground whitespace-nowrap flex-shrink-0">
-              {entityTypeLabel}
-            </span>
-          )}
+          <div className="flex-shrink-0">
+            <EntityFollowButton
+              entityId={entity.id}
+              entityName={entity.name}
+              size="sm"
+            />
+          </div>
         </div>
 
         {/* Venue / location */}
@@ -113,7 +113,7 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
           </div>
         ) : stats && stats.averageRating !== null ? (
           <div className="mt-3 pt-3 border-t">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
               <ConnectedRingsRating
                 value={stats.averageRating}
                 variant="badge"
@@ -129,8 +129,9 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
               </span>
             </div>
             <div className="mt-1 leading-tight">
-              <div className="font-semibold text-xs text-foreground">
+              <div className="flex items-center gap-1 font-semibold text-xs text-foreground">
                 Overall Rating
+                <InfoTooltip content="Overall Rating is the average review rating from all users who reviewed this item on Common Groundz." />
               </div>
               <div
                 className="text-xs font-bold"
@@ -148,7 +149,7 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
         {/* === SECONDARY: Circle Rating === */}
         {user && !circleLoading && circleRating !== null && circleRatingCount > 0 ? (
           <div className="mt-3 pt-3 border-t">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
               <div className="w-fit">
                 <ConnectedRingsRating
                   value={circleRating}
@@ -166,8 +167,9 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
               </span>
             </div>
             <div className="mt-1 leading-tight">
-              <div className="font-semibold text-xs text-brand-orange">
+              <div className="flex items-center gap-1 font-semibold text-xs text-brand-orange">
                 Circle Rating
+                <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
               </div>
               <div
                 className="text-xs font-bold"
@@ -189,7 +191,7 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
           </div>
         ) : user && !circleLoading && (circleRating === null || circleRatingCount === 0) ? (
           <div className="mt-3 pt-3 border-t">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between">
               <div className="w-fit">
                 <ConnectedRingsRating
                   value={0}
@@ -204,8 +206,9 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
               </span>
             </div>
             <div className="mt-1 leading-tight">
-              <div className="font-semibold text-xs text-brand-orange">
+              <div className="flex items-center gap-1 font-semibold text-xs text-brand-orange">
                 Circle Rating
+                <InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />
               </div>
               <div className="text-xs text-muted-foreground">
                 No ratings from your circle yet
@@ -215,20 +218,36 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
         ) : null}
 
         {/* === TERTIARY: Recommendations === */}
-        {stats && stats.recommendationCount > 0 && (
+        {stats && (stats.recommendationCount > 0 || (user && stats.circleRecommendationCount > 0)) && (
           <div className="mt-3 pt-3 border-t">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs flex-wrap">
               <ThumbsUp className="h-3.5 w-3.5 text-brand-orange" />
-              <span className="font-medium text-foreground">{stats.recommendationCount}</span>
-              <span>Recommending</span>
+              <span className="text-foreground font-medium">
+                {stats.recommendationCount > 0 && (
+                  <>
+                    <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> Recommending
+                    {user && stats.circleRecommendationCount > 0 && (
+                      <>
+                        {' '}<span className="text-muted-foreground">(</span><span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from circle</span><span className="text-muted-foreground">)</span>
+                      </>
+                    )}
+                  </>
+                )}
+                {stats.recommendationCount === 0 && user && stats.circleRecommendationCount > 0 && (
+                  <span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from your circle</span>
+                )}
+              </span>
+              <InfoTooltip 
+                content={`Reviews with 4 or more circles are considered recommendations.\n"From circle" shows how many people you follow have recommended this recently.\nOnly recent ratings are counted to keep things current and relevant.`}
+                side="top"
+              />
             </div>
           </div>
         )}
 
         <Button
-          variant="outline"
           size="sm"
-          className="w-full mt-4 text-xs"
+          className="w-full mt-4 text-xs bg-brand-orange hover:bg-brand-orange/90 text-white"
           onClick={() => navigate(entityUrl)}
         >
           View all experiences
