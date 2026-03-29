@@ -384,15 +384,15 @@ export function ModernCreatePostForm({
       case 'watching':
         return "What are you watching or doing right now?";
       case 'story':
-        return "What's on your mind?";
+        return "Share your experience...";
       case 'routine':
-        return "Share your routine...";
+        return "What's your routine? Share what works...";
       case 'project':
         return "Tell us about your project...";
       case 'note':
-        return "What's on your mind?";
+        return "Share your experience...";
       default:
-        return "What's on your mind?";
+        return "Share your experience...";
     }
   };
   

@@ -237,8 +237,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }
   };
 
-  const handleEntityClick = (entity: Entity, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleEntityClick = (entity: Entity) => {
     navigate(getEntityUrl(entity));
   };
 
@@ -253,7 +252,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               type="entity"
               label={entity.name}
               entityType={entity.type as any}
-              onClick={(e) => handleEntityClick(entity, e)}
+              onClick={() => handleEntityClick(entity)}
             />
             {entity.category_id && (
               <EntityCategoryBadge 
@@ -279,9 +278,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             key={index}
             type="location"
             label={tag}
-            onClick={(e) => {
-              e.stopPropagation();
-            }}
+            onClick={() => {}}
           />
         ))}
       </div>
