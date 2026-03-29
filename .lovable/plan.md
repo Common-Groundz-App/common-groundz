@@ -1,53 +1,42 @@
 
 
-# Align Post Detail Sidebar with Entity V4 Design System
+# Refine Post Detail Sidebar — Match Entity V4 Exactly
 
-## Problem
-The sidebar uses generic Star/ThumbsUp icons and flat hierarchy that doesn't match the Entity V4 design system used everywhere else in the app.
+## Changes — `src/components/content/PostDetailSidebar.tsx` only
 
-## Approach
-Reuse Entity V4 components directly — treat sidebar as a **compressed but not cramped** version of Entity V4.
+### 1. Replace type badge with EntityFollowButton
+- Remove the `Place` badge from the header row
+- Add `EntityFollowButton` (from `@/components/entity/EntityFollowButton`) right-aligned next to entity name
+- Entity name gets `min-w-0 flex-1` + `truncate` to prevent overflow when follow button is present
+- Use `size="sm"` on the follow button to fit sidebar width
 
-## Changes — `src/components/content/PostDetailSidebar.tsx`
+### 2. Right-align rating numbers (both Overall and Circle)
+- Change rating layout from `flex items-center gap-3` to `flex items-center justify-between`
+- Rings + labels on left, rating number on right — matching the screenshot of Entity V4
 
-### Entity Card restructure
+### 3. Add InfoTooltip to Overall Rating and Circle Rating
+- Import `InfoTooltip` from `@/components/ui/info-tooltip`
+- Add next to "Overall Rating" label: `<InfoTooltip content="Overall Rating is the average review rating from all users who reviewed this item on Common Groundz." />`
+- Add next to "Circle Rating" label: `<InfoTooltip content="Circle Rating is the average review rating from people in your Circle (friends or trusted users you follow)." />`
+- Same `flex items-center gap-1` pattern as EntityHeader
 
-**Imports to add:**
-- `ConnectedRingsRating` from `@/components/ui/connected-rings`
-- `RatingRingIcon` from `@/components/ui/rating-ring-icon`
-- `getSentimentColor`, `getSentimentLabel` from `@/utils/ratingColorUtils`
-- `useCircleRating` from `@/hooks/use-circle-rating`
-- `CircleContributorsPreview` from `@/components/recommendations/CircleContributorsPreview`
+### 4. Match Recommending row to Entity V4 style
+- Change from plain text to Entity V4 pattern: `<span className="text-brand-orange">{count}</span> Recommending`
+- Add circle count: `(X from circle)` with `text-brand-orange font-medium` — same markup as EntityHeader lines 529-534
+- Add `InfoTooltip` with the same recommendations tooltip content from EntityHeader lines 541-545
+- Use `ThumbsUp` icon with `text-brand-orange` tint (already present, just needs text styling fix)
 
-**Remove:** `Star` from lucide imports
+### 5. CTA button styling
+- Change "View all experiences" to brand orange: `className="w-full mt-4 text-xs bg-brand-orange hover:bg-brand-orange/90 text-white"`
+- Keep wording as "View all experiences" — it accurately describes what clicking does
 
-**New hierarchy within card (top to bottom):**
-1. Hero image (keep as-is)
-2. Name + type badge (keep)
-3. Venue/location (keep)
-4. Description (keep, line-clamp-3)
-5. **Overall Rating** (PRIMARY) — `ConnectedRingsRating` (size `"sm"`) + color-coded number via `getSentimentColor()` + `getSentimentLabel()` + `"(X reviews)"` muted text
-6. **Circle Rating** (SECONDARY) — `useCircleRating(entity.id)` → `ConnectedRingsRating` for circle rating + `CircleContributorsPreview` avatar stack. `text-brand-orange` label. Only shown when logged in and data exists.
-7. **Recommendations count** (TERTIARY) — `ThumbsUp` with count
-8. CTA button (keep)
+### 6. Additional refinement
+- Add `flex items-center gap-1` wrapper for "Overall Rating" and "Circle Rating" labels (to hold InfoTooltip inline)
+- Import: `InfoTooltip` from `@/components/ui/info-tooltip`, `EntityFollowButton` from `@/components/entity/EntityFollowButton`
+- Remove: unused `entityTypeLabel` computation
 
-Each section separated by `border-t` dividers with `pt-3 mt-3` spacing.
-
-### Spacing & typography guardrails
-- Increase `CardContent` padding from `p-4` to `p-5`
-- Match Entity V4 text sizes exactly: rating number `text-lg font-bold`, sentiment label `text-xs`, muted counts `text-xs text-muted-foreground`
-- Same font weights, same color tokens, same gaps — no approximations
-- Do NOT over-compress: rating and circle sections maintain comfortable line-height and spacing for readability
-
-### Author Card
-- Increase padding from `p-4` to `p-5`
-- Everything else stays (already has follower count, post count, member since, follow button)
-
-### Loading skeletons
-- Update to reflect new section structure (rating block skeleton, circle block skeleton)
-
-## Files
+### Files
 | File | Change |
 |------|--------|
-| `src/components/content/PostDetailSidebar.tsx` | Replace rating/circle UI with Entity V4 component reuse, fix hierarchy and spacing |
+| `src/components/content/PostDetailSidebar.tsx` | All 5 refinements above |
 
