@@ -13,9 +13,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFollow } from '@/hooks/use-follow';
 import FollowButton from '@/components/profile/actions/FollowButton';
 import { useQuery } from '@tanstack/react-query';
-import { Star, MapPin, MessageSquare, ThumbsUp, Users, Calendar } from 'lucide-react';
+import { MapPin, MessageSquare, ThumbsUp, Users, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
+import { useCircleRating } from '@/hooks/use-circle-rating';
+import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
 
 interface TaggedEntity {
   id: string;
@@ -45,6 +49,8 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
     staleTime: 1000 * 60 * 10,
   });
 
+  const { circleRating, circleRatingCount, circleContributors, isLoading: circleLoading } = useCircleRating(entity.id);
+
   const entityTypeLabel = entity.type
     ? entity.type.charAt(0).toUpperCase() + entity.type.slice(1).replace(/_/g, ' ')
     : '';
@@ -67,7 +73,7 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
         </button>
       )}
 
-      <CardContent className="p-4">
+      <CardContent className="p-5">
         {/* Entity name + type badge */}
         <div className="flex items-start justify-between gap-2">
           <button
@@ -98,46 +104,131 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
           </p>
         )}
 
-        {/* Stats row */}
+        {/* === PRIMARY: Overall Rating === */}
         {statsLoading ? (
-          <div className="flex gap-4 mt-3 pt-3 border-t">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-12" />
+          <div className="mt-3 pt-3 border-t space-y-2">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-3 w-20" />
           </div>
-        ) : stats ? (
-          <div className="flex items-center gap-4 mt-3 pt-3 border-t text-xs text-muted-foreground">
-            {stats.averageRating !== null && (
-              <div className="flex items-center gap-1">
-                <Star className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500" />
-                <span className="font-medium text-foreground">{stats.averageRating.toFixed(1)}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-1">
-              <ThumbsUp className="h-3 w-3" />
-              <span>{stats.recommendationCount}</span>
+        ) : stats && stats.averageRating !== null ? (
+          <div className="mt-3 pt-3 border-t">
+            <div className="flex items-center gap-3">
+              <ConnectedRingsRating
+                value={stats.averageRating}
+                variant="badge"
+                showValue={false}
+                size="sm"
+                minimal={true}
+              />
+              <span
+                className="text-lg font-bold"
+                style={{ color: getSentimentColor(stats.averageRating, stats.reviewCount > 0) }}
+              >
+                {stats.reviewCount > 0 ? stats.averageRating.toFixed(1) : "0"}
+              </span>
             </div>
-            <div className="flex items-center gap-1">
-              <MessageSquare className="h-3 w-3" />
-              <span>{stats.reviewCount}</span>
+            <div className="mt-1 leading-tight">
+              <div className="font-semibold text-xs text-foreground">
+                Overall Rating
+              </div>
+              <div
+                className="text-xs font-bold"
+                style={{ color: getSentimentColor(stats.averageRating, stats.reviewCount > 0) }}
+              >
+                {getSentimentLabel(stats.averageRating, stats.reviewCount > 0)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                ({stats.reviewCount.toLocaleString()} {stats.reviewCount === 1 ? 'review' : 'reviews'})
+              </div>
             </div>
           </div>
         ) : null}
 
-        {/* Circle signal */}
-        {stats && stats.circleRecommendationCount > 0 && (
-          <div className="mt-2 text-xs text-primary font-medium flex items-center gap-1.5">
-            <Users className="h-3 w-3" />
-            <span>
-              {stats.circleRecommendationCount} from your circle recommend{stats.circleRecommendationCount === 1 ? 's' : ''} this
-            </span>
+        {/* === SECONDARY: Circle Rating === */}
+        {user && !circleLoading && circleRating !== null && circleRatingCount > 0 ? (
+          <div className="mt-3 pt-3 border-t">
+            <div className="flex items-center gap-3">
+              <div className="w-fit">
+                <ConnectedRingsRating
+                  value={circleRating}
+                  variant="badge"
+                  showValue={false}
+                  size="sm"
+                  minimal={true}
+                />
+              </div>
+              <span
+                className="text-lg font-bold"
+                style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
+              >
+                {circleRating.toFixed(1)}
+              </span>
+            </div>
+            <div className="mt-1 leading-tight">
+              <div className="font-semibold text-xs text-brand-orange">
+                Circle Rating
+              </div>
+              <div
+                className="text-xs font-bold"
+                style={{ color: getSentimentColor(circleRating, circleRatingCount > 0) }}
+              >
+                {getSentimentLabel(circleRating, circleRatingCount > 0)}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
+              </div>
+              <CircleContributorsPreview
+                contributors={circleContributors}
+                totalCount={circleRatingCount}
+                maxDisplay={4}
+                entityName={entity.name}
+                stats={stats}
+              />
+            </div>
+          </div>
+        ) : user && !circleLoading && (circleRating === null || circleRatingCount === 0) ? (
+          <div className="mt-3 pt-3 border-t">
+            <div className="flex items-center gap-3">
+              <div className="w-fit">
+                <ConnectedRingsRating
+                  value={0}
+                  variant="badge"
+                  showValue={false}
+                  size="sm"
+                  minimal={true}
+                />
+              </div>
+              <span className="text-lg font-bold text-muted-foreground">
+                0
+              </span>
+            </div>
+            <div className="mt-1 leading-tight">
+              <div className="font-semibold text-xs text-brand-orange">
+                Circle Rating
+              </div>
+              <div className="text-xs text-muted-foreground">
+                No ratings from your circle yet
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* === TERTIARY: Recommendations === */}
+        {stats && stats.recommendationCount > 0 && (
+          <div className="mt-3 pt-3 border-t">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <ThumbsUp className="h-3.5 w-3.5 text-brand-orange" />
+              <span className="font-medium text-foreground">{stats.recommendationCount}</span>
+              <span>Recommending</span>
+            </div>
           </div>
         )}
 
         <Button
           variant="outline"
           size="sm"
-          className="w-full mt-3 text-xs"
+          className="w-full mt-4 text-xs"
           onClick={() => navigate(entityUrl)}
         >
           View all experiences
@@ -175,7 +266,7 @@ const AuthorCard: React.FC<{ userId: string }> = ({ userId }) => {
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="p-5 space-y-3">
           <div className="flex items-center gap-3">
             <Skeleton className="h-10 w-10 rounded-full" />
             <div className="space-y-1.5 flex-1">
@@ -200,7 +291,7 @@ const AuthorCard: React.FC<{ userId: string }> = ({ userId }) => {
 
   return (
     <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
+      <CardContent className="p-5">
         <div className="flex items-center gap-3">
           <ProfileAvatar userId={userId} size="md" />
           <div className="min-w-0 flex-1">
@@ -280,20 +371,32 @@ const PostDetailSidebar: React.FC<PostDetailSidebarProps> = ({
         <Card>
           <CardContent className="p-0">
             <Skeleton className="h-32 w-full rounded-t-lg" />
-            <div className="p-4 space-y-3">
+            <div className="p-5 space-y-3">
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-3/4" />
-              <div className="flex gap-4 pt-3 border-t">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-16" />
+              {/* Rating block skeleton */}
+              <div className="pt-3 border-t space-y-2">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-6 w-8" />
+                </div>
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+              {/* Circle block skeleton */}
+              <div className="pt-3 border-t space-y-2">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-6 w-20" />
+                  <Skeleton className="h-6 w-8" />
+                </div>
+                <Skeleton className="h-3 w-28" />
               </div>
               <Skeleton className="h-8 w-full" />
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 space-y-3">
+          <CardContent className="p-5 space-y-3">
             <div className="flex items-center gap-3">
               <Skeleton className="h-10 w-10 rounded-full" />
               <Skeleton className="h-4 w-24" />
