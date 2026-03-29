@@ -579,14 +579,18 @@ export function ModernCreatePostForm({
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant={selectedEntities.length > 0 ? "secondary" : "ghost"}
                       size="sm"
-                      className="rounded-full"
+                      className="rounded-full gap-1"
                     >
                       <AtSign size={20} className="text-muted-foreground" />
+                      {selectedEntities.length === 0 && (
+                        <span className="text-xs text-muted-foreground hidden sm:inline">What's this about?</span>
+                      )}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-72 p-2">
+                    <p className="text-xs text-muted-foreground mb-2 px-1">What are you sharing about?</p>
                     <SimpleEntitySelector
                       onEntitiesChange={handleEntitiesChange}
                       initialEntities={selectedEntities}
