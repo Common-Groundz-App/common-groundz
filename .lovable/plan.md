@@ -1,78 +1,53 @@
 
 
-# Enrich Post Detail Sidebar
+# Align Post Detail Sidebar with Entity V4 Design System
 
-## The Problem
+## Problem
+The sidebar uses generic Star/ThumbsUp icons and flat hierarchy that doesn't match the Entity V4 design system used everywhere else in the app.
 
-The current sidebar is bare — just entity name/type and author name/bio with "View" buttons. Compared to Reddit's rich community card (stats, description, creation date, rules), ours feels like a placeholder.
+## Approach
+Reuse Entity V4 components directly — treat sidebar as a **compressed but not cramped** version of Entity V4.
 
-## What to Add (Platform-Appropriate)
+## Changes — `src/components/content/PostDetailSidebar.tsx`
 
-### Entity Card — Make it a "Decision Card"
+### Entity Card restructure
 
-The entity card should answer: *"Is this place/product worth my attention?"*
+**Imports to add:**
+- `ConnectedRingsRating` from `@/components/ui/connected-rings`
+- `RatingRingIcon` from `@/components/ui/rating-ring-icon`
+- `getSentimentColor`, `getSentimentLabel` from `@/utils/ratingColorUtils`
+- `useCircleRating` from `@/hooks/use-circle-rating`
+- `CircleContributorsPreview` from `@/components/recommendations/CircleContributorsPreview`
 
-**New data points (all already available in Entity type or via `getEntityStats`):**
+**Remove:** `Star` from lucide imports
 
-1. **Larger entity image** — hero-style banner at top of card (not tiny 48px thumbnail)
-2. **Entity description** — 3-line clamp (already passed but underused)
-3. **Stats row** — recommendations count, reviews count, average rating (star icon + number). Fetch via `getEntityStats(entity.id)` 
-4. **Circle signal** — "X from your circle recommend this" (circleRecommendationCount from stats, only when logged in and > 0)
-5. **Location/venue** — if entity has `venue` field, show with MapPin icon
-6. **Entity type badge** — styled pill instead of plain text
+**New hierarchy within card (top to bottom):**
+1. Hero image (keep as-is)
+2. Name + type badge (keep)
+3. Venue/location (keep)
+4. Description (keep, line-clamp-3)
+5. **Overall Rating** (PRIMARY) — `ConnectedRingsRating` (size `"sm"`) + color-coded number via `getSentimentColor()` + `getSentimentLabel()` + `"(X reviews)"` muted text
+6. **Circle Rating** (SECONDARY) — `useCircleRating(entity.id)` → `ConnectedRingsRating` for circle rating + `CircleContributorsPreview` avatar stack. `text-brand-orange` label. Only shown when logged in and data exists.
+7. **Recommendations count** (TERTIARY) — `ThumbsUp` with count
+8. CTA button (keep)
 
-### Author Card — Make it a "Trust Card"
+Each section separated by `border-t` dividers with `pt-3 mt-3` spacing.
 
-The author card should answer: *"Should I trust this person?"*
+### Spacing & typography guardrails
+- Increase `CardContent` padding from `p-4` to `p-5`
+- Match Entity V4 text sizes exactly: rating number `text-lg font-bold`, sentiment label `text-xs`, muted counts `text-xs text-muted-foreground`
+- Same font weights, same color tokens, same gaps — no approximations
+- Do NOT over-compress: rating and circle sections maintain comfortable line-height and spacing for readability
 
-**New data points (available via `useProfile` + `fetchFollowerCount`):**
+### Author Card
+- Increase padding from `p-4` to `p-5`
+- Everything else stays (already has follower count, post count, member since, follow button)
 
-1. **Follower count** — fetch via existing `fetchFollowerCount` RPC
-2. **Post/recommendation count** — simple count query
-3. **Member since** — from `profile.created_at`, formatted as "Joined Mar 2025"
-4. **Follow button** — for non-own profiles (reuse existing `FollowButton` component if available)
-
-## Technical Approach
-
-### PostDetailSidebar.tsx changes
-
-**Entity Card:**
-- Accept full entity object (not just TaggedEntity subset) OR fetch stats inside the card using `getEntityStats`
-- Add a `useQuery` inside `EntityCard` for stats: `queryKey: ['entity-stats', entity.id]`
-- Render hero image, description, stats row, circle signal, venue
-
-**Author Card:**
-- Add `useQuery` for follower count: `queryKey: ['followerCount', userId]`
-- Format `created_at` as "Joined Mon YYYY"
-- Render stats row (followers, joined date)
-- Add follow button (search for existing FollowButton component)
-
-### PostView.tsx / PostContentViewer.tsx
-
-- Pass the full entity object to sidebar (not just `{id, name, type, slug}`) so we have description, venue, image_url etc.
-
-### Data flow
-
-```text
-PostContentViewer → onPostLoaded(meta) → PostView → PostDetailSidebar
-                                                      ├─ EntityCard
-                                                      │   └─ useQuery(['entity-stats', id])
-                                                      └─ AuthorCard
-                                                          └─ useQuery(['followerCount', userId])
-```
+### Loading skeletons
+- Update to reflect new section structure (rating block skeleton, circle block skeleton)
 
 ## Files
-
 | File | Change |
 |------|--------|
-| `src/components/content/PostDetailSidebar.tsx` | Major — enrich both cards with stats, layout, styling |
-| `src/components/content/PostContentViewer.tsx` | Minor — pass fuller entity data in onPostLoaded |
-| `src/pages/PostView.tsx` | Minor — update TaggedEntity interface if needed |
-
-## What NOT to add
-
-- No sorting/filtering in sidebar
-- No community rules (not applicable)
-- No assistant integration yet
-- No mutual connections in sidebar (separate feature)
+| `src/components/content/PostDetailSidebar.tsx` | Replace rating/circle UI with Entity V4 component reuse, fix hierarchy and spacing |
 
