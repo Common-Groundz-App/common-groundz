@@ -23,8 +23,8 @@ const FollowButton = ({
       size={isMobile ? "sm" : "default"} 
       className={
         isFollowing 
-          ? `${isHovering ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'} transition-colors duration-200` 
-          : "bg-brand-orange hover:bg-brand-orange/90 transition-all transform hover:scale-105"
+          ? `${isHovering ? 'border border-red-500 text-red-500 bg-transparent hover:bg-red-50 dark:hover:bg-red-500/10' : 'bg-muted text-foreground hover:bg-muted/80'} transition-colors duration-200` 
+          : "bg-brand-orange text-white hover:bg-brand-orange/90 transition-all transform hover:scale-105"
       }
       onClick={onFollowToggle}
       disabled={isLoading}
