@@ -123,7 +123,16 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
           visibility: data.visibility || 'private',
           imageUrl: data.media?.[0]?.url || undefined,
           authorId: data.user_id || undefined,
-          taggedEntities: taggedEntities,
+          taggedEntities: taggedEntities.map((e: any) => ({
+            id: e.id,
+            name: e.name,
+            type: e.type,
+            slug: e.slug,
+            description: e.description,
+            image_url: e.image_url,
+            category_id: e.category_id,
+            venue: e.venue,
+          })),
         });
       } catch (err) {
         console.error('Error fetching post:', err);
