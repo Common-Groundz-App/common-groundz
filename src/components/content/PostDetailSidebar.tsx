@@ -73,7 +73,7 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
 
       <CardContent className="p-5">
         {/* Entity name + follow button */}
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <button
             onClick={() => navigate(entityUrl)}
             className="font-semibold text-sm hover:underline text-left leading-tight min-w-0 flex-1"
@@ -91,7 +91,7 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
 
         {/* Venue / location */}
         {entity.venue && (
-          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
             <MapPin className="h-3 w-3 flex-shrink-0" />
             <span className="truncate">{entity.venue}</span>
           </div>
