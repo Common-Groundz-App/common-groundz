@@ -61,7 +61,7 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
           onClick={() => navigate(entityUrl)}
           className="w-full block"
         >
-          <div className="w-full h-20 overflow-hidden">
+          <div className="w-full h-32 overflow-hidden">
             <img
               src={entity.image_url}
               alt={entity.name}
@@ -389,7 +389,7 @@ const PostDetailSidebar: React.FC<PostDetailSidebarProps> = ({
       <div className="space-y-4 sticky top-20">
         <Card>
           <CardContent className="p-0">
-            <Skeleton className="h-20 w-full rounded-t-lg" />
+            <Skeleton className="h-32 w-full rounded-t-lg" />
             <div className="p-5 space-y-3">
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-3 w-full" />
