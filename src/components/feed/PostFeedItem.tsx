@@ -3,7 +3,7 @@ import { sharePost } from '@/utils/sharePost';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share, Globe, Lock, Users, ChevronDown, MapPin } from 'lucide-react';
+import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share, Globe, Lock, Users, MapPin } from 'lucide-react';
 import { formatDateLong } from '@/utils/dateUtils';
 import { cn } from '@/lib/utils';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
@@ -11,7 +11,6 @@ import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { HashtagRenderer } from '@/components/hashtag/HashtagRenderer';
-import CommentDialog from '@/components/comments/CommentDialog';
 import { fetchCommentCount } from '@/services/commentsService';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import UsernameLink from '@/components/common/UsernameLink';
@@ -68,8 +67,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const { requireAuth } = useAuthPrompt();
   const navigate = useNavigate();
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isCommentDialogOpen, setIsCommentDialogOpen] = useState(!!highlightCommentId);
   const [localLikes, setLocalLikes] = useState(post.likes || 0);
   const [localIsLiked, setLocalIsLiked] = useState(post.is_liked || false);
   const [localIsSaved, setLocalIsSaved] = useState(post.is_saved || false);
@@ -79,7 +76,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   
   const isOwner = user?.id === post.user_id;
-  const CONTENT_LIMIT = 280;
   
   React.useEffect(() => {
     const getInitialCommentCount = async () => {
@@ -99,7 +95,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     if (!requireAuth({ action: 'like', surface: 'post_feed_item', postId: post?.id })) return;
     if (!post) return;
     
-    // Email verification gate (Phase 2 — UI only)
     if (!canPerformAction('canLikeContent')) {
       showVerificationRequired('canLikeContent');
       return;
@@ -124,7 +119,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         setLocalLikes(prev => prev + 1);
       }
       
-      // Provide haptic + sound feedback
       try {
         feedbackActions.like();
       } catch (error) {
@@ -156,7 +150,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         setLocalIsSaved(true);
       }
       
-      // Provide haptic + sound feedback
       try {
         feedbackActions.save();
       } catch (error) {
@@ -233,9 +226,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }
   };
 
-  // Using shared getInitialsFromName from profileUtils
-
-
   const getEntityTypeColor = (type: string): string => {
     switch(type) {
       case 'book': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
@@ -247,8 +237,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }
   };
 
-  // Navigation handler for tagged entities
-  const handleEntityClick = (entity: Entity) => {
+  const handleEntityClick = (entity: Entity, e: React.MouseEvent) => {
+    e.stopPropagation();
     navigate(getEntityUrl(entity));
   };
 
@@ -256,27 +246,25 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     if (!entities || entities.length === 0) return null;
     
     return (
-      <div className="mt-4">
-        <div className="flex flex-wrap gap-2">
-          {entities.map(entity => (
-            <div key={entity.id} className="flex flex-col gap-1">
-              <TagBadge
-                type="entity"
-                label={entity.name}
-                entityType={entity.type as any}
-                onClick={() => handleEntityClick(entity)}
+      <div className="flex flex-wrap gap-2">
+        {entities.map(entity => (
+          <div key={entity.id} className="flex flex-col gap-1">
+            <TagBadge
+              type="entity"
+              label={entity.name}
+              entityType={entity.type as any}
+              onClick={(e) => handleEntityClick(entity, e)}
+            />
+            {entity.category_id && (
+              <EntityCategoryBadge 
+                categoryId={entity.category_id} 
+                showFullPath={false}
+                variant="outline"
+                className="text-xs"
               />
-              {entity.category_id && (
-                <EntityCategoryBadge 
-                  categoryId={entity.category_id} 
-                  showFullPath={false}
-                  variant="outline"
-                  className="text-xs"
-                />
-              )}
-            </div>
-          ))}
-        </div>
+            )}
+          </div>
+        ))}
       </div>
     );
   };
@@ -285,26 +273,23 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     if (!tags || tags.length === 0) return null;
     
     return (
-      <div className="mt-4">
-        <div className="flex flex-wrap gap-2">
-          {tags.map((tag, index) => (
-            <TagBadge
-              key={index}
-              type="location"
-              label={tag}
-              onClick={() => {
-                // Optional: Navigate to location view or search
-                // navigate(`/search?location=${encodeURIComponent(tag)}`);
-              }}
-            />
-          ))}
-        </div>
+      <div className="flex flex-wrap gap-2">
+        {tags.map((tag, index) => (
+          <TagBadge
+            key={index}
+            type="location"
+            label={tag}
+            onClick={(e) => {
+              e.stopPropagation();
+            }}
+          />
+        ))}
       </div>
     );
   };
 
   const handleCommentClick = () => {
-    setIsCommentDialogOpen(true);
+    navigate(`/post/${post.id}?focus=comment`);
     if (onComment) onComment(post.id);
   };
   
@@ -312,7 +297,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
 
-  const handleEdit = () => {
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsEditDialogOpen(true);
   };
 
@@ -335,17 +321,29 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     }, 100);
   };
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     setIsDeleteDialogOpen(true);
   };
 
   const displayCommentCount = localCommentCount !== null ? localCommentCount : post.comment_count;
 
+  const handleContentAreaClick = () => {
+    navigate(`/post/${post.id}`);
+  };
+
+  const handleContentAreaKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      navigate(`/post/${post.id}`);
+    }
+  };
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-6">
         {/* User Info and Post Meta */}
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10 border">
               <AvatarImage src={post.avatar_url || undefined} alt={post.displayName || post.username || 'User'} />
@@ -396,56 +394,60 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           )}
         </div>
         
-        {/* Post Content */}
-        <div className="mt-4">
-          <div className={cn("text-sm relative", isExpanded ? "" : "max-h-[120px] overflow-hidden")}>
-            <div className="min-w-0">
+        {/* Clickable Content Area */}
+        <div 
+          className="mt-4 cursor-pointer rounded-md hover:bg-muted/30 transition-colors -mx-1 px-1"
+          onClick={handleContentAreaClick}
+          onKeyDown={handleContentAreaKeyDown}
+          role="link"
+          tabIndex={0}
+        >
+          {/* Entity Tags - Always visible above content */}
+          {post.tagged_entities && post.tagged_entities.length > 0 && (
+            <div className="mb-2">
+              {renderTaggedEntities(post.tagged_entities)}
+            </div>
+          )}
+
+          {/* Location Tags */}
+          {post.tags && post.tags.length > 0 && (
+            <div className="mb-2">
+              {renderLocationTags(post.tags)}
+            </div>
+          )}
+
+          {/* Post Title */}
+          {post.title && (
+            <h3 className="font-semibold text-base mb-1">{post.title}</h3>
+          )}
+
+          {/* Post Content - Hard truncated */}
+          <div className="text-sm">
+            <div className="min-w-0 line-clamp-3">
               {post.content ? (
                 <HashtagRenderer content={post.content} />
               ) : (
                 <RichTextDisplay content={post.content} />
               )}
             </div>
-            {(!isExpanded && post.content && post.content.length > CONTENT_LIMIT) && (
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background to-transparent h-8" />
-            )}
           </div>
-          
-          {post.content && post.content.length > CONTENT_LIMIT && (
-            <Button
-              variant="link"
-              size="sm"
-              className="p-0 h-auto font-normal text-muted-foreground"
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
-              {isExpanded ? "Show less" : "Show more"}
-              <ChevronDown className={cn("h-4 w-4 ml-1 transition-transform", isExpanded && "rotate-180")} />
-            </Button>
+
+          {/* Media Content */}
+          {post.media && post.media.length > 0 && (
+            <div onClick={e => e.stopPropagation()}>
+              <PostMediaDisplay 
+                media={post.media} 
+                className="mt-3"
+                maxHeight="h-80"
+                aspectRatio="maintain"
+                objectFit="contain"
+              />
+            </div>
           )}
         </div>
 
-        {/* Media Content */}
-        {post.media && post.media.length > 0 && (
-          <PostMediaDisplay 
-            media={post.media} 
-            className="mt-3 mb-4"
-            maxHeight="h-80"
-            aspectRatio="maintain"
-            objectFit="contain"
-          />
-        )}
-        
-        {/* Tag Groups - Updated layout with improved styling */}
-        <div className="space-y-3 mt-4">
-          {/* Render location tags */}
-          {post.tags && renderLocationTags(post.tags)}
-          
-          {/* Render entity tags */}
-          {post.tagged_entities && renderTaggedEntities(post.tagged_entities)}
-        </div>
-
-        {/* Social Actions */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t">
+        {/* Social Actions - Isolated from click area */}
+        <div className="flex items-center justify-between mt-4 pt-4 border-t" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 sm:gap-6">
             <Button 
               variant="ghost" 
@@ -494,17 +496,6 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           </Button>
         </div>
       </CardContent>
-      
-      {/* Comments Dialog */}
-      {isCommentDialogOpen && (
-        <CommentDialog
-          isOpen={isCommentDialogOpen}
-          onClose={() => setIsCommentDialogOpen(false)}
-          itemId={post.id}
-          itemType="post"
-          highlightCommentId={highlightCommentId}
-        />
-      )}
       
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
