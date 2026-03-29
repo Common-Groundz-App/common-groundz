@@ -50,6 +50,7 @@ interface PostFeedItemProps {
   refreshFeed?: () => void;
   highlightCommentId?: string | null;
   isPreview?: boolean;
+  isDetailView?: boolean;
 }
 
 export const PostFeedItem: React.FC<PostFeedItemProps> = ({ 
