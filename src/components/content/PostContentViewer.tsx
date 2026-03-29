@@ -10,14 +10,15 @@ import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { fetchEntityPosts } from '@/services/entityPostsService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, ArrowLeft } from 'lucide-react';
 import type { PostFeedItem as PostFeedItemType } from '@/hooks/feed/api/posts/types';
 
 interface PostContentViewerProps {
   postId: string;
   highlightCommentId: string | null;
   isInModal?: boolean;
-  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string } | null) => void;
+  isDetailView?: boolean;
+  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string; authorId?: string; taggedEntities?: any[] } | null) => void;
 }
 
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPostLoaded }: PostContentViewerProps) => {
