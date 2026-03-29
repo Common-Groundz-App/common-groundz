@@ -346,8 +346,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     >
       <CardContent className="p-6">
         {/* User Info and Post Meta */}
-        <div className="flex justify-between items-start" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center gap-3">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
             <Avatar className="h-10 w-10 border">
               <AvatarImage src={post.avatar_url || undefined} alt={post.displayName || post.username || 'User'} />
               <AvatarFallback className="bg-brand-orange text-white">{getInitialsFromName(post.displayName || post.username)}</AvatarFallback>
@@ -375,25 +375,27 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           </div>
 
           {isOwner && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
-                  <MoreVertical className="h-4 w-4" />
-                  <span className="sr-only">More options</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
-                  <Pencil className="h-4 w-4" /> Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={handleDeleteClick} 
-                  className="text-destructive focus:text-destructive flex items-center gap-2"
-                >
-                  <Trash2 className="h-4 w-4" /> Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div onClick={e => e.stopPropagation()} onPointerDown={e => e.stopPropagation()}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full h-8 w-8">
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="sr-only">More options</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={handleDeleteClick} 
+                    className="text-destructive focus:text-destructive flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )}
         </div>
         
