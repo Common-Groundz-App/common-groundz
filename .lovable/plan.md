@@ -1,20 +1,14 @@
 
 
-# Reduce Follow Button Size in Sidebar
+# Fix Header Alignment in Post Detail Sidebar
 
-## Problem
-The `EntityFollowButton` ignores the `size="sm"` prop passed from the sidebar — it hardcodes `size={isMobile ? "sm" : "default"}` and uses fixed `16px` icons. The button appears too large in the sidebar context.
+## Changes — `src/components/content/PostDetailSidebar.tsx`
 
-## Changes
+1. **Align name and button vertically** — change header row from `items-start` to `items-center`
+2. **Tighten name-to-venue spacing** — change venue row margin from `mt-1.5` to `mt-1`
+3. **Add `leading-tight`** to the entity name button for tighter title line-height
 
-### `src/components/entity/EntityFollowButton.tsx`
-- Use the `size` prop instead of hardcoding: `size={isMobile ? "sm" : size}` 
-- When `size="sm"`, reduce icon size from `16` to `14` and reduce `mr-1` to `mr-0.5`
-- Add `text-xs` class when `size="sm"` for smaller button text
-
-### `src/components/content/PostDetailSidebar.tsx`
-- No changes needed — already passes `size="sm"`
-
-## Result
-The follow button in the sidebar will render noticeably smaller with compact text and icons, while the full-size button on entity pages remains unchanged.
+| File | Change |
+|------|--------|
+| `src/components/content/PostDetailSidebar.tsx` | 3 class changes as described above |
 
