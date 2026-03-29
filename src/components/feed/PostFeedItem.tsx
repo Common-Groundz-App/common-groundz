@@ -34,6 +34,7 @@ import TagBadge from './TagBadge';
 import { feedbackActions } from '@/services/feedbackService';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
 import { EntityCategoryBadge } from '@/components/entity/EntityCategoryBadge';
+import { shouldHideCategory } from '@/services/categoryService';
 
 const resetBodyPointerEvents = () => {
   if (document.body.style.pointerEvents === 'none') {
@@ -256,7 +257,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               entityType={entity.type as any}
               onClick={() => handleEntityClick(entity)}
             />
-            {entity.category_id && (
+            {entity.category_id && !shouldHideCategory(entity.category_id) && (
               <EntityCategoryBadge 
                 categoryId={entity.category_id} 
                 showFullPath={false}
