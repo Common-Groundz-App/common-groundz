@@ -337,7 +337,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card 
+      className="overflow-hidden cursor-pointer hover:bg-muted/30 transition-colors"
+      onClick={handleContentAreaClick}
+      onKeyDown={handleContentAreaKeyDown}
+      role="link"
+      tabIndex={0}
+    >
       <CardContent className="p-6">
         {/* User Info and Post Meta */}
         <div className="flex justify-between items-start" onClick={e => e.stopPropagation()}>
@@ -391,28 +397,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           )}
         </div>
         
-        {/* Clickable Content Area */}
-        <div 
-          className="mt-4 cursor-pointer rounded-md hover:bg-muted/30 transition-colors -mx-1 px-1"
-          onClick={handleContentAreaClick}
-          onKeyDown={handleContentAreaKeyDown}
-          role="link"
-          tabIndex={0}
-        >
-          {/* Entity Tags - Always visible above content */}
-          {post.tagged_entities && post.tagged_entities.length > 0 && (
-            <div className="mb-2">
-              {renderTaggedEntities(post.tagged_entities)}
-            </div>
-          )}
-
-          {/* Location Tags */}
-          {post.tags && post.tags.length > 0 && (
-            <div className="mb-2">
-              {renderLocationTags(post.tags)}
-            </div>
-          )}
-
+        {/* Content Area */}
+        <div className="mt-4">
           {/* Post Title */}
           {post.title && (
             <h3 className="font-semibold text-base mb-1">{post.title}</h3>
@@ -439,6 +425,20 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                 aspectRatio="maintain"
                 objectFit="contain"
               />
+            </div>
+          )}
+
+          {/* Entity Tags - Below content */}
+          {post.tagged_entities && post.tagged_entities.length > 0 && (
+            <div className="mt-3" onClick={e => e.stopPropagation()}>
+              {renderTaggedEntities(post.tagged_entities)}
+            </div>
+          )}
+
+          {/* Location Tags */}
+          {post.tags && post.tags.length > 0 && (
+            <div className="mt-2" onClick={e => e.stopPropagation()}>
+              {renderLocationTags(post.tags)}
             </div>
           )}
         </div>
