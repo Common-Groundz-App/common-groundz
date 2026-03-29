@@ -50,6 +50,7 @@ interface PostFeedItemProps {
   refreshFeed?: () => void;
   highlightCommentId?: string | null;
   isPreview?: boolean;
+  isDetailView?: boolean;
 }
 
 export const PostFeedItem: React.FC<PostFeedItemProps> = ({ 
@@ -60,7 +61,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   onDelete,
   refreshFeed,
   highlightCommentId = null,
-  isPreview = false
+  isPreview = false,
+  isDetailView = false
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -338,11 +340,15 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
 
   return (
     <Card 
-      className="overflow-hidden cursor-pointer hover:bg-muted/30 transition-colors"
-      onClick={handleContentAreaClick}
-      onKeyDown={handleContentAreaKeyDown}
-      role="link"
-      tabIndex={0}
+      className={cn(
+        "overflow-hidden transition-colors",
+        !isDetailView && "cursor-pointer hover:bg-muted/30 shadow-sm",
+        isDetailView && "shadow-none"
+      )}
+      onClick={!isDetailView ? handleContentAreaClick : undefined}
+      onKeyDown={!isDetailView ? handleContentAreaKeyDown : undefined}
+      role={!isDetailView ? "link" : undefined}
+      tabIndex={!isDetailView ? 0 : undefined}
     >
       <CardContent className="p-6">
         {/* User Info and Post Meta */}
@@ -406,9 +412,9 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             <h3 className="font-semibold text-base mb-1">{post.title}</h3>
           )}
 
-          {/* Post Content - Hard truncated */}
+          {/* Post Content */}
           <div className="text-sm">
-            <div className="min-w-0 line-clamp-3">
+            <div className={cn("min-w-0", !isDetailView && "line-clamp-3")}>
               {post.content ? (
                 <HashtagRenderer content={post.content} />
               ) : (

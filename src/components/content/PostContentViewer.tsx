@@ -10,17 +10,18 @@ import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { fetchEntityPosts } from '@/services/entityPostsService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, ArrowLeft } from 'lucide-react';
 import type { PostFeedItem as PostFeedItemType } from '@/hooks/feed/api/posts/types';
 
 interface PostContentViewerProps {
   postId: string;
   highlightCommentId: string | null;
   isInModal?: boolean;
-  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string } | null) => void;
+  isDetailView?: boolean;
+  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string; authorId?: string; taggedEntities?: any[] } | null) => void;
 }
 
-const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPostLoaded }: PostContentViewerProps) => {
+const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDetailView = false, onPostLoaded }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
   const navigate = useNavigate();
@@ -121,6 +122,8 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
           content: data.content || '',
           visibility: data.visibility || 'private',
           imageUrl: data.media?.[0]?.url || undefined,
+          authorId: data.user_id || undefined,
+          taggedEntities: taggedEntities,
         });
       } catch (err) {
         console.error('Error fetching post:', err);
@@ -245,23 +248,47 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
     );
   }
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/home');
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 overflow-y-auto max-h-full">
+      {/* Back button */}
+      {isDetailView && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
+          onClick={handleBack}
+        >
+          <ArrowLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+      )}
+
       <PostFeedItem 
         post={post} 
         onLike={handlePostLike} 
         onSave={handlePostSave}
         onDelete={handleDelete}
         highlightCommentId={highlightCommentId}
+        isDetailView={isDetailView}
       />
 
-      {/* Inline Comments - Always visible */}
-      <InlineCommentThread
-        itemId={postId}
-        itemType="post"
-        highlightCommentId={highlightCommentId}
-        autoFocusInput={autoFocusComment}
-      />
+      {/* Inline Comments */}
+      <div className="mt-6 pt-6 border-t">
+        <InlineCommentThread
+          itemId={postId}
+          itemType="post"
+          highlightCommentId={highlightCommentId}
+          autoFocusInput={autoFocusComment}
+        />
+      </div>
 
       {/* More Experiences About [Entity] */}
       {post.tagged_entities?.[0] && (
