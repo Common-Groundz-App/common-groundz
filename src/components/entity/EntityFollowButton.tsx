@@ -27,6 +27,10 @@ export const EntityFollowButton: React.FC<EntityFollowButtonProps> = ({
   const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
 
+  const iconSize = size === 'sm' ? 14 : 16;
+  const iconMargin = size === 'sm' ? 'mr-0.5' : 'mr-1';
+  const textClass = size === 'sm' ? 'text-xs' : '';
+
   const handleFollow = async () => {
     if (!canFollow) {
       trackGuestEvent('guest_attempted_follow', { entityId });
