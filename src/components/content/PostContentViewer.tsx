@@ -3,11 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import PostFeedItem from '@/components/feed/PostFeedItem';
 import FeedSkeleton from '@/components/feed/FeedSkeleton';
-import CommentsPreview from '@/components/comments/CommentsPreview';
-import CommentDialog from '@/components/comments/CommentDialog';
-import { useSearchParams } from 'react-router-dom';
+import InlineCommentThread from '@/components/comments/InlineCommentThread';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
+import { fetchEntityPosts } from '@/services/entityPostsService';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { MessageCircle } from 'lucide-react';
+import type { PostFeedItem as PostFeedItemType } from '@/hooks/feed/api/posts/types';
 
 interface PostContentViewerProps {
   postId: string;
@@ -19,20 +23,20 @@ interface PostContentViewerProps {
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPostLoaded }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
+  const navigate = useNavigate();
   const [post, setPost] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [showComments, setShowComments] = React.useState(false);
   const [searchParams] = useSearchParams();
   
-  // Use the profile cache for the post author
-  const { data: authorProfile } = useProfile(post?.user_id);
+  const autoFocusComment = searchParams.has('focus') && searchParams.get('focus') === 'comment';
   
-  React.useEffect(() => {
-    if (highlightCommentId || searchParams.has('commentId')) {
-      setShowComments(true);
-    }
-  }, [highlightCommentId, searchParams]);
+  // Related posts state
+  const [relatedPosts, setRelatedPosts] = React.useState<PostFeedItemType[]>([]);
+  const [relatedLoading, setRelatedLoading] = React.useState(false);
+  const [relatedEntityName, setRelatedEntityName] = React.useState<string>('');
+  
+  const { data: authorProfile } = useProfile(post?.user_id);
   
   React.useEffect(() => {
     const fetchPost = async () => {
@@ -42,18 +46,8 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
         const { data, error } = await supabase
           .from('posts')
           .select(`
-            id,
-            title,
-            content,
-            post_type,
-            visibility,
-            user_id,
-            created_at,
-            updated_at,
-            media,
-            view_count,
-            status,
-            is_deleted
+            id, title, content, post_type, visibility, user_id,
+            created_at, updated_at, media, view_count, status, is_deleted
           `)
           .eq('id', postId)
           .eq('is_deleted', false)
@@ -81,7 +75,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
             .eq('post_id', postId)
             .eq('user_id', user.id)
             .single();
-            
           isLiked = !!likeData;
           
           const { data: saveData } = await supabase
@@ -90,7 +83,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
             .eq('post_id', postId)
             .eq('user_id', user.id)
             .single();
-            
           isSaved = !!saveData;
         }
         
@@ -100,7 +92,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
           .eq('post_id', postId)
           .eq('is_deleted', false);
         
-        let taggedEntities = [];
+        let taggedEntities: any[] = [];
         try {
           const { data: entityData } = await supabase
             .from('post_entities')
@@ -131,7 +123,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
           imageUrl: data.media?.[0]?.url || undefined,
         });
       } catch (err) {
-        // Background fetch — fail silently (no destructive toast)
         console.error('Error fetching post:', err);
         setError('Error loading post');
         onPostLoaded?.(null);
@@ -148,13 +139,39 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
   // Update post with profile data when available
   React.useEffect(() => {
     if (post && authorProfile) {
-      setPost(prevPost => ({
+      setPost((prevPost: any) => ({
         ...prevPost,
         username: authorProfile.displayName || authorProfile.username,
         avatar_url: authorProfile.avatar_url
       }));
     }
-  }, [post, authorProfile]);
+  }, [authorProfile]);
+
+  // Fetch related posts for first tagged entity
+  React.useEffect(() => {
+    const fetchRelated = async () => {
+      if (!post?.tagged_entities?.[0]?.id) return;
+      
+      const entity = post.tagged_entities[0];
+      setRelatedEntityName(entity.name);
+      setRelatedLoading(true);
+      
+      try {
+        const posts = await fetchEntityPosts(entity.id, user?.id || null, 0, 6);
+        // Filter out current post
+        const filtered = posts.filter((p: any) => p.id !== postId);
+        setRelatedPosts(filtered.slice(0, 5));
+      } catch (err) {
+        console.error('Error fetching related posts:', err);
+      } finally {
+        setRelatedLoading(false);
+      }
+    };
+    
+    if (post && !loading) {
+      fetchRelated();
+    }
+  }, [post?.tagged_entities, loading]);
 
   const handlePostLike = async () => {
     if (!requireAuth({ action: 'like', surface: 'post_detail', postId: post?.id })) return;
@@ -167,22 +184,12 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
           .delete()
           .eq('post_id', post.id)
           .eq('user_id', user.id);
-        
-        setPost({
-          ...post,
-          is_liked: false,
-          likes: post.likes - 1
-        });
+        setPost({ ...post, is_liked: false, likes: post.likes - 1 });
       } else {
         await supabase
           .from('post_likes')
           .insert({ post_id: post.id, user_id: user.id });
-        
-        setPost({
-          ...post,
-          is_liked: true,
-          likes: post.likes + 1
-        });
+        setPost({ ...post, is_liked: true, likes: post.likes + 1 });
       }
     } catch (err) {
       console.error('Error toggling like:', err);
@@ -200,20 +207,12 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
           .delete()
           .eq('post_id', post.id)
           .eq('user_id', user.id);
-        
-        setPost({
-          ...post,
-          is_saved: false
-        });
+        setPost({ ...post, is_saved: false });
       } else {
         await supabase
           .from('post_saves')
           .insert({ post_id: post.id, user_id: user.id });
-        
-        setPost({
-          ...post,
-          is_saved: true
-        });
+        setPost({ ...post, is_saved: true });
       }
     } catch (err) {
       console.error('Error toggling save:', err);
@@ -225,10 +224,6 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
       setError('This post has been deleted');
       setPost(null);
     }
-  };
-
-  const handleCommentsClick = () => {
-    setShowComments(true);
   };
 
   if (loading) {
@@ -260,19 +255,83 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, onPo
         highlightCommentId={highlightCommentId}
       />
 
-      <CommentsPreview
-        commentCount={post.comment_count}
-        onClick={handleCommentsClick}
+      {/* Inline Comments - Always visible */}
+      <InlineCommentThread
+        itemId={postId}
+        itemType="post"
+        highlightCommentId={highlightCommentId}
+        autoFocusInput={autoFocusComment}
       />
 
-      {showComments && (
-        <CommentDialog
-          isOpen={showComments}
-          onClose={() => setShowComments(false)}
-          itemId={postId}
-          itemType="post"
-          highlightCommentId={highlightCommentId}
-        />
+      {/* More Experiences About [Entity] */}
+      {post.tagged_entities?.[0] && (
+        <div className="mt-8 pt-6 border-t">
+          <h3 className="font-semibold text-sm mb-4">
+            More experiences about {relatedEntityName}
+          </h3>
+          
+          {relatedLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="flex gap-3 items-start">
+                  <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3 w-32" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : relatedPosts.length === 0 ? (
+            <div className="text-center py-6">
+              <MessageCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-30" />
+              <p className="text-sm text-muted-foreground mb-3">
+                No more experiences yet. Be the first to share yours about {relatedEntityName}.
+              </p>
+              {user && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/')}
+                >
+                  Share your experience
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {relatedPosts.map((relatedPost) => (
+                <div
+                  key={relatedPost.id}
+                  className="cursor-pointer rounded-lg border p-4 hover:bg-muted/30 transition-colors"
+                  onClick={() => navigate(`/post/${relatedPost.id}`)}
+                  role="link"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(`/post/${relatedPost.id}`);
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-medium">{relatedPost.displayName || relatedPost.username}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(relatedPost.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  {relatedPost.title && (
+                    <p className="text-sm font-medium mb-1">{relatedPost.title}</p>
+                  )}
+                  <p className="text-sm text-muted-foreground line-clamp-2">
+                    {relatedPost.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
