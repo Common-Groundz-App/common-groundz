@@ -337,7 +337,13 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card 
+      className="overflow-hidden cursor-pointer hover:bg-muted/30 transition-colors"
+      onClick={handleContentAreaClick}
+      onKeyDown={handleContentAreaKeyDown}
+      role="link"
+      tabIndex={0}
+    >
       <CardContent className="p-6">
         {/* User Info and Post Meta */}
         <div className="flex justify-between items-start" onClick={e => e.stopPropagation()}>
