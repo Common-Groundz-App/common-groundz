@@ -1,37 +1,29 @@
 
-# Phase 1: Reddit-Style Discussion Shift — IMPLEMENTED
 
-## What was done
+# Refinements to PostFeedItem
 
-### Step 1: PostFeedItem — Clickable preview cards ✅
-- Content area (title, text, media, tags) wrapped in clickable div → navigates to `/post/:id`
-- Action bar (like, save, share, comment) isolated with `stopPropagation`
-- Entity tags moved above content (always visible, never hidden by truncation)
-- Post title rendered as bold `<h3>` when present
-- "Show more/less" replaced with CSS `line-clamp-3` hard truncation
-- CommentDialog removed — comment button navigates to `/post/:id?focus=comment`
-- Keyboard accessible (`role="link"`, `tabIndex`, Enter/Space)
+Two changes to `src/components/feed/PostFeedItem.tsx`:
 
-### Step 2: InlineCommentThread — New component ✅
-- Extracted from CommentDialog into standalone `src/components/comments/InlineCommentThread.tsx`
-- Full CRUD: add, edit, delete comments inline
-- `autoFocusInput` prop: scrolls to and focuses comment input
-- `highlightCommentId` prop: scrolls to and highlights specific comment
-- Skeleton loading states, empty state
-- Enter to submit (Shift+Enter for newline)
+## 1. Make entire card clickable (Reddit-style)
 
-### Step 3: PostContentViewer — Inline comments + entity cross-links ✅
-- CommentDialog and CommentsPreview removed
-- InlineCommentThread rendered directly below the post (always visible)
-- `?focus=comment` URL param triggers autofocus on comment input
-- "More experiences about [Entity]" section after comments:
-  - Fetches related posts for first tagged entity
-  - Skeleton loading state
-  - Empty state with CTA: "Be the first to share yours about [Entity]"
-  - Clickable related post cards
+Currently only the content area div (lines 395-444) is the click target. Change to make the whole `Card` the click target:
 
-### Step 4: Composer microcopy ✅
-- Default placeholder: "Share your experience..."
-- Routine placeholder: "What's your routine? Share what works..."
-- Entity selector button shows "What's this about?" hint
-- Popover includes "What are you sharing about?" prompt
+- Move `onClick={handleContentAreaClick}` and `cursor-pointer` to the outer `<Card>` element (line 340)
+- Add keyboard accessibility (`role="link"`, `tabIndex={0}`, `onKeyDown`) to the Card
+- Remove the inner clickable div wrapper (lines 395-401, 444) — just render the content directly
+- Keep `e.stopPropagation()` on: author row (line 343), dropdown menu, action buttons row (line 447), media (line 434), entity tag clicks, location tag clicks
+- **Comment button** keeps its own navigate to `?focus=comment` (already isolated)
+- **Media** already has `e.stopPropagation()` (line 434) so lightbox opens instead of navigation
+- **Like, Save, Share buttons** already isolated — they perform their action, no navigation
+
+## 2. Move entity tags back below content (original position)
+
+Currently entity tags render above content (lines 402-407). Move them back to after the content and media, restoring the original look from `entity_tags.png`:
+
+- Move the entity tags block (lines 402-407) and location tags block (lines 409-414) to after the media section (after line 443)
+- This restores: content first, then media, then entity/location tags at the bottom (before the action bar)
+
+### Technical detail
+
+The Card gets: `className="overflow-hidden cursor-pointer hover:bg-muted/30 transition-colors"` with `onClick={handleContentAreaClick}` and keyboard handlers. The inner content div loses its click wrapper and just renders content naturally.
+
