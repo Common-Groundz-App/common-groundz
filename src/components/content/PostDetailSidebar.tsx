@@ -22,6 +22,7 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
+import { formatCount } from '@/lib/utils';
 
 interface TaggedEntity {
   id: string;
