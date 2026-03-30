@@ -312,13 +312,14 @@ const AuthorCard: React.FC<{ userId: string }> = ({ userId }) => {
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-5">
         <div className="flex items-center gap-3">
-          <ProfileAvatar userId={userId} size="md" />
+          <ProfileAvatar userId={userId} size="md" className="ring-2 ring-background shadow-sm" />
           <div className="min-w-0 flex-1">
             <UsernameLink
               userId={userId}
               username={profile.username}
               displayName={profile.displayName}
               showHandle={true}
+              className="[&>a:first-child]:text-lg [&>a:first-child]:font-bold"
             />
           </div>
         </div>
@@ -357,7 +358,7 @@ const AuthorCard: React.FC<{ userId: string }> = ({ userId }) => {
 
         {/* Follow button or View Profile */}
         {!isOwnProfile && user ? (
-          <div className="mt-3">
+          <div className="mt-4 [&>button]:w-full">
             <FollowButton
               isFollowing={isFollowing}
               isLoading={followLoading}
@@ -368,7 +369,7 @@ const AuthorCard: React.FC<{ userId: string }> = ({ userId }) => {
           <Button
             variant="outline"
             size="sm"
-            className="w-full mt-3 text-xs"
+            className="w-full mt-4 text-xs"
             onClick={() => navigate(profileUrl)}
           >
             View Profile
