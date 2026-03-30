@@ -1,34 +1,31 @@
 
 
-# Unified Follow Button Polish
+# Unify Entity Unfollow Hover to Match Profile
 
-## 3 changes across 2 files
+## The Problem
 
-### 1. Profile FollowButton (`src/components/profile/actions/FollowButton.tsx`)
+The entity follow button uses `variant="outline"` on the `<Button>`, which applies base styles (`border border-input bg-background`) from the button component. These base styles partially override the red hover classes, making it look washed out compared to the profile button's clean red.
 
-**Following idle** (line 26):
-- Before: `bg-muted text-foreground hover:bg-muted/80`
-- After: `bg-brand-orange/10 text-brand-orange hover:bg-brand-orange/15`
+## The Fix
 
-**Follow hover** (line 27):
-- Before: `bg-brand-orange text-white hover:bg-brand-orange/90`
-- After: `bg-brand-orange text-white hover:bg-brand-orange/90 hover:shadow-md`
+**File:** `src/components/entity/EntityFollowButton.tsx`
 
-### 2. EntityFollowButton (`src/components/entity/EntityFollowButton.tsx`)
+One change: when hovering in the "following" state (i.e., showing "Unfollow"), override the outline variant's base border color more explicitly and ensure the red is as strong as the profile button.
 
-**Following idle** (line 63):
-- Before: `border-brand-orange text-brand-orange hover:bg-brand-orange/5`
-- After: `border-brand-orange text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/15`
+Current entity unfollow hover:
+```
+border-red-500 text-red-500 bg-transparent hover:bg-red-50 dark:hover:bg-red-500/10
+```
 
-**Unfollow hover** (line 63):
-- Before: `border-red-500 text-red-500 hover:bg-red-50`
-- After: `border-red-500 text-red-500 bg-transparent hover:bg-red-50 dark:hover:bg-red-500/10`
+Updated entity unfollow hover — add `!border-red-500` (force override the outline variant's `border-input`) and add `hover:text-red-600` for stronger text on hover:
+```
+!border-red-500 text-red-500 bg-transparent hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10
+```
 
-### Result — unified system
+This ensures the border turns fully red (not the muted `border-input` gray from the outline variant) and the text intensifies on hover, matching the profile button's crisp red unfollow appearance.
 
-| State | Profile Button | Entity Button |
-|-------|---------------|---------------|
-| Follow | Solid orange + shadow on hover | Orange outline → fills on hover |
-| Following | Soft orange bg (`brand-orange/10`) | Orange outline + soft orange bg |
-| Unfollow hover | Red outline (identical) | Red outline (identical) |
+## What stays the same
+- Profile FollowButton — no changes
+- All other states (Follow, Following idle) — untouched
+- The intentional style differences between entity (outline) and profile (solid) remain
 
