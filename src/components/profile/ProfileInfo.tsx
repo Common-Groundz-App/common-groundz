@@ -56,12 +56,10 @@ const ProfileInfo = ({
             onClick={handleShowFollowing}
           >
             <Users size={16} className="mr-1.5 text-gray-500" />
-            <span>
-              <span className="font-medium">{followingCount}</span> Following
-            </span>
+            <span className="font-medium">{followingCount} following</span>
           </div>
           <div 
-            className="text-gray-600 cursor-pointer hover:text-gray-800 transition-colors"
+            className="font-medium text-gray-600 cursor-pointer hover:text-gray-800 transition-colors"
             onClick={handleShowFollowers}
           >
             {formatCount(followerCount, 'follower')}

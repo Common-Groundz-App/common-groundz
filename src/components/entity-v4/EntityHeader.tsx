@@ -526,7 +526,7 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                         >
                           {stats.recommendationCount > 0 && (
                             <>
-                              <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> Recommending
+                          <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> recommending
                               {user && stats.circleRecommendationCount > 0 && (
                                 <>
                                   {' '}<span className="text-muted-foreground">(</span><span className="text-brand-orange font-medium">{stats.circleRecommendationCount} from circle</span><span className="text-muted-foreground">)</span>
@@ -554,7 +554,7 @@ Only recent ratings are counted to keep things current and relevant.`}
                           onClick={onRecommendationModalOpen}
                           className="text-foreground hover:text-brand-orange hover:underline font-medium cursor-pointer transition-colors"
                         >
-                          <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> Recommending
+                          <span className="text-brand-orange">{stats.recommendationCount.toLocaleString()}</span> recommending
                         </button>
                         <Link
                           to={`/auth?tab=signup&returnTo=${encodeURIComponent(location.pathname + location.search + location.hash)}`}

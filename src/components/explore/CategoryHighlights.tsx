@@ -14,6 +14,7 @@ import { PersonalizedEntity } from '@/services/enhancedExploreService';
 import { EntityTypeString } from '@/hooks/feed/api/types';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { formatCount } from '@/lib/utils';
 
 interface CategoryHighlightsProps {
   entityType?: EntityTypeString;
@@ -141,7 +142,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                               {entity.averageRating.toFixed(1)}
                             </span>
                             <span className="text-xs text-muted-foreground ml-1">
-                              ({entity.reviewCount})
+                              ({formatCount(entity.reviewCount, 'review')})
                             </span>
                           </>
                         ) : (
@@ -202,7 +203,7 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                               {entity.averageRating.toFixed(1)}
                             </span>
                             <span className="text-xs text-muted-foreground ml-1">
-                              ({entity.reviewCount})
+                              ({formatCount(entity.reviewCount, 'review')})
                             </span>
                           </>
                         ) : (
@@ -296,27 +297,27 @@ export const CategoryHighlights: React.FC<CategoryHighlightsProps> = ({ entityTy
                           <span className="text-xs font-medium" style={{ color: getSentimentColor(entity.averageRating) }}>
                             {entity.averageRating.toFixed(1)}
                           </span>
-                          <span className="text-xs text-muted-foreground ml-1">
-                            ({entity.reviewCount})
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <RatingRingIcon 
-                            rating={0} 
-                            size={10} 
-                          />
-                          <span className="text-xs text-muted-foreground">No ratings yet</span>
-                        </>
-                      )}
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({formatCount(entity.reviewCount, 'review')})
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <RatingRingIcon 
+                              rating={0} 
+                              size={10} 
+                            />
+                            <span className="text-xs text-muted-foreground">No ratings yet</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
     </div>
   );
 };
