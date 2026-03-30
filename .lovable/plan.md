@@ -1,31 +1,63 @@
 
 
-# Unify Entity Unfollow Hover to Match Profile
+# Author Card Refinements — Match Entity Card Pattern
 
-## The Problem
+## Current State (from screenshot)
 
-The entity follow button uses `variant="outline"` on the `<Button>`, which applies base styles (`border border-input bg-background`) from the button component. These base styles partially override the red hover classes, making it look washed out compared to the profile button's clean red.
+The author card currently stacks vertically: avatar + name/handle on one row, then bio, stats, joined date, and a full-width "Following" button at the bottom. Meanwhile, the entity card places its name and follow button **side by side** in a compact header row.
 
-## The Fix
+## Proposed Changes
 
-**File:** `src/components/entity/EntityFollowButton.tsx`
+### 1. Move Follow Button inline with name (match entity card pattern)
 
-One change: when hovering in the "following" state (i.e., showing "Unfollow"), override the outline variant's base border color more explicitly and ensure the red is as strong as the profile button.
+Restructure the author card header from:
 
-Current entity unfollow hover:
+```text
+CURRENT:
+[Avatar] [Name + @handle]
+[bio]
+[stats]
+[joined]
+[────── Following ──────]  ← full-width, bottom
+
+PROPOSED:
+[Avatar] [Name + @handle]  [Following]  ← inline, right-aligned
+[bio]
+[stats]
+[joined]
 ```
-border-red-500 text-red-500 bg-transparent hover:bg-red-50 dark:hover:bg-red-500/10
-```
 
-Updated entity unfollow hover — add `!border-red-500` (force override the outline variant's `border-input`) and add `hover:text-red-600` for stronger text on hover:
-```
-!border-red-500 text-red-500 bg-transparent hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10
-```
+This mirrors the entity card's `flex items-center justify-between` layout and removes the detached bottom button.
 
-This ensures the border turns fully red (not the muted `border-input` gray from the outline variant) and the text intensifies on hover, matching the profile button's crisp red unfollow appearance.
+### 2. Use consistent `size="sm"` on FollowButton
 
-## What stays the same
-- Profile FollowButton — no changes
-- All other states (Follow, Following idle) — untouched
-- The intentional style differences between entity (outline) and profile (solid) remain
+The entity card passes `size="sm"` to its follow button. The author card currently uses the FollowButton's default size (which varies by mobile breakpoint). We'll force `size="sm"` in the sidebar context to match.
+
+### 3. Additional polish suggestions
+
+- **Remove full-width "View Profile" button for own profile** — replace with a subtle text link or remove entirely (the name already links to the profile)
+- **Tighten vertical spacing** — the current `mt-3` on the follow button area becomes unnecessary when it moves inline
+
+## Technical Details
+
+**File:** `src/components/content/PostDetailSidebar.tsx` (AuthorCard, lines 311-378)
+
+**Changes:**
+1. Wrap the avatar + name row in `flex items-center justify-between` and place the FollowButton (or "View Profile" link) in the same row, right-aligned with `flex-shrink-0`
+2. Pass a new `size` prop to FollowButton — add `size?: "sm" | "default"` to FollowButton's interface
+3. Remove the separate `<div className="mt-3">` block that currently holds the follow button at the bottom
+
+**File:** `src/components/profile/actions/FollowButton.tsx`
+
+**Changes:**
+1. Add optional `size` prop to interface (default: auto-detect via `useIsMobile`)
+2. When `size` is explicitly passed, use it instead of the mobile breakpoint logic
+
+## Summary
+
+| Change | File |
+|--------|------|
+| Move follow button inline with avatar+name row | `PostDetailSidebar.tsx` |
+| Add explicit `size` prop support | `FollowButton.tsx` |
+| Remove bottom follow button block | `PostDetailSidebar.tsx` |
 
