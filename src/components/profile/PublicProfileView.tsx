@@ -100,7 +100,7 @@ const PublicProfileView: React.FC<PublicProfileViewProps> = ({ profile, follower
 
           <div className="flex gap-4 text-sm">
             <span className="text-muted-foreground">
-              <strong className="text-foreground">{formatCount(followerCount, 'follower')}</strong>
+              <strong className="text-foreground">{followerCount}</strong> {followerCount === 1 ? 'follower' : 'followers'}
             </span>
             <span className="text-muted-foreground">
               <strong className="text-foreground">{followingCount}</strong> following
