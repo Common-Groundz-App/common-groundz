@@ -1,37 +1,34 @@
 
 
-# Restyle Profile FollowButton — Revised Plan
+# Unified Follow Button Polish
 
-## Strategy (ChatGPT-informed, with refinement)
+## 3 changes across 2 files
 
-Maintain **visual hierarchy** between Follow (primary action) and Following (passive state), rather than flattening everything to outline.
+### 1. Profile FollowButton (`src/components/profile/actions/FollowButton.tsx`)
 
-## Changes — `src/components/profile/actions/FollowButton.tsx`
+**Following idle** (line 26):
+- Before: `bg-muted text-foreground hover:bg-muted/80`
+- After: `bg-brand-orange/10 text-brand-orange hover:bg-brand-orange/15`
 
-### 1. Follow state (not following yet) — **keep solid orange**
-- Keep as-is: `bg-brand-orange text-white hover:bg-brand-orange/90`
-- This is a primary CTA, should feel strong
+**Follow hover** (line 27):
+- Before: `bg-brand-orange text-white hover:bg-brand-orange/90`
+- After: `bg-brand-orange text-white hover:bg-brand-orange/90 hover:shadow-md`
 
-### 2. Following state (idle) — **replace grey with soft neutral**
-- **Before:** `bg-gray-600 hover:bg-gray-700` (harsh grey block)
-- **After:** `bg-muted text-foreground hover:bg-muted/80`
-- Calm, theme-aware, works in both light and dark mode
+### 2. EntityFollowButton (`src/components/entity/EntityFollowButton.tsx`)
 
-### 3. Following state (hover → Unfollow) — **outlined red**
-- **Before:** `bg-red-600 hover:bg-red-700` (solid red)
-- **After:** `border border-red-500 text-red-500 bg-transparent hover:bg-red-50 dark:hover:bg-red-500/10`
-- Added `dark:` variant so the red hover background works in dark mode too
+**Following idle** (line 63):
+- Before: `border-brand-orange text-brand-orange hover:bg-brand-orange/5`
+- After: `border-brand-orange text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/15`
 
-### 4. Button variant
-- Change from default variant to `variant="outline"` only when in the "Following + hovering" state; otherwise keep default variant behavior
-- Actually simpler: keep no variant prop, control everything via className as currently done
+**Unfollow hover** (line 63):
+- Before: `border-red-500 text-red-500 hover:bg-red-50`
+- After: `border-red-500 text-red-500 bg-transparent hover:bg-red-50 dark:hover:bg-red-500/10`
 
-## Why this differs from EntityFollowButton
-- **EntityFollowButton** = exploration context → outline style is appropriate (secondary action)
-- **Profile FollowButton** = social context → solid Follow CTA + muted Following state preserves hierarchy
+### Result — unified system
 
-## File
-| File | Change |
-|------|--------|
-| `src/components/profile/actions/FollowButton.tsx` | Update className for Following and hover-to-Unfollow states |
+| State | Profile Button | Entity Button |
+|-------|---------------|---------------|
+| Follow | Solid orange + shadow on hover | Orange outline → fills on hover |
+| Following | Soft orange bg (`brand-orange/10`) | Orange outline + soft orange bg |
+| Unfollow hover | Red outline (identical) | Red outline (identical) |
 
