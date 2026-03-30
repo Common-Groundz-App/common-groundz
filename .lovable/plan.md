@@ -1,46 +1,37 @@
 
 
-# Refine Author Card — Identity-First Polish
+# Fix Singular/Plural Count Labels App-Wide
 
-## Changes (1 file only)
+The plan is solid and ready to ship. Adding the NaN guard as suggested by Codex is a good defensive measure.
 
-**File:** `src/components/content/PostDetailSidebar.tsx` — AuthorCard section (lines 311-378)
+## Step 1: Add `formatCount` to `src/lib/utils.ts`
 
-### 1. Name prominence (highest ROI)
-Pass a className to `UsernameLink` to override the default `text-sm font-semibold` with `text-lg font-bold` — making the display name the most visually dominant element in the card.
-
-```tsx
-<UsernameLink
-  userId={userId}
-  username={profile.username}
-  displayName={profile.displayName}
-  showHandle={true}
-  className="[&>a:first-child]:text-lg [&>a:first-child]:font-bold"
-/>
+```ts
+export function formatCount(count: number | null | undefined, singular: string, plural?: string): string {
+  const n = Number(count ?? 0);
+  const safeN = Number.isNaN(n) ? 0 : n;
+  const p = plural || `${singular}s`;
+  return safeN === 1 ? `1 ${singular}` : `${safeN} ${p}`;
+}
 ```
 
-### 2. Avatar presence
-Add ring and shadow to ProfileAvatar for a lifted, identity-anchor feel:
+## Step 2: Apply across 8 files
 
-```tsx
-<ProfileAvatar userId={userId} size="md" className="ring-2 ring-background shadow-sm" />
-```
+All inline stats use **lowercase**. All manual ternaries replaced.
 
-### 3. Follow button — full-width + spacing
-Change `mt-3` to `mt-4` and force the child button full-width using a wrapper class. This creates clear Info → Action separation:
+| File | Changes |
+|------|---------|
+| `PostDetailSidebar.tsx` | `formatCount(followerCount, 'follower')`, `formatCount(postCount, 'post')`, reviews, ratings |
+| `ProfileInfo.tsx` | `formatCount(followerCount, 'follower')` |
+| `PublicProfileView.tsx` | follower label |
+| `ProfileBadges.tsx` | follower label |
+| `EntityFollowersCount.tsx` | follower label |
+| `EntityV3Header.tsx` | review, rating counts |
+| `UserDirectoryList.tsx` | recommendation, follower counts |
+| `JourneyRecommendationCard.tsx` | user count |
 
-```tsx
-<div className="mt-4 [&>button]:w-full">
-  <FollowButton ... />
-</div>
-```
-
-### 4. View Profile button spacing
-Match the same `mt-4` spacing on the "View Profile" button (currently `mt-3`).
-
-## What stays untouched
-- Entity card — no changes
-- FollowButton component — no changes
-- UsernameLink component defaults — no changes
-- All other pages/components — no changes
+## Rules
+- **Inline stats**: lowercase via `formatCount` — "1 follower", "5 posts"
+- **"Following"**: unchanged (it's a label)
+- No layout or component API changes
 
