@@ -60,7 +60,7 @@ export const EntityFollowButton: React.FC<EntityFollowButtonProps> = ({
       variant="outline"
       className={`${textClass} ${
         isFollowing 
-          ? `${isHovering ? '? `${isHovering ? '!border-red-500 text-red-500 bg-transparent hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10' : 'border-brand-orange text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/15'} transition-colors duration-200`' : 'border-brand-orange text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/15'} transition-colors duration-200` 
+          ? `${isHovering ? '!border-red-500 text-red-500 bg-transparent hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10' : 'border-brand-orange text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/15'} transition-colors duration-200` 
           : "border-brand-orange text-brand-orange hover:bg-brand-orange hover:text-white transition-all transform hover:scale-105"
       }`}
       onClick={handleFollow}
