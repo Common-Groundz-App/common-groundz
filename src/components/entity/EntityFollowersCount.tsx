@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useEntityFollow } from '@/hooks/use-entity-follow';
 import { EntityFollowerModal } from './EntityFollowerModal';
+import { formatCount } from '@/lib/utils';
 
 interface EntityFollowersCountProps {
   entityId: string;
@@ -24,7 +25,7 @@ export const EntityFollowersCount: React.FC<EntityFollowersCountProps> = ({ enti
         className="text-foreground hover:text-brand-orange hover:underline font-medium cursor-pointer transition-colors disabled:cursor-default disabled:hover:text-muted-foreground disabled:hover:no-underline"
         disabled={followersCount === 0}
       >
-        Followers <span className="text-brand-orange">{followersCount}</span>
+        {formatCount(followersCount, 'follower')}
       </button>
 
       <EntityFollowerModal

@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { UserCheck, UserPlus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getInitialsFromName } from '@/utils/profileUtils';
+import { formatCount } from '@/lib/utils';
 
 type MutualPreview = {
   mutual_user_id: string;
@@ -312,7 +313,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
                   </p>
                 )}
                 <p className="text-sm text-muted-foreground truncate">
-                  {user.recommendation_count} recommendations
+                  {formatCount(user.recommendation_count, 'recommendation')}
                 </p>
               </div>
             </div>
@@ -356,7 +357,7 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
             
             <div className="flex justify-between items-center mt-3">
               <span className="text-sm text-muted-foreground">
-                {user.follower_count} follower{user.follower_count !== 1 ? 's' : ''}
+                {formatCount(user.follower_count, 'follower')}
               </span>
               
               <Button

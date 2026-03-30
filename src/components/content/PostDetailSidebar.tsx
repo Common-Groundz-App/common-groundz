@@ -22,6 +22,7 @@ import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { getSentimentColor, getSentimentLabel } from '@/utils/ratingColorUtils';
 import { useCircleRating } from '@/hooks/use-circle-rating';
 import { CircleContributorsPreview } from '@/components/recommendations/CircleContributorsPreview';
+import { formatCount } from '@/lib/utils';
 
 interface TaggedEntity {
   id: string;
@@ -140,7 +141,7 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
                 {getSentimentLabel(stats.averageRating, stats.reviewCount > 0)}
               </div>
               <div className="text-xs text-muted-foreground">
-                ({stats.reviewCount.toLocaleString()} {stats.reviewCount === 1 ? 'review' : 'reviews'})
+                ({formatCount(stats.reviewCount, 'review')})
               </div>
             </div>
           </div>
@@ -178,7 +179,7 @@ const EntityCard: React.FC<{ entity: TaggedEntity }> = ({ entity }) => {
                 {getSentimentLabel(circleRating, circleRatingCount > 0)}
               </div>
               <div className="text-xs text-muted-foreground">
-                Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
+                Based on {formatCount(circleRatingCount, 'rating')} from your circle
               </div>
               <CircleContributorsPreview
                 contributors={circleContributors}
@@ -335,15 +336,13 @@ const AuthorCard: React.FC<{ userId: string }> = ({ userId }) => {
           {followerCount !== undefined && (
             <div className="flex items-center gap-1">
               <Users className="h-3 w-3" />
-              <span className="font-medium text-foreground">{followerCount}</span>
-              <span>followers</span>
+              <span>{formatCount(followerCount, 'follower')}</span>
             </div>
           )}
           {postCount !== undefined && (
             <div className="flex items-center gap-1">
               <MessageSquare className="h-3 w-3" />
-              <span className="font-medium text-foreground">{postCount}</span>
-              <span>posts</span>
+              <span>{formatCount(postCount, 'post')}</span>
             </div>
           )}
         </div>

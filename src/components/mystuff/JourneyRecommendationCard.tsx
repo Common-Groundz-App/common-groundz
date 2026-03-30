@@ -9,6 +9,7 @@ import { savedInsightsService } from '@/services/savedInsightsService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
+import { formatCount } from '@/lib/utils';
 
 interface JourneyRecommendationCardProps {
   recommendation: JourneyRecommendation;
@@ -221,7 +222,7 @@ const JourneyRecommendationCard: React.FC<JourneyRecommendationCardProps> = ({
         {/* Footer */}
         <div className="mt-3 pt-3 border-t border-border/50 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
-            {consensusCount} {consensusCount === 1 ? 'user' : 'users'} made this journey
+            {formatCount(consensusCount, 'user')} made this journey
           </span>
         </div>
       </CardContent>
