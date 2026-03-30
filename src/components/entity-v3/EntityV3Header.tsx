@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Share, Bookmark, Globe, Navigation, CheckCircle, AlertTriangle, Users, ThumbsUp } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ClaimedBadgeTooltip } from '@/components/ui/claimed-badge-tooltip';
+import { formatCount } from '@/lib/utils';
 
 interface EntityV3HeaderProps {
   entity: Entity;
@@ -131,7 +132,7 @@ export const EntityV3Header: React.FC<EntityV3HeaderProps> = ({
                           {getSentimentLabel(stats.averageRating || 0, stats.reviewCount > 0)}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          ({stats.reviewCount.toLocaleString()} {stats.reviewCount === 1 ? 'review' : 'reviews'})
+                          ({formatCount(stats.reviewCount, 'review')})
                         </div>
                       </div>
                     </div>
@@ -167,7 +168,7 @@ export const EntityV3Header: React.FC<EntityV3HeaderProps> = ({
                             {getSentimentLabel(circleRating || 0, circleRatingCount > 0)}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            Based on {circleRatingCount} rating{circleRatingCount !== 1 ? 's' : ''} from your circle
+                            Based on {formatCount(circleRatingCount, 'rating')} from your circle
                           </div>
                         </div>
                       </div>

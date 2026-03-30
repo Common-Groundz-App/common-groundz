@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { MapPin, Calendar, Users } from 'lucide-react';
 import UserListModal from './modals/UserListModal';
 import MutualConnectionsProof from './MutualConnectionsProof';
+import { formatCount } from '@/lib/utils';
 
 interface ProfileInfoProps {
   location: string;
@@ -63,7 +64,7 @@ const ProfileInfo = ({
             className="text-gray-600 cursor-pointer hover:text-gray-800 transition-colors"
             onClick={handleShowFollowers}
           >
-            <span className="font-medium">{followerCount}</span> Followers
+            {formatCount(followerCount, 'follower')}
           </div>
         </div>
 

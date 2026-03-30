@@ -2,6 +2,7 @@
 import React from 'react';
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Users, Award } from 'lucide-react';
+import { formatCount } from '@/lib/utils';
 
 interface ProfileBadgesProps {
   isOwnProfile: boolean;
@@ -26,7 +27,7 @@ const ProfileBadges = ({
       
       {followerCount > 0 && (
         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 flex items-center">
-          <Users size={12} className="mr-1" /> {followerCount} {followerCount === 1 ? 'Follower' : 'Followers'}
+          <Users size={12} className="mr-1" /> {formatCount(followerCount, 'follower')}
         </Badge>
       )}
       

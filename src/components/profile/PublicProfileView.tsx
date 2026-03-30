@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { MapPin, CalendarDays, BadgeCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { trackGuestEvent } from '@/utils/guestConversionTracker';
+import { formatCount } from '@/lib/utils';
 
 interface PublicProfileViewProps {
   profile: {
@@ -98,9 +99,8 @@ const PublicProfileView: React.FC<PublicProfileViewProps> = ({ profile, follower
           </div>
 
           <div className="flex gap-4 text-sm">
-            <span>
-              <strong className="text-foreground">{followerCount}</strong>{' '}
-              <span className="text-muted-foreground">Followers</span>
+            <span className="text-muted-foreground">
+              {formatCount(followerCount, 'follower')}
             </span>
             <span>
               <strong className="text-foreground">{followingCount}</strong>{' '}
