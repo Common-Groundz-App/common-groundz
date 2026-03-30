@@ -311,16 +311,28 @@ const AuthorCard: React.FC<{ userId: string }> = ({ userId }) => {
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-5">
-        <div className="flex items-center gap-3">
-          <ProfileAvatar userId={userId} size="md" />
-          <div className="min-w-0 flex-1">
-            <UsernameLink
-              userId={userId}
-              username={profile.username}
-              displayName={profile.displayName}
-              showHandle={true}
-            />
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <ProfileAvatar userId={userId} size="md" />
+            <div className="min-w-0 flex-1">
+              <UsernameLink
+                userId={userId}
+                username={profile.username}
+                displayName={profile.displayName}
+                showHandle={true}
+              />
+            </div>
           </div>
+          {!isOwnProfile && user && (
+            <div className="flex-shrink-0">
+              <FollowButton
+                isFollowing={isFollowing}
+                isLoading={followLoading}
+                onFollowToggle={handleFollowToggle}
+                size="sm"
+              />
+            </div>
+          )}
         </div>
 
         {profile.bio && (
@@ -353,26 +365,6 @@ const AuthorCard: React.FC<{ userId: string }> = ({ userId }) => {
             <Calendar className="h-3 w-3" />
             <span>Joined {memberSince}</span>
           </div>
-        )}
-
-        {/* Follow button or View Profile */}
-        {!isOwnProfile && user ? (
-          <div className="mt-3">
-            <FollowButton
-              isFollowing={isFollowing}
-              isLoading={followLoading}
-              onFollowToggle={handleFollowToggle}
-            />
-          </div>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full mt-3 text-xs"
-            onClick={() => navigate(profileUrl)}
-          >
-            View Profile
-          </Button>
         )}
       </CardContent>
     </Card>
