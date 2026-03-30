@@ -1,31 +1,46 @@
 
 
-# Unify Entity Unfollow Hover to Match Profile
+# Refine Author Card — Identity-First Polish
 
-## The Problem
+## Changes (1 file only)
 
-The entity follow button uses `variant="outline"` on the `<Button>`, which applies base styles (`border border-input bg-background`) from the button component. These base styles partially override the red hover classes, making it look washed out compared to the profile button's clean red.
+**File:** `src/components/content/PostDetailSidebar.tsx` — AuthorCard section (lines 311-378)
 
-## The Fix
+### 1. Name prominence (highest ROI)
+Pass a className to `UsernameLink` to override the default `text-sm font-semibold` with `text-lg font-bold` — making the display name the most visually dominant element in the card.
 
-**File:** `src/components/entity/EntityFollowButton.tsx`
-
-One change: when hovering in the "following" state (i.e., showing "Unfollow"), override the outline variant's base border color more explicitly and ensure the red is as strong as the profile button.
-
-Current entity unfollow hover:
-```
-border-red-500 text-red-500 bg-transparent hover:bg-red-50 dark:hover:bg-red-500/10
-```
-
-Updated entity unfollow hover — add `!border-red-500` (force override the outline variant's `border-input`) and add `hover:text-red-600` for stronger text on hover:
-```
-!border-red-500 text-red-500 bg-transparent hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10
+```tsx
+<UsernameLink
+  userId={userId}
+  username={profile.username}
+  displayName={profile.displayName}
+  showHandle={true}
+  className="[&>a:first-child]:text-lg [&>a:first-child]:font-bold"
+/>
 ```
 
-This ensures the border turns fully red (not the muted `border-input` gray from the outline variant) and the text intensifies on hover, matching the profile button's crisp red unfollow appearance.
+### 2. Avatar presence
+Add ring and shadow to ProfileAvatar for a lifted, identity-anchor feel:
 
-## What stays the same
-- Profile FollowButton — no changes
-- All other states (Follow, Following idle) — untouched
-- The intentional style differences between entity (outline) and profile (solid) remain
+```tsx
+<ProfileAvatar userId={userId} size="md" className="ring-2 ring-background shadow-sm" />
+```
+
+### 3. Follow button — full-width + spacing
+Change `mt-3` to `mt-4` and force the child button full-width using a wrapper class. This creates clear Info → Action separation:
+
+```tsx
+<div className="mt-4 [&>button]:w-full">
+  <FollowButton ... />
+</div>
+```
+
+### 4. View Profile button spacing
+Match the same `mt-4` spacing on the "View Profile" button (currently `mt-3`).
+
+## What stays untouched
+- Entity card — no changes
+- FollowButton component — no changes
+- UsernameLink component defaults — no changes
+- All other pages/components — no changes
 
