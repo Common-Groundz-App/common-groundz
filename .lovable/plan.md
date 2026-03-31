@@ -1,47 +1,32 @@
 
 
-# Fix Bold/Weight Issues on Profile Stats
+# Phase 1: Threaded Comments with Likes — IMPLEMENTED
 
-## 2 files, 2 fixes
+## What was built
 
-### 1. PublicProfileView.tsx — only number bold, not label
-**Lines 101-108:** Replace current code so only the count is wrapped in `<strong>`, label stays normal weight:
+### Database
+1. `parent_id` column on `post_comments` and `recommendation_comments` (ON DELETE SET NULL, indexed)
+2. `comment_likes` table with RLS (polymorphic: post/recommendation, email-verified INSERT)
+3. Updated RPCs:
+   - `add_comment` — accepts `p_parent_id`, enforces 1-level depth
+   - `get_comments_with_profiles` — returns `parent_id`, `like_count`, `reply_count`, `is_liked`, `is_from_circle`
+   - `toggle_comment_like` — atomic like/unlike with SECURITY DEFINER
+   - `delete_comment` — soft-deletes replies when parent deleted, adjusts comment_count
+   - `update_comment` — re-hardened with search_path
 
-```jsx
-<div className="flex gap-4 text-sm">
-  <span className="text-muted-foreground">
-    <strong className="text-foreground">{followerCount}</strong> {followerCount === 1 ? 'follower' : 'followers'}
-  </span>
-  <span className="text-muted-foreground">
-    <strong className="text-foreground">{followingCount}</strong> following
-  </span>
-</div>
-```
+### Frontend
+1. **`CommentItem.tsx`** — Extracted comment component with ❤️ heart reaction, Reply button, edit/delete dropdown
+2. **`InlineCommentThread.tsx`** — Full rework:
+   - Threaded grouping (top-level + replies)
+   - Sorting: conversations first → newest → id DESC tie-break
+   - Replies oldest-first within threads
+   - Auto-expand 1-2 replies, collapsible 3+
+   - Inline reply input with "Replying to @username"
+   - Optimistic like UI (revert on failure)
+   - Placeholder: "Share your experience, or ask someone who's tried this"
+   - Empty state: "No comments yet. Share your experience or ask something!"
+3. **`commentsService.ts`** — Extended `CommentData`, `toggleCommentLike`, `parentId` support
 
-Manual label derivation is acceptable here because styling requires splitting number from label. `formatCount` remains the default everywhere else.
-
-### 2. ProfileInfo.tsx — remove font-medium from stats
-Remove `font-medium` from both the "following" `<span>` and the "followers" `<div>` so their weight matches the rest of the profile card (location, joined date).
-
-```jsx
-<div className="flex items-center gap-3 text-sm">
-  <div 
-    className="flex items-center text-gray-600 cursor-pointer hover:text-gray-800 transition-colors"
-    onClick={handleShowFollowing}
-  >
-    <Users size={16} className="mr-1.5 text-gray-500" />
-    <span>{followingCount} following</span>
-  </div>
-  <div 
-    className="text-gray-600 cursor-pointer hover:text-gray-800 transition-colors"
-    onClick={handleShowFollowers}
-  >
-    {formatCount(followerCount, 'follower')}
-  </div>
-</div>
-```
-
-### Not touched
-- EntityHeader, CategoryHighlights — already fixed in previous implementation
-- No other files modified
-
+## Future Phases
+- **Phase 2**: "From your circle" badge, sort toggle, visual conversation prominence
+- **Phase 3**: @mentions with notifications, "Most helpful" comment highlight
