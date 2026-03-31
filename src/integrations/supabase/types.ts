@@ -334,6 +334,30 @@ export type Database = {
           },
         ]
       }
+      comment_likes: {
+        Row: {
+          comment_id: string
+          comment_type: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          comment_type: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          comment_type?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       content_flags: {
         Row: {
           content_id: string
@@ -1798,6 +1822,7 @@ export type Database = {
           edited_at: string | null
           id: string
           is_deleted: boolean
+          parent_id: string | null
           post_id: string
           updated_at: string
           user_id: string
@@ -1808,6 +1833,7 @@ export type Database = {
           edited_at?: string | null
           id?: string
           is_deleted?: boolean
+          parent_id?: string | null
           post_id: string
           updated_at?: string
           user_id: string
@@ -1818,11 +1844,19 @@ export type Database = {
           edited_at?: string | null
           id?: string
           is_deleted?: boolean
+          parent_id?: string | null
           post_id?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "post_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "post_comments_post_id_fkey"
             columns: ["post_id"]
@@ -2283,6 +2317,7 @@ export type Database = {
           edited_at: string | null
           id: string
           is_deleted: boolean
+          parent_id: string | null
           recommendation_id: string
           updated_at: string
           user_id: string
@@ -2293,6 +2328,7 @@ export type Database = {
           edited_at?: string | null
           id?: string
           is_deleted?: boolean
+          parent_id?: string | null
           recommendation_id: string
           updated_at?: string
           user_id: string
@@ -2303,11 +2339,19 @@ export type Database = {
           edited_at?: string | null
           id?: string
           is_deleted?: boolean
+          parent_id?: string | null
           recommendation_id?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "recommendation_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "recommendation_comments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "recommendation_comments_recommendation_id_fkey"
             columns: ["recommendation_id"]
@@ -3597,15 +3641,26 @@ export type Database = {
       }
     }
     Functions: {
-      add_comment: {
-        Args: {
-          p_content: string
-          p_item_id: string
-          p_item_type: string
-          p_user_id: string
-        }
-        Returns: boolean
-      }
+      add_comment:
+        | {
+            Args: {
+              p_content: string
+              p_item_id: string
+              p_item_type: string
+              p_user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_content: string
+              p_item_id: string
+              p_item_type: string
+              p_parent_id?: string
+              p_user_id: string
+            }
+            Returns: boolean
+          }
       calculate_enhanced_trending_score: {
         Args: { p_entity_id: string }
         Returns: number
@@ -3672,10 +3727,23 @@ export type Database = {
         Args: { bucket_id: string }
         Returns: boolean
       }
-      delete_comment: {
-        Args: { p_comment_id: string; p_item_type: string; p_user_id: string }
-        Returns: boolean
-      }
+      delete_comment:
+        | {
+            Args: {
+              p_comment_id: string
+              p_item_type: string
+              p_user_id: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_comment_id: string
+              p_item_type: string
+              p_user_id: string
+            }
+            Returns: boolean
+          }
       delete_post_like: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined
@@ -3867,19 +3935,48 @@ export type Database = {
           entity_id: string
         }[]
       }
-      get_comments_with_profiles: {
-        Args: { p_id_field: string; p_item_id: string; p_table_name: string }
-        Returns: {
-          avatar_url: string
-          content: string
-          created_at: string
-          first_name: string
-          id: string
-          last_name: string
-          user_id: string
-          username: string
-        }[]
-      }
+      get_comments_with_profiles:
+        | {
+            Args: {
+              p_id_field: string
+              p_item_id: string
+              p_table_name: string
+            }
+            Returns: {
+              avatar_url: string
+              content: string
+              created_at: string
+              first_name: string
+              id: string
+              last_name: string
+              user_id: string
+              username: string
+            }[]
+          }
+        | {
+            Args: {
+              p_current_user_id?: string
+              p_id_field: string
+              p_item_id: string
+              p_table_name: string
+            }
+            Returns: {
+              avatar_url: string
+              content: string
+              created_at: string
+              edited_at: string
+              first_name: string
+              id: string
+              is_from_circle: boolean
+              is_liked: boolean
+              last_name: string
+              like_count: number
+              parent_id: string
+              reply_count: number
+              user_id: string
+              username: string
+            }[]
+          }
       get_dynamic_rating: { Args: { p_entity_id: string }; Returns: number }
       get_embedding_stats: {
         Args: never
@@ -4344,6 +4441,14 @@ export type Database = {
           parent_name: string
           slug: string
         }[]
+      }
+      toggle_comment_like: {
+        Args: {
+          p_comment_id: string
+          p_comment_type: string
+          p_user_id: string
+        }
+        Returns: boolean
       }
       toggle_entity_save: {
         Args: { p_entity_id: string; p_user_id: string }
