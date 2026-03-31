@@ -66,10 +66,10 @@ BEGIN
       ELSE false END as is_from_circle
     FROM %I c
     LEFT JOIN profiles p ON c.user_id = p.id AND (p.deleted_at IS NULL OR p.id IS NULL)
-    WHERE c.%I = %L AND c.is_deleted = false
+    WHERE c.%I = $1 AND c.is_deleted = false
     ORDER BY c.created_at ASC
-  ', comment_type_val, p_table_name, p_current_user_id, comment_type_val, p_current_user_id, p_current_user_id, p_current_user_id, p_table_name, p_id_field, p_item_id);
+  ', comment_type_val, p_table_name, p_current_user_id, comment_type_val, p_current_user_id, p_current_user_id, p_current_user_id, p_table_name, p_id_field);
 
-  RETURN QUERY EXECUTE query;
+  RETURN QUERY EXECUTE query USING p_item_id;
 END;
 $$;
