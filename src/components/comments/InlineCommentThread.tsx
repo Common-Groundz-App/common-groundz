@@ -1,23 +1,22 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from '@/contexts/AuthContext';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
-import { formatDistanceToNow } from 'date-fns';
-import { fetchComments, addComment, deleteComment, updateComment, CommentData } from '@/services/commentsService';
+import { fetchComments, addComment, deleteComment, updateComment, toggleCommentLike, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, MessageCircle, ArrowUp, User } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { MessageCircle, ArrowUp, User } from 'lucide-react';
 import { fetchUserProfile } from '@/services/profileService';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import UsernameLink from '@/components/common/UsernameLink';
 import { feedbackActions } from '@/services/feedbackService';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { Skeleton } from '@/components/ui/skeleton';
+import CommentItem from './CommentItem';
 
 interface InlineCommentThreadProps {
   itemId: string;
@@ -25,6 +24,12 @@ interface InlineCommentThreadProps {
   highlightCommentId?: string | null;
   autoFocusInput?: boolean;
   onCommentCountChange?: (count: number) => void;
+}
+
+interface GroupedComment {
+  comment: CommentData;
+  replies: CommentData[];
+  isDeletedWithReplies: boolean;
 }
 
 const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
@@ -45,8 +50,14 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [userProfile, setUserProfile] = useState<{ avatar_url?: string; username?: string; first_name?: string; last_name?: string }>({});
 
+  // Reply state
+  const [replyingTo, setReplyingTo] = useState<CommentData | null>(null);
+  const [replyContent, setReplyContent] = useState('');
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+
   const commentToDeleteRef = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
   const commentSectionRef = useRef<HTMLDivElement>(null);
 
   const { user } = useAuth();
@@ -54,14 +65,69 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
 
-  const sortedComments = useMemo(() => {
-    if (!user || comments.length === 0) return comments;
-    const currentUserComments = comments.filter(c => c.user_id === user.id);
-    const otherComments = comments
-      .filter(c => c.user_id !== user.id)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    return [...currentUserComments, ...otherComments];
-  }, [comments, user]);
+  // Group comments into threads
+  const groupedComments = useMemo((): GroupedComment[] => {
+    if (comments.length === 0) return [];
+
+    const topLevel = comments.filter(c => !c.parent_id);
+    const replyMap = new Map<string, CommentData[]>();
+
+    comments.forEach(c => {
+      if (c.parent_id) {
+        const existing = replyMap.get(c.parent_id) || [];
+        existing.push(c);
+        replyMap.set(c.parent_id, existing);
+      }
+    });
+
+    // Sort replies oldest-first within each thread
+    replyMap.forEach((replies) => {
+      replies.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    });
+
+    const groups: GroupedComment[] = topLevel.map(comment => ({
+      comment,
+      replies: replyMap.get(comment.id) || [],
+      isDeletedWithReplies: false,
+    }));
+
+    // Sort: conversations first (has replies), then newest, tie-break by id DESC
+    groups.sort((a, b) => {
+      const aHasReplies = a.replies.length > 0 ? 1 : 0;
+      const bHasReplies = b.replies.length > 0 ? 1 : 0;
+      if (bHasReplies !== aHasReplies) return bHasReplies - aHasReplies;
+
+      const timeDiff = new Date(b.comment.created_at).getTime() - new Date(a.comment.created_at).getTime();
+      if (timeDiff !== 0) return timeDiff;
+
+      return b.comment.id.localeCompare(a.comment.id);
+    });
+
+    return groups;
+  }, [comments]);
+
+  // Auto-expand threads with highlighted comment or 1-2 replies
+  useEffect(() => {
+    const newExpanded = new Set<string>();
+
+    groupedComments.forEach(group => {
+      // Auto-expand if 1-2 replies
+      if (group.replies.length > 0 && group.replies.length <= 2) {
+        newExpanded.add(group.comment.id);
+      }
+      // Auto-expand if highlighted comment is a reply in this thread
+      if (highlightCommentId && group.replies.some(r => r.id === highlightCommentId)) {
+        newExpanded.add(group.comment.id);
+      }
+    });
+
+    setExpandedThreads(prev => {
+      const merged = new Set([...prev, ...newExpanded]);
+      return merged;
+    });
+  }, [groupedComments, highlightCommentId]);
+
+  const totalCommentCount = comments.length;
 
   useEffect(() => {
     const loadUserProfile = async () => {
@@ -110,7 +176,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     if (!itemId) return;
     setIsLoading(true);
     try {
-      const commentData = await fetchComments(itemId, itemType);
+      const commentData = await fetchComments(itemId, itemType, user?.id);
       setComments(commentData);
       onCommentCountChange?.(commentData.length);
     } catch (error) {
@@ -149,6 +215,89 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       setIsSending(false);
     }
   };
+
+  const handleReplySubmit = async (parentComment: CommentData) => {
+    if (!requireAuth({ action: 'comment', surface: 'inline_comment_thread' })) return;
+    if (!canPerformAction('canComment')) {
+      showVerificationRequired('canComment');
+      return;
+    }
+    if (!replyContent.trim()) return;
+
+    // Determine the actual parent (always top-level)
+    const parentId = parentComment.parent_id || parentComment.id;
+
+    setIsSending(true);
+    try {
+      const success = await addComment(itemId, itemType, replyContent, user.id, parentId);
+      if (!success) throw new Error("Failed to add reply");
+
+      setReplyContent('');
+      setReplyingTo(null);
+
+      // Auto-expand the thread
+      setExpandedThreads(prev => new Set([...prev, parentId]));
+      
+      loadComments();
+
+      const refreshEventName = `refresh-${itemType}-comment-count`;
+      window.dispatchEvent(new CustomEvent(refreshEventName, { detail: { itemId } }));
+
+      try { feedbackActions.comment(); } catch {}
+
+      toast({ title: "Reply added", description: "Your reply has been added successfully" });
+    } catch (error) {
+      console.error('Error adding reply:', error);
+      toast({ title: "Error adding reply", description: "Please try again later", variant: "destructive" });
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleReplyClick = useCallback((comment: CommentData) => {
+    if (!requireAuth({ action: 'comment', surface: 'inline_comment_thread' })) return;
+    
+    setReplyingTo(comment);
+    setReplyContent('');
+    
+    // Focus the reply textarea after render
+    setTimeout(() => replyTextareaRef.current?.focus(), 100);
+  }, [requireAuth]);
+
+  const handleLikeClick = useCallback(async (comment: CommentData) => {
+    if (!requireAuth({ action: 'like', surface: 'inline_comment_thread' })) return;
+    if (!canPerformAction('canLike')) {
+      showVerificationRequired('canLike');
+      return;
+    }
+
+    // Optimistic update
+    const wasLiked = comment.is_liked;
+    setComments(prev => prev.map(c => 
+      c.id === comment.id 
+        ? { ...c, is_liked: !wasLiked, like_count: (c.like_count || 0) + (wasLiked ? -1 : 1) }
+        : c
+    ));
+
+    try {
+      const result = await toggleCommentLike(comment.id, itemType === 'post' ? 'post' : 'recommendation', user.id);
+      if (result === null) {
+        // Revert on failure
+        setComments(prev => prev.map(c => 
+          c.id === comment.id 
+            ? { ...c, is_liked: wasLiked, like_count: (c.like_count || 0) + (wasLiked ? 1 : -1) }
+            : c
+        ));
+      }
+    } catch {
+      // Revert
+      setComments(prev => prev.map(c => 
+        c.id === comment.id 
+          ? { ...c, is_liked: wasLiked, like_count: (c.like_count || 0) + (wasLiked ? 1 : -1) }
+          : c
+      ));
+    }
+  }, [requireAuth, canPerformAction, showVerificationRequired, user, itemType]);
 
   const handleEditClick = (comment: CommentData) => {
     setEditingCommentId(comment.id);
@@ -198,8 +347,15 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       const success = await deleteComment(commentId, itemType, user.id);
       if (!success) throw new Error("Failed to delete comment");
 
-      setComments(prev => prev.filter(comment => comment.id !== commentId));
-      onCommentCountChange?.(comments.length - 1);
+      // Remove from local state (deleted comment + its replies if top-level)
+      const deletedComment = comments.find(c => c.id === commentId);
+      if (deletedComment && !deletedComment.parent_id) {
+        // Top-level: remove it and all its replies
+        setComments(prev => prev.filter(c => c.id !== commentId && c.parent_id !== commentId));
+      } else {
+        // Reply: just remove it
+        setComments(prev => prev.filter(c => c.id !== commentId));
+      }
 
       const refreshEventName = `refresh-${itemType}-comment-count`;
       window.dispatchEvent(new CustomEvent(refreshEventName, { detail: { itemId } }));
@@ -215,24 +371,31 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     }
   };
 
-  const formatRelativeTime = (dateString: string) => {
-    try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: false });
-    } catch { return ''; }
+  const toggleThread = (commentId: string) => {
+    setExpandedThreads(prev => {
+      const next = new Set(prev);
+      if (next.has(commentId)) {
+        next.delete(commentId);
+      } else {
+        next.add(commentId);
+      }
+      return next;
+    });
   };
 
-  const isCommentEdited = (comment: CommentData) => {
-    return comment.edited_at && comment.edited_at !== comment.created_at;
+  // Determine @username for reply-to-reply display
+  const getReplyToUsername = (reply: CommentData, parentComment: CommentData): string | undefined => {
+    // If replying to the top-level comment author, no need to show @username
+    // Only show when the reply's content implies replying to someone other than the parent
+    return undefined;
   };
-
-  const isCurrentUserComment = (userId: string) => user && user.id === userId;
 
   return (
     <div ref={commentSectionRef} className="mt-6">
       <div className="flex items-center gap-2 mb-4">
         <MessageCircle className="h-5 w-5 text-muted-foreground" />
         <h3 className="font-semibold text-sm">Comments</h3>
-        {!isLoading && <span className="text-xs text-muted-foreground">({comments.length})</span>}
+        {!isLoading && <span className="text-xs text-muted-foreground">({totalCommentCount})</span>}
       </div>
 
       {/* Comment List */}
@@ -251,96 +414,147 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       ) : comments.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
           <MessageCircle className="h-10 w-10 mb-2 opacity-30" />
-          <p className="text-sm">No comments yet. Be the first to comment!</p>
+          <p className="text-sm">No comments yet. Share your experience or ask something!</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {sortedComments.map((comment) => (
-            <div
-              key={comment.id}
-              id={`comment-${comment.id}`}
-              className={cn(
-                "relative group flex gap-3 p-3 rounded-lg transition-colors",
-                editingCommentId === comment.id && "bg-muted/50"
-              )}
-            >
-              <Avatar className="h-8 w-8 flex-shrink-0">
-                <AvatarImage src={comment.avatar_url || undefined} />
-                <AvatarFallback className="bg-brand-orange text-white">
-                  {getInitialsFromName(comment.displayName || comment.username)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <UsernameLink
-                        username={comment.username}
-                        userId={comment.user_id}
-                        displayName={comment.displayName}
-                        showHandle={false}
-                        className="text-sm"
+        <div className="space-y-1">
+          {groupedComments.map((group) => (
+            <div key={group.comment.id}>
+              {/* Top-level comment */}
+              <CommentItem
+                comment={group.comment}
+                currentUserId={user?.id}
+                editingCommentId={editingCommentId}
+                editCommentContent={editCommentContent}
+                isEditing={isEditing}
+                onEditClick={handleEditClick}
+                onEditCancel={handleEditCancel}
+                onEditSave={handleEditSave}
+                onEditContentChange={setEditCommentContent}
+                onDeleteClick={handleDeleteClick}
+                onReplyClick={handleReplyClick}
+                onLikeClick={handleLikeClick}
+                highlightCommentId={highlightCommentId}
+              />
+
+              {/* Replies */}
+              {group.replies.length > 0 && (
+                <div className="ml-6 bg-muted/20 rounded-lg p-2">
+                  {group.replies.length <= 2 ? (
+                    // Auto-expanded
+                    group.replies.map(reply => (
+                      <CommentItem
+                        key={reply.id}
+                        comment={reply}
+                        isReply
+                        currentUserId={user?.id}
+                        replyToUsername={getReplyToUsername(reply, group.comment)}
+                        editingCommentId={editingCommentId}
+                        editCommentContent={editCommentContent}
+                        isEditing={isEditing}
+                        onEditClick={handleEditClick}
+                        onEditCancel={handleEditCancel}
+                        onEditSave={handleEditSave}
+                        onEditContentChange={setEditCommentContent}
+                        onDeleteClick={handleDeleteClick}
+                        onReplyClick={handleReplyClick}
+                        onLikeClick={handleLikeClick}
+                        highlightCommentId={highlightCommentId}
                       />
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <span>{formatRelativeTime(comment.created_at)}</span>
-                        {isCommentEdited(comment) && (
-                          <>
-                            <span>·</span>
-                            <span className="italic">Edited</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {editingCommentId === comment.id ? (
-                      <div className="mt-1">
-                        <Textarea
-                          value={editCommentContent}
-                          onChange={(e) => setEditCommentContent(e.target.value)}
-                          className="min-h-[60px] text-sm resize-none bg-muted/30 border focus:border-primary focus:ring-0 focus-visible:ring-0"
-                          placeholder="Edit your comment..."
-                          disabled={isEditing}
-                        />
-                        <div className="flex justify-end gap-2 mt-2">
-                          <Button variant="ghost" size="sm" onClick={handleEditCancel} disabled={isEditing}>
-                            Cancel
-                          </Button>
-                          <Button variant="default" size="sm" onClick={handleEditSave} disabled={isEditing || !editCommentContent.trim()}>
-                            Save
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-sm break-words">{comment.content}</p>
-                    )}
-                  </div>
-
-                  {isCurrentUserComment(comment.user_id) && editingCommentId !== comment.id && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground opacity-50 sm:opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <MoreHorizontal size={14} />
-                          <span className="sr-only">More options</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem onClick={() => handleEditClick(comment)}>Edit</DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => handleDeleteClick(comment.id)}
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    ))
+                  ) : (
+                    // Collapsible for 3+
+                    <Collapsible
+                      open={expandedThreads.has(group.comment.id)}
+                      onOpenChange={() => toggleThread(group.comment.id)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <button className="text-xs text-primary hover:text-primary/80 font-medium py-1 px-3 transition-colors">
+                          {expandedThreads.has(group.comment.id)
+                            ? 'Hide replies'
+                            : `View ${group.replies.length} replies`
+                          }
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent>
+                        {group.replies.map(reply => (
+                          <CommentItem
+                            key={reply.id}
+                            comment={reply}
+                            isReply
+                            currentUserId={user?.id}
+                            replyToUsername={getReplyToUsername(reply, group.comment)}
+                            editingCommentId={editingCommentId}
+                            editCommentContent={editCommentContent}
+                            isEditing={isEditing}
+                            onEditClick={handleEditClick}
+                            onEditCancel={handleEditCancel}
+                            onEditSave={handleEditSave}
+                            onEditContentChange={setEditCommentContent}
+                            onDeleteClick={handleDeleteClick}
+                            onReplyClick={handleReplyClick}
+                            onLikeClick={handleLikeClick}
+                            highlightCommentId={highlightCommentId}
+                          />
+                        ))}
+                      </CollapsibleContent>
+                    </Collapsible>
                   )}
                 </div>
-              </div>
+              )}
+
+              {/* Inline reply input */}
+              {replyingTo && (replyingTo.id === group.comment.id || group.replies.some(r => r.id === replyingTo.id)) && (
+                <div className="ml-6 p-3">
+                  <div className="text-xs text-muted-foreground mb-2">
+                    Replying to <span className="font-medium text-foreground">@{replyingTo.username}</span>
+                  </div>
+                  <div className="flex gap-2 items-start">
+                    <Textarea
+                      ref={replyTextareaRef}
+                      placeholder="Write a reply..."
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      disabled={isSending}
+                      rows={1}
+                      className="min-h-[36px] max-h-[100px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-3 text-sm"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleReplySubmit(replyingTo);
+                        }
+                        if (e.key === 'Escape') {
+                          setReplyingTo(null);
+                          setReplyContent('');
+                        }
+                      }}
+                    />
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs h-8"
+                        onClick={() => { setReplyingTo(null); setReplyContent(''); }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="icon"
+                        className={cn(
+                          "rounded-full h-8 w-8 flex-shrink-0 transition-colors",
+                          replyContent.trim()
+                            ? "bg-foreground text-background hover:bg-foreground/90"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                        onClick={() => handleReplySubmit(replyingTo)}
+                        disabled={!replyContent.trim() || isSending}
+                      >
+                        <ArrowUp size={14} className={isSending ? "animate-pulse" : ""} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -365,7 +579,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
           </Avatar>
           <Textarea
             ref={textareaRef}
-            placeholder="Add a comment..."
+            placeholder="Share your experience, or ask someone who's tried this"
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             disabled={isSending}
