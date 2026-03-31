@@ -149,7 +149,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                     size={14}
                     className={cn(
                       "transition-colors",
-                      comment.is_liked && "fill-red-500 text-red-500"
+                      comment.is_liked && "fill-destructive text-destructive"
                     )}
                   />
                   {(comment.like_count || 0) > 0 && (

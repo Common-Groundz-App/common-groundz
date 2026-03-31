@@ -266,8 +266,8 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
   const handleLikeClick = useCallback(async (comment: CommentData) => {
     if (!requireAuth({ action: 'like', surface: 'inline_comment_thread' })) return;
-    if (!canPerformAction('canLike')) {
-      showVerificationRequired('canLike');
+    if (!canPerformAction('canLikeContent')) {
+      showVerificationRequired('canLikeContent');
       return;
     }
 
