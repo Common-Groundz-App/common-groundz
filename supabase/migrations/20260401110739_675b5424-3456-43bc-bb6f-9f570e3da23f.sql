@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.add_comment(uuid, text, text, uuid);
