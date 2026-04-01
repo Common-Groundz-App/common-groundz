@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
-import { fetchComments, addComment, deleteComment, updateComment, toggleCommentLike, CommentData } from '@/services/commentsService';
+import { fetchComments, addComment, deleteComment, updateComment, toggleCommentLike, fetchCommentUserReputations, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { MessageCircle, ArrowUp, User } from 'lucide-react';
@@ -17,6 +17,7 @@ import { feedbackActions } from '@/services/feedbackService';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import CommentItem from './CommentItem';
+import MentionAutocomplete from './MentionAutocomplete';
 
 interface InlineCommentThreadProps {
   itemId: string;
