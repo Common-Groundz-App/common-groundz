@@ -534,6 +534,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                         onReplyClick={handleReplyClick}
                         onLikeClick={handleLikeClick}
                         highlightCommentId={highlightCommentId}
+                        isTrustedContributor={trustedUserIds.has(reply.user_id)}
                       />
                     ))
                   ) : (
