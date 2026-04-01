@@ -1,49 +1,48 @@
 
 
-# Phase 2: Circle Trust Layer + Smart Ranking — FINAL
+# Fix: Harden add_comment and toggle_comment_like RPCs
 
-## Changes
+## What and Why
 
-### File 1: `src/components/comments/CommentItem.tsx`
-- Import `Users` from lucide-react
-- After username/time row, render "From your circle" when `comment.is_from_circle` — `text-xs text-muted-foreground flex items-center gap-1`
-- When `isReply && comment.is_from_circle`, use `border-primary/40` instead of `border-muted`
+Two small but meaningful improvements to the already-deployed Phase 3 SQL:
 
-### File 2: `src/components/comments/InlineCommentThread.tsx`
-- Replace current sort with precomputed 5-tier ranking:
+1. **Auth guard** — Both `add_comment` and `toggle_comment_like` are `SECURITY DEFINER` functions. Without validating `auth.uid() = p_user_id`, a malicious client could call the RPC with someone else's user_id. Add a check at the top of both functions.
 
-```text
-const scored = groups.map(g => {
-  const hasCircleReply = g.replies.some(r => r.is_from_circle);
-  const replyLikes = g.replies.reduce((s, r) => s + (r.like_count || 0), 0);
-  return {
-    ...g,
-    _hasReplies: g.replies.length > 0 ? 1 : 0,
-    _circle: g.comment.is_from_circle || hasCircleReply ? 1 : 0,
-    _likeScore: Math.min((g.comment.like_count || 0) + Math.floor(replyLikes * 0.5), 20),
-    _time: g.comment.created_at ? new Date(g.comment.created_at).getTime() : 0,
-  };
-});
+2. **Optimize reply notification check** — Replace the `SELECT unnest(ARRAY(SELECT ...))` pattern with a simpler `NOT EXISTS` subquery for checking if the parent author was already mentioned.
 
-scored.sort((a, b) => {
-  if (b._hasReplies !== a._hasReplies) return b._hasReplies - a._hasReplies;
-  if (b._circle !== a._circle) return b._circle - a._circle;
-  if (b._likeScore !== a._likeScore) return b._likeScore - a._likeScore;
-  if (b._time !== a._time) return b._time - a._time;
-  return b.comment.id.localeCompare(a.comment.id);
-});
+## Migration SQL
 
-return scored.map(({ _hasReplies, _circle, _likeScore, _time, ...group }) => group);
-```
+Single migration with `CREATE OR REPLACE FUNCTION` for both RPCs. Changes are minimal:
 
-- Add "Sorted by relevance" muted text near comment count when 2+ top-level comments
+### `add_comment` changes:
+- Add after item type validation:
+  ```sql
+  IF auth.uid() IS NULL OR auth.uid() != p_user_id THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+  ```
+- Replace the reply notification's array-based mention check:
+  ```sql
+  -- OLD:
+  AND NOT (parent_author_id = ANY(SELECT unnest(ARRAY(SELECT cm.mentioned_user_id ...))))
+  -- NEW:
+  AND NOT EXISTS (
+    SELECT 1 FROM public.comment_mentions cm
+    WHERE cm.comment_id = new_comment_id
+      AND cm.comment_type = p_item_type
+      AND cm.mentioned_user_id = parent_author_id
+  )
+  ```
 
-### Files modified
-1. `src/components/comments/CommentItem.tsx`
-2. `src/components/comments/InlineCommentThread.tsx`
+### `toggle_comment_like` changes:
+- Add after comment type validation:
+  ```sql
+  IF auth.uid() IS NULL OR auth.uid() != p_user_id THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+  ```
 
-No database or service changes.
+## Files Modified
 
-### Build error
-The `aws s3 cp exit 127` error is a transient infrastructure issue — not code-related. A retry will fix it.
+- **1 migration file** (SQL only) — no frontend changes needed
 
