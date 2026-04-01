@@ -125,6 +125,26 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     return scored.map(({ _hasReplies, _circle, _likeScore, _time, ...group }) => group);
   }, [comments]);
 
+  // Compute "Most Helpful" comment ID (top-level with highest likes >= 2)
+  const mostHelpfulCommentId = useMemo(() => {
+    if (groupedComments.length === 0) return null;
+    let best: { id: string; likes: number } | null = null;
+    for (const group of groupedComments) {
+      const likes = group.comment.like_count || 0;
+      if (likes >= 2 && (!best || likes > best.likes)) {
+        best = { id: group.comment.id, likes };
+      }
+    }
+    return best?.id || null;
+  }, [groupedComments]);
+
+  // Fetch reputation scores for all unique comment authors
+  useEffect(() => {
+    if (comments.length === 0) return;
+    const userIds = [...new Set(comments.map(c => c.user_id))];
+    fetchCommentUserReputations(userIds).then(setTrustedUserIds);
+  }, [comments]);
+
   // Auto-expand threads with highlighted comment or 1-2 replies
   useEffect(() => {
     const newExpanded = new Set<string>();
