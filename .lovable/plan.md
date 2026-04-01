@@ -1,49 +1,49 @@
 
 
-# Assessment: Phase 1 Implementation Status + Migration Fixes
+# Phase 2: Circle Trust Layer + Smart Ranking — FINAL
 
-## Implementation Status
+## Changes
 
-The frontend code (CommentItem, InlineCommentThread, commentsService) is **fully implemented** and matches the plan:
-- Threading with grouping, collapsible replies, auto-expand 1-2 replies
-- Heart likes with optimistic UI
-- Conversation-first sorting with tie-breaking
-- Inline reply input with "Replying to @username"
-- "[Comment deleted]" placeholder support
-- Correct placeholder text
+### File 1: `src/components/comments/CommentItem.tsx`
+- Import `Users` from lucide-react
+- After username/time row, render "From your circle" when `comment.is_from_circle` — `text-xs text-muted-foreground flex items-center gap-1`
+- When `isReply && comment.is_from_circle`, use `border-primary/40` instead of `border-muted`
 
-## ChatGPT's 3 Migration Fixes — My Assessment
+### File 2: `src/components/comments/InlineCommentThread.tsx`
+- Replace current sort with precomputed 5-tier ranking:
 
-### 1. "SQL injection in `get_comments_with_profiles`" — **Not actually a vulnerability, but worth improving**
+```text
+const scored = groups.map(g => {
+  const hasCircleReply = g.replies.some(r => r.is_from_circle);
+  const replyLikes = g.replies.reduce((s, r) => s + (r.like_count || 0), 0);
+  return {
+    ...g,
+    _hasReplies: g.replies.length > 0 ? 1 : 0,
+    _circle: g.comment.is_from_circle || hasCircleReply ? 1 : 0,
+    _likeScore: Math.min((g.comment.like_count || 0) + Math.floor(replyLikes * 0.5), 20),
+    _time: g.comment.created_at ? new Date(g.comment.created_at).getTime() : 0,
+  };
+});
 
-ChatGPT is wrong that `%L` is an injection risk — `format('%L', value)` in PostgreSQL properly quotes and escapes literals. It's safe. However, using `$1` with `USING` is cleaner practice. This is a **code quality improvement**, not a security fix. Worth doing.
+scored.sort((a, b) => {
+  if (b._hasReplies !== a._hasReplies) return b._hasReplies - a._hasReplies;
+  if (b._circle !== a._circle) return b._circle - a._circle;
+  if (b._likeScore !== a._likeScore) return b._likeScore - a._likeScore;
+  if (b._time !== a._time) return b._time - a._time;
+  return b.comment.id.localeCompare(a.comment.id);
+});
 
-### 2. "Missing `auth.uid()` check in `toggle_comment_like`" — **Yes, add this**
+return scored.map(({ _hasReplies, _circle, _likeScore, _time, ...group }) => group);
+```
 
-Since the function is `SECURITY DEFINER` (bypasses RLS), validating `auth.uid() = p_user_id` prevents spoofing. Same pattern should be applied to `add_comment` and `delete_comment` for consistency (though `delete_comment` already validates ownership via the query).
+- Add "Sorted by relevance" muted text near comment count when 2+ top-level comments
 
-### 3. "Remove `edited_at = now()` from `update_comment`" — **Yes, fix this**
+### Files modified
+1. `src/components/comments/CommentItem.tsx`
+2. `src/components/comments/InlineCommentThread.tsx`
 
-The comment tables don't have an `edited_at` column. The RPC derives it from `updated_at > created_at + interval '1 second'`. Setting a non-existent column will cause the UPDATE to fail silently or error. Remove `edited_at = now()` and keep only `updated_at = now()`.
+No database or service changes.
 
-### Optional: "Prevent liking own comment" — **Skip for now**
-
-Self-likes are harmless at this stage. Can revisit later.
-
-## Plan: Apply 2 Migration Fixes
-
-Run a new migration with:
-
-1. **Fix `update_comment`**: Remove `edited_at = now()`, keep only `updated_at = now()`
-2. **Add auth check to `toggle_comment_like`**: Add `IF auth.uid() IS NULL OR auth.uid() != p_user_id THEN RAISE EXCEPTION` at the top
-3. **Improve `get_comments_with_profiles`**: Use parameterized `$1` with `USING` for `p_item_id` instead of `%L` (code quality, not security)
-
-All three are `CREATE OR REPLACE FUNCTION` statements — no schema changes, no frontend changes needed.
-
-## What's Ready
-
-After these fixes, Phase 1 is complete:
-- Database schema (parent_id, comment_likes) ✅
-- RPC functions (add_comment, get_comments_with_profiles, toggle_comment_like, delete_comment) ✅ (pending fixes)
-- Frontend (CommentItem, InlineCommentThread, commentsService) ✅
+### Build error
+The `aws s3 cp exit 127` error is a transient infrastructure issue — not code-related. A retry will fix it.
 
