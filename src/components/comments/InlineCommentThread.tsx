@@ -651,7 +651,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
       {/* Comment Input */}
       <div className="border-t border-border mt-4 pt-4">
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-3 items-center relative">
           <Avatar className="h-8 w-8 flex-shrink-0">
             {user ? (
               <>
@@ -670,7 +670,10 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
             ref={textareaRef}
             placeholder="Share your experience, or ask someone who's tried this"
             value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
+            onChange={(e) => {
+              setNewComment(e.target.value);
+              detectMention(e.target.value, 'main');
+            }}
             disabled={isSending}
             rows={1}
             className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
@@ -682,12 +685,22 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
               }
             }}
             onKeyDown={(e) => {
+              if (mentionVisible) return;
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleAddComment();
               }
             }}
           />
+          {mentionVisible && mentionTarget === 'main' && (
+            <MentionAutocomplete
+              query={mentionQuery}
+              visible={mentionVisible}
+              onSelect={handleMentionSelect}
+              onClose={() => setMentionVisible(false)}
+              className="bottom-full mb-1 left-11"
+            />
+          )}
           <Button
             size="icon"
             className={cn(
