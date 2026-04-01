@@ -358,6 +358,33 @@ export type Database = {
         }
         Relationships: []
       }
+      comment_mentions: {
+        Row: {
+          comment_id: string
+          comment_type: string
+          created_at: string
+          id: string
+          mentioned_user_id: string
+          mentioner_user_id: string
+        }
+        Insert: {
+          comment_id: string
+          comment_type: string
+          created_at?: string
+          id?: string
+          mentioned_user_id: string
+          mentioner_user_id: string
+        }
+        Update: {
+          comment_id?: string
+          comment_type?: string
+          created_at?: string
+          id?: string
+          mentioned_user_id?: string
+          mentioner_user_id?: string
+        }
+        Relationships: []
+      }
       content_flags: {
         Row: {
           content_id: string

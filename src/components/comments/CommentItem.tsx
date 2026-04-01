@@ -4,12 +4,13 @@ import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, Heart, MessageCircle, Users } from 'lucide-react';
+import { MoreHorizontal, Heart, MessageCircle, Users, ThumbsUp, ShieldCheck } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import UsernameLink from '@/components/common/UsernameLink';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentData } from '@/services/commentsService';
+import MentionText from './MentionText';
 
 interface CommentItemProps {
   comment: CommentData;
@@ -28,6 +29,8 @@ interface CommentItemProps {
   onReplyClick: (comment: CommentData) => void;
   onLikeClick: (comment: CommentData) => void;
   highlightCommentId?: string | null;
+  isMostHelpful?: boolean;
+  isTrustedContributor?: boolean;
 }
 
 const CommentItem: React.FC<CommentItemProps> = ({
@@ -47,6 +50,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
   onReplyClick,
   onLikeClick,
   highlightCommentId,
+  isMostHelpful = false,
+  isTrustedContributor = false,
 }) => {
   const isCurrentUser = currentUserId && currentUserId === comment.user_id;
   const isBeingEdited = editingCommentId === comment.id;
@@ -92,14 +97,19 @@ const CommentItem: React.FC<CommentItemProps> = ({
       <div className="flex-1 min-w-0">
         <div className="flex items-start">
           <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <UsernameLink
-                username={comment.username}
-                userId={comment.user_id}
-                displayName={comment.displayName}
-                showHandle={false}
-                className="text-sm"
-              />
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                {isTrustedContributor && (
+                  <ShieldCheck size={12} className="text-muted-foreground" />
+                )}
+                <UsernameLink
+                  username={comment.username}
+                  userId={comment.user_id}
+                  displayName={comment.displayName}
+                  showHandle={false}
+                  className="text-sm"
+                />
+              </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <span>{formatRelativeTime(comment.created_at)}</span>
                 {isEdited && (
@@ -109,6 +119,12 @@ const CommentItem: React.FC<CommentItemProps> = ({
                   </>
                 )}
               </div>
+              {isMostHelpful && (
+                <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                  <ThumbsUp size={12} />
+                  <span className="font-medium">Most Helpful</span>
+                </div>
+              )}
               {comment.is_from_circle && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Users size={12} />
@@ -140,7 +156,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                 {replyToUsername && (
                   <span className="text-primary font-medium mr-1">@{replyToUsername}</span>
                 )}
-                {comment.content}
+                <MentionText content={comment.content} />
               </p>
             )}
 

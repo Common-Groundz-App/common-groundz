@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
-import { fetchComments, addComment, deleteComment, updateComment, toggleCommentLike, CommentData } from '@/services/commentsService';
+import { fetchComments, addComment, deleteComment, updateComment, toggleCommentLike, fetchCommentUserReputations, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { MessageCircle, ArrowUp, User } from 'lucide-react';
@@ -17,6 +17,7 @@ import { feedbackActions } from '@/services/feedbackService';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import CommentItem from './CommentItem';
+import MentionAutocomplete from './MentionAutocomplete';
 
 interface InlineCommentThreadProps {
   itemId: string;
@@ -54,6 +55,14 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const [replyingTo, setReplyingTo] = useState<CommentData | null>(null);
   const [replyContent, setReplyContent] = useState('');
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
+
+  // Mention autocomplete state
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionVisible, setMentionVisible] = useState(false);
+  const [mentionTarget, setMentionTarget] = useState<'main' | 'reply'>('main');
+
+  // Reputation/badge state
+  const [trustedUserIds, setTrustedUserIds] = useState<Set<string>>(new Set());
 
   const commentToDeleteRef = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -114,6 +123,26 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
     // Strip scoring fields — return clean group shape
     return scored.map(({ _hasReplies, _circle, _likeScore, _time, ...group }) => group);
+  }, [comments]);
+
+  // Compute "Most Helpful" comment ID (top-level with highest likes >= 2)
+  const mostHelpfulCommentId = useMemo(() => {
+    if (groupedComments.length === 0) return null;
+    let best: { id: string; likes: number } | null = null;
+    for (const group of groupedComments) {
+      const likes = group.comment.like_count || 0;
+      if (likes >= 2 && (!best || likes > best.likes)) {
+        best = { id: group.comment.id, likes };
+      }
+    }
+    return best?.id || null;
+  }, [groupedComments]);
+
+  // Fetch reputation scores for all unique comment authors
+  useEffect(() => {
+    if (comments.length === 0) return;
+    const userIds = [...new Set(comments.map(c => c.user_id))];
+    fetchCommentUserReputations(userIds).then(setTrustedUserIds);
   }, [comments]);
 
   // Auto-expand threads with highlighted comment or 1-2 replies
@@ -395,9 +424,39 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
   // Determine @username for reply-to-reply display
   const getReplyToUsername = (reply: CommentData, parentComment: CommentData): string | undefined => {
-    // If replying to the top-level comment author, no need to show @username
-    // Only show when the reply's content implies replying to someone other than the parent
     return undefined;
+  };
+
+  // Mention detection for textareas
+  const detectMention = (text: string, target: 'main' | 'reply') => {
+    const match = text.match(/(?:^|\s)@([a-z0-9._]*)$/i);
+    if (match) {
+      setMentionQuery(match[1]);
+      setMentionVisible(true);
+      setMentionTarget(target);
+    } else {
+      setMentionVisible(false);
+      setMentionQuery('');
+    }
+  };
+
+  const handleMentionSelect = (username: string) => {
+    const insertMention = (text: string): string => {
+      return text.replace(/(?:^|\s)@([a-z0-9._]*)$/i, (match) => {
+        const prefix = match.startsWith(' ') ? ' ' : '';
+        return `${prefix}@${username} `;
+      });
+    };
+
+    if (mentionTarget === 'main') {
+      setNewComment(prev => insertMention(prev));
+      textareaRef.current?.focus();
+    } else {
+      setReplyContent(prev => insertMention(prev));
+      replyTextareaRef.current?.focus();
+    }
+    setMentionVisible(false);
+    setMentionQuery('');
   };
 
   return (
@@ -448,6 +507,8 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                 onReplyClick={handleReplyClick}
                 onLikeClick={handleLikeClick}
                 highlightCommentId={highlightCommentId}
+                isMostHelpful={mostHelpfulCommentId === group.comment.id}
+                isTrustedContributor={trustedUserIds.has(group.comment.user_id)}
               />
 
               {/* Replies */}
@@ -473,6 +534,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                         onReplyClick={handleReplyClick}
                         onLikeClick={handleLikeClick}
                         highlightCommentId={highlightCommentId}
+                        isTrustedContributor={trustedUserIds.has(reply.user_id)}
                       />
                     ))
                   ) : (
@@ -508,6 +570,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                             onReplyClick={handleReplyClick}
                             onLikeClick={handleLikeClick}
                             highlightCommentId={highlightCommentId}
+                            isTrustedContributor={trustedUserIds.has(reply.user_id)}
                           />
                         ))}
                       </CollapsibleContent>
@@ -522,16 +585,20 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                   <div className="text-xs text-muted-foreground mb-2">
                     Replying to <span className="font-medium text-foreground">@{replyingTo.username}</span>
                   </div>
-                  <div className="flex gap-2 items-start">
+                  <div className="flex gap-2 items-start relative">
                     <Textarea
                       ref={replyTextareaRef}
                       placeholder="Write a reply..."
                       value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
+                      onChange={(e) => {
+                        setReplyContent(e.target.value);
+                        detectMention(e.target.value, 'reply');
+                      }}
                       disabled={isSending}
                       rows={1}
                       className="min-h-[36px] max-h-[100px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-3 text-sm"
                       onKeyDown={(e) => {
+                        if (mentionVisible) return; // Let MentionAutocomplete handle keys
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleReplySubmit(replyingTo);
@@ -542,6 +609,15 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                         }
                       }}
                     />
+                    {mentionVisible && mentionTarget === 'reply' && (
+                      <MentionAutocomplete
+                        query={mentionQuery}
+                        visible={mentionVisible}
+                        onSelect={handleMentionSelect}
+                        onClose={() => setMentionVisible(false)}
+                        className="bottom-full mb-1 left-0"
+                      />
+                    )}
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
@@ -575,7 +651,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
       {/* Comment Input */}
       <div className="border-t border-border mt-4 pt-4">
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-3 items-center relative">
           <Avatar className="h-8 w-8 flex-shrink-0">
             {user ? (
               <>
@@ -594,7 +670,10 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
             ref={textareaRef}
             placeholder="Share your experience, or ask someone who's tried this"
             value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
+            onChange={(e) => {
+              setNewComment(e.target.value);
+              detectMention(e.target.value, 'main');
+            }}
             disabled={isSending}
             rows={1}
             className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
@@ -606,12 +685,22 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
               }
             }}
             onKeyDown={(e) => {
+              if (mentionVisible) return;
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleAddComment();
               }
             }}
           />
+          {mentionVisible && mentionTarget === 'main' && (
+            <MentionAutocomplete
+              query={mentionQuery}
+              visible={mentionVisible}
+              onSelect={handleMentionSelect}
+              onClose={() => setMentionVisible(false)}
+              className="bottom-full mb-1 left-11"
+            />
+          )}
           <Button
             size="icon"
             className={cn(

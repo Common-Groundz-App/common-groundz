@@ -177,3 +177,20 @@ export const toggleCommentLike = async (commentId: string, commentType: 'post' |
     return null;
   }
 };
+
+export const fetchCommentUserReputations = async (userIds: string[]): Promise<Set<string>> => {
+  if (!userIds.length) return new Set();
+  try {
+    const { data, error } = await supabase
+      .from('user_reputation')
+      .select('user_id, overall_score')
+      .in('user_id', userIds)
+      .gte('overall_score', 70);
+
+    if (error) throw error;
+    return new Set((data || []).map(r => r.user_id));
+  } catch (error) {
+    console.error('Error fetching user reputations:', error);
+    return new Set();
+  }
+};
