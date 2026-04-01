@@ -29,6 +29,8 @@ interface CommentItemProps {
   onReplyClick: (comment: CommentData) => void;
   onLikeClick: (comment: CommentData) => void;
   highlightCommentId?: string | null;
+  isMostHelpful?: boolean;
+  isTrustedContributor?: boolean;
 }
 
 const CommentItem: React.FC<CommentItemProps> = ({
