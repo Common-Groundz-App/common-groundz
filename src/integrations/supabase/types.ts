@@ -3668,26 +3668,16 @@ export type Database = {
       }
     }
     Functions: {
-      add_comment:
-        | {
-            Args: {
-              p_content: string
-              p_item_id: string
-              p_item_type: string
-              p_user_id: string
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              p_content: string
-              p_item_id: string
-              p_item_type: string
-              p_parent_id?: string
-              p_user_id: string
-            }
-            Returns: boolean
-          }
+      add_comment: {
+        Args: {
+          p_content: string
+          p_item_id: string
+          p_item_type: string
+          p_parent_id?: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
       calculate_enhanced_trending_score: {
         Args: { p_entity_id: string }
         Returns: number
