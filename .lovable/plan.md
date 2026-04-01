@@ -1,24 +1,104 @@
 
 
-# Fix: Drop duplicate `add_comment` function overload
+# Fix: Comment Reply and Edit Failures (Final Version)
 
-## Root Cause
+## Current State
 
-The Phase 3 migration used `CREATE OR REPLACE FUNCTION` which created a **new** 5-parameter version of `add_comment` (with `p_parent_id uuid DEFAULT NULL`), but the **old** 4-parameter version (without `p_parent_id`) was never dropped. PostgreSQL sees two candidate functions and throws:
+- **`add_comment`** (lines 50-63): Uses `IF NOT FOUND` after `EXECUTE ... INTO` for parent validation — unreliable, causing "Parent comment not found or deleted" on valid replies
+- **`update_comment`** (lines 33-35): Uses `IF NOT FOUND` after `EXECUTE` — unreliable, causing false return even when update succeeds
+- Both already have `SET search_path = public` ✅
+- `add_comment` already has auth guard ✅
+- `update_comment` is missing auth guard ❌
 
-> "Could not choose the best candidate function between..."
+## Changes — 1 migration file, 2 function updates
 
-## Fix
+### 1. `add_comment` — replace `FOUND` with explicit boolean + COALESCE on is_deleted
 
-One migration that drops the old 4-parameter overload:
+Only the parent validation block (lines 50-63) changes:
 
 ```sql
-DROP FUNCTION IF EXISTS public.add_comment(uuid, text, text, uuid);
+-- Add to DECLARE:
+  parent_found boolean := false;
+
+-- Replace lines 50-63:
+  IF p_parent_id IS NOT NULL THEN
+    EXECUTE format('
+      SELECT parent_id, true
+      FROM %I
+      WHERE id = $1 AND COALESCE(is_deleted, false) = false
+      LIMIT 1
+    ', comment_table)
+    INTO parent_parent_id, parent_found
+    USING p_parent_id;
+
+    IF NOT COALESCE(parent_found, false) THEN
+      RAISE EXCEPTION 'Parent comment not found or deleted';
+    END IF;
+
+    IF parent_parent_id IS NOT NULL THEN
+      RAISE EXCEPTION 'Cannot reply to a reply (max 1 level of nesting)';
+    END IF;
+  END IF;
 ```
 
-This leaves only the new 5-parameter version (which has `p_parent_id DEFAULT NULL`, so calls without that argument still work).
+Everything else (auth guard, insert, mentions, notifications) stays identical.
 
-## Files Modified
+### 2. `update_comment` — auth guard + UPDATE RETURNING + COALESCE on is_deleted
 
-- **1 new migration file** — single `DROP FUNCTION` statement. No frontend changes needed.
+Full function replacement:
+
+```sql
+CREATE OR REPLACE FUNCTION public.update_comment(
+  p_comment_id uuid, p_content text, p_user_id uuid, p_item_type text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  comment_table text;
+  did_update boolean;
+BEGIN
+  IF p_item_type NOT IN ('recommendation', 'post') THEN
+    RAISE EXCEPTION 'Invalid item type: %', p_item_type;
+  END IF;
+
+  IF auth.uid() IS NULL OR auth.uid() != p_user_id THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_item_type = 'recommendation' THEN
+    comment_table := 'recommendation_comments';
+  ELSE
+    comment_table := 'post_comments';
+  END IF;
+
+  EXECUTE format('
+    UPDATE %I
+    SET content = $1, updated_at = now()
+    WHERE id = $2 AND user_id = $3 AND COALESCE(is_deleted, false) = false
+    RETURNING true
+  ', comment_table)
+  INTO did_update
+  USING p_content, p_comment_id, p_user_id;
+
+  RETURN COALESCE(did_update, false);
+END;
+$$;
+```
+
+### What's improved
+
+| Issue | Fix |
+|---|---|
+| `FOUND` unreliable after `EXECUTE` | Replaced with explicit boolean / `RETURNING true` |
+| `is_deleted` could be NULL | `COALESCE(is_deleted, false)` in all predicates |
+| `update_comment` missing auth guard | Added `auth.uid()` check |
+| Parent query edge cases | Added `LIMIT 1` for safety |
+| `search_path` hardening | Already present on both functions ✅ |
+
+### No frontend changes needed
+
+Verified: `commentsService.ts` correctly passes all RPC params. `InlineCommentThread.tsx` correctly resolves `parentId` to top-level comment ID.
 
