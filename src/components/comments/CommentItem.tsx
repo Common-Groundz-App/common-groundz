@@ -97,14 +97,19 @@ const CommentItem: React.FC<CommentItemProps> = ({
       <div className="flex-1 min-w-0">
         <div className="flex items-start">
           <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <UsernameLink
-                username={comment.username}
-                userId={comment.user_id}
-                displayName={comment.displayName}
-                showHandle={false}
-                className="text-sm"
-              />
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                {isTrustedContributor && (
+                  <ShieldCheck size={12} className="text-muted-foreground" />
+                )}
+                <UsernameLink
+                  username={comment.username}
+                  userId={comment.user_id}
+                  displayName={comment.displayName}
+                  showHandle={false}
+                  className="text-sm"
+                />
+              </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <span>{formatRelativeTime(comment.created_at)}</span>
                 {isEdited && (
@@ -114,6 +119,12 @@ const CommentItem: React.FC<CommentItemProps> = ({
                   </>
                 )}
               </div>
+              {isMostHelpful && (
+                <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+                  <ThumbsUp size={12} />
+                  <span className="font-medium">Most Helpful</span>
+                </div>
+              )}
               {comment.is_from_circle && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Users size={12} />
