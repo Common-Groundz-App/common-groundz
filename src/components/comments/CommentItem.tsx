@@ -50,6 +50,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
   onReplyClick,
   onLikeClick,
   highlightCommentId,
+  isMostHelpful = false,
+  isTrustedContributor = false,
 }) => {
   const isCurrentUser = currentUserId && currentUserId === comment.user_id;
   const isBeingEdited = editingCommentId === comment.id;
