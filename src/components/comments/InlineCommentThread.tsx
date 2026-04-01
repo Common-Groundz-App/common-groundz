@@ -406,6 +406,9 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
         <MessageCircle className="h-5 w-5 text-muted-foreground" />
         <h3 className="font-semibold text-sm">Comments</h3>
         {!isLoading && <span className="text-xs text-muted-foreground">({totalCommentCount})</span>}
+        {!isLoading && groupedComments.length >= 2 && (
+          <span className="text-xs text-muted-foreground ml-auto">Sorted by relevance</span>
+        )}
       </div>
 
       {/* Comment List */}

@@ -109,6 +109,12 @@ const CommentItem: React.FC<CommentItemProps> = ({
                   </>
                 )}
               </div>
+              {comment.is_from_circle && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Users size={12} />
+                  <span>From your circle</span>
+                </div>
+              )}
             </div>
 
             {isBeingEdited ? (
