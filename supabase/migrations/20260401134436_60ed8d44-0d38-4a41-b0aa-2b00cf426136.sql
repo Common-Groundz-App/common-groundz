@@ -1,6 +1,5 @@
-
--- Function to add a comment and update comment count (with threading support)
-CREATE OR REPLACE FUNCTION add_comment(
+-- 1. Harden add_comment: replace FOUND with explicit boolean + COALESCE on is_deleted
+CREATE OR REPLACE FUNCTION public.add_comment(
   p_item_id uuid,
   p_item_type text,
   p_content text,
@@ -195,5 +194,49 @@ BEGIN
   END IF;
 
   RETURN true;
+END;
+$$;
+
+-- 2. Harden update_comment: auth guard + UPDATE RETURNING + COALESCE on is_deleted
+CREATE OR REPLACE FUNCTION public.update_comment(
+  p_comment_id uuid,
+  p_content text,
+  p_user_id uuid,
+  p_item_type text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  comment_table text;
+  did_update boolean;
+BEGIN
+  IF p_item_type NOT IN ('recommendation', 'post') THEN
+    RAISE EXCEPTION 'Invalid item type: %', p_item_type;
+  END IF;
+
+  -- Auth guard: prevent user_id spoofing
+  IF auth.uid() IS NULL OR auth.uid() != p_user_id THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  IF p_item_type = 'recommendation' THEN
+    comment_table := 'recommendation_comments';
+  ELSE
+    comment_table := 'post_comments';
+  END IF;
+
+  EXECUTE format('
+    UPDATE %I
+    SET content = $1, updated_at = now(), edited_at = now()
+    WHERE id = $2 AND user_id = $3 AND COALESCE(is_deleted, false) = false
+    RETURNING true
+  ', comment_table)
+  INTO did_update
+  USING p_content, p_comment_id, p_user_id;
+
+  RETURN COALESCE(did_update, false);
 END;
 $$;
