@@ -156,7 +156,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                 {replyToUsername && (
                   <span className="text-primary font-medium mr-1">@{replyToUsername}</span>
                 )}
-                {comment.content}
+                <MentionText content={comment.content} />
               </p>
             )}
 
