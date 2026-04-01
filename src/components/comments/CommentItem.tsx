@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, Heart, MessageCircle } from 'lucide-react';
+import { MoreHorizontal, Heart, MessageCircle, Users } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import UsernameLink from '@/components/common/UsernameLink';
 import { getInitialsFromName } from '@/utils/profileUtils';
@@ -79,7 +79,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
       className={cn(
         "relative group flex gap-3 p-3 rounded-lg transition-colors",
         isBeingEdited && "bg-muted/50",
-        isReply && "pl-10 border-l-2 border-muted",
+        isReply && cn("pl-10 border-l-2", comment.is_from_circle ? "border-primary/40" : "border-muted"),
         isHighlighted && "bg-accent/50"
       )}
     >
@@ -109,6 +109,12 @@ const CommentItem: React.FC<CommentItemProps> = ({
                   </>
                 )}
               </div>
+              {comment.is_from_circle && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Users size={12} />
+                  <span>From your circle</span>
+                </div>
+              )}
             </div>
 
             {isBeingEdited ? (
