@@ -585,16 +585,20 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                   <div className="text-xs text-muted-foreground mb-2">
                     Replying to <span className="font-medium text-foreground">@{replyingTo.username}</span>
                   </div>
-                  <div className="flex gap-2 items-start">
+                  <div className="flex gap-2 items-start relative">
                     <Textarea
                       ref={replyTextareaRef}
                       placeholder="Write a reply..."
                       value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
+                      onChange={(e) => {
+                        setReplyContent(e.target.value);
+                        detectMention(e.target.value, 'reply');
+                      }}
                       disabled={isSending}
                       rows={1}
                       className="min-h-[36px] max-h-[100px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-3 text-sm"
                       onKeyDown={(e) => {
+                        if (mentionVisible) return; // Let MentionAutocomplete handle keys
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleReplySubmit(replyingTo);
@@ -605,6 +609,15 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                         }
                       }}
                     />
+                    {mentionVisible && mentionTarget === 'reply' && (
+                      <MentionAutocomplete
+                        query={mentionQuery}
+                        visible={mentionVisible}
+                        onSelect={handleMentionSelect}
+                        onClose={() => setMentionVisible(false)}
+                        className="bottom-full mb-1 left-0"
+                      />
+                    )}
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
