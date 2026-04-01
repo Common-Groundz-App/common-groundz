@@ -56,6 +56,14 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const [replyContent, setReplyContent] = useState('');
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
 
+  // Mention autocomplete state
+  const [mentionQuery, setMentionQuery] = useState('');
+  const [mentionVisible, setMentionVisible] = useState(false);
+  const [mentionTarget, setMentionTarget] = useState<'main' | 'reply'>('main');
+
+  // Reputation/badge state
+  const [trustedUserIds, setTrustedUserIds] = useState<Set<string>>(new Set());
+
   const commentToDeleteRef = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
