@@ -10,6 +10,7 @@ import UsernameLink from '@/components/common/UsernameLink';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentData } from '@/services/commentsService';
+import MentionText from './MentionText';
 
 interface CommentItemProps {
   comment: CommentData;
