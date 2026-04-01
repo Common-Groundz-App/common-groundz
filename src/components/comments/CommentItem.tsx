@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MoreHorizontal, Heart, MessageCircle, Users } from 'lucide-react';
+import { MoreHorizontal, Heart, MessageCircle, Users, ThumbsUp, ShieldCheck } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import UsernameLink from '@/components/common/UsernameLink';
 import { getInitialsFromName } from '@/utils/profileUtils';
