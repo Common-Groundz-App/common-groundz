@@ -424,9 +424,39 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
   // Determine @username for reply-to-reply display
   const getReplyToUsername = (reply: CommentData, parentComment: CommentData): string | undefined => {
-    // If replying to the top-level comment author, no need to show @username
-    // Only show when the reply's content implies replying to someone other than the parent
     return undefined;
+  };
+
+  // Mention detection for textareas
+  const detectMention = (text: string, target: 'main' | 'reply') => {
+    const match = text.match(/(?:^|\s)@([a-z0-9._]*)$/i);
+    if (match) {
+      setMentionQuery(match[1]);
+      setMentionVisible(true);
+      setMentionTarget(target);
+    } else {
+      setMentionVisible(false);
+      setMentionQuery('');
+    }
+  };
+
+  const handleMentionSelect = (username: string) => {
+    const insertMention = (text: string): string => {
+      return text.replace(/(?:^|\s)@([a-z0-9._]*)$/i, (match) => {
+        const prefix = match.startsWith(' ') ? ' ' : '';
+        return `${prefix}@${username} `;
+      });
+    };
+
+    if (mentionTarget === 'main') {
+      setNewComment(prev => insertMention(prev));
+      textareaRef.current?.focus();
+    } else {
+      setReplyContent(prev => insertMention(prev));
+      replyTextareaRef.current?.focus();
+    }
+    setMentionVisible(false);
+    setMentionQuery('');
   };
 
   return (
