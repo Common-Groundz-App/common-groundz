@@ -91,19 +91,29 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       isDeletedWithReplies: false,
     }));
 
-    // Sort: conversations first (has replies), then newest, tie-break by id DESC
-    groups.sort((a, b) => {
-      const aHasReplies = a.replies.length > 0 ? 1 : 0;
-      const bHasReplies = b.replies.length > 0 ? 1 : 0;
-      if (bHasReplies !== aHasReplies) return bHasReplies - aHasReplies;
+    // Precompute scores for 5-tier relevance ranking
+    const scored = groups.map(g => {
+      const hasCircleReply = g.replies.some(r => r.is_from_circle);
+      const replyLikes = g.replies.reduce((s, r) => s + (r.like_count || 0), 0);
+      return {
+        ...g,
+        _hasReplies: g.replies.length > 0 ? 1 : 0,
+        _circle: g.comment.is_from_circle || hasCircleReply ? 1 : 0,
+        _likeScore: Math.min((g.comment.like_count || 0) + Math.floor(replyLikes * 0.5), 20),
+        _time: g.comment.created_at ? new Date(g.comment.created_at).getTime() : 0,
+      };
+    });
 
-      const timeDiff = new Date(b.comment.created_at).getTime() - new Date(a.comment.created_at).getTime();
-      if (timeDiff !== 0) return timeDiff;
-
+    scored.sort((a, b) => {
+      if (b._hasReplies !== a._hasReplies) return b._hasReplies - a._hasReplies;
+      if (b._circle !== a._circle) return b._circle - a._circle;
+      if (b._likeScore !== a._likeScore) return b._likeScore - a._likeScore;
+      if (b._time !== a._time) return b._time - a._time;
       return b.comment.id.localeCompare(a.comment.id);
     });
 
-    return groups;
+    // Strip scoring fields — return clean group shape
+    return scored.map(({ _hasReplies, _circle, _likeScore, _time, ...group }) => group);
   }, [comments]);
 
   // Auto-expand threads with highlighted comment or 1-2 replies
