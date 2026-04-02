@@ -11,7 +11,7 @@ import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { fetchComments, addComment, deleteComment, updateComment, toggleCommentLike, fetchCommentUserReputations, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { MessageCircle, ArrowUp, User } from 'lucide-react';
+import { MessageCircle, ArrowUp, User, ArrowUpDown } from 'lucide-react';
 import { fetchUserProfile } from '@/services/profileService';
 import { feedbackActions } from '@/services/feedbackService';
 import { getInitialsFromName } from '@/utils/profileUtils';
@@ -33,6 +33,16 @@ interface GroupedComment {
   isDeletedWithReplies: boolean;
 }
 
+type SortMode = 'relevance' | 'newest';
+
+const getSavedSortMode = (): SortMode => {
+  try {
+    const saved = window.localStorage.getItem('cg-comment-sort');
+    if (saved === 'newest' || saved === 'relevance') return saved;
+  } catch {}
+  return 'relevance';
+};
+
 const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   itemId,
   itemType,
@@ -50,6 +60,9 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const [editCommentContent, setEditCommentContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [userProfile, setUserProfile] = useState<{ avatar_url?: string; username?: string; first_name?: string; last_name?: string }>({});
+
+  // Sort mode state (#4)
+  const [sortMode, setSortMode] = useState<SortMode>(getSavedSortMode);
 
   // Reply state
   const [replyingTo, setReplyingTo] = useState<CommentData | null>(null);
@@ -74,11 +87,20 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
 
+  const handleSortToggle = useCallback(() => {
+    setSortMode(prev => {
+      const next: SortMode = prev === 'relevance' ? 'newest' : 'relevance';
+      try { window.localStorage.setItem('cg-comment-sort', next); } catch {}
+      return next;
+    });
+  }, []);
+
   // Group comments into threads
   const groupedComments = useMemo((): GroupedComment[] => {
     if (comments.length === 0) return [];
 
     const topLevel = comments.filter(c => !c.parent_id);
+    const topLevelIds = new Set(topLevel.map(c => c.id));
     const replyMap = new Map<string, CommentData[]>();
 
     comments.forEach(c => {
@@ -100,7 +122,52 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       isDeletedWithReplies: false,
     }));
 
-    // Precompute scores for 5-tier relevance ranking
+    // #3: Orphaned reply detection
+    replyMap.forEach((replies, parentId) => {
+      if (!topLevelIds.has(parentId)) {
+        // Find earliest reply timestamp for safe sorting
+        const earliestCreatedAt = replies.reduce((earliest, r) => {
+          const t = new Date(r.created_at).getTime();
+          return isNaN(t) ? earliest : (earliest === '' ? r.created_at : (t < new Date(earliest).getTime() ? r.created_at : earliest));
+        }, '');
+
+        const syntheticParent: CommentData = {
+          id: parentId,
+          content: '',
+          created_at: earliestCreatedAt || new Date().toISOString(),
+          user_id: '',
+          username: '',
+          displayName: '',
+          avatar_url: '',
+          first_name: '',
+          last_name: '',
+          edited_at: undefined,
+          parent_id: null,
+          like_count: 0,
+          reply_count: replies.length,
+          is_liked: false,
+          is_from_circle: false,
+        };
+
+        groups.push({
+          comment: syntheticParent,
+          replies,
+          isDeletedWithReplies: true,
+        });
+      }
+    });
+
+    // #4: Sort based on sortMode
+    if (sortMode === 'newest') {
+      groups.sort((a, b) => {
+        const timeA = new Date(a.comment.created_at).getTime() || 0;
+        const timeB = new Date(b.comment.created_at).getTime() || 0;
+        return timeB - timeA;
+      });
+      return groups;
+    }
+
+    // Relevance sorting (5-tier)
     const scored = groups.map(g => {
       const hasCircleReply = g.replies.some(r => r.is_from_circle);
       const replyLikes = g.replies.reduce((s, r) => s + (r.like_count || 0), 0);
@@ -123,7 +190,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
     // Strip scoring fields — return clean group shape
     return scored.map(({ _hasReplies, _circle, _likeScore, _time, ...group }) => group);
-  }, [comments]);
+  }, [comments, sortMode]);
 
   // Compute "Most Helpful" comment ID (top-level with highest likes >= 2)
   const mostHelpfulCommentId = useMemo(() => {
@@ -266,9 +333,18 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     // Determine the actual parent (always top-level)
     const parentId = parentComment.parent_id || parentComment.id;
 
+    // #2: Auto-prepend @username for reply-to-reply
+    let finalContent = replyContent;
+    if (parentComment.parent_id && parentComment.username) {
+      const username = parentComment.username;
+      if (!finalContent.trimStart().toLowerCase().startsWith(`@${username.toLowerCase()}`)) {
+        finalContent = `@${username} ${finalContent}`;
+      }
+    }
+
     setIsSending(true);
     try {
-      const success = await addComment(itemId, itemType, replyContent, user.id, parentId);
+      const success = await addComment(itemId, itemType, finalContent, user.id, parentId);
       if (!success) throw new Error("Failed to add reply");
 
       setReplyContent('');
@@ -422,9 +498,16 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     });
   };
 
-  // Determine @username for reply-to-reply display
+  // #1: Determine @username for reply-to-reply display
   const getReplyToUsername = (reply: CommentData, parentComment: CommentData): string | undefined => {
-    return undefined;
+    const match = reply.content.match(/^@([a-z0-9._]+)\s/i);
+    if (!match) return undefined;
+    const mentionedUsername = match[1];
+    // If mentioning the parent author, it's implied context — don't show
+    if (parentComment.username && mentionedUsername.toLowerCase() === parentComment.username.toLowerCase()) {
+      return undefined;
+    }
+    return mentionedUsername;
   };
 
   // Mention detection for textareas
@@ -459,14 +542,31 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     setMentionQuery('');
   };
 
+  // #10 & #6: Dynamic placeholders based on itemType
+  const mainPlaceholder = itemType === 'post'
+    ? 'Ask the author something or share your thoughts'
+    : 'Share your experience, or ask someone who\'s tried this';
+
+  const emptyStateMessage = itemType === 'post'
+    ? 'No comments yet. Share your thoughts or ask the author a question.'
+    : 'No comments yet. Share your experience or ask someone who\'s tried this.';
+
   return (
     <div ref={commentSectionRef} className="mt-6">
       <div className="flex items-center gap-2 mb-4">
         <MessageCircle className="h-5 w-5 text-muted-foreground" />
         <h3 className="font-semibold text-sm">Comments</h3>
         {!isLoading && <span className="text-xs text-muted-foreground">({totalCommentCount})</span>}
+        {/* #4: Sort toggle */}
         {!isLoading && groupedComments.length >= 2 && (
-          <span className="text-xs text-muted-foreground ml-auto">Sorted by relevance</span>
+          <button
+            onClick={handleSortToggle}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground ml-auto transition-colors"
+            aria-label="Change comment sort order"
+          >
+            <ArrowUpDown size={12} />
+            <span>{sortMode === 'relevance' ? 'Relevance' : 'Newest'}</span>
+          </button>
         )}
       </div>
 
@@ -484,9 +584,10 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
           ))}
         </div>
       ) : comments.length === 0 ? (
+        /* #6: Contextual empty state */
         <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
           <MessageCircle className="h-10 w-10 mb-2 opacity-30" />
-          <p className="text-sm">No comments yet. Share your experience or ask something!</p>
+          <p className="text-sm">{emptyStateMessage}</p>
         </div>
       ) : (
         <div className="space-y-1">
@@ -495,6 +596,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
               {/* Top-level comment */}
               <CommentItem
                 comment={group.comment}
+                isDeleted={group.isDeletedWithReplies}
                 currentUserId={user?.id}
                 editingCommentId={editingCommentId}
                 editCommentContent={editCommentContent}
@@ -507,13 +609,19 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                 onReplyClick={handleReplyClick}
                 onLikeClick={handleLikeClick}
                 highlightCommentId={highlightCommentId}
-                isMostHelpful={mostHelpfulCommentId === group.comment.id}
+                isMostHelpful={!group.isDeletedWithReplies && mostHelpfulCommentId === group.comment.id}
                 isTrustedContributor={trustedUserIds.has(group.comment.user_id)}
               />
 
               {/* Replies */}
               {group.replies.length > 0 && (
-                <div className="ml-6 bg-muted/20 rounded-lg p-2">
+                /* #9: Active thread styling — 3+ replies get enhanced styling */
+                <div className={cn(
+                  "ml-6 rounded-lg p-2",
+                  group.replies.length >= 3
+                    ? "bg-muted/30 border-l-2 border-primary/20"
+                    : "bg-muted/20"
+                )}>
                   {group.replies.length <= 2 ? (
                     // Auto-expanded
                     group.replies.map(reply => (
@@ -543,15 +651,23 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                       open={expandedThreads.has(group.comment.id)}
                       onOpenChange={() => toggleThread(group.comment.id)}
                     >
+                      {/* #8: Upgraded thread toggle label */}
                       <CollapsibleTrigger asChild>
-                        <button className="text-xs text-primary hover:text-primary/80 font-medium py-1 px-3 transition-colors">
+                        <button
+                          className="text-xs text-primary hover:text-primary/80 font-medium py-1 px-3 transition-colors"
+                          aria-label={expandedThreads.has(group.comment.id)
+                            ? 'Hide replies'
+                            : `View ${group.replies.length} replies to this comment`
+                          }
+                        >
                           {expandedThreads.has(group.comment.id)
                             ? 'Hide replies'
-                            : `View ${group.replies.length} replies`
+                            : `💬 ${group.replies.length} replies · View discussion`
                           }
                         </button>
                       </CollapsibleTrigger>
-                      <CollapsibleContent>
+                      {/* #5: Smooth expand/collapse animation */}
+                      <CollapsibleContent className="overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:slide-out-to-top-2 duration-200">
                         {group.replies.map(reply => (
                           <CommentItem
                             key={reply.id}
@@ -586,9 +702,10 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                     Replying to <span className="font-medium text-foreground">@{replyingTo.username}</span>
                   </div>
                   <div className="flex gap-2 items-start relative">
+                    {/* #7: Dynamic reply placeholder */}
                     <Textarea
                       ref={replyTextareaRef}
-                      placeholder="Write a reply..."
+                      placeholder={`Reply to ${replyingTo.displayName || replyingTo.username}...`}
                       value={replyContent}
                       onChange={(e) => {
                         setReplyContent(e.target.value);
@@ -666,9 +783,10 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
               </AvatarFallback>
             )}
           </Avatar>
+          {/* #10: Dynamic main input placeholder */}
           <Textarea
             ref={textareaRef}
-            placeholder="Share your experience, or ask someone who's tried this"
+            placeholder={mainPlaceholder}
             value={newComment}
             onChange={(e) => {
               setNewComment(e.target.value);
