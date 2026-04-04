@@ -333,12 +333,23 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     // Determine the actual parent (always top-level)
     const parentId = parentComment.parent_id || parentComment.id;
 
-    // #2: Auto-prepend @username for reply-to-reply
+    // #2: Auto-prepend @username for reply-to-reply (with scoped dedup and escaped regex)
     let finalContent = replyContent;
     if (parentComment.parent_id && parentComment.username) {
       const username = parentComment.username;
-      if (!finalContent.trimStart().toLowerCase().startsWith(`@${username.toLowerCase()}`)) {
-        finalContent = `@${username} ${finalContent}`;
+      if (!username || username.trim() === '') {
+        finalContent = finalContent.trimStart();
+      } else {
+        const escUser = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        finalContent = finalContent.trimStart();
+        // Remove duplicate leading @username mentions (scoped to target only)
+        const dupRegex = new RegExp(`^(@${escUser}\\s+)+`, 'i');
+        finalContent = finalContent.replace(dupRegex, '').trimStart();
+        // Check if mention already present with word boundary
+        const mentionRegex = new RegExp(`^@${escUser}\\b`, 'i');
+        if (!mentionRegex.test(finalContent)) {
+          finalContent = `@${username} ${finalContent}`;
+        }
       }
     }
 
