@@ -3744,23 +3744,10 @@ export type Database = {
         Args: { bucket_id: string }
         Returns: boolean
       }
-      delete_comment:
-        | {
-            Args: {
-              p_comment_id: string
-              p_item_type: string
-              p_user_id: string
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              p_comment_id: string
-              p_item_type: string
-              p_user_id: string
-            }
-            Returns: boolean
-          }
+      delete_comment: {
+        Args: { p_comment_id: string; p_item_type: string; p_user_id: string }
+        Returns: boolean
+      }
       delete_post_like: {
         Args: { p_post_id: string; p_user_id: string }
         Returns: undefined

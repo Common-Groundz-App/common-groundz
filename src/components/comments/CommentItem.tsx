@@ -152,12 +152,21 @@ const CommentItem: React.FC<CommentItemProps> = ({
                 </div>
               </div>
             ) : (
-              <p className="mt-1 text-sm break-words">
-                {replyToUsername && (
-                  <span className="text-primary font-medium mr-1">@{replyToUsername}</span>
-                )}
-                <MentionText content={comment.content} />
-              </p>
+              (() => {
+                const content = comment.content || '';
+                const escUsername = replyToUsername?.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const displayContent = replyToUsername
+                  ? content.replace(new RegExp(`^@${escUsername}\\b\\s*`, 'i'), '')
+                  : content;
+                return (
+                  <p className="mt-1 text-sm break-words">
+                    {replyToUsername && (
+                      <span className="text-primary font-medium mr-1">@{replyToUsername}</span>
+                    )}
+                    <MentionText content={displayContent} />
+                  </p>
+                );
+              })()
             )}
 
             {/* Action row */}
