@@ -2,6 +2,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MoreHorizontal, Heart, MessageCircle, Users, ThumbsUp, ShieldCheck } from 'lucide-react';
@@ -84,7 +85,8 @@ const CommentItem: React.FC<CommentItemProps> = ({
       className={cn(
         "relative group flex gap-3 p-3 rounded-lg transition-colors",
         isBeingEdited && "bg-muted/50",
-        isReply && cn("pl-10 border-l-2", comment.is_from_circle ? "border-primary/40" : "border-muted"),
+        !isReply && comment.is_from_circle && "border-l-2 border-orange-300 hover:bg-orange-50/30 dark:hover:bg-orange-950/20",
+        isReply && "pl-10 border-l-2 border-muted",
         isHighlighted && "bg-accent/50"
       )}
     >
@@ -125,11 +127,11 @@ const CommentItem: React.FC<CommentItemProps> = ({
                   <span className="font-medium">Most Helpful</span>
                 </div>
               )}
-              {comment.is_from_circle && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Users size={12} />
-                  <span>From your circle</span>
-                </div>
+              {comment.is_from_circle && !isReply && (
+                <Badge variant="outline" className="ml-1 text-[11px] px-1.5 py-0 border-orange-300 text-orange-600 dark:text-orange-400 dark:border-orange-500 gap-0.5">
+                  <Users size={10} />
+                  From your circle
+                </Badge>
               )}
             </div>
 
