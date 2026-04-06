@@ -595,10 +595,25 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
           ))}
         </div>
       ) : comments.length === 0 ? (
-        /* #6: Contextual empty state */
-        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-          <MessageCircle className="h-10 w-10 mb-2 opacity-30" />
-          <p className="text-sm">{emptyStateMessage}</p>
+        /* #6: Community-driven empty state */
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <div className="flex -space-x-2 mb-4">
+            <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+          <p className="text-sm font-medium text-foreground mb-1">Start the conversation</p>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            {itemType === 'post'
+              ? 'Be the first to share your thoughts or ask the author a question.'
+              : 'Be the first to share your experience or ask someone who\'s tried this.'}
+          </p>
         </div>
       ) : (
         <div className="space-y-1">
