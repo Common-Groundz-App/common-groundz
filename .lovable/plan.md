@@ -1,58 +1,47 @@
 
 
-# Refined "From Your Circle" Badge — Post Detail Comments (Final)
+## Premium Polish Plan — Experiences & Comments
 
-## Summary
+You're right — "Comments" stays as "Comments". That was a mistake in the previous plan. The heading at line 566 of `InlineCommentThread.tsx` will NOT be changed.
 
-Upgrade the subtle "From your circle" text to a proper outline badge with orange tones, but keep it restrained for comment readability. Incorporates all feedback: badge on top-level only, no orange border on replies, improved spacing, subtle hover, softer tones.
+### Changes
 
-## Changes — `src/components/comments/CommentItem.tsx`
+**File: `src/components/content/PostContentViewer.tsx`**
 
-### 1. Add Badge import
+1. **Rename heading + add subheading**
+   - Line 306-308: Change "More experiences about {name}" → **"Real experiences with {name}"**
+   - Add subtitle: *"See how people actually used it"* (`text-xs text-muted-foreground`)
+   - Heading gets `text-base font-semibold`
 
-Add `Badge` from `@/components/ui/badge` to existing imports.
+2. **Stronger section separation**
+   - Line 305: Change `mt-8 pt-6` → `mt-10 pt-8 border-t border-border/50` (subtle divider for mental shift)
 
-### 2. Container className (lines 84-89)
+3. **Circle vs Community split**
+   - Import `useUserFollowing` hook
+   - Split `relatedPosts` into `circlePosts` (author's user_id is in following list) and `communityPosts`
+   - **"From your Circle"** subsection (only if non-empty):
+     - Heading: `font-medium text-foreground` with subtext *"Trusted experiences from your Circle"*
+     - Visual: `border-l-2 border-orange-400 bg-orange-50/20 dark:bg-orange-950/20 rounded-lg p-3`
+   - **"From the community"** subsection:
+     - Heading: `text-sm text-muted-foreground` (de-emphasized vs Circle)
+     - No special styling
 
-Update to add left border for top-level circle comments only, keep replies neutral, and add subtle hover:
+4. **Upgrade empty state copy**
+   - Keep dynamic entity name
+   - Primary: *"No experiences about {relatedEntityName} yet"*
+   - Secondary: *"People who've tried {relatedEntityName} haven't shared here yet. Be the first from your Circle!"*
+   - Below CTA button: *"Your experience could help someone decide."* (`text-xs text-muted-foreground mt-2`)
+   - Add more breathing room between elements
 
-```tsx
-className={cn(
-  "relative group flex gap-3 p-3 rounded-lg transition-colors",
-  isBeingEdited && "bg-muted/50",
-  !isReply && comment.is_from_circle && "border-l-2 border-orange-300 hover:bg-orange-50/30 dark:hover:bg-orange-950/20",
-  isReply && "pl-10 border-l-2 border-muted",
-  isHighlighted && "bg-accent/50"
-)}
-```
+5. **Staggered fade-in + hover lift on experience cards**
+   - Each `PostFeedItem` wrapped in a div with:
+     - `animate-fade-in` with `animationDelay: ${index * 100}ms`
+     - `hover:shadow-sm hover:-translate-y-[1px] transition-all duration-200`
+   - Section container also gets a subtle `animate-fade-in`
 
-Key decisions:
-- Top-level circle comments get orange left border + subtle hover
-- **All replies get neutral `border-muted`** — no orange, no visual competition
-- Hover is `orange-50/30` (very subtle, not noisy)
-
-### 3. Badge upgrade (lines 128-133)
-
-Replace muted text with outline Badge, **only on top-level comments**:
-
-```tsx
-{comment.is_from_circle && !isReply && (
-  <Badge variant="outline" className="ml-1 text-[11px] px-1.5 py-0 border-orange-300 text-orange-600 dark:text-orange-400 dark:border-orange-500 gap-0.5">
-    <Users size={10} />
-    From your circle
-  </Badge>
-)}
-```
-
-Key decisions:
-- `!isReply` — badge only on top-level, replies stay clean
-- `ml-1` for breathing room from timestamp
-- `border-orange-300` (softer than 400) for premium feel
-- Outline variant, not filled — readable without shouting
-
-### Files Modified
-
-| File | Change |
-|---|---|
-| `src/components/comments/CommentItem.tsx` | Import Badge, upgrade circle indicator to outline badge (top-level only), add subtle orange left border + hover for top-level circle comments, keep replies neutral |
+### What stays unchanged
+- `InlineCommentThread.tsx` — "Comments" heading remains as-is
+- `PostFeedItem` component internals — no padding/layout changes
+- All other pages and components
+- Empty state overlapping circles pattern in comments
 
