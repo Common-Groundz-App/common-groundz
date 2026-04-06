@@ -7,6 +7,7 @@ import InlineCommentThread from '@/components/comments/InlineCommentThread';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
+import { useUserFollowing } from '@/hooks/useUserFollowing';
 import { fetchEntityPosts } from '@/services/entityPostsService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
   const navigate = useNavigate();
+  const { data: followingIds = [] } = useUserFollowing();
   const [post, setPost] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -300,63 +302,111 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         />
       </div>
 
-      {/* More Experiences About [Entity] */}
-      {post.tagged_entities?.[0] && (
-        <div className="mt-8 pt-6 border-t">
-          <h3 className="font-semibold text-sm mb-4">
-            More experiences about {relatedEntityName}
-          </h3>
-          
-          {relatedLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="flex gap-3 items-start">
-                  <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-3 w-32" />
-                    <Skeleton className="h-4 w-full" />
-                    <Skeleton className="h-4 w-3/4" />
+      {/* Real Experiences About [Entity] */}
+      {post.tagged_entities?.[0] && (() => {
+        const circlePosts = relatedPosts.filter((p: any) => followingIds.includes(p.user_id));
+        const communityPosts = relatedPosts.filter((p: any) => !followingIds.includes(p.user_id));
+        
+        return (
+          <div className="mt-10 pt-8 border-t border-border/50 animate-fade-in">
+            <div className="mb-5">
+              <h3 className="text-base font-semibold text-foreground">
+                Real experiences with {relatedEntityName}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                See how people actually used it
+              </p>
+            </div>
+            
+            {relatedLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="flex gap-3 items-start">
+                    <Skeleton className="h-8 w-8 rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-3/4" />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : relatedPosts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-center">
-              <div className="flex -space-x-2 mb-4">
-                <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
-                <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
-                <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
+                ))}
               </div>
-              <p className="text-sm font-medium text-foreground mb-1">
-                No experiences about {relatedEntityName} yet
-              </p>
-              <p className="text-xs text-muted-foreground max-w-xs mb-4">
-                People who've tried {relatedEntityName} haven't shared here yet. Be the first!
-              </p>
-              {user && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  onClick={() => navigate('/')}
-                >
-                  Share your experience
-                </Button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {relatedPosts.map((relatedPost) => (
-                <PostFeedItem
-                  key={relatedPost.id}
-                  post={relatedPost as any}
-                  onLike={() => {}}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+            ) : relatedPosts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="flex -space-x-2 mb-5">
+                  <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
+                  <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
+                  <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
+                </div>
+                <p className="text-sm font-medium text-foreground mb-1.5">
+                  No experiences about {relatedEntityName} yet
+                </p>
+                <p className="text-xs text-muted-foreground max-w-xs mb-5">
+                  People who've tried {relatedEntityName} haven't shared here yet. Be the first from your Circle!
+                </p>
+                {user && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 mb-2"
+                    onClick={() => navigate('/')}
+                  >
+                    Share your experience
+                  </Button>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  Your experience could help someone decide.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* From your Circle */}
+                {circlePosts.length > 0 && (
+                  <div className="border-l-2 border-orange-400 bg-orange-50/20 dark:bg-orange-950/20 rounded-lg p-3 space-y-3">
+                    <div className="mb-2">
+                      <p className="text-sm font-medium text-foreground">From your Circle</p>
+                      <p className="text-xs text-muted-foreground">Trusted experiences from your Circle</p>
+                    </div>
+                    {circlePosts.map((relatedPost, index) => (
+                      <div
+                        key={relatedPost.id}
+                        className="animate-fade-in hover:shadow-sm hover:-translate-y-[1px] transition-all duration-200"
+                        style={{ animationDelay: `${index * 100}ms`, animationFillMode: 'backwards' }}
+                      >
+                        <PostFeedItem
+                          post={relatedPost as any}
+                          onLike={() => {}}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* From the community */}
+                {communityPosts.length > 0 && (
+                  <div className="space-y-3">
+                    {circlePosts.length > 0 && (
+                      <p className="text-sm text-muted-foreground mt-2">From the community</p>
+                    )}
+                    {communityPosts.map((relatedPost, index) => (
+                      <div
+                        key={relatedPost.id}
+                        className="animate-fade-in hover:shadow-sm hover:-translate-y-[1px] transition-all duration-200"
+                        style={{ animationDelay: `${(circlePosts.length + index) * 100}ms`, animationFillMode: 'backwards' }}
+                      >
+                        <PostFeedItem
+                          post={relatedPost as any}
+                          onLike={() => {}}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 };
