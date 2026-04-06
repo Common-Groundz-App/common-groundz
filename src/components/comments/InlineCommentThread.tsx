@@ -558,9 +558,6 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     ? 'Ask the author something or share your thoughts'
     : 'Share your experience, or ask someone who\'s tried this';
 
-  const emptyStateMessage = itemType === 'post'
-    ? 'No comments yet. Share your thoughts or ask the author a question.'
-    : 'No comments yet. Share your experience or ask someone who\'s tried this.';
 
   return (
     <div ref={commentSectionRef} className="mt-6">
