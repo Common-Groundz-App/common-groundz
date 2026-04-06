@@ -10,7 +10,7 @@ import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { fetchEntityPosts } from '@/services/entityPostsService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import type { PostFeedItem as PostFeedItemType } from '@/hooks/feed/api/posts/types';
 
 interface PostContentViewerProps {
@@ -321,15 +321,23 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
               ))}
             </div>
           ) : relatedPosts.length === 0 ? (
-            <div className="text-center py-6">
-              <MessageCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-30" />
-              <p className="text-sm text-muted-foreground mb-3">
-                No more experiences yet. Be the first to share yours about {relatedEntityName}.
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="flex -space-x-2 mb-4">
+                <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
+                <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
+                <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
+              </div>
+              <p className="text-sm font-medium text-foreground mb-1">
+                No experiences about {relatedEntityName} yet
+              </p>
+              <p className="text-xs text-muted-foreground max-w-xs mb-4">
+                People who've tried {relatedEntityName} haven't shared here yet. Be the first!
               </p>
               {user && (
                 <Button
                   variant="outline"
                   size="sm"
+                  className="gap-1.5"
                   onClick={() => navigate('/')}
                 >
                   Share your experience
@@ -337,34 +345,13 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
               )}
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {relatedPosts.map((relatedPost) => (
-                <div
+                <PostFeedItem
                   key={relatedPost.id}
-                  className="cursor-pointer rounded-lg border p-4 hover:bg-muted/30 transition-colors"
-                  onClick={() => navigate(`/post/${relatedPost.id}`)}
-                  role="link"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      navigate(`/post/${relatedPost.id}`);
-                    }
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-medium">{relatedPost.displayName || relatedPost.username}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(relatedPost.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  {relatedPost.title && (
-                    <p className="text-sm font-medium mb-1">{relatedPost.title}</p>
-                  )}
-                  <p className="text-sm text-muted-foreground line-clamp-2">
-                    {relatedPost.content}
-                  </p>
-                </div>
+                  post={relatedPost as any}
+                  onLike={() => {}}
+                />
               ))}
             </div>
           )}
