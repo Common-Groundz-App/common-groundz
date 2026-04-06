@@ -1,57 +1,52 @@
 
 
-## Fix Plan: 3 Changes, 3 Files
+## Fix: Create-post dialog not opening from PostView
 
-### 1. Comments empty state — single icon
-**File:** `src/components/comments/InlineCommentThread.tsx` (lines 596–606)
+### Root cause
+`SmartComposerButton.tsx` line 76-81: when `detail` exists but `detail.contentType` is falsy, the handler never calls `setIsDialogOpen(true)`. The "Share your experience" button dispatches `{ entityId, entityName }` with no `contentType`, so the modal silently fails to open.
 
-Replace the three overlapping `MessageCircle` circles with one clean icon in a muted circle:
+### Changes (2 files)
+
+**1. `src/components/feed/SmartComposerButton.tsx` — lines 73-91**
+
+Replace the handler so modal **always opens**, with stale entity reset:
+
 ```tsx
-<div className="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-  <MessageCircle className="h-7 w-7 text-muted-foreground" />
-</div>
-```
-Keep "Start the conversation" text and subtext unchanged.
+const handleOpenDialog = (event: Event) => {
+  const detail = (event as CustomEvent)?.detail ?? {};
 
-### 2. "Share your experience" button — orange outline + CustomEvent
-**File:** `src/components/content/PostContentViewer.tsx` (lines 347–355)
+  const contentType = detail.contentType ?? 'post';
+  setSelectedContentType(contentType as ContentType);
+  setIsPopoverOpen(false);
+  setIsDialogOpen(true);
 
-**Styling:** Add branded orange outline classes:
-```
-className="gap-1.5 mb-2 border-brand-orange text-brand-orange hover:bg-brand-orange/10"
+  // Support both payload shapes + reset stale data
+  if (detail.entity) {
+    setEntityData(detail.entity);
+  } else if (detail.entityId) {
+    setEntityData({
+      entity_id: detail.entityId,
+      name: detail.entityName ?? null,
+    });
+  } else {
+    setEntityData(null);
+  }
+};
 ```
 
-**Behavior:** Replace `navigate('/')` with CustomEvent passing entity context:
+**2. `src/components/content/PostContentViewer.tsx` — lines 355-360**
+
+Add `contentType: 'post'` and normalize entity id:
+
 ```tsx
-onClick={() => {
-  const entity = post.tagged_entities?.[0];
-  window.dispatchEvent(
-    new CustomEvent('open-create-post-dialog', {
-      detail: {
-        entityId: entity?.entity_id ?? null,
-        entityName: relatedEntityName ?? null,
-      },
-    })
-  );
-}}
+new CustomEvent('open-create-post-dialog', {
+  detail: {
+    contentType: 'post',
+    entityId: entity?.entity_id ?? entity?.id ?? null,
+    entityName: relatedEntityName ?? null,
+  },
+})
 ```
 
-### 3. Mount hidden SmartComposerButton on PostView
-**File:** `src/pages/PostView.tsx` (after line 178, before closing `</div>`)
-
-Import `SmartComposerButton` and render it hidden inside the logged-in layout, guarded by `user`:
-```tsx
-{user && (
-  <div className="hidden">
-    <SmartComposerButton />
-  </div>
-)}
-```
-
-Without this, the `open-create-post-dialog` event has no listener on PostView and the button does nothing.
-
-### What stays unchanged
-- "Comments" heading in InlineCommentThread — unchanged
-- PostFeedItem internals — unchanged
-- All other pages/components — unchanged
+**No other files changed.** `PostView.tsx` already mounts the hidden `SmartComposerButton`.
 
