@@ -348,8 +348,18 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-1.5 mb-2"
-                    onClick={() => navigate('/')}
+                    className="gap-1.5 mb-2 border-brand-orange text-brand-orange hover:bg-brand-orange/10"
+                    onClick={() => {
+                      const entity = post.tagged_entities?.[0];
+                      window.dispatchEvent(
+                        new CustomEvent('open-create-post-dialog', {
+                          detail: {
+                            entityId: entity?.entity_id ?? null,
+                            entityName: relatedEntityName ?? null,
+                          },
+                        })
+                      );
+                    }}
                   >
                     Share your experience
                   </Button>

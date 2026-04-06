@@ -176,6 +176,13 @@ const PostView = () => {
       <div className="xl:hidden">
         <BottomNavigation />
       </div>
+
+      {/* Hidden composer to listen for open-create-post-dialog events */}
+      {user && (
+        <div className="hidden">
+          <SmartComposerButton />
+        </div>
+      )}
     </div>
   );
 };
