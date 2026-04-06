@@ -85,7 +85,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
       className={cn(
         "relative group flex gap-3 p-3 rounded-lg transition-colors",
         isBeingEdited && "bg-muted/50",
-        !isReply && comment.is_from_circle && "border-l-2 border-orange-300 hover:bg-orange-50/30 dark:hover:bg-orange-950/20",
+        !isReply && comment.is_from_circle && "border-l-2 border-orange-400 hover:bg-orange-50/30 dark:hover:bg-orange-950/20",
         isReply && "pl-10 border-l-2 border-muted",
         isHighlighted && "bg-accent/50"
       )}
