@@ -1,47 +1,30 @@
 
 
-## Premium Polish Plan — Experiences & Comments
+## Fixes for Post Detail Page — 3 Items
 
-You're right — "Comments" stays as "Comments". That was a mistake in the previous plan. The heading at line 566 of `InlineCommentThread.tsx` will NOT be changed.
+### 1. Replace 3 chat icons in comments empty state with single icon
+**File:** `src/components/comments/InlineCommentThread.tsx` (lines 597-606)
 
-### Changes
+Replace the three overlapping `MessageCircle` circles with a single, larger `MessageCircle` icon in a muted circle. This removes the "mistake" feeling while keeping a clean visual anchor above "Start the conversation."
 
-**File: `src/components/content/PostContentViewer.tsx`**
+```
+Before: 3 overlapping circles with MessageCircle icons
+After:  1 centered circle (h-12 w-12) with a single MessageCircle (h-6 w-6)
+```
 
-1. **Rename heading + add subheading**
-   - Line 306-308: Change "More experiences about {name}" → **"Real experiences with {name}"**
-   - Add subtitle: *"See how people actually used it"* (`text-xs text-muted-foreground`)
-   - Heading gets `text-base font-semibold`
+### 2. Replace 3 empty bubbles in experiences empty state with blurred avatar placeholders
+**File:** `src/components/content/PostContentViewer.tsx` (lines 336-340)
 
-2. **Stronger section separation**
-   - Line 305: Change `mt-8 pt-6` → `mt-10 pt-8 border-t border-border/50` (subtle divider for mental shift)
+Replace the plain `bg-muted` circles with blurred placeholder avatars that imply "people will be here." Use the same overlapping layout but add a `blur-[2px]` filter and slightly varied muted background tones to suggest real avatars rather than empty dots.
 
-3. **Circle vs Community split**
-   - Import `useUserFollowing` hook
-   - Split `relatedPosts` into `circlePosts` (author's user_id is in following list) and `communityPosts`
-   - **"From your Circle"** subsection (only if non-empty):
-     - Heading: `font-medium text-foreground` with subtext *"Trusted experiences from your Circle"*
-     - Visual: `border-l-2 border-orange-400 bg-orange-50/20 dark:bg-orange-950/20 rounded-lg p-3`
-   - **"From the community"** subsection:
-     - Heading: `text-sm text-muted-foreground` (de-emphasized vs Circle)
-     - No special styling
+### 3. Fix "Share your experience" button — orange outline + open modal
+**File:** `src/components/content/PostContentViewer.tsx` (lines 348-355)
 
-4. **Upgrade empty state copy**
-   - Keep dynamic entity name
-   - Primary: *"No experiences about {relatedEntityName} yet"*
-   - Secondary: *"People who've tried {relatedEntityName} haven't shared here yet. Be the first from your Circle!"*
-   - Below CTA button: *"Your experience could help someone decide."* (`text-xs text-muted-foreground mt-2`)
-   - Add more breathing room between elements
+**Styling:** Keep `variant="outline"` but add explicit orange border and text classes: `border-brand-orange text-brand-orange hover:bg-brand-orange/10`. This makes it visually distinct as a branded secondary action without competing with primary actions.
 
-5. **Staggered fade-in + hover lift on experience cards**
-   - Each `PostFeedItem` wrapped in a div with:
-     - `animate-fade-in` with `animationDelay: ${index * 100}ms`
-     - `hover:shadow-sm hover:-translate-y-[1px] transition-all duration-200`
-   - Section container also gets a subtle `animate-fade-in`
+**Behavior:** Replace `onClick={() => navigate('/')}` with `onClick={() => window.dispatchEvent(new CustomEvent('open-create-post-dialog'))})`. This opens the create post modal over the current page — no redirect. After submission, the modal closes and feeds refresh via the existing event system. User stays on the post detail page throughout.
 
-### What stays unchanged
-- `InlineCommentThread.tsx` — "Comments" heading remains as-is
-- `PostFeedItem` component internals — no padding/layout changes
-- All other pages and components
-- Empty state overlapping circles pattern in comments
+### Files changed
+- `src/components/comments/InlineCommentThread.tsx` — single icon replacing 3
+- `src/components/content/PostContentViewer.tsx` — blurred placeholders + button fix
 
