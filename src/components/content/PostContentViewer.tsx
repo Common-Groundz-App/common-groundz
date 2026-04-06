@@ -7,6 +7,7 @@ import InlineCommentThread from '@/components/comments/InlineCommentThread';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
+import { useUserFollowing } from '@/hooks/useUserFollowing';
 import { fetchEntityPosts } from '@/services/entityPostsService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
   const navigate = useNavigate();
+  const { data: followingIds = [] } = useUserFollowing();
   const [post, setPost] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
