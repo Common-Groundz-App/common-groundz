@@ -594,8 +594,16 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       ) : comments.length === 0 ? (
         /* #6: Community-driven empty state */
         <div className="flex flex-col items-center justify-center py-10 text-center">
-          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
-            <MessageCircle className="h-6 w-6 text-muted-foreground" />
+          <div className="flex -space-x-2 mb-4">
+            <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="h-8 w-8 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+              <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            </div>
           </div>
           <p className="text-sm font-medium text-foreground mb-1">Start the conversation</p>
           <p className="text-xs text-muted-foreground max-w-xs">
