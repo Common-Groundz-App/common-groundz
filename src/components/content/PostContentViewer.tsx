@@ -334,9 +334,9 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
             ) : relatedPosts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <div className="flex -space-x-2 mb-5">
-                  <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
-                  <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
-                  <div className="h-8 w-8 rounded-full bg-muted border-2 border-background" />
+                  <div className="h-8 w-8 rounded-full bg-muted/80 border-2 border-background blur-[2px]" />
+                  <div className="h-8 w-8 rounded-full bg-muted/60 border-2 border-background blur-[2px]" />
+                  <div className="h-8 w-8 rounded-full bg-muted/70 border-2 border-background blur-[2px]" />
                 </div>
                 <p className="text-sm font-medium text-foreground mb-1.5">
                   No experiences about {relatedEntityName} yet
@@ -348,8 +348,8 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-1.5 mb-2"
-                    onClick={() => navigate('/')}
+                    className="gap-1.5 mb-2 border-brand-orange text-brand-orange hover:bg-brand-orange/10"
+                    onClick={() => window.dispatchEvent(new CustomEvent('open-create-post-dialog'))}
                   >
                     Share your experience
                   </Button>
