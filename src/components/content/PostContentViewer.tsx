@@ -10,7 +10,7 @@ import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { fetchEntityPosts } from '@/services/entityPostsService';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import type { PostFeedItem as PostFeedItemType } from '@/hooks/feed/api/posts/types';
 
 interface PostContentViewerProps {
