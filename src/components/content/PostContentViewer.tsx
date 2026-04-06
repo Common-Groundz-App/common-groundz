@@ -352,9 +352,10 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
                     onClick={() => {
                       const entity = post.tagged_entities?.[0];
                       window.dispatchEvent(
-                        new CustomEvent('open-create-post-dialog', {
+                         new CustomEvent('open-create-post-dialog', {
                           detail: {
-                            entityId: entity?.entity_id ?? null,
+                            contentType: 'post',
+                            entityId: entity?.entity_id ?? entity?.id ?? null,
                             entityName: relatedEntityName ?? null,
                           },
                         })

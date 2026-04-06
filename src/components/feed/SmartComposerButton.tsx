@@ -71,23 +71,23 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
   // Listen for the "open-create-post-dialog" event
   useEffect(() => {
     const handleOpenDialog = (event: Event) => {
-      // Check if the event has a detail property with a contentType
-      const customEvent = event as CustomEvent;
-      if (customEvent.detail) {
-        if (customEvent.detail.contentType) {
-          setSelectedContentType(customEvent.detail.contentType as ContentType);
-          setIsPopoverOpen(false);
-          setIsDialogOpen(true);
-        }
-        
-        // Extract entity data if available
-        if (customEvent.detail.entity) {
-          setEntityData(customEvent.detail.entity);
-        }
+      const detail = (event as CustomEvent)?.detail ?? {};
+
+      const contentType = detail.contentType ?? 'post';
+      setSelectedContentType(contentType as ContentType);
+      setIsPopoverOpen(false);
+      setIsDialogOpen(true);
+
+      // Support both payload shapes + reset stale data
+      if (detail.entity) {
+        setEntityData(detail.entity);
+      } else if (detail.entityId) {
+        setEntityData({
+          entity_id: detail.entityId,
+          name: detail.entityName ?? null,
+        });
       } else {
-        setSelectedContentType('post');
-        setIsPopoverOpen(false);
-        setIsDialogOpen(true);
+        setEntityData(null);
       }
     };
     
