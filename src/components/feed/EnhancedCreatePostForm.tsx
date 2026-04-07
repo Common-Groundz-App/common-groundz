@@ -28,6 +28,7 @@ interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
   onCancel: () => void;
   profileData?: any;
+  initialEntity?: Entity;
 }
 
 type VisibilityOption = 'public' | 'private' | 'circle';
@@ -42,7 +43,7 @@ const mapVisibilityToDatabase = (visibility: VisibilityOption): 'public' | 'priv
   }
 };
 
-export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: EnhancedCreatePostFormProps) {
+export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initialEntity }: EnhancedCreatePostFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
@@ -68,6 +69,15 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
   const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
   const MAX_MEDIA_COUNT = 4;
   
+  // Prefill entity when passed from parent (e.g. "Share your experience")
+  useEffect(() => {
+    if (initialEntity?.id) {
+      setEntities(prev =>
+        prev.some(e => e.id === initialEntity.id) ? prev : [...prev, initialEntity]
+      );
+    }
+  }, [initialEntity]);
+
   // Auto-resize textarea as content changes
   useEffect(() => {
     if (textareaRef.current) {
@@ -311,7 +321,12 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData }: Enh
       window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
       window.dispatchEvent(new CustomEvent('refresh-following-feed'));
       window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
-      window.dispatchEvent(new CustomEvent('refresh-posts'));
+      const refreshEntityId = entities[0]?.id;
+      if (refreshEntityId) {
+        window.dispatchEvent(new CustomEvent('refresh-posts', {
+          detail: { entityId: refreshEntityId }
+        }));
+      }
 
       // Reset form and notify parent
       onSuccess();
