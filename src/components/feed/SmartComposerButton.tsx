@@ -80,11 +80,18 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
 
       // Support both payload shapes + reset stale data
       if (detail.entity) {
-        setEntityData(detail.entity);
+        const normalizedId = detail.entity.id ?? detail.entity.entity_id;
+        setEntityData({
+          ...detail.entity,
+          id: normalizedId,
+          name: detail.entity.name ?? '',
+          type: detail.entity.type ?? 'product',
+        });
       } else if (detail.entityId) {
         setEntityData({
-          entity_id: detail.entityId,
-          name: detail.entityName ?? null,
+          id: detail.entityId,
+          name: detail.entityName ?? '',
+          type: detail.entityType ?? 'product',
         });
       } else {
         setEntityData(null);
@@ -239,7 +246,8 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
             <EnhancedCreatePostForm 
               profileData={profileData}
               onSuccess={handleContentCreated}
-              onCancel={() => setIsDialogOpen(false)} 
+              onCancel={() => setIsDialogOpen(false)}
+              initialEntity={entityData}
             />
           )}
           

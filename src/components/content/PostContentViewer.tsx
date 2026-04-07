@@ -188,6 +188,23 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
     }
   }, [post?.tagged_entities, loading]);
 
+  // Listen for entity-specific refresh after new post creation
+  React.useEffect(() => {
+    const handleRefresh = (e: Event) => {
+      const refreshedEntityId = (e as CustomEvent)?.detail?.entityId;
+      const entity = post?.tagged_entities?.[0];
+      const currentEntityId = entity?.entity_id ?? entity?.id;
+      if (!currentEntityId || refreshedEntityId !== currentEntityId) return;
+
+      fetchEntityPosts(currentEntityId, user?.id || null, 0, 6).then(posts => {
+        const filtered = posts.filter((p: any) => p.id !== postId);
+        setRelatedPosts(filtered.slice(0, 5));
+      });
+    };
+    window.addEventListener('refresh-posts', handleRefresh);
+    return () => window.removeEventListener('refresh-posts', handleRefresh);
+  }, [post?.tagged_entities, user?.id, postId]);
+
   const handlePostLike = async () => {
     if (!requireAuth({ action: 'like', surface: 'post_detail', postId: post?.id })) return;
     if (!post) return;
