@@ -1,52 +1,110 @@
 
 
-## Fix: Create-post dialog not opening from PostView
+## Auto-tag entity + refresh "Real experiences" — Implementation Plan
 
-### Root cause
-`SmartComposerButton.tsx` line 76-81: when `detail` exists but `detail.contentType` is falsy, the handler never calls `setIsDialogOpen(true)`. The "Share your experience" button dispatches `{ entityId, entityName }` with no `contentType`, so the modal silently fails to open.
+### 3 files, 4 changes
 
-### Changes (2 files)
+---
 
-**1. `src/components/feed/SmartComposerButton.tsx` — lines 73-91**
+**1. `src/components/feed/SmartComposerButton.tsx` — two changes**
 
-Replace the handler so modal **always opens**, with stale entity reset:
-
+**A) Lines 82-91** — entity normalization already exists but needs `id` normalization for canonical shape:
 ```tsx
-const handleOpenDialog = (event: Event) => {
-  const detail = (event as CustomEvent)?.detail ?? {};
+if (detail.entity) {
+  const normalizedId = detail.entity.id ?? detail.entity.entity_id;
+  setEntityData({
+    ...detail.entity,
+    id: normalizedId,
+    name: detail.entity.name ?? '',
+    type: detail.entity.type ?? 'product',
+  });
+} else if (detail.entityId) {
+  setEntityData({
+    id: detail.entityId,
+    name: detail.entityName ?? '',
+    type: detail.entityType ?? 'product',
+  });
+} else {
+  setEntityData(null);
+}
+```
 
-  const contentType = detail.contentType ?? 'post';
-  setSelectedContentType(contentType as ContentType);
-  setIsPopoverOpen(false);
-  setIsDialogOpen(true);
+**B) ~Line 239** — pass entity to `EnhancedCreatePostForm`:
+```tsx
+<EnhancedCreatePostForm 
+  profileData={profileData}
+  onSuccess={handleContentCreated}
+  onCancel={() => setIsDialogOpen(false)}
+  initialEntity={entityData}
+/>
+```
 
-  // Support both payload shapes + reset stale data
-  if (detail.entity) {
-    setEntityData(detail.entity);
-  } else if (detail.entityId) {
-    setEntityData({
-      entity_id: detail.entityId,
-      name: detail.entityName ?? null,
-    });
-  } else {
-    setEntityData(null);
+---
+
+**2. `src/components/feed/EnhancedCreatePostForm.tsx` — three changes**
+
+**A) Line 27-31** — add `initialEntity` to props interface:
+```tsx
+interface EnhancedCreatePostFormProps {
+  onSuccess: () => void;
+  onCancel: () => void;
+  profileData?: any;
+  initialEntity?: Entity;
+}
+```
+
+**B) Line 45** — accept in destructuring:
+```tsx
+export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initialEntity }: EnhancedCreatePostFormProps) {
+```
+
+**C) After line 69** — add closure-safe prefill effect:
+```tsx
+useEffect(() => {
+  if (initialEntity?.id) {
+    setEntities(prev =>
+      prev.some(e => e.id === initialEntity.id) ? prev : [...prev, initialEntity]
+    );
   }
-};
+}, [initialEntity]);
 ```
 
-**2. `src/components/content/PostContentViewer.tsx` — lines 355-360**
+**D) Line 314** — replace bare `refresh-posts` dispatch with guarded, entity-specific version:
+```tsx
+const refreshEntityId = entities[0]?.id;
+if (refreshEntityId) {
+  window.dispatchEvent(new CustomEvent('refresh-posts', {
+    detail: { entityId: refreshEntityId }
+  }));
+}
+```
 
-Add `contentType: 'post'` and normalize entity id:
+---
+
+**3. `src/components/content/PostContentViewer.tsx` — one addition**
+
+After line 189 (after the existing related-posts fetch effect), add entity-filtered refresh listener:
 
 ```tsx
-new CustomEvent('open-create-post-dialog', {
-  detail: {
-    contentType: 'post',
-    entityId: entity?.entity_id ?? entity?.id ?? null,
-    entityName: relatedEntityName ?? null,
-  },
-})
+React.useEffect(() => {
+  const handleRefresh = (e: Event) => {
+    const refreshedEntityId = (e as CustomEvent)?.detail?.entityId;
+    const entity = post?.tagged_entities?.[0];
+    const currentEntityId = entity?.entity_id ?? entity?.id;
+    if (!currentEntityId || refreshedEntityId !== currentEntityId) return;
+
+    fetchEntityPosts(currentEntityId, user?.id || null, 0, 6).then(posts => {
+      const filtered = posts.filter((p: any) => p.id !== postId);
+      setRelatedPosts(filtered.slice(0, 5));
+    });
+  };
+  window.addEventListener('refresh-posts', handleRefresh);
+  return () => window.removeEventListener('refresh-posts', handleRefresh);
+}, [post?.tagged_entities, user?.id, postId]);
 ```
 
-**No other files changed.** `PostView.tsx` already mounts the hidden `SmartComposerButton`.
+---
+
+### What stays unchanged
+Everything else — PostView.tsx, PostContentViewer dispatcher, DB schema, submit logic (lines 290-303 already persist to `post_entities`).
 
