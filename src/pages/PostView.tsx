@@ -9,7 +9,6 @@ import PostDetailSidebar from '@/components/content/PostDetailSidebar';
 import PublicContentNotFound from '@/components/content/PublicContentNotFound';
 import SEOHead from '@/components/seo/SEOHead';
 import Logo from '@/components/Logo';
-import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
 import { Bell, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -178,12 +177,6 @@ const PostView = () => {
         <BottomNavigation />
       </div>
 
-      {/* Hidden composer to listen for open-create-post-dialog events */}
-      {user && (
-        <div className="hidden">
-          <SmartComposerButton />
-        </div>
-      )}
     </div>
   );
 };

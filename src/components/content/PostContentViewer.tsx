@@ -368,15 +368,12 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
                     className="gap-1.5 mb-2 border-brand-orange text-brand-orange hover:bg-brand-orange/10"
                     onClick={() => {
                       const entity = post.tagged_entities?.[0];
-                      window.dispatchEvent(
-                         new CustomEvent('open-create-post-dialog', {
-                          detail: {
-                            contentType: 'post',
-                            entityId: entity?.entity_id ?? entity?.id ?? null,
-                            entityName: relatedEntityName ?? null,
-                          },
-                        })
-                      );
+                      const entityId = entity?.entity_id ?? entity?.id;
+                      const params = new URLSearchParams();
+                      if (entityId) params.set('entityId', entityId);
+                      if (relatedEntityName) params.set('entityName', relatedEntityName);
+                      const qs = params.toString();
+                      navigate(`/create${qs ? `?${qs}` : ''}`);
                     }}
                   >
                     Share your experience

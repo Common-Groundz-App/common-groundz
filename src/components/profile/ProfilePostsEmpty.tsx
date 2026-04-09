@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
@@ -9,6 +10,7 @@ interface ProfilePostsEmptyProps {
 }
 
 const ProfilePostsEmpty = ({ isOwnProfile }: ProfilePostsEmptyProps) => {
+  const navigate = useNavigate();
   return (
     <Card className="border-dashed">
       <CardContent className="text-center py-12 flex flex-col items-center">
@@ -24,8 +26,7 @@ const ProfilePostsEmpty = ({ isOwnProfile }: ProfilePostsEmptyProps) => {
             size="lg"
             className="px-6 bg-brand-orange hover:bg-brand-orange/90"
             onClick={() => {
-              const event = new CustomEvent('open-create-post-dialog');
-              window.dispatchEvent(event);
+              navigate('/create');
             }}
           >
             Create your first post

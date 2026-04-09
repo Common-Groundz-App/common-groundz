@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { PlusCircle, Star, Book, Tag, FileText, Eye } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ModernCreatePostForm } from './ModernCreatePostForm';
-import { EnhancedCreatePostForm } from './EnhancedCreatePostForm';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,13 +18,14 @@ interface SmartComposerButtonProps {
   onPostCreated?: () => void; // Add compatibility with old prop name
 }
 
-type ContentType = 'post' | 'review' | 'journal' | 'recommendation' | 'watching';
+type ContentType = 'review' | 'journal' | 'recommendation' | 'watching';
 
 export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartComposerButtonProps) {
   const { user, isLoading } = useAuth();
+  const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const [selectedContentType, setSelectedContentType] = useState<ContentType>('post');
+  const [selectedContentType, setSelectedContentType] = useState<ContentType>('review');
   const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [entityData, setEntityData] = useState<any>(null); // Store entity data for forms
@@ -68,12 +69,23 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
     }
   }, [user, isDialogOpen, isRecommendationFormOpen]);
 
-  // Listen for the "open-create-post-dialog" event
+  // Listen for the "open-create-post-dialog" event — only for non-post types now
   useEffect(() => {
     const handleOpenDialog = (event: Event) => {
       const detail = (event as CustomEvent)?.detail ?? {};
-
       const contentType = detail.contentType ?? 'post';
+
+      // Posts now go to /create route
+      if (contentType === 'post') {
+        const params = new URLSearchParams();
+        if (detail.entityId) params.set('entityId', detail.entityId);
+        if (detail.entityName) params.set('entityName', detail.entityName);
+        if (detail.entityType) params.set('entityType', detail.entityType);
+        const qs = params.toString();
+        navigate(`/create${qs ? `?${qs}` : ''}`);
+        return;
+      }
+
       setSelectedContentType(contentType as ContentType);
       setIsPopoverOpen(false);
       setIsDialogOpen(true);
@@ -100,7 +112,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
     
     const handleOpenRecommendationForm = (event: Event) => {
       const customEvent = event as CustomEvent;
-      // Extract entity data if available
       if (customEvent.detail && customEvent.detail.entity) {
         setEntityData(customEvent.detail.entity);
       }
@@ -114,7 +125,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
       window.removeEventListener('open-create-post-dialog', handleOpenDialog);
       window.removeEventListener('open-recommendation-form', handleOpenRecommendationForm);
     };
-  }, []);
+  }, [navigate]);
 
   const handleContentCreated = () => {
     setIsDialogOpen(false);
@@ -209,7 +220,10 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               {/* Rearranged order of content type options */}
               <button
                 className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
-                onClick={() => handleContentTypeSelect('post')}
+                onClick={() => {
+                  setIsPopoverOpen(false);
+                  navigate('/create');
+                }}
               >
                 <FileText size={16} className="text-blue-500" />
                 <span>Post</span>
@@ -242,15 +256,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
-          {selectedContentType === 'post' && (
-            <EnhancedCreatePostForm 
-              profileData={profileData}
-              onSuccess={handleContentCreated}
-              onCancel={() => setIsDialogOpen(false)}
-              initialEntity={entityData}
-            />
-          )}
-          
           {selectedContentType === 'review' && (
             <ReviewForm
               isOpen={isDialogOpen} 

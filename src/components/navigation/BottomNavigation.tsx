@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Home, Search, User, PlusCircle, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,7 @@ interface NavItem {
 
 export const BottomNavigation = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { profileUrl } = useCanonicalProfileUrl();
   
@@ -29,10 +30,7 @@ export const BottomNavigation = () => {
       icon: PlusCircle, 
       primary: true, 
       onClick: () => {
-        const event = new CustomEvent('open-create-post-dialog', {
-          detail: { contentType: 'post' }
-        });
-        window.dispatchEvent(event);
+        navigate('/create');
       }
     },
     { name: 'My Stuff', path: '/my-stuff', icon: Package },
