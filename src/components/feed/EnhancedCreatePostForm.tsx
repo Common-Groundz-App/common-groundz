@@ -26,7 +26,7 @@ import { LocationSearchInput } from './LocationSearchInput';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
-  onCancel: () => void;
+  onCancel?: () => void;
   profileData?: any;
   initialEntity?: Entity;
 }
