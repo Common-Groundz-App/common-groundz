@@ -25,6 +25,7 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const loadPosts = async () => {
     try {
@@ -70,10 +71,7 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
   };
 
   const handleCreatePost = () => {
-    // Dispatch custom event with contentType to directly open post modal
-    window.dispatchEvent(new CustomEvent('open-create-post-dialog', {
-      detail: { contentType: 'post' }
-    }));
+    navigate('/create');
   };
 
   if (loading) {

@@ -239,6 +239,11 @@ function App() {
                     </AppProtectedRoute>
                   } />
                   <Route path="/u/:username" element={<UserProfile />} />
+                  <Route path="/create" element={
+                    <AppProtectedRoute>
+                      <CreatePost />
+                    </AppProtectedRoute>
+                  } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </AuthPromptProvider>
