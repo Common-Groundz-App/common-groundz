@@ -41,6 +41,7 @@ import UserProfile from '@/pages/UserProfile';
 import ResetPassword from '@/pages/ResetPassword';
 import CompleteProfile from '@/pages/CompleteProfile';
 import AccountDeleted from '@/pages/AccountDeleted';
+import CreatePost from '@/pages/CreatePost';
 import PrivacyPolicy from '@/pages/PrivacyPolicy';
 import TermsOfService from '@/pages/TermsOfService';
 import CookiePolicy from '@/pages/CookiePolicy';
