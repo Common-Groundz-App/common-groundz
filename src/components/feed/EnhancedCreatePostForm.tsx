@@ -274,12 +274,13 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
 
       // Prepare post data for database - explicitly type the post_type
       const postData = {
+        title: title.trim() || null,
         content,
         media: mediaToSave,
         visibility: dbVisibility,
         user_id: user.id,
-        post_type: 'story' as 'story' | 'routine' | 'project' | 'note', // Explicit type casting
-        tags: tags, // Use the tags field instead of the non-existent metadata field
+        post_type: 'story' as 'story' | 'routine' | 'project' | 'note',
+        tags: tags,
       };
 
       console.log('Submitting post:', postData);
@@ -314,8 +315,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       }
       
       toast({
-        title: 'Post created',
-        description: 'Your post has been published successfully',
+        title: 'Experience shared',
+        description: 'Your experience has been shared successfully',
       });
 
       // Trigger refresh events for various parts of the app
@@ -330,6 +331,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       }
 
       // Reset form and notify parent
+      setTitle('');
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
