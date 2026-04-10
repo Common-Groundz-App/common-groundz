@@ -86,7 +86,7 @@ const CreatePost = () => {
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-base font-semibold">Create post</h1>
+          <h1 className="text-base font-semibold">Share your experience</h1>
           <div className="w-9" /> {/* Spacer for centering */}
         </div>
       </div>
@@ -107,7 +107,7 @@ const CreatePost = () => {
               >
                 <ArrowLeft size={20} />
               </button>
-              <h1 className="text-xl font-semibold">Create post</h1>
+              <h1 className="text-xl font-semibold">Share your experience</h1>
             </div>
 
             <div className="bg-card rounded-lg border shadow-sm">

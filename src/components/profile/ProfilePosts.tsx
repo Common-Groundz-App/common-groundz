@@ -127,7 +127,7 @@ const ProfilePosts = ({ profileUserId, isOwnProfile }: ProfilePostsProps) => {
               className="flex items-center shadow-md hover:shadow-lg transition-all duration-300 max-[500px]:text-sm max-[500px]:px-2 max-[500px]:h-10 max-[500px]:w-10 max-[500px]:p-0 max-[500px]:rounded-md max-[500px]:text-[18px]"
             >
               <Plus size={18} className="max-[500px]:mr-0 min-[500px]:mr-2" />
-              <span className="max-[500px]:hidden">Create Post</span>
+              <span className="max-[500px]:hidden">Share Experience</span>
             </Button>
           )}
         </div>

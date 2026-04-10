@@ -26,7 +26,7 @@ export function CreatePostButton({ onPostCreated }: CreatePostButtonProps) {
       className="bg-brand-orange hover:bg-brand-orange/90 gap-2"
     >
       <PlusCircle size={18} />
-      Create Post
+      Share Experience
     </Button>
   );
 }

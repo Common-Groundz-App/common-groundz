@@ -48,6 +48,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
   const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
   const [content, setContent] = useState('');
+  const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [entities, setEntities] = useState<Entity[]>([]);
@@ -273,12 +274,13 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
 
       // Prepare post data for database - explicitly type the post_type
       const postData = {
+        title: title.trim() || null,
         content,
         media: mediaToSave,
         visibility: dbVisibility,
         user_id: user.id,
-        post_type: 'story' as 'story' | 'routine' | 'project' | 'note', // Explicit type casting
-        tags: tags, // Use the tags field instead of the non-existent metadata field
+        post_type: 'story' as 'story' | 'routine' | 'project' | 'note',
+        tags: tags,
       };
 
       console.log('Submitting post:', postData);
@@ -313,8 +315,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       }
       
       toast({
-        title: 'Post created',
-        description: 'Your post has been published successfully',
+        title: 'Experience shared',
+        description: 'Your experience has been shared successfully',
       });
 
       // Trigger refresh events for various parts of the app
@@ -329,6 +331,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       }
 
       // Reset form and notify parent
+      setTitle('');
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -397,9 +400,83 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         </Avatar>
         <div className="flex-1 space-y-1">
           <p className="text-sm font-medium">{userDisplayName}</p>
+          
+          {/* Title Input */}
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Add a title (optional)"
+            maxLength={120}
+            aria-label="Post title"
+            className="text-lg font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/50"
+          />
+
+          {/* Entity Section — compact-expandable */}
+          {entities.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1 py-1">
+              {entities.map((entity) => (
+                <Badge 
+                  key={entity.id} 
+                  variant="outline" 
+                  className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
+                >
+                  <span>{getEntityIcon(entity.type)}</span>
+                  <span>{entity.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-4 w-4 p-0 rounded-full hover:bg-muted"
+                    onClick={() => removeEntity(entity.id)}
+                  >
+                    <X size={10} />
+                  </Button>
+                </Badge>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectorPrefillQuery('');
+                  setEntitySelectorVisible(true);
+                  setEmojiPickerVisible(false);
+                  setShowLocationInput(false);
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                + Add more
+              </button>
+            </div>
+          ) : !entitySelectorVisible ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectorPrefillQuery('');
+                setEntitySelectorVisible(true);
+                setEmojiPickerVisible(false);
+                setShowLocationInput(false);
+              }}
+              className="flex items-center gap-2 w-full text-left cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors"
+            >
+              <Tag className="h-4 w-4" />
+              <span>What are you sharing about?</span>
+            </button>
+          ) : null}
+
+          {/* Inline Entity Selector */}
+          {entitySelectorVisible && (
+            <div className="p-3 border rounded-lg bg-background animate-fade-in">
+              <SimpleEntitySelector 
+                onEntitiesChange={handleEntitiesChange}
+                initialEntities={entities}
+                initialQuery={selectorPrefillQuery}
+                autoFocusSearch={true}
+              />
+            </div>
+          )}
+
           <Textarea
             ref={textareaRef}
-            placeholder="What do you want to share today?"
+            placeholder="Share your experience..."
             value={content}
             onChange={(e) => {
               const newContent = e.target.value;
@@ -426,6 +503,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
             onKeyUp={saveCursorPosition}
             onFocus={saveCursorPosition}
           />
+          <p className="text-xs text-muted-foreground/60 mt-1">What worked? · What didn't? · Who is this useful for?</p>
         </div>
       </div>
 
@@ -435,30 +513,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
           media={media}
           onRemove={removeMedia}
         />
-      )}
-
-      {/* Entity Tags */}
-      {entities.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-3">
-          {entities.map((entity) => (
-            <Badge 
-              key={entity.id} 
-              variant="outline" 
-              className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
-            >
-              <span>{getEntityIcon(entity.type)}</span>
-              <span>{entity.name}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-4 w-4 p-0 rounded-full hover:bg-muted"
-                onClick={() => removeEntity(entity.id)}
-              >
-                <X size={10} />
-              </Button>
-            </Badge>
-          ))}
-        </div>
       )}
 
       {/* Location Tag */}
@@ -482,18 +536,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
           {location.address && (
             <span className="text-xs text-muted-foreground">{location.address}</span>
           )}
-        </div>
-      )}
-
-      {/* Entity Selector (only shown when tag button is clicked or @ is typed) */}
-      {entitySelectorVisible && (
-        <div className="mt-3 p-3 border rounded-lg bg-background animate-fade-in">
-          <SimpleEntitySelector 
-            onEntitiesChange={handleEntitiesChange}
-            initialEntities={entities}
-            initialQuery={selectorPrefillQuery}
-            autoFocusSearch={!!selectorPrefillQuery}
-          />
         </div>
       )}
 
