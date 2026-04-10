@@ -1,81 +1,58 @@
 
 
-## Move Post Composer from Modal to `/create` Route — Updated Plan
+## Phase 1: Composer & Language Refinement — Implementation Plan
 
-### Summary
-Replace the post modal with a dedicated `/create` page. All 6 locations that trigger the post composer will navigate to `/create` instead. The `open-create-post-dialog` event is fully removed for posts. Reviews, journals, watching, and recommendations stay as modals.
+All feedback from ChatGPT and Codex has been incorporated. Here's the final plan.
 
-### Feedback incorporated
-
-| ChatGPT suggestion | Action |
-|---|---|
-| Remove `open-create-post-dialog` entirely for posts | Yes — no "temporary" keep, clean removal |
-| Safe query param handling (missing/partial params) | Yes — defensive parsing, blank form on missing params |
-| Defensive back navigation | Yes — `history.length > 1 ? navigate(-1) : navigate('/home')` |
-| Remove modal styling leftovers | Yes — form renders without Dialog wrapper, no max-height/overflow hacks |
-| Keep form UI identical | Yes — zero layout or field changes to `EnhancedCreatePostForm` |
-| Hidden SmartComposerButton cleanup | Remove from PostView — only needed for post event, which is gone. SmartComposerButton still lives in Feed layout for review/journal/watching modals + recommendation event |
+### Scope
+- **4 files modified**, no new files, no DB changes
+- Adds title field, elevates entity tagging, updates copy, adds guidance text
 
 ---
 
-### Files to create
+### 1. `src/components/feed/EnhancedCreatePostForm.tsx`
 
-**`src/pages/CreatePost.tsx`** — New full-page composer
+**A. Add `title` state and input**
+- New state: `const [title, setTitle] = useState('')`
+- Render a borderless `<input>` between the username (line 399) and Textarea (line 400):
+  - `placeholder="Add a title (optional)"`, `maxLength={120}`, `aria-label="Post title"`
+  - Styled: `text-lg font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/50`
+- Reset `setTitle('')` after successful submit (around line 331)
+- Include `title: title.trim() || null` in `postData` at line 275
 
-- Desktop: centered card (max-w-xl) within standard app shell, matching feed width
-- Mobile: full-screen with top bar (X close left, "Create post" title center)
-- Reads entity from URL search params: `entityId`, `entityName`, `entityType`
-- Defensive parsing: if any param missing, just skip prefill (blank form)
-- Renders `EnhancedCreatePostForm` directly (no Dialog wrapper)
-- On success: dispatches refresh events, then `navigate(-1)` with `/home` fallback
-- On cancel/X: same back navigation
-- Uses `useEmailVerification` gate like current flow
+**B. Elevate entity section — compact-expandable, always visible**
+- Move entity UI from hidden toggle (lines 488-498) to between title and textarea
+- When no entities selected and not expanded: render a `<button>` with Tag icon + "What are you sharing about?" styled `cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5 text-sm text-muted-foreground w-full text-left`
+- On click: expand `SimpleEntitySelector` with `autoFocusSearch={true}`
+- When entities selected: show existing entity badges (lines 441-462) moved here, plus "Add more" trigger
+- Keep toolbar Tag button as secondary shortcut
+- Preserve `@mention` trigger behavior unchanged
 
----
+**C. Textarea placeholder (line 402)**
+- `"What do you want to share today?"` → `"Share your experience..."`
 
-### Files to modify
+**D. Helper text after textarea (after line 428)**
+- Add: `<p className="text-xs text-muted-foreground/60 mt-1">What worked? · What didn't? · Who is this useful for?</p>`
 
-**`src/App.tsx`**
-- Add `/create` route wrapped in `AppProtectedRoute`
+**E. Success toast (lines 316-317)**
+- `"Post created"` → `"Experience shared"`
+- `"Your post has been published successfully"` → `"Your experience has been shared successfully"`
 
-**`src/components/navigation/BottomNavigation.tsx`**
-- Replace `CustomEvent('open-create-post-dialog')` dispatch with `navigate('/create')`
+### 2. `src/pages/CreatePost.tsx`
+- Line 91 mobile header: `"Create post"` → `"Share your experience"`
+- Line 108 desktop header: `"Create post"` → `"Share your experience"`
 
-**`src/components/profile/ProfilePosts.tsx`**
-- Replace event dispatch with `navigate('/create')`
+### 3. `src/components/feed/CreatePostButton.tsx`
+- Line 29: `"Create Post"` → `"Share Experience"`
 
-**`src/components/profile/ProfilePostsEmpty.tsx`**
-- Replace event dispatch with `navigate('/create')`
-
-**`src/components/content/PostContentViewer.tsx`** (line 369-380)
-- Replace event dispatch with `navigate('/create?entityId=...&entityName=...&entityType=...')`
-- Entity params built from `post.tagged_entities[0]`
-
-**`src/components/feed/SmartComposerButton.tsx`**
-- Remove the `open-create-post-dialog` listener's post path — when `contentType === 'post'`, navigate to `/create` instead of opening dialog
-- Remove the `selectedContentType === 'post'` branch from the Dialog content (lines 245-251)
-- Popover "Post" button: navigate to `/create` instead of `handleContentTypeSelect('post')`
-- Keep review, journal, watching in the Dialog as-is
-- Keep recommendation form as-is
-
-**`src/pages/PostView.tsx`** (lines 181-186)
-- Remove the hidden `<SmartComposerButton />` — no longer needed since PostContentViewer navigates directly
-
-**`src/components/feed/EnhancedCreatePostForm.tsx`**
-- Make `onCancel` optional (`onCancel?: () => void`) since the `/create` page handles navigation
-- No other changes — form internals stay identical
-
-**`src/components/feed/CreatePostButton.tsx`**
-- Replace `open-create-post-dialog` listener with `navigate('/create')`
-- Replace button click handler with `navigate('/create')`
-- Remove the Dialog entirely — it's redundant now
-
----
+### 4. `src/components/profile/ProfilePosts.tsx`
+- Line ~130: `"Create Post"` → `"Share Experience"`
 
 ### What stays unchanged
-- `EnhancedCreatePostForm` internal logic (submit, entity tagging, media, emoji, location)
-- Review, journal, watching modals inside SmartComposerButton
-- Recommendation form
-- DB schema, `post_entities` persistence
-- All refresh event dispatching inside the form
+- Submit button: **"Post"** / **"Posting..."**
+- Entity remains **optional**
+- Validation: content or media required
+- Media upload, emoji, location, visibility — untouched
+- `@mention` trigger behavior preserved
+- No DB schema changes, no feed/detail page changes
 
