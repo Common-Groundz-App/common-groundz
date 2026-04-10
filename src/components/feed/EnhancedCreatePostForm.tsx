@@ -48,6 +48,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
   const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
   const [content, setContent] = useState('');
+  const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [entities, setEntities] = useState<Entity[]>([]);
