@@ -3,7 +3,8 @@ import { sharePost } from '@/utils/sharePost';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share, Globe, Lock, Users, MapPin } from 'lucide-react';
+import { ThumbsUp, Tag, MessageCircle, MoreVertical, Pencil, Trash2, Bookmark, Share, Globe, Lock, Users, MapPin } from 'lucide-react';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { formatDateLong } from '@/utils/dateUtils';
 import { cn } from '@/lib/utils';
 import { PostFeedItem as PostItem } from '@/hooks/feed/types';
@@ -77,6 +78,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isLiking, setIsLiking] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
   const isOwner = user?.id === post.user_id;
   
@@ -95,6 +98,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   }, [post.id, post.comment_count]);
 
   const handleLikeClick = async () => {
+    if (isLiking) return;
     if (!requireAuth({ action: 'like', surface: 'post_feed_item', postId: post?.id })) return;
     if (!post) return;
     
@@ -103,6 +107,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       return;
     }
     
+    setIsLiking(true);
     try {
       if (localIsLiked) {
         await supabase
@@ -129,13 +134,17 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       }
     } catch (err) {
       console.error('Error toggling like:', err);
+    } finally {
+      setIsLiking(false);
     }
   };
   
   const handleSaveClick = async () => {
+    if (isSaving) return;
     if (!requireAuth({ action: 'save', surface: 'post_feed_item', postId: post?.id })) return;
     if (!post) return;
     
+    setIsSaving(true);
     try {
       if (localIsSaved) {
         await supabase
@@ -160,6 +169,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       }
     } catch (err) {
       console.error('Error toggling save:', err);
+    } finally {
+      setIsSaving(false);
     }
   };
   
@@ -454,48 +465,68 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
 
         {/* Social Actions - Isolated from click area */}
         <div className="flex items-center justify-between mt-4 pt-4 border-t" onClick={e => e.stopPropagation()}>
-          <div className="flex items-center gap-3 sm:gap-6">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className={cn(
-                "flex items-center gap-1 py-0 px-2 sm:px-4", 
-                localIsLiked && "text-red-500 hover:text-red-600"
-              )}
-              onClick={handleLikeClick}
-            >
-              <Heart className={cn("h-5 w-5", localIsLiked && "fill-current")} />
-              <span>{localLikes || 0}</span>
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm" 
-              className="flex items-center gap-1 py-0 px-2 sm:px-4"
-              onClick={handleCommentClick}
-            >
-              <MessageCircle className="h-5 w-5" />
-              <span>{displayCommentCount || 0}</span>
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm" 
-              className={cn(
-                "flex items-center gap-1 py-0 px-2 sm:px-4",
-                localIsSaved && "text-primary"
-              )}
-              onClick={handleSaveClick}
-            >
-              <Bookmark className={cn("h-5 w-5", localIsSaved && "fill-current")} />
-            </Button>
-          </div>
+          <TooltipProvider delayDuration={300}>
+            <div className="flex items-center gap-3 sm:gap-6">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className={cn(
+                      "flex items-center gap-1.5 py-0 px-2 sm:px-4 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed", 
+                      localIsLiked && "text-blue-500 hover:text-blue-600"
+                    )}
+                    onClick={handleLikeClick}
+                    disabled={isLiking}
+                    aria-label="Mark as helpful"
+                    aria-pressed={localIsLiked}
+                  >
+                    <ThumbsUp className={cn("h-5 w-5", localIsLiked && "fill-current")} />
+                    <span>{localLikes || 0}</span>
+                    <span className="ml-1 hidden sm:inline">Helpful</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Mark as helpful</TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm" 
+                    className="flex items-center gap-1.5 py-0 px-2 sm:px-4 whitespace-nowrap"
+                    onClick={handleCommentClick}
+                    aria-label="View discussion"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    <span>{displayCommentCount || 0}</span>
+                    <span className="ml-1 hidden sm:inline">Discuss</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>View discussion</TooltipContent>
+              </Tooltip>
+              
+              <Button
+                variant="ghost"
+                size="sm" 
+                className={cn(
+                  "flex items-center gap-1.5 py-0 px-2 sm:px-4 disabled:opacity-50 disabled:cursor-not-allowed",
+                  localIsSaved && "text-primary"
+                )}
+                onClick={handleSaveClick}
+                disabled={isSaving}
+                aria-pressed={localIsSaved}
+              >
+                <Bookmark className={cn("h-5 w-5", localIsSaved && "fill-current")} />
+              </Button>
+            </div>
+          </TooltipProvider>
           
           {/* Share button */}
           <Button
             variant="ghost"
             size="sm" 
-            className="flex items-center gap-1 py-0 px-2 sm:px-4"
+            className="flex items-center gap-1.5 py-0 px-2 sm:px-4"
             onClick={handleShare}
           >
             <Share className="h-5 w-5" />
