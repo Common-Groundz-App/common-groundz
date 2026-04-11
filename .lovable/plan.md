@@ -1,58 +1,45 @@
 
 
-## Phase 1: Composer & Language Refinement — Implementation Plan
-
-All feedback from ChatGPT and Codex has been incorporated. Here's the final plan.
+## Phase 2: Feed Card Interaction Refinement — Final Plan
 
 ### Scope
-- **4 files modified**, no new files, no DB changes
-- Adds title field, elevates entity tagging, updates copy, adds guidance text
+**1 file**: `src/components/feed/PostFeedItem.tsx`. No DB changes. `RecommendationFeedItem` untouched.
 
----
+### All Changes
 
-### 1. `src/components/feed/EnhancedCreatePostForm.tsx`
+**1. Imports (line 6)**
+- Replace `Heart` with `ThumbsUp` in lucide-react import
+- Add `Tooltip, TooltipTrigger, TooltipContent, TooltipProvider` from `@/components/ui/tooltip`
 
-**A. Add `title` state and input**
-- New state: `const [title, setTitle] = useState('')`
-- Render a borderless `<input>` between the username (line 399) and Textarea (line 400):
-  - `placeholder="Add a title (optional)"`, `maxLength={120}`, `aria-label="Post title"`
-  - Styled: `text-lg font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/50`
-- Reset `setTitle('')` after successful submit (around line 331)
-- Include `title: title.trim() || null` in `postData` at line 275
+**2. New state for in-flight guards**
+- `const [isLiking, setIsLiking] = useState(false)`
+- `const [isSaving, setIsSaving] = useState(false)`
+- `handleLikeClick`: early return if `isLiking`, wrap in `setIsLiking(true)` / `finally { setIsLiking(false) }`
+- `handleSaveClick`: same pattern with `isSaving`
 
-**B. Elevate entity section — compact-expandable, always visible**
-- Move entity UI from hidden toggle (lines 488-498) to between title and textarea
-- When no entities selected and not expanded: render a `<button>` with Tag icon + "What are you sharing about?" styled `cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5 text-sm text-muted-foreground w-full text-left`
-- On click: expand `SimpleEntitySelector` with `autoFocusSearch={true}`
-- When entities selected: show existing entity badges (lines 441-462) moved here, plus "Add more" trigger
-- Keep toolbar Tag button as secondary shortcut
-- Preserve `@mention` trigger behavior unchanged
+**3. Helpful button (replaces Heart/Like)**
+- `ThumbsUp` icon, active color `text-blue-500 hover:text-blue-600`, keep `fill-current`
+- `aria-label="Mark as helpful"`, `aria-pressed={localIsLiked}`
+- `disabled={isLiking}`, `disabled:opacity-50 disabled:cursor-not-allowed`
+- `whitespace-nowrap` on button
+- Label: `<span className="ml-1 hidden sm:inline">Helpful</span>`
+- Wrapped in `Tooltip` → "Mark as helpful"
 
-**C. Textarea placeholder (line 402)**
-- `"What do you want to share today?"` → `"Share your experience..."`
+**4. Discuss button (comment action)**
+- `aria-label="View discussion"`
+- `whitespace-nowrap` on button
+- Label: `<span className="ml-1 hidden sm:inline">Discuss</span>`
+- Wrapped in `Tooltip` → "View discussion"
 
-**D. Helper text after textarea (after line 428)**
-- Add: `<p className="text-xs text-muted-foreground/60 mt-1">What worked? · What didn't? · Who is this useful for?</p>`
+**5. Save button**
+- Add `aria-pressed={localIsSaved}`, `disabled={isSaving}`, `disabled:opacity-50 disabled:cursor-not-allowed`
 
-**E. Success toast (lines 316-317)**
-- `"Post created"` → `"Experience shared"`
-- `"Your post has been published successfully"` → `"Your experience has been shared successfully"`
+**6. Wrapper**
+- Wrap social actions div content in `<TooltipProvider delayDuration={300}>`
 
-### 2. `src/pages/CreatePost.tsx`
-- Line 91 mobile header: `"Create post"` → `"Share your experience"`
-- Line 108 desktop header: `"Create post"` → `"Share your experience"`
-
-### 3. `src/components/feed/CreatePostButton.tsx`
-- Line 29: `"Create Post"` → `"Share Experience"`
-
-### 4. `src/components/profile/ProfilePosts.tsx`
-- Line ~130: `"Create Post"` → `"Share Experience"`
+**7. Spacing**
+- `gap-1.5` on action buttons for natural spacing
 
 ### What stays unchanged
-- Submit button: **"Post"** / **"Posting..."**
-- Entity remains **optional**
-- Validation: content or media required
-- Media upload, emoji, location, visibility — untouched
-- `@mention` trigger behavior preserved
-- No DB schema changes, no feed/detail page changes
+- Entity tags position, Bookmark/Share buttons, card layout, detail view behavior, `RecommendationFeedItem`, DB logic
 
