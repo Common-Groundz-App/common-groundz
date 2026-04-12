@@ -310,6 +310,11 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         isDetailView={isDetailView}
       />
 
+      {/* Structured Experience Fields */}
+      {post.structured_fields && typeof post.structured_fields === 'object' && (
+        <StructuredFieldsDisplay data={post.structured_fields} />
+      )}
+
       {/* Inline Comments */}
       <div className="mt-6 pt-6 border-t">
         <InlineCommentThread
