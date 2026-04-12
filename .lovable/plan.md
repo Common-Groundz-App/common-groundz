@@ -1,58 +1,77 @@
 
 
-## Phase 1: Composer & Language Refinement — Implementation Plan
+## Phase 3: Structured Experience Fields — Final Implementation Plan
 
-All feedback from ChatGPT and Codex has been incorporated. Here's the final plan.
+This plan has been refined through multiple rounds of review. Both final suggestions are incorporated:
 
-### Scope
-- **4 files modified**, no new files, no DB changes
-- Adds title field, elevates entity tagging, updates copy, adds guidance text
+1. **DB CHECK constraint** — Ensure `structured_fields` is either `NULL` or a JSON object (not array/string/number)
+2. **Analytics only when non-null** — Only fire `post_structured_fields_used` when `cleanStructuredFields()` returns non-null
 
 ---
 
-### 1. `src/components/feed/EnhancedCreatePostForm.tsx`
+### Step 1: Database Migration
 
-**A. Add `title` state and input**
-- New state: `const [title, setTitle] = useState('')`
-- Render a borderless `<input>` between the username (line 399) and Textarea (line 400):
-  - `placeholder="Add a title (optional)"`, `maxLength={120}`, `aria-label="Post title"`
-  - Styled: `text-lg font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/50`
-- Reset `setTitle('')` after successful submit (around line 331)
-- Include `title: title.trim() || null` in `postData` at line 275
+```sql
+-- Add the column
+ALTER TABLE posts ADD COLUMN IF NOT EXISTS structured_fields jsonb DEFAULT NULL;
 
-**B. Elevate entity section — compact-expandable, always visible**
-- Move entity UI from hidden toggle (lines 488-498) to between title and textarea
-- When no entities selected and not expanded: render a `<button>` with Tag icon + "What are you sharing about?" styled `cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5 text-sm text-muted-foreground w-full text-left`
-- On click: expand `SimpleEntitySelector` with `autoFocusSearch={true}`
-- When entities selected: show existing entity badges (lines 441-462) moved here, plus "Add more" trigger
-- Keep toolbar Tag button as secondary shortcut
-- Preserve `@mention` trigger behavior unchanged
+-- Ensure it's always null or a valid object
+ALTER TABLE posts ADD CONSTRAINT structured_fields_is_object
+CHECK (structured_fields IS NULL OR jsonb_typeof(structured_fields) = 'object');
+```
 
-**C. Textarea placeholder (line 402)**
-- `"What do you want to share today?"` → `"Share your experience..."`
+No RLS changes needed — existing `posts` policies cover this column.
 
-**D. Helper text after textarea (after line 428)**
-- Add: `<p className="text-xs text-muted-foreground/60 mt-1">What worked? · What didn't? · Who is this useful for?</p>`
+### Step 2: New File — `src/types/structuredFields.ts`
 
-**E. Success toast (lines 316-317)**
-- `"Post created"` → `"Experience shared"`
-- `"Your post has been published successfully"` → `"Your experience has been shared successfully"`
+- `StructuredFields` interface with keys: `what_worked`, `what_didnt`, `duration`, `good_for`, `reuse_intent`, `_v`
+- `DURATION_OPTIONS` map (enum codes → labels): `lt_1w`, `1_4w`, `1_3m`, `3_6m`, `6_12m`, `1y_plus`
+- `ALLOWED_STRUCTURED_KEYS` whitelist for safe rendering
+- `cleanStructuredFields(input)`:
+  - Trims strings, collapses multiple spaces
+  - Enforces max lengths (500 for narratives, 300 for `good_for`)
+  - Preserves user casing (no lowercasing)
+  - Validates `duration` and `reuse_intent` against allowed values
+  - Maps legacy keys (`pros`→`what_worked`, `cons`→`what_didnt`, `best_for`→`good_for`)
+  - Returns `null` if all fields empty (never stores `{"_v":1}` alone)
+  - Adds `_v: 1` only when returning non-null
+- `hasStructuredContent(data)` — boolean check, ignores `_v` key
 
-### 2. `src/pages/CreatePost.tsx`
-- Line 91 mobile header: `"Create post"` → `"Share your experience"`
-- Line 108 desktop header: `"Create post"` → `"Share your experience"`
+### Step 3: Edit `EnhancedCreatePostForm.tsx`
 
-### 3. `src/components/feed/CreatePostButton.tsx`
-- Line 29: `"Create Post"` → `"Share Experience"`
+- Add state for 5 structured fields
+- Add Radix Collapsible section labeled "Add more about your experience", collapsed by default
+- On expand: auto-focus "What worked" textarea
+- Fields: two textareas with live character counters, one duration dropdown, one text input with counter, yes/no toggle ("Yes, I'd use it again" / "No, I wouldn't")
+- Trim + collapse whitespace on blur (no casing changes)
+- On submit:
+  - Run `cleanStructuredFields()` 
+  - If non-null: include as `structured_fields` in postData AND fire `analytics.track('post_structured_fields_used', { has_pros, has_cons, has_duration, has_good_for, has_reuse })`
+  - If null: omit `structured_fields` from postData entirely (don't send the key at all)
+- Reset all fields on success
 
-### 4. `src/components/profile/ProfilePosts.tsx`
-- Line ~130: `"Create Post"` → `"Share Experience"`
+### Step 4: Edit `PostContentViewer.tsx`
+
+- Add `structured_fields` to Supabase select query
+- Guard with `typeof === 'object'` + `hasStructuredContent()` check
+- Only render keys from `ALLOWED_STRUCTURED_KEYS` (ignore unknown keys silently)
+- Grouped display:
+  - **Narrative** (top): "What worked" / "What didn't" with subtle icons (👍/👎)
+  - **Metadata** (bottom): Duration, Good for, Would use again — inline row
+- Only render fields that have values
+
+### Files
+
+| File | Action |
+|------|--------|
+| New migration SQL | Add column + CHECK constraint |
+| `src/types/structuredFields.ts` | NEW — types, constants, cleaners |
+| `src/components/feed/EnhancedCreatePostForm.tsx` | EDIT — collapsible section |
+| `src/components/content/PostContentViewer.tsx` | EDIT — render structured fields |
 
 ### What stays unchanged
-- Submit button: **"Post"** / **"Posting..."**
-- Entity remains **optional**
-- Validation: content or media required
-- Media upload, emoji, location, visibility — untouched
-- `@mention` trigger behavior preserved
-- No DB schema changes, no feed/detail page changes
+- Feed cards — no changes
+- Heart/Like interaction — untouched
+- Submit button stays "Post"
+- All existing validation and submission logic preserved
 
