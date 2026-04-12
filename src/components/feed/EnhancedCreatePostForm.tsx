@@ -284,8 +284,17 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       // Store location as a tag if it exists, instead of in metadata
       const tags = location ? [location.name] : [];
 
+      // Clean structured fields
+      const cleanedStructured = cleanStructuredFields({
+        what_worked: whatWorked,
+        what_didnt: whatDidnt,
+        duration: duration || undefined,
+        good_for: goodFor,
+        reuse_intent: reuseIntent || undefined,
+      });
+
       // Prepare post data for database - explicitly type the post_type
-      const postData = {
+      const postData: Record<string, any> = {
         title: title.trim() || null,
         content,
         media: mediaToSave,
@@ -294,6 +303,20 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         post_type: 'story' as 'story' | 'routine' | 'project' | 'note',
         tags: tags,
       };
+
+      // Only include structured_fields when there's actual data
+      if (cleanedStructured) {
+        postData.structured_fields = cleanedStructured;
+
+        // Analytics: track which fields are used
+        analytics.track('post_structured_fields_used', {
+          has_pros: !!cleanedStructured.what_worked,
+          has_cons: !!cleanedStructured.what_didnt,
+          has_duration: !!cleanedStructured.duration,
+          has_good_for: !!cleanedStructured.good_for,
+          has_reuse: !!cleanedStructured.reuse_intent,
+        });
+      }
 
       console.log('Submitting post:', postData);
       
