@@ -47,15 +47,12 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
       try {
         setLoading(true);
         
-          const { data, error } = await supabase
+        const { data, error } = await supabase
           .from('posts')
           .select(`
             id, title, content, post_type, visibility, user_id,
             created_at, updated_at, media, view_count, status, is_deleted, structured_fields
           `)
-          .eq('id', postId)
-          .eq('is_deleted', false)
-          .single();
           .eq('id', postId)
           .eq('is_deleted', false)
           .single();
