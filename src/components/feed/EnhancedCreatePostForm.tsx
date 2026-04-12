@@ -323,7 +323,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       // Save to database
       const { data: newPost, error } = await supabase
         .from('posts')
-        .insert(postData)
+        .insert(postData as any)
         .select()
         .single();
       
