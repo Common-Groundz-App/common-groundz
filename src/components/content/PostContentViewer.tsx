@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import PostFeedItem from '@/components/feed/PostFeedItem';
 import FeedSkeleton from '@/components/feed/FeedSkeleton';
 import InlineCommentThread from '@/components/comments/InlineCommentThread';
+import StructuredFieldsDisplay from '@/components/content/StructuredFieldsDisplay';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
@@ -50,7 +51,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
           .from('posts')
           .select(`
             id, title, content, post_type, visibility, user_id,
-            created_at, updated_at, media, view_count, status, is_deleted
+            created_at, updated_at, media, view_count, status, is_deleted, structured_fields
           `)
           .eq('id', postId)
           .eq('is_deleted', false)
@@ -308,6 +309,11 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         highlightCommentId={highlightCommentId}
         isDetailView={isDetailView}
       />
+
+      {/* Structured Experience Fields */}
+      {post.structured_fields && typeof post.structured_fields === 'object' && (
+        <StructuredFieldsDisplay data={post.structured_fields} />
+      )}
 
       {/* Inline Comments */}
       <div className="mt-6 pt-6 border-t">

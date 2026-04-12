@@ -9,7 +9,7 @@ import { SimpleEntitySelector } from '@/components/feed/SimpleEntitySelector';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Badge } from '@/components/ui/badge';
-import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users } from 'lucide-react';
+import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users, ChevronDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredFields';
+import { analytics } from '@/services/analytics';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -63,6 +66,15 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
     coordinates: { lat: number; lng: number };
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Structured fields state
+  const [structuredOpen, setStructuredOpen] = useState(false);
+  const [whatWorked, setWhatWorked] = useState('');
+  const [whatDidnt, setWhatDidnt] = useState('');
+  const [duration, setDuration] = useState('');
+  const [goodFor, setGoodFor] = useState('');
+  const [reuseIntent, setReuseIntent] = useState<'' | 'yes' | 'no'>('');
+  const whatWorkedRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
@@ -272,8 +284,17 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       // Store location as a tag if it exists, instead of in metadata
       const tags = location ? [location.name] : [];
 
+      // Clean structured fields
+      const cleanedStructured = cleanStructuredFields({
+        what_worked: whatWorked,
+        what_didnt: whatDidnt,
+        duration: duration || undefined,
+        good_for: goodFor,
+        reuse_intent: reuseIntent || undefined,
+      });
+
       // Prepare post data for database - explicitly type the post_type
-      const postData = {
+      const postData: Record<string, any> = {
         title: title.trim() || null,
         content,
         media: mediaToSave,
@@ -283,12 +304,26 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         tags: tags,
       };
 
+      // Only include structured_fields when there's actual data
+      if (cleanedStructured) {
+        postData.structured_fields = cleanedStructured;
+
+        // Analytics: track which fields are used
+        analytics.track('post_structured_fields_used', {
+          has_pros: !!cleanedStructured.what_worked,
+          has_cons: !!cleanedStructured.what_didnt,
+          has_duration: !!cleanedStructured.duration,
+          has_good_for: !!cleanedStructured.good_for,
+          has_reuse: !!cleanedStructured.reuse_intent,
+        });
+      }
+
       console.log('Submitting post:', postData);
       
       // Save to database
       const { data: newPost, error } = await supabase
         .from('posts')
-        .insert(postData)
+        .insert(postData as any)
         .select()
         .single();
       
@@ -332,6 +367,12 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
 
       // Reset form and notify parent
       setTitle('');
+      setWhatWorked('');
+      setWhatDidnt('');
+      setDuration('');
+      setGoodFor('');
+      setReuseIntent('');
+      setStructuredOpen(false);
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -504,6 +545,115 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
             onFocus={saveCursorPosition}
           />
           <p className="text-xs text-muted-foreground/60 mt-1">What worked? · What didn't? · Who is this useful for?</p>
+
+          {/* Structured Experience Fields — Collapsible */}
+          <Collapsible open={structuredOpen} onOpenChange={(open) => {
+            setStructuredOpen(open);
+            if (open) {
+              setTimeout(() => whatWorkedRef.current?.focus(), 100);
+            }
+          }}>
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 mt-3 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              >
+                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", structuredOpen && "rotate-180")} />
+                Add more about your experience
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3 space-y-3 animate-fade-in">
+              {/* What worked */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">What worked?</label>
+                <Textarea
+                  ref={whatWorkedRef}
+                  value={whatWorked}
+                  onChange={(e) => setWhatWorked(e.target.value)}
+                  onBlur={() => setWhatWorked(prev => prev.trim().replace(/\s{2,}/g, ' '))}
+                  placeholder="The best part was..."
+                  maxLength={500}
+                  className="min-h-[60px] resize-none text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatWorked.length}/500</p>
+              </div>
+
+              {/* What didn't work */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">What didn't work?</label>
+                <Textarea
+                  value={whatDidnt}
+                  onChange={(e) => setWhatDidnt(e.target.value)}
+                  onBlur={() => setWhatDidnt(prev => prev.trim().replace(/\s{2,}/g, ' '))}
+                  placeholder="I wish it had..."
+                  maxLength={500}
+                  className="min-h-[60px] resize-none text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatDidnt.length}/500</p>
+              </div>
+
+              {/* Duration */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">How long have you used it?</label>
+                <Select value={duration} onValueChange={setDuration}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Select duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(DURATION_OPTIONS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Good for */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Good for</label>
+                <input
+                  type="text"
+                  value={goodFor}
+                  onChange={(e) => setGoodFor(e.target.value)}
+                  onBlur={() => setGoodFor(prev => prev.trim().replace(/\s{2,}/g, ' '))}
+                  placeholder="e.g. Dry skin, Beginners, Date night"
+                  maxLength={300}
+                  className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+                <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{goodFor.length}/300</p>
+              </div>
+
+              {/* Would use again */}
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">Would you use it again?</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setReuseIntent(reuseIntent === 'yes' ? '' : 'yes')}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs border transition-colors",
+                      reuseIntent === 'yes'
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-input text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                    )}
+                  >
+                    Yes, I'd use it again
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReuseIntent(reuseIntent === 'no' ? '' : 'no')}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs border transition-colors",
+                      reuseIntent === 'no'
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-input text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                    )}
+                  >
+                    No, I wouldn't
+                  </button>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
 

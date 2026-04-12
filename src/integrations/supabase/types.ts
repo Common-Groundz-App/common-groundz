@@ -2129,6 +2129,7 @@ export type Database = {
           media: Json | null
           post_type: Database["public"]["Enums"]["post_type"]
           status: string | null
+          structured_fields: Json | null
           tags: string[] | null
           title: string | null
           updated_at: string
@@ -2146,6 +2147,7 @@ export type Database = {
           media?: Json | null
           post_type?: Database["public"]["Enums"]["post_type"]
           status?: string | null
+          structured_fields?: Json | null
           tags?: string[] | null
           title?: string | null
           updated_at?: string
@@ -2163,6 +2165,7 @@ export type Database = {
           media?: Json | null
           post_type?: Database["public"]["Enums"]["post_type"]
           status?: string | null
+          structured_fields?: Json | null
           tags?: string[] | null
           title?: string | null
           updated_at?: string
