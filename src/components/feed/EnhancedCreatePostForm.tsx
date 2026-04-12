@@ -9,7 +9,7 @@ import { SimpleEntitySelector } from '@/components/feed/SimpleEntitySelector';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Badge } from '@/components/ui/badge';
-import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users } from 'lucide-react';
+import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users, ChevronDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +23,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredFields';
+import { analytics } from '@/services/analytics';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -63,6 +66,15 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
     coordinates: { lat: number; lng: number };
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Structured fields state
+  const [structuredOpen, setStructuredOpen] = useState(false);
+  const [whatWorked, setWhatWorked] = useState('');
+  const [whatDidnt, setWhatDidnt] = useState('');
+  const [duration, setDuration] = useState('');
+  const [goodFor, setGoodFor] = useState('');
+  const [reuseIntent, setReuseIntent] = useState<'' | 'yes' | 'no'>('');
+  const whatWorkedRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
