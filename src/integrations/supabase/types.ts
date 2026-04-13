@@ -4526,7 +4526,15 @@ export type Database = {
         | "copyright_violation"
         | "duplicate"
         | "other"
-      post_type: "story" | "routine" | "project" | "note"
+      post_type:
+        | "story"
+        | "routine"
+        | "project"
+        | "note"
+        | "comparison"
+        | "question"
+        | "tip"
+        | "update"
       recommendation_category: "food" | "movie" | "product" | "book" | "place"
       recommendation_visibility: "public" | "private" | "circle_only"
       suggestion_status: "pending" | "approved" | "rejected" | "applied"
@@ -4684,7 +4692,16 @@ export const Constants = {
         "duplicate",
         "other",
       ],
-      post_type: ["story", "routine", "project", "note"],
+      post_type: [
+        "story",
+        "routine",
+        "project",
+        "note",
+        "comparison",
+        "question",
+        "tip",
+        "update",
+      ],
       recommendation_category: ["food", "movie", "product", "book", "place"],
       recommendation_visibility: ["public", "private", "circle_only"],
       suggestion_status: ["pending", "approved", "rejected", "applied"],
