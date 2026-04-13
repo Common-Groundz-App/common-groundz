@@ -541,7 +541,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
 
           <Textarea
             ref={textareaRef}
-            placeholder="Share your experience..."
+            placeholder={getPlaceholderForType(postType)}
             value={content}
             onChange={(e) => {
               const newContent = e.target.value;
