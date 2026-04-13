@@ -38,7 +38,7 @@ import { extractHashtagsFromPost, normalizeHashtag } from '@/utils/hashtag';
 import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
 
 // Define valid database post types
-type DatabasePostType = 'story' | 'routine' | 'project' | 'note';
+type DatabasePostType = 'story' | 'routine' | 'project' | 'note' | 'comparison' | 'question' | 'tip' | 'update';
 // Define all UI post types
 type UIPostType = DatabasePostType | 'journal' | 'watching';
 
