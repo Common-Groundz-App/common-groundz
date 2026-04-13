@@ -368,10 +368,10 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               />
               <div className="flex items-center text-muted-foreground text-xs gap-1">
                 <span>{formatDateLong(post.created_at)}</span>
-                {shouldShowTypeBadge(post.post_type) && (
+                {shouldShowTypeBadge(post.post_type ?? 'story') && (
                   <>
                     <span>·</span>
-                    <span className="text-muted-foreground/70">{getPostTypeLabel(post.post_type)}</span>
+                    <span className="text-muted-foreground/70">{getPostTypeLabel(post.post_type ?? 'story')}</span>
                   </>
                 )}
                 {post.visibility !== 'public' && (
