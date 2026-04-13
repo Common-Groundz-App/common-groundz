@@ -1,77 +1,82 @@
 
 
-## Phase 3: Structured Experience Fields — Final Implementation Plan
+## Phase 4: Post Type Labels — Final Implementation Plan
 
-This plan has been refined through multiple rounds of review. Both final suggestions are incorporated:
+All feedback rounds incorporated. Ready to implement.
 
-1. **DB CHECK constraint** — Ensure `structured_fields` is either `NULL` or a JSON object (not array/string/number)
-2. **Analytics only when non-null** — Only fire `post_structured_fields_used` when `cleanStructuredFields()` returns non-null
+### Refinements from latest review (both adopted)
 
----
+1. **Backfill NULL post_type** — add `UPDATE posts SET post_type = 'story' WHERE post_type IS NULL;` in migration
+2. **Placeholder reset** — explicitly reset to base text when toggling back to Experience
+3. **Chip styling** — `text-xs`, outline/ghost variant, muted colors, visually secondary
+4. **Badge resilience** — null/unknown types render no badge, never crash
 
-### Step 1: Database Migration
+### Implementation
 
+**Step 1: Database Migration**
 ```sql
--- Add the column
-ALTER TABLE posts ADD COLUMN IF NOT EXISTS structured_fields jsonb DEFAULT NULL;
+-- Forward-only enum additions
+ALTER TYPE post_type ADD VALUE IF NOT EXISTS 'comparison';
+ALTER TYPE post_type ADD VALUE IF NOT EXISTS 'question';
+ALTER TYPE post_type ADD VALUE IF NOT EXISTS 'tip';
+ALTER TYPE post_type ADD VALUE IF NOT EXISTS 'update';
 
--- Ensure it's always null or a valid object
-ALTER TABLE posts ADD CONSTRAINT structured_fields_is_object
-CHECK (structured_fields IS NULL OR jsonb_typeof(structured_fields) = 'object');
+-- DB-level default
+ALTER TABLE posts ALTER COLUMN post_type SET DEFAULT 'story';
+
+-- Backfill any NULLs
+UPDATE posts SET post_type = 'story' WHERE post_type IS NULL;
 ```
 
-No RLS changes needed — existing `posts` policies cover this column.
+**Step 2: `src/components/feed/utils/postUtils.ts`**
+- Expand `DatabasePostType`: add `'comparison' | 'question' | 'tip' | 'update'`
+- Keep legacy mappings
+- Update `getPostTypeLabel()` with new labels
+- Add `POST_TYPE_OPTIONS` array: `[{value, label, placeholder}]`
+- Add `shouldShowTypeBadge(type)`: whitelist check — `['comparison','question','tip','update'].includes(type)`
+- Add `getPlaceholderForType(type)`: returns subtle suffixes, defaults to "Share your experience..."
 
-### Step 2: New File — `src/types/structuredFields.ts`
+**Step 3: `EnhancedCreatePostForm.tsx` (create flow only)**
+- Add `postType` state, default `'story'`
+- Horizontal chip selector below title (text-xs, outline style, muted)
+- Toggle-off: clicking selected chip resets to `'story'` AND resets placeholder to base text
+- Submit: `post_type: postType || 'story'`
+- Analytics: track `post_type_selected` on submit when non-default
+- Reset on success
 
-- `StructuredFields` interface with keys: `what_worked`, `what_didnt`, `duration`, `good_for`, `reuse_intent`, `_v`
-- `DURATION_OPTIONS` map (enum codes → labels): `lt_1w`, `1_4w`, `1_3m`, `3_6m`, `6_12m`, `1y_plus`
-- `ALLOWED_STRUCTURED_KEYS` whitelist for safe rendering
-- `cleanStructuredFields(input)`:
-  - Trims strings, collapses multiple spaces
-  - Enforces max lengths (500 for narratives, 300 for `good_for`)
-  - Preserves user casing (no lowercasing)
-  - Validates `duration` and `reuse_intent` against allowed values
-  - Maps legacy keys (`pros`→`what_worked`, `cons`→`what_didnt`, `best_for`→`good_for`)
-  - Returns `null` if all fields empty (never stores `{"_v":1}` alone)
-  - Adds `_v: 1` only when returning non-null
-- `hasStructuredContent(data)` — boolean check, ignores `_v` key
+**Step 4: Edit form type-safety (no UI)**
+- `ModernCreatePostForm.tsx`: expand zod enum and type unions to accept new values
+- `CreatePostForm.tsx`: expand zod enum to accept new values
+- No chip UI added — prevents validation errors when editing typed posts
 
-### Step 3: Edit `EnhancedCreatePostForm.tsx`
+**Step 5: `PostFeedItem.tsx` — feed badge**
+- Show small muted outline Badge next to date when `shouldShowTypeBadge` returns true
+- Null/unknown: no badge, no crash
 
-- Add state for 5 structured fields
-- Add Radix Collapsible section labeled "Add more about your experience", collapsed by default
-- On expand: auto-focus "What worked" textarea
-- Fields: two textareas with live character counters, one duration dropdown, one text input with counter, yes/no toggle ("Yes, I'd use it again" / "No, I wouldn't")
-- Trim + collapse whitespace on blur (no casing changes)
-- On submit:
-  - Run `cleanStructuredFields()` 
-  - If non-null: include as `structured_fields` in postData AND fire `analytics.track('post_structured_fields_used', { has_pros, has_cons, has_duration, has_good_for, has_reuse })`
-  - If null: omit `structured_fields` from postData entirely (don't send the key at all)
-- Reset all fields on success
+**Step 6: `PostContentViewer.tsx` — detail badge**
+- Same badge logic for consistency
 
-### Step 4: Edit `PostContentViewer.tsx`
-
-- Add `structured_fields` to Supabase select query
-- Guard with `typeof === 'object'` + `hasStructuredContent()` check
-- Only render keys from `ALLOWED_STRUCTURED_KEYS` (ignore unknown keys silently)
-- Grouped display:
-  - **Narrative** (top): "What worked" / "What didn't" with subtle icons (👍/👎)
-  - **Metadata** (bottom): Duration, Good for, Would use again — inline row
-- Only render fields that have values
+**Step 7: Type files**
+- `src/integrations/supabase/types.ts`: expand enum union
+- `src/hooks/feed/types.ts`: expand `post_type` in PostFeedItem interface
 
 ### Files
 
 | File | Action |
 |------|--------|
-| New migration SQL | Add column + CHECK constraint |
-| `src/types/structuredFields.ts` | NEW — types, constants, cleaners |
-| `src/components/feed/EnhancedCreatePostForm.tsx` | EDIT — collapsible section |
-| `src/components/content/PostContentViewer.tsx` | EDIT — render structured fields |
+| New migration SQL | Enum values + default + backfill |
+| `postUtils.ts` | Types, labels, helpers |
+| `EnhancedCreatePostForm.tsx` | Chip selector UI |
+| `ModernCreatePostForm.tsx` | Zod/type safety only |
+| `CreatePostForm.tsx` | Zod/type safety only |
+| `PostFeedItem.tsx` | Type badge |
+| `PostContentViewer.tsx` | Type badge |
+| `supabase/types.ts` | Enum update |
+| `hooks/feed/types.ts` | Union update |
 
-### What stays unchanged
-- Feed cards — no changes
-- Heart/Like interaction — untouched
-- Submit button stays "Post"
-- All existing validation and submission logic preserved
+### Unchanged
+- Structured fields (Phase 3) — independent
+- Hearts/interaction — untouched
+- Feed layout — minimal addition (small muted badge)
+- Edit form UI — no chips added
 
