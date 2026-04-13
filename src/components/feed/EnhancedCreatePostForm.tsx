@@ -321,6 +321,11 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         });
       }
 
+      // Track post type selection when non-default
+      if (postType && postType !== 'story') {
+        analytics.track('post_type_selected', { post_type: postType });
+      }
+
       console.log('Submitting post:', postData);
       
       // Save to database
@@ -376,6 +381,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       setGoodFor('');
       setReuseIntent('');
       setStructuredOpen(false);
+      setPostType('story');
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
