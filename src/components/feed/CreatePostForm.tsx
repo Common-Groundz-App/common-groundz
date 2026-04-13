@@ -38,7 +38,7 @@ import { extractHashtagsFromPost, normalizeHashtag } from '@/utils/hashtag';
 import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
 
 // Define valid database post types
-type DatabasePostType = 'story' | 'routine' | 'project' | 'note';
+type DatabasePostType = 'story' | 'routine' | 'project' | 'note' | 'comparison' | 'question' | 'tip' | 'update';
 // Define all UI post types
 type UIPostType = DatabasePostType | 'journal' | 'watching';
 
@@ -54,7 +54,7 @@ const mapPostTypeToDatabase = (uiType: UIPostType): DatabasePostType => {
 const formSchema = z.object({
   title: z.string().min(1, { message: 'Title is required' }).max(100),
   content: z.string().min(1, { message: 'Content is required' }),
-  post_type: z.enum(['story', 'routine', 'project', 'note', 'journal', 'watching'] as const),
+  post_type: z.enum(['story', 'routine', 'project', 'note', 'journal', 'watching', 'comparison', 'question', 'tip', 'update'] as const),
   visibility: z.enum(['public', 'circle_only', 'private']),
   media: z.array(z.any()).optional(),
   tagged_entities: z.array(z.any()).optional(),

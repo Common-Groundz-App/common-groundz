@@ -29,7 +29,7 @@ import { ModernCreatePostForm } from '@/components/feed/ModernCreatePostForm';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getPostTypeLabel } from './utils/postUtils';
+import { getPostTypeLabel, shouldShowTypeBadge } from './utils/postUtils';
 import TagBadge from './TagBadge';
 import { feedbackActions } from '@/services/feedbackService';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
@@ -368,6 +368,12 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               />
               <div className="flex items-center text-muted-foreground text-xs gap-1">
                 <span>{formatDateLong(post.created_at)}</span>
+                {shouldShowTypeBadge(post.post_type) && (
+                  <>
+                    <span>·</span>
+                    <span className="text-muted-foreground/70">{getPostTypeLabel(post.post_type)}</span>
+                  </>
+                )}
                 {post.visibility !== 'public' && (
                   <>
                     <span>·</span>

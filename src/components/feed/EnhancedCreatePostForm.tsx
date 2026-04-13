@@ -26,6 +26,8 @@ import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredFields';
 import { analytics } from '@/services/analytics';
+import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
+import type { DatabasePostType } from './utils/postUtils';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -81,6 +83,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
   const MAX_MEDIA_COUNT = 4;
+  const [postType, setPostType] = useState<DatabasePostType>('story');
   
   // Prefill entity when passed from parent (e.g. "Share your experience")
   useEffect(() => {
@@ -300,7 +303,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         media: mediaToSave,
         visibility: dbVisibility,
         user_id: user.id,
-        post_type: 'story' as 'story' | 'routine' | 'project' | 'note',
+        post_type: (postType || 'story') as 'story' | 'routine' | 'project' | 'note',
         tags: tags,
       };
 
@@ -316,6 +319,11 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
           has_good_for: !!cleanedStructured.good_for,
           has_reuse: !!cleanedStructured.reuse_intent,
         });
+      }
+
+      // Track post type selection when non-default
+      if (postType && postType !== 'story') {
+        analytics.track('post_type_selected', { post_type: postType });
       }
 
       console.log('Submitting post:', postData);
@@ -373,6 +381,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       setGoodFor('');
       setReuseIntent('');
       setStructuredOpen(false);
+      setPostType('story');
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -451,7 +460,28 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
             maxLength={120}
             aria-label="Post title"
             className="text-lg font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/50"
-          />
+           />
+
+          {/* Post Type Chips */}
+          <div className="flex flex-wrap gap-1.5 py-1">
+            {POST_TYPE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  setPostType(prev => prev === option.value ? 'story' : option.value);
+                }}
+                className={cn(
+                  "px-2.5 py-0.5 rounded-full text-xs border transition-colors",
+                  postType === option.value
+                    ? "bg-accent text-accent-foreground border-accent-foreground/20"
+                    : "border-input text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
 
           {/* Entity Section — compact-expandable */}
           {entities.length > 0 ? (
@@ -517,7 +547,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
 
           <Textarea
             ref={textareaRef}
-            placeholder="Share your experience..."
+            placeholder={getPlaceholderForType(postType)}
             value={content}
             onChange={(e) => {
               const newContent = e.target.value;

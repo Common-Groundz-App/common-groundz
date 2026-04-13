@@ -30,7 +30,7 @@ import { triggerHaptic, playSound } from '@/services/feedbackService';
 const formSchema = z.object({
   content: z.string().min(1, { message: 'Content is required' }),
   title: z.string().optional(),
-  post_type: z.enum(['story', 'routine', 'project', 'note', 'journal', 'watching'] as const),
+  post_type: z.enum(['story', 'routine', 'project', 'note', 'journal', 'watching', 'comparison', 'question', 'tip', 'update'] as const),
   visibility: z.enum(['public', 'circle_only', 'private']),
   tagged_entities: z.array(z.any()).optional(),
 });
@@ -41,7 +41,7 @@ interface PostToEdit {
   id: string;
   title: string;
   content: string;
-  post_type: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching';
+  post_type: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching' | 'comparison' | 'question' | 'tip' | 'update';
   visibility: 'public' | 'circle_only' | 'private';
   tagged_entities?: Entity[];
   media?: MediaItem[];
@@ -51,7 +51,7 @@ interface ModernCreatePostFormProps {
   onSuccess: () => void;
   onCancel: () => void;
   postToEdit?: PostToEdit;
-  defaultPostType?: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching';
+  defaultPostType?: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching' | 'comparison' | 'question' | 'tip' | 'update';
   profileData?: any;
 }
 
