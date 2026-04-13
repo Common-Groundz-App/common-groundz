@@ -454,7 +454,28 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
             maxLength={120}
             aria-label="Post title"
             className="text-lg font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/50"
-          />
+           />
+
+          {/* Post Type Chips */}
+          <div className="flex flex-wrap gap-1.5 py-1">
+            {POST_TYPE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  setPostType(prev => prev === option.value ? 'story' : option.value);
+                }}
+                className={cn(
+                  "px-2.5 py-0.5 rounded-full text-xs border transition-colors",
+                  postType === option.value
+                    ? "bg-accent text-accent-foreground border-accent-foreground/20"
+                    : "border-input text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
 
           {/* Entity Section — compact-expandable */}
           {entities.length > 0 ? (
