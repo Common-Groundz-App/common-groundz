@@ -28,7 +28,6 @@ import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredField
 import { analytics } from '@/services/analytics';
 import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
 import type { DatabasePostType } from './utils/postUtils';
-import { analytics } from '@/services/analytics';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
