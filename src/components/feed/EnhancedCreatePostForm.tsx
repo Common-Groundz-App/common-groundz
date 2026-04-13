@@ -26,6 +26,9 @@ import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredFields';
 import { analytics } from '@/services/analytics';
+import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
+import type { DatabasePostType } from './utils/postUtils';
+import { analytics } from '@/services/analytics';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -81,6 +84,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
   const MAX_MEDIA_COUNT = 4;
+  const [postType, setPostType] = useState<DatabasePostType>('story');
   
   // Prefill entity when passed from parent (e.g. "Share your experience")
   useEffect(() => {
@@ -300,7 +304,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         media: mediaToSave,
         visibility: dbVisibility,
         user_id: user.id,
-        post_type: 'story' as 'story' | 'routine' | 'project' | 'note',
+        post_type: (postType || 'story') as 'story' | 'routine' | 'project' | 'note',
         tags: tags,
       };
 
