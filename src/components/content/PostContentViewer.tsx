@@ -5,6 +5,7 @@ import PostFeedItem from '@/components/feed/PostFeedItem';
 import FeedSkeleton from '@/components/feed/FeedSkeleton';
 import InlineCommentThread from '@/components/comments/InlineCommentThread';
 import StructuredFieldsDisplay from '@/components/content/StructuredFieldsDisplay';
+import { shouldShowTypeBadge, getPostTypeLabel } from '@/components/feed/utils/postUtils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
@@ -309,6 +310,15 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         highlightCommentId={highlightCommentId}
         isDetailView={isDetailView}
       />
+
+      {/* Post Type Badge (detail view) */}
+      {shouldShowTypeBadge(post.post_type ?? 'story') && (
+        <div className="mt-2 mb-1 px-1">
+          <span className="text-xs text-muted-foreground/70 border border-border/50 rounded-full px-2 py-0.5">
+            {getPostTypeLabel(post.post_type ?? 'story')}
+          </span>
+        </div>
+      )}
 
       {/* Structured Experience Fields */}
       {post.structured_fields && typeof post.structured_fields === 'object' && (

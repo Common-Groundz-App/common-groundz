@@ -303,7 +303,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         media: mediaToSave,
         visibility: dbVisibility,
         user_id: user.id,
-        post_type: (postType || 'story') as 'story' | 'routine' | 'project' | 'note',
+        post_type: postType || 'story',
         tags: tags,
       };
 
