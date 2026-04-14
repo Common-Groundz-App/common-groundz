@@ -10,7 +10,7 @@ import { PostFeedItem as PostItem } from '@/hooks/feed/types';
 import { Entity } from '@/services/recommendation/types';
 import { PostMediaDisplay } from '@/components/feed/PostMediaDisplay';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
-import { HashtagRenderer } from '@/components/hashtag/HashtagRenderer';
+import { PostTextRenderer } from '@/components/text/PostTextRenderer';
 import { fetchCommentCount } from '@/services/commentsService';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import UsernameLink from '@/components/common/UsernameLink';
@@ -423,7 +423,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           <div className="text-sm">
             <div className={cn("min-w-0", !isDetailView && "line-clamp-3")}>
               {post.content ? (
-                <HashtagRenderer content={post.content} />
+                <PostTextRenderer content={post.content} />
               ) : (
                 <RichTextDisplay content={post.content} />
               )}
