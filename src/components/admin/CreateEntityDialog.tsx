@@ -1680,7 +1680,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
       resetForm();
       onOpenChange(false);
-      onEntityCreated();
+      onEntityCreated(newEntity ? {
+        id: newEntity.id,
+        name: newEntity.name,
+        type: newEntity.type,
+        image_url: newEntity.image_url || undefined,
+      } : undefined);
       
       // Navigate to the newly created entity
       if (newEntity) {

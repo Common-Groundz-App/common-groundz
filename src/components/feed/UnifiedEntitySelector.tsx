@@ -496,7 +496,7 @@ export function UnifiedEntitySelector({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm truncate">
-                        <HighlightMatch text={user.display_name || user.username || ''} query={searchQuery} />
+                        <HighlightMatch text={user.username || ''} query={searchQuery} />
                       </div>
                       {user.username && (
                         <div className="text-xs text-muted-foreground">@{user.username}</div>
@@ -512,8 +512,8 @@ export function UnifiedEntitySelector({
             {showAddEntity && (
               <div className="border-t">
                 {hasSimilarResults && localEntities.length > 0 && (
-                  <div className="px-3 py-1.5 bg-amber-50 dark:bg-amber-900/20">
-                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                  <div className="px-3 py-1.5 bg-accent/30">
+                    <p className="text-xs text-muted-foreground">
                       Did you mean one of the results above?
                     </p>
                   </div>
