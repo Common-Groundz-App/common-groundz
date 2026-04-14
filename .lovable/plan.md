@@ -1,33 +1,34 @@
 
 
-## Phase 4 Completion — Two Fixes + One Safeguard
+## Unified Entity Tagging — Final Implementation Plan
 
-### Changes
-
-**1. `src/components/feed/EnhancedCreatePostForm.tsx` (line 306)**
-Remove the narrow type cast:
-```ts
-// Before
-post_type: (postType || 'story') as 'story' | 'routine' | 'project' | 'note',
-// After
-post_type: postType || 'story',
-```
-
-**2. `src/components/content/PostContentViewer.tsx`**
-- Import `shouldShowTypeBadge` and `getPostTypeLabel` from `postUtils.ts`
-- After rendering the `PostFeedItem`, add a small muted badge (matching the feed pattern) when `shouldShowTypeBadge(post.post_type)` is true
-- Use `post.post_type ?? 'story'` as safe fallback
-
-**3. `src/components/feed/PostFeedItem.tsx` (line 371)**
-Add safe fallback: use `post.post_type ?? 'story'` when calling `shouldShowTypeBadge` and `getPostTypeLabel`
+All feedback incorporated. No further iteration needed.
 
 ### Files
 
-| File | Change |
-|------|--------|
-| `EnhancedCreatePostForm.tsx` | Remove narrow type cast (line 306) |
-| `PostContentViewer.tsx` | Add type badge import + render |
-| `PostFeedItem.tsx` | Add `?? 'story'` fallback |
+| # | File | Change |
+|---|------|--------|
+| 1 | `src/components/feed/UnifiedEntitySelector.tsx` | **New.** UI wrapper around `useEnhancedRealtimeSearch`. Single search input, categorized results with bold match highlighting, Enter auto-selects first entity, "+ Add Entity" (query >= 3 chars) opens `CreateEntityDialog`, "Did you mean?" before add CTA, People click inserts plain `@username`, configurable `maxEntities` (default 3) with disabled state + message when limit reached. Normalize strings (lowercase + trim) for similarity comparison. |
+| 2 | `src/components/feed/EnhancedCreatePostForm.tsx` | Swap `SimpleEntitySelector` → `UnifiedEntitySelector`. Add `onMentionInsert` handler that sanitizes username and inserts `@username` at cursor in textarea. |
+| 3 | `src/components/admin/CreateEntityDialog.tsx` | Extend `onEntityCreated` to pass back typed entity shape: `onEntityCreated?: (entity?: { id: string; name: string; type: string; image_url?: string }) => void`. Backward compatible. |
 
-No other changes. Three small, surgical edits.
+### All adopted safeguards
+
+| Source | Safeguard |
+|--------|-----------|
+| ChatGPT | Normalize before "Did you mean" compare (lowercase + trim + collapse spaces) |
+| ChatGPT | Disable entity selection when max reached + show "Up to 3 tags" message |
+| ChatGPT | No silent creation — Enter with no results opens dialog |
+| ChatGPT | "+ Add Entity" only when query >= 3 chars |
+| ChatGPT | Bold matched substring in results |
+| Codex | Strong typing for `onEntityCreated` — no `any`, use `{ id, name, type, image_url? }` |
+| Codex | Sanitize username before `@mention` insertion (strip invalid chars) |
+| Codex | People click = plain text only, no persistence (deferred) |
+| Codex | `maxEntities` as configurable prop, not hardcoded |
+
+### What stays untouched
+- `SimpleEntitySelector.tsx` — kept
+- `ModernCreatePostForm.tsx` — not changed (edit flow deferred)
+- `useEnhancedRealtimeSearch` — used as-is
+- All search APIs, edge functions, caching — unchanged
 
