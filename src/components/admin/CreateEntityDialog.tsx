@@ -40,7 +40,7 @@ import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 interface CreateEntityDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onEntityCreated: () => void;
+  onEntityCreated: (entity?: { id: string; name: string; type: string; image_url?: string }) => void;
   variant?: 'admin' | 'user';        // Default: 'admin' (backward compatible)
   showPreviewTab?: boolean;           // Default: true (backward compatible)
   prefillName?: string;               // Optional: search query to prefill
