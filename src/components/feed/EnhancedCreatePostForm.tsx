@@ -244,10 +244,44 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
     );
   };
 
+  const replaceAtTrigger = (
+    currentContent: string,
+    liveCursorPos: number,
+    replacement: string
+  ): { newContent: string; newCursorPos: number } | null => {
+    // Scan backward from cursor to find @ trigger
+    const textBefore = currentContent.substring(0, liveCursorPos);
+    const triggerMatch = textBefore.match(/(^|\s)@(\w*)$/);
+    if (!triggerMatch) return null;
+    
+    const atIndex = liveCursorPos - triggerMatch[0].length + triggerMatch[1].length;
+    // Validate: @ must be at start or preceded by whitespace
+    if (atIndex > 0 && !/\s/.test(currentContent[atIndex - 1])) return null;
+    
+    const newContent = currentContent.substring(0, atIndex) + replacement + currentContent.substring(liveCursorPos);
+    const newCursorPos = atIndex + replacement.length;
+    return { newContent, newCursorPos };
+  };
+
   const handleEntitiesChange = (newEntities: Entity[]) => {
+    // If triggered via @, clean up the @query text from content
+    if (selectorPrefillQuery !== '') {
+      const liveCursor = textareaRef.current?.selectionStart ?? cursorPosition.start;
+      const result = replaceAtTrigger(content, liveCursor, '');
+      if (result) {
+        setContent(result.newContent);
+        setCursorPosition({ start: result.newCursorPos, end: result.newCursorPos });
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.setSelectionRange(result.newCursorPos, result.newCursorPos);
+          }
+        }, 10);
+      }
+    }
     setEntities(newEntities);
     setEntitySelectorVisible(false);
-    setSelectorPrefillQuery(''); // Clear prefill query when closing
+    setSelectorPrefillQuery('');
   };
 
   const removeEntity = (entityId: string) => {
