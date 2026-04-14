@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { SimpleEntitySelector } from '@/components/feed/SimpleEntitySelector';
+import { UnifiedEntitySelector } from '@/components/feed/UnifiedEntitySelector';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Badge } from '@/components/ui/badge';
@@ -536,11 +536,53 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
           {/* Inline Entity Selector */}
           {entitySelectorVisible && (
             <div className="p-3 border rounded-lg bg-background animate-fade-in">
-              <SimpleEntitySelector 
+              <UnifiedEntitySelector 
                 onEntitiesChange={handleEntitiesChange}
                 initialEntities={entities}
                 initialQuery={selectorPrefillQuery}
                 autoFocusSearch={true}
+                maxEntities={3}
+                onMentionInsert={(username) => {
+                  // Insert @username at cursor position in textarea
+                  const sanitized = username.replace(/[^a-z0-9._]/gi, '');
+                  if (!sanitized) return;
+                  const mentionText = `@${sanitized} `;
+                  const start = cursorPosition.start;
+                  const end = cursorPosition.end;
+                  
+                  // Check if we were triggered by @ in textarea — replace the @trigger text
+                  const textBeforeCursor = content.substring(0, start);
+                  const mentionTriggerMatch = textBeforeCursor.match(/(^|\s)@(\w*)$/);
+                  
+                  let newContent: string;
+                  let newCursorPos: number;
+                  
+                  if (mentionTriggerMatch) {
+                    // Replace the @trigger text
+                    const triggerStart = start - mentionTriggerMatch[0].length + (mentionTriggerMatch[1].length);
+                    newContent = content.substring(0, triggerStart) + mentionText + content.substring(end);
+                    newCursorPos = triggerStart + mentionText.length;
+                  } else {
+                    // Insert at cursor
+                    newContent = content.substring(0, start) + mentionText + content.substring(end);
+                    newCursorPos = start + mentionText.length;
+                  }
+                  
+                  setContent(newContent);
+                  setCursorPosition({ start: newCursorPos, end: newCursorPos });
+                  
+                  // Focus textarea and set cursor
+                  setTimeout(() => {
+                    if (textareaRef.current) {
+                      textareaRef.current.focus();
+                      textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                    }
+                  }, 10);
+                  
+                  // Close entity selector
+                  setEntitySelectorVisible(false);
+                  setSelectorPrefillQuery('');
+                }}
               />
             </div>
           )}
