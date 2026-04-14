@@ -577,35 +577,30 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
                 autoFocusSearch={true}
                 maxEntities={3}
                 onMentionInsert={(username) => {
-                  // Insert @username at cursor position in textarea
                   const sanitized = username.replace(/[^a-z0-9._]/gi, '');
                   if (!sanitized) return;
                   const mentionText = `@${sanitized} `;
-                  const start = cursorPosition.start;
-                  const end = cursorPosition.end;
                   
-                  // Check if we were triggered by @ in textarea — replace the @trigger text
-                  const textBeforeCursor = content.substring(0, start);
-                  const mentionTriggerMatch = textBeforeCursor.match(/(^|\s)@(\w*)$/);
+                  // Use live cursor from textarea ref
+                  const liveCursor = textareaRef.current?.selectionStart ?? cursorPosition.start;
+                  const result = replaceAtTrigger(content, liveCursor, mentionText);
                   
                   let newContent: string;
                   let newCursorPos: number;
                   
-                  if (mentionTriggerMatch) {
-                    // Replace the @trigger text
-                    const triggerStart = start - mentionTriggerMatch[0].length + (mentionTriggerMatch[1].length);
-                    newContent = content.substring(0, triggerStart) + mentionText + content.substring(end);
-                    newCursorPos = triggerStart + mentionText.length;
+                  if (result) {
+                    newContent = result.newContent;
+                    newCursorPos = result.newCursorPos;
                   } else {
-                    // Insert at cursor
-                    newContent = content.substring(0, start) + mentionText + content.substring(end);
+                    // Fallback: insert at cursor
+                    const start = liveCursor;
+                    newContent = content.substring(0, start) + mentionText + content.substring(start);
                     newCursorPos = start + mentionText.length;
                   }
                   
                   setContent(newContent);
                   setCursorPosition({ start: newCursorPos, end: newCursorPos });
                   
-                  // Focus textarea and set cursor
                   setTimeout(() => {
                     if (textareaRef.current) {
                       textareaRef.current.focus();
@@ -613,7 +608,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
                     }
                   }, 10);
                   
-                  // Close entity selector
                   setEntitySelectorVisible(false);
                   setSelectorPrefillQuery('');
                 }}
