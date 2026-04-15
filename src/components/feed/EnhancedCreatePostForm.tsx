@@ -1,5 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -391,21 +392,60 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         }
       }
       
-      toast({
-        title: 'Experience shared',
-        description: 'Your experience has been shared successfully',
-      });
+      // Optimistic cache update — prepend new post to feed
+      try {
+        const optimisticItem = {
+          ...newPost,
+          is_post: true,
+          username: profileData?.username || null,
+          displayName: getDisplayName(profileData) || null,
+          avatar_url: profileData?.avatar_url || null,
+          likes: 0,
+          is_liked: false,
+          is_saved: false,
+          comment_count: 0,
+          tagged_entities: entities,
+          created_at: newPost.created_at || new Date().toISOString(),
+        };
 
-      // Trigger refresh events for various parts of the app
-      window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
-      window.dispatchEvent(new CustomEvent('refresh-following-feed'));
-      window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+        const updateFeedCache = (oldData: any) => {
+          if (!oldData?.pages?.[0]?.items) return oldData;
+          const firstPage = oldData.pages[0];
+          if (firstPage.items.some((item: any) => item.id === newPost.id)) return oldData;
+          return {
+            ...oldData,
+            pages: [
+              { ...firstPage, items: [optimisticItem, ...firstPage.items] },
+              ...oldData.pages.slice(1),
+            ],
+          };
+        };
+
+        // Update all cached feed variants for this user
+        queryClient.setQueriesData(
+          { queryKey: ['infinite-feed'] },
+          updateFeedCache
+        );
+      } catch (e) {
+        console.warn('Optimistic update failed, relying on invalidation', e);
+      }
+
+      // Broad invalidation for background sync across all feed variants
+      queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
+
+      // Keep entity-specific refresh events for entity pages
       const refreshEntityId = entities[0]?.id;
       if (refreshEntityId) {
         window.dispatchEvent(new CustomEvent('refresh-posts', {
           detail: { entityId: refreshEntityId }
         }));
       }
+      window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+
+      toast({
+        title: 'Experience shared',
+        description: 'Your experience has been shared successfully',
+      });
 
       // Reset form and notify parent
       setTitle('');
