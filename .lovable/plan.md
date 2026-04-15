@@ -1,87 +1,66 @@
 
 
-## Final Plan: Reliable post-creation feed refresh with optimistic insertion
+## Plan: New post highlight animation (ship this)
 
-### Summary
-Fix the intermittent "post not appearing after creation" bug by adding optimistic cache insertion + React Query invalidation, replacing unreliable custom events.
+Same plan as before, with one addition: `outline-offset: 2px`.
 
 ### Changes
 
 | # | File | Change |
 |---|------|--------|
-| 1 | `EnhancedCreatePostForm.tsx` | After entity relationships are saved (~line 392), add optimistic cache update + invalidation. Import `useQueryClient`. Wrap in try/catch fail-safe. |
-| 2 | `CreatePost.tsx` | Remove 3 redundant event dispatches from `handleSuccess`. Change `navigateBack()` → `navigate('/home')`. |
+| 1 | `EnhancedCreatePostForm.tsx` | Add `is_optimistic: true` to the optimistic item |
+| 2 | `PostFeedItem.tsx` | Detect flag + user ownership, apply highlight once via `useRef`, auto-remove after 1.8s |
+| 3 | `index.css` | Add `highlight-fade` keyframes with `outline-offset: 2px` + reduced-motion override |
 
-### Implementation detail
+### Implementation
 
-**File 1 — `EnhancedCreatePostForm.tsx`** (after line 392, before toast):
-
+**`EnhancedCreatePostForm.tsx`** — add to optimistic item:
 ```ts
-// Import useQueryClient at top
-import { useQueryClient } from '@tanstack/react-query';
+is_optimistic: true,
+```
 
-// In component body
-const queryClient = useQueryClient();
+**`PostFeedItem.tsx`**:
+```tsx
+const hasAnimatedRef = useRef(false);
+const [showHighlight, setShowHighlight] = useState(() => {
+  if (post.is_optimistic && post.user_id === user?.id && !hasAnimatedRef.current) {
+    hasAnimatedRef.current = true;
+    return true;
+  }
+  return false;
+});
 
-// After entity relationships saved, before toast:
-try {
-  queryClient.setQueryData(['infinite-feed', 'for_you', user.id], (oldData: any) => {
-    if (!oldData?.pages?.[0]?.items) return oldData;
-    const firstPage = oldData.pages[0];
-    if (firstPage.items.some((item: any) => item.id === newPost.id)) return oldData;
-    
-    const optimisticItem = {
-      ...newPost,
-      is_post: true,
-      username: profileData?.username || null,
-      displayName: getDisplayName(profileData) || null,
-      avatar_url: profileData?.avatar_url || null,
-      likes: 0,
-      is_liked: false,
-      is_saved: false,
-      comment_count: 0,
-      tagged_entities: entities,
-      created_at: newPost.created_at || new Date().toISOString(),
-    };
-    
-    return {
-      ...oldData,
-      pages: [
-        { ...firstPage, items: [optimisticItem, ...firstPage.items] },
-        ...oldData.pages.slice(1),
-      ],
-    };
-  });
-} catch (e) {
-  console.warn('Optimistic update failed, relying on invalidation', e);
+useEffect(() => {
+  if (showHighlight) {
+    const timer = setTimeout(() => setShowHighlight(false), 1800);
+    return () => clearTimeout(timer);
+  }
+}, [showHighlight]);
+
+// Add to Card className:
+showHighlight && "animate-highlight-fade"
+```
+
+**`index.css`**:
+```css
+@keyframes highlight-fade {
+  0% { outline: 2px solid hsl(var(--brand-orange) / 0.25); outline-offset: 2px; }
+  60% { outline: 2px solid hsl(var(--brand-orange) / 0.15); outline-offset: 2px; }
+  100% { outline: 2px solid transparent; outline-offset: 2px; }
+}
+.animate-highlight-fade {
+  animation: highlight-fade 1.8s ease-out forwards;
 }
 
-queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
+@media (prefers-reduced-motion: reduce) {
+  .animate-highlight-fade {
+    animation: none !important;
+  }
+}
 ```
 
-Keep existing custom events as fallback for already-mounted components (entity refresh, profile posts).
-
-**File 2 — `CreatePost.tsx`**:
-
-```ts
-const handleSuccess = useCallback(() => {
-  navigate('/home');
-}, [navigate]);
-```
-
-### Safeguards
-
-| Guard | How |
-|-------|-----|
-| Cache shape | `if (!oldData?.pages?.[0]?.items) return oldData` |
-| Dedup | `items.some(i => i.id === newPost.id)` check |
-| Fail-safe | try/catch around setQueryData |
-| Broad invalidation | `exact: false` covers all feed variants |
-| `created_at` fallback | Uses `newPost.created_at` with client-side fallback |
-| Scroll to top | Handled by existing `ScrollToTop` on PUSH navigation |
-
-### What stays untouched
-- Feed hooks, API layer, realtime subscriptions — unchanged
-- Entity-specific refresh events stay in the form (for entity pages)
-- No new dependencies
+### Why no further changes needed
+- **State cleanup**: Server data from `invalidateQueries` lacks `is_optimistic`, so highlight never lingers
+- **Border-radius**: Modern browsers render `outline` with `border-radius` correctly
+- **Dark mode**: Orange at 0.25 opacity is actually more visible on dark backgrounds — no alpha adjustment needed
 
