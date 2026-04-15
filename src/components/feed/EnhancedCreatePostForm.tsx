@@ -399,7 +399,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
           ...newPost,
           is_post: true,
           username: profileData?.username || null,
-          displayName: getDisplayName(profileData) || null,
+          displayName: profileData?.display_name || profileData?.username || null,
           avatar_url: profileData?.avatar_url || null,
           likes: 0,
           is_liked: false,
