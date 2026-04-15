@@ -132,12 +132,21 @@
 
 /* New post highlight animation */
 @keyframes highlight-fade {
-  0% { outline: 2px solid hsl(var(--brand-orange) / 0.25); outline-offset: 2px; }
-  60% { outline: 2px solid hsl(var(--brand-orange) / 0.15); outline-offset: 2px; }
-  100% { outline: 2px solid transparent; outline-offset: 2px; }
+  0% {
+    box-shadow: 0 0 8px 2px hsl(var(--brand-orange) / 0.25),
+                0 0 16px 4px hsl(var(--brand-orange) / 0.12);
+  }
+  60% {
+    box-shadow: 0 0 6px 1px hsl(var(--brand-orange) / 0.18),
+                0 0 12px 3px hsl(var(--brand-orange) / 0.08);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent,
+                0 0 0 0 transparent;
+  }
 }
 .animate-highlight-fade {
-  animation: highlight-fade 1.8s ease-out forwards;
+  animation: highlight-fade 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 /* Respect reduced motion preferences */
