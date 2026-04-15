@@ -53,6 +53,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
   const { user } = useAuth();
   const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
+  const queryClient = useQueryClient();
   const [content, setContent] = useState('');
   const [title, setTitle] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
