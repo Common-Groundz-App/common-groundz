@@ -79,21 +79,19 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   // New post highlight animation — triggers once for optimistic posts owned by current user
+  const prefersReducedMotion =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   const hasAnimatedRef = useRef(false);
   const [showHighlight, setShowHighlight] = useState(() => {
     if ((post as any).is_optimistic && post.user_id === user?.id && !hasAnimatedRef.current) {
       hasAnimatedRef.current = true;
+      if (prefersReducedMotion) return false;
       return true;
     }
     return false;
   });
-
-  useEffect(() => {
-    if (showHighlight) {
-      const timer = setTimeout(() => setShowHighlight(false), 1800);
-      return () => clearTimeout(timer);
-    }
-  }, [showHighlight]);
   
   const isOwner = user?.id === post.user_id;
   
@@ -364,6 +362,11 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         isDetailView && "shadow-none",
         showHighlight && "animate-highlight-fade"
       )}
+      onAnimationEnd={(e) => {
+        if (e.target === e.currentTarget && e.animationName === 'highlight-fade') {
+          setShowHighlight(false);
+        }
+      }}
       onClick={!isDetailView ? handleContentAreaClick : undefined}
       onKeyDown={!isDetailView ? handleContentAreaKeyDown : undefined}
       role={!isDetailView ? "link" : undefined}
