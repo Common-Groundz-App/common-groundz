@@ -67,12 +67,8 @@ const CreatePost = () => {
   }, [navigate]);
 
   const handleSuccess = useCallback(() => {
-    // Dispatch refresh events
-    window.dispatchEvent(new CustomEvent('refresh-for-you-feed'));
-    window.dispatchEvent(new CustomEvent('refresh-following-feed'));
-    window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
-    navigateBack();
-  }, [navigateBack]);
+    navigate('/home');
+  }, [navigate]);
 
   return (
     <div className="min-h-screen flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
