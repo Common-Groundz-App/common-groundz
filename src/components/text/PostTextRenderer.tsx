@@ -94,7 +94,7 @@ export const PostTextRenderer: React.FC<PostTextRendererProps> = ({ content, cla
     segments.push(<span key={`t-${lastIndex}`}>{content.slice(lastIndex)}</span>);
   }
 
-  return <div className={cn("min-w-0", className)}>{segments}</div>;
+  return <div className={cn("min-w-0 whitespace-pre-wrap", className)}>{segments}</div>;
 };
 
 export default PostTextRenderer;
