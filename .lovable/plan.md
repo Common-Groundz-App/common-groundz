@@ -1,66 +1,77 @@
 
 
-## Plan: New post highlight animation (ship this)
+## Plan: Ship the post highlight glow (final — no more iterations)
 
-Same plan as before, with one addition: `outline-offset: 2px`.
+The only addition: wrap `window.matchMedia` in a `typeof window !== 'undefined'` guard. Everything else is unchanged from the approved plan.
 
 ### Changes
 
 | # | File | Change |
 |---|------|--------|
-| 1 | `EnhancedCreatePostForm.tsx` | Add `is_optimistic: true` to the optimistic item |
-| 2 | `PostFeedItem.tsx` | Detect flag + user ownership, apply highlight once via `useRef`, auto-remove after 1.8s |
-| 3 | `index.css` | Add `highlight-fade` keyframes with `outline-offset: 2px` + reduced-motion override |
+| 1 | `src/index.css` | Replace `highlight-fade` keyframes with soft box-shadow glow, cubic-bezier easing, 2s |
+| 2 | `src/components/feed/PostFeedItem.tsx` | Replace `useEffect` timeout with `onAnimationEnd`, add SSR-safe reduced-motion check |
 
-### Implementation
+### CSS (`src/index.css`)
 
-**`EnhancedCreatePostForm.tsx`** — add to optimistic item:
-```ts
-is_optimistic: true,
+Replace existing `highlight-fade` block:
+
+```css
+@keyframes highlight-fade {
+  0% {
+    box-shadow: 0 0 8px 2px hsl(var(--brand-orange) / 0.25),
+                0 0 16px 4px hsl(var(--brand-orange) / 0.12);
+  }
+  60% {
+    box-shadow: 0 0 6px 1px hsl(var(--brand-orange) / 0.18),
+                0 0 12px 3px hsl(var(--brand-orange) / 0.08);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent,
+                0 0 0 0 transparent;
+  }
+}
+.animate-highlight-fade {
+  animation: highlight-fade 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
 ```
 
-**`PostFeedItem.tsx`**:
+Reduced-motion CSS override stays as-is.
+
+### PostFeedItem.tsx
+
+**Remove** the existing `useEffect` timeout block. Update the state initializer with SSR-safe guard:
+
 ```tsx
+const prefersReducedMotion =
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 const hasAnimatedRef = useRef(false);
 const [showHighlight, setShowHighlight] = useState(() => {
-  if (post.is_optimistic && post.user_id === user?.id && !hasAnimatedRef.current) {
+  if ((post as any).is_optimistic && post.user_id === user?.id && !hasAnimatedRef.current) {
     hasAnimatedRef.current = true;
+    if (prefersReducedMotion) return false;
     return true;
   }
   return false;
 });
-
-useEffect(() => {
-  if (showHighlight) {
-    const timer = setTimeout(() => setShowHighlight(false), 1800);
-    return () => clearTimeout(timer);
-  }
-}, [showHighlight]);
-
-// Add to Card className:
-showHighlight && "animate-highlight-fade"
 ```
 
-**`index.css`**:
-```css
-@keyframes highlight-fade {
-  0% { outline: 2px solid hsl(var(--brand-orange) / 0.25); outline-offset: 2px; }
-  60% { outline: 2px solid hsl(var(--brand-orange) / 0.15); outline-offset: 2px; }
-  100% { outline: 2px solid transparent; outline-offset: 2px; }
-}
-.animate-highlight-fade {
-  animation: highlight-fade 1.8s ease-out forwards;
-}
+**Add** to Card element:
 
-@media (prefers-reduced-motion: reduce) {
-  .animate-highlight-fade {
-    animation: none !important;
+```tsx
+onAnimationEnd={(e) => {
+  if (e.target === e.currentTarget && e.animationName === 'highlight-fade') {
+    setShowHighlight(false);
   }
-}
+}}
 ```
 
-### Why no further changes needed
-- **State cleanup**: Server data from `invalidateQueries` lacks `is_optimistic`, so highlight never lingers
-- **Border-radius**: Modern browsers render `outline` with `border-radius` correctly
-- **Dark mode**: Orange at 0.25 opacity is actually more visible on dark backgrounds — no alpha adjustment needed
+### Summary of all safeguards
+- `useRef` — triggers once per mount
+- `user?.id` check — only highlights own posts
+- `e.target === e.currentTarget` — no bubbling from nested animations
+- `typeof window` + `matchMedia` — SSR-safe reduced-motion skip
+- CSS `prefers-reduced-motion` — backup override
+- `onAnimationEnd` — no JS/CSS duration drift
 
