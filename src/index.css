@@ -130,11 +130,22 @@
   }
 }
 
+/* New post highlight animation */
+@keyframes highlight-fade {
+  0% { outline: 2px solid hsl(var(--brand-orange) / 0.25); outline-offset: 2px; }
+  60% { outline: 2px solid hsl(var(--brand-orange) / 0.15); outline-offset: 2px; }
+  100% { outline: 2px solid transparent; outline-offset: 2px; }
+}
+.animate-highlight-fade {
+  animation: highlight-fade 1.8s ease-out forwards;
+}
+
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
   .animate-bounce,
   .animate-pulse,
-  .animate-spin {
+  .animate-spin,
+  .animate-highlight-fade {
     animation: none !important;
   }
 }

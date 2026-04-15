@@ -398,6 +398,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         const optimisticItem = {
           ...newPost,
           is_post: true,
+          is_optimistic: true,
           username: profileData?.username || null,
           displayName: profileData?.display_name || profileData?.username || null,
           avatar_url: profileData?.avatar_url || null,

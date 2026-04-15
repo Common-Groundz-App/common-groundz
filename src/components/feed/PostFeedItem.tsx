@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { sharePost } from '@/utils/sharePost';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -77,6 +77,23 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // New post highlight animation — triggers once for optimistic posts owned by current user
+  const hasAnimatedRef = useRef(false);
+  const [showHighlight, setShowHighlight] = useState(() => {
+    if ((post as any).is_optimistic && post.user_id === user?.id && !hasAnimatedRef.current) {
+      hasAnimatedRef.current = true;
+      return true;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    if (showHighlight) {
+      const timer = setTimeout(() => setShowHighlight(false), 1800);
+      return () => clearTimeout(timer);
+    }
+  }, [showHighlight]);
   
   const isOwner = user?.id === post.user_id;
   
@@ -344,7 +361,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       className={cn(
         "overflow-hidden transition-colors",
         !isDetailView && "cursor-pointer hover:bg-muted/30 shadow-sm",
-        isDetailView && "shadow-none"
+        isDetailView && "shadow-none",
+        showHighlight && "animate-highlight-fade"
       )}
       onClick={!isDetailView ? handleContentAreaClick : undefined}
       onKeyDown={!isDetailView ? handleContentAreaKeyDown : undefined}
