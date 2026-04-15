@@ -1,31 +1,24 @@
 
 
-## Refinements: Clean `@` triggers + Unified text rendering
+## Plan: Preserve newlines + Defer composer colorization
 
-### Summary
-Fix the leftover `@` text when selecting entities/users, and create a unified text renderer so `@mentions` in the feed look consistent with comments (orange, clickable).
+### What we'll do now (quick fix)
 
-### Changes
+**Preserve user whitespace in `PostTextRenderer.tsx`**
 
-| # | File | Change |
-|---|------|--------|
-| 1 | `src/components/text/PostTextRenderer.tsx` | **New.** Single unified renderer for both `#hashtags` and `@mentions` in one pass. Hashtags: blue link to `/t/{tag}`. Mentions: orange `text-primary font-medium hover:underline` link to `/u/{username}` (matching comment MentionText styling). **Safeguards**: skip `@` preceded by non-whitespace (avoids `email@test.com`); skip matches inside URLs. Only for plain-text content — rich text keeps existing renderer. |
-| 2 | `src/components/feed/EnhancedCreatePostForm.tsx` | **A)** `handleEntitiesChange`: when `selectorPrefillQuery` is non-empty (meaning `@` triggered selector), remove the `@query` text from content. Use `textareaRef.current.selectionStart` (not stale `cursorPosition` state) to reliably find the `@` trigger via backward scan. Only valid if `@` is at start or preceded by whitespace. **B)** `onMentionInsert`: same fix — read live `selectionStart` from textarea ref, backward-scan to `@`, replace `@trigger` → `@username `. Restore cursor after replacement. |
-| 3 | `src/components/feed/PostFeedItem.tsx` | Replace `HashtagRenderer` → `PostTextRenderer` for post content rendering. |
+Add `whitespace-pre-wrap` to the renderer's wrapper div so newlines typed by the user are preserved in the feed and post detail views. This matches Twitter/X, Instagram, and Reddit behavior.
 
-### What stays untouched
-- `HashtagRenderer.tsx` — kept (used elsewhere)
-- `MentionText.tsx` — kept (used in comments)
-- `UnifiedEntitySelector.tsx` — unchanged
-- `ModernCreatePostForm.tsx` — unchanged (edit flow deferred)
+| File | Change |
+|------|--------|
+| `src/components/text/PostTextRenderer.tsx` | Add `whitespace-pre-wrap` to the root `<div>` className |
 
-### Safeguards adopted
+One line change. This fixes the collapsed newline issue immediately.
 
-| Source | Safeguard |
-|--------|-----------|
-| ChatGPT | Only treat `@` as trigger if at start or preceded by whitespace |
-| ChatGPT | Skip `@mentions` inside URLs in renderer |
-| ChatGPT | `hover:underline` on mentions for clickable affordance |
-| Codex | Only use PostTextRenderer for plain-text; rich text keeps existing path |
-| Codex | Use live `textareaRef.current.selectionStart` instead of stale cursor state |
+### What we defer (composer syntax highlighting)
+
+Live colorization of `@mentions` and `#hashtags` inside the compose textarea is a separate, complex feature requiring either:
+- A transparent textarea + styled mirror div overlay, or
+- A `contentEditable` rich text approach
+
+This is worth doing but should be scoped as its own task to avoid introducing input bugs. The current plain textarea remains functional — users can still see their mentions/hashtags rendered correctly after posting.
 
