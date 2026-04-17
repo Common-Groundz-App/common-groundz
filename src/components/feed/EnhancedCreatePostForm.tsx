@@ -735,6 +735,24 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
           />
           <p className="text-xs text-muted-foreground/60 mt-1">What worked? · What didn't? · Who is this useful for?</p>
 
+          {/* Detected hashtags chip row (read-only preview) */}
+          {detectedHashtagsForChips.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs font-medium text-muted-foreground mb-1.5">Tags</p>
+              <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {detectedHashtagsForChips.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="secondary"
+                    className="shrink-0 font-normal"
+                  >
+                    #{tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Structured Experience Fields — Collapsible */}
           <Collapsible open={structuredOpen} onOpenChange={(open) => {
             setStructuredOpen(open);
