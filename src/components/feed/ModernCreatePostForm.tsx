@@ -288,6 +288,14 @@ export function ModernCreatePostForm({
           }
         }
 
+        // ===== Hashtag persistence (edit) — non-blocking =====
+        await persistHashtags({
+          postId: postToEdit.id,
+          title: data.title || '',
+          content,
+          mode: 'edit',
+        });
+
         // ✅ Play sound after successful post update
         try {
           playSound('/sounds/post.mp3');
@@ -319,6 +327,16 @@ export function ModernCreatePostForm({
                 entity_id: entity.id
               });
           }
+        }
+
+        // ===== Hashtag persistence (create) — non-blocking =====
+        if (newPost) {
+          await persistHashtags({
+            postId: newPost.id,
+            title: data.title || '',
+            content,
+            mode: 'create',
+          });
         }
 
         // ✅ Play sound after successful post creation
