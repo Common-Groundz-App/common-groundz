@@ -24,6 +24,9 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
 import { triggerHaptic, playSound } from '@/services/feedbackService';
+import { extractHashtagsDetailed, normalizeHashtag } from '@/utils/hashtag';
+import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
+import { analytics } from '@/services/analytics';
 
 // Emoji picker styles are now in global CSS (index.css)
 
@@ -201,6 +204,60 @@ export function ModernCreatePostForm({
     setIsEmojiPickerOpen(false);
   };
 
+  // Shared non-blocking hashtag persistence for both create and edit flows
+  const persistHashtags = async ({
+    postId,
+    title,
+    content,
+    mode,
+  }: {
+    postId: string;
+    title: string;
+    content: string;
+    mode: 'create' | 'edit';
+  }) => {
+    const { all, source } = extractHashtagsDetailed(title, content);
+    const filtered = all
+      .map(t => ({ original: t, normalized: normalizeHashtag(t) }))
+      .filter(p => p.normalized.length > 0 && p.normalized.length <= 50);
+
+    // Defensive duplicate guard
+    const uniquePayload = Array.from(
+      new Map(filtered.map(p => [p.normalized, p])).values()
+    );
+
+    // For edit mode we always call updatePostHashtags so an empty array clears all tags.
+    // For create mode we only call when there's at least one valid tag.
+    const shouldCall = mode === 'edit' || uniquePayload.length > 0;
+
+    if (shouldCall) {
+      try {
+        const ok = mode === 'edit'
+          ? await updatePostHashtags(postId, uniquePayload)
+          : await processPostHashtags(postId, uniquePayload);
+        if (!ok) throw new Error(`${mode === 'edit' ? 'updatePostHashtags' : 'processPostHashtags'} returned false`);
+      } catch (err: any) {
+        console.error('Hashtag linking failed (non-blocking):', err);
+        analytics.track('post_hashtag_link_failed', {
+          source: mode,
+          tag_count: uniquePayload.length,
+          error_code: err?.code || err?.message || 'unknown',
+        });
+        toast({
+          title: "Tags couldn't be saved",
+          description: 'You can edit your post to add them again.',
+        });
+      }
+    }
+
+    analytics.track('post_hashtags_extracted', {
+      source: mode,
+      count: uniquePayload.length,
+      has_hashtags: uniquePayload.length > 0,
+      hashtag_source: source,
+    });
+  };
+
   const onSubmit = async (data: FormData) => {
     if (!user) return;
     
@@ -285,6 +342,14 @@ export function ModernCreatePostForm({
           }
         }
 
+        // ===== Hashtag persistence (edit) — non-blocking =====
+        await persistHashtags({
+          postId: postToEdit.id,
+          title: data.title || '',
+          content,
+          mode: 'edit',
+        });
+
         // ✅ Play sound after successful post update
         try {
           playSound('/sounds/post.mp3');
@@ -316,6 +381,16 @@ export function ModernCreatePostForm({
                 entity_id: entity.id
               });
           }
+        }
+
+        // ===== Hashtag persistence (create) — non-blocking =====
+        if (newPost) {
+          await persistHashtags({
+            postId: newPost.id,
+            title: data.title || '',
+            content,
+            mode: 'create',
+          });
         }
 
         // ✅ Play sound after successful post creation

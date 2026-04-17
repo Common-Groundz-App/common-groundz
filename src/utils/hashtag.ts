@@ -128,3 +128,27 @@ export const extractHashtagsFromPost = (title?: string, content?: string): strin
   const allHashtags = [...titleHashtags, ...contentHashtags];
   return [...new Set(allHashtags)].filter(isValidHashtag);
 };
+
+/**
+ * Detailed hashtag extraction returning per-field breakdown.
+ * Reuses existing extractHashtags + isValidHashtag — no new regex, no parallel logic.
+ * Use this when you need to know WHERE the hashtags came from (e.g. for analytics).
+ */
+export interface DetailedHashtags {
+  all: string[];
+  title: string[];
+  content: string[];
+  source: 'title' | 'content' | 'both' | 'none';
+}
+
+export const extractHashtagsDetailed = (title?: string, content?: string): DetailedHashtags => {
+  const titleTags = extractHashtags(title || '').filter(isValidHashtag);
+  const contentTags = extractHashtags(content || '').filter(isValidHashtag);
+  const all = [...new Set([...titleTags, ...contentTags])];
+  const source: DetailedHashtags['source'] =
+    titleTags.length && contentTags.length ? 'both'
+    : titleTags.length ? 'title'
+    : contentTags.length ? 'content'
+    : 'none';
+  return { all, title: titleTags, content: contentTags, source };
+};
