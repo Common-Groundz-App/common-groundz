@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -29,6 +29,8 @@ import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredField
 import { analytics } from '@/services/analytics';
 import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
 import type { DatabasePostType } from './utils/postUtils';
+import { extractHashtagsDetailed, normalizeHashtag } from '@/utils/hashtag';
+import { processPostHashtags } from '@/services/hashtagService';
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
@@ -393,6 +395,42 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         }
       }
       
+      // ===== Hashtag persistence (non-blocking) =====
+      const { all: detectedTags, source: hashtagSource } = extractHashtagsDetailed(title, content);
+      const filteredPayload = detectedTags
+        .map(t => ({ original: t, normalized: normalizeHashtag(t) }))
+        .filter(p => p.normalized.length > 0 && p.normalized.length <= 50);
+
+      // Defensive duplicate guard (in case upstream dedup logic ever changes)
+      const uniquePayload = Array.from(
+        new Map(filteredPayload.map(p => [p.normalized, p])).values()
+      );
+
+      if (uniquePayload.length > 0 && newPost) {
+        try {
+          const ok = await processPostHashtags(newPost.id, uniquePayload);
+          if (!ok) throw new Error('processPostHashtags returned false');
+        } catch (err: any) {
+          console.error('Hashtag linking failed (non-blocking):', err);
+          analytics.track('post_hashtag_link_failed', {
+            source: 'create',
+            tag_count: uniquePayload.length,
+            error_code: err?.code || err?.message || 'unknown',
+          });
+          toast({
+            title: "Tags couldn't be saved",
+            description: 'You can edit your post to add them again.',
+          });
+        }
+      }
+
+      analytics.track('post_hashtags_extracted', {
+        source: 'create',
+        count: uniquePayload.length,
+        has_hashtags: uniquePayload.length > 0,
+        hashtag_source: hashtagSource,
+      });
+      
       // Optimistic cache update — prepend new post to feed
       try {
         const optimisticItem = {
@@ -407,6 +445,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
           is_saved: false,
           comment_count: 0,
           tagged_entities: entities,
+          hashtags: uniquePayload.map(p => p.normalized),
           created_at: newPost.created_at || new Date().toISOString(),
         };
 
@@ -501,6 +540,14 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
 
   // Computed properties
   const isPostButtonDisabled = (!content.trim() && media.length === 0) || isSubmitting;
+
+  // Live-detected hashtags for the composer chip row (read-only preview)
+  const detectedHashtagsForChips = useMemo(() => {
+    const { all } = extractHashtagsDetailed(title, content);
+    return all
+      .map(t => normalizeHashtag(t))
+      .filter(n => n.length > 0 && n.length <= 50);
+  }, [title, content]);
   
   // Get user display name using the profileData or fallback to user metadata
   const userDisplayName = user ? (
