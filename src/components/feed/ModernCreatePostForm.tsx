@@ -24,6 +24,9 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
 import { triggerHaptic, playSound } from '@/services/feedbackService';
+import { extractHashtagsDetailed, normalizeHashtag } from '@/utils/hashtag';
+import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
+import { analytics } from '@/services/analytics';
 
 // Emoji picker styles are now in global CSS (index.css)
 
