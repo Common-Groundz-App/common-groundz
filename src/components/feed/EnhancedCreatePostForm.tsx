@@ -91,14 +91,16 @@ export function EnhancedCreatePostForm({
   const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
-  const [content, setContent] = useState('');
-  const [title, setTitle] = useState('');
+  const [content, setContent] = useState(postToEdit?.content ?? '');
+  const [title, setTitle] = useState(postToEdit?.title ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [media, setMedia] = useState<MediaItem[]>([]);
-  const [entities, setEntities] = useState<Entity[]>([]);
+  const [media, setMedia] = useState<MediaItem[]>(postToEdit?.media ?? []);
+  const [entities, setEntities] = useState<Entity[]>(postToEdit?.tagged_entities ?? []);
   const [entitySelectorVisible, setEntitySelectorVisible] = useState(false);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
-  const [visibility, setVisibility] = useState<VisibilityOption>('public');
+  const [visibility, setVisibility] = useState<VisibilityOption>(
+    mapVisibilityFromDatabase(postToEdit?.visibility)
+  );
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [location, setLocation] = useState<{
     name: string;
@@ -107,14 +109,19 @@ export function EnhancedCreatePostForm({
     coordinates: { lat: number; lng: number };
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  // Structured fields state
-  const [structuredOpen, setStructuredOpen] = useState(false);
-  const [whatWorked, setWhatWorked] = useState('');
-  const [whatDidnt, setWhatDidnt] = useState('');
-  const [duration, setDuration] = useState('');
-  const [goodFor, setGoodFor] = useState('');
-  const [reuseIntent, setReuseIntent] = useState<'' | 'yes' | 'no'>('');
+
+  // Structured fields state — hydrate from postToEdit if editing
+  const sf = (postToEdit?.structured_fields ?? {}) as Record<string, any>;
+  const [structuredOpen, setStructuredOpen] = useState(
+    !!(sf.what_worked || sf.what_didnt || sf.duration || sf.good_for || sf.reuse_intent)
+  );
+  const [whatWorked, setWhatWorked] = useState<string>(sf.what_worked ?? '');
+  const [whatDidnt, setWhatDidnt] = useState<string>(sf.what_didnt ?? '');
+  const [duration, setDuration] = useState<string>(sf.duration ?? '');
+  const [goodFor, setGoodFor] = useState<string>(sf.good_for ?? '');
+  const [reuseIntent, setReuseIntent] = useState<'' | 'yes' | 'no'>(
+    (sf.reuse_intent as 'yes' | 'no' | undefined) ?? ''
+  );
   const whatWorkedRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
@@ -122,16 +129,20 @@ export function EnhancedCreatePostForm({
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
   const MAX_MEDIA_COUNT = 4;
-  const [postType, setPostType] = useState<DatabasePostType>('story');
-  
-  // Prefill entity when passed from parent (e.g. "Share your experience")
+  const [postType, setPostType] = useState<DatabasePostType>(
+    (postToEdit?.post_type as DatabasePostType) ?? defaultPostType ?? 'story'
+  );
+
+  // Prefill entity when passed from parent (e.g. "Share your experience").
+  // Skip in edit mode — entities are already hydrated from postToEdit.
   useEffect(() => {
+    if (isEditMode) return;
     if (initialEntity?.id) {
       setEntities(prev =>
         prev.some(e => e.id === initialEntity.id) ? prev : [...prev, initialEntity]
       );
     }
-  }, [initialEntity]);
+  }, [initialEntity, isEditMode]);
 
   // Auto-resize textarea as content changes
   useEffect(() => {
