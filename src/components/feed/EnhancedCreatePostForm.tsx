@@ -31,13 +31,30 @@ import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
 import type { DatabasePostType } from './utils/postUtils';
 import { extractHashtagsDetailed, normalizeHashtag, extractHashtags } from '@/utils/hashtag';
 import { getSuggestedTags } from '@/utils/hashtagSuggestions';
-import { processPostHashtags } from '@/services/hashtagService';
+import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
+import { triggerHaptic, playSound } from '@/services/feedbackService';
+
+export interface PostToEdit {
+  id: string;
+  title?: string | null;
+  content?: string | null;
+  post_type?: DatabasePostType | null;
+  visibility?: 'public' | 'circle_only' | 'private';
+  tagged_entities?: Entity[];
+  media?: MediaItem[];
+  tags?: string[] | null;
+  structured_fields?: Record<string, any> | null;
+  created_at?: string | null;
+  last_edited_at?: string | null;
+}
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
   onCancel?: () => void;
   profileData?: any;
   initialEntity?: Entity;
+  postToEdit?: PostToEdit;
+  defaultPostType?: DatabasePostType;
 }
 
 type VisibilityOption = 'public' | 'private' | 'circle';
@@ -52,7 +69,24 @@ const mapVisibilityToDatabase = (visibility: VisibilityOption): 'public' | 'priv
   }
 };
 
-export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initialEntity }: EnhancedCreatePostFormProps) {
+// Map database visibility back to UI option (for edit hydration)
+const mapVisibilityFromDatabase = (visibility?: string | null): VisibilityOption => {
+  switch (visibility) {
+    case 'private': return 'private';
+    case 'circle_only': return 'circle';
+    default: return 'public';
+  }
+};
+
+export function EnhancedCreatePostForm({
+  onSuccess,
+  onCancel,
+  profileData,
+  initialEntity,
+  postToEdit,
+  defaultPostType,
+}: EnhancedCreatePostFormProps) {
+  const isEditMode = !!postToEdit;
   const { user } = useAuth();
   const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
