@@ -1322,10 +1322,10 @@ export function EnhancedCreatePostForm({
             {isSubmitting ? (
               <div className="flex items-center gap-2">
                 <div className="h-4 w-4 border-2 border-t-transparent rounded-full animate-spin" /> 
-                <span>Posting...</span>
+                <span>{isEditMode ? 'Updating...' : 'Posting...'}</span>
               </div>
             ) : (
-              <span>Post</span>
+              <span>{isEditMode ? 'Update' : 'Post'}</span>
             )}
           </Button>
         </div>
