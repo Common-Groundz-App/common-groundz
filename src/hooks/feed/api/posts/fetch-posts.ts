@@ -23,6 +23,7 @@ export const fetchPosts = async (
         user_id,
         created_at,
         updated_at,
+        last_edited_at,
         media,
         view_count,
         status,
