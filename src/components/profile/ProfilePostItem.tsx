@@ -47,10 +47,11 @@ interface Post {
   id: string;
   title: string;
   content: string;
-  post_type: 'story' | 'routine' | 'project' | 'note';
+  post_type: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching' | 'comparison' | 'question' | 'tip' | 'update';
   visibility: 'public' | 'circle_only' | 'private';
   created_at: string;
   updated_at: string;
+  last_edited_at?: string | null;
   tagged_entities?: Entity[];
   media?: MediaItem[];
   user_id?: string;
@@ -532,8 +533,8 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           <DialogHeader>
             <DialogTitle>Edit Post</DialogTitle>
           </DialogHeader>
-          <CreatePostForm 
-            postToEdit={post}
+          <EnhancedCreatePostForm
+            postToEdit={post as unknown as PostToEdit}
             onSuccess={handleEditSuccess}
             onCancel={() => setIsEditDialogOpen(false)}
           />

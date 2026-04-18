@@ -317,8 +317,12 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
 
+  const editAllowed = canEditPost(post as any, user?.id, isAdmin);
+  const wasEdited = hasBeenEdited(post as any);
+
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!editAllowed) return;
     setIsEditDialogOpen(true);
   };
 
@@ -550,8 +554,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
-          <ModernCreatePostForm 
-            postToEdit={post}
+          <EnhancedCreatePostForm
+            postToEdit={post as unknown as PostToEdit}
             onSuccess={handleEditSuccess}
             onCancel={() => setIsEditDialogOpen(false)}
           />
