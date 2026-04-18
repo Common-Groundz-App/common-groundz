@@ -25,7 +25,11 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { ModernCreatePostForm } from '@/components/feed/ModernCreatePostForm';
+import { EnhancedCreatePostForm, type PostToEdit } from '@/components/feed/EnhancedCreatePostForm';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { canEditPost, hasBeenEdited } from '@/utils/postEditPolicy';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { formatDistanceToNow } from 'date-fns';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -66,6 +70,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   isDetailView = false
 }) => {
   const { user } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const { requireAuth } = useAuthPrompt();
@@ -312,8 +317,12 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
     setLocalCommentCount(prev => (prev !== null ? prev + 1 : 1));
   };
 
+  const editAllowed = canEditPost(post as any, user?.id, isAdmin);
+  const wasEdited = hasBeenEdited(post as any);
+
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!editAllowed) return;
     setIsEditDialogOpen(true);
   };
 
@@ -389,6 +398,18 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               />
               <div className="flex items-center text-muted-foreground text-xs gap-1">
                 <span>{formatDateLong(post.created_at)}</span>
+                {wasEdited && post.last_edited_at && (
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-muted-foreground/70 cursor-default">· edited</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Edited {formatDistanceToNow(new Date(post.last_edited_at), { addSuffix: true })}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 {shouldShowTypeBadge(post.post_type ?? 'story') && (
                   <>
                     <span>·</span>
@@ -533,8 +554,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
-          <ModernCreatePostForm 
-            postToEdit={post}
+          <EnhancedCreatePostForm
+            postToEdit={post as unknown as PostToEdit}
             onSuccess={handleEditSuccess}
             onCancel={() => setIsEditDialogOpen(false)}
           />

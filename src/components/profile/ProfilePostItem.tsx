@@ -21,7 +21,11 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CreatePostForm } from '@/components/feed/CreatePostForm';
+import { EnhancedCreatePostForm, type PostToEdit } from '@/components/feed/EnhancedCreatePostForm';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { canEditPost, hasBeenEdited } from '@/utils/postEditPolicy';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { formatDistanceToNow } from 'date-fns';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,10 +47,11 @@ interface Post {
   id: string;
   title: string;
   content: string;
-  post_type: 'story' | 'routine' | 'project' | 'note';
+  post_type: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching' | 'comparison' | 'question' | 'tip' | 'update';
   visibility: 'public' | 'circle_only' | 'private';
   created_at: string;
   updated_at: string;
+  last_edited_at?: string | null;
   tagged_entities?: Entity[];
   media?: MediaItem[];
   user_id?: string;
@@ -528,8 +533,8 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
           <DialogHeader>
             <DialogTitle>Edit Post</DialogTitle>
           </DialogHeader>
-          <CreatePostForm 
-            postToEdit={post}
+          <EnhancedCreatePostForm
+            postToEdit={post as unknown as PostToEdit}
             onSuccess={handleEditSuccess}
             onCancel={() => setIsEditDialogOpen(false)}
           />

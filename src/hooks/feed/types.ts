@@ -32,6 +32,7 @@ export interface PostFeedItem {
   user_id: string;
   created_at: string;
   updated_at: string;
+  last_edited_at?: string | null;
   username: string | null;
   displayName: string | null;
   avatar_url: string | null;

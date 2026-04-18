@@ -31,13 +31,30 @@ import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
 import type { DatabasePostType } from './utils/postUtils';
 import { extractHashtagsDetailed, normalizeHashtag, extractHashtags } from '@/utils/hashtag';
 import { getSuggestedTags } from '@/utils/hashtagSuggestions';
-import { processPostHashtags } from '@/services/hashtagService';
+import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
+import { triggerHaptic, playSound } from '@/services/feedbackService';
+
+export interface PostToEdit {
+  id: string;
+  title?: string | null;
+  content?: string | null;
+  post_type?: DatabasePostType | null;
+  visibility?: 'public' | 'circle_only' | 'private';
+  tagged_entities?: Entity[];
+  media?: MediaItem[];
+  tags?: string[] | null;
+  structured_fields?: Record<string, any> | null;
+  created_at?: string | null;
+  last_edited_at?: string | null;
+}
 
 interface EnhancedCreatePostFormProps {
   onSuccess: () => void;
   onCancel?: () => void;
   profileData?: any;
   initialEntity?: Entity;
+  postToEdit?: PostToEdit;
+  defaultPostType?: DatabasePostType;
 }
 
 type VisibilityOption = 'public' | 'private' | 'circle';
@@ -52,19 +69,38 @@ const mapVisibilityToDatabase = (visibility: VisibilityOption): 'public' | 'priv
   }
 };
 
-export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initialEntity }: EnhancedCreatePostFormProps) {
+// Map database visibility back to UI option (for edit hydration)
+const mapVisibilityFromDatabase = (visibility?: string | null): VisibilityOption => {
+  switch (visibility) {
+    case 'private': return 'private';
+    case 'circle_only': return 'circle';
+    default: return 'public';
+  }
+};
+
+export function EnhancedCreatePostForm({
+  onSuccess,
+  onCancel,
+  profileData,
+  initialEntity,
+  postToEdit,
+  defaultPostType,
+}: EnhancedCreatePostFormProps) {
+  const isEditMode = !!postToEdit;
   const { user } = useAuth();
   const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
   const queryClient = useQueryClient();
-  const [content, setContent] = useState('');
-  const [title, setTitle] = useState('');
+  const [content, setContent] = useState(postToEdit?.content ?? '');
+  const [title, setTitle] = useState(postToEdit?.title ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [media, setMedia] = useState<MediaItem[]>([]);
-  const [entities, setEntities] = useState<Entity[]>([]);
+  const [media, setMedia] = useState<MediaItem[]>(postToEdit?.media ?? []);
+  const [entities, setEntities] = useState<Entity[]>(postToEdit?.tagged_entities ?? []);
   const [entitySelectorVisible, setEntitySelectorVisible] = useState(false);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
-  const [visibility, setVisibility] = useState<VisibilityOption>('public');
+  const [visibility, setVisibility] = useState<VisibilityOption>(
+    mapVisibilityFromDatabase(postToEdit?.visibility)
+  );
   const [showLocationInput, setShowLocationInput] = useState(false);
   const [location, setLocation] = useState<{
     name: string;
@@ -73,14 +109,19 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
     coordinates: { lat: number; lng: number };
   } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  // Structured fields state
-  const [structuredOpen, setStructuredOpen] = useState(false);
-  const [whatWorked, setWhatWorked] = useState('');
-  const [whatDidnt, setWhatDidnt] = useState('');
-  const [duration, setDuration] = useState('');
-  const [goodFor, setGoodFor] = useState('');
-  const [reuseIntent, setReuseIntent] = useState<'' | 'yes' | 'no'>('');
+
+  // Structured fields state — hydrate from postToEdit if editing
+  const sf = (postToEdit?.structured_fields ?? {}) as Record<string, any>;
+  const [structuredOpen, setStructuredOpen] = useState(
+    !!(sf.what_worked || sf.what_didnt || sf.duration || sf.good_for || sf.reuse_intent)
+  );
+  const [whatWorked, setWhatWorked] = useState<string>(sf.what_worked ?? '');
+  const [whatDidnt, setWhatDidnt] = useState<string>(sf.what_didnt ?? '');
+  const [duration, setDuration] = useState<string>(sf.duration ?? '');
+  const [goodFor, setGoodFor] = useState<string>(sf.good_for ?? '');
+  const [reuseIntent, setReuseIntent] = useState<'' | 'yes' | 'no'>(
+    (sf.reuse_intent as 'yes' | 'no' | undefined) ?? ''
+  );
   const whatWorkedRef = useRef<HTMLTextAreaElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
@@ -88,16 +129,20 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
   const MAX_MEDIA_COUNT = 4;
-  const [postType, setPostType] = useState<DatabasePostType>('story');
-  
-  // Prefill entity when passed from parent (e.g. "Share your experience")
+  const [postType, setPostType] = useState<DatabasePostType>(
+    (postToEdit?.post_type as DatabasePostType) ?? defaultPostType ?? 'story'
+  );
+
+  // Prefill entity when passed from parent (e.g. "Share your experience").
+  // Skip in edit mode — entities are already hydrated from postToEdit.
   useEffect(() => {
+    if (isEditMode) return;
     if (initialEntity?.id) {
       setEntities(prev =>
         prev.some(e => e.id === initialEntity.id) ? prev : [...prev, initialEntity]
       );
     }
-  }, [initialEntity]);
+  }, [initialEntity, isEditMode]);
 
   // Auto-resize textarea as content changes
   useEffect(() => {
@@ -305,13 +350,18 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       return;
     }
 
+    // Haptic immediately after validation, before async work (mobile no-ops on desktop)
+    try {
+      triggerHaptic('light');
+    } catch (err) {
+      console.error('Haptic trigger failed:', err);
+    }
+
     try {
       setIsSubmitting(true);
 
-      // Map visibility to database enum type
       const dbVisibility = mapVisibilityToDatabase(visibility);
-      
-      // Clean media items for database
+
       const mediaToSave = media.map(item => ({
         id: item.id || uuidv4(),
         url: item.url,
@@ -323,10 +373,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         thumbnail_url: item.thumbnail_url || item.url
       }));
 
-      // Store location as a tag if it exists, instead of in metadata
       const tags = location ? [location.name] : [];
 
-      // Clean structured fields
       const cleanedStructured = cleanStructuredFields({
         what_worked: whatWorked,
         what_didnt: whatDidnt,
@@ -335,22 +383,20 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         reuse_intent: reuseIntent || undefined,
       });
 
-      // Prepare post data for database - explicitly type the post_type
-      const postData: Record<string, any> = {
+      const basePostData: Record<string, any> = {
         title: title.trim() || null,
         content,
         media: mediaToSave,
         visibility: dbVisibility,
-        user_id: user.id,
         post_type: postType || 'story',
         tags: tags,
       };
 
-      // Only include structured_fields when there's actual data
-      if (cleanedStructured) {
-        postData.structured_fields = cleanedStructured;
+      // Always set structured_fields explicitly so edits can also CLEAR them
+      // (sending null when empty rather than omitting from the payload).
+      basePostData.structured_fields = cleanedStructured ?? null;
 
-        // Analytics: track which fields are used
+      if (cleanedStructured) {
         analytics.track('post_structured_fields_used', {
           has_pros: !!cleanedStructured.what_worked,
           has_cons: !!cleanedStructured.what_didnt,
@@ -360,27 +406,117 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         });
       }
 
-      // Track post type selection when non-default
       if (postType && postType !== 'story') {
         analytics.track('post_type_selected', { post_type: postType });
       }
 
-      console.log('Submitting post:', postData);
-      
-      // Save to database
+      // ====== EDIT MODE BRANCH ======
+      if (isEditMode && postToEdit) {
+        const updatePayload = {
+          ...basePostData,
+          last_edited_at: new Date().toISOString(),
+        };
+
+        const { data: updatedPost, error } = await supabase
+          .from('posts')
+          .update(updatePayload as any)
+          .eq('id', postToEdit.id)
+          .eq('user_id', user.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Replace entity relationships: delete-then-insert
+        await supabase
+          .from('post_entities')
+          .delete()
+          .eq('post_id', postToEdit.id);
+
+        if (entities.length > 0) {
+          for (const entity of entities) {
+            const { error: entityError } = await supabase
+              .from('post_entities')
+              .insert({ post_id: postToEdit.id, entity_id: entity.id });
+            if (entityError) console.error('Error saving entity relationship:', entityError);
+          }
+        }
+
+        // Hashtags: always call updatePostHashtags so removing tags clears them
+        const { all: detectedTagsEdit, source: hashtagSourceEdit } = extractHashtagsDetailed(title, content);
+        const editPayload = Array.from(
+          new Map(
+            detectedTagsEdit
+              .map(t => ({ original: t, normalized: normalizeHashtag(t) }))
+              .filter(p => p.normalized.length > 0 && p.normalized.length <= 50)
+              .map(p => [p.normalized, p])
+          ).values()
+        );
+
+        try {
+          const ok = await updatePostHashtags(postToEdit.id, editPayload);
+          if (!ok) throw new Error('updatePostHashtags returned false');
+        } catch (err: any) {
+          console.error('Hashtag update failed (non-blocking):', err);
+          analytics.track('post_hashtag_link_failed', {
+            source: 'edit',
+            tag_count: editPayload.length,
+            error_code: err?.code || err?.message || 'unknown',
+          });
+          toast({
+            title: "Tags couldn't be saved",
+            description: 'You can edit your post to add them again.',
+          });
+        }
+
+        analytics.track('post_hashtags_extracted', {
+          source: 'edit',
+          count: editPayload.length,
+          has_hashtags: editPayload.length > 0,
+          hashtag_source: hashtagSourceEdit,
+        });
+
+        // Refresh feeds + profile posts (no optimistic prepend on edit)
+        queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
+        window.dispatchEvent(new CustomEvent('refresh-feed'));
+        window.dispatchEvent(new CustomEvent('refresh-posts', {
+          detail: { entityId: entities[0]?.id }
+        }));
+        window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+
+        try {
+          playSound('/sounds/post.mp3');
+        } catch (err) {
+          console.error('Sound playback failed:', err);
+        }
+
+        toast({
+          title: 'Post updated',
+          description: 'Your changes have been saved.',
+        });
+
+        onSuccess();
+        return;
+      }
+
+      // ====== CREATE MODE BRANCH ======
+      const createPayload = {
+        ...basePostData,
+        user_id: user.id,
+      };
+
+      console.log('Submitting post:', createPayload);
+
       const { data: newPost, error } = await supabase
         .from('posts')
-        .insert(postData as any)
+        .insert(createPayload as any)
         .select()
         .single();
-      
-      if (error) {
-        throw error;
-      }
-      
+
+      if (error) throw error;
+
       console.log('Post created:', newPost);
-      
-      // Add entity relationships if any
+
       if (entities.length > 0 && newPost) {
         for (const entity of entities) {
           const { error: entityError } = await supabase
@@ -389,20 +525,19 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
               post_id: newPost.id,
               entity_id: entity.id
             });
-            
+
           if (entityError) {
             console.error('Error saving entity relationship:', entityError);
           }
         }
       }
-      
+
       // ===== Hashtag persistence (non-blocking) =====
       const { all: detectedTags, source: hashtagSource } = extractHashtagsDetailed(title, content);
       const filteredPayload = detectedTags
         .map(t => ({ original: t, normalized: normalizeHashtag(t) }))
         .filter(p => p.normalized.length > 0 && p.normalized.length <= 50);
 
-      // Defensive duplicate guard (in case upstream dedup logic ever changes)
       const uniquePayload = Array.from(
         new Map(filteredPayload.map(p => [p.normalized, p])).values()
       );
@@ -431,7 +566,7 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         has_hashtags: uniquePayload.length > 0,
         hashtag_source: hashtagSource,
       });
-      
+
       // Optimistic cache update — prepend new post to feed
       try {
         const optimisticItem = {
@@ -463,7 +598,6 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
           };
         };
 
-        // Update all cached feed variants for this user
         queryClient.setQueriesData(
           { queryKey: ['infinite-feed'] },
           updateFeedCache
@@ -472,10 +606,8 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         console.warn('Optimistic update failed, relying on invalidation', e);
       }
 
-      // Broad invalidation for background sync across all feed variants
       queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
 
-      // Keep entity-specific refresh events for entity pages
       const refreshEntityId = entities[0]?.id;
       if (refreshEntityId) {
         window.dispatchEvent(new CustomEvent('refresh-posts', {
@@ -483,6 +615,12 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
         }));
       }
       window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+
+      try {
+        playSound('/sounds/post.mp3');
+      } catch (err) {
+        console.error('Sound playback failed:', err);
+      }
 
       toast({
         title: 'Experience shared',
@@ -1184,10 +1322,10 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
             {isSubmitting ? (
               <div className="flex items-center gap-2">
                 <div className="h-4 w-4 border-2 border-t-transparent rounded-full animate-spin" /> 
-                <span>Posting...</span>
+                <span>{isEditMode ? 'Updating...' : 'Posting...'}</span>
               </div>
             ) : (
-              <span>Post</span>
+              <span>{isEditMode ? 'Update' : 'Post'}</span>
             )}
           </Button>
         </div>

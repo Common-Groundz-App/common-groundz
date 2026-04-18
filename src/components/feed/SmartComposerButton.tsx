@@ -230,21 +230,30 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               </button>
               <button
                 className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
-                onClick={() => handleContentTypeSelect('review')}
+                onClick={() => {
+                  setIsPopoverOpen(false);
+                  navigate('/create');
+                }}
               >
                 <Star size={16} className="text-yellow-500" />
                 <span>Review</span>
               </button>
               <button
                 className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
-                onClick={() => handleContentTypeSelect('journal')}
+                onClick={() => {
+                  setIsPopoverOpen(false);
+                  navigate('/create?postType=journal');
+                }}
               >
                 <Book size={16} className="text-green-500" />
                 <span>Journal</span>
               </button>
               <button
                 className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
-                onClick={() => handleContentTypeSelect('watching')}
+                onClick={() => {
+                  setIsPopoverOpen(false);
+                  navigate('/create?postType=watching');
+                }}
               >
                 <Eye size={16} className="text-purple-500" />
                 <span>Currently Watching/Using</span>
