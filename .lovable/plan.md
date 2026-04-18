@@ -2,129 +2,199 @@
 
 ## My take
 
-All four points are valid. Adopting all of them — they're small, safe, and prevent real bugs.
+Both reviews land on solid additions. Adopting all 3 with one important nuance.
 
-**ChatGPT's additions:**
-1. **Duplicate guard before DB write** — defensive, costs nothing, protects against future regressions if dedup logic upstream changes.
-2. **Max length filter (≤50 chars)** — sensible UX guard. Note: existing `isValidHashtag` already caps at 100, so I'll standardize on **50** for the persistence path (stricter than display validation, matches DB hygiene goals).
+**ChatGPT #1 + Codex #1 — Dedup analytics:** Correct and important. My v4 `useEffect` would refire on every render where `suggestions` is a new array reference (which is *every* render unless deeply memoized). Need a guard.
 
-**Codex's corrections:**
-1. **Use the actual field name** — confirmed correct concern. I need to verify the actual variable name in each form (`content` vs `contentHtml`) when implementing. This is an implementation-time check, not a plan change.
-2. **`extractHashtagsDetailed` must reuse `extractHashtagsFromPost` internally** — already in my plan (it calls `extractHashtags` per-field then dedupes via `Set`), but I'll make it explicit: no new regex, no parallel logic.
+**ChatGPT #2 — Reset on context change:** Correct complement to #1. When entity/postType actually changes, we *want* a new impression event. Combining #1 + #2 = track once per meaningful context.
 
-## Final locked Phase 1 plan
+**Codex #2 — Reuse existing hashtag parser:** Right principle (no regex drift), but needs care. The existing `extractHashtags` returns *all* hashtags from text — perfect for the duplicate check. Use `extractHashtags(title + ' ' + content).includes(tag)` instead of a hand-rolled regex. Eliminates the `escapeRegex` helper entirely. Cleaner.
+
+**Better implementation than two separate `useEffect`s:** Use a single ref keyed on a serialized context signature. One `useEffect`, one source of truth, no race between the "track" and "reset" effects.
+
+## Final Phase 2 plan
 
 ### Files
-- `src/utils/hashtag.ts` — add `extractHashtagsDetailed` helper
-- `src/components/feed/EnhancedCreatePostForm.tsx` — create flow + chip row
-- `src/components/feed/ModernCreatePostForm.tsx` — edit flow
+- **New:** `src/utils/hashtagSuggestions.ts` (~45 lines)
+- **Edit:** `src/components/feed/EnhancedCreatePostForm.tsx` (~35 lines added)
 
-### 1. New helper (`src/utils/hashtag.ts`)
+### 1. Helper: `src/utils/hashtagSuggestions.ts`
+
 ```ts
-export interface DetailedHashtags {
-  all: string[];
-  title: string[];
-  content: string[];
-  source: 'title' | 'content' | 'both' | 'none';
+import { normalizeHashtag, isValidHashtag } from './hashtag';
+
+const RAW_CATEGORY_TAGS: Record<string, string[]> = {
+  product:  ['review', 'budget', 'recommend', 'dupe'],
+  food:     ['recipe', 'foodie', 'musttry', 'budget'],
+  movie:    ['review', 'mustwatch', 'spoilerfree'],
+  book:     ['review', 'mustread', 'recommend'],
+  place:    ['travel', 'mustvisit', 'hiddengem'],
+  default:  ['review', 'recommend', 'experience', 'tip'],
+};
+
+const RAW_POST_TYPE_TAGS: Record<string, string[]> = {
+  story:      ['journey', 'experience'],
+  comparison: ['comparison', 'dupe'],
+  question:   ['help', 'advice'],
+  tip:        ['tip', 'protip'],
+};
+
+const normalize = (arr: string[]) =>
+  arr.map(normalizeHashtag).filter(t => isValidHashtag(t) && t.length > 0 && t.length <= 50);
+
+const CATEGORY_TAGS = Object.fromEntries(
+  Object.entries(RAW_CATEGORY_TAGS).map(([k, v]) => [k, normalize(v)])
+);
+const POST_TYPE_TAGS = Object.fromEntries(
+  Object.entries(RAW_POST_TYPE_TAGS).map(([k, v]) => [k, normalize(v)])
+);
+
+export interface SuggestionInput {
+  entities: Array<{ type?: string }>;
+  postType?: string;
+  existingTags: string[];
 }
 
-export const extractHashtagsDetailed = (title?: string, content?: string): DetailedHashtags => {
-  // Reuses existing extractHashtags + isValidHashtag — no new regex
-  const titleTags = extractHashtags(title || '').filter(isValidHashtag);
-  const contentTags = extractHashtags(content || '').filter(isValidHashtag);
-  const all = [...new Set([...titleTags, ...contentTags])];
-  const source =
-    titleTags.length && contentTags.length ? 'both'
-    : titleTags.length ? 'title'
-    : contentTags.length ? 'content' : 'none';
-  return { all, title: titleTags, content: contentTags, source };
+export function getSuggestedTags({
+  entities, postType, existingTags
+}: SuggestionInput): string[] {
+  const existing = new Set(existingTags.map(t => t.toLowerCase()));
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+
+  entities.forEach(e => {
+    (CATEGORY_TAGS[e.type || 'default'] || CATEGORY_TAGS.default).forEach(t => {
+      if (!seen.has(t) && !existing.has(t)) { ordered.push(t); seen.add(t); }
+    });
+  });
+
+  if (postType && POST_TYPE_TAGS[postType]) {
+    POST_TYPE_TAGS[postType].forEach(t => {
+      if (!seen.has(t) && !existing.has(t)) { ordered.push(t); seen.add(t); }
+    });
+  }
+
+  if (ordered.length === 0) {
+    CATEGORY_TAGS.default.forEach(t => {
+      if (!existing.has(t)) { ordered.push(t); seen.add(t); }
+    });
+  }
+
+  return ordered.slice(0, 5);
+}
+```
+
+No `escapeRegex` — duplicate check uses existing `extractHashtags`.
+
+### 2. Composer: `EnhancedCreatePostForm.tsx`
+
+```tsx
+import { extractHashtags } from '@/utils/hashtag';
+import { getSuggestedTags } from '@/utils/hashtagSuggestions';
+
+const suggestions = useMemo(() => getSuggestedTags({
+  entities: selectedEntities,
+  postType,
+  existingTags: detectedHashtagsForChips,
+}), [selectedEntities, postType, detectedHashtagsForChips]);
+
+// Single-source dedup: track once per context signature
+const lastTrackedSignatureRef = useRef<string>('');
+useEffect(() => {
+  if (suggestions.length === 0) return;
+  const signature = JSON.stringify({
+    tags: suggestions,
+    entityIds: selectedEntities.map(e => e.id),
+    postType: postType || null,
+  });
+  if (lastTrackedSignatureRef.current === signature) return;
+  lastTrackedSignatureRef.current = signature;
+  analytics.track('hashtag_suggestions_shown', {
+    count: suggestions.length,
+    tags: suggestions,
+    entity_count: selectedEntities.length,
+    post_type: postType || null,
+  });
+}, [suggestions, selectedEntities, postType]);
+
+const handleSuggestionClick = (tag: string) => {
+  // Reuse existing extraction — no regex drift
+  const present = new Set(extractHashtags(`${title || ''} ${content || ''}`));
+  if (present.has(tag.toLowerCase())) return;
+
+  const tagToken = `#${tag}`;
+  const position = suggestions.indexOf(tag);
+
+  if (content?.trim()) {
+    setContent(prev => {
+      const base = (prev || '').trimEnd();
+      return base ? `${base} ${tagToken} ` : `${tagToken} `;
+    });
+  } else if (title?.trim()) {
+    setTitle(prev => {
+      const base = (prev || '').trimEnd();
+      return base ? `${base} ${tagToken}` : tagToken;
+    });
+  } else {
+    setContent(`${tagToken} `);
+  }
+
+  analytics.track('hashtag_suggestion_clicked', {
+    tag,
+    tag_position: position,
+    entity_count: selectedEntities.length,
+    post_type: postType || null,
+    source: 'suggested_chip',
+  });
 };
 ```
 
-### 2. Create flow (`EnhancedCreatePostForm.tsx`)
-Implementation-time: verify actual content field name in this form (likely `content`, not `contentHtml`). After `posts.insert()` succeeds:
-
-```ts
-const { all, source } = extractHashtagsDetailed(title, content);
-
-const payload = all
-  .map(t => ({ original: t, normalized: normalizeHashtag(t) }))
-  .filter(p => p.normalized.length > 0 && p.normalized.length <= 50);
-
-// Duplicate guard (defensive)
-const uniquePayload = Array.from(
-  new Map(payload.map(p => [p.normalized, p])).values()
-);
-
-if (uniquePayload.length > 0) {
-  try {
-    await processPostHashtags(newPost.id, uniquePayload);
-  } catch (err: any) {
-    console.error('Hashtag linking failed (non-blocking):', err);
-    analytics.track('post_hashtag_link_failed', {
-      source: 'create',
-      tag_count: uniquePayload.length,
-      error_code: err?.code || 'unknown',
-    });
-    toast({
-      title: "Tags couldn't be saved",
-      description: 'You can edit your post to add them again.',
-    });
-  }
-}
-
-analytics.track('post_hashtags_extracted', {
-  source: 'create',
-  count: uniquePayload.length,
-  has_hashtags: uniquePayload.length > 0,
-  hashtag_source: source,
-});
+```tsx
+{suggestions.length > 0 && (
+  <div className="space-y-2">
+    <p className="text-xs font-medium text-muted-foreground">Suggested</p>
+    <div className="flex flex-wrap gap-2">
+      {suggestions.map(tag => (
+        <Badge
+          key={tag}
+          variant="outline"
+          className="cursor-pointer hover:bg-accent gap-1"
+          onClick={() => handleSuggestionClick(tag)}
+        >
+          <Plus className="h-3 w-3" /> #{tag}
+        </Badge>
+      ))}
+    </div>
+  </div>
+)}
 ```
-Include `uniquePayload` in optimistic cache item so `PostTextRenderer` shows inline links instantly.
 
-### 3. Edit flow (`ModernCreatePostForm.tsx`)
-Implementation-time: verify actual content field name. Same pattern, calling `updatePostHashtags(postId, uniquePayload)` (delete-then-insert). Empty array correctly clears all hashtags. Wrapped in try/catch — edit succeeds even if tag link fails. Analytics fires with `source: 'edit'`.
+Placement: above the existing Phase 1 detected-tags ("Tags") row.
 
-### 4. Composer chip row (`EnhancedCreatePostForm`)
-- `useMemo` over `[title, content]` → `extractHashtagsDetailed(title, content).all`, then apply same length filter (≤50)
-- Render below textarea, **only when count > 0**:
-  ```
-  Tags
-  [#oilyskin] [#budget]
-  ```
-- `Badge variant="secondary"` + `#` prefix
-- Mobile: `overflow-x-auto` horizontal scroll
-- **Read-only**: no `×`, no chip-to-text sync
-- Source of truth = textarea content
+### Why the signature-ref approach beats two effects
+- **One source of truth** — no race between "track" effect and "reset" effect
+- **Naturally handles all context changes** — entity swap, postType swap, tag list change all produce a new signature
+- **Naturally suppresses re-renders** — same context = same signature = no re-fire
+- **Resilient to React StrictMode double-invocation**
 
-### Failure policy
-- Hashtag write failures **never block** post publish/edit
-- Soft toast with recovery hint
-- `post_hashtag_link_failed` event for production monitoring
+### Out of scope (Phase 2.5+)
+- ❌ `#` typeahead/autocomplete
+- ❌ Chip × removal
+- ❌ Edit composer (`ModernCreatePostForm`)
+- ❌ DB-backed suggestions
+- ❌ AI suggestions
 
-### Out of scope (Phase 1)
-- Chip → text deletion
-- Suggested tags (Phase 2)
-- Bidirectional sync, autocomplete, `#` typeahead
-- Any change to `PostTextRenderer`, `HashtagRenderer`, feed cards, post detail, `/t/:tag`
-- DB migrations, new tables
-- Test infrastructure
-- Composer redesign (Phase 3)
+### Verification
+1. No entity → 4 default suggestions, `hashtag_suggestions_shown` fires once
+2. Tag `product` entity → suggestions update, event fires once more (new signature)
+3. Type random text in content → suggestions unchanged, **no** new event fires (signature stable)
+4. Click `+ #budget` → tag appended, `hashtag_suggestion_clicked` fires with `tag_position`
+5. Click `+ #budget` again (already in content) → no-op (extractHashtags-based dedup)
+6. Type `#budgeting` then click `+ #budget` → still inserts (extractHashtags returns distinct tokens)
+7. Submit → Phase 1 persistence handles `post_hashtags` row
+8. Mobile: chips wrap cleanly, no overflow
+9. All tags lowercase
 
-### Verification checklist
-1. Create with `#oilyskin` in content → row in `post_hashtags`, inline link in feed, post on `/t/oilyskin`, analytics: `hashtag_source: 'content'`
-2. Create with `#review` in title only → captured, `hashtag_source: 'title'`
-3. Create with both → `hashtag_source: 'both'`
-4. Edit post: swap `#oilyskin` → `#dryskin` → old removed, new added
-5. Edit post: remove all hashtags → `post_hashtags` count drops to 0
-6. Try `#thisisaveryveryveryveryverylonghashtagthatexceedsfiftychars` → filtered out, not persisted, not in chip row
-7. Composer chip row appears only when ≥1 valid tag detected
-8. Mobile: chips scroll horizontally
-9. Force-fail `processPostHashtags` (network throttle) → post still publishes, soft toast shown, `post_hashtag_link_failed` fires
-
-### Phases 2 & 3 (deferred)
-- **Phase 2** (after 2 weeks of analytics data): entity-aware suggested tag chips
-- **Phase 3** (later): full composer redesign
-
-Ready to implement Phase 1 on approval.
+### Build estimate
+1 new file (~45 lines), 1 edit (~35 lines added). One implementation pass.
 
