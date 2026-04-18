@@ -2126,6 +2126,7 @@ export type Database = {
           entity_id: string | null
           id: string
           is_deleted: boolean
+          last_edited_at: string | null
           media: Json | null
           post_type: Database["public"]["Enums"]["post_type"]
           status: string | null
@@ -2144,6 +2145,7 @@ export type Database = {
           entity_id?: string | null
           id?: string
           is_deleted?: boolean
+          last_edited_at?: string | null
           media?: Json | null
           post_type?: Database["public"]["Enums"]["post_type"]
           status?: string | null
@@ -2162,6 +2164,7 @@ export type Database = {
           entity_id?: string | null
           id?: string
           is_deleted?: boolean
+          last_edited_at?: string | null
           media?: Json | null
           post_type?: Database["public"]["Enums"]["post_type"]
           status?: string | null
