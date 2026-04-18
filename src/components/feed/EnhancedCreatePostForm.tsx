@@ -350,13 +350,18 @@ export function EnhancedCreatePostForm({
       return;
     }
 
+    // Haptic immediately after validation, before async work (mobile no-ops on desktop)
+    try {
+      triggerHaptic('light');
+    } catch (err) {
+      console.error('Haptic trigger failed:', err);
+    }
+
     try {
       setIsSubmitting(true);
 
-      // Map visibility to database enum type
       const dbVisibility = mapVisibilityToDatabase(visibility);
-      
-      // Clean media items for database
+
       const mediaToSave = media.map(item => ({
         id: item.id || uuidv4(),
         url: item.url,
@@ -368,10 +373,8 @@ export function EnhancedCreatePostForm({
         thumbnail_url: item.thumbnail_url || item.url
       }));
 
-      // Store location as a tag if it exists, instead of in metadata
       const tags = location ? [location.name] : [];
 
-      // Clean structured fields
       const cleanedStructured = cleanStructuredFields({
         what_worked: whatWorked,
         what_didnt: whatDidnt,
@@ -380,22 +383,20 @@ export function EnhancedCreatePostForm({
         reuse_intent: reuseIntent || undefined,
       });
 
-      // Prepare post data for database - explicitly type the post_type
-      const postData: Record<string, any> = {
+      const basePostData: Record<string, any> = {
         title: title.trim() || null,
         content,
         media: mediaToSave,
         visibility: dbVisibility,
-        user_id: user.id,
         post_type: postType || 'story',
         tags: tags,
       };
 
-      // Only include structured_fields when there's actual data
-      if (cleanedStructured) {
-        postData.structured_fields = cleanedStructured;
+      // Always set structured_fields explicitly so edits can also CLEAR them
+      // (sending null when empty rather than omitting from the payload).
+      basePostData.structured_fields = cleanedStructured ?? null;
 
-        // Analytics: track which fields are used
+      if (cleanedStructured) {
         analytics.track('post_structured_fields_used', {
           has_pros: !!cleanedStructured.what_worked,
           has_cons: !!cleanedStructured.what_didnt,
@@ -405,27 +406,117 @@ export function EnhancedCreatePostForm({
         });
       }
 
-      // Track post type selection when non-default
       if (postType && postType !== 'story') {
         analytics.track('post_type_selected', { post_type: postType });
       }
 
-      console.log('Submitting post:', postData);
-      
-      // Save to database
+      // ====== EDIT MODE BRANCH ======
+      if (isEditMode && postToEdit) {
+        const updatePayload = {
+          ...basePostData,
+          last_edited_at: new Date().toISOString(),
+        };
+
+        const { data: updatedPost, error } = await supabase
+          .from('posts')
+          .update(updatePayload as any)
+          .eq('id', postToEdit.id)
+          .eq('user_id', user.id)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Replace entity relationships: delete-then-insert
+        await supabase
+          .from('post_entities')
+          .delete()
+          .eq('post_id', postToEdit.id);
+
+        if (entities.length > 0) {
+          for (const entity of entities) {
+            const { error: entityError } = await supabase
+              .from('post_entities')
+              .insert({ post_id: postToEdit.id, entity_id: entity.id });
+            if (entityError) console.error('Error saving entity relationship:', entityError);
+          }
+        }
+
+        // Hashtags: always call updatePostHashtags so removing tags clears them
+        const { all: detectedTagsEdit, source: hashtagSourceEdit } = extractHashtagsDetailed(title, content);
+        const editPayload = Array.from(
+          new Map(
+            detectedTagsEdit
+              .map(t => ({ original: t, normalized: normalizeHashtag(t) }))
+              .filter(p => p.normalized.length > 0 && p.normalized.length <= 50)
+              .map(p => [p.normalized, p])
+          ).values()
+        );
+
+        try {
+          const ok = await updatePostHashtags(postToEdit.id, editPayload);
+          if (!ok) throw new Error('updatePostHashtags returned false');
+        } catch (err: any) {
+          console.error('Hashtag update failed (non-blocking):', err);
+          analytics.track('post_hashtag_link_failed', {
+            source: 'edit',
+            tag_count: editPayload.length,
+            error_code: err?.code || err?.message || 'unknown',
+          });
+          toast({
+            title: "Tags couldn't be saved",
+            description: 'You can edit your post to add them again.',
+          });
+        }
+
+        analytics.track('post_hashtags_extracted', {
+          source: 'edit',
+          count: editPayload.length,
+          has_hashtags: editPayload.length > 0,
+          hashtag_source: hashtagSourceEdit,
+        });
+
+        // Refresh feeds + profile posts (no optimistic prepend on edit)
+        queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
+        window.dispatchEvent(new CustomEvent('refresh-feed'));
+        window.dispatchEvent(new CustomEvent('refresh-posts', {
+          detail: { entityId: entities[0]?.id }
+        }));
+        window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+
+        try {
+          playSound('/sounds/post.mp3');
+        } catch (err) {
+          console.error('Sound playback failed:', err);
+        }
+
+        toast({
+          title: 'Post updated',
+          description: 'Your changes have been saved.',
+        });
+
+        onSuccess();
+        return;
+      }
+
+      // ====== CREATE MODE BRANCH ======
+      const createPayload = {
+        ...basePostData,
+        user_id: user.id,
+      };
+
+      console.log('Submitting post:', createPayload);
+
       const { data: newPost, error } = await supabase
         .from('posts')
-        .insert(postData as any)
+        .insert(createPayload as any)
         .select()
         .single();
-      
-      if (error) {
-        throw error;
-      }
-      
+
+      if (error) throw error;
+
       console.log('Post created:', newPost);
-      
-      // Add entity relationships if any
+
       if (entities.length > 0 && newPost) {
         for (const entity of entities) {
           const { error: entityError } = await supabase
@@ -434,20 +525,19 @@ export function EnhancedCreatePostForm({
               post_id: newPost.id,
               entity_id: entity.id
             });
-            
+
           if (entityError) {
             console.error('Error saving entity relationship:', entityError);
           }
         }
       }
-      
+
       // ===== Hashtag persistence (non-blocking) =====
       const { all: detectedTags, source: hashtagSource } = extractHashtagsDetailed(title, content);
       const filteredPayload = detectedTags
         .map(t => ({ original: t, normalized: normalizeHashtag(t) }))
         .filter(p => p.normalized.length > 0 && p.normalized.length <= 50);
 
-      // Defensive duplicate guard (in case upstream dedup logic ever changes)
       const uniquePayload = Array.from(
         new Map(filteredPayload.map(p => [p.normalized, p])).values()
       );
@@ -476,7 +566,7 @@ export function EnhancedCreatePostForm({
         has_hashtags: uniquePayload.length > 0,
         hashtag_source: hashtagSource,
       });
-      
+
       // Optimistic cache update — prepend new post to feed
       try {
         const optimisticItem = {
@@ -508,7 +598,6 @@ export function EnhancedCreatePostForm({
           };
         };
 
-        // Update all cached feed variants for this user
         queryClient.setQueriesData(
           { queryKey: ['infinite-feed'] },
           updateFeedCache
@@ -517,10 +606,8 @@ export function EnhancedCreatePostForm({
         console.warn('Optimistic update failed, relying on invalidation', e);
       }
 
-      // Broad invalidation for background sync across all feed variants
       queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
 
-      // Keep entity-specific refresh events for entity pages
       const refreshEntityId = entities[0]?.id;
       if (refreshEntityId) {
         window.dispatchEvent(new CustomEvent('refresh-posts', {
@@ -528,6 +615,12 @@ export function EnhancedCreatePostForm({
         }));
       }
       window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+
+      try {
+        playSound('/sounds/post.mp3');
+      } catch (err) {
+        console.error('Sound playback failed:', err);
+      }
 
       toast({
         title: 'Experience shared',
