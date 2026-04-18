@@ -21,7 +21,11 @@ import {
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CreatePostForm } from '@/components/feed/CreatePostForm';
+import { EnhancedCreatePostForm, type PostToEdit } from '@/components/feed/EnhancedCreatePostForm';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { canEditPost, hasBeenEdited } from '@/utils/postEditPolicy';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { formatDistanceToNow } from 'date-fns';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
