@@ -70,6 +70,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   isDetailView = false
 }) => {
   const { user } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
   const { requireAuth } = useAuthPrompt();
@@ -393,6 +394,18 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               />
               <div className="flex items-center text-muted-foreground text-xs gap-1">
                 <span>{formatDateLong(post.created_at)}</span>
+                {wasEdited && post.last_edited_at && (
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="text-muted-foreground/70 cursor-default">· edited</span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        Edited {formatDistanceToNow(new Date(post.last_edited_at), { addSuffix: true })}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 {shouldShowTypeBadge(post.post_type ?? 'story') && (
                   <>
                     <span>·</span>
