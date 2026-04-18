@@ -10,7 +10,7 @@ import { UnifiedEntitySelector } from '@/components/feed/UnifiedEntitySelector';
 import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Badge } from '@/components/ui/badge';
-import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users, ChevronDown } from 'lucide-react';
+import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users, ChevronDown, Plus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -29,7 +29,8 @@ import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredField
 import { analytics } from '@/services/analytics';
 import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
 import type { DatabasePostType } from './utils/postUtils';
-import { extractHashtagsDetailed, normalizeHashtag } from '@/utils/hashtag';
+import { extractHashtagsDetailed, normalizeHashtag, extractHashtags } from '@/utils/hashtag';
+import { getSuggestedTags } from '@/utils/hashtagSuggestions';
 import { processPostHashtags } from '@/services/hashtagService';
 
 interface EnhancedCreatePostFormProps {
@@ -548,6 +549,63 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
       .map(t => normalizeHashtag(t))
       .filter(n => n.length > 0 && n.length <= 50);
   }, [title, content]);
+
+  // Phase 2: Suggested hashtags (entity + postType driven)
+  const suggestedHashtags = useMemo(() => getSuggestedTags({
+    entities,
+    postType,
+    existingTags: detectedHashtagsForChips,
+  }), [entities, postType, detectedHashtagsForChips]);
+
+  // Single-source dedup: track impression once per meaningful context signature
+  const lastTrackedSuggestionsSignatureRef = useRef<string>('');
+  useEffect(() => {
+    if (suggestedHashtags.length === 0) return;
+    const signature = JSON.stringify({
+      tags: suggestedHashtags,
+      entityIds: entities.map(e => e.id),
+      postType: postType || null,
+    });
+    if (lastTrackedSuggestionsSignatureRef.current === signature) return;
+    lastTrackedSuggestionsSignatureRef.current = signature;
+    analytics.track('hashtag_suggestions_shown', {
+      count: suggestedHashtags.length,
+      tags: suggestedHashtags,
+      entity_count: entities.length,
+      post_type: postType || null,
+    });
+  }, [suggestedHashtags, entities, postType]);
+
+  const handleSuggestedHashtagClick = useCallback((tag: string) => {
+    // Reuse existing extractor — no regex drift vs Phase 1 persistence
+    const present = new Set(extractHashtags(`${title || ''} ${content || ''}`));
+    if (present.has(tag.toLowerCase())) return;
+
+    const tagToken = `#${tag}`;
+    const position = suggestedHashtags.indexOf(tag);
+
+    if (content?.trim()) {
+      setContent(prev => {
+        const base = (prev || '').trimEnd();
+        return base ? `${base} ${tagToken} ` : `${tagToken} `;
+      });
+    } else if (title?.trim()) {
+      setTitle(prev => {
+        const base = (prev || '').trimEnd();
+        return base ? `${base} ${tagToken}` : tagToken;
+      });
+    } else {
+      setContent(`${tagToken} `);
+    }
+
+    analytics.track('hashtag_suggestion_clicked', {
+      tag,
+      tag_position: position,
+      entity_count: entities.length,
+      post_type: postType || null,
+      source: 'suggested_chip',
+    });
+  }, [title, content, suggestedHashtags, entities, postType]);
   
   // Get user display name using the profileData or fallback to user metadata
   const userDisplayName = user ? (
@@ -734,6 +792,26 @@ export function EnhancedCreatePostForm({ onSuccess, onCancel, profileData, initi
             onFocus={saveCursorPosition}
           />
           <p className="text-xs text-muted-foreground/60 mt-1">What worked? · What didn't? · Who is this useful for?</p>
+
+          {/* Suggested hashtags chip row (clickable, Phase 2) */}
+          {suggestedHashtags.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">Suggested</p>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestedHashtags.map((tag) => (
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    onClick={() => handleSuggestedHashtagClick(tag)}
+                    className="cursor-pointer hover:bg-accent gap-1 font-normal"
+                  >
+                    <Plus className="h-3 w-3" />
+                    #{tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Detected hashtags chip row (read-only preview) */}
           {detectedHashtagsForChips.length > 0 && (
