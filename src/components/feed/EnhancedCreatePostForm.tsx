@@ -412,14 +412,12 @@ export function EnhancedCreatePostForm({
 
       // ====== EDIT MODE BRANCH ======
       if (isEditMode && postToEdit) {
-        const updatePayload = {
-          ...basePostData,
-          last_edited_at: new Date().toISOString(),
-        };
-
+        // Note: last_edited_at is stamped server-side by the
+        // enforce_post_edit_window trigger — only on meaningful changes.
+        // Same trigger enforces the 1h window + admin bypass.
         const { data: updatedPost, error } = await supabase
           .from('posts')
-          .update(updatePayload as any)
+          .update(basePostData as any)
           .eq('id', postToEdit.id)
           .eq('user_id', user.id)
           .select()

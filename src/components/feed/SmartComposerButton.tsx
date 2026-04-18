@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Star, Book, Tag, FileText, Eye } from 'lucide-react';
+import { PlusCircle, Star, Book, FileText, Eye } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { ModernCreatePostForm } from './ModernCreatePostForm';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
@@ -263,6 +262,10 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
         </PopoverContent>
       </Popover>
       
+      {/* Review still uses an in-page dialog. Journal/Watching/Post all
+          navigate to /create (handled in popover + 'open-create-post-dialog'
+          listener), so the legacy ModernCreatePostForm dialog branches were
+          removed when the composer was unified onto EnhancedCreatePostForm. */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           {selectedContentType === 'review' && (
@@ -274,24 +277,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
                 return Promise.resolve();
               }}
               entity={entityData}
-            />
-          )}
-          
-          {selectedContentType === 'journal' && (
-            <ModernCreatePostForm 
-              profileData={profileData}
-              onSuccess={handleContentCreated}
-              onCancel={() => setIsDialogOpen(false)}
-              defaultPostType="journal"
-            />
-          )}
-          
-          {selectedContentType === 'watching' && (
-            <ModernCreatePostForm 
-              profileData={profileData}
-              onSuccess={handleContentCreated}
-              onCancel={() => setIsDialogOpen(false)}
-              defaultPostType="watching"
             />
           )}
         </DialogContent>
