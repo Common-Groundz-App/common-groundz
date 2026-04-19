@@ -19,7 +19,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { EnhancedSearchInput } from '@/components/search/EnhancedSearchInput';
 import { checkForNewContent, getLastRefreshTime, setLastRefreshTime, NewContentCheckResult } from '@/services/feedContentService';
-import { feedbackActions } from '@/services/feedbackService';
+import { feedbackActions, triggerHaptic } from '@/services/feedbackService';
 import { smartPrefetchService } from '@/services/smartPrefetchService';
 import { performanceAnalyticsService } from '@/services/performanceAnalyticsService';
 import { getTrendingHashtags, HashtagWithCount } from '@/services/hashtagService';
