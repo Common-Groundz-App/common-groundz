@@ -112,7 +112,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         console.error('Error loading entities:', err);
       }
       
-      const processedPost = {
+      const baseProcessedPost = {
         ...data,
         likes: likeCount || 0,
         comment_count: commentCount || 0,
@@ -120,7 +120,17 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         is_saved: isSaved,
         tagged_entities: taggedEntities
       };
-      
+
+      const ap = authorProfileRef.current;
+      const processedPost = ap
+        ? {
+            ...baseProcessedPost,
+            displayName: ap.displayName || (ap as any).first_name || ap.username,
+            username: ap.username,
+            avatar_url: ap.avatar_url,
+          }
+        : baseProcessedPost;
+
       setPost(processedPost);
       onPostLoaded?.({
         title: data.title || '',
