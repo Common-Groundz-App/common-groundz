@@ -230,8 +230,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
               <button
                 className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
                 onClick={() => {
-                  setIsPopoverOpen(false);
-                  navigate('/create');
+                  handleContentTypeSelect('review');
                 }}
               >
                 <Star size={16} className="text-yellow-500" />
