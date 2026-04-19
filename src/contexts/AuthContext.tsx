@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType } from '@/types/auth';
 import { toast } from '@/hooks/use-toast';
 import { setLastAuthMethod, consumePendingGoogleAuth } from '@/lib/lastAuthMethod';
-import { feedbackActions } from '@/services/feedbackService';
+import { feedbackActions, playSigninAfterInteraction } from '@/services/feedbackService';
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // (the SIGNED_IN event fires before the listener is attached on OAuth return)
           if (consumePendingGoogleAuth()) {
             setLastAuthMethod('google');
-            try { feedbackActions.signin(); } catch {}
+            playSigninAfterInteraction();
           }
         } else {
           console.log('No cached session found');
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // Track last-used auth method for Google OAuth
               if (event === 'SIGNED_IN' && consumePendingGoogleAuth()) {
                 setLastAuthMethod('google');
-                try { feedbackActions.signin(); } catch {}
+                playSigninAfterInteraction();
               }
 
               // Handle sign out event specifically

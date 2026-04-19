@@ -160,3 +160,28 @@ export const feedbackActions = {
   like: () => triggerHaptic('selection'),
   save: () => triggerHaptic('selection'),
 };
+
+// ---------------------------------------------------------------------------
+// Deferred signin sound — for flows like Google OAuth where we return to the
+// app via redirect (no fresh user gesture). Browsers (esp. iOS Safari/Chrome)
+// require a post-load gesture to unlock audio, so we wait for the next
+// pointerdown before playing the signin sound.
+// ---------------------------------------------------------------------------
+let pendingSigninHandler: (() => void) | null = null;
+
+export function playSigninAfterInteraction(): void {
+  // Cancel any previously queued signin sound (prevents double-fire if the
+  // user signs in, signs out, and signs in again before tapping).
+  if (pendingSigninHandler) {
+    window.removeEventListener('pointerdown', pendingSigninHandler);
+    pendingSigninHandler = null;
+  }
+
+  const handler = () => {
+    pendingSigninHandler = null;
+    try { feedbackActions.signin(); } catch {}
+  };
+
+  pendingSigninHandler = handler;
+  window.addEventListener('pointerdown', handler, { once: true, passive: true });
+}
