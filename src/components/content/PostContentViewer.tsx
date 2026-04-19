@@ -42,7 +42,9 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
   const [relatedEntityName, setRelatedEntityName] = React.useState<string>('');
   
   const { data: authorProfile } = useProfile(post?.user_id);
-  
+  const authorProfileRef = React.useRef(authorProfile);
+  React.useEffect(() => { authorProfileRef.current = authorProfile; }, [authorProfile]);
+
   const fetchPost = React.useCallback(async () => {
     try {
       setLoading(true);
