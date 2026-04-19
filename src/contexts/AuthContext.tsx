@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType } from '@/types/auth';
 import { toast } from '@/hooks/use-toast';
 import { setLastAuthMethod, consumePendingGoogleAuth } from '@/lib/lastAuthMethod';
-import { feedbackActions } from '@/services/feedbackService';
+import { feedbackActions, playSigninAfterInteraction } from '@/services/feedbackService';
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
