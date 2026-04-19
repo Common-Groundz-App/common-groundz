@@ -1,6 +1,10 @@
 
 import { Howl, Howler } from 'howler';
 
+// Default pool of 10 gets exhausted quickly with html5:true on iOS.
+// Bump to 20 to prevent "Audio pool exhausted" errors.
+Howler.html5PoolSize = 20;
+
 // Types for haptic feedback
 export type HapticType = 'light' | 'medium' | 'heavy' | 'selection';
 
