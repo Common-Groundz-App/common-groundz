@@ -15,6 +15,7 @@ import GoogleSignInButton from './GoogleSignInButton';
 import { Separator } from '@/components/ui/separator';
 import { getLastAuthMethod } from '@/lib/lastAuthMethod';
 import { useTheme } from '@/contexts/ThemeContext';
+import { feedbackActions } from '@/services/feedbackService';
 
 interface SignUpFormProps {
   onSwitchToSignIn?: () => void;
@@ -138,6 +139,7 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       }
       
       // Show verification pending screen instead of navigating away
+      try { feedbackActions.signup(); } catch {}
       setShowVerificationPending(true);
     } catch (error: any) {
       const msg = error.message || 'Error signing up';
