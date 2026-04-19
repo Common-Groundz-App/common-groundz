@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // (the SIGNED_IN event fires before the listener is attached on OAuth return)
           if (consumePendingGoogleAuth()) {
             setLastAuthMethod('google');
-            try { feedbackActions.signin(); } catch {}
+            playSigninAfterInteraction();
           }
         } else {
           console.log('No cached session found');
