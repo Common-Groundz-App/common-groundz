@@ -182,7 +182,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
     if (post && authorProfile) {
       setPost((prevPost: any) => ({
         ...prevPost,
-        displayName: authorProfile.displayName || authorProfile.username,
+        displayName: authorProfile.displayName || (authorProfile as any).first_name || authorProfile.username,
         username: authorProfile.username,
         avatar_url: authorProfile.avatar_url
       }));
