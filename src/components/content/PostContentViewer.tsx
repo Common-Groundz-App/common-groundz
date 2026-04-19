@@ -42,7 +42,9 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
   const [relatedEntityName, setRelatedEntityName] = React.useState<string>('');
   
   const { data: authorProfile } = useProfile(post?.user_id);
-  
+  const authorProfileRef = React.useRef(authorProfile);
+  React.useEffect(() => { authorProfileRef.current = authorProfile; }, [authorProfile]);
+
   const fetchPost = React.useCallback(async () => {
     try {
       setLoading(true);
@@ -110,7 +112,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         console.error('Error loading entities:', err);
       }
       
-      const processedPost = {
+      const baseProcessedPost = {
         ...data,
         likes: likeCount || 0,
         comment_count: commentCount || 0,
@@ -118,7 +120,17 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         is_saved: isSaved,
         tagged_entities: taggedEntities
       };
-      
+
+      const ap = authorProfileRef.current;
+      const processedPost = ap
+        ? {
+            ...baseProcessedPost,
+            displayName: ap.displayName || (ap as any).first_name || ap.username,
+            username: ap.username,
+            avatar_url: ap.avatar_url,
+          }
+        : baseProcessedPost;
+
       setPost(processedPost);
       onPostLoaded?.({
         title: data.title || '',
@@ -170,7 +182,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
     if (post && authorProfile) {
       setPost((prevPost: any) => ({
         ...prevPost,
-        displayName: authorProfile.displayName || authorProfile.username,
+        displayName: authorProfile.displayName || (authorProfile as any).first_name || authorProfile.username,
         username: authorProfile.username,
         avatar_url: authorProfile.avatar_url
       }));
