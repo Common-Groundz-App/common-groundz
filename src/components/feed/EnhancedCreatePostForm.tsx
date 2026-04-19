@@ -515,19 +515,46 @@ export function EnhancedCreatePostForm({
           hashtag_source: hashtagSourceEdit,
         });
 
-        // Refresh feeds + profile posts (no optimistic prepend on edit)
-        queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
-        window.dispatchEvent(new CustomEvent('refresh-feed'));
-        window.dispatchEvent(new CustomEvent('refresh-posts', {
-          detail: { entityId: entities[0]?.id }
-        }));
-        window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+        // -------- Guard C: only refresh feeds when something actually changed.
+        // Compare cleaned user input vs cleaned existing — not merged vs existing
+        // — so adding/removing the ui_post_type marker alone doesn't trigger a
+        // false refresh.
+        const cleanedExisting = cleanStructuredFields(
+          (postToEdit?.structured_fields as Record<string, any>) ?? {}
+        ) ?? {};
+        const cleanedNow = cleanStructuredFields({
+          what_worked: whatWorked,
+          what_didnt: whatDidnt,
+          duration: duration || undefined,
+          good_for: goodFor,
+          reuse_intent: reuseIntent || undefined,
+        }) ?? {};
+        const hasStructuredChanged =
+          JSON.stringify(cleanedNow) !== JSON.stringify(cleanedExisting);
+
+        const hasChanged =
+          (title.trim() || null) !== (postToEdit.title ?? null) ||
+          content !== (postToEdit.content ?? '') ||
+          dbPostType !== (postToEdit.post_type ?? 'story') ||
+          hasStructuredChanged;
+
+        if (hasChanged) {
+          queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
+          window.dispatchEvent(new CustomEvent('refresh-feed'));
+          window.dispatchEvent(new CustomEvent('refresh-posts', {
+            detail: { entityId: entities[0]?.id }
+          }));
+          window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+        }
 
         try {
-          playSound('/sounds/post.mp3');
+          playSound('/sounds/post.wav');
         } catch (err) {
           console.error('Sound playback failed:', err);
         }
+        // Visual fallback pulse — fires regardless of audio outcome
+        setSubmitPulse(true);
+        setTimeout(() => setSubmitPulse(false), 220);
 
         toast({
           title: 'Post updated',
@@ -656,10 +683,13 @@ export function EnhancedCreatePostForm({
       window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
 
       try {
-        playSound('/sounds/post.mp3');
+        playSound('/sounds/post.wav');
       } catch (err) {
         console.error('Sound playback failed:', err);
       }
+      // Visual fallback pulse — fires regardless of audio outcome
+      setSubmitPulse(true);
+      setTimeout(() => setSubmitPulse(false), 220);
 
       toast({
         title: 'Experience shared',
@@ -827,13 +857,13 @@ export function EnhancedCreatePostForm({
                 key={option.value}
                 type="button"
                 onClick={() => {
-                  setPostType(prev => prev === option.value ? 'story' : option.value);
+                  setPostType((prev) => (prev === option.value ? 'story' : option.value));
                 }}
                 className={cn(
-                  "px-2.5 py-0.5 rounded-full text-xs border transition-colors",
+                  'px-2.5 py-0.5 rounded-full text-xs border transition-colors',
                   postType === option.value
-                    ? "bg-accent text-accent-foreground border-accent-foreground/20"
-                    : "border-input text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                    ? 'bg-brand-orange text-white border-brand-orange'
+                    : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground/30'
                 )}
               >
                 {option.label}
@@ -1353,7 +1383,8 @@ export function EnhancedCreatePostForm({
           <Button 
             className={cn(
               "bg-brand-orange hover:bg-brand-orange/90 transition-all",
-              (!isPostButtonDisabled && !isSubmitting) && "animate-fade-in"
+              (!isPostButtonDisabled && !isSubmitting) && "animate-fade-in",
+              submitPulse && "scale-95 opacity-80"
             )}
             onClick={handleSubmit} 
             disabled={isPostButtonDisabled || showLocationInput}
