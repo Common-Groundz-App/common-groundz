@@ -123,6 +123,7 @@ const CreatePost = () => {
                 onSuccess={handleSuccess}
                 onCancel={navigateBack}
                 initialEntity={initialEntity}
+                defaultPostType={defaultPostType}
               />
             </div>
           </div>
