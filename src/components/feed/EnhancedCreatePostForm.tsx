@@ -394,18 +394,48 @@ export function EnhancedCreatePostForm({
         reuse_intent: reuseIntent || undefined,
       });
 
+      // -------- Safe structured_fields merge (Guard A + stale clear) --------
+      // Never wipe user data on null/empty cleaned. Strip ui_post_type when
+      // the user switched away from a UI-only type so hydration stays correct.
+      const existingStructured =
+        (postToEdit?.structured_fields as Record<string, any>) ?? {};
+      const safeCleaned: Record<string, any> =
+        cleanedStructured && Object.keys(cleanedStructured).length > 0
+          ? { ...cleanedStructured }
+          : {};
+
+      let mergedStructured: Record<string, any> | null;
+      if (postType === 'journal' || postType === 'watching') {
+        mergedStructured = {
+          ...existingStructured,
+          ...safeCleaned,
+          ui_post_type: postType,
+        };
+      } else {
+        // Switched to a non-UI type: drop stale ui_post_type marker
+        const { ui_post_type: _drop, ...rest } = existingStructured;
+        mergedStructured = { ...rest, ...safeCleaned };
+      }
+      // Normalize: empty object → null so the column doesn't store {}
+      if (mergedStructured && Object.keys(mergedStructured).length === 0) {
+        mergedStructured = null;
+      }
+
+      // Map UI-only post types to a valid DB enum value.
+      const dbPostType = mapPostTypeToDatabase(postType || 'story');
+
       const basePostData: Record<string, any> = {
         title: title.trim() || null,
         content,
         media: mediaToSave,
         visibility: dbVisibility,
-        post_type: postType || 'story',
+        post_type: dbPostType,
         tags: tags,
       };
 
       // Always set structured_fields explicitly so edits can also CLEAR them
       // (sending null when empty rather than omitting from the payload).
-      basePostData.structured_fields = cleanedStructured ?? null;
+      basePostData.structured_fields = mergedStructured;
 
       if (cleanedStructured) {
         analytics.track('post_structured_fields_used', {
