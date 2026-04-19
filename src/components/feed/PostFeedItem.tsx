@@ -595,6 +595,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           isLoading={isDeleting}
         />
       </div>
+    </Card>
   );
 };
 
