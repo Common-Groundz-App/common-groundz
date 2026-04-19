@@ -27,8 +27,8 @@ import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredFields';
 import { analytics } from '@/services/analytics';
-import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
-import type { DatabasePostType } from './utils/postUtils';
+import { POST_TYPE_OPTIONS, getPlaceholderForType, mapPostTypeToDatabase } from './utils/postUtils';
+import type { DatabasePostType, UIPostType } from './utils/postUtils';
 import { extractHashtagsDetailed, normalizeHashtag, extractHashtags } from '@/utils/hashtag';
 import { getSuggestedTags } from '@/utils/hashtagSuggestions';
 import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
@@ -54,7 +54,8 @@ interface EnhancedCreatePostFormProps {
   profileData?: any;
   initialEntity?: Entity;
   postToEdit?: PostToEdit;
-  defaultPostType?: DatabasePostType;
+  /** Accepts UI types ('journal' | 'watching') in addition to DB types. */
+  defaultPostType?: UIPostType;
 }
 
 type VisibilityOption = 'public' | 'private' | 'circle';
@@ -129,9 +130,19 @@ export function EnhancedCreatePostForm({
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
   const MAX_MEDIA_COUNT = 4;
-  const [postType, setPostType] = useState<DatabasePostType>(
-    (postToEdit?.post_type as DatabasePostType) ?? defaultPostType ?? 'story'
+  // postType holds a UIPostType — 'journal' / 'watching' are UI-only and
+  // get mapped to DB 'note' on submit (with ui_post_type stamped in
+  // structured_fields so we can re-hydrate the chip on edit).
+  const hydratedUiType =
+    (postToEdit?.structured_fields as any)?.ui_post_type as UIPostType | undefined;
+  const [postType, setPostType] = useState<UIPostType>(
+    hydratedUiType ??
+      (postToEdit?.post_type as UIPostType | undefined) ??
+      defaultPostType ??
+      'story'
   );
+  // Visual fallback pulse on submit success (in case sound fails)
+  const [submitPulse, setSubmitPulse] = useState(false);
 
   // Prefill entity when passed from parent (e.g. "Share your experience").
   // Skip in edit mode — entities are already hydrated from postToEdit.

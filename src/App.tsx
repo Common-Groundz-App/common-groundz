@@ -89,7 +89,7 @@ function App() {
     // Unlock audio context on first user interaction
     const unlockAudio = () => {
       try {
-        const silent = new Howl({ src: ['/sounds/like.mp3'], volume: 0 });
+        const silent = new Howl({ src: ['/sounds/like.wav'], volume: 0 });
         silent.play();
         document.removeEventListener('click', unlockAudio);
       } catch (error) {
