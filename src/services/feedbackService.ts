@@ -1,11 +1,34 @@
 
-import { Howl } from 'howler';
+import { Howl, Howler } from 'howler';
 
 // Types for haptic feedback
 export type HapticType = 'light' | 'medium' | 'heavy' | 'selection';
 
 // Cache for loaded sounds to avoid reloading
 const soundCache = new Map<string, Howl>();
+
+// ---------------------------------------------------------------------------
+// Audio unlock — many browsers (esp. iOS Safari, mobile Chrome) suspend the
+// AudioContext until a user gesture occurs. We resume it on the very first
+// pointerdown so subsequent programmatic plays (post submit, like, etc.)
+// actually produce sound. Runs once per page load.
+// ---------------------------------------------------------------------------
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    try {
+      // Howler v2 exposes the shared AudioContext on its singleton.
+      const ctx = (Howler as any).ctx as AudioContext | undefined;
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch((err) => {
+          console.warn('AudioContext resume failed:', err);
+        });
+      }
+    } catch (err) {
+      console.warn('Audio unlock failed:', err);
+    }
+  };
+  window.addEventListener('pointerdown', unlock, { once: true, passive: true });
+}
 
 /**
  * Triggers haptic feedback if supported
@@ -84,10 +107,10 @@ export const triggerFeedback = (hapticType: HapticType, soundSrc: string): void 
  */
 export const preloadSounds = (): void => {
   const commonSounds = [
-    '/sounds/like.mp3',
-    '/sounds/refresh.mp3',
-    '/sounds/post.mp3',
-    '/sounds/save.mp3'
+    '/sounds/like.wav',
+    '/sounds/refresh.wav',
+    '/sounds/post.wav',
+    '/sounds/save.wav'
   ];
 
   commonSounds.forEach(src => {
@@ -111,9 +134,9 @@ export const preloadSounds = (): void => {
 
 // Predefined feedback combinations for common actions
 export const feedbackActions = {
-  like: () => triggerFeedback('selection', '/sounds/like.mp3'),
-  save: () => triggerFeedback('selection', '/sounds/save.mp3'),
-  post: () => triggerFeedback('light', '/sounds/post.mp3'),
-  refresh: () => triggerFeedback('medium', '/sounds/refresh.mp3'),
-  comment: () => triggerFeedback('light', '/sounds/post.mp3')
+  like: () => triggerFeedback('selection', '/sounds/like.wav'),
+  save: () => triggerFeedback('selection', '/sounds/save.wav'),
+  post: () => triggerFeedback('light', '/sounds/post.wav'),
+  refresh: () => triggerFeedback('medium', '/sounds/refresh.wav'),
+  comment: () => triggerFeedback('light', '/sounds/post.wav')
 };

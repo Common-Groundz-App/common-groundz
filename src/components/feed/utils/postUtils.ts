@@ -30,8 +30,13 @@ export const getPostTypeLabel = (type: string): string => {
   }
 };
 
-// Post type options for chip selector in create flow
-export const POST_TYPE_OPTIONS: { value: DatabasePostType; label: string; placeholder: string }[] = [
+// Post type options for chip selector in create flow.
+// Note: 'journal' and 'watching' are UI-only types — they map to DB 'note'
+// but are tracked separately via structured_fields.ui_post_type so the
+// composer can re-hydrate the correct chip on edit.
+export const POST_TYPE_OPTIONS: { value: UIPostType; label: string; placeholder: string }[] = [
+  { value: 'journal', label: 'Journal', placeholder: 'Log how it actually went...' },
+  { value: 'watching', label: 'Currently Watching/Using', placeholder: 'What are you trying right now?' },
   { value: 'comparison', label: 'Comparison', placeholder: 'Compare two or more options...' },
   { value: 'question', label: 'Question', placeholder: 'What would you like to know?' },
   { value: 'tip', label: 'Tip', placeholder: 'Share a helpful tip...' },
@@ -39,7 +44,7 @@ export const POST_TYPE_OPTIONS: { value: DatabasePostType; label: string; placeh
 ];
 
 // Whitelist check — only show badge for known non-default types
-const BADGE_TYPES = ['comparison', 'question', 'tip', 'update'];
+const BADGE_TYPES = ['comparison', 'question', 'tip', 'update', 'journal', 'watching'];
 export const shouldShowTypeBadge = (type: string | null | undefined): boolean => {
   if (!type) return false;
   return BADGE_TYPES.includes(type);

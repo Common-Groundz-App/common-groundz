@@ -84,6 +84,7 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   
   const isOwner = user?.id === post.user_id;
+  const editAllowed = canEditPost(post as any, user?.id, false);
   const CONTENT_LIMIT = 280;
 
   // Load initial data
@@ -394,9 +395,28 @@ const ProfilePostItem = ({ post, onDeleted }: ProfilePostItemProps) => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
-                  <Pencil className="h-4 w-4" /> Edit
-                </DropdownMenuItem>
+                {editAllowed ? (
+                  <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4" /> Edit
+                  </DropdownMenuItem>
+                ) : (
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuItem
+                          onClick={(e) => e.preventDefault()}
+                          onSelect={(e) => e.preventDefault()}
+                          className="flex items-center gap-2 opacity-50 cursor-not-allowed"
+                        >
+                          <Pencil className="h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        Edit window closed (1 hour limit)
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
                 <DropdownMenuItem 
                   onClick={handleDeleteClick} 
                   className="text-destructive focus:text-destructive flex items-center gap-2"

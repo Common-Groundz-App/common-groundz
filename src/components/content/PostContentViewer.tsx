@@ -43,114 +43,127 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
   
   const { data: authorProfile } = useProfile(post?.user_id);
   
-  React.useEffect(() => {
-    const fetchPost = async () => {
-      try {
-        setLoading(true);
+  const fetchPost = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          id, title, content, post_type, visibility, user_id,
+          created_at, updated_at, last_edited_at, media, view_count, status, is_deleted, structured_fields
+        `)
+        .eq('id', postId)
+        .eq('is_deleted', false)
+        .single();
         
-        const { data, error } = await supabase
-          .from('posts')
-          .select(`
-            id, title, content, post_type, visibility, user_id,
-            created_at, updated_at, media, view_count, status, is_deleted, structured_fields
-          `)
-          .eq('id', postId)
-          .eq('is_deleted', false)
-          .single();
-          
-        if (error) throw error;
-        if (!data) {
-          setError('Post not found or has been deleted');
-          onPostLoaded?.(null);
-          return;
-        }
-        
-        const { count: likeCount } = await supabase
-          .from('post_likes')
-          .select('*', { count: 'exact', head: true })
-          .eq('post_id', postId);
-          
-        let isLiked = false;
-        let isSaved = false;
-        
-        if (user) {
-          const { data: likeData } = await supabase
-            .from('post_likes')
-            .select('*')
-            .eq('post_id', postId)
-            .eq('user_id', user.id)
-            .single();
-          isLiked = !!likeData;
-          
-          const { data: saveData } = await supabase
-            .from('post_saves')
-            .select('*')
-            .eq('post_id', postId)
-            .eq('user_id', user.id)
-            .single();
-          isSaved = !!saveData;
-        }
-        
-        const { count: commentCount } = await supabase
-          .from('post_comments')
-          .select('*', { count: 'exact', head: true })
-          .eq('post_id', postId)
-          .eq('is_deleted', false);
-        
-        let taggedEntities: any[] = [];
-        try {
-          const { data: entityData } = await supabase
-            .from('post_entities')
-            .select('entity_id, entities:entity_id(*)')
-            .eq('post_id', postId);
-          
-          if (entityData && entityData.length > 0) {
-            taggedEntities = entityData.map((item: any) => item.entities);
-          }
-        } catch (err) {
-          console.error('Error loading entities:', err);
-        }
-        
-        const processedPost = {
-          ...data,
-          likes: likeCount || 0,
-          comment_count: commentCount || 0,
-          is_liked: isLiked,
-          is_saved: isSaved,
-          tagged_entities: taggedEntities
-        };
-        
-        setPost(processedPost);
-        onPostLoaded?.({
-          title: data.title || '',
-          content: data.content || '',
-          visibility: data.visibility || 'private',
-          imageUrl: data.media?.[0]?.url || undefined,
-          authorId: data.user_id || undefined,
-          taggedEntities: taggedEntities.map((e: any) => ({
-            id: e.id,
-            name: e.name,
-            type: e.type,
-            slug: e.slug,
-            description: e.description,
-            image_url: e.image_url,
-            category_id: e.category_id,
-            venue: e.venue,
-          })),
-        });
-      } catch (err) {
-        console.error('Error fetching post:', err);
-        setError('Error loading post');
+      if (error) throw error;
+      if (!data) {
+        setError('Post not found or has been deleted');
         onPostLoaded?.(null);
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
-    
+      
+      const { count: likeCount } = await supabase
+        .from('post_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', postId);
+        
+      let isLiked = false;
+      let isSaved = false;
+      
+      if (user) {
+        const { data: likeData } = await supabase
+          .from('post_likes')
+          .select('*')
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .single();
+        isLiked = !!likeData;
+        
+        const { data: saveData } = await supabase
+          .from('post_saves')
+          .select('*')
+          .eq('post_id', postId)
+          .eq('user_id', user.id)
+          .single();
+        isSaved = !!saveData;
+      }
+      
+      const { count: commentCount } = await supabase
+        .from('post_comments')
+        .select('*', { count: 'exact', head: true })
+        .eq('post_id', postId)
+        .eq('is_deleted', false);
+      
+      let taggedEntities: any[] = [];
+      try {
+        const { data: entityData } = await supabase
+          .from('post_entities')
+          .select('entity_id, entities:entity_id(*)')
+          .eq('post_id', postId);
+        
+        if (entityData && entityData.length > 0) {
+          taggedEntities = entityData.map((item: any) => item.entities);
+        }
+      } catch (err) {
+        console.error('Error loading entities:', err);
+      }
+      
+      const processedPost = {
+        ...data,
+        likes: likeCount || 0,
+        comment_count: commentCount || 0,
+        is_liked: isLiked,
+        is_saved: isSaved,
+        tagged_entities: taggedEntities
+      };
+      
+      setPost(processedPost);
+      onPostLoaded?.({
+        title: data.title || '',
+        content: data.content || '',
+        visibility: data.visibility || 'private',
+        imageUrl: data.media?.[0]?.url || undefined,
+        authorId: data.user_id || undefined,
+        taggedEntities: taggedEntities.map((e: any) => ({
+          id: e.id,
+          name: e.name,
+          type: e.type,
+          slug: e.slug,
+          description: e.description,
+          image_url: e.image_url,
+          category_id: e.category_id,
+          venue: e.venue,
+        })),
+      });
+    } catch (err) {
+      console.error('Error fetching post:', err);
+      setError('Error loading post');
+      onPostLoaded?.(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [postId, user?.id, onPostLoaded]);
+
+  React.useEffect(() => {
     if (postId) {
       fetchPost();
     }
-  }, [postId, user?.id]);
+  }, [postId, fetchPost]);
+
+  // Re-fetch on edit events from anywhere in the app (composer dialogs, etc.)
+  React.useEffect(() => {
+    const handleRefresh = () => {
+      if (postId) fetchPost();
+    };
+    window.addEventListener('refresh-feed', handleRefresh);
+    window.addEventListener('refresh-profile-posts', handleRefresh);
+    return () => {
+      window.removeEventListener('refresh-feed', handleRefresh);
+      window.removeEventListener('refresh-profile-posts', handleRefresh);
+    };
+  }, [postId, fetchPost]);
 
   // Update post with profile data when available
   React.useEffect(() => {

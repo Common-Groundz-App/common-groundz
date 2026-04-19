@@ -27,8 +27,8 @@ import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredFields';
 import { analytics } from '@/services/analytics';
-import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
-import type { DatabasePostType } from './utils/postUtils';
+import { POST_TYPE_OPTIONS, getPlaceholderForType, mapPostTypeToDatabase } from './utils/postUtils';
+import type { DatabasePostType, UIPostType } from './utils/postUtils';
 import { extractHashtagsDetailed, normalizeHashtag, extractHashtags } from '@/utils/hashtag';
 import { getSuggestedTags } from '@/utils/hashtagSuggestions';
 import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
@@ -54,7 +54,8 @@ interface EnhancedCreatePostFormProps {
   profileData?: any;
   initialEntity?: Entity;
   postToEdit?: PostToEdit;
-  defaultPostType?: DatabasePostType;
+  /** Accepts UI types ('journal' | 'watching') in addition to DB types. */
+  defaultPostType?: UIPostType;
 }
 
 type VisibilityOption = 'public' | 'private' | 'circle';
@@ -129,9 +130,19 @@ export function EnhancedCreatePostForm({
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
   const MAX_MEDIA_COUNT = 4;
-  const [postType, setPostType] = useState<DatabasePostType>(
-    (postToEdit?.post_type as DatabasePostType) ?? defaultPostType ?? 'story'
+  // postType holds a UIPostType — 'journal' / 'watching' are UI-only and
+  // get mapped to DB 'note' on submit (with ui_post_type stamped in
+  // structured_fields so we can re-hydrate the chip on edit).
+  const hydratedUiType =
+    (postToEdit?.structured_fields as any)?.ui_post_type as UIPostType | undefined;
+  const [postType, setPostType] = useState<UIPostType>(
+    hydratedUiType ??
+      (postToEdit?.post_type as UIPostType | undefined) ??
+      defaultPostType ??
+      'story'
   );
+  // Visual fallback pulse on submit success (in case sound fails)
+  const [submitPulse, setSubmitPulse] = useState(false);
 
   // Prefill entity when passed from parent (e.g. "Share your experience").
   // Skip in edit mode — entities are already hydrated from postToEdit.
@@ -383,18 +394,48 @@ export function EnhancedCreatePostForm({
         reuse_intent: reuseIntent || undefined,
       });
 
+      // -------- Safe structured_fields merge (Guard A + stale clear) --------
+      // Never wipe user data on null/empty cleaned. Strip ui_post_type when
+      // the user switched away from a UI-only type so hydration stays correct.
+      const existingStructured =
+        (postToEdit?.structured_fields as Record<string, any>) ?? {};
+      const safeCleaned: Record<string, any> =
+        cleanedStructured && Object.keys(cleanedStructured).length > 0
+          ? { ...cleanedStructured }
+          : {};
+
+      let mergedStructured: Record<string, any> | null;
+      if (postType === 'journal' || postType === 'watching') {
+        mergedStructured = {
+          ...existingStructured,
+          ...safeCleaned,
+          ui_post_type: postType,
+        };
+      } else {
+        // Switched to a non-UI type: drop stale ui_post_type marker
+        const { ui_post_type: _drop, ...rest } = existingStructured;
+        mergedStructured = { ...rest, ...safeCleaned };
+      }
+      // Normalize: empty object → null so the column doesn't store {}
+      if (mergedStructured && Object.keys(mergedStructured).length === 0) {
+        mergedStructured = null;
+      }
+
+      // Map UI-only post types to a valid DB enum value.
+      const dbPostType = mapPostTypeToDatabase(postType || 'story');
+
       const basePostData: Record<string, any> = {
         title: title.trim() || null,
         content,
         media: mediaToSave,
         visibility: dbVisibility,
-        post_type: postType || 'story',
+        post_type: dbPostType,
         tags: tags,
       };
 
       // Always set structured_fields explicitly so edits can also CLEAR them
       // (sending null when empty rather than omitting from the payload).
-      basePostData.structured_fields = cleanedStructured ?? null;
+      basePostData.structured_fields = mergedStructured;
 
       if (cleanedStructured) {
         analytics.track('post_structured_fields_used', {
@@ -474,19 +515,46 @@ export function EnhancedCreatePostForm({
           hashtag_source: hashtagSourceEdit,
         });
 
-        // Refresh feeds + profile posts (no optimistic prepend on edit)
-        queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
-        window.dispatchEvent(new CustomEvent('refresh-feed'));
-        window.dispatchEvent(new CustomEvent('refresh-posts', {
-          detail: { entityId: entities[0]?.id }
-        }));
-        window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+        // -------- Guard C: only refresh feeds when something actually changed.
+        // Compare cleaned user input vs cleaned existing — not merged vs existing
+        // — so adding/removing the ui_post_type marker alone doesn't trigger a
+        // false refresh.
+        const cleanedExisting = cleanStructuredFields(
+          (postToEdit?.structured_fields as Record<string, any>) ?? {}
+        ) ?? {};
+        const cleanedNow = cleanStructuredFields({
+          what_worked: whatWorked,
+          what_didnt: whatDidnt,
+          duration: duration || undefined,
+          good_for: goodFor,
+          reuse_intent: reuseIntent || undefined,
+        }) ?? {};
+        const hasStructuredChanged =
+          JSON.stringify(cleanedNow) !== JSON.stringify(cleanedExisting);
+
+        const hasChanged =
+          (title.trim() || null) !== (postToEdit.title ?? null) ||
+          content !== (postToEdit.content ?? '') ||
+          dbPostType !== (postToEdit.post_type ?? 'story') ||
+          hasStructuredChanged;
+
+        if (hasChanged) {
+          queryClient.invalidateQueries({ queryKey: ['infinite-feed'], exact: false });
+          window.dispatchEvent(new CustomEvent('refresh-feed'));
+          window.dispatchEvent(new CustomEvent('refresh-posts', {
+            detail: { entityId: entities[0]?.id }
+          }));
+          window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
+        }
 
         try {
-          playSound('/sounds/post.mp3');
+          playSound('/sounds/post.wav');
         } catch (err) {
           console.error('Sound playback failed:', err);
         }
+        // Visual fallback pulse — fires regardless of audio outcome
+        setSubmitPulse(true);
+        setTimeout(() => setSubmitPulse(false), 220);
 
         toast({
           title: 'Post updated',
@@ -615,10 +683,13 @@ export function EnhancedCreatePostForm({
       window.dispatchEvent(new CustomEvent('refresh-profile-posts'));
 
       try {
-        playSound('/sounds/post.mp3');
+        playSound('/sounds/post.wav');
       } catch (err) {
         console.error('Sound playback failed:', err);
       }
+      // Visual fallback pulse — fires regardless of audio outcome
+      setSubmitPulse(true);
+      setTimeout(() => setSubmitPulse(false), 220);
 
       toast({
         title: 'Experience shared',
@@ -786,13 +857,13 @@ export function EnhancedCreatePostForm({
                 key={option.value}
                 type="button"
                 onClick={() => {
-                  setPostType(prev => prev === option.value ? 'story' : option.value);
+                  setPostType((prev) => (prev === option.value ? 'story' : option.value));
                 }}
                 className={cn(
-                  "px-2.5 py-0.5 rounded-full text-xs border transition-colors",
+                  'px-2.5 py-0.5 rounded-full text-xs border transition-colors',
                   postType === option.value
-                    ? "bg-accent text-accent-foreground border-accent-foreground/20"
-                    : "border-input text-muted-foreground hover:text-foreground hover:border-foreground/30"
+                    ? 'bg-brand-orange text-white border-brand-orange'
+                    : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground/30'
                 )}
               >
                 {option.label}
@@ -1312,7 +1383,8 @@ export function EnhancedCreatePostForm({
           <Button 
             className={cn(
               "bg-brand-orange hover:bg-brand-orange/90 transition-all",
-              (!isPostButtonDisabled && !isSubmitting) && "animate-fade-in"
+              (!isPostButtonDisabled && !isSubmitting) && "animate-fade-in",
+              submitPulse && "scale-95 opacity-80"
             )}
             onClick={handleSubmit} 
             disabled={isPostButtonDisabled || showLocationInput}

@@ -10,6 +10,9 @@ import { useToast } from '@/hooks/use-toast';
 import Logo from '@/components/Logo';
 import { ArrowLeft } from 'lucide-react';
 import type { Entity } from '@/services/recommendation/types';
+import type { UIPostType } from '@/components/feed/utils/postUtils';
+
+const VALID_UI_POST_TYPES: ReadonlyArray<UIPostType> = ['journal', 'watching'];
 
 const CreatePost = () => {
   const navigate = useNavigate();
@@ -38,6 +41,14 @@ const CreatePost = () => {
       type: (searchParams.get('entityType') as any) || 'product',
     } as Entity;
   })();
+
+  // Whitelisted postType param — anything else is ignored to keep state safe
+  const rawPostType = searchParams.get('postType');
+  const defaultPostType: UIPostType | undefined = VALID_UI_POST_TYPES.includes(
+    rawPostType as UIPostType
+  )
+    ? (rawPostType as UIPostType)
+    : undefined;
 
   // Load profile data
   useEffect(() => {
@@ -112,6 +123,7 @@ const CreatePost = () => {
                 onSuccess={handleSuccess}
                 onCancel={navigateBack}
                 initialEntity={initialEntity}
+                defaultPostType={defaultPostType}
               />
             </div>
           </div>
