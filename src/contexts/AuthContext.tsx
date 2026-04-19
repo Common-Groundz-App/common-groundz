@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // Track last-used auth method for Google OAuth
               if (event === 'SIGNED_IN' && consumePendingGoogleAuth()) {
                 setLastAuthMethod('google');
-                try { feedbackActions.signin(); } catch {}
+                playSigninAfterInteraction();
               }
 
               // Handle sign out event specifically
