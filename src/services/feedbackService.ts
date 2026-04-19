@@ -146,11 +146,6 @@ const AUTH_VOLUME = 0.15;
 
 // Predefined feedback combinations for common actions
 export const feedbackActions = {
-  _placeholder: undefined,
-} as any;
-
-// Reassign below — keep type inference simple
-Object.assign(feedbackActions, {
   // Content creation — standard volume, satisfying confirmation
   post: () => triggerFeedback('light', '/sounds/post.wav'),
   // Comments share the same sound as posts (both are "user posting" actions)
