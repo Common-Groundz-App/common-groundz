@@ -12,6 +12,7 @@ import { loginViaGateway, formatRateLimitError } from '@/lib/authGateway';
 import { supabase } from '@/integrations/supabase/client';
 import GoogleSignInButton from './GoogleSignInButton';
 import { getLastAuthMethod, setLastAuthMethod, clearPendingGoogleAuth } from '@/lib/lastAuthMethod';
+import { feedbackActions } from '@/services/feedbackService';
 
 const getFriendlyAuthError = (message: string): string => {
   const lower = message.toLowerCase();
@@ -103,6 +104,7 @@ const SignInForm = () => {
       }
       
       setLastAuthMethod('email');
+      try { feedbackActions.signin(); } catch {}
       toast.success('Successfully signed in!');
       navigate('/home');
     } catch (error: any) {
