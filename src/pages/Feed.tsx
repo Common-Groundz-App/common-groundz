@@ -357,10 +357,9 @@ const Feed = React.memo(() => {
       });
     }
     
-    // Provide haptic feedback only — refresh has no sound (visual is enough)
+    // Refresh: haptic only (no sound per minimal sound strategy)
     try {
-      // Haptic-only feedback for refresh
-      // (sound removed per minimal sound strategy)
+      triggerHaptic('medium');
     } catch (error) {
       console.error('Feedback error:', error);
     }
