@@ -439,9 +439,28 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
-                    <Pencil className="h-4 w-4" /> Edit
-                  </DropdownMenuItem>
+                  {editAllowed ? (
+                    <DropdownMenuItem onClick={handleEdit} className="flex items-center gap-2">
+                      <Pencil className="h-4 w-4" /> Edit
+                    </DropdownMenuItem>
+                  ) : (
+                    <TooltipProvider delayDuration={150}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DropdownMenuItem
+                            onClick={(e) => e.preventDefault()}
+                            onSelect={(e) => e.preventDefault()}
+                            className="flex items-center gap-2 opacity-50 cursor-not-allowed"
+                          >
+                            <Pencil className="h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">
+                          Edit window closed (1 hour limit)
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                   <DropdownMenuItem 
                     onClick={handleDeleteClick} 
                     className="text-destructive focus:text-destructive flex items-center gap-2"
@@ -551,30 +570,31 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         </div>
       </CardContent>
       
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
-          <EnhancedCreatePostForm
-            postToEdit={post as unknown as PostToEdit}
-            onSuccess={handleEditSuccess}
-            onCancel={() => setIsEditDialogOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-      
-      {/* Delete Confirmation Dialog */}
-      <DeleteConfirmationDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => {
-          setIsDeleteDialogOpen(false);
-          setIsDeleting(false);
-        }}
-        onConfirm={handleDeleteConfirm}
-        title="Delete Post"
-        description="Are you sure you want to delete this post? This action cannot be undone."
-        isLoading={isDeleting}
-      />
-    </Card>
+      {/* Edit + Delete dialogs — wrapped to stop the card-click navigation
+          handler from firing while the user interacts with the modal. */}
+      <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+            <EnhancedCreatePostForm
+              postToEdit={post as unknown as PostToEdit}
+              onSuccess={handleEditSuccess}
+              onCancel={() => setIsEditDialogOpen(false)}
+            />
+          </DialogContent>
+        </Dialog>
+
+        <DeleteConfirmationDialog
+          isOpen={isDeleteDialogOpen}
+          onClose={() => {
+            setIsDeleteDialogOpen(false);
+            setIsDeleting(false);
+          }}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Post"
+          description="Are you sure you want to delete this post? This action cannot be undone."
+          isLoading={isDeleting}
+        />
+      </div>
   );
 };
 
