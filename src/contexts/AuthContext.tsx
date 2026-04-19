@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthContextType } from '@/types/auth';
 import { toast } from '@/hooks/use-toast';
 import { setLastAuthMethod, consumePendingGoogleAuth } from '@/lib/lastAuthMethod';
+import { feedbackActions } from '@/services/feedbackService';
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined);
 
@@ -265,6 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Force clear state immediately after successful logout
       setSession(null);
       setUser(null);
+      try { feedbackActions.logout(); } catch {}
       return { error: null };
     } catch (error) {
       console.error('Unexpected error during signOut:', error);
