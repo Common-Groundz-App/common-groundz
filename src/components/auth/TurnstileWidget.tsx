@@ -1,5 +1,9 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
+
+export interface TurnstileWidgetHandle {
+  reset: () => void;
+}
 
 interface TurnstileWidgetProps {
   onVerify: (token: string) => void;
@@ -37,15 +41,27 @@ const scheduleIdle = (cb: () => void) => {
   }
 };
 
-const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
+const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(({
   onVerify,
   onError,
   onExpire,
   theme = 'light',
-}) => {
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const scriptLoadedRef = useRef(false);
+
+  useImperativeHandle(ref, () => ({
+    reset: () => {
+      if (widgetIdRef.current && window.turnstile) {
+        try {
+          window.turnstile.reset(widgetIdRef.current);
+        } catch (e) {
+          console.warn('Turnstile reset failed:', e);
+        }
+      }
+    },
+  }));
 
   const initWidget = useCallback(() => {
     if (!window.turnstile || !containerRef.current || widgetIdRef.current) {
@@ -141,6 +157,8 @@ const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
   }
 
   return <div ref={containerRef} className="turnstile-container [&:empty]:hidden" />;
-};
+});
+
+TurnstileWidget.displayName = 'TurnstileWidget';
 
 export default TurnstileWidget;

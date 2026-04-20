@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -9,7 +9,7 @@ import UserInfoFields from './UserInfoFields';
 import CredentialFields from './CredentialFields';
 import UsernameField from './UsernameField';
 import EmailVerificationPending from './EmailVerificationPending';
-import TurnstileWidget from './TurnstileWidget';
+import TurnstileWidget, { type TurnstileWidgetHandle } from './TurnstileWidget';
 import { signUpViaGateway, formatRateLimitError } from '@/lib/authGateway';
 import GoogleSignInButton from './GoogleSignInButton';
 import { Separator } from '@/components/ui/separator';
@@ -36,6 +36,12 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showVerificationPending, setShowVerificationPending] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+
+  const resetTurnstile = () => {
+    setTurnstileToken(null);
+    turnstileRef.current?.reset();
+  };
 
   // Clear password error when passwords change
   useEffect(() => {
@@ -129,10 +135,12 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       if (result.error) {
         if (result.code === 'RATE_LIMITED') {
           toast.error(formatRateLimitError(result.retryAfter, 'signup'));
+          resetTurnstile();
           return;
         }
         if (result.code === 'USER_EXISTS') {
           toast.error('An account with this email already exists. Try signing in instead.');
+          resetTurnstile();
           return;
         }
         throw new Error(result.error);
@@ -143,11 +151,15 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       setShowVerificationPending(true);
     } catch (error: any) {
       const msg = error.message || 'Error signing up';
-      if (msg.toLowerCase().includes('user already registered')) {
+      const lower = msg.toLowerCase();
+      if (lower.includes('user already registered')) {
         toast.error('An account with this email already exists. Try signing in instead.');
+      } else if (lower.includes('email') && lower.includes('invalid')) {
+        toast.error("This email address can't be used. Please try a different email, or contact support if you believe this is a mistake.");
       } else {
         toast.error(msg);
       }
+      resetTurnstile();
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -208,6 +220,7 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
 
         {/* Invisible Turnstile CAPTCHA - outside space-y-4 to avoid layout gap */}
         <TurnstileWidget
+          ref={turnstileRef}
           onVerify={handleTurnstileVerify}
           onError={handleTurnstileError}
           onExpire={handleTurnstileExpire}
