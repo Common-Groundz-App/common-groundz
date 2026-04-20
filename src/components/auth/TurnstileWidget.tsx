@@ -1,5 +1,9 @@
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { createPortal } from 'react-dom';
+
+export interface TurnstileWidgetHandle {
+  reset: () => void;
+}
 
 interface TurnstileWidgetProps {
   onVerify: (token: string) => void;
