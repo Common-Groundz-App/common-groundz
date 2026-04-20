@@ -128,7 +128,7 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       
       if (result.error) {
         if (result.code === 'RATE_LIMITED') {
-          toast.error(formatRateLimitError(result.retryAfter));
+          toast.error(formatRateLimitError(result.retryAfter, 'signup'));
           return;
         }
         if (result.code === 'USER_EXISTS') {
