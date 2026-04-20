@@ -41,15 +41,27 @@ const scheduleIdle = (cb: () => void) => {
   }
 };
 
-const TurnstileWidget: React.FC<TurnstileWidgetProps> = ({
+const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(({
   onVerify,
   onError,
   onExpire,
   theme = 'light',
-}) => {
+}, ref) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const scriptLoadedRef = useRef(false);
+
+  useImperativeHandle(ref, () => ({
+    reset: () => {
+      if (widgetIdRef.current && window.turnstile) {
+        try {
+          window.turnstile.reset(widgetIdRef.current);
+        } catch (e) {
+          console.warn('Turnstile reset failed:', e);
+        }
+      }
+    },
+  }));
 
   const initWidget = useCallback(() => {
     if (!window.turnstile || !containerRef.current || widgetIdRef.current) {
