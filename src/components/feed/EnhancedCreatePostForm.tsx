@@ -25,7 +25,7 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cleanStructuredFields, DURATION_OPTIONS } from '@/types/structuredFields';
+import { cleanStructuredFields, DURATION_OPTIONS, isValidStoredLocation } from '@/types/structuredFields';
 import { analytics } from '@/services/analytics';
 import { POST_TYPE_OPTIONS, getPlaceholderForType, mapPostTypeToDatabase } from './utils/postUtils';
 import type { DatabasePostType, UIPostType } from './utils/postUtils';
@@ -108,7 +108,19 @@ export function EnhancedCreatePostForm({
     address: string;
     placeId: string;
     coordinates: { lat: number; lng: number };
-  } | null>(null);
+  } | null>(() => {
+    // Hydrate location from postToEdit.structured_fields.location.
+    // Validation gate: ignore malformed/legacy garbage so the chip never
+    // pre-fills with broken data. Map snake_case (storage) → camelCase (state).
+    const stored = (postToEdit?.structured_fields as any)?.location;
+    if (!isValidStoredLocation(stored)) return null;
+    return {
+      name: stored.name,
+      address: stored.address ?? '',
+      placeId: stored.place_id ?? '',
+      coordinates: stored.coordinates ?? { lat: 0, lng: 0 },
+    };
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Structured fields state — hydrate from postToEdit if editing
@@ -386,12 +398,36 @@ export function EnhancedCreatePostForm({
 
       const tags = location ? [location.name] : [];
 
+      // Build location payload for structured_fields. Guards:
+      // - skip entirely if name is empty/whitespace (no garbage rows)
+      // - coordinates only stored if BOTH lat and lng are finite numbers
+      //   (partial/string-shaped coords → omitted, never half-stored)
+      // - snake_case at storage boundary (placeId → place_id)
+      const trimmedLocName = location?.name?.trim();
+      const validCoords =
+        location?.coordinates &&
+        typeof location.coordinates.lat === 'number' &&
+        typeof location.coordinates.lng === 'number' &&
+        Number.isFinite(location.coordinates.lat) &&
+        Number.isFinite(location.coordinates.lng)
+          ? { lat: location.coordinates.lat, lng: location.coordinates.lng }
+          : null;
+      const locationPayload = trimmedLocName
+        ? {
+            name: trimmedLocName,
+            address: location?.address?.trim() || null,
+            place_id: location?.placeId?.trim() || null,
+            coordinates: validCoords,
+          }
+        : null;
+
       const cleanedStructured = cleanStructuredFields({
         what_worked: whatWorked,
         what_didnt: whatDidnt,
         duration: duration || undefined,
         good_for: goodFor,
         reuse_intent: reuseIntent || undefined,
+        location: locationPayload ?? undefined,
       });
 
       // -------- Safe structured_fields merge (Guard A + stale clear) --------
@@ -416,6 +452,13 @@ export function EnhancedCreatePostForm({
         const { ui_post_type: _drop, ...rest } = existingStructured;
         mergedStructured = { ...rest, ...safeCleaned };
       }
+
+      // Stale-clear: if user removed the location chip during edit, drop the
+      // key from merged output (don't store as null forever).
+      if (!locationPayload && mergedStructured && 'location' in mergedStructured) {
+        delete mergedStructured.location;
+      }
+
       // Normalize: empty object → null so the column doesn't store {}
       if (mergedStructured && Object.keys(mergedStructured).length === 0) {
         mergedStructured = null;
