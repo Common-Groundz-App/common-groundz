@@ -9,7 +9,7 @@ const CORS_HEADERS = {
 // Rate limit configuration
 const RATE_LIMITS: Record<string, { maxAttempts: number; windowSeconds: number; blockSeconds: number }> = {
   login: { maxAttempts: 5, windowSeconds: 60, blockSeconds: 300 },
-  signup: { maxAttempts: 3, windowSeconds: 300, blockSeconds: 900 },
+  signup: { maxAttempts: 5, windowSeconds: 600, blockSeconds: 600 },
   password_reset: { maxAttempts: 3, windowSeconds: 300, blockSeconds: 600 },
   resend_verification: { maxAttempts: 2, windowSeconds: 60, blockSeconds: 300 },
 };

@@ -115,17 +115,24 @@ export async function resendVerificationViaGateway(
 }
 
 /**
- * Formats rate limit error for display
+ * Formats rate limit error for display.
+ * For signup, hints that the limit is network-level (shared Wi-Fi/NAT)
+ * so users on shared connections understand it's not personal.
  */
-export function formatRateLimitError(retryAfter?: number): string {
+export function formatRateLimitError(retryAfter?: number, action?: 'signup' | 'login' | 'password_reset' | 'resend_verification'): string {
+  const isSignup = action === 'signup';
+  const prefix = isSignup ? 'Too many signup attempts from your network.' : 'Too many attempts.';
+  const suffix = isSignup ? ' or try from a different connection.' : '';
+
   if (!retryAfter) {
-    return 'Too many attempts. Please try again later.';
+    return `${prefix} Please try again later${suffix ? ',' + suffix : '.'}`;
   }
-  
+
   if (retryAfter < 60) {
-    return `Too many attempts. Please try again in ${retryAfter} seconds.`;
+    return `${prefix} Please try again in ${retryAfter} seconds${suffix ? ',' + suffix : '.'}`;
   }
-  
+
   const minutes = Math.ceil(retryAfter / 60);
-  return `Too many attempts. Please try again in ${minutes} minute${minutes > 1 ? 's' : ''}.`;
+  const minuteStr = `${minutes} minute${minutes > 1 ? 's' : ''}`;
+  return `${prefix} Please try again in ${minuteStr}${suffix ? ',' + suffix : '.'}`;
 }
