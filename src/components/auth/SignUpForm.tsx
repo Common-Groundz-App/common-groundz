@@ -220,6 +220,7 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
 
         {/* Invisible Turnstile CAPTCHA - outside space-y-4 to avoid layout gap */}
         <TurnstileWidget
+          ref={turnstileRef}
           onVerify={handleTurnstileVerify}
           onError={handleTurnstileError}
           onExpire={handleTurnstileExpire}
