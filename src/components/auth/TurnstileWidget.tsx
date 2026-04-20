@@ -157,6 +157,8 @@ const TurnstileWidget = forwardRef<TurnstileWidgetHandle, TurnstileWidgetProps>(
   }
 
   return <div ref={containerRef} className="turnstile-container [&:empty]:hidden" />;
-};
+});
+
+TurnstileWidget.displayName = 'TurnstileWidget';
 
 export default TurnstileWidget;
