@@ -36,6 +36,12 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showVerificationPending, setShowVerificationPending] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileWidgetHandle>(null);
+
+  const resetTurnstile = () => {
+    setTurnstileToken(null);
+    turnstileRef.current?.reset();
+  };
 
   // Clear password error when passwords change
   useEffect(() => {
