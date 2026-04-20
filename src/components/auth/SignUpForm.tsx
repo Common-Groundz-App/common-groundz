@@ -135,10 +135,12 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       if (result.error) {
         if (result.code === 'RATE_LIMITED') {
           toast.error(formatRateLimitError(result.retryAfter, 'signup'));
+          resetTurnstile();
           return;
         }
         if (result.code === 'USER_EXISTS') {
           toast.error('An account with this email already exists. Try signing in instead.');
+          resetTurnstile();
           return;
         }
         throw new Error(result.error);
@@ -149,11 +151,15 @@ const SignUpForm = ({ onSwitchToSignIn }: SignUpFormProps) => {
       setShowVerificationPending(true);
     } catch (error: any) {
       const msg = error.message || 'Error signing up';
-      if (msg.toLowerCase().includes('user already registered')) {
+      const lower = msg.toLowerCase();
+      if (lower.includes('user already registered')) {
         toast.error('An account with this email already exists. Try signing in instead.');
+      } else if (lower.includes('email') && lower.includes('invalid')) {
+        toast.error("This email address can't be used. Please try a different email, or contact support if you believe this is a mistake.");
       } else {
         toast.error(msg);
       }
+      resetTurnstile();
       console.error(error);
     } finally {
       setIsLoading(false);
