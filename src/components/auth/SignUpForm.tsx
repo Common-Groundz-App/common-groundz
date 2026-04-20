@@ -9,7 +9,7 @@ import UserInfoFields from './UserInfoFields';
 import CredentialFields from './CredentialFields';
 import UsernameField from './UsernameField';
 import EmailVerificationPending from './EmailVerificationPending';
-import TurnstileWidget from './TurnstileWidget';
+import TurnstileWidget, { type TurnstileWidgetHandle } from './TurnstileWidget';
 import { signUpViaGateway, formatRateLimitError } from '@/lib/authGateway';
 import GoogleSignInButton from './GoogleSignInButton';
 import { Separator } from '@/components/ui/separator';
