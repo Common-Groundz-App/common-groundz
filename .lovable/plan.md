@@ -1,56 +1,64 @@
 
 
-## Verdict: Try one quick targeted fix, then move on if it doesn't work
+## Verdict: Adopt the spirit of both reviews — relax the limit, skip the cleanup, add a tiny bit of clarity. Skip the over-engineering.
 
-ChatGPT is right that you shouldn't sink more time into this. But the proposed fixes are mostly off-target for our specific situation. Let me explain what's actually happening and what the minimal correct fix is.
+Both ChatGPT and Codex landed on the same core point: **relax the signup limit, don't do a global cleanup**. You've already confirmed the cleanup is unnecessary (the 15-min block expired naturally). Good — we drop it.
 
-### What the console log actually means
+Now let me cut through what's actually useful vs. nice-to-have-someday:
 
-The error `"HTML5 Audio pool exhausted, returning potentially locked audio object"` is firing **4 times on page load** — before any sign-in. That's our `preloadSounds()` running on app boot, hitting Howler's default HTML5 audio pool limit.
+### What I agree with and will do
 
-Looking at `feedbackService.ts`:
-- We use `html5: true` for every Howl (mobile compatibility)
-- Default Howler HTML5 pool size is 10
-- We preload 4 sounds + each play creates additional audio nodes
-- On iOS especially, the pool gets exhausted and Howler returns "locked" objects that won't play
+1. **Soften the signup limit** — exactly as originally proposed: `5 attempts / 10 min window / 10 min block`. Both reviewers agreed. This is the whole fix.
 
-### What's wrong with ChatGPT's suggestions
+2. **Skip the DB cleanup** — you said it, ChatGPT said it, Codex said it. Nothing to do here.
 
-- **Fix 1 (`Howler.pool = 5`)** — Wrong direction. Lowering the pool makes exhaustion *worse*. Should *increase* it.
-- **Fix 2 (reuse instances)** — We already do this. `soundCache` Map caches every Howl by src.
-- **Fix 5 (MP3 instead of WAV)** — Possible but requires re-uploading 4 files. Not worth it as first try.
+### What I'm rejecting and why
 
-### The actual minimal fix
+**Codex's "environment-specific limits (dev vs prod)"** — Reject. Lovable apps don't have a clean env-split for edge functions, and you're a solo dev on a single deployment. Adds complexity for ~zero benefit. The relaxed `5/10min` limit is already lenient enough for both dev testing and real production users.
 
-Two small changes in `src/services/feedbackService.ts`:
+**Codex's "targeted unblock utility"** — Reject. This is a dev tool you'd use maybe twice a year. Building an admin-only "clear my IP" endpoint = new edge function + auth gating + UI surface. Not worth it. If you ever get blocked again during testing, you can run a one-line SQL in the Supabase dashboard scoped to your IP. No code needed.
 
-**Change 1: Increase Howler's HTML5 audio pool**
-At the top of the file (after the Howler import), add:
+**ChatGPT's "log detected IP / action / remaining block time"** — Partially reject. Your `auth-gateway` **already logs all of this** (lines like `console.log(\`Rate limited: ${identifier} for ${action}, retry after ${retryAfter}s\`)`). Visible in edge function logs. No new logging needed.
+
+**ChatGPT's "two separate limiters" concern** — Worth acknowledging in the plan but not "fixing." There genuinely are two: your gateway (IP-based, configurable) and Supabase Auth's built-in email-rate-limiter (per-email, not configurable from code). Your "email rate limit exceeded" was the latter, your "too many attempts, 11 minutes" was the former. They serve different purposes; both should stay.
+
+### What I'll add that neither reviewer mentioned
+
+**Improve the user-facing error message slightly** (Codex's third suggestion — this one IS worth doing, it's a 1-line change). The current message is just: *"Too many attempts. Please try again in X minutes."*
+
+A small upgrade in `formatRateLimitError()` (`src/lib/authGateway.ts`) to mention this is a network-level limit, so users on shared Wi-Fi understand it's not personal:
+
+> *"Too many signup attempts from your network. Please try again in X minutes, or try from a different connection."*
+
+This directly addresses the confusion you experienced ("why is my phone blocked too?").
+
+### The minimal change set
+
+**File 1: `supabase/functions/auth-gateway/index.ts`** — one line changed:
 ```ts
-// Default pool of 10 gets exhausted quickly with html5:true on iOS.
-// Bump to 20 to prevent "Audio pool exhausted" errors.
-Howler.html5PoolSize = 20;
+// Before
+signup: { maxAttempts: 3, windowSeconds: 300, blockSeconds: 900 },
+
+// After
+signup: { maxAttempts: 5, windowSeconds: 600, blockSeconds: 600 },
 ```
 
-**Change 2: Don't keep `html5: true` for the deferred signin sound path**
+**File 2: `src/lib/authGateway.ts`** — improve `formatRateLimitError()` to hint at the shared-network nature when the error happens during signup. Small copy refinement only.
 
-The root cause of the "locked audio object" warning is `html5: true` combined with iOS's strict gesture requirements. For the signin sound specifically (which now fires inside a `pointerdown` handler — a guaranteed user gesture), we can use Web Audio instead, which is more reliable post-gesture.
-
-Simplest approach: keep current behavior for all sounds, just bump the pool. If that alone fixes it, done. If not, we accept the limitation for Google OAuth signin sound only.
-
-### What I'm NOT going to do
-- Convert WAV → MP3 (no evidence the files are bad — post/comment/email signin all work)
-- Refactor the sound architecture
-- Add visual fallback ("Welcome back" toast) — out of scope, you already declined this earlier
-- Touch any other sound flow (post, comment, email signin, logout all work)
-
-### One-line change, then verify
-
-Just add `Howler.html5PoolSize = 20;` near the top of `feedbackService.ts`. That's the entire change.
+### What stays untouched
+- Login limit (5/min) — fine
+- Password reset limit (3/5min) — fine
+- Resend verification limit (2/min) — fine
+- Turnstile CAPTCHA — stays (the real bot defense)
+- IP-based identification strategy — stays (only stable pre-auth identifier)
+- All RLS policies, schema, other auth flow — untouched
+- No DB cleanup migration
 
 ### Verification
-1. Reload the app — console should show fewer or no "Audio pool exhausted" warnings
-2. Sign in with Google → tap anywhere → listen for signin sound
-3. Confirm post/comment/email signin/logout sounds still work (no regression)
-4. If Google signin sound still silent after this → **stop here, accept it, move on.** ChatGPT's mindset advice is correct: this is polish, not core product. The pending-flag + deferred-interaction architecture is sound; if iOS Chrome still won't cooperate, that's a browser limitation, not an architecture problem.
+1. Edge function deploys → wait ~30 sec.
+2. Try 5 signup attempts in a row → all should be allowed (was 3 before).
+3. 6th attempt → blocked with new message mentioning "your network".
+4. Wait 10 min → unblocked (was 15 min before).
+5. Login, password reset, resend verification → unchanged behavior.
+6. Confirm a real signup with a fresh email still works end-to-end.
 
