@@ -3,6 +3,13 @@
  * Types, constants, and cleaning utilities for structured post data.
  */
 
+export interface PostLocation {
+  name: string;
+  address?: string | null;
+  place_id?: string | null;
+  coordinates?: { lat: number; lng: number } | null;
+}
+
 export interface StructuredFields {
   what_worked?: string;
   what_didnt?: string;
@@ -15,7 +22,37 @@ export interface StructuredFields {
    * composer re-hydrate the correct chip on edit.
    */
   ui_post_type?: 'journal' | 'watching';
+  /**
+   * Structured location data captured from the composer's location chip.
+   * Stored here (not in a dedicated `metadata` column) to avoid a schema
+   * migration. Always validated via `isValidStoredLocation` on read/write.
+   */
+  location?: PostLocation;
   _v: number;
+}
+
+/**
+ * Validates a stored location object. A valid location must have a non-empty
+ * trimmed `name`. Coordinates are optional, but if present must be a
+ * `{ lat, lng }` pair of finite numbers — partial/string-shaped coords are
+ * rejected entirely (caller should drop the coordinates key, not half-store).
+ */
+export function isValidStoredLocation(loc: any): loc is PostLocation {
+  if (!loc || typeof loc !== 'object') return false;
+  if (typeof loc.name !== 'string' || loc.name.trim().length === 0) return false;
+  if (loc.coordinates !== undefined && loc.coordinates !== null) {
+    const c = loc.coordinates;
+    if (
+      typeof c !== 'object' ||
+      typeof c.lat !== 'number' ||
+      typeof c.lng !== 'number' ||
+      !Number.isFinite(c.lat) ||
+      !Number.isFinite(c.lng)
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export const DURATION_OPTIONS: Record<string, string> = {
@@ -34,6 +71,7 @@ export const ALLOWED_STRUCTURED_KEYS = [
   'good_for',
   'reuse_intent',
   'ui_post_type',
+  'location',
 ] as const;
 
 const VALID_UI_POST_TYPES = ['journal', 'watching'];
@@ -104,6 +142,23 @@ export function cleanStructuredFields(
   // UI-only post type marker (journal | watching)
   if (typeof mapped.ui_post_type === 'string' && VALID_UI_POST_TYPES.includes(mapped.ui_post_type)) {
     result.ui_post_type = mapped.ui_post_type as 'journal' | 'watching';
+  }
+
+  // Structured location — gated by isValidStoredLocation; normalize fields
+  // so partial coordinates / blank strings don't leak into the column.
+  if (isValidStoredLocation(mapped.location)) {
+    const loc = mapped.location;
+    const normalized: PostLocation = { name: loc.name.trim() };
+    if (typeof loc.address === 'string' && loc.address.trim().length > 0) {
+      normalized.address = loc.address.trim();
+    }
+    if (typeof loc.place_id === 'string' && loc.place_id.trim().length > 0) {
+      normalized.place_id = loc.place_id.trim();
+    }
+    if (loc.coordinates && typeof loc.coordinates.lat === 'number' && typeof loc.coordinates.lng === 'number') {
+      normalized.coordinates = { lat: loc.coordinates.lat, lng: loc.coordinates.lng };
+    }
+    result.location = normalized;
   }
 
   // Return null if no fields have values (don't store { "_v": 1 } alone)
