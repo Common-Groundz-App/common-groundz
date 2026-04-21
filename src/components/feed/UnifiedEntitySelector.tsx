@@ -263,28 +263,33 @@ export function UnifiedEntitySelector({
     onEntitiesChange(newEntities);
   }, [selectedEntities, onEntitiesChange]);
 
-  // Enter key handler
+  // Keyboard handler: ↑/↓ navigate, Enter picks, Esc closes
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setShowResults(false);
       return;
     }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx((i) => {
+        if (pickableItems.length === 0) return -1;
+        return (i + 1) % pickableItems.length;
+      });
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx((i) => {
+        if (pickableItems.length === 0) return -1;
+        return i <= 0 ? pickableItems.length - 1 : i - 1;
+      });
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
-      // Try to select first eligible entity result
-      const firstEntity = results.entities?.[0];
-      if (firstEntity && !isMaxReached) {
-        handleEntitySelect({
-          id: firstEntity.id,
-          name: firstEntity.name,
-          type: firstEntity.type,
-          image_url: firstEntity.image_url || undefined,
-          description: firstEntity.description || undefined,
-          venue: firstEntity.venue || undefined,
-        });
-        return;
-      }
-      // No results and query >= 3 chars → open create dialog
+      if (isMaxReached) return;
+      if (pickActive()) return;
+      // No pickable results and query >= 3 chars → open create dialog
       if (searchQuery.trim().length >= 3 && !hasAnyResults) {
         setShowCreateDialog(true);
       }
