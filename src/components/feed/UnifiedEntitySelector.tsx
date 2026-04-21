@@ -118,6 +118,9 @@ export function UnifiedEntitySelector({
 
   const isMaxReached = selectedEntities.length >= maxEntities;
 
+  // Recent searches (composer surface) — declared early so callbacks can use addRecent.
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('composer');
+
   // Sync initial entities from parent
   useEffect(() => {
     setSelectedEntities(initialEntities);
