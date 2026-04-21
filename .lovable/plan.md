@@ -1,91 +1,90 @@
 
 
-## Verdict: Yes — adopt both reviewers' additions. Both are real concerns, both are cheap.
+## Verdict: Ship the plan as-is. Skip Codex's "exact host from config" addition.
 
-ChatGPT and Codex independently flagged the same race-condition risk (rapid clicks → duplicate creates), and Codex caught a real typing bug I missed. Adding both. Plus one more thing I noticed on a re-read.
+ChatGPT signs off with no additions. Codex suggests matching `isOurProxyUrl` against an allow-list of exact proxy hosts pulled from config. **I'm declining this one** — here's why:
+
+1. **We already have one source of truth for the host** — `SUPABASE_URL` in `src/integrations/supabase/client.ts` (`https://uyjtgybbktgapspodajy.supabase.co`). Pulling it through a new "config" indirection adds a layer for zero practical benefit — there's exactly one Supabase project for this app.
+2. **The check `hostname.endsWith('supabase.co') && pathname.startsWith('/functions/v1/proxy-')` is already strict enough.** The only false-positive scenario would require an attacker to control a `*.supabase.co` subdomain AND host a path starting with `/functions/v1/proxy-`. That's not a realistic threat for a client-side image-URL guard whose only job is "don't double-wrap our own proxy."
+3. **YAGNI.** Adding config indirection now, for a hypothetical multi-project future, is the kind of premature abstraction we should resist. If we ever go multi-project, we add it then in one place.
+
+If you want extra strictness without the config layer, I can tighten the hostname check to `hostname === new URL(SUPABASE_URL).hostname` — exact match against the one project we have. **I'll include that as the strict form** since it's a one-line change and removes any subdomain ambiguity. Best of both worlds, no new config surface.
 
 ---
 
-## What I'm adding to the previous plan
+## Final plan (4 files, all small)
 
-### 1. Selection lock (both reviewers)
-A single `isCreatingEntity` state in `UnifiedEntitySelector`. While `handleExternalSelect` is in flight:
-- Early-return if already creating (guards against double-fire even before React re-renders)
-- Pass a `disabled` / `busy` flag down so the result row shows a small spinner and ignores further clicks on **any** external result (not just the one clicked — prevents picking a different result mid-create)
-- Always clear in `finally`
+### 1. `src/utils/imageUtils.ts`
 
-This also closes a subtle dedupe race: two fast clicks on the same brand-new external result could both miss `findEntityByApiRef` (neither has been inserted yet) and both call `createEntityQuick`, creating two rows. The lock prevents that.
-
-### 2. Normalize `type` before create (Codex)
-External results come in with `type` strings from different sources (`'place'`, `'book'`, `'movie'`, sometimes missing). The previous plan had `result.type || 'product'` as a fallback — that would silently mis-type a Google Places result as `'product'` if `type` is ever undefined. Fix:
-
+Import the Supabase URL once at module top, derive the canonical hostname, then use it in a small helper:
 ```ts
-const normalizedType = normalizeEntityType(result.type, result.api_source);
-// e.g. api_source='google_places' → 'place'
-//      api_source='google_books' → 'book'
-//      api_source='omdb'/'tmdb' → 'movie'
-//      else → result.type, else 'product'
+import { SUPABASE_URL } from '@/integrations/supabase/client'; 
+// (or hardcode-derive — see note below)
+
+const SUPABASE_HOSTNAME = new URL(SUPABASE_URL).hostname;
+
+const isOurProxyUrl = (url: string): boolean => {
+  try {
+    const u = new URL(url);
+    return u.hostname === SUPABASE_HOSTNAME 
+      && u.pathname.startsWith('/functions/v1/proxy-');
+  } catch {
+    return false;
+  }
+};
 ```
+Note: if `SUPABASE_URL` isn't currently exported from `client.ts`, I'll either export it (one-line addition, no behavior change) or compute the hostname from the existing constant inline. No new env var, no new config file.
 
-This helper already exists in spirit in `use-entity-operations.ts` (`getCorrectEntityType`). I'll reuse/extract it rather than reinvent it — keep one source of truth for the api_source → type mapping.
+Use `isOurProxyUrl` as the first check in:
+- `getProxyUrlForImage()` → if true, return `originalUrl` untouched
+- `isCorsProblematic()` → if true, return `false`
 
-### 3. **My addition: skip the create call entirely if `api_source` or `api_ref` is missing**
-A defensive guard. If for some reason an external result lacks one of these (malformed data, future regression), `findEntityByApiRef` will short-circuit to `null` and we'll happily insert a duplicate-prone row with no dedupe key. Guard:
+### 2. `src/components/common/ImageWithFallback.tsx`
+- Add module-level: `const DEBUG_IMAGES = import.meta.env.DEV && import.meta.env.VITE_DEBUG_IMAGES === 'true';`
+- Wrap all 4 `console.log` calls with `if (DEBUG_IMAGES && !suppressConsoleErrors)`
+- Default-off in dev, opt-in via `.env`, always-off in production
+- Per-call `suppressConsoleErrors` prop still acts as a hard override
 
-```ts
-if (!result.api_source || !result.api_ref) {
-  toast({ title: 'Could not add this result', variant: 'destructive' });
-  return;
-}
-```
-External results without dedupe keys should go through the explicit "+ Add as new entity" dialog instead, not the auto-create path.
+### 3. `src/components/feed/UnifiedEntitySelector.tsx`
+- Pass `suppressConsoleErrors` to `<ImageWithFallback />` in result rows (belt-and-braces with the env flag)
+
+### 4. `src/hooks/use-enhanced-realtime-search.ts`
+- Wire `signal: controller.signal` into both `supabase.functions.invoke()` calls (with `@ts-expect-error` cast since SDK types may not expose it)
+- Add post-await `if (controller.signal.aborted) return;` guard before `setResults(...)` in both `performLocalSearch` and `performExternalSearch` (works even if SDK ignores signal)
+- Split single `abortControllerRef` into `localAbortRef` and `externalAbortRef`
+- Bump debounces: `LOCAL_DEBOUNCE_MS` 300 → 450, `EXTERNAL_DEBOUNCE_MS` 800 → 1100
+- Keep `MIN_EXTERNAL_QUERY_LENGTH = 4` (already enforced before invoke at the top of `performExternalSearch`)
+- Add `lastLocalQueryRef` for local query dedupe (mirror of existing `lastExternalQueryRef`)
+- Catch blocks: skip log when `err.name === 'AbortError'` or message includes `'Failed to fetch'` / `'aborted'`
 
 ---
 
-## Final plan (unchanged where not noted)
+## Explicitly NOT touching
 
-### Files changed (1)
-**`src/components/feed/UnifiedEntitySelector.tsx`** — rewrite `handleExternalSelect`:
-
-1. Guard: bail if `isCreatingEntity` already true, or if `api_source`/`api_ref` missing
-2. Set `isCreatingEntity = true`
-3. Compute `normalizedType` via shared helper
-4. `findEntityByApiRef(api_source, api_ref)` — dedupe
-5. If null, `createEntityQuick({...}, normalizedType)`
-6. If `api_source === 'google_places'` and we have `entity.id` + `api_ref`, fire `refresh-google-places-entity` (non-blocking, `.catch(console.error)`)
-7. `handleEntitySelect(entity)` to add chip
-8. `finally { setIsCreatingEntity(false) }`
-9. Pass `isCreatingEntity` into the result list so external rows render `disabled` + small spinner on the active row
-
-### Files possibly touched (small)
-**`src/hooks/recommendations/use-entity-operations.ts`** — extract the existing `getCorrectEntityType` helper into a shared util (or export it) so `UnifiedEntitySelector` can import it. No behavior change to existing callers.
-
-If extracting feels risky, I'll inline a small private copy in `UnifiedEntitySelector` instead — call it. The mapping is 5 lines.
-
-### Explicitly NOT touching
-- No new edge function (the whole point — reuse Explore's client path)
-- No DB migration, no schema change
-- No changes to `SearchResultHandler` / Explore (already works — we're mirroring it)
-- No changes to local-entity selection ("Already on Groundz" rows)
-- No changes to `CreateEntityDialog` ("+ Add as new entity")
-- No changes to location flow (last turn's `structured_fields.location` work)
-- No changes to mentions, hashtags, sound, post submission, structured fields
-
----
+- ❌ No edge function changes (`unified-search-v2`, `proxy-*` all correct given correct inputs)
+- ❌ No whitelist additions to `proxy-external-image`
+- ❌ No new config/env file for proxy hosts (Codex's suggestion declined — YAGNI)
+- ❌ No changes to `UnifiedEntitySelector.handleExternalSelect` logic (entity-selection fix intact)
+- ❌ No changes to `structured_fields.location` flow
+- ❌ No changes to `EnhancedSearchInput.tsx`
+- ❌ No global behavior change to `ImageWithFallback` — only logging is gated; URL processing, fallback chain, CORS mode all unchanged
+- ❌ No 406 fix this pass (deferred — separate trace later if needed)
+- ❌ No new caching/batching/priority-queue layer (out of scope; ChatGPT's "smart caching + ranking layer" tease is a future enhancement)
+- ❌ No changes to `MIN_EXTERNAL_QUERY_LENGTH` (stays 4)
+- ❌ No changes to mentions, hashtags, sound, post submission, comments, structured_fields schema
 
 ## Verification
 
-1. `/create` → search "malika biryani" → click a **Places** result → chip appears, **no CORS error**, no `FunctionsFetchError`
-2. Search same name again → result now appears under **"Already on Groundz"**
-3. Click that "Already on Groundz" result → tagged, no new row in `entities` (verify in Supabase)
-4. **Rapid double-click** on a brand-new external result → only one entity row created, second click is ignored while spinner shows
-5. **Click result A then quickly result B** during create → result B click ignored until A completes
-6. Books result → chip appears, second search shows it under "Already on Groundz", row has `type='book'` (not `'product'`)
-7. Movies result → same, row has `type='movie'`
-8. Google Places pick → background `refresh-google-places-entity` fires (check edge function logs)
-9. Local entity click → still works
-10. "+ Add as new entity" dialog → still works
-11. Location pin → still writes `structured_fields.location` (last turn's fix intact)
-12. Submit post with tagged entity → row in `post_entities` join table
-13. Console clean of CORS / NET::ERR_FAILED on entity selection
+1. `/create` → type "malika biryani" slowly → console clean (no 403s, no "Processing image URL" spam)
+2. `/create` → burst-type "inception" → at most 1–2 `unified-search-v2` requests in Network tab; no `OPTIONS 502`, no `net::ERR_FAILED`, no CORS errors
+3. Edit query mid-search → previous request silently cancelled or its response discarded; no error log
+4. Network tab: zero requests to `proxy-external-image?url=https%3A%2F%2F...supabase.co...` (no double-wrapping)
+5. Same clean behavior on `/explore` search (proves shared fix works in both surfaces — Explore uses same hook + same image component)
+6. Movie/book thumbnails load via correct first-level proxy or fall back silently
+7. Entity selection still works (Mallika Biryani still tags) — last turn's fix intact
+8. Location pin still writes `structured_fields.location` — last turn's fix intact
+9. Set `VITE_DEBUG_IMAGES=true` in `.env` and reload → image logs reappear (proves the flag works)
+10. Submit post → entity in `post_entities`, location in `structured_fields.location`
+11. Edge case: a URL with `supabase.co/functions/v1/proxy-` as a query-param value (not as the actual hostname/path) is still proxied normally — proves URL-parsing is robust vs substring-matching
+12. Edge case: a URL on `*.supabase.co` that isn't our project (hypothetical) is no longer treated as our proxy — exact hostname match prevents subdomain false-positives
 
