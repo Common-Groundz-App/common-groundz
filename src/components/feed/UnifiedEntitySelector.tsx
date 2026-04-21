@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { createEntityQuick } from '@/services/enhancedEntityService';
+import {
+  normalize,
+  dedupeResults,
+  rankCategories,
+  applyExactMatchOverride,
+  softCollapse,
+} from '@/utils/searchRanking';
+import { useRecentSearches } from '@/hooks/useRecentSearches';
+import { RecentSearchesPanel } from '@/components/search/RecentSearchesPanel';
 
 // Map api_source → canonical entity type (single source of truth, mirrors use-entity-operations)
 const normalizeEntityType = (rawType: string | undefined, apiSource: string | undefined): string => {
