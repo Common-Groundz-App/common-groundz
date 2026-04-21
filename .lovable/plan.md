@@ -1,62 +1,147 @@
 
 
-## Root cause for the two remaining 404s
+## Verdict: Adopt both of ChatGPT's additions. They're tiny and prevent real bugs.
 
-### Error 1: `proxy-movie-image 404 (Not Found)` for `m.media-amazon.com/...` 
-The TMDB/Amazon image URL returned by the external Movies search **no longer exists on the source server**. Our `proxy-movie-image` edge function correctly fetches it, gets a 404 from Amazon, and forwards that 404 to the browser. **This is not a bug** — it's a real broken upstream image. The edge function is doing exactly what it should.
-
-The fix is purely cosmetic: stop letting the browser surface this as a red console error. Currently `<img>` element fires the native `onerror` for 404s (browsers always log failed image requests), so even a perfect fallback chain can't suppress the **first** request's network error from devtools.
-
-We can't suppress browser-native 404 logging on `<img>` tags — that's a browser behavior. But we **can** prevent the broken URL from being attempted in the first place by checking it server-side and substituting the fallback inside `unified-search-v2` before returning results to the client.
-
-### Error 2: `unsplash.com/photo-1489590528505-98d2b5aba04b 404 (Not Found)`
-Found it: **`supabase/functions/unified-search-v2/index.ts` line 110** — our hardcoded movie fallback image. Unsplash deleted that photo. Every movie search result with a missing image falls back to this dead URL → guaranteed 404 on every render.
-
-Same Unsplash photo ID is **not** referenced anywhere in `src/` — so this is the only place to fix.
+Both are defensive hygiene — shared normalizer prevents "works in scoring, fails in dedupe" drift; Levenshtein length guard prevents wasted CPU on edge cases. Folding in.
 
 ---
 
-## Fix plan (1 file, 1 line)
+## What changes from the previous plan
 
-### `supabase/functions/unified-search-v2/index.ts` (line 110)
+### Added (2 small hardenings)
 
-Replace the dead Unsplash photo ID with a known-good Unsplash photo for the "movie" fallback.
+**1. Single shared `normalize()` used everywhere in `searchRanking.ts`**
 
-**Before:**
 ```ts
-movie: 'https://images.unsplash.com/photo-1489590528505-98d2b5aba04b?auto=format&fit=crop&q=80&w=1000',
+export const normalize = (str: string): string =>
+  (str || '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')   // strip punctuation
+    .replace(/\s+/g, ' ')      // collapse whitespace
+    .trim();
 ```
 
-**After:**
+Used by **every** ranking function — `scoreResult`, `dedupeResults` (for the dedupe key), `isNearMatch`, `shouldOverride`, `applyExactMatchOverride`. No local re-implementations. Prevents the classic "exact match doesn't fire because dedupe stripped a comma but scoring didn't" bug.
+
+Note: `UnifiedEntitySelector.tsx` already has its own local `normalize` (line 47). I'll **delete that local copy** and have it import the shared one from `searchRanking.ts` so the entire file uses one definition. No behavior change there — its current normalize is a subset (lowercase + collapse spaces, no punctuation strip), and upgrading it to also strip punctuation is strictly an improvement for the "Did you mean?" similarity check.
+
+**2. Skip Levenshtein for very long strings (>40 chars)**
+
 ```ts
-movie: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&q=80&w=1000',
+function isNearMatch(a: string, b: string): boolean {
+  const na = normalize(a);
+  const nb = normalize(b);
+  if (na.length > 40 || nb.length > 40) return false;  // skip — long names don't need typo correction
+  return levenshtein(na, nb) <= levenshteinThreshold(nb);
+}
 ```
 
-That photo ID (`1485846234645-a62644f84728`) is already used as the movie fallback in **two other places** in our codebase (`src/utils/imageUtils.ts` and `src/services/entityTypeHelpers.ts`) and has been verified live for months. This brings the edge function into alignment with the client-side fallback list — single source of truth.
+Prevents wasted CPU on full book/movie titles ("The Curious Incident of the Dog in the Night-Time"). Long names already match well via substring scoring; Levenshtein adds nothing useful at that length.
 
-This single change fixes **both** errors:
-- ✅ Eliminates the dead Unsplash 404 directly
-- ✅ Cuts off the cascade: when an Amazon/TMDB image 404s, `ImageWithFallback` falls back to this Unsplash URL — which previously also 404'd, doubling the console noise. Now the fallback resolves cleanly, so the cascade ends quietly after one expected (unavoidable) browser-level 404 for the genuinely-broken upstream image.
+### Unchanged from previous plan
+
+- ✅ Adaptive Levenshtein threshold (1 / 2 / 3 by query length)
+- ✅ Confidence-gated override (exact: always; near: only if score ≥ 60)
+- ✅ Cross-category visual deduplication
+- ✅ Soft-collapse (strong: 5, medium: 3, weak: 1–2)
+- ✅ Top row gets `font-medium` + faint divider, no chip/badge/label
+- ✅ `useRecentSearches` + `RecentSearchesPanel` with × per row + "Clear all"
+- ✅ localStorage cache (`cg_search_cache_v1`, 60s TTL, 50 entries)
+- ✅ Keyboard nav (↑/↓/Enter), per-category shimmer, last-picked-category icon hint
 
 ---
 
-## What I'm NOT changing
+## Files (final)
 
-- ❌ No changes to `proxy-movie-image` — it correctly proxies and correctly returns the upstream 404. The user-facing 404 in DevTools for genuinely dead Amazon image URLs is a browser behavior we can't suppress without intercepting every `<img>` request (out of scope, fragile).
-- ❌ No changes to `ImageWithFallback.tsx` — the fallback chain works; the problem was just that the fallback URL itself was dead.
-- ❌ No changes to client-side fallback lists — they already use the working URL.
-- ❌ No changes to entity selection, location, search lifecycle, debounces, abort logic, or any of the previous turns' work.
-- ❌ No fix for the unrelated `SearchDialog` hooks runtime error visible in runtime-errors — outside the scope of this request ("clean up the two console 404s"). Happy to address separately if you want.
+| File | Change |
+|------|--------|
+| `src/utils/searchRanking.ts` | **NEW** — exports shared `normalize`, `levenshtein` (with >40 char skip), `levenshteinThreshold`, `isNearMatch`, `shouldOverride`, `scoreResult`, `dedupeResults`, `rankCategories`, `applyExactMatchOverride`, `softCollapse`. JSDoc spec block for canonical queries. |
+| `src/hooks/useRecentSearches.ts` | **NEW** — surface-scoped recent-searches hook |
+| `src/components/search/RecentSearchesPanel.tsx` | **NEW** — reusable history UI with × per row |
+| `src/components/feed/UnifiedEntitySelector.tsx` | Apply pipeline, mount panel, keyboard nav, top-row weight; **delete local `normalize` (line 47), import from `searchRanking.ts`** |
+| `src/pages/Explore.tsx` | Same pipeline + panel in dropdown |
+| `src/hooks/use-enhanced-realtime-search.ts` | localStorage layer behind existing cache helpers |
+
+No edge function changes. No DB. No new env vars. No new deps.
+
+---
+
+## Final pipeline
+
+```text
+raw results from edge function
+        │
+        ▼
+dedupeResults()
+  key = normalize(name) + '|' + normalize(venue)
+        │
+        ▼
+scoreResult()  (uses shared normalize)
+        │
+        ▼
+sort within each category by score
+        │
+        ▼
+sort categories by top-result score
+        │
+        ▼
+applyExactMatchOverride()
+  shouldOverride() gate:
+    normalize(a) === normalize(b)                            → always
+    isNearMatch(a, b) && score >= 60                          → conditional
+  isNearMatch:
+    skip if either string > 40 chars
+    threshold: ≤4 → 1 | ≤8 → 2 | >8 → 3
+        │
+        ▼
+softCollapse()
+  strong (top ≥ 50): 5 visible
+  medium (30–49):    3 visible
+  weak (<30):        1–2 visible
+  rest behind "Show N more"
+        │
+        ▼
+render
+  row[0][0]: font-medium + faint divider
+  no chip, no badge, no label
+```
+
+---
+
+## Explicitly NOT touching (carried forward)
+
+- ❌ No edge function changes
+- ❌ No changes to debounces, abort logic, MIN_EXTERNAL_QUERY_LENGTH, image proxy, fallbacks
+- ❌ No changes to entity selection, location, mentions, hashtags, post submission
+- ❌ No `★ Best match` chip — anywhere
+- ❌ No DB tables, RLS, migrations
+- ❌ No test suite (spec captured in JSDoc)
+- ❌ No analytics events
+- ❌ No personalized/circle-based ranking
+- ❌ No new third-party libs
 
 ---
 
 ## Verification
 
-1. Redeploy edge function → reload `/create`
-2. Type "inception" or any movie query → results render
-3. Network tab: zero `unsplash.com/photo-1489590528505...` 404s (the dead URL no longer exists in any response payload)
-4. Movies with missing TMDB images now show the working Unsplash movie placeholder (clean, no second 404)
-5. The only remaining 404 (if any) would be for a movie with a genuinely broken TMDB URL — and even that resolves immediately to the working fallback, so it shows as a single line in DevTools, not a red repeating cascade
-6. Entity selection still works (last turn's fix intact)
-7. Location chip still works (previous turns' fix intact)
+1. `/create` → "malika biryani" → Mallika Biryani is row 0 of category 0 (near-match + score ≥ 60)
+2. `/create` → "Mallika, Biryani!" (with punctuation) → still triggers override (shared normalize strips it)
+3. `/create` → "malika briyani" (transposed) → still triggers override
+4. `/create` → "ram" → does NOT pull in "cream"/"ramen" (threshold = 1, score gate)
+5. `/create` → "The Curious Incident of the Dog in the Night-Time" → no Levenshtein run (>40 chars), substring scoring still works
+6. `/create` → "inception" → Movies first; if exact title exists, row 0
+7. Categories with weak matches show 1–2 items + "Show N more"
+8. Strong categories show up to 5 inline
+9. Dedup: same place from Places + Food APIs → one entry only
+10. `/create` → empty focused input → Recent searches with × per row + "Clear all"
+11. × removes a single recent without closing dropdown
+12. Same on `/explore`
+13. Reload → cached query returns instantly within 60s, no edge call
+14. ↓/↓/Enter → highlights and selects correctly
+15. Private mode → recent + cache silently no-op
+16. localStorage quota exceeded → caught silently
+17. No chip, no "Best match" text anywhere
+18. Top-row visual weight is subtle, not loud
+19. `UnifiedEntitySelector`'s "Did you mean?" check still works (now using shared normalize, slightly improved)
+20. All previous turns' fixes intact
 
