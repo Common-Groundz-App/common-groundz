@@ -736,7 +736,7 @@ export function UnifiedEntitySelector({
             )}
 
             {/* External search still loading indicator */}
-            {loadingStates.external && !loadingStates.local && (
+            {searchQuery.length >= 2 && loadingStates.external && !loadingStates.local && (
               <div className="flex items-center justify-center gap-2 p-2 text-xs text-muted-foreground border-t">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span>Searching more sources...</span>
