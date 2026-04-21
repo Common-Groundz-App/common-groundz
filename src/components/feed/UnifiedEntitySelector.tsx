@@ -492,7 +492,7 @@ export function UnifiedEntitySelector({
                   renderEntityRow(
                     { ...book, type: 'book' },
                     () => handleExternalSelect({ ...book, type: 'book' }),
-                    isMaxReached
+                    isMaxReached || isCreatingEntity
                   )
                 )}
               </div>
@@ -506,7 +506,7 @@ export function UnifiedEntitySelector({
                   renderEntityRow(
                     { ...movie, type: 'movie' },
                     () => handleExternalSelect({ ...movie, type: 'movie' }),
-                    isMaxReached
+                    isMaxReached || isCreatingEntity
                   )
                 )}
               </div>
@@ -520,7 +520,7 @@ export function UnifiedEntitySelector({
                   renderEntityRow(
                     { ...place, type: 'place' },
                     () => handleExternalSelect({ ...place, type: 'place' }),
-                    isMaxReached
+                    isMaxReached || isCreatingEntity
                   )
                 )}
               </div>
