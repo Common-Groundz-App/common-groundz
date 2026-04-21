@@ -94,6 +94,8 @@ export function UnifiedEntitySelector({
   const resultsRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+  const [isCreatingEntity, setIsCreatingEntity] = useState(false);
+  const isCreatingRef = useRef(false);
 
   const { results, isLoading, loadingStates } = useEnhancedRealtimeSearch(debouncedQuery);
   const {
