@@ -315,7 +315,7 @@ export function UnifiedEntitySelector({
     return getEntityTypeFallbackImage(item.type || 'product');
   };
 
-  // Compute result groups
+  // Raw category buckets from backend
   const localEntities = results.entities || [];
   const books = results.categorized?.books || [];
   const movies = results.categorized?.movies || [];
@@ -323,12 +323,58 @@ export function UnifiedEntitySelector({
   const people = results.users || [];
   const hashtags = results.hashtags || [];
 
-  const hasAnyResults = localEntities.length > 0 || books.length > 0 || movies.length > 0 || places.length > 0 || people.length > 0;
+  // Recent searches (composer surface)
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('composer');
 
-  // "Did you mean?" — check if any local entity names are similar to query
-  const hasSimilarResults = searchQuery.trim().length >= 3 && localEntities.some(
-    e => normalize(e.name).includes(normalize(searchQuery)) || normalize(searchQuery).includes(normalize(e.name))
-  );
+  // Ranking pipeline:
+  //   dedupe → score+sort within → sort categories → exact override → soft collapse
+  const collapsed = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return [] as ReturnType<typeof softCollapse>;
+
+    // Dedupe across external buckets — same name+venue collapses to higher score.
+    const externalAll = dedupeResults(
+      [
+        ...books.map((b: any) => ({ ...b, type: 'book' })),
+        ...movies.map((m: any) => ({ ...m, type: 'movie' })),
+        ...places.map((p: any) => ({ ...p, type: 'place' })),
+      ],
+      q,
+    );
+    const dedupedBooks = externalAll.filter((r) => r.type === 'book');
+    const dedupedMovies = externalAll.filter((r) => r.type === 'movie');
+    const dedupedPlaces = externalAll.filter((r) => r.type === 'place');
+    const dedupedLocal = dedupeResults(localEntities, q);
+
+    const ranked = rankCategories(
+      {
+        entities: dedupedLocal,
+        places: dedupedPlaces,
+        books: dedupedBooks,
+        movies: dedupedMovies,
+        people,
+      },
+      q,
+    );
+    const overridden = applyExactMatchOverride(ranked, q);
+    return softCollapse(overridden);
+  }, [searchQuery, localEntities, books, movies, places, people]);
+
+  const hasAnyResults =
+    localEntities.length > 0 ||
+    books.length > 0 ||
+    movies.length > 0 ||
+    places.length > 0 ||
+    people.length > 0;
+
+  // "Did you mean?" — uses shared normalize() (now also strips punctuation).
+  const hasSimilarResults =
+    searchQuery.trim().length >= 3 &&
+    localEntities.some(
+      (e) =>
+        normalize(e.name).includes(normalize(searchQuery)) ||
+        normalize(searchQuery).includes(normalize(e.name)),
+    );
 
   const showAddEntity = searchQuery.trim().length >= 3 && !isMaxReached;
 
