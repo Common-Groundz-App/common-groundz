@@ -384,6 +384,43 @@ export function UnifiedEntitySelector({
   // Location toggle
   const showLocationToggle = places.length > 0 || searchQuery.length >= 2;
 
+  // Flat list of pickable items (in render order) for keyboard nav.
+  // Excludes "people" (they trigger @mention, not entity-add).
+  const pickableItems = useMemo(() => {
+    const flat: { categoryKey: string; item: any }[] = [];
+    for (const cat of collapsed) {
+      if (cat.key === 'people') continue;
+      for (const it of cat.visible) flat.push({ categoryKey: cat.key, item: it });
+    }
+    return flat;
+  }, [collapsed]);
+
+  const [activeIdx, setActiveIdx] = useState(-1);
+  useEffect(() => {
+    setActiveIdx(-1);
+  }, [searchQuery]);
+
+  // Trigger pick on the currently-highlighted item (or first item if none highlighted).
+  const pickActive = useCallback(() => {
+    const idx = activeIdx >= 0 ? activeIdx : 0;
+    const target = pickableItems[idx];
+    if (!target) return false;
+    const it = target.item;
+    if (target.categoryKey === 'entities') {
+      handleEntitySelect({
+        id: it.id,
+        name: it.name,
+        type: it.type,
+        image_url: it.image_url || undefined,
+        description: it.description || undefined,
+        venue: it.venue || undefined,
+      });
+    } else {
+      handleExternalSelect({ ...it, type: it.type || target.categoryKey.replace(/s$/, '') });
+    }
+    return true;
+  }, [activeIdx, pickableItems, handleEntitySelect, handleExternalSelect]);
+
   // Section rendering helper
   const renderSectionHeader = (title: string, count: number) => (
     <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b">
