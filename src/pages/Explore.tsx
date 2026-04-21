@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/seo/SEOHead';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
