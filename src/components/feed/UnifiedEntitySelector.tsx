@@ -533,11 +533,10 @@ export function UnifiedEntitySelector({
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              if (e.target.value.length >= 2) setShowResults(true);
-              else setShowResults(false);
+              setShowResults(true);
             }}
             onKeyDown={handleKeyDown}
-            onFocus={() => { if (searchQuery.length >= 2) setShowResults(true); }}
+            onFocus={() => setShowResults(true)}
             autoFocus={autoFocusSearch}
             className="pl-8 pr-8"
             disabled={isMaxReached}
