@@ -1,83 +1,91 @@
 
 
-## Verdict: Yes — both reviews are right. Adopt their additions, plus one more I caught.
+## Verdict: Yes — adopt both reviewers' additions. Both are real concerns, both are cheap.
 
-Both reviews converge on the same point: **add input validation before persisting**. ChatGPT split it into two checks (name + coordinates), Codex bundled it as one. Same idea, both worth doing. They're cheap, they prevent garbage data, and they're exactly the kind of guard you want at a storage boundary.
-
-I also caught one more thing while re-reading the plan that neither review mentioned — see #3 below.
+ChatGPT and Codex independently flagged the same race-condition risk (rapid clicks → duplicate creates), and Codex caught a real typing bug I missed. Adding both. Plus one more thing I noticed on a re-read.
 
 ---
 
-## What I'm adding to the plan
+## What I'm adding to the previous plan
 
-### 1. Guard: skip location entirely if `name` is empty/whitespace
+### 1. Selection lock (both reviewers)
+A single `isCreatingEntity` state in `UnifiedEntitySelector`. While `handleExternalSelect` is in flight:
+- Early-return if already creating (guards against double-fire even before React re-renders)
+- Pass a `disabled` / `busy` flag down so the result row shows a small spinner and ignores further clicks on **any** external result (not just the one clicked — prevents picking a different result mid-create)
+- Always clear in `finally`
+
+This also closes a subtle dedupe race: two fast clicks on the same brand-new external result could both miss `findEntityByApiRef` (neither has been inserted yet) and both call `createEntityQuick`, creating two rows. The lock prevents that.
+
+### 2. Normalize `type` before create (Codex)
+External results come in with `type` strings from different sources (`'place'`, `'book'`, `'movie'`, sometimes missing). The previous plan had `result.type || 'product'` as a fallback — that would silently mis-type a Google Places result as `'product'` if `type` is ever undefined. Fix:
+
 ```ts
-const trimmedName = location?.name?.trim();
-const locationPayload = trimmedName ? { ... } : null;
+const normalizedType = normalizeEntityType(result.type, result.api_source);
+// e.g. api_source='google_places' → 'place'
+//      api_source='google_books' → 'book'
+//      api_source='omdb'/'tmdb' → 'movie'
+//      else → result.type, else 'product'
 ```
-Prevents `{ "location": { "name": "  " } }` rows.
 
-### 2. Guard: normalize coordinates — store only if both `lat` and `lng` are finite numbers
+This helper already exists in spirit in `use-entity-operations.ts` (`getCorrectEntityType`). I'll reuse/extract it rather than reinvent it — keep one source of truth for the api_source → type mapping.
+
+### 3. **My addition: skip the create call entirely if `api_source` or `api_ref` is missing**
+A defensive guard. If for some reason an external result lacks one of these (malformed data, future regression), `findEntityByApiRef` will short-circuit to `null` and we'll happily insert a duplicate-prone row with no dedupe key. Guard:
+
 ```ts
-const coords =
-  typeof location?.coordinates?.lat === 'number' &&
-  typeof location?.coordinates?.lng === 'number' &&
-  Number.isFinite(location.coordinates.lat) &&
-  Number.isFinite(location.coordinates.lng)
-    ? { lat: location.coordinates.lat, lng: location.coordinates.lng }
-    : null;
+if (!result.api_source || !result.api_ref) {
+  toast({ title: 'Could not add this result', variant: 'destructive' });
+  return;
+}
 ```
-Then `coordinates: coords` (so a partial/string-shaped object becomes `null`, never half-stored). Apply the same validation inside `cleanStructuredFields` so any path into the column is safe — not just the composer.
-
-### 3. **My addition: also validate on hydrate, not just on write**
-The plan validates on write but trusts whatever's in the DB on read. If an old row has a malformed `location` (from before this fix, or from a future bug), the edit screen will silently load garbage into local state.
-
-Add a tiny `isValidStoredLocation(loc)` helper used in **both** places:
-- On hydrate: only call `setLocation(...)` if `isValidStoredLocation(sf.location)`
-- Inside `cleanStructuredFields`: only accept the location key if `isValidStoredLocation(input.location)`
-
-One helper, two call sites, zero `as any` leakage. This is the "consistent shape everywhere" point ChatGPT hinted at, made concrete.
+External results without dedupe keys should go through the explicit "+ Add as new entity" dialog instead, not the auto-create path.
 
 ---
 
-## What I'm explicitly NOT adding
+## Final plan (unchanged where not noted)
 
-- No DB migration / no `metadata` column
-- No refactor of `LocationSearchInput`'s prop shape (still uses camelCase locally; we normalize at the storage boundary only — out-of-scope refactor otherwise)
-- No `tags` change (kept for discovery layer)
-- No new map/nearby/discovery features (those are next-step work, this just unblocks them)
-- No touching mentions, entities, hashtags, sound, edit-window, visibility, etc.
+### Files changed (1)
+**`src/components/feed/UnifiedEntitySelector.tsx`** — rewrite `handleExternalSelect`:
 
----
+1. Guard: bail if `isCreatingEntity` already true, or if `api_source`/`api_ref` missing
+2. Set `isCreatingEntity = true`
+3. Compute `normalizedType` via shared helper
+4. `findEntityByApiRef(api_source, api_ref)` — dedupe
+5. If null, `createEntityQuick({...}, normalizedType)`
+6. If `api_source === 'google_places'` and we have `entity.id` + `api_ref`, fire `refresh-google-places-entity` (non-blocking, `.catch(console.error)`)
+7. `handleEntitySelect(entity)` to add chip
+8. `finally { setIsCreatingEntity(false) }`
+9. Pass `isCreatingEntity` into the result list so external rows render `disabled` + small spinner on the active row
 
-## Final file changes (still just 2 files)
+### Files possibly touched (small)
+**`src/hooks/recommendations/use-entity-operations.ts`** — extract the existing `getCorrectEntityType` helper into a shared util (or export it) so `UnifiedEntitySelector` can import it. No behavior change to existing callers.
 
-**`src/types/structuredFields.ts`**
-- Add `PostLocation` interface with strict `coordinates: { lat: number; lng: number }`
-- Add `location?: PostLocation` to `StructuredFields`
-- Add `'location'` to `ALLOWED_STRUCTURED_KEYS`
-- Add `isValidStoredLocation(loc): loc is PostLocation` helper (checks name non-empty + coords finite-or-absent)
-- In `cleanStructuredFields`: pass `mapped.location` through `isValidStoredLocation` before accepting
+If extracting feels risky, I'll inline a small private copy in `UnifiedEntitySelector` instead — call it. The mapping is 5 lines.
 
-**`src/components/feed/EnhancedCreatePostForm.tsx`**
-- Build `locationPayload` only when `name.trim()` is non-empty; coords normalized via the finite-number check
-- Merge into `structured_fields` via existing `cleanStructuredFields` flow
-- After merge, delete `location` key if `locationPayload` is null (so clearing on edit drops the data, doesn't store null)
-- On edit hydrate: use `isValidStoredLocation(sf.location)` gate before `setLocation(...)`, mapping `place_id` → `placeId` for local state
-- Keep `tags: [location.name]` unchanged
+### Explicitly NOT touching
+- No new edge function (the whole point — reuse Explore's client path)
+- No DB migration, no schema change
+- No changes to `SearchResultHandler` / Explore (already works — we're mirroring it)
+- No changes to local-entity selection ("Already on Groundz" rows)
+- No changes to `CreateEntityDialog` ("+ Add as new entity")
+- No changes to location flow (last turn's `structured_fields.location` work)
+- No changes to mentions, hashtags, sound, post submission, structured fields
 
 ---
 
 ## Verification
 
-1. **Create with location** → DB row has `structured_fields.location = { name, address, place_id, coordinates: { lat, lng } }`
-2. **Edit hydrates** → location chip pre-fills correctly
-3. **Clear on edit** → `location` key gone from row (not stored as null)
-4. **Whitespace-only name** (force via devtools) → location dropped, no row pollution
-5. **Malformed coordinates** (e.g. `{ lat: "12.9" }`) → coordinates stored as `null` or omitted, never half-stored
-6. **Old row with garbage location** → edit screen ignores it cleanly, no crash
-7. **No location** → `structured_fields.location` absent
-8. **Existing posts** → load and edit normally; no regression
-9. **`tags`** → still contains `[location.name]` when set
-10. **`tsc`** clean, no `as any` near location read/write
+1. `/create` → search "malika biryani" → click a **Places** result → chip appears, **no CORS error**, no `FunctionsFetchError`
+2. Search same name again → result now appears under **"Already on Groundz"**
+3. Click that "Already on Groundz" result → tagged, no new row in `entities` (verify in Supabase)
+4. **Rapid double-click** on a brand-new external result → only one entity row created, second click is ignored while spinner shows
+5. **Click result A then quickly result B** during create → result B click ignored until A completes
+6. Books result → chip appears, second search shows it under "Already on Groundz", row has `type='book'` (not `'product'`)
+7. Movies result → same, row has `type='movie'`
+8. Google Places pick → background `refresh-google-places-entity` fires (check edge function logs)
+9. Local entity click → still works
+10. "+ Add as new entity" dialog → still works
+11. Location pin → still writes `structured_fields.location` (last turn's fix intact)
+12. Submit post with tagged entity → row in `post_entities` join table
+13. Console clean of CORS / NET::ERR_FAILED on entity selection
 
