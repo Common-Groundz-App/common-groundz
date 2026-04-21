@@ -576,119 +576,126 @@ export function UnifiedEntitySelector({
         )}
 
         {/* Results dropdown */}
-        {showResults && searchQuery.length >= 2 && (
+        {showResults && (
           <div
             ref={resultsRef}
             className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-[300px] overflow-y-auto"
           >
-            {/* Loading */}
-            {isLoading && (
-              <div className="flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Searching...</span>
-              </div>
+            {/* Recent searches — shown when input is empty / under 2 chars */}
+            {searchQuery.trim().length < 2 && (
+              <RecentSearchesPanel
+                recents={recents}
+                onPick={(q) => {
+                  setSearchQuery(q);
+                  setDebouncedQuery(q);
+                  setShowResults(true);
+                  inputRef.current?.focus();
+                }}
+                onRemove={removeRecent}
+                onClearAll={clearRecents}
+              />
             )}
 
-            {/* Creating entity */}
-            {isCreatingEntity && (
-              <div className="flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground border-b">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Adding entity...</span>
-              </div>
-            )}
-
-            {/* Local entities — "On Groundz" */}
-            {localEntities.length > 0 && (
-              <div>
-                {renderSectionHeader('✨ On Groundz', localEntities.length)}
-                {localEntities.slice(0, MAX_RESULTS_PER_CATEGORY).map(entity =>
-                  renderEntityRow(
-                    entity,
-                    () => handleEntitySelect({
-                      id: entity.id,
-                      name: entity.name,
-                      type: entity.type,
-                      image_url: entity.image_url || undefined,
-                      description: entity.description || undefined,
-                      venue: entity.venue || undefined,
-                    }),
-                    isMaxReached
-                  )
-                )}
-              </div>
-            )}
-
-            {/* Books */}
-            {books.length > 0 && (
-              <div>
-                {renderSectionHeader('📚 Books', books.length)}
-                {books.slice(0, MAX_RESULTS_PER_CATEGORY).map((book, i) =>
-                  renderEntityRow(
-                    { ...book, type: 'book' },
-                    () => handleExternalSelect({ ...book, type: 'book' }),
-                    isMaxReached || isCreatingEntity
-                  )
-                )}
-              </div>
-            )}
-
-            {/* Movies */}
-            {movies.length > 0 && (
-              <div>
-                {renderSectionHeader('🎬 Movies', movies.length)}
-                {movies.slice(0, MAX_RESULTS_PER_CATEGORY).map((movie, i) =>
-                  renderEntityRow(
-                    { ...movie, type: 'movie' },
-                    () => handleExternalSelect({ ...movie, type: 'movie' }),
-                    isMaxReached || isCreatingEntity
-                  )
-                )}
-              </div>
-            )}
-
-            {/* Places */}
-            {places.length > 0 && (
-              <div>
-                {renderSectionHeader('📍 Places', places.length)}
-                {places.slice(0, MAX_RESULTS_PER_CATEGORY).map((place, i) =>
-                  renderEntityRow(
-                    { ...place, type: 'place' },
-                    () => handleExternalSelect({ ...place, type: 'place' }),
-                    isMaxReached || isCreatingEntity
-                  )
-                )}
-              </div>
-            )}
-
-            {/* People — click inserts @mention */}
-            {people.length > 0 && (
-              <div>
-                {renderSectionHeader('👥 People', people.length)}
-                {people.slice(0, MAX_RESULTS_PER_CATEGORY).map(user => (
-                  <div
-                    key={user.id}
-                    className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent/30 transition-colors"
-                    onClick={() => handlePeopleClick(user)}
-                  >
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
-                      {user.avatar_url ? (
-                        <img src={user.avatar_url} alt={user.username || ''} className="w-full h-full object-cover" />
-                      ) : (
-                        <span>{(user.username || '?')[0].toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">
-                        <HighlightMatch text={user.username || ''} query={searchQuery} />
-                      </div>
-                      {user.username && (
-                        <div className="text-xs text-muted-foreground">@{user.username}</div>
-                      )}
-                    </div>
-                    <span className="text-xs text-primary">@mention</span>
+            {searchQuery.length >= 2 && (
+              <>
+                {/* Loading */}
+                {isLoading && (
+                  <div className="flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Searching...</span>
                   </div>
-                ))}
-              </div>
+                )}
+
+                {/* Creating entity */}
+                {isCreatingEntity && (
+                  <div className="flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground border-b">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Adding entity...</span>
+                  </div>
+                )}
+
+                {/* Ranked categories (collapsed) */}
+                {collapsed.map((cat) => {
+                  if (cat.visible.length === 0) return null;
+                  const title = categoryTitle[cat.key] || cat.key;
+                  const total = cat.visible.length + cat.hidden.length;
+
+                  // People: render as @mention rows (no entity-add).
+                  if (cat.key === 'people') {
+                    return (
+                      <div key={cat.key}>
+                        {renderSectionHeader(title, total)}
+                        {cat.visible.map((user: any) => (
+                          <div
+                            key={user.id}
+                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent/30 transition-colors"
+                            onClick={() => handlePeopleClick(user)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
+                              {user.avatar_url ? (
+                                <img src={user.avatar_url} alt={user.username || ''} className="w-full h-full object-cover" />
+                              ) : (
+                                <span>{(user.username || '?')[0].toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm truncate">
+                                <HighlightMatch text={user.username || ''} query={searchQuery} />
+                              </div>
+                              {user.username && (
+                                <div className="text-xs text-muted-foreground">@{user.username}</div>
+                              )}
+                            </div>
+                            <span className="text-xs text-primary">@mention</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={cat.key}>
+                      {renderSectionHeader(title, total)}
+                      {cat.visible.map((item: any, rowIdx: number) => {
+                        const flatIdx = flatIndexFor(cat.key, rowIdx);
+                        // Only the very first item across all categories gets the "top" weight.
+                        const isTop = flatIdx === 0;
+                        const isActive = flatIdx === activeIdx;
+                        const onPick =
+                          cat.key === 'entities'
+                            ? () =>
+                                handleEntitySelect({
+                                  id: item.id,
+                                  name: item.name,
+                                  type: item.type,
+                                  image_url: item.image_url || undefined,
+                                  description: item.description || undefined,
+                                  venue: item.venue || undefined,
+                                })
+                            : () => handleExternalSelect({ ...item, type: item.type || cat.key.replace(/s$/, '') });
+                        return renderEntityRow(
+                          { ...item, type: item.type || cat.key.replace(/s$/, '') },
+                          onPick,
+                          cat.key === 'entities' ? isMaxReached : isMaxReached || isCreatingEntity,
+                          { isTop, isActive },
+                        );
+                      })}
+                      {cat.hidden.length > 0 && (
+                        <button
+                          type="button"
+                          className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
+                          onClick={() => {
+                            // Cheap UX: if user wants more, run the broader search page.
+                            // Inline expansion would need state per category — defer.
+                          }}
+                        >
+                          Show {cat.hidden.length} more
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
             )}
 
             {/* "Did you mean?" + Add Entity section */}
