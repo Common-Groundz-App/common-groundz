@@ -54,8 +54,7 @@ interface CreatedEntityShape {
 
 const MAX_RESULTS_PER_CATEGORY = 5;
 
-// Normalize string for comparison: lowercase, trim, collapse spaces
-const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+// Normalize is imported from searchRanking.ts (shared, strips punctuation too).
 
 // Sanitize username: only allow alphanumeric, dots, underscores
 const sanitizeUsername = (username: string) => username.replace(/[^a-z0-9._]/gi, '');
