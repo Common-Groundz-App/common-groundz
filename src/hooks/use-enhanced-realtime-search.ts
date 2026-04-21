@@ -26,32 +26,77 @@ const EXTERNAL_DEBOUNCE_MS = 1100; // Slower external search (bumped from 800)
 const MIN_EXTERNAL_QUERY_LENGTH = 4; // Minimum chars for external search
 const EXTERNAL_CACHE_TTL_MS = 60000; // 60 second cache for external results
 
-// Simple cache for external search results to prevent duplicate API calls
+// Simple cache for external search results to prevent duplicate API calls.
+// Two-tier: in-memory Map (session) + localStorage (cross-reload, 60s TTL, 50 entries).
 const externalSearchCache = new Map<string, { 
   data: any; 
   timestamp: number; 
 }>();
 
+const PERSIST_KEY = 'cg_search_cache_v1';
+const PERSIST_MAX_ENTRIES = 50;
+
+type PersistedCache = Record<string, { data: any; timestamp: number }>;
+
+const readPersistedCache = (): PersistedCache => {
+  try {
+    const raw = window.localStorage.getItem(PERSIST_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writePersistedCache = (cache: PersistedCache) => {
+  try {
+    // Trim to most recent N entries by timestamp.
+    const entries = Object.entries(cache);
+    if (entries.length > PERSIST_MAX_ENTRIES) {
+      entries.sort((a, b) => b[1].timestamp - a[1].timestamp);
+      const trimmed: PersistedCache = {};
+      for (const [k, v] of entries.slice(0, PERSIST_MAX_ENTRIES)) trimmed[k] = v;
+      window.localStorage.setItem(PERSIST_KEY, JSON.stringify(trimmed));
+    } else {
+      window.localStorage.setItem(PERSIST_KEY, JSON.stringify(cache));
+    }
+  } catch {
+    // Quota / private mode — silent no-op.
+  }
+};
+
 const getCachedExternalResults = (query: string) => {
   const key = query.toLowerCase().trim();
-  const cached = externalSearchCache.get(key);
-  if (cached && Date.now() - cached.timestamp < EXTERNAL_CACHE_TTL_MS) {
-    return cached.data;
+  // 1) In-memory first.
+  const mem = externalSearchCache.get(key);
+  if (mem && Date.now() - mem.timestamp < EXTERNAL_CACHE_TTL_MS) {
+    return mem.data;
+  }
+  // 2) Fall back to persisted cache.
+  const persisted = readPersistedCache();
+  const p = persisted[key];
+  if (p && Date.now() - p.timestamp < EXTERNAL_CACHE_TTL_MS) {
+    // Hydrate in-memory tier so subsequent hits are O(1).
+    externalSearchCache.set(key, p);
+    return p.data;
   }
   return null;
 };
 
 const setCachedExternalResults = (query: string, data: any) => {
   const key = query.toLowerCase().trim();
-  externalSearchCache.set(key, {
-    data,
-    timestamp: Date.now()
-  });
-  // Clean up old cache entries (keep last 20)
+  const entry = { data, timestamp: Date.now() };
+  externalSearchCache.set(key, entry);
+  // Clean up old in-memory entries (keep last 20)
   if (externalSearchCache.size > 20) {
     const firstKey = externalSearchCache.keys().next().value;
     if (firstKey) externalSearchCache.delete(firstKey);
   }
+  // Mirror to localStorage (silent on failure).
+  const persisted = readPersistedCache();
+  persisted[key] = entry;
+  writePersistedCache(persisted);
 };
 
 /** True for benign aborts / cancelled fetches we don't want to log. */
