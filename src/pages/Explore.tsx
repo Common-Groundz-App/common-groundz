@@ -133,6 +133,9 @@ const Explore = () => {
   }, [searchQuery, results.entities, results.categorized, results.users]);
 
   const handleResultClick = async (entityId?: string, entityType?: string) => {
+    // Record query in recent searches when user picks something
+    if (searchQuery.trim()) addRecent(searchQuery.trim());
+
     // Start dropdown closing animation
     setIsDropdownClosing(true);
     
