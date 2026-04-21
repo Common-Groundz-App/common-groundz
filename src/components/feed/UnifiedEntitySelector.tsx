@@ -162,10 +162,11 @@ export function UnifiedEntitySelector({
     const newEntities = [...selectedEntities, entity];
     setSelectedEntities(newEntities);
     onEntitiesChange(newEntities);
+    if (searchQuery.trim()) addRecent(searchQuery.trim());
     setSearchQuery('');
     setDebouncedQuery('');
     setShowResults(false);
-  }, [selectedEntities, isMaxReached, onEntitiesChange]);
+  }, [selectedEntities, isMaxReached, onEntitiesChange, searchQuery, addRecent]);
 
   // Select an external result (find-or-create entity client-side, mirrors Explore search flow)
   const handleExternalSelect = useCallback(async (result: any) => {
