@@ -352,6 +352,7 @@ export function UnifiedEntitySelector({
           className="w-8 h-8 object-cover rounded"
           fallbackSrc={getEntityTypeFallbackImage(entity.type || 'product')}
           entityType={entity.type}
+          suppressConsoleErrors
         />
       </div>
       <div className="flex-1 min-w-0">
