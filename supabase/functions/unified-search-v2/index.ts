@@ -107,7 +107,7 @@ function processImageUrl(originalUrl: string, entityType: string): string {
 function getEntityTypeFallbackImage(entityType: string): string {
   const fallbacks = {
     book: 'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&q=80&w=1000',
-    movie: 'https://images.unsplash.com/photo-1489590528505-98d2b5aba04b?auto=format&fit=crop&q=80&w=1000',
+    movie: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?auto=format&fit=crop&q=80&w=1000',
     place: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&q=80&w=1000',
     default: 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?auto=format&fit=crop&q=80&w=1000'
   }
