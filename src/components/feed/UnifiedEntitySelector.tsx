@@ -463,6 +463,14 @@ export function UnifiedEntitySelector({
               </div>
             )}
 
+            {/* Creating entity */}
+            {isCreatingEntity && (
+              <div className="flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground border-b">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Adding entity...</span>
+              </div>
+            )}
+
             {/* Local entities — "On Groundz" */}
             {localEntities.length > 0 && (
               <div>
