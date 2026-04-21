@@ -98,6 +98,40 @@ const Explore = () => {
     refetch
   } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
 
+  // Recent searches (explore surface)
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('explore');
+
+  // Ranking pipeline: dedupe → score+sort → reorder categories → exact override → soft collapse
+  const collapsed = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return [] as ReturnType<typeof softCollapse>;
+    const externalAll = dedupeResults(
+      [
+        ...(results.categorized?.books || []).map((b: any) => ({ ...b, type: 'book' })),
+        ...(results.categorized?.movies || []).map((m: any) => ({ ...m, type: 'movie' })),
+        ...(results.categorized?.places || []).map((p: any) => ({ ...p, type: 'place' })),
+      ],
+      q,
+    );
+    const dedupedBooks = externalAll.filter((r) => r.type === 'book');
+    const dedupedMovies = externalAll.filter((r) => r.type === 'movie');
+    const dedupedPlaces = externalAll.filter((r) => r.type === 'place');
+    const dedupedLocal = dedupeResults(results.entities || [], q);
+
+    const ranked = rankCategories(
+      {
+        entities: dedupedLocal,
+        places: dedupedPlaces,
+        books: dedupedBooks,
+        movies: dedupedMovies,
+        users: results.users || [],
+      },
+      q,
+    );
+    const overridden = applyExactMatchOverride(ranked, q);
+    return softCollapse(overridden);
+  }, [searchQuery, results.entities, results.categorized, results.users]);
+
   const handleResultClick = async (entityId?: string, entityType?: string) => {
     // Start dropdown closing animation
     setIsDropdownClosing(true);
