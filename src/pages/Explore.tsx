@@ -339,6 +339,7 @@ const Explore = () => {
                     placeholder="Search for people, places, food, products..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setShowDropdown(true)}
                     onKeyDown={handleKeyDown}
                     className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0 pr-10"
                   />
