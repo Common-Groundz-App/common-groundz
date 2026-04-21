@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { createEntityQuick } from '@/services/enhancedEntityService';
+import {
+  normalize,
+  dedupeResults,
+  rankCategories,
+  applyExactMatchOverride,
+  softCollapse,
+} from '@/utils/searchRanking';
+import { useRecentSearches } from '@/hooks/useRecentSearches';
+import { RecentSearchesPanel } from '@/components/search/RecentSearchesPanel';
 
 // Map api_source → canonical entity type (single source of truth, mirrors use-entity-operations)
 const normalizeEntityType = (rawType: string | undefined, apiSource: string | undefined): string => {
@@ -45,8 +54,7 @@ interface CreatedEntityShape {
 
 const MAX_RESULTS_PER_CATEGORY = 5;
 
-// Normalize string for comparison: lowercase, trim, collapse spaces
-const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+// Normalize is imported from searchRanking.ts (shared, strips punctuation too).
 
 // Sanitize username: only allow alphanumeric, dots, underscores
 const sanitizeUsername = (username: string) => username.replace(/[^a-z0-9._]/gi, '');
@@ -110,6 +118,9 @@ export function UnifiedEntitySelector({
 
   const isMaxReached = selectedEntities.length >= maxEntities;
 
+  // Recent searches (composer surface) — declared early so callbacks can use addRecent.
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('composer');
+
   // Sync initial entities from parent
   useEffect(() => {
     setSelectedEntities(initialEntities);
@@ -154,10 +165,11 @@ export function UnifiedEntitySelector({
     const newEntities = [...selectedEntities, entity];
     setSelectedEntities(newEntities);
     onEntitiesChange(newEntities);
+    if (searchQuery.trim()) addRecent(searchQuery.trim());
     setSearchQuery('');
     setDebouncedQuery('');
     setShowResults(false);
-  }, [selectedEntities, isMaxReached, onEntitiesChange]);
+  }, [selectedEntities, isMaxReached, onEntitiesChange, searchQuery, addRecent]);
 
   // Select an external result (find-or-create entity client-side, mirrors Explore search flow)
   const handleExternalSelect = useCallback(async (result: any) => {
@@ -251,28 +263,33 @@ export function UnifiedEntitySelector({
     onEntitiesChange(newEntities);
   }, [selectedEntities, onEntitiesChange]);
 
-  // Enter key handler
+  // Keyboard handler: ↑/↓ navigate, Enter picks, Esc closes
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       setShowResults(false);
       return;
     }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIdx((i) => {
+        if (pickableItems.length === 0) return -1;
+        return (i + 1) % pickableItems.length;
+      });
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx((i) => {
+        if (pickableItems.length === 0) return -1;
+        return i <= 0 ? pickableItems.length - 1 : i - 1;
+      });
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
-      // Try to select first eligible entity result
-      const firstEntity = results.entities?.[0];
-      if (firstEntity && !isMaxReached) {
-        handleEntitySelect({
-          id: firstEntity.id,
-          name: firstEntity.name,
-          type: firstEntity.type,
-          image_url: firstEntity.image_url || undefined,
-          description: firstEntity.description || undefined,
-          venue: firstEntity.venue || undefined,
-        });
-        return;
-      }
-      // No results and query >= 3 chars → open create dialog
+      if (isMaxReached) return;
+      if (pickActive()) return;
+      // No pickable results and query >= 3 chars → open create dialog
       if (searchQuery.trim().length >= 3 && !hasAnyResults) {
         setShowCreateDialog(true);
       }
@@ -307,7 +324,7 @@ export function UnifiedEntitySelector({
     return getEntityTypeFallbackImage(item.type || 'product');
   };
 
-  // Compute result groups
+  // Raw category buckets from backend
   const localEntities = results.entities || [];
   const books = results.categorized?.books || [];
   const movies = results.categorized?.movies || [];
@@ -315,17 +332,99 @@ export function UnifiedEntitySelector({
   const people = results.users || [];
   const hashtags = results.hashtags || [];
 
-  const hasAnyResults = localEntities.length > 0 || books.length > 0 || movies.length > 0 || places.length > 0 || people.length > 0;
+  // (recent searches hook is declared near the top of the component)
 
-  // "Did you mean?" — check if any local entity names are similar to query
-  const hasSimilarResults = searchQuery.trim().length >= 3 && localEntities.some(
-    e => normalize(e.name).includes(normalize(searchQuery)) || normalize(searchQuery).includes(normalize(e.name))
-  );
+  // Ranking pipeline:
+  //   dedupe → score+sort within → sort categories → exact override → soft collapse
+  const collapsed = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return [] as ReturnType<typeof softCollapse>;
+
+    // Dedupe across external buckets — same name+venue collapses to higher score.
+    const externalAll = dedupeResults(
+      [
+        ...books.map((b: any) => ({ ...b, type: 'book' })),
+        ...movies.map((m: any) => ({ ...m, type: 'movie' })),
+        ...places.map((p: any) => ({ ...p, type: 'place' })),
+      ],
+      q,
+    );
+    const dedupedBooks = externalAll.filter((r) => r.type === 'book');
+    const dedupedMovies = externalAll.filter((r) => r.type === 'movie');
+    const dedupedPlaces = externalAll.filter((r) => r.type === 'place');
+    const dedupedLocal = dedupeResults(localEntities, q);
+
+    const ranked = rankCategories(
+      {
+        entities: dedupedLocal,
+        places: dedupedPlaces,
+        books: dedupedBooks,
+        movies: dedupedMovies,
+        people,
+      },
+      q,
+    );
+    const overridden = applyExactMatchOverride(ranked, q);
+    return softCollapse(overridden);
+  }, [searchQuery, localEntities, books, movies, places, people]);
+
+  const hasAnyResults =
+    localEntities.length > 0 ||
+    books.length > 0 ||
+    movies.length > 0 ||
+    places.length > 0 ||
+    people.length > 0;
+
+  // "Did you mean?" — uses shared normalize() (now also strips punctuation).
+  const hasSimilarResults =
+    searchQuery.trim().length >= 3 &&
+    localEntities.some(
+      (e) =>
+        normalize(e.name).includes(normalize(searchQuery)) ||
+        normalize(searchQuery).includes(normalize(e.name)),
+    );
 
   const showAddEntity = searchQuery.trim().length >= 3 && !isMaxReached;
 
   // Location toggle
   const showLocationToggle = places.length > 0 || searchQuery.length >= 2;
+
+  // Flat list of pickable items (in render order) for keyboard nav.
+  // Excludes "people" (they trigger @mention, not entity-add).
+  const pickableItems = useMemo(() => {
+    const flat: { categoryKey: string; item: any }[] = [];
+    for (const cat of collapsed) {
+      if (cat.key === 'people') continue;
+      for (const it of cat.visible) flat.push({ categoryKey: cat.key, item: it });
+    }
+    return flat;
+  }, [collapsed]);
+
+  const [activeIdx, setActiveIdx] = useState(-1);
+  useEffect(() => {
+    setActiveIdx(-1);
+  }, [searchQuery]);
+
+  // Trigger pick on the currently-highlighted item (or first item if none highlighted).
+  const pickActive = useCallback(() => {
+    const idx = activeIdx >= 0 ? activeIdx : 0;
+    const target = pickableItems[idx];
+    if (!target) return false;
+    const it = target.item;
+    if (target.categoryKey === 'entities') {
+      handleEntitySelect({
+        id: it.id,
+        name: it.name,
+        type: it.type,
+        image_url: it.image_url || undefined,
+        description: it.description || undefined,
+        venue: it.venue || undefined,
+      });
+    } else {
+      handleExternalSelect({ ...it, type: it.type || target.categoryKey.replace(/s$/, '') });
+    }
+    return true;
+  }, [activeIdx, pickableItems, handleEntitySelect, handleExternalSelect]);
 
   // Section rendering helper
   const renderSectionHeader = (title: string, count: number) => (
@@ -337,12 +436,17 @@ export function UnifiedEntitySelector({
     </div>
   );
 
-  const renderEntityRow = (entity: any, onClick: () => void, isDisabled = false) => (
+  const renderEntityRow = (
+    entity: any,
+    onClick: () => void,
+    isDisabled = false,
+    opts: { isTop?: boolean; isActive?: boolean } = {},
+  ) => (
     <div
       key={entity.id || `${entity.api_source}-${entity.api_ref}`}
       className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
         isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/30'
-      }`}
+      } ${opts.isActive ? 'bg-accent/40' : ''} ${opts.isTop ? 'border-b border-border/40' : ''}`}
       onClick={isDisabled ? undefined : onClick}
     >
       <div className="flex-shrink-0">
@@ -356,7 +460,7 @@ export function UnifiedEntitySelector({
         />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm truncate">
+        <div className={`text-sm truncate ${opts.isTop ? 'font-medium' : ''}`}>
           <HighlightMatch text={entity.name} query={searchQuery} />
         </div>
         {entity.venue && (
@@ -366,6 +470,27 @@ export function UnifiedEntitySelector({
       <span className="text-xs text-muted-foreground">{getEntityIcon(entity.type || 'product')}</span>
     </div>
   );
+
+  // Map category key → display title
+  const categoryTitle: Record<string, string> = {
+    entities: '✨ On Groundz',
+    places: '📍 Places',
+    books: '📚 Books',
+    movies: '🎬 Movies',
+    people: '👥 People',
+  };
+
+  // Compute the global flat-index of each render row, so we can highlight via activeIdx.
+  // (people are excluded from pickableItems; they keep no highlight slot.)
+  const flatIndexFor = (categoryKey: string, rowIndex: number): number => {
+    let idx = 0;
+    for (const cat of collapsed) {
+      if (cat.key === 'people') continue;
+      if (cat.key === categoryKey) return idx + rowIndex;
+      idx += cat.visible.length;
+    }
+    return -1;
+  };
 
   return (
     <div className="space-y-3">
@@ -408,11 +533,10 @@ export function UnifiedEntitySelector({
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
-              if (e.target.value.length >= 2) setShowResults(true);
-              else setShowResults(false);
+              setShowResults(true);
             }}
             onKeyDown={handleKeyDown}
-            onFocus={() => { if (searchQuery.length >= 2) setShowResults(true); }}
+            onFocus={() => setShowResults(true)}
             autoFocus={autoFocusSearch}
             className="pl-8 pr-8"
             disabled={isMaxReached}
@@ -451,119 +575,126 @@ export function UnifiedEntitySelector({
         )}
 
         {/* Results dropdown */}
-        {showResults && searchQuery.length >= 2 && (
+        {showResults && (
           <div
             ref={resultsRef}
             className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-[300px] overflow-y-auto"
           >
-            {/* Loading */}
-            {isLoading && (
-              <div className="flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Searching...</span>
-              </div>
+            {/* Recent searches — shown when input is empty / under 2 chars */}
+            {searchQuery.trim().length < 2 && (
+              <RecentSearchesPanel
+                recents={recents}
+                onPick={(q) => {
+                  setSearchQuery(q);
+                  setDebouncedQuery(q);
+                  setShowResults(true);
+                  inputRef.current?.focus();
+                }}
+                onRemove={removeRecent}
+                onClearAll={clearRecents}
+              />
             )}
 
-            {/* Creating entity */}
-            {isCreatingEntity && (
-              <div className="flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground border-b">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Adding entity...</span>
-              </div>
-            )}
-
-            {/* Local entities — "On Groundz" */}
-            {localEntities.length > 0 && (
-              <div>
-                {renderSectionHeader('✨ On Groundz', localEntities.length)}
-                {localEntities.slice(0, MAX_RESULTS_PER_CATEGORY).map(entity =>
-                  renderEntityRow(
-                    entity,
-                    () => handleEntitySelect({
-                      id: entity.id,
-                      name: entity.name,
-                      type: entity.type,
-                      image_url: entity.image_url || undefined,
-                      description: entity.description || undefined,
-                      venue: entity.venue || undefined,
-                    }),
-                    isMaxReached
-                  )
-                )}
-              </div>
-            )}
-
-            {/* Books */}
-            {books.length > 0 && (
-              <div>
-                {renderSectionHeader('📚 Books', books.length)}
-                {books.slice(0, MAX_RESULTS_PER_CATEGORY).map((book, i) =>
-                  renderEntityRow(
-                    { ...book, type: 'book' },
-                    () => handleExternalSelect({ ...book, type: 'book' }),
-                    isMaxReached || isCreatingEntity
-                  )
-                )}
-              </div>
-            )}
-
-            {/* Movies */}
-            {movies.length > 0 && (
-              <div>
-                {renderSectionHeader('🎬 Movies', movies.length)}
-                {movies.slice(0, MAX_RESULTS_PER_CATEGORY).map((movie, i) =>
-                  renderEntityRow(
-                    { ...movie, type: 'movie' },
-                    () => handleExternalSelect({ ...movie, type: 'movie' }),
-                    isMaxReached || isCreatingEntity
-                  )
-                )}
-              </div>
-            )}
-
-            {/* Places */}
-            {places.length > 0 && (
-              <div>
-                {renderSectionHeader('📍 Places', places.length)}
-                {places.slice(0, MAX_RESULTS_PER_CATEGORY).map((place, i) =>
-                  renderEntityRow(
-                    { ...place, type: 'place' },
-                    () => handleExternalSelect({ ...place, type: 'place' }),
-                    isMaxReached || isCreatingEntity
-                  )
-                )}
-              </div>
-            )}
-
-            {/* People — click inserts @mention */}
-            {people.length > 0 && (
-              <div>
-                {renderSectionHeader('👥 People', people.length)}
-                {people.slice(0, MAX_RESULTS_PER_CATEGORY).map(user => (
-                  <div
-                    key={user.id}
-                    className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent/30 transition-colors"
-                    onClick={() => handlePeopleClick(user)}
-                  >
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
-                      {user.avatar_url ? (
-                        <img src={user.avatar_url} alt={user.username || ''} className="w-full h-full object-cover" />
-                      ) : (
-                        <span>{(user.username || '?')[0].toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">
-                        <HighlightMatch text={user.username || ''} query={searchQuery} />
-                      </div>
-                      {user.username && (
-                        <div className="text-xs text-muted-foreground">@{user.username}</div>
-                      )}
-                    </div>
-                    <span className="text-xs text-primary">@mention</span>
+            {searchQuery.length >= 2 && (
+              <>
+                {/* Loading */}
+                {isLoading && (
+                  <div className="flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Searching...</span>
                   </div>
-                ))}
-              </div>
+                )}
+
+                {/* Creating entity */}
+                {isCreatingEntity && (
+                  <div className="flex items-center justify-center gap-2 p-3 text-sm text-muted-foreground border-b">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Adding entity...</span>
+                  </div>
+                )}
+
+                {/* Ranked categories (collapsed) */}
+                {collapsed.map((cat) => {
+                  if (cat.visible.length === 0) return null;
+                  const title = categoryTitle[cat.key] || cat.key;
+                  const total = cat.visible.length + cat.hidden.length;
+
+                  // People: render as @mention rows (no entity-add).
+                  if (cat.key === 'people') {
+                    return (
+                      <div key={cat.key}>
+                        {renderSectionHeader(title, total)}
+                        {cat.visible.map((user: any) => (
+                          <div
+                            key={user.id}
+                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent/30 transition-colors"
+                            onClick={() => handlePeopleClick(user)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
+                              {user.avatar_url ? (
+                                <img src={user.avatar_url} alt={user.username || ''} className="w-full h-full object-cover" />
+                              ) : (
+                                <span>{(user.username || '?')[0].toUpperCase()}</span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm truncate">
+                                <HighlightMatch text={user.username || ''} query={searchQuery} />
+                              </div>
+                              {user.username && (
+                                <div className="text-xs text-muted-foreground">@{user.username}</div>
+                              )}
+                            </div>
+                            <span className="text-xs text-primary">@mention</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={cat.key}>
+                      {renderSectionHeader(title, total)}
+                      {cat.visible.map((item: any, rowIdx: number) => {
+                        const flatIdx = flatIndexFor(cat.key, rowIdx);
+                        // Only the very first item across all categories gets the "top" weight.
+                        const isTop = flatIdx === 0;
+                        const isActive = flatIdx === activeIdx;
+                        const onPick =
+                          cat.key === 'entities'
+                            ? () =>
+                                handleEntitySelect({
+                                  id: item.id,
+                                  name: item.name,
+                                  type: item.type,
+                                  image_url: item.image_url || undefined,
+                                  description: item.description || undefined,
+                                  venue: item.venue || undefined,
+                                })
+                            : () => handleExternalSelect({ ...item, type: item.type || cat.key.replace(/s$/, '') });
+                        return renderEntityRow(
+                          { ...item, type: item.type || cat.key.replace(/s$/, '') },
+                          onPick,
+                          cat.key === 'entities' ? isMaxReached : isMaxReached || isCreatingEntity,
+                          { isTop, isActive },
+                        );
+                      })}
+                      {cat.hidden.length > 0 && (
+                        <button
+                          type="button"
+                          className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
+                          onClick={() => {
+                            // Cheap UX: if user wants more, run the broader search page.
+                            // Inline expansion would need state per category — defer.
+                          }}
+                        >
+                          Show {cat.hidden.length} more
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
             )}
 
             {/* "Did you mean?" + Add Entity section */}
@@ -605,7 +736,7 @@ export function UnifiedEntitySelector({
             )}
 
             {/* External search still loading indicator */}
-            {loadingStates.external && !loadingStates.local && (
+            {searchQuery.length >= 2 && loadingStates.external && !loadingStates.local && (
               <div className="flex items-center justify-center gap-2 p-2 text-xs text-muted-foreground border-t">
                 <Loader2 className="h-3 w-3 animate-spin" />
                 <span>Searching more sources...</span>

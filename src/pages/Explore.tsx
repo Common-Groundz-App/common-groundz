@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/seo/SEOHead';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
@@ -29,6 +29,15 @@ import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
 import { TrendingHashtags } from '@/components/hashtag/TrendingHashtags';
 import { enhancedExploreService } from '@/services/enhancedExploreService';
 import { getTrendingHashtags, HashtagWithCount } from '@/services/hashtagService';
+import {
+  dedupeResults,
+  rankCategories,
+  applyExactMatchOverride,
+  softCollapse,
+  scoreResult,
+} from '@/utils/searchRanking';
+import { useRecentSearches } from '@/hooks/useRecentSearches';
+import { RecentSearchesPanel } from '@/components/search/RecentSearchesPanel';
 
 import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -89,7 +98,44 @@ const Explore = () => {
     refetch
   } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
 
+  // Recent searches (explore surface)
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('explore');
+
+  // Ranking pipeline: dedupe → score+sort → reorder categories → exact override → soft collapse
+  const collapsed = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q) return [] as ReturnType<typeof softCollapse>;
+    const externalAll = dedupeResults(
+      [
+        ...(results.categorized?.books || []).map((b: any) => ({ ...b, type: 'book' })),
+        ...(results.categorized?.movies || []).map((m: any) => ({ ...m, type: 'movie' })),
+        ...(results.categorized?.places || []).map((p: any) => ({ ...p, type: 'place' })),
+      ],
+      q,
+    );
+    const dedupedBooks = externalAll.filter((r) => r.type === 'book');
+    const dedupedMovies = externalAll.filter((r) => r.type === 'movie');
+    const dedupedPlaces = externalAll.filter((r) => r.type === 'place');
+    const dedupedLocal = dedupeResults(results.entities || [], q);
+
+    const ranked = rankCategories(
+      {
+        entities: dedupedLocal,
+        places: dedupedPlaces,
+        books: dedupedBooks,
+        movies: dedupedMovies,
+        users: results.users || [],
+      },
+      q,
+    );
+    const overridden = applyExactMatchOverride(ranked, q);
+    return softCollapse(overridden);
+  }, [searchQuery, results.entities, results.categorized, results.users]);
+
   const handleResultClick = async (entityId?: string, entityType?: string) => {
+    // Record query in recent searches when user picks something
+    if (searchQuery.trim()) addRecent(searchQuery.trim());
+
     // Start dropdown closing animation
     setIsDropdownClosing(true);
     
@@ -229,8 +275,17 @@ const Explore = () => {
     </div>
   );
 
-  // Show dropdown when user has typed at least 1 character and not closing
-  const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1 && !isDropdownClosing && showDropdown;
+  // Show dropdown when user is focused (allows recent searches on empty input) or has typed
+  const shouldShowDropdown = !isDropdownClosing && showDropdown;
+
+  // Map category key → display title for ranked render
+  const exploreCategoryTitle: Record<string, string> = {
+    entities: '✨ Already on Groundz',
+    places: '📍 Places',
+    books: '📚 Books',
+    movies: '🎬 Movies',
+    users: '👥 People',
+  };
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
@@ -284,6 +339,7 @@ const Explore = () => {
                     placeholder="Search for people, places, food, products..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onFocus={() => setShowDropdown(true)}
                     onKeyDown={handleKeyDown}
                     className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0 pr-10"
                   />
@@ -319,139 +375,159 @@ const Explore = () => {
                 <div className={`absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto transition-all duration-300 ${
                   isDropdownClosing ? 'opacity-0 transform scale-95 translate-y-2' : 'opacity-100 transform scale-100 translate-y-0'
                 }`}>
-                  
-                  {/* Loading State */}
-                  {isLoading && (
-                    <div className="p-3 text-center border-b bg-background">
-                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Searching with enhanced reliability...</span>
-                      </div>
-                    </div>
+
+                  {/* Recent searches — shown when input is empty / under 1 char */}
+                  {searchQuery.trim().length < 1 && (
+                    <RecentSearchesPanel
+                      recents={recents}
+                      onPick={(q) => {
+                        setSearchQuery(q);
+                      }}
+                      onRemove={removeRecent}
+                      onClearAll={clearRecents}
+                    />
                   )}
 
-                  {/* Error State */}
-                  {error && (
-                    <div className="p-3 text-center border-b bg-yellow-50 dark:bg-yellow-900/20">
-                      <div className="flex items-center justify-center gap-2 text-sm text-yellow-700 dark:text-yellow-300">
-                        <AlertCircle className="w-4 h-4" />
-                        <span>{error}</span>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Already on Groundz - Local Results */}
-                  {results.entities.length > 0 && (
-                    <div className="border-b last:border-b-0 bg-background">
-                      {renderSectionHeader('✨ Already on Groundz', results.entities.length, 'entities')}
-                      {(showAllResults.entities ? results.entities : results.entities.slice(0, 3)).map((entity) => (
-                        <EntityResultItem
-                          key={entity.id}
-                          entity={entity}
-                          onClick={() => handleResultClick(entity.id, entity.type)}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Books from External APIs */}
-                  {results.categorized?.books?.length > 0 && (
-                    <div className="border-b last:border-b-0 bg-background">
-                      {renderSectionHeader('📚 Books', results.categorized.books.length, 'books')}
-                      {(showAllResults.books ? results.categorized.books : results.categorized.books.slice(0, 3)).map((book, index) => (
-                        <SearchResultHandler
-                          key={`${book.api_source}-${book.api_ref || index}`}
-                          result={book}
-                          query={searchQuery}
-                          onClose={() => handleResultClick()}
-                          isProcessing={isProcessingEntity}
-                          onProcessingStart={handleProcessingStart}
-                          onProcessingUpdate={handleProcessingUpdate}
-                          onProcessingEnd={handleProcessingEnd}
-                          useExternalOverlay={true}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Movies from External APIs */}
-                  {results.categorized?.movies?.length > 0 && (
-                    <div className="border-b last:border-b-0 bg-background">
-                      {renderSectionHeader('🎬 Movies', results.categorized.movies.length, 'movies')}
-                      {(showAllResults.movies ? results.categorized.movies : results.categorized.movies.slice(0, 3)).map((movie, index) => (
-                        <SearchResultHandler
-                          key={`${movie.api_source}-${movie.api_ref || index}`}
-                          result={movie}
-                          query={searchQuery}
-                          onClose={() => handleResultClick()}
-                          isProcessing={isProcessingEntity}
-                          onProcessingStart={handleProcessingStart}
-                          onProcessingUpdate={handleProcessingUpdate}
-                          onProcessingEnd={handleProcessingEnd}
-                          useExternalOverlay={true}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Places from External APIs */}
-                  {results.categorized?.places?.length > 0 && (
-                    <div className="border-b last:border-b-0 bg-background">
-                      {renderSectionHeader('📍 Places', results.categorized.places.length, 'places')}
-                      {(showAllResults.places ? results.categorized.places : results.categorized.places.slice(0, 3)).map((place, index) => (
-                        <SearchResultHandler
-                          key={`${place.api_source}-${place.api_ref || index}`}
-                          result={place}
-                          query={searchQuery}
-                          onClose={() => handleResultClick()}
-                          isProcessing={isProcessingEntity}
-                          onProcessingStart={handleProcessingStart}
-                          onProcessingUpdate={handleProcessingUpdate}
-                          onProcessingEnd={handleProcessingEnd}
-                          useExternalOverlay={true}
-                        />
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Hashtags */}
-                  {results.hashtags?.length > 0 && (
-                    <div className="border-b last:border-b-0 bg-background">
-                      {renderSectionHeader('# Hashtags', results.hashtags.length, 'hashtags')}
-                      {(showAllResults.hashtags ? results.hashtags : results.hashtags.slice(0, 3)).map((hashtag) => (
-                        <div
-                          key={hashtag.id}
-                          onClick={() => {
-                            navigate(`/t/${hashtag.name_norm}`);
-                            handleResultClick();
-                          }}
-                          className="flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-primary font-medium">#{hashtag.name_original}</span>
-                            </div>
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                              {hashtag.post_count} posts
-                            </p>
+                  {searchQuery.trim().length >= 1 && (
+                    <>
+                      {/* Loading State */}
+                      {isLoading && (
+                        <div className="p-3 text-center border-b bg-background">
+                          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Searching with enhanced reliability...</span>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* People */}
-                  {results.users.length > 0 && (
-                    <div className="border-b last:border-b-0 bg-background">
-                      {renderSectionHeader('👥 People', results.users.length, 'users')}
-                      {(showAllResults.users ? results.users : results.users.slice(0, 3)).map((user) => (
-                        <UserResultItem
-                          key={user.id}
-                          user={user}
-                          onClick={() => handleResultClick()}
-                        />
-                      ))}
-                    </div>
+                      )}
+
+                      {/* Error State */}
+                      {error && (
+                        <div className="p-3 text-center border-b bg-yellow-50 dark:bg-yellow-900/20">
+                          <div className="flex items-center justify-center gap-2 text-sm text-yellow-700 dark:text-yellow-300">
+                            <AlertCircle className="w-4 h-4" />
+                            <span>{error}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Ranked categories (collapsed) — replaces fixed-order blocks */}
+                      {(() => {
+                        // Compute global flat-row index so the very first row gets top weight.
+                        let flatIdx = 0;
+                        return collapsed.map((cat) => {
+                          if (cat.visible.length === 0) return null;
+                          const title = exploreCategoryTitle[cat.key] || cat.key;
+                          const total = cat.visible.length + cat.hidden.length;
+
+                          if (cat.key === 'users') {
+                            const node = (
+                              <div key={cat.key} className="border-b last:border-b-0 bg-background">
+                                {renderSectionHeader(title, total)}
+                                {cat.visible.map((u: any) => {
+                                  const isTop = flatIdx === 0;
+                                  flatIdx += 1;
+                                  return (
+                                    <div
+                                      key={u.id}
+                                      className={isTop ? 'border-b border-border/40' : ''}
+                                    >
+                                      <UserResultItem user={u} onClick={() => handleResultClick()} />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                            return node;
+                          }
+
+                          if (cat.key === 'entities') {
+                            return (
+                              <div key={cat.key} className="border-b last:border-b-0 bg-background">
+                                {renderSectionHeader(title, total)}
+                                {cat.visible.map((entity: any) => {
+                                  const isTop = flatIdx === 0;
+                                  flatIdx += 1;
+                                  return (
+                                    <div
+                                      key={entity.id}
+                                      className={isTop ? 'border-b border-border/40 [&_*]:font-medium' : ''}
+                                    >
+                                      <EntityResultItem
+                                        entity={entity}
+                                        onClick={() => handleResultClick(entity.id, entity.type)}
+                                      />
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          }
+
+                          // External: places / books / movies
+                          return (
+                            <div key={cat.key} className="border-b last:border-b-0 bg-background">
+                              {renderSectionHeader(title, total)}
+                              {cat.visible.map((item: any, idx: number) => {
+                                const isTop = flatIdx === 0;
+                                flatIdx += 1;
+                                return (
+                                  <div
+                                    key={`${item.api_source}-${item.api_ref || idx}`}
+                                    className={isTop ? 'border-b border-border/40 [&_*]:font-medium' : ''}
+                                  >
+                                    <SearchResultHandler
+                                      result={item}
+                                      query={searchQuery}
+                                      onClose={() => handleResultClick()}
+                                      isProcessing={isProcessingEntity}
+                                      onProcessingStart={handleProcessingStart}
+                                      onProcessingUpdate={handleProcessingUpdate}
+                                      onProcessingEnd={handleProcessingEnd}
+                                      useExternalOverlay={true}
+                                    />
+                                  </div>
+                                );
+                              })}
+                              {cat.hidden.length > 0 && (
+                                <button
+                                  type="button"
+                                  className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
+                                  onClick={handleComplexProductSearch}
+                                >
+                                  Show {cat.hidden.length} more in full search
+                                </button>
+                              )}
+                            </div>
+                          );
+                        });
+                      })()}
+
+                      {/* Hashtags (kept separate — not part of ranking pipeline) */}
+                      {results.hashtags?.length > 0 && (
+                        <div className="border-b last:border-b-0 bg-background">
+                          {renderSectionHeader('# Hashtags', results.hashtags.length, 'hashtags')}
+                          {(showAllResults.hashtags ? results.hashtags : results.hashtags.slice(0, 3)).map((hashtag) => (
+                            <div
+                              key={hashtag.id}
+                              onClick={() => {
+                                navigate(`/t/${hashtag.name_norm}`);
+                                handleResultClick();
+                              }}
+                              className="flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-primary font-medium">#{hashtag.name_original}</span>
+                                </div>
+                                <p className="text-sm text-muted-foreground mt-0.5">
+                                  {hashtag.post_count} posts
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
 
               {/* Add Entity CTA */}
