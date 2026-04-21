@@ -3,6 +3,18 @@ import React, { useState, useEffect } from 'react';
 import { ensureHttps } from '@/utils/urlUtils';
 import { isValidImageUrl, getProxyUrlForImage, getEntityTypeFallbackImage } from '@/utils/imageUtils';
 
+/**
+ * Module-level debug flag for image lifecycle logging.
+ *
+ * - Default: OFF in dev and prod (keeps console clean during normal use)
+ * - Opt-in: set VITE_DEBUG_IMAGES=true in .env to surface logs while debugging
+ * - Production: never logs regardless of the env var (DEV gate)
+ *
+ * The per-call `suppressConsoleErrors` prop still acts as an explicit override
+ * for surfaces (e.g. search dropdown) that need guaranteed silence.
+ */
+const DEBUG_IMAGES = import.meta.env.DEV && import.meta.env.VITE_DEBUG_IMAGES === 'true';
+
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   fallbackSrc?: string;
   entityType?: string;
@@ -39,7 +51,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     // Then apply appropriate proxy if needed
     const proxyUrl = getProxyUrlForImage(secureUrl);
     
-    if (proxyUrl !== secureUrl && !suppressConsoleErrors) {
+    if (proxyUrl !== secureUrl && DEBUG_IMAGES && !suppressConsoleErrors) {
       console.log('ImageWithFallback: Using proxy for:', secureUrl, '-> proxy URL:', proxyUrl);
     }
     
@@ -52,7 +64,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       setHasError(false);
       setProxyAttempted(false);
       
-      if (!suppressConsoleErrors) {
+      if (DEBUG_IMAGES && !suppressConsoleErrors) {
         console.log('ImageWithFallback: Processing image URL:', src);
       }
       
@@ -61,7 +73,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       
       // Basic URL validation
       if (!isValidImageUrl(processedUrl)) {
-        if (!suppressConsoleErrors) {
+        if (DEBUG_IMAGES && !suppressConsoleErrors) {
           console.log("ImageWithFallback: Invalid image URL format, using fallback for entity type:", entityType);
         }
         setImgSrc(actualFallback);
@@ -69,13 +81,13 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         return;
       }
       
-      if (!suppressConsoleErrors) {
+      if (DEBUG_IMAGES && !suppressConsoleErrors) {
         console.log('ImageWithFallback: Using processed URL:', processedUrl);
       }
       
       setImgSrc(processedUrl);
     } else {
-      if (!suppressConsoleErrors) {
+      if (DEBUG_IMAGES && !suppressConsoleErrors) {
         console.log("ImageWithFallback: No source URL provided, using fallback for type:", entityType);
       }
       setImgSrc(actualFallback);
@@ -83,7 +95,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   }, [src, actualFallback, entityType, suppressConsoleErrors]);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    if (!suppressConsoleErrors) {
+    if (DEBUG_IMAGES && !suppressConsoleErrors) {
       console.log('ImageWithFallback: Image load error, using fallback for type:', entityType, 'Original URL:', src);
     }
     
@@ -91,7 +103,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     if (src && !proxyAttempted && getProxyUrlForImage(src) !== src) {
       setProxyAttempted(true);
       const directUrl = ensureHttps(src);
-      if (directUrl && !suppressConsoleErrors) {
+      if (directUrl && DEBUG_IMAGES && !suppressConsoleErrors) {
         console.log('ImageWithFallback: Proxy failed, trying direct URL:', directUrl);
       }
       setImgSrc(directUrl || actualFallback);

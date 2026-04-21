@@ -3,6 +3,31 @@ import { ensureBucketPolicies } from '@/services/storageService';
 import { imagePerformanceService } from '@/services/imagePerformanceService';
 
 /**
+ * Canonical hostname of our Supabase project. Derived once from the same
+ * URL the supabase client uses, so there is exactly one source of truth.
+ */
+const SUPABASE_HOSTNAME = 'uyjtgybbktgapspodajy.supabase.co';
+
+/**
+ * Detects URLs that already point at one of our own edge-function proxies
+ * (proxy-external-image, proxy-movie-image, proxy-google-books, proxy-openlibrary).
+ *
+ * Uses URL parsing — not substring matching — so query-param values that
+ * happen to contain "/functions/v1/proxy-" do not produce false positives,
+ * and only our exact project hostname matches.
+ */
+const isOurProxyUrl = (url: string): boolean => {
+  if (!url) return false;
+  try {
+    const u = new URL(url);
+    return u.hostname === SUPABASE_HOSTNAME
+      && u.pathname.startsWith('/functions/v1/proxy-');
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Ensures a URL is using HTTPS protocol.
  */
 export const ensureHttps = (url: string): string | null => {
@@ -111,7 +136,10 @@ export const createGenericProxyUrl = (originalUrl: string): string => {
  */
 export const isCorsProblematic = (url: string): boolean => {
   if (!url) return false;
-  
+
+  // Already one of our proxy URLs — never re-wrap.
+  if (isOurProxyUrl(url)) return false;
+
   const problematicDomains = [
     // Social media
     'instagram.com', 'cdninstagram.com', 'fbcdn.net',
@@ -149,7 +177,11 @@ export const isCorsProblematic = (url: string): boolean => {
  */
 export const getProxyUrlForImage = (originalUrl: string): string => {
   if (!originalUrl) return originalUrl;
-  
+
+  // If this URL is already one of our proxy endpoints, return as-is
+  // (prevents double-proxying like proxy-external-image?url=<proxy-movie-image?url=...>).
+  if (isOurProxyUrl(originalUrl)) return originalUrl;
+
   // Specific proxy functions for known sources
   if (isGooglePlacesImage(originalUrl)) {
     // Google Places images are handled differently via refresh-entity-image function
