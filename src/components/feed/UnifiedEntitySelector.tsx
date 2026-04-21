@@ -11,6 +11,21 @@ import { useLocation } from '@/contexts/LocationContext';
 import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
+import { createEntityQuick } from '@/services/enhancedEntityService';
+
+// Map api_source → canonical entity type (single source of truth, mirrors use-entity-operations)
+const normalizeEntityType = (rawType: string | undefined, apiSource: string | undefined): string => {
+  const apiSourceMap: Record<string, string> = {
+    openlibrary: 'book',
+    google_books: 'book',
+    omdb: 'movie',
+    tmdb: 'movie',
+    google_places: 'place',
+  };
+  if (apiSource && apiSourceMap[apiSource]) return apiSourceMap[apiSource];
+  return rawType || 'product';
+};
 
 interface UnifiedEntitySelectorProps {
   onEntitiesChange: (entities: EntityAdapter[]) => void;
