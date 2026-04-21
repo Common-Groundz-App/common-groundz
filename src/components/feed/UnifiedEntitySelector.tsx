@@ -327,8 +327,7 @@ export function UnifiedEntitySelector({
   const people = results.users || [];
   const hashtags = results.hashtags || [];
 
-  // Recent searches (composer surface)
-  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('composer');
+  // (recent searches hook is declared near the top of the component)
 
   // Ranking pipeline:
   //   dedupe → score+sort within → sort categories → exact override → soft collapse
