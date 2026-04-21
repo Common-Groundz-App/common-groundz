@@ -436,12 +436,17 @@ export function UnifiedEntitySelector({
     </div>
   );
 
-  const renderEntityRow = (entity: any, onClick: () => void, isDisabled = false) => (
+  const renderEntityRow = (
+    entity: any,
+    onClick: () => void,
+    isDisabled = false,
+    opts: { isTop?: boolean; isActive?: boolean } = {},
+  ) => (
     <div
       key={entity.id || `${entity.api_source}-${entity.api_ref}`}
       className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
         isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/30'
-      }`}
+      } ${opts.isActive ? 'bg-accent/40' : ''} ${opts.isTop ? 'border-b border-border/40' : ''}`}
       onClick={isDisabled ? undefined : onClick}
     >
       <div className="flex-shrink-0">
@@ -455,7 +460,7 @@ export function UnifiedEntitySelector({
         />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-sm truncate">
+        <div className={`text-sm truncate ${opts.isTop ? 'font-medium' : ''}`}>
           <HighlightMatch text={entity.name} query={searchQuery} />
         </div>
         {entity.venue && (
@@ -465,6 +470,27 @@ export function UnifiedEntitySelector({
       <span className="text-xs text-muted-foreground">{getEntityIcon(entity.type || 'product')}</span>
     </div>
   );
+
+  // Map category key → display title
+  const categoryTitle: Record<string, string> = {
+    entities: '✨ On Groundz',
+    places: '📍 Places',
+    books: '📚 Books',
+    movies: '🎬 Movies',
+    people: '👥 People',
+  };
+
+  // Compute the global flat-index of each render row, so we can highlight via activeIdx.
+  // (people are excluded from pickableItems; they keep no highlight slot.)
+  const flatIndexFor = (categoryKey: string, rowIndex: number): number => {
+    let idx = 0;
+    for (const cat of collapsed) {
+      if (cat.key === 'people') continue;
+      if (cat.key === categoryKey) return idx + rowIndex;
+      idx += cat.visible.length;
+    }
+    return -1;
+  };
 
   return (
     <div className="space-y-3">
