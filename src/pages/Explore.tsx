@@ -275,8 +275,17 @@ const Explore = () => {
     </div>
   );
 
-  // Show dropdown when user has typed at least 1 character and not closing
-  const shouldShowDropdown = searchQuery && searchQuery.trim().length >= 1 && !isDropdownClosing && showDropdown;
+  // Show dropdown when user is focused (allows recent searches on empty input) or has typed
+  const shouldShowDropdown = !isDropdownClosing && showDropdown;
+
+  // Map category key → display title for ranked render
+  const exploreCategoryTitle: Record<string, string> = {
+    entities: '✨ Already on Groundz',
+    places: '📍 Places',
+    books: '📚 Books',
+    movies: '🎬 Movies',
+    users: '👥 People',
+  };
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
