@@ -29,6 +29,15 @@ import { CategoryHighlights } from '@/components/explore/CategoryHighlights';
 import { TrendingHashtags } from '@/components/hashtag/TrendingHashtags';
 import { enhancedExploreService } from '@/services/enhancedExploreService';
 import { getTrendingHashtags, HashtagWithCount } from '@/services/hashtagService';
+import {
+  dedupeResults,
+  rankCategories,
+  applyExactMatchOverride,
+  softCollapse,
+  scoreResult,
+} from '@/utils/searchRanking';
+import { useRecentSearches } from '@/hooks/useRecentSearches';
+import { RecentSearchesPanel } from '@/components/search/RecentSearchesPanel';
 
 import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
 import { useToast } from '@/hooks/use-toast';
