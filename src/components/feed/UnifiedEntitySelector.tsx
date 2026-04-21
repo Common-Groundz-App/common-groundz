@@ -159,36 +159,65 @@ export function UnifiedEntitySelector({
     setShowResults(false);
   }, [selectedEntities, isMaxReached, onEntitiesChange]);
 
-  // Select an external result (create entity from external API result)
+  // Select an external result (find-or-create entity client-side, mirrors Explore search flow)
   const handleExternalSelect = useCallback(async (result: any) => {
     if (isMaxReached) return;
-    try {
-      // Use the edge function to find-or-create entity from external result
-      const { data, error } = await supabase.functions.invoke('find-or-create-entity', {
-        body: {
-          name: result.name,
-          type: result.type || 'product',
-          api_source: result.api_source,
-          api_ref: result.api_ref,
-          description: result.description,
-          image_url: result.image_url,
-          venue: result.venue,
-          metadata: result.metadata || {},
-        }
+    // Selection lock: prevent rapid double-clicks / picking another result mid-create
+    if (isCreatingRef.current) return;
+    // Defensive guard: external results must have dedupe keys
+    if (!result.api_source || !result.api_ref) {
+      toast({
+        title: 'Could not add this result',
+        description: 'Try the "Add as new entity" option instead.',
+        variant: 'destructive',
       });
+      return;
+    }
 
-      if (error) throw error;
-      if (data?.entity) {
-        const entity: EntityAdapter = {
-          id: data.entity.id,
-          name: data.entity.name,
-          type: data.entity.type,
-          image_url: data.entity.image_url,
-          description: data.entity.description,
-          venue: data.entity.venue,
-        };
-        handleEntitySelect(entity);
+    isCreatingRef.current = true;
+    setIsCreatingEntity(true);
+    try {
+      const normalizedType = normalizeEntityType(result.type, result.api_source);
+
+      // Step 1: Dedupe — check if this external entity already exists locally
+      let entity = await findEntityByApiRef(result.api_source, result.api_ref);
+
+      // Step 2: Create if not found
+      if (!entity) {
+        entity = await createEntityQuick(
+          {
+            name: result.name,
+            venue: result.venue,
+            description: result.description,
+            image_url: result.image_url,
+            api_source: result.api_source,
+            api_ref: result.api_ref,
+            metadata: result.metadata || {},
+          },
+          normalizedType
+        );
       }
+
+      if (!entity) throw new Error('Entity creation returned null');
+
+      // Step 3: Fire-and-forget background enrichment for Google Places
+      if (result.api_source === 'google_places' && entity.id && result.api_ref) {
+        supabase.functions
+          .invoke('refresh-google-places-entity', {
+            body: { entityId: entity.id, placeId: result.api_ref },
+          })
+          .catch((err) => console.error('Background enrichment failed:', err));
+      }
+
+      // Step 4: Add as tag chip
+      handleEntitySelect({
+        id: entity.id,
+        name: entity.name,
+        type: entity.type,
+        image_url: entity.image_url || undefined,
+        description: entity.description || undefined,
+        venue: entity.venue || undefined,
+      });
     } catch (err) {
       console.error('Error selecting external result:', err);
       toast({
@@ -196,6 +225,9 @@ export function UnifiedEntitySelector({
         description: 'Could not select this item. Please try again.',
         variant: 'destructive',
       });
+    } finally {
+      isCreatingRef.current = false;
+      setIsCreatingEntity(false);
     }
   }, [isMaxReached, handleEntitySelect, toast]);
 
