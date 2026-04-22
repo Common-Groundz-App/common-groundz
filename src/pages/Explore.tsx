@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useEntityCache } from '@/hooks/use-entity-cache';
+import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import SEOHead from '@/components/seo/SEOHead';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
@@ -62,8 +64,33 @@ const Explore = () => {
   const [processingEntityName, setProcessingEntityName] = useState('');
   const [processingMessage, setProcessingMessage] = useState('');
   
-  // Dropdown state for search
-  const [showDropdown, setShowDropdown] = useState(true); // Always show when shouldShowDropdown is true
+  // Dropdown state for search — focus-gated, with single-Escape dismissal flag
+  const [isFocused, setIsFocused] = useState(false);
+  const [isDropdownDismissed, setIsDropdownDismissed] = useState(false);
+  const [highlightedIdx, setHighlightedIdx] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPrefetchedSlugRef = useRef<string | null>(null);
+
+  // Entity prefetch (TanStack Query cache)
+  const { prefetchEntity } = useEntityCache({ slugOrId: '', enabled: false });
+
+  const schedulePrefetch = useCallback((slug?: string) => {
+    if (!slug || slug === lastPrefetchedSlugRef.current) return;
+    if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    prefetchTimerRef.current = setTimeout(() => {
+      prefetchEntity(slug);
+      lastPrefetchedSlugRef.current = slug;
+    }, 80);
+  }, [prefetchEntity]);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    };
+  }, []);
   
   // Trending hashtags state
   const [trendingHashtags, setTrendingHashtags] = useState<HashtagWithCount[]>([]);
@@ -132,13 +159,17 @@ const Explore = () => {
     return softCollapse(overridden);
   }, [searchQuery, results.entities, results.categorized, results.users]);
 
-  const handleResultClick = async (entityId?: string, entityType?: string) => {
-    // Record query in recent searches when user picks something
-    if (searchQuery.trim()) addRecent(searchQuery.trim());
+  const handleResultClick = async (entityId?: string, entityType?: string, entityName?: string, entitySlug?: string) => {
+    // Record in recent searches: prefer entity-kind when we know the entity, else query.
+    if (entityId && entityName) {
+      addRecent(entityName, 'entity', { entityId, entityType, slug: entitySlug });
+    } else if (searchQuery.trim()) {
+      addRecent(searchQuery.trim(), 'query');
+    }
 
     // Start dropdown closing animation
     setIsDropdownClosing(true);
-    
+
     // Track interaction if we have entity details
     if (entityId && entityType && user?.id) {
       await enhancedExploreService.trackUserInteraction(
@@ -149,11 +180,13 @@ const Explore = () => {
         'click'
       );
     }
-    
+
     // Clear search and close dropdown after animation
     setTimeout(() => {
       setSearchQuery('');
       setIsDropdownClosing(false);
+      setIsFocused(false);
+      setHighlightedIdx(-1);
     }, 300);
   };
 
@@ -186,13 +219,137 @@ const Explore = () => {
 
   const handleComplexProductSearch = () => {
     if (searchQuery.trim().length >= 2) {
+      // Record the typed query as a recent before navigating to full search
+      addRecent(searchQuery.trim(), 'query');
       const encodedQuery = encodeURIComponent(searchQuery.trim());
       navigate(`/search?q=${encodedQuery}&mode=quick`);
     }
   };
 
+  // Pick a recent: entity → deep-link with fallback state; query → fill input + run search
+  const handlePickRecent = (q: string, item?: { kind?: string; entityId?: string; slug?: string }) => {
+    if (item?.kind === 'entity' && item.slug) {
+      navigate(`/entity/${item.slug}`, {
+        state: { fallbackQuery: q, fallbackEntityId: item.entityId },
+      });
+      setIsFocused(false);
+      setHighlightedIdx(-1);
+      return;
+    }
+    setSearchQuery(q);
+    setIsDropdownDismissed(false);
+    setHighlightedIdx(-1);
+    inputRef.current?.focus();
+  };
+
+  // Build a flat list of keyboard-navigable items: recents first (when shown), then ranked categories.
+  type FlatItem =
+    | { kind: 'recent'; query: string; entityKind?: 'query' | 'entity'; entityId?: string; slug?: string }
+    | { kind: 'entity'; entityId: string; entityType: string; name: string; slug?: string }
+    | { kind: 'user'; userId: string }
+    | { kind: 'external'; slug?: string; itemRef: any; categoryKey: string };
+
+  const showRecentsPanel = searchQuery.trim().length < 1 && recents.length > 0;
+
+  const flatKeyboardItems: FlatItem[] = useMemo(() => {
+    const out: FlatItem[] = [];
+    if (showRecentsPanel) {
+      const visible = recents.slice(0, 6);
+      visible.forEach((r) => {
+        out.push({
+          kind: 'recent',
+          query: r.query,
+          entityKind: r.kind,
+          entityId: r.entityId,
+          slug: r.slug,
+        });
+      });
+    }
+    if (searchQuery.trim().length >= 1) {
+      collapsed.forEach((cat) => {
+        if (cat.visible.length === 0) return;
+        if (cat.key === 'users') {
+          cat.visible.forEach((u: any) => out.push({ kind: 'user', userId: u.id }));
+        } else if (cat.key === 'entities') {
+          cat.visible.forEach((e: any) =>
+            out.push({
+              kind: 'entity',
+              entityId: e.id,
+              entityType: e.type,
+              name: e.name,
+              slug: e.slug,
+            }),
+          );
+        } else {
+          cat.visible.forEach((it: any) =>
+            out.push({ kind: 'external', categoryKey: cat.key, itemRef: it, slug: it.slug }),
+          );
+        }
+      });
+    }
+    return out;
+  }, [showRecentsPanel, recents, searchQuery, collapsed]);
+
+  // Reset highlight when items change underneath
+  useEffect(() => {
+    setHighlightedIdx(-1);
+  }, [searchQuery, isFocused, isDropdownDismissed]);
+
+  // Prefetch entity for the currently highlighted entity-like item
+  useEffect(() => {
+    if (highlightedIdx < 0) return;
+    const item = flatKeyboardItems[highlightedIdx];
+    if (!item) return;
+    if (item.kind === 'entity' && item.slug) schedulePrefetch(item.slug);
+    if (item.kind === 'recent' && item.entityKind === 'entity' && item.slug) {
+      schedulePrefetch(item.slug);
+    }
+  }, [highlightedIdx, flatKeyboardItems, schedulePrefetch]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsDropdownDismissed(true);
+      setHighlightedIdx(-1);
+      // keep focus on input — standard combobox behavior
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      if (flatKeyboardItems.length === 0) return;
+      e.preventDefault();
+      setHighlightedIdx((idx) => (idx + 1) % flatKeyboardItems.length);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      if (flatKeyboardItems.length === 0) return;
+      e.preventDefault();
+      setHighlightedIdx((idx) =>
+        idx <= 0 ? flatKeyboardItems.length - 1 : idx - 1,
+      );
+      return;
+    }
     if (e.key === 'Enter') {
+      const active = highlightedIdx >= 0 ? flatKeyboardItems[highlightedIdx] : null;
+      if (active) {
+        e.preventDefault();
+        if (active.kind === 'recent') {
+          handlePickRecent(active.query, {
+            kind: active.entityKind,
+            entityId: active.entityId,
+            slug: active.slug,
+          });
+          return;
+        }
+        if (active.kind === 'entity') {
+          const url = active.slug
+            ? `/entity/${active.slug}`
+            : getEntityUrlWithParent({ id: active.entityId });
+          handleResultClick(active.entityId, active.entityType, active.name, active.slug);
+          navigate(url);
+          return;
+        }
+        // user / external → fall through to existing default behavior
+      }
       handleComplexProductSearch();
     }
   };
@@ -275,8 +432,16 @@ const Explore = () => {
     </div>
   );
 
-  // Show dropdown when user is focused (allows recent searches on empty input) or has typed
-  const shouldShowDropdown = !isDropdownClosing && showDropdown;
+  // Focus-gated dropdown with Escape dismissal
+  const shouldShowDropdown =
+    isFocused &&
+    !isDropdownDismissed &&
+    !isDropdownClosing &&
+    (searchQuery.trim().length >= 1 || recents.length > 0);
+
+  const dropdownId = 'explore-search-dropdown';
+  const activeOptionId =
+    shouldShowDropdown && highlightedIdx >= 0 ? `explore-opt-${highlightedIdx}` : undefined;
 
   // Map category key → display title for ranked render
   const exploreCategoryTitle: Record<string, string> = {
@@ -335,12 +500,35 @@ const Explore = () => {
                 </div>
                 <div className="relative flex-1 min-w-0">
                   <Input
+                    ref={inputRef}
                     type="text"
                     placeholder="Search for people, places, food, products..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onFocus={() => setShowDropdown(true)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setIsDropdownDismissed(false);
+                    }}
+                    onFocus={() => {
+                      if (blurTimerRef.current) {
+                        clearTimeout(blurTimerRef.current);
+                        blurTimerRef.current = null;
+                      }
+                      setIsFocused(true);
+                      setIsDropdownDismissed(false);
+                    }}
+                    onBlur={() => {
+                      blurTimerRef.current = setTimeout(() => {
+                        setIsFocused(false);
+                        setIsDropdownDismissed(false);
+                        setHighlightedIdx(-1);
+                      }, 150);
+                    }}
                     onKeyDown={handleKeyDown}
+                    role="combobox"
+                    aria-expanded={shouldShowDropdown}
+                    aria-controls={dropdownId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeOptionId}
                     className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0 pr-10"
                   />
                   {searchQuery && (
@@ -372,19 +560,22 @@ const Explore = () => {
               
               {/* Enhanced Search Results Dropdown with smooth closing animation */}
               {shouldShowDropdown && (
-                <div className={`absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto transition-all duration-300 ${
-                  isDropdownClosing ? 'opacity-0 transform scale-95 translate-y-2' : 'opacity-100 transform scale-100 translate-y-0'
-                }`}>
+                <div
+                  id={dropdownId}
+                  className={`absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto transition-all duration-150 animate-in fade-in-0 slide-in-from-top-1 ${
+                    isDropdownClosing ? 'opacity-0 transform scale-95 translate-y-2' : 'opacity-100 transform scale-100 translate-y-0'
+                  }`}
+                >
 
                   {/* Recent searches — shown when input is empty / under 1 char */}
-                  {searchQuery.trim().length < 1 && (
+                  {showRecentsPanel && (
                     <RecentSearchesPanel
                       recents={recents}
-                      onPick={(q) => {
-                        setSearchQuery(q);
-                      }}
+                      onPick={(q, item) => handlePickRecent(q, item)}
                       onRemove={removeRecent}
                       onClearAll={clearRecents}
+                      optionIdPrefix="explore-opt"
+                      highlightedIndex={highlightedIdx >= 0 && highlightedIdx < recents.slice(0, 6).length ? highlightedIdx : undefined}
                     />
                   )}
 
@@ -454,7 +645,7 @@ const Explore = () => {
                                     >
                                       <EntityResultItem
                                         entity={entity}
-                                        onClick={() => handleResultClick(entity.id, entity.type)}
+                                        onClick={() => handleResultClick(entity.id, entity.type, entity.name, entity.slug)}
                                       />
                                     </div>
                                   );
@@ -541,7 +732,7 @@ const Explore = () => {
                     onClick={() => {
                       setCreateEntityQuery(searchQuery);
                       setShowCreateEntityDialog(true);
-                      setShowDropdown(false);
+                      setIsFocused(false);
                       setIsDropdownClosing(true);
                       setTimeout(() => setIsDropdownClosing(false), 300);
                     }}
@@ -678,7 +869,7 @@ const Explore = () => {
         onOpenChange={(open) => {
           setShowCreateEntityDialog(open);
           if (!open) {
-            setShowDropdown(true);
+            inputRef.current?.focus();
           }
         }}
         onEntityCreated={() => {
