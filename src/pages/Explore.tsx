@@ -242,8 +242,114 @@ const Explore = () => {
     inputRef.current?.focus();
   };
 
+  // Build a flat list of keyboard-navigable items: recents first (when shown), then ranked categories.
+  type FlatItem =
+    | { kind: 'recent'; query: string; entityKind?: 'query' | 'entity'; entityId?: string; slug?: string }
+    | { kind: 'entity'; entityId: string; entityType: string; name: string; slug?: string }
+    | { kind: 'user'; userId: string }
+    | { kind: 'external'; slug?: string; itemRef: any; categoryKey: string };
+
+  const showRecentsPanel = searchQuery.trim().length < 1 && recents.length > 0;
+
+  const flatKeyboardItems: FlatItem[] = useMemo(() => {
+    const out: FlatItem[] = [];
+    if (showRecentsPanel) {
+      const visible = recents.slice(0, 6);
+      visible.forEach((r) => {
+        out.push({
+          kind: 'recent',
+          query: r.query,
+          entityKind: r.kind,
+          entityId: r.entityId,
+          slug: r.slug,
+        });
+      });
+    }
+    if (searchQuery.trim().length >= 1) {
+      collapsed.forEach((cat) => {
+        if (cat.visible.length === 0) return;
+        if (cat.key === 'users') {
+          cat.visible.forEach((u: any) => out.push({ kind: 'user', userId: u.id }));
+        } else if (cat.key === 'entities') {
+          cat.visible.forEach((e: any) =>
+            out.push({
+              kind: 'entity',
+              entityId: e.id,
+              entityType: e.type,
+              name: e.name,
+              slug: e.slug,
+            }),
+          );
+        } else {
+          cat.visible.forEach((it: any) =>
+            out.push({ kind: 'external', categoryKey: cat.key, itemRef: it, slug: it.slug }),
+          );
+        }
+      });
+    }
+    return out;
+  }, [showRecentsPanel, recents, searchQuery, collapsed]);
+
+  // Reset highlight when items change underneath
+  useEffect(() => {
+    setHighlightedIdx(-1);
+  }, [searchQuery, isFocused, isDropdownDismissed]);
+
+  // Prefetch entity for the currently highlighted entity-like item
+  useEffect(() => {
+    if (highlightedIdx < 0) return;
+    const item = flatKeyboardItems[highlightedIdx];
+    if (!item) return;
+    if (item.kind === 'entity' && item.slug) schedulePrefetch(item.slug);
+    if (item.kind === 'recent' && item.entityKind === 'entity' && item.slug) {
+      schedulePrefetch(item.slug);
+    }
+  }, [highlightedIdx, flatKeyboardItems, schedulePrefetch]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsDropdownDismissed(true);
+      setHighlightedIdx(-1);
+      // keep focus on input — standard combobox behavior
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      if (flatKeyboardItems.length === 0) return;
+      e.preventDefault();
+      setHighlightedIdx((idx) => (idx + 1) % flatKeyboardItems.length);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      if (flatKeyboardItems.length === 0) return;
+      e.preventDefault();
+      setHighlightedIdx((idx) =>
+        idx <= 0 ? flatKeyboardItems.length - 1 : idx - 1,
+      );
+      return;
+    }
     if (e.key === 'Enter') {
+      const active = highlightedIdx >= 0 ? flatKeyboardItems[highlightedIdx] : null;
+      if (active) {
+        e.preventDefault();
+        if (active.kind === 'recent') {
+          handlePickRecent(active.query, {
+            kind: active.entityKind,
+            entityId: active.entityId,
+            slug: active.slug,
+          });
+          return;
+        }
+        if (active.kind === 'entity') {
+          const url = active.slug
+            ? `/entity/${active.slug}`
+            : getEntityUrlWithParent({ id: active.entityId });
+          handleResultClick(active.entityId, active.entityType, active.name, active.slug);
+          navigate(url);
+          return;
+        }
+        // user / external → fall through to existing default behavior
+      }
       handleComplexProductSearch();
     }
   };
@@ -326,8 +432,16 @@ const Explore = () => {
     </div>
   );
 
-  // Show dropdown when user is focused (allows recent searches on empty input) or has typed
-  const shouldShowDropdown = !isDropdownClosing && showDropdown;
+  // Focus-gated dropdown with Escape dismissal
+  const shouldShowDropdown =
+    isFocused &&
+    !isDropdownDismissed &&
+    !isDropdownClosing &&
+    (searchQuery.trim().length >= 1 || recents.length > 0);
+
+  const dropdownId = 'explore-search-dropdown';
+  const activeOptionId =
+    shouldShowDropdown && highlightedIdx >= 0 ? `explore-opt-${highlightedIdx}` : undefined;
 
   // Map category key → display title for ranked render
   const exploreCategoryTitle: Record<string, string> = {
