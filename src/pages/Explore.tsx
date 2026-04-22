@@ -645,7 +645,7 @@ const Explore = () => {
                                     >
                                       <EntityResultItem
                                         entity={entity}
-                                        onClick={() => handleResultClick(entity.id, entity.type)}
+                                        onClick={() => handleResultClick(entity.id, entity.type, entity.name, entity.slug)}
                                       />
                                     </div>
                                   );
