@@ -207,12 +207,6 @@ const EntityDetailOriginal = () => {
     }
   }, [circleContributors]);
 
-  // Redirect if matched via slug history
-  if (redirectToSlug && redirectToSlug !== entitySlug) {
-    navigate(`/entity/${redirectToSlug}`, { replace: true });
-    return null;
-  }
-
   const location = useLocation();
   const { removeRecentByEntityId } = useRecentSearches('explore');
   const entityNotFound = !isLoading && (!!error || !entity);
@@ -229,6 +223,12 @@ const EntityDetailOriginal = () => {
     }
     navigate(`/search?q=${encodeURIComponent(fallbackQuery)}`, { replace: true });
   }, [entityNotFound, location.state, navigate, removeRecentByEntityId]);
+
+  // Redirect if matched via slug history
+  if (redirectToSlug && redirectToSlug !== entitySlug) {
+    navigate(`/entity/${redirectToSlug}`, { replace: true });
+    return null;
+  }
 
   if (entityNotFound) {
     return (
