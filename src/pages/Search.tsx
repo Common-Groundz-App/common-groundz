@@ -409,9 +409,141 @@ const Search = () => {
     return null;
   };
 
+  // Render search dropdown — focus-gated, with Escape dismissal flag
+  const shouldShowDropdown =
+    isFocused &&
+    !isDropdownDismissed &&
+    (searchQuery.trim().length >= 2 || recents.length > 0);
+
+  // Build flat keyboard-navigable list: recents (when no/short query) then results.
+  const showRecentsBranch = searchQuery.trim().length < 2 && recents.length > 0;
+
+  type FlatItem =
+    | { kind: 'recent'; query: string; entityKind?: 'query' | 'entity'; entityId?: string; slug?: string }
+    | { kind: 'entity'; entityId: string; entityType?: string; name: string; slug?: string }
+    | { kind: 'external'; categoryKey: string; itemRef: any; slug?: string };
+
+  const dropdownAllLocal = useMemo(
+    () => [
+      ...(dropdownResults.entities || []),
+      ...(dropdownResults.reviews || []),
+      ...(dropdownResults.recommendations || []),
+    ],
+    [dropdownResults.entities, dropdownResults.reviews, dropdownResults.recommendations],
+  );
+
+  const flatKeyboardItems: FlatItem[] = useMemo(() => {
+    const out: FlatItem[] = [];
+    if (showRecentsBranch) {
+      recents.slice(0, 6).forEach((r) =>
+        out.push({
+          kind: 'recent',
+          query: r.query,
+          entityKind: r.kind,
+          entityId: r.entityId,
+          slug: r.slug,
+        }),
+      );
+    }
+    if (searchQuery.trim().length >= 2) {
+      const localVisible = dropdownShowAll.localResults
+        ? dropdownAllLocal
+        : dropdownAllLocal.slice(0, 3);
+      localVisible.forEach((it: any) => {
+        if (it && 'name' in it && 'type' in it) {
+          out.push({ kind: 'entity', entityId: it.id, entityType: it.type, name: it.name, slug: it.slug });
+        }
+      });
+      const books = dropdownResults.categorized?.books || [];
+      const movies = dropdownResults.categorized?.movies || [];
+      const places = dropdownResults.categorized?.places || [];
+      (dropdownShowAll.books ? books : books.slice(0, 3)).forEach((b: any) =>
+        out.push({ kind: 'external', categoryKey: 'books', itemRef: b, slug: b.slug }),
+      );
+      (dropdownShowAll.movies ? movies : movies.slice(0, 3)).forEach((m: any) =>
+        out.push({ kind: 'external', categoryKey: 'movies', itemRef: m, slug: m.slug }),
+      );
+      (dropdownShowAll.places ? places : places.slice(0, 3)).forEach((p: any) =>
+        out.push({ kind: 'external', categoryKey: 'places', itemRef: p, slug: p.slug }),
+      );
+    }
+    return out;
+  }, [showRecentsBranch, recents, searchQuery, dropdownAllLocal, dropdownResults.categorized, dropdownShowAll]);
+
+  // Reset highlight when context changes
+  useEffect(() => {
+    setHighlightedIdx(-1);
+  }, [searchQuery, isFocused, isDropdownDismissed]);
+
+  // Prefetch entity for currently highlighted entity-like item
+  useEffect(() => {
+    if (highlightedIdx < 0) return;
+    const item = flatKeyboardItems[highlightedIdx];
+    if (!item) return;
+    if (item.kind === 'entity' && item.slug) schedulePrefetch(item.slug);
+    if (item.kind === 'recent' && item.entityKind === 'entity' && item.slug) {
+      schedulePrefetch(item.slug);
+    }
+  }, [highlightedIdx, flatKeyboardItems, schedulePrefetch]);
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsDropdownDismissed(true);
+      setHighlightedIdx(-1);
+      // do NOT blur — keep focus on input
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      if (flatKeyboardItems.length === 0) return;
+      e.preventDefault();
+      setHighlightedIdx((idx) => (idx + 1) % flatKeyboardItems.length);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      if (flatKeyboardItems.length === 0) return;
+      e.preventDefault();
+      setHighlightedIdx((idx) => (idx <= 0 ? flatKeyboardItems.length - 1 : idx - 1));
+      return;
+    }
+    if (e.key === 'Enter') {
+      const active = highlightedIdx >= 0 ? flatKeyboardItems[highlightedIdx] : null;
+      if (active) {
+        e.preventDefault();
+        if (active.kind === 'recent') {
+          handlePickRecent(active.query, {
+            kind: active.entityKind,
+            entityId: active.entityId,
+            slug: active.slug,
+          });
+          return;
+        }
+        if (active.kind === 'entity') {
+          handleDropdownItemClick(active.name, {
+            entityId: active.entityId,
+            entityType: active.entityType,
+            slug: active.slug,
+          });
+          if (active.slug) navigate(`/entity/${active.slug}`);
+          return;
+        }
+        if (active.kind === 'external') {
+          const name = active.itemRef?.name || active.itemRef?.title || '';
+          if (name) handleDropdownItemClick(name);
+          return;
+        }
+      }
+      // No highlight — let form's onSubmit handle the search
+    }
+  };
+
+  const dropdownId = 'search-dropdown';
+  const activeOptionId =
+    shouldShowDropdown && highlightedIdx >= 0 ? `search-opt-${highlightedIdx}` : undefined;
+
   // Render search dropdown
   const renderSearchDropdown = () => {
-    if (!showDropdown || searchQuery.trim().length < 2) return null;
+    if (!shouldShowDropdown) return null;
 
     const allLocalResults = [
       ...dropdownResults.entities,
