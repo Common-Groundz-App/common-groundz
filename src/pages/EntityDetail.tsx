@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useRecentSearches } from '@/hooks/useRecentSearches';
 import { formatSlugAsName } from '@/utils/formatSlug';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -212,7 +213,24 @@ const EntityDetailOriginal = () => {
     return null;
   }
 
-  if (!isLoading && (error || !entity)) {
+  const location = useLocation();
+  const { removeRecentByEntityId } = useRecentSearches('explore');
+  const entityNotFound = !isLoading && (!!error || !entity);
+
+  // If we landed here from a stale entity-recent click, gracefully redirect to /search
+  // and surgically prune the dead recent so it doesn't haunt the user.
+  useEffect(() => {
+    if (!entityNotFound) return;
+    const navState = (location.state ?? {}) as { fallbackQuery?: string; fallbackEntityId?: string };
+    const { fallbackQuery, fallbackEntityId } = navState;
+    if (!fallbackQuery) return;
+    if (fallbackEntityId) {
+      removeRecentByEntityId(fallbackEntityId);
+    }
+    navigate(`/search?q=${encodeURIComponent(fallbackQuery)}`, { replace: true });
+  }, [entityNotFound, location.state, navigate, removeRecentByEntityId]);
+
+  if (entityNotFound) {
     return (
       <div className="min-h-screen flex flex-col">
         {user ? <NavBarComponent /> : <GuestNavBar />}
