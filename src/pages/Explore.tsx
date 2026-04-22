@@ -159,13 +159,17 @@ const Explore = () => {
     return softCollapse(overridden);
   }, [searchQuery, results.entities, results.categorized, results.users]);
 
-  const handleResultClick = async (entityId?: string, entityType?: string) => {
-    // Record query in recent searches when user picks something
-    if (searchQuery.trim()) addRecent(searchQuery.trim());
+  const handleResultClick = async (entityId?: string, entityType?: string, entityName?: string, entitySlug?: string) => {
+    // Record in recent searches: prefer entity-kind when we know the entity, else query.
+    if (entityId && entityName) {
+      addRecent(entityName, 'entity', { entityId, entityType, slug: entitySlug });
+    } else if (searchQuery.trim()) {
+      addRecent(searchQuery.trim(), 'query');
+    }
 
     // Start dropdown closing animation
     setIsDropdownClosing(true);
-    
+
     // Track interaction if we have entity details
     if (entityId && entityType && user?.id) {
       await enhancedExploreService.trackUserInteraction(
@@ -176,11 +180,13 @@ const Explore = () => {
         'click'
       );
     }
-    
+
     // Clear search and close dropdown after animation
     setTimeout(() => {
       setSearchQuery('');
       setIsDropdownClosing(false);
+      setIsFocused(false);
+      setHighlightedIdx(-1);
     }, 300);
   };
 
@@ -213,9 +219,27 @@ const Explore = () => {
 
   const handleComplexProductSearch = () => {
     if (searchQuery.trim().length >= 2) {
+      // Record the typed query as a recent before navigating to full search
+      addRecent(searchQuery.trim(), 'query');
       const encodedQuery = encodeURIComponent(searchQuery.trim());
       navigate(`/search?q=${encodedQuery}&mode=quick`);
     }
+  };
+
+  // Pick a recent: entity → deep-link with fallback state; query → fill input + run search
+  const handlePickRecent = (q: string, item?: { kind?: string; entityId?: string; slug?: string }) => {
+    if (item?.kind === 'entity' && item.slug) {
+      navigate(`/entity/${item.slug}`, {
+        state: { fallbackQuery: q, fallbackEntityId: item.entityId },
+      });
+      setIsFocused(false);
+      setHighlightedIdx(-1);
+      return;
+    }
+    setSearchQuery(q);
+    setIsDropdownDismissed(false);
+    setHighlightedIdx(-1);
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
