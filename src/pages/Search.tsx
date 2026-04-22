@@ -813,17 +813,37 @@ const Search = () => {
                     <SearchIcon className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <Input
+                    ref={inputRef}
                     type="text"
                     placeholder="Search for people, places, products..."
                     value={searchQuery}
                     onChange={handleSearchInputChange}
+                    onFocus={() => {
+                      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+                      setIsFocused(true);
+                      setIsDropdownDismissed(false);
+                    }}
+                    onBlur={() => {
+                      blurTimerRef.current = setTimeout(() => {
+                        setIsFocused(false);
+                        setIsDropdownDismissed(false);
+                      }, 150);
+                    }}
+                    onKeyDown={handleInputKeyDown}
+                    role="combobox"
+                    aria-expanded={shouldShowDropdown}
+                    aria-controls={dropdownId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeOptionId}
                     className="pl-10 pr-10 min-w-0"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => {
                         setSearchQuery('');
-                        setShowDropdown(false);
+                        setIsDropdownDismissed(false);
+                        setHighlightedIdx(-1);
+                        inputRef.current?.focus();
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
                       type="button"
