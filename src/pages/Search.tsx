@@ -47,14 +47,43 @@ const Search = () => {
   const [showCreateEntityDialog, setShowCreateEntityDialog] = useState(false);
   const [createEntityQuery, setCreateEntityQuery] = useState('');
 
-  // Dropdown state for search suggestions
-  const [showDropdown, setShowDropdown] = useState(false);
+  // Dropdown state for search suggestions — focus-gated with single-Escape dismissal
+  const [isFocused, setIsFocused] = useState(false);
+  const [isDropdownDismissed, setIsDropdownDismissed] = useState(false);
+  const [highlightedIdx, setHighlightedIdx] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPrefetchedSlugRef = useRef<string | null>(null);
+
   const [dropdownShowAll, setDropdownShowAll] = useState({
     localResults: false,
     books: false,
     movies: false,
     places: false
   });
+
+  // Recent searches — shared 'explore' bucket with /explore page
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('explore');
+
+  // Entity prefetch (TanStack Query cache)
+  const { prefetchEntity } = useEntityCache({ slugOrId: '', enabled: false });
+
+  const schedulePrefetch = useCallback((slug?: string) => {
+    if (!slug || slug === lastPrefetchedSlugRef.current) return;
+    if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    prefetchTimerRef.current = setTimeout(() => {
+      prefetchEntity(slug);
+      lastPrefetchedSlugRef.current = slug;
+    }, 80);
+  }, [prefetchEntity]);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    };
+  }, []);
 
   const { toast } = useToast();
 
