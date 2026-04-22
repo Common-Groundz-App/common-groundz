@@ -557,8 +557,28 @@ const Search = () => {
                      dropdownResults.categorized?.places?.length > 0;
 
     return (
-      <div className="absolute top-full left-0 right-0 z-50 bg-background border border-border rounded-lg shadow-lg mt-1 max-h-96 overflow-y-auto">
-        {dropdownLoading ? (
+      <div
+        id={dropdownId}
+        role="listbox"
+        aria-label="Search suggestions"
+        className="absolute top-full left-0 right-0 z-50 bg-background border border-border rounded-lg shadow-lg mt-1 max-h-96 overflow-y-auto animate-in fade-in-0 slide-in-from-top-1 duration-150"
+      >
+        {showRecentsBranch ? (
+          <RecentSearchesPanel
+            recents={recents}
+            onPick={(q, item) =>
+              handlePickRecent(q, {
+                kind: item?.kind,
+                entityId: item?.entityId,
+                slug: item?.slug,
+              })
+            }
+            onRemove={removeRecent}
+            onClearAll={clearRecents}
+            highlightedIndex={highlightedIdx >= 0 ? highlightedIdx : undefined}
+            optionIdPrefix="search-opt"
+          />
+        ) : dropdownLoading ? (
           <div className="p-4 text-center">
             <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">Searching...</p>
@@ -724,17 +744,17 @@ const Search = () => {
                 <p className="text-xs text-muted-foreground mb-2">
                   Couldn't find "<span className="font-medium text-foreground">{searchQuery}</span>"?
                 </p>
-                <button 
-                  className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
-                  onClick={() => {
-                    setCreateEntityQuery(searchQuery);
-                    setShowCreateEntityDialog(true);
-                    setShowDropdown(false);
-                  }}
-                >
-                  <Plus className="w-3 h-3 mr-1" />
-                  Add Entity
-                </button>
+            <button 
+              className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
+              onClick={() => {
+                setCreateEntityQuery(searchQuery);
+                setShowCreateEntityDialog(true);
+                setIsDropdownDismissed(true);
+              }}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add Entity
+            </button>
               </div>
             )}
           </div>
@@ -743,17 +763,17 @@ const Search = () => {
             <p className="text-xs text-muted-foreground mb-2">
               Couldn't find "<span className="font-medium text-foreground">{searchQuery}</span>"?
             </p>
-            <button 
-              className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
-              onClick={() => {
-                setCreateEntityQuery(searchQuery);
-                setShowCreateEntityDialog(true);
-                setShowDropdown(false);
-              }}
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Add Entity
-            </button>
+                <button 
+                  className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
+                  onClick={() => {
+                    setCreateEntityQuery(searchQuery);
+                    setShowCreateEntityDialog(true);
+                    setIsDropdownDismissed(true);
+                  }}
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Entity
+                </button>
           </div>
         )}
       </div>
