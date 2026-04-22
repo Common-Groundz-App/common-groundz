@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/seo/SEOHead';
+import { useRecentSearches } from '@/hooks/useRecentSearches';
+import { RecentSearchesPanel } from '@/components/search/RecentSearchesPanel';
+import { useEntityCache } from '@/hooks/use-entity-cache';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { TubelightTabs, TabsContent } from '@/components/ui/tubelight-tabs';
@@ -44,14 +47,43 @@ const Search = () => {
   const [showCreateEntityDialog, setShowCreateEntityDialog] = useState(false);
   const [createEntityQuery, setCreateEntityQuery] = useState('');
 
-  // Dropdown state for search suggestions
-  const [showDropdown, setShowDropdown] = useState(false);
+  // Dropdown state for search suggestions — focus-gated with single-Escape dismissal
+  const [isFocused, setIsFocused] = useState(false);
+  const [isDropdownDismissed, setIsDropdownDismissed] = useState(false);
+  const [highlightedIdx, setHighlightedIdx] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPrefetchedSlugRef = useRef<string | null>(null);
+
   const [dropdownShowAll, setDropdownShowAll] = useState({
     localResults: false,
     books: false,
     movies: false,
     places: false
   });
+
+  // Recent searches — shared 'explore' bucket with /explore page
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('explore');
+
+  // Entity prefetch (TanStack Query cache)
+  const { prefetchEntity } = useEntityCache({ slugOrId: '', enabled: false });
+
+  const schedulePrefetch = useCallback((slug?: string) => {
+    if (!slug || slug === lastPrefetchedSlugRef.current) return;
+    if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    prefetchTimerRef.current = setTimeout(() => {
+      prefetchEntity(slug);
+      lastPrefetchedSlugRef.current = slug;
+    }, 80);
+  }, [prefetchEntity]);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    };
+  }, []);
 
   const { toast } = useToast();
 
@@ -98,29 +130,51 @@ const Search = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim().length >= 2) {
+      // Save typed query as a recent before navigating
+      addRecent(searchQuery.trim(), 'query');
       setSearchParams({ q: searchQuery, mode: 'quick' });
-      setShowDropdown(false);
+      setIsDropdownDismissed(true);
     }
   };
 
-  // Handle search input changes
+  // Handle search input changes — dismissed flag resets so user can keep typing after Escape
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
-    
-    // Show dropdown if query is 2+ characters and different from current query
-    if (value.trim().length >= 2 && value !== query) {
-      setShowDropdown(true);
-    } else {
-      setShowDropdown(false);
-    }
+    setIsDropdownDismissed(false);
+    setHighlightedIdx(-1);
   };
 
-  // Handle dropdown item click with proper type handling
-  const handleDropdownItemClick = (clickedQuery: string) => {
+  // Handle dropdown item click — saves recent (entity if known, query otherwise) and runs search
+  const handleDropdownItemClick = (
+    clickedQuery: string,
+    meta?: { entityId?: string; entityType?: string; slug?: string },
+  ) => {
+    if (meta?.entityId) {
+      addRecent(clickedQuery, 'entity', meta);
+    } else if (clickedQuery.trim()) {
+      addRecent(clickedQuery.trim(), 'query');
+    }
     setSearchQuery(clickedQuery);
     setSearchParams({ q: clickedQuery, mode: 'quick' });
-    setShowDropdown(false);
+    setIsDropdownDismissed(true);
+    setHighlightedIdx(-1);
+  };
+
+  // Pick a recent: entity → deep-link with fallback state; query → fill input + run search
+  const handlePickRecent = (q: string, item?: { kind?: string; entityId?: string; slug?: string }) => {
+    if (item?.kind === 'entity' && item.slug) {
+      navigate(`/entity/${item.slug}`, {
+        state: { fallbackQuery: q, fallbackEntityId: item.entityId },
+      });
+      setIsFocused(false);
+      setHighlightedIdx(-1);
+      return;
+    }
+    setSearchQuery(q);
+    setSearchParams({ q, mode: 'quick' });
+    setIsDropdownDismissed(true);
+    setHighlightedIdx(-1);
   };
 
   // Helper function to get the display name from different result types
@@ -163,7 +217,8 @@ const Search = () => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       if (!target.closest('.search-dropdown-container')) {
-        setShowDropdown(false);
+        setIsFocused(false);
+        setIsDropdownDismissed(false);
       }
     };
 
@@ -354,9 +409,141 @@ const Search = () => {
     return null;
   };
 
+  // Render search dropdown — focus-gated, with Escape dismissal flag
+  const shouldShowDropdown =
+    isFocused &&
+    !isDropdownDismissed &&
+    (searchQuery.trim().length >= 2 || recents.length > 0);
+
+  // Build flat keyboard-navigable list: recents (when no/short query) then results.
+  const showRecentsBranch = searchQuery.trim().length < 2 && recents.length > 0;
+
+  type FlatItem =
+    | { kind: 'recent'; query: string; entityKind?: 'query' | 'entity'; entityId?: string; slug?: string }
+    | { kind: 'entity'; entityId: string; entityType?: string; name: string; slug?: string }
+    | { kind: 'external'; categoryKey: string; itemRef: any; slug?: string };
+
+  const dropdownAllLocal = useMemo(
+    () => [
+      ...(dropdownResults.entities || []),
+      ...(dropdownResults.reviews || []),
+      ...(dropdownResults.recommendations || []),
+    ],
+    [dropdownResults.entities, dropdownResults.reviews, dropdownResults.recommendations],
+  );
+
+  const flatKeyboardItems: FlatItem[] = useMemo(() => {
+    const out: FlatItem[] = [];
+    if (showRecentsBranch) {
+      recents.slice(0, 6).forEach((r) =>
+        out.push({
+          kind: 'recent',
+          query: r.query,
+          entityKind: r.kind,
+          entityId: r.entityId,
+          slug: r.slug,
+        }),
+      );
+    }
+    if (searchQuery.trim().length >= 2) {
+      const localVisible = dropdownShowAll.localResults
+        ? dropdownAllLocal
+        : dropdownAllLocal.slice(0, 3);
+      localVisible.forEach((it: any) => {
+        if (it && 'name' in it && 'type' in it) {
+          out.push({ kind: 'entity', entityId: it.id, entityType: it.type, name: it.name, slug: it.slug });
+        }
+      });
+      const books = dropdownResults.categorized?.books || [];
+      const movies = dropdownResults.categorized?.movies || [];
+      const places = dropdownResults.categorized?.places || [];
+      (dropdownShowAll.books ? books : books.slice(0, 3)).forEach((b: any) =>
+        out.push({ kind: 'external', categoryKey: 'books', itemRef: b, slug: b.slug }),
+      );
+      (dropdownShowAll.movies ? movies : movies.slice(0, 3)).forEach((m: any) =>
+        out.push({ kind: 'external', categoryKey: 'movies', itemRef: m, slug: m.slug }),
+      );
+      (dropdownShowAll.places ? places : places.slice(0, 3)).forEach((p: any) =>
+        out.push({ kind: 'external', categoryKey: 'places', itemRef: p, slug: p.slug }),
+      );
+    }
+    return out;
+  }, [showRecentsBranch, recents, searchQuery, dropdownAllLocal, dropdownResults.categorized, dropdownShowAll]);
+
+  // Reset highlight when context changes
+  useEffect(() => {
+    setHighlightedIdx(-1);
+  }, [searchQuery, isFocused, isDropdownDismissed]);
+
+  // Prefetch entity for currently highlighted entity-like item
+  useEffect(() => {
+    if (highlightedIdx < 0) return;
+    const item = flatKeyboardItems[highlightedIdx];
+    if (!item) return;
+    if (item.kind === 'entity' && item.slug) schedulePrefetch(item.slug);
+    if (item.kind === 'recent' && item.entityKind === 'entity' && item.slug) {
+      schedulePrefetch(item.slug);
+    }
+  }, [highlightedIdx, flatKeyboardItems, schedulePrefetch]);
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsDropdownDismissed(true);
+      setHighlightedIdx(-1);
+      // do NOT blur — keep focus on input
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      if (flatKeyboardItems.length === 0) return;
+      e.preventDefault();
+      setHighlightedIdx((idx) => (idx + 1) % flatKeyboardItems.length);
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      if (flatKeyboardItems.length === 0) return;
+      e.preventDefault();
+      setHighlightedIdx((idx) => (idx <= 0 ? flatKeyboardItems.length - 1 : idx - 1));
+      return;
+    }
+    if (e.key === 'Enter') {
+      const active = highlightedIdx >= 0 ? flatKeyboardItems[highlightedIdx] : null;
+      if (active) {
+        e.preventDefault();
+        if (active.kind === 'recent') {
+          handlePickRecent(active.query, {
+            kind: active.entityKind,
+            entityId: active.entityId,
+            slug: active.slug,
+          });
+          return;
+        }
+        if (active.kind === 'entity') {
+          handleDropdownItemClick(active.name, {
+            entityId: active.entityId,
+            entityType: active.entityType,
+            slug: active.slug,
+          });
+          if (active.slug) navigate(`/entity/${active.slug}`);
+          return;
+        }
+        if (active.kind === 'external') {
+          const name = active.itemRef?.name || active.itemRef?.title || '';
+          if (name) handleDropdownItemClick(name);
+          return;
+        }
+      }
+      // No highlight — let form's onSubmit handle the search
+    }
+  };
+
+  const dropdownId = 'search-dropdown';
+  const activeOptionId =
+    shouldShowDropdown && highlightedIdx >= 0 ? `search-opt-${highlightedIdx}` : undefined;
+
   // Render search dropdown
   const renderSearchDropdown = () => {
-    if (!showDropdown || searchQuery.trim().length < 2) return null;
+    if (!shouldShowDropdown) return null;
 
     const allLocalResults = [
       ...dropdownResults.entities,
@@ -370,8 +557,28 @@ const Search = () => {
                      dropdownResults.categorized?.places?.length > 0;
 
     return (
-      <div className="absolute top-full left-0 right-0 z-50 bg-background border border-border rounded-lg shadow-lg mt-1 max-h-96 overflow-y-auto">
-        {dropdownLoading ? (
+      <div
+        id={dropdownId}
+        role="listbox"
+        aria-label="Search suggestions"
+        className="absolute top-full left-0 right-0 z-50 bg-background border border-border rounded-lg shadow-lg mt-1 max-h-96 overflow-y-auto animate-in fade-in-0 slide-in-from-top-1 duration-150"
+      >
+        {showRecentsBranch ? (
+          <RecentSearchesPanel
+            recents={recents}
+            onPick={(q, item) =>
+              handlePickRecent(q, {
+                kind: item?.kind,
+                entityId: item?.entityId,
+                slug: item?.slug,
+              })
+            }
+            onRemove={removeRecent}
+            onClearAll={clearRecents}
+            highlightedIndex={highlightedIdx >= 0 ? highlightedIdx : undefined}
+            optionIdPrefix="search-opt"
+          />
+        ) : dropdownLoading ? (
           <div className="p-4 text-center">
             <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">Searching...</p>
@@ -537,17 +744,17 @@ const Search = () => {
                 <p className="text-xs text-muted-foreground mb-2">
                   Couldn't find "<span className="font-medium text-foreground">{searchQuery}</span>"?
                 </p>
-                <button 
-                  className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
-                  onClick={() => {
-                    setCreateEntityQuery(searchQuery);
-                    setShowCreateEntityDialog(true);
-                    setShowDropdown(false);
-                  }}
-                >
-                  <Plus className="w-3 h-3 mr-1" />
-                  Add Entity
-                </button>
+            <button 
+              className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
+              onClick={() => {
+                setCreateEntityQuery(searchQuery);
+                setShowCreateEntityDialog(true);
+                setIsDropdownDismissed(true);
+              }}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Add Entity
+            </button>
               </div>
             )}
           </div>
@@ -556,17 +763,17 @@ const Search = () => {
             <p className="text-xs text-muted-foreground mb-2">
               Couldn't find "<span className="font-medium text-foreground">{searchQuery}</span>"?
             </p>
-            <button 
-              className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
-              onClick={() => {
-                setCreateEntityQuery(searchQuery);
-                setShowCreateEntityDialog(true);
-                setShowDropdown(false);
-              }}
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Add Entity
-            </button>
+                <button 
+                  className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
+                  onClick={() => {
+                    setCreateEntityQuery(searchQuery);
+                    setShowCreateEntityDialog(true);
+                    setIsDropdownDismissed(true);
+                  }}
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add Entity
+                </button>
           </div>
         )}
       </div>
@@ -606,17 +813,37 @@ const Search = () => {
                     <SearchIcon className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <Input
+                    ref={inputRef}
                     type="text"
                     placeholder="Search for people, places, products..."
                     value={searchQuery}
                     onChange={handleSearchInputChange}
+                    onFocus={() => {
+                      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+                      setIsFocused(true);
+                      setIsDropdownDismissed(false);
+                    }}
+                    onBlur={() => {
+                      blurTimerRef.current = setTimeout(() => {
+                        setIsFocused(false);
+                        setIsDropdownDismissed(false);
+                      }, 150);
+                    }}
+                    onKeyDown={handleInputKeyDown}
+                    role="combobox"
+                    aria-expanded={shouldShowDropdown}
+                    aria-controls={dropdownId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeOptionId}
                     className="pl-10 pr-10 min-w-0"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => {
                         setSearchQuery('');
-                        setShowDropdown(false);
+                        setIsDropdownDismissed(false);
+                        setHighlightedIdx(-1);
+                        inputRef.current?.focus();
                       }}
                       className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
                       type="button"
