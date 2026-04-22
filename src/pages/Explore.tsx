@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useEntityCache } from '@/hooks/use-entity-cache';
+import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import SEOHead from '@/components/seo/SEOHead';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
@@ -62,8 +64,33 @@ const Explore = () => {
   const [processingEntityName, setProcessingEntityName] = useState('');
   const [processingMessage, setProcessingMessage] = useState('');
   
-  // Dropdown state for search
-  const [showDropdown, setShowDropdown] = useState(true); // Always show when shouldShowDropdown is true
+  // Dropdown state for search — focus-gated, with single-Escape dismissal flag
+  const [isFocused, setIsFocused] = useState(false);
+  const [isDropdownDismissed, setIsDropdownDismissed] = useState(false);
+  const [highlightedIdx, setHighlightedIdx] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastPrefetchedSlugRef = useRef<string | null>(null);
+
+  // Entity prefetch (TanStack Query cache)
+  const { prefetchEntity } = useEntityCache({ slugOrId: '', enabled: false });
+
+  const schedulePrefetch = useCallback((slug?: string) => {
+    if (!slug || slug === lastPrefetchedSlugRef.current) return;
+    if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    prefetchTimerRef.current = setTimeout(() => {
+      prefetchEntity(slug);
+      lastPrefetchedSlugRef.current = slug;
+    }, 80);
+  }, [prefetchEntity]);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    };
+  }, []);
   
   // Trending hashtags state
   const [trendingHashtags, setTrendingHashtags] = useState<HashtagWithCount[]>([]);
