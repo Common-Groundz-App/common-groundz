@@ -560,19 +560,22 @@ const Explore = () => {
               
               {/* Enhanced Search Results Dropdown with smooth closing animation */}
               {shouldShowDropdown && (
-                <div className={`absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto transition-all duration-300 ${
-                  isDropdownClosing ? 'opacity-0 transform scale-95 translate-y-2' : 'opacity-100 transform scale-100 translate-y-0'
-                }`}>
+                <div
+                  id={dropdownId}
+                  className={`absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-xl z-[60] max-h-[70vh] overflow-y-auto transition-all duration-150 animate-in fade-in-0 slide-in-from-top-1 ${
+                    isDropdownClosing ? 'opacity-0 transform scale-95 translate-y-2' : 'opacity-100 transform scale-100 translate-y-0'
+                  }`}
+                >
 
                   {/* Recent searches — shown when input is empty / under 1 char */}
-                  {searchQuery.trim().length < 1 && (
+                  {showRecentsPanel && (
                     <RecentSearchesPanel
                       recents={recents}
-                      onPick={(q) => {
-                        setSearchQuery(q);
-                      }}
+                      onPick={(q, item) => handlePickRecent(q, item)}
                       onRemove={removeRecent}
                       onClearAll={clearRecents}
+                      optionIdPrefix="explore-opt"
+                      highlightedIndex={highlightedIdx >= 0 && highlightedIdx < recents.slice(0, 6).length ? highlightedIdx : undefined}
                     />
                   )}
 
@@ -729,7 +732,7 @@ const Explore = () => {
                     onClick={() => {
                       setCreateEntityQuery(searchQuery);
                       setShowCreateEntityDialog(true);
-                      setShowDropdown(false);
+                      setIsFocused(false);
                       setIsDropdownClosing(true);
                       setTimeout(() => setIsDropdownClosing(false), 300);
                     }}
@@ -866,7 +869,7 @@ const Explore = () => {
         onOpenChange={(open) => {
           setShowCreateEntityDialog(open);
           if (!open) {
-            setShowDropdown(true);
+            inputRef.current?.focus();
           }
         }}
         onEntityCreated={() => {
