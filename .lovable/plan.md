@@ -1,147 +1,173 @@
 
 
-## Verdict: Adopt both of ChatGPT's additions. They're tiny and prevent real bugs.
-
-Both are defensive hygiene — shared normalizer prevents "works in scoring, fails in dedupe" drift; Levenshtein length guard prevents wasted CPU on edge cases. Folding in.
+## Verdict: Adopt all 5 (ChatGPT's 1 + Codex's 4). All are small, defensive, and prevent real bugs.
 
 ---
 
 ## What changes from the previous plan
 
-### Added (2 small hardenings)
+### Added — ChatGPT's prefetch debounce
 
-**1. Single shared `normalize()` used everywhere in `searchRanking.ts`**
+Hover sweeps or held arrow keys can spam `prefetchEntity` calls. Debounce 80ms:
 
 ```ts
-export const normalize = (str: string): string =>
-  (str || '')
-    .toLowerCase()
-    .replace(/[^\w\s]/g, '')   // strip punctuation
-    .replace(/\s+/g, ' ')      // collapse whitespace
-    .trim();
+const prefetchTimerRef = useRef<NodeJS.Timeout | null>(null);
+const lastPrefetchedSlugRef = useRef<string | null>(null);
+
+const handlePrefetch = (slug?: string) => {
+  if (!slug || slug === lastPrefetchedSlugRef.current) return;
+  if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+  prefetchTimerRef.current = setTimeout(() => {
+    prefetchEntity(slug);
+    lastPrefetchedSlugRef.current = slug;
+  }, 80);
+};
 ```
 
-Used by **every** ranking function — `scoreResult`, `dedupeResults` (for the dedupe key), `isNearMatch`, `shouldOverride`, `applyExactMatchOverride`. No local re-implementations. Prevents the classic "exact match doesn't fire because dedupe stripped a comma but scoring didn't" bug.
+Used in both `onMouseEnter` and keyboard-highlight effect. Cleared on dropdown close.
 
-Note: `UnifiedEntitySelector.tsx` already has its own local `normalize` (line 47). I'll **delete that local copy** and have it import the shared one from `searchRanking.ts` so the entire file uses one definition. No behavior change there — its current normalize is a subset (lowercase + collapse spaces, no punctuation strip), and upgrading it to also strip punctuation is strictly an improvement for the "Did you mean?" similarity check.
+### Corrected — Codex #1: `isDropdownDismissed` reset paths
 
-**2. Skip Levenshtein for very long strings (>40 chars)**
+Previous plan only reset on next blur + onChange. Add **reset on next focus** too, so the flag never gets "stuck closed" across focus cycles:
 
 ```ts
-function isNearMatch(a: string, b: string): boolean {
-  const na = normalize(a);
-  const nb = normalize(b);
-  if (na.length > 40 || nb.length > 40) return false;  // skip — long names don't need typo correction
-  return levenshtein(na, nb) <= levenshteinThreshold(nb);
+onFocus: () => {
+  setIsFocused(true);
+  setIsDropdownDismissed(false);  // ← added
+}
+onChange: (e) => {
+  setIsDropdownDismissed(false);  // already planned
+  // ... existing handler
+}
+onBlur: () => {
+  setTimeout(() => {
+    setIsFocused(false);
+    setIsDropdownDismissed(false);  // already planned
+  }, 150);
 }
 ```
 
-Prevents wasted CPU on full book/movie titles ("The Curious Incident of the Dog in the Night-Time"). Long names already match well via substring scoring; Levenshtein adds nothing useful at that length.
+Three reset paths guarantee the flag is purely a single-Escape-press dismissal, never persistent state.
 
-### Unchanged from previous plan
+### Corrected — Codex #2: Safe stale-entity removal with guard
 
-- ✅ Adaptive Levenshtein threshold (1 / 2 / 3 by query length)
-- ✅ Confidence-gated override (exact: always; near: only if score ≥ 60)
-- ✅ Cross-category visual deduplication
-- ✅ Soft-collapse (strong: 5, medium: 3, weak: 1–2)
-- ✅ Top row gets `font-medium` + faint divider, no chip/badge/label
-- ✅ `useRecentSearches` + `RecentSearchesPanel` with × per row + "Clear all"
-- ✅ localStorage cache (`cg_search_cache_v1`, 60s TTL, 50 entries)
-- ✅ Keyboard nav (↑/↓/Enter), per-category shimmer, last-picked-category icon hint
+Previous plan assumed `fallbackEntityId` would always be present. Legacy nav state (from before this change rolled out) won't have it. Guard:
+
+```ts
+useEffect(() => {
+  if (!entityNotFound) return;
+  const { fallbackQuery, fallbackEntityId } = location.state ?? {};
+  if (!fallbackQuery) return;  // not from a recent-pick — bail
+  if (fallbackEntityId) {
+    removeRecentByEntityId(fallbackEntityId);  // surgical, safe
+  }
+  // If fallbackEntityId missing: redirect only, do NOT touch recents
+  // (text-based removal could nuke a same-named query recent — unsafe)
+  navigate(`/search?q=${encodeURIComponent(fallbackQuery)}`, { replace: true });
+}, [entityNotFound, location.state]);
+```
+
+Non-destructive fallback for legacy state. Worst case: one stale entity recent stays until the user manually × removes it or 30-day TTL evicts it.
+
+### Corrected — Codex #3: Prefetch only-when-changed guard
+
+Already covered by `lastPrefetchedSlugRef` in the debounce snippet above — same slug won't refetch. Confirms intent.
+
+### Added — Codex #4: ARIA `aria-activedescendant` for full combobox compliance
+
+Previous plan had `role="combobox"`, `role="listbox"`, `role="option"`, `aria-selected`. Missing piece: screen readers also need `aria-activedescendant` on the input pointing to the currently-highlighted option's `id` so they announce the highlighted item without focus actually moving:
+
+```tsx
+// Each option gets a stable id:
+<div role="option" id={`search-opt-${idx}`} aria-selected={highlightedIdx === idx}>
+
+// Input wires it:
+<Input
+  role="combobox"
+  aria-expanded={shouldShowDropdown}
+  aria-controls="search-dropdown"
+  aria-activedescendant={
+    shouldShowDropdown && highlightedIdx >= 0
+      ? `search-opt-${highlightedIdx}`
+      : undefined
+  }
+/>
+```
+
+Standard ARIA 1.2 combobox pattern. Zero visual change.
+
+### Carried unchanged from previous turn
+
+- ✅ Render-guard, focus-only opening, `onBlur` 150ms grace
+- ✅ Restore inline "See More" with `max-h-[300px] overflow-y-auto`
+- ✅ Keep "Show N more in full search" link AND top-right "Search More" button
+- ✅ Entity recents store `entityId`, `entityType`, `slug`
+- ✅ Cross-kind dedup (entity wins), normalized dedupe via shared `normalize`
+- ✅ 30-day TTL cleanup on mount
+- ✅ Visible cap 6 (storage cap stays 8)
+- ✅ Shared `'explore'` recents bucket across `/explore` + `/search`
+- ✅ Composer (`'composer'` bucket) untouched, back-compat preserved
+- ✅ Animation: `animate-in fade-in-0 slide-in-from-top-1 duration-150`
+- ✅ ↑/↓ keyboard nav across merged list, Enter activates, Escape closes (no blur)
+- ✅ Hover/highlight prefetch via `useEntityCache().prefetchEntity`
+- ✅ NotFound redirect with `fallbackQuery` state
 
 ---
 
-## Files (final)
+## Files to change (final)
 
 | File | Change |
 |------|--------|
-| `src/utils/searchRanking.ts` | **NEW** — exports shared `normalize`, `levenshtein` (with >40 char skip), `levenshteinThreshold`, `isNearMatch`, `shouldOverride`, `scoreResult`, `dedupeResults`, `rankCategories`, `applyExactMatchOverride`, `softCollapse`. JSDoc spec block for canonical queries. |
-| `src/hooks/useRecentSearches.ts` | **NEW** — surface-scoped recent-searches hook |
-| `src/components/search/RecentSearchesPanel.tsx` | **NEW** — reusable history UI with × per row |
-| `src/components/feed/UnifiedEntitySelector.tsx` | Apply pipeline, mount panel, keyboard nav, top-row weight; **delete local `normalize` (line 47), import from `searchRanking.ts`** |
-| `src/pages/Explore.tsx` | Same pipeline + panel in dropdown |
-| `src/hooks/use-enhanced-realtime-search.ts` | localStorage layer behind existing cache helpers |
-
-No edge function changes. No DB. No new env vars. No new deps.
+| `src/hooks/useRecentSearches.ts` | Extend `RecentSearchItem` with `kind` + entity metadata; cross-kind dedup (entity wins); shared `normalize`; 30-day TTL filter on mount; add `removeRecentByEntityId(id)` |
+| `src/components/search/RecentSearchesPanel.tsx` | New shape; clock icon for query, bookmark icon for entity; visible cap 6; `role="listbox"` + `role="option"` with stable `id` + `aria-selected`; pass full item to `onPick`; `onMouseEnter` debounced prefetch hook for entity items |
+| `src/pages/Explore.tsx` | (a) `isFocused` + `isDropdownDismissed` state with **3 reset paths** (focus, change, blur); (b) `shouldShowDropdown = isFocused && !isDropdownDismissed && (query \|\| recents)`; (c) Escape closes via dismissed flag, **does NOT blur**; (d) ↑/↓ keyboard nav across merged list; (e) **debounced prefetch (80ms) + last-slug guard** on hover and keyboard highlight; (f) ARIA: `role="combobox"`, `aria-expanded`, `aria-controls`, **`aria-activedescendant`**; (g) restore inline expansion with `max-h-[300px] overflow-y-auto`; (h) keep both "Show N more" link and "Search More" button; (i) `addRecent(entity.name, 'entity', { entityId, entityType, slug })` on click; (j) `addRecent(searchQuery, 'query')` on Enter; (k) `onPickRecent`: entity → `navigate(slug, { state: { fallbackQuery, fallbackEntityId } })`, query → fill input + run search; (l) animation classes |
+| `src/pages/Search.tsx` (or whatever powers `/search`) | Identical pattern: same bucket, same gating, same Escape rule, same keyboard rules, same animation, same fallback state, same debounced prefetch, same ARIA |
+| Entity page component (NotFound branch) | Guarded redirect: only `removeRecentByEntityId` when `fallbackEntityId` present; otherwise redirect-only (non-destructive) |
 
 ---
 
-## Final pipeline
+## Explicitly NOT touching
 
-```text
-raw results from edge function
-        │
-        ▼
-dedupeResults()
-  key = normalize(name) + '|' + normalize(venue)
-        │
-        ▼
-scoreResult()  (uses shared normalize)
-        │
-        ▼
-sort within each category by score
-        │
-        ▼
-sort categories by top-result score
-        │
-        ▼
-applyExactMatchOverride()
-  shouldOverride() gate:
-    normalize(a) === normalize(b)                            → always
-    isNearMatch(a, b) && score >= 60                          → conditional
-  isNearMatch:
-    skip if either string > 40 chars
-    threshold: ≤4 → 1 | ≤8 → 2 | >8 → 3
-        │
-        ▼
-softCollapse()
-  strong (top ≥ 50): 5 visible
-  medium (30–49):    3 visible
-  weak (<30):        1–2 visible
-  rest behind "Show N more"
-        │
-        ▼
-render
-  row[0][0]: font-medium + faint divider
-  no chip, no badge, no label
-```
-
----
-
-## Explicitly NOT touching (carried forward)
-
-- ❌ No edge function changes
-- ❌ No changes to debounces, abort logic, MIN_EXTERNAL_QUERY_LENGTH, image proxy, fallbacks
-- ❌ No changes to entity selection, location, mentions, hashtags, post submission
-- ❌ No `★ Best match` chip — anywhere
-- ❌ No DB tables, RLS, migrations
-- ❌ No test suite (spec captured in JSDoc)
-- ❌ No analytics events
-- ❌ No personalized/circle-based ranking
-- ❌ No new third-party libs
+- ❌ `UnifiedEntitySelector.tsx` (composer) — bucket and behavior unchanged; back-compat default keeps it identical
+- ❌ `searchRanking.ts` — pipeline unchanged (just consumed for `normalize`)
+- ❌ `use-enhanced-realtime-search.ts` — `toggleShowAll` already exists, just rewiring JSX
+- ❌ Edge functions, debounces (search-side), abort logic, cache layer, image proxy
+- ❌ "Show N more in full search" link — kept
+- ❌ Storage cap 8; only **visible** cap is 6
+- ❌ No new dependencies, no DB, no env vars
+- ❌ No analytics, no behavioral ranking (good next step, not now)
+- ❌ Text-based stale-recent removal (rejected as unsafe)
 
 ---
 
 ## Verification
 
-1. `/create` → "malika biryani" → Mallika Biryani is row 0 of category 0 (near-match + score ≥ 60)
-2. `/create` → "Mallika, Biryani!" (with punctuation) → still triggers override (shared normalize strips it)
-3. `/create` → "malika briyani" (transposed) → still triggers override
-4. `/create` → "ram" → does NOT pull in "cream"/"ramen" (threshold = 1, score gate)
-5. `/create` → "The Curious Incident of the Dog in the Night-Time" → no Levenshtein run (>40 chars), substring scoring still works
-6. `/create` → "inception" → Movies first; if exact title exists, row 0
-7. Categories with weak matches show 1–2 items + "Show N more"
-8. Strong categories show up to 5 inline
-9. Dedup: same place from Places + Food APIs → one entry only
-10. `/create` → empty focused input → Recent searches with × per row + "Clear all"
-11. × removes a single recent without closing dropdown
-12. Same on `/explore`
-13. Reload → cached query returns instantly within 60s, no edge call
-14. ↓/↓/Enter → highlights and selects correctly
-15. Private mode → recent + cache silently no-op
-16. localStorage quota exceeded → caught silently
-17. No chip, no "Best match" text anywhere
-18. Top-row visual weight is subtle, not loud
-19. `UnifiedEntitySelector`'s "Did you mean?" check still works (now using shared normalize, slightly improved)
-20. All previous turns' fixes intact
+1. Visit `/explore` fresh with existing recents → no dropdown (focus required)
+2. Click input with empty recents → no dropdown (render-guard)
+3. Click input with recents → fades in 150ms, max 6 items
+4. Press Escape → closes, focus stays, can keep typing
+5. Type after Escape → reopens (dismissed flag reset on change)
+6. Press Escape, click outside, click back in → reopens (dismissed flag reset on focus)
+7. Click outside → fades out (150ms grace)
+8. ↓/↑ navigate merged list; Enter activates highlighted
+9. Hover entity recent rapidly → only one prefetch fires after 80ms idle
+10. Hold ↓ key → prefetch only fires when slug actually changes (not per keypress on same item)
+11. Hover entity recent → entity data in TanStack cache → click feels instant
+12. Type "mal" → click "See More" on Books → expands inline, capped 300px, scrollable
+13. "Show N more in full search" + "Search More" both present
+14. Click "Mallika Biryani" → entity → return → focus → recent shows entity name with bookmark
+15. If entity later deleted: clicking recent → NotFound → auto-redirects to `/search?q=...` → entity recent removed by ID (same-text query recent stays intact)
+16. Legacy nav state without `fallbackEntityId`: redirect happens, no recent removed (safe)
+17. Type "mallika biryani" → Enter → return → only entity version shown (entity wins dedup)
+18. Type "ramen" → Enter → return → recent with clock icon; click → fills input + searches
+19. `/search` page → identical behavior, shares recents
+20. Recent older than 30 days → silently removed on next visit
+21. "Mallika!" + "mallika" → one entry (normalized)
+22. Legacy entity recent without `slug` → treated as query
+23. × on recent → row removed, panel stays open
+24. "Clear all" → cleared, panel hides
+25. Screen reader: combobox state announced, highlighted option announced via `aria-activedescendant`, listbox/option roles correct
+26. Composer recents behavior unchanged
+27. Private mode / quota → silent no-op
+28. All previous turns' fixes intact
 
