@@ -500,12 +500,35 @@ const Explore = () => {
                 </div>
                 <div className="relative flex-1 min-w-0">
                   <Input
+                    ref={inputRef}
                     type="text"
                     placeholder="Search for people, places, food, products..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onFocus={() => setShowDropdown(true)}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setIsDropdownDismissed(false);
+                    }}
+                    onFocus={() => {
+                      if (blurTimerRef.current) {
+                        clearTimeout(blurTimerRef.current);
+                        blurTimerRef.current = null;
+                      }
+                      setIsFocused(true);
+                      setIsDropdownDismissed(false);
+                    }}
+                    onBlur={() => {
+                      blurTimerRef.current = setTimeout(() => {
+                        setIsFocused(false);
+                        setIsDropdownDismissed(false);
+                        setHighlightedIdx(-1);
+                      }, 150);
+                    }}
                     onKeyDown={handleKeyDown}
+                    role="combobox"
+                    aria-expanded={shouldShowDropdown}
+                    aria-controls={dropdownId}
+                    aria-autocomplete="list"
+                    aria-activedescendant={activeOptionId}
                     className="border-0 focus-visible:ring-0 focus-visible:ring-offset-0 min-w-0 pr-10"
                   />
                   {searchQuery && (
