@@ -130,29 +130,51 @@ const Search = () => {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim().length >= 2) {
+      // Save typed query as a recent before navigating
+      addRecent(searchQuery.trim(), 'query');
       setSearchParams({ q: searchQuery, mode: 'quick' });
-      setShowDropdown(false);
+      setIsDropdownDismissed(true);
     }
   };
 
-  // Handle search input changes
+  // Handle search input changes — dismissed flag resets so user can keep typing after Escape
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchQuery(value);
-    
-    // Show dropdown if query is 2+ characters and different from current query
-    if (value.trim().length >= 2 && value !== query) {
-      setShowDropdown(true);
-    } else {
-      setShowDropdown(false);
-    }
+    setIsDropdownDismissed(false);
+    setHighlightedIdx(-1);
   };
 
-  // Handle dropdown item click with proper type handling
-  const handleDropdownItemClick = (clickedQuery: string) => {
+  // Handle dropdown item click — saves recent (entity if known, query otherwise) and runs search
+  const handleDropdownItemClick = (
+    clickedQuery: string,
+    meta?: { entityId?: string; entityType?: string; slug?: string },
+  ) => {
+    if (meta?.entityId) {
+      addRecent(clickedQuery, 'entity', meta);
+    } else if (clickedQuery.trim()) {
+      addRecent(clickedQuery.trim(), 'query');
+    }
     setSearchQuery(clickedQuery);
     setSearchParams({ q: clickedQuery, mode: 'quick' });
-    setShowDropdown(false);
+    setIsDropdownDismissed(true);
+    setHighlightedIdx(-1);
+  };
+
+  // Pick a recent: entity → deep-link with fallback state; query → fill input + run search
+  const handlePickRecent = (q: string, item?: { kind?: string; entityId?: string; slug?: string }) => {
+    if (item?.kind === 'entity' && item.slug) {
+      navigate(`/entity/${item.slug}`, {
+        state: { fallbackQuery: q, fallbackEntityId: item.entityId },
+      });
+      setIsFocused(false);
+      setHighlightedIdx(-1);
+      return;
+    }
+    setSearchQuery(q);
+    setSearchParams({ q, mode: 'quick' });
+    setIsDropdownDismissed(true);
+    setHighlightedIdx(-1);
   };
 
   // Helper function to get the display name from different result types
@@ -195,7 +217,8 @@ const Search = () => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
       if (!target.closest('.search-dropdown-container')) {
-        setShowDropdown(false);
+        setIsFocused(false);
+        setIsDropdownDismissed(false);
       }
     };
 
