@@ -24,6 +24,12 @@ import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
 import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
 import { useToast } from '@/hooks/use-toast';
+import {
+  dedupeResults,
+  rankCategories,
+  applyExactMatchOverride,
+  softCollapse,
+} from '@/utils/searchRanking';
 
 const Search = () => {
   const isMobile = useIsMobile();
@@ -35,8 +41,13 @@ const Search = () => {
   const [searchQuery, setSearchQuery] = useState(query);
   const [activeTab, setActiveTab] = useState('all');
   const [isDeepSearching, setIsDeepSearching] = useState(mode === 'deep');
-  
-  // State for "show all" functionality
+
+  // Keep input ↔ URL in sync (initial load, back/forward, pasted links)
+  useEffect(() => {
+    setSearchQuery(searchParams.get('q') || '');
+  }, [searchParams]);
+
+  // State for "show all" functionality (page-results section)
   const [showAllStates, setShowAllStates] = useState({
     localResults: false,
     externalResults: false,
@@ -47,6 +58,11 @@ const Search = () => {
   const [showCreateEntityDialog, setShowCreateEntityDialog] = useState(false);
   const [createEntityQuery, setCreateEntityQuery] = useState('');
 
+  // Page-level entity processing (overlay for external picks)
+  const [isProcessingEntity, setIsProcessingEntity] = useState(false);
+  const [processingEntityName, setProcessingEntityName] = useState('');
+  const [processingMessage, setProcessingMessage] = useState('');
+
   // Dropdown state for search suggestions — focus-gated with single-Escape dismissal
   const [isFocused, setIsFocused] = useState(false);
   const [isDropdownDismissed, setIsDropdownDismissed] = useState(false);
@@ -55,6 +71,7 @@ const Search = () => {
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPrefetchedSlugRef = useRef<string | null>(null);
+  const isComposingRef = useRef(false); // IME composition guard
 
   const [dropdownShowAll, setDropdownShowAll] = useState({
     localResults: false,
@@ -78,6 +95,7 @@ const Search = () => {
     }, 80);
   }, [prefetchEntity]);
 
+  // Cleanup pending timers on unmount
   useEffect(() => {
     return () => {
       if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
@@ -108,31 +126,75 @@ const Search = () => {
     { value: 'users', label: 'People', icon: Users }
   ];
 
-  // Use the faster enhanced realtime search hook for both main search and dropdown
-  const { 
-    results, 
-    isLoading, 
-    loadingStates, 
+  // SINGLE realtime search hook — drives both dropdown AND page results.
+  // Keyed off `searchQuery` (which stays in sync with URL ?q=).
+  const {
+    results,
+    isLoading,
+    loadingStates,
     error,
     showAllResults,
     toggleShowAll,
     searchMode,
     refetch
-  } = useEnhancedRealtimeSearch(query, { mode: mode as 'quick' | 'deep' });
+  } = useEnhancedRealtimeSearch(searchQuery, { mode: mode as 'quick' | 'deep' });
 
-  // Separate hook for dropdown search suggestions
-  const { 
-    results: dropdownResults,
-    isLoading: dropdownLoading
-  } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
+  // Trimmed query — reused everywhere
+  const trimmedQuery = searchQuery.trim();
+
+  // Reset show-all state when query changes (skip during IME composition)
+  useEffect(() => {
+    if (isComposingRef.current) return;
+    setDropdownShowAll({
+      localResults: false,
+      books: false,
+      movies: false,
+      places: false
+    });
+  }, [trimmedQuery]);
+
+  // Reset last-prefetched slug when query changes so same-named entity re-prefetches in new results
+  useEffect(() => {
+    lastPrefetchedSlugRef.current = null;
+  }, [trimmedQuery]);
+
+  // Ranking pipeline for dropdown — gated on trimmed query to prevent stale-flicker
+  const collapsed = useMemo(() => {
+    if (trimmedQuery.length < 1) return null;
+    const externalAll = dedupeResults(
+      [
+        ...(results.categorized?.books || []).map((b: any) => ({ ...b, type: 'book' })),
+        ...(results.categorized?.movies || []).map((m: any) => ({ ...m, type: 'movie' })),
+        ...(results.categorized?.places || []).map((p: any) => ({ ...p, type: 'place' })),
+      ],
+      trimmedQuery,
+    );
+    const dedupedBooks = externalAll.filter((r) => r.type === 'book');
+    const dedupedMovies = externalAll.filter((r) => r.type === 'movie');
+    const dedupedPlaces = externalAll.filter((r) => r.type === 'place');
+    const dedupedLocal = dedupeResults(results.entities || [], trimmedQuery);
+
+    const ranked = rankCategories(
+      {
+        entities: dedupedLocal,
+        places: dedupedPlaces,
+        books: dedupedBooks,
+        movies: dedupedMovies,
+        users: results.users || [],
+      },
+      trimmedQuery,
+    );
+    const overridden = applyExactMatchOverride(ranked, trimmedQuery);
+    return softCollapse(overridden);
+  }, [trimmedQuery, results.entities, results.categorized, results.users]);
 
   // Update the URL when search query changes
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim().length >= 2) {
+    if (trimmedQuery.length >= 1) {
       // Save typed query as a recent before navigating
-      addRecent(searchQuery.trim(), 'query');
-      setSearchParams({ q: searchQuery, mode: 'quick' });
+      addRecent(trimmedQuery, 'query');
+      setSearchParams({ q: trimmedQuery, mode: 'quick' });
       setIsDropdownDismissed(true);
     }
   };
@@ -142,22 +204,6 @@ const Search = () => {
     const value = e.target.value;
     setSearchQuery(value);
     setIsDropdownDismissed(false);
-    setHighlightedIdx(-1);
-  };
-
-  // Handle dropdown item click — saves recent (entity if known, query otherwise) and runs search
-  const handleDropdownItemClick = (
-    clickedQuery: string,
-    meta?: { entityId?: string; entityType?: string; slug?: string },
-  ) => {
-    if (meta?.entityId) {
-      addRecent(clickedQuery, 'entity', meta);
-    } else if (clickedQuery.trim()) {
-      addRecent(clickedQuery.trim(), 'query');
-    }
-    setSearchQuery(clickedQuery);
-    setSearchParams({ q: clickedQuery, mode: 'quick' });
-    setIsDropdownDismissed(true);
     setHighlightedIdx(-1);
   };
 
@@ -177,6 +223,47 @@ const Search = () => {
     setHighlightedIdx(-1);
   };
 
+  // Click on a local entity row → record recent + navigate to entity page
+  const handleEntityClick = (entity: { id: string; type?: string; name: string; slug?: string }) => {
+    addRecent(entity.name, 'entity', {
+      entityId: entity.id,
+      entityType: entity.type,
+      slug: entity.slug,
+    });
+    setIsDropdownDismissed(true);
+    setIsFocused(false);
+    setHighlightedIdx(-1);
+    if (entity.slug) {
+      navigate(`/entity/${entity.slug}`);
+    }
+  };
+
+  // Page-level processing handlers (mirror Explore)
+  const handleProcessingStart = (entityName: string, message: string) => {
+    // Dismiss dropdown to avoid overlay/dropdown overlap
+    setIsDropdownDismissed(true);
+    setIsFocused(false);
+    setIsProcessingEntity(true);
+    setProcessingEntityName(entityName);
+    setProcessingMessage(message);
+  };
+
+  const handleProcessingUpdate = (message: string) => {
+    setProcessingMessage(message);
+  };
+
+  const handleProcessingEnd = () => {
+    setIsProcessingEntity(false);
+    setProcessingEntityName('');
+    setProcessingMessage('');
+  };
+
+  const handleCancelProcessing = () => {
+    setIsProcessingEntity(false);
+    setProcessingEntityName('');
+    setProcessingMessage('');
+  };
+
   // Helper function to get the display name from different result types
   const getResultDisplayName = (item: any): string => {
     if ('name' in item) return item.name;
@@ -192,7 +279,7 @@ const Search = () => {
     }
   };
 
-  // Handle "View All" button clicks
+  // Handle "View All" button clicks (page-results)
   const handleViewAll = (section: keyof typeof showAllStates) => {
     if (section === 'users') {
       setActiveTab('users');
@@ -212,21 +299,7 @@ const Search = () => {
     }));
   };
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      if (!target.closest('.search-dropdown-container')) {
-        setIsFocused(false);
-        setIsDropdownDismissed(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Filter results based on active tab using backend categorization
+  // Filter results based on active tab using backend categorization (page-results)
   const getFilteredResults = () => {
     const allLocalResults = [
       ...results.entities,
@@ -234,17 +307,14 @@ const Search = () => {
       ...results.recommendations
     ];
 
-    // Use categorized results from backend
     const categorizedProducts = {
       movies: results.categorized?.movies || [],
       books: results.categorized?.books || [],
       places: results.categorized?.places || [],
-      // General products that don't fall into specific categories
       products: results.products.filter(p => {
         const movieRefs = (results.categorized?.movies || []).map(item => item.api_ref);
         const bookRefs = (results.categorized?.books || []).map(item => item.api_ref);
         const placeRefs = (results.categorized?.places || []).map(item => item.api_ref);
-        
         return !movieRefs.includes(p.api_ref) &&
                !bookRefs.includes(p.api_ref) &&
                !placeRefs.includes(p.api_ref);
@@ -253,11 +323,7 @@ const Search = () => {
 
     switch (activeTab) {
       case 'hashtags':
-        return {
-          localResults: [],
-          externalResults: [],
-          hashtags: results.hashtags || []
-        };
+        return { localResults: [], externalResults: [], hashtags: results.hashtags || [] };
       case 'movies':
         return {
           localResults: allLocalResults.filter(item => {
@@ -299,13 +365,8 @@ const Search = () => {
           hashtags: []
         };
       case 'users':
-        return {
-          localResults: [],
-          externalResults: [],
-          users: results.users,
-          hashtags: []
-        };
-      default: // 'all'
+        return { localResults: [], externalResults: [], users: results.users, hashtags: [] };
+      default:
         return {
           localResults: allLocalResults,
           externalResults: results.products,
@@ -320,18 +381,15 @@ const Search = () => {
   // Enhanced loading screen with category-based loading facts
   const renderEnhancedLoadingState = () => {
     const capitalizedQuery = query.charAt(0).toUpperCase() + query.slice(1);
-    
-    // Determine category for loading facts
     const getCategoryForFacts = (): EntityCategory => {
       switch (activeTab) {
         case 'movies': return 'movie';
         case 'books': return 'book';
         case 'places': return 'place';
         case 'products': return 'product';
-        default: return 'product'; // Default for 'all' tab
+        default: return 'product';
       }
     };
-
     const loadingFact = getRandomLoadingMessage(getCategoryForFacts());
 
     return (
@@ -340,16 +398,11 @@ const Search = () => {
           <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
           <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
         </div>
-        
         <h2 className="text-xl font-semibold mb-3 flex items-center gap-2">
           🔍 {searchMode === 'deep' ? 'Deep searching' : 'Searching'} for "{capitalizedQuery}"
         </h2>
-        
         <div className="text-center max-w-md">
-          <p className="text-muted-foreground mb-4">
-            {loadingFact}
-          </p>
-          
+          <p className="text-muted-foreground mb-4">{loadingFact}</p>
           {searchMode === 'deep' && (
             <div className="flex gap-2 justify-center flex-wrap">
               <Badge variant={loadingStates.external ? "default" : "outline"} className="text-xs">
@@ -371,40 +424,16 @@ const Search = () => {
     );
   };
 
-  // Helper function to render mixed local results with proper type handling
+  // Helper function to render mixed local results (page-results section)
   const renderLocalResultItem = (item: any) => {
     if ('username' in item) {
-      return (
-        <UserResultItem
-          key={item.id}
-          user={item}
-          onClick={() => {}}
-        />
-      );
+      return <UserResultItem key={item.id} user={item} onClick={() => {}} />;
     } else if ('entity_id' in item && 'rating' in item && 'title' in item && 'description' in item) {
-      return (
-        <ReviewResultItem
-          key={item.id}
-          review={item}
-          onClick={() => {}}
-        />
-      );
+      return <ReviewResultItem key={item.id} review={item} onClick={() => {}} />;
     } else if ('entity_id' in item && 'title' in item && !('rating' in item)) {
-      return (
-        <RecommendationResultItem
-          key={item.id}
-          recommendation={item}
-          onClick={() => {}}
-        />
-      );
+      return <RecommendationResultItem key={item.id} recommendation={item} onClick={() => {}} />;
     } else if ('name' in item && 'type' in item) {
-      return (
-        <EntityResultItem
-          key={item.id}
-          entity={item}
-          onClick={() => {}}
-        />
-      );
+      return <EntityResultItem key={item.id} entity={item} onClick={() => {}} />;
     }
     return null;
   };
@@ -413,24 +442,25 @@ const Search = () => {
   const shouldShowDropdown =
     isFocused &&
     !isDropdownDismissed &&
-    (searchQuery.trim().length >= 2 || recents.length > 0);
+    (trimmedQuery.length >= 1 || recents.length > 0);
 
-  // Build flat keyboard-navigable list: recents (when no/short query) then results.
-  const showRecentsBranch = searchQuery.trim().length < 2 && recents.length > 0;
+  // Cancel queued prefetch when dropdown closes
+  useEffect(() => {
+    if (!shouldShowDropdown && prefetchTimerRef.current) {
+      clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = null;
+    }
+  }, [shouldShowDropdown]);
+
+  // Build flat keyboard-navigable list — recents first, then ranked categories
+  const showRecentsBranch = trimmedQuery.length < 1 && recents.length > 0;
 
   type FlatItem =
     | { kind: 'recent'; query: string; entityKind?: 'query' | 'entity'; entityId?: string; slug?: string }
     | { kind: 'entity'; entityId: string; entityType?: string; name: string; slug?: string }
-    | { kind: 'external'; categoryKey: string; itemRef: any; slug?: string };
-
-  const dropdownAllLocal = useMemo(
-    () => [
-      ...(dropdownResults.entities || []),
-      ...(dropdownResults.reviews || []),
-      ...(dropdownResults.recommendations || []),
-    ],
-    [dropdownResults.entities, dropdownResults.reviews, dropdownResults.recommendations],
-  );
+    | { kind: 'user'; userId: string }
+    | { kind: 'external'; categoryKey: string; itemRef: any; slug?: string }
+    | { kind: 'hashtag'; nameNorm: string; nameOriginal: string };
 
   const flatKeyboardItems: FlatItem[] = useMemo(() => {
     const out: FlatItem[] = [];
@@ -445,35 +475,39 @@ const Search = () => {
         }),
       );
     }
-    if (searchQuery.trim().length >= 2) {
-      const localVisible = dropdownShowAll.localResults
-        ? dropdownAllLocal
-        : dropdownAllLocal.slice(0, 3);
-      localVisible.forEach((it: any) => {
-        if (it && 'name' in it && 'type' in it) {
-          out.push({ kind: 'entity', entityId: it.id, entityType: it.type, name: it.name, slug: it.slug });
+    if (trimmedQuery.length >= 1 && collapsed) {
+      collapsed.forEach((cat) => {
+        if (cat.visible.length === 0) return;
+        if (cat.key === 'users') {
+          cat.visible.forEach((u: any) => out.push({ kind: 'user', userId: u.id }));
+        } else if (cat.key === 'entities') {
+          cat.visible.forEach((e: any) =>
+            out.push({
+              kind: 'entity',
+              entityId: e.id,
+              entityType: e.type,
+              name: e.name,
+              slug: e.slug,
+            }),
+          );
+        } else {
+          cat.visible.forEach((it: any) =>
+            out.push({ kind: 'external', categoryKey: cat.key, itemRef: it, slug: it.slug }),
+          );
         }
       });
-      const books = dropdownResults.categorized?.books || [];
-      const movies = dropdownResults.categorized?.movies || [];
-      const places = dropdownResults.categorized?.places || [];
-      (dropdownShowAll.books ? books : books.slice(0, 3)).forEach((b: any) =>
-        out.push({ kind: 'external', categoryKey: 'books', itemRef: b, slug: b.slug }),
-      );
-      (dropdownShowAll.movies ? movies : movies.slice(0, 3)).forEach((m: any) =>
-        out.push({ kind: 'external', categoryKey: 'movies', itemRef: m, slug: m.slug }),
-      );
-      (dropdownShowAll.places ? places : places.slice(0, 3)).forEach((p: any) =>
-        out.push({ kind: 'external', categoryKey: 'places', itemRef: p, slug: p.slug }),
+      // Hashtags — kept separate from ranking pipeline
+      (results.hashtags || []).slice(0, 3).forEach((h: any) =>
+        out.push({ kind: 'hashtag', nameNorm: h.name_norm, nameOriginal: h.name_original }),
       );
     }
     return out;
-  }, [showRecentsBranch, recents, searchQuery, dropdownAllLocal, dropdownResults.categorized, dropdownShowAll]);
+  }, [showRecentsBranch, recents, trimmedQuery, collapsed, results.hashtags]);
 
   // Reset highlight when context changes
   useEffect(() => {
     setHighlightedIdx(-1);
-  }, [searchQuery, isFocused, isDropdownDismissed]);
+  }, [trimmedQuery, isFocused, isDropdownDismissed]);
 
   // Prefetch entity for currently highlighted entity-like item
   useEffect(() => {
@@ -487,11 +521,13 @@ const Search = () => {
   }, [highlightedIdx, flatKeyboardItems, schedulePrefetch]);
 
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // IME composition guard — do not handle nav keys while composing
+    if (isComposingRef.current || (e.nativeEvent as any).isComposing) return;
+
     if (e.key === 'Escape') {
       e.preventDefault();
       setIsDropdownDismissed(true);
       setHighlightedIdx(-1);
-      // do NOT blur — keep focus on input
       return;
     }
     if (e.key === 'ArrowDown') {
@@ -519,21 +555,23 @@ const Search = () => {
           return;
         }
         if (active.kind === 'entity') {
-          handleDropdownItemClick(active.name, {
-            entityId: active.entityId,
-            entityType: active.entityType,
+          handleEntityClick({
+            id: active.entityId,
+            type: active.entityType,
+            name: active.name,
             slug: active.slug,
           });
-          if (active.slug) navigate(`/entity/${active.slug}`);
           return;
         }
-        if (active.kind === 'external') {
-          const name = active.itemRef?.name || active.itemRef?.title || '';
-          if (name) handleDropdownItemClick(name);
+        if (active.kind === 'hashtag') {
+          navigate(`/t/${active.nameNorm}`);
+          setIsDropdownDismissed(true);
+          setIsFocused(false);
           return;
         }
+        // user / external → fall through to default form submit
       }
-      // No highlight — let form's onSubmit handle the search
+      // No actionable highlight — let form's onSubmit run
     }
   };
 
@@ -541,29 +579,64 @@ const Search = () => {
   const activeOptionId =
     shouldShowDropdown && highlightedIdx >= 0 ? `search-opt-${highlightedIdx}` : undefined;
 
+  // Map category key → display title for ranked render
+  const dropdownCategoryTitle: Record<string, string> = {
+    entities: '✨ Already on Groundz',
+    places: '📍 Places',
+    books: '📚 Books',
+    movies: '🎬 Movies',
+    users: '👥 People',
+  };
+
+  // Section header (matches Explore visual)
+  const renderSectionHeader = (
+    title: string,
+    count: number,
+    categoryKey?: keyof typeof dropdownShowAll,
+  ) => (
+    <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
+      <span>{title} ({count})</span>
+      <div className="flex items-center gap-2">
+        {categoryKey && count > 3 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-brand-orange font-semibold hover:text-brand-orange/80"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => handleDropdownViewAll(categoryKey)}
+          >
+            {dropdownShowAll[categoryKey] ? (
+              <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+            ) : (
+              <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+            )}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  // "Show N more in full search" → run the URL search
+  const handleShowMoreInFullSearch = () => {
+    if (trimmedQuery.length >= 1) {
+      addRecent(trimmedQuery, 'query');
+      setSearchParams({ q: trimmedQuery, mode: 'quick' });
+      setIsDropdownDismissed(true);
+    }
+  };
+
   // Render search dropdown
   const renderSearchDropdown = () => {
     if (!shouldShowDropdown) return null;
-
-    const allLocalResults = [
-      ...dropdownResults.entities,
-      ...dropdownResults.reviews,
-      ...dropdownResults.recommendations
-    ];
-
-    const hasResults = allLocalResults.length > 0 || 
-                     dropdownResults.categorized?.books?.length > 0 ||
-                     dropdownResults.categorized?.movies?.length > 0 ||
-                     dropdownResults.categorized?.places?.length > 0;
 
     return (
       <div
         id={dropdownId}
         role="listbox"
         aria-label="Search suggestions"
-        className="absolute top-full left-0 right-0 z-50 bg-background border border-border rounded-lg shadow-lg mt-1 max-h-96 overflow-y-auto animate-in fade-in-0 slide-in-from-top-1 duration-150"
+        className="absolute top-full left-0 right-0 z-50 bg-background border border-border rounded-lg shadow-xl mt-1 max-h-[70vh] overflow-y-auto animate-in fade-in-0 slide-in-from-top-1 duration-150"
       >
-        {showRecentsBranch ? (
+        {showRecentsBranch && (
           <RecentSearchesPanel
             recents={recents}
             onPick={(q, item) =>
@@ -575,206 +648,220 @@ const Search = () => {
             }
             onRemove={removeRecent}
             onClearAll={clearRecents}
-            highlightedIndex={highlightedIdx >= 0 ? highlightedIdx : undefined}
+            highlightedIndex={
+              highlightedIdx >= 0 && highlightedIdx < recents.slice(0, 6).length
+                ? highlightedIdx
+                : undefined
+            }
             optionIdPrefix="search-opt"
           />
-        ) : dropdownLoading ? (
-          <div className="p-4 text-center">
-            <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Searching...</p>
-          </div>
-        ) : hasResults ? (
-          <div className="p-2">
-            {/* Already on Groundz section */}
-            {allLocalResults.length > 0 && (
-              <div className="mb-4">
-                <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-md">
-                  <h3 className="text-sm font-medium flex items-center gap-2">
-                    ✨ Already on Groundz
-                  </h3>
-                  {allLocalResults.length > 3 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDropdownViewAll('localResults')}
-                      className="text-xs h-6"
-                    >
-                      {dropdownShowAll.localResults ? (
-                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
-                      ) : (
-                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
-                      )}
-                    </Button>
-                  )}
-                </div>
-                <div className="space-y-0">
-                  {(dropdownShowAll.localResults ? allLocalResults : allLocalResults.slice(0, 3)).map((item, index, arr) => (
-                    <div
-                      key={item.id}
-                      onClick={() => handleDropdownItemClick(getResultDisplayName(item))}
-                      className={`cursor-pointer hover:bg-muted rounded p-2 transition-colors ${index < arr.length - 1 ? 'border-b border-border/50' : ''}`}
-                    >
-                      {renderLocalResultItem(item)}
-                    </div>
-                  ))}
+        )}
+
+        {trimmedQuery.length >= 1 && (
+          <>
+            {/* Loading state */}
+            {isLoading && (
+              <div className="p-3 text-center border-b bg-background">
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Searching with enhanced reliability...</span>
                 </div>
               </div>
             )}
 
-            {/* Books section */}
-            {dropdownResults.categorized?.books?.length > 0 && (
-              <div className="mb-4">
-                <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-md">
-                  <h3 className="text-sm font-medium flex items-center gap-2">
-                    📚 Books
-                  </h3>
-                  {dropdownResults.categorized.books.length > 3 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDropdownViewAll('books')}
-                      className="text-xs h-6"
-                    >
-                      {dropdownShowAll.books ? (
-                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
-                      ) : (
-                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
-                      )}
-                    </Button>
-                  )}
-                </div>
-                <div className="space-y-0">
-                  {(dropdownShowAll.books ? dropdownResults.categorized.books : dropdownResults.categorized.books.slice(0, 3)).map((book, index, arr) => (
-                    <div
-                      key={`${book.api_source}-${book.api_ref || index}`}
-                      onClick={() => handleDropdownItemClick(book.name)}
-                      className={`cursor-pointer hover:bg-muted rounded p-2 transition-colors ${index < arr.length - 1 ? 'border-b border-border/50' : ''}`}
-                    >
-                      <SearchResultHandler
-                        result={book}
-                        query={searchQuery}
-                      />
-                    </div>
-                  ))}
+            {/* Error state */}
+            {error && (
+              <div className="p-3 text-center border-b bg-yellow-50 dark:bg-yellow-900/20">
+                <div className="flex items-center justify-center gap-2 text-sm text-yellow-700 dark:text-yellow-300">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>{error}</span>
                 </div>
               </div>
             )}
 
-            {/* Movies section */}
-            {dropdownResults.categorized?.movies?.length > 0 && (
-              <div className="mb-4">
-                <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-md">
-                  <h3 className="text-sm font-medium flex items-center gap-2">
-                    🎬 Movies
-                  </h3>
-                  {dropdownResults.categorized.movies.length > 3 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDropdownViewAll('movies')}
-                      className="text-xs h-6"
-                    >
-                      {dropdownShowAll.movies ? (
-                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
-                      ) : (
-                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
-                      )}
-                    </Button>
-                  )}
-                </div>
-                <div className="space-y-0">
-                  {(dropdownShowAll.movies ? dropdownResults.categorized.movies : dropdownResults.categorized.movies.slice(0, 3)).map((movie, index, arr) => (
-                    <div
-                      key={`${movie.api_source}-${movie.api_ref || index}`}
-                      onClick={() => handleDropdownItemClick(movie.name)}
-                      className={`cursor-pointer hover:bg-muted rounded p-2 transition-colors ${index < arr.length - 1 ? 'border-b border-border/50' : ''}`}
-                    >
-                      <SearchResultHandler
-                        result={movie}
-                        query={searchQuery}
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Ranked categories (collapsed) */}
+            {collapsed && (() => {
+              // Compute global flat-row index across keyboard-nav items so highlight maps correctly
+              let kbdIdx = showRecentsBranch ? recents.slice(0, 6).length : 0;
+              return collapsed.map((cat) => {
+                if (cat.visible.length === 0) return null;
+                const title = dropdownCategoryTitle[cat.key] || cat.key;
+                const total = cat.visible.length + cat.hidden.length;
+                const categoryKey =
+                  cat.key === 'entities' ? 'localResults'
+                  : cat.key === 'books' ? 'books'
+                  : cat.key === 'movies' ? 'movies'
+                  : cat.key === 'places' ? 'places'
+                  : undefined;
 
-            {/* Places section */}
-            {dropdownResults.categorized?.places?.length > 0 && (
-              <div className="mb-2">
-                <div className="flex items-center justify-between px-3 py-2 bg-muted/20 rounded-md">
-                  <h3 className="text-sm font-medium flex items-center gap-2">
-                    📍 Places
-                  </h3>
-                  {dropdownResults.categorized.places.length > 3 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDropdownViewAll('places')}
-                      className="text-xs h-6"
-                    >
-                      {dropdownShowAll.places ? (
-                        <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
-                      ) : (
-                        <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
-                      )}
-                    </Button>
-                  )}
-                </div>
-                <div className="space-y-0">
-                  {(dropdownShowAll.places ? dropdownResults.categorized.places : dropdownResults.categorized.places.slice(0, 3)).map((place, index, arr) => (
-                    <div
-                      key={`${place.api_source}-${place.api_ref || index}`}
-                      onClick={() => handleDropdownItemClick(place.name)}
-                      className={`cursor-pointer hover:bg-muted rounded p-2 transition-colors ${index < arr.length - 1 ? 'border-b border-border/50' : ''}`}
-                    >
-                      <SearchResultHandler
-                        result={place}
-                        query={searchQuery}
-                      />
+                if (cat.key === 'users') {
+                  return (
+                    <div key={cat.key} className="border-b last:border-b-0 bg-background">
+                      {renderSectionHeader(title, total)}
+                      {cat.visible.map((u: any) => {
+                        const myIdx = kbdIdx++;
+                        return (
+                          <div
+                            key={u.id}
+                            id={`search-opt-${myIdx}`}
+                            role="option"
+                            aria-selected={highlightedIdx === myIdx}
+                            className={highlightedIdx === myIdx ? 'bg-accent/40' : ''}
+                          >
+                            <UserResultItem user={u} onClick={() => {}} />
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  );
+                }
 
-            {/* Add Entity CTA */}
-            {hasResults && (
-              <div className="p-3 text-center bg-muted/30 border-t">
-                <p className="text-xs text-muted-foreground mb-2">
-                  Couldn't find "<span className="font-medium text-foreground">{searchQuery}</span>"?
-                </p>
-            <button 
-              className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
-              onClick={() => {
-                setCreateEntityQuery(searchQuery);
-                setShowCreateEntityDialog(true);
-                setIsDropdownDismissed(true);
-              }}
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Add Entity
-            </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="p-3 text-center bg-muted/30 border-t">
-            <p className="text-xs text-muted-foreground mb-2">
-              Couldn't find "<span className="font-medium text-foreground">{searchQuery}</span>"?
-            </p>
-                <button 
-                  className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
-                  onClick={() => {
-                    setCreateEntityQuery(searchQuery);
-                    setShowCreateEntityDialog(true);
-                    setIsDropdownDismissed(true);
-                  }}
-                >
-                  <Plus className="w-3 h-3 mr-1" />
-                  Add Entity
-                </button>
-          </div>
+                if (cat.key === 'entities') {
+                  return (
+                    <div key={cat.key} className="border-b last:border-b-0 bg-background">
+                      {renderSectionHeader(title, total, categoryKey)}
+                      {cat.visible.map((entity: any) => {
+                        const myIdx = kbdIdx++;
+                        return (
+                          <div
+                            key={entity.id}
+                            id={`search-opt-${myIdx}`}
+                            role="option"
+                            aria-selected={highlightedIdx === myIdx}
+                            className={cn(
+                              'cursor-pointer',
+                              highlightedIdx === myIdx ? 'bg-accent/40' : '',
+                            )}
+                            onMouseEnter={() => schedulePrefetch(entity.slug)}
+                            onClick={() =>
+                              handleEntityClick({
+                                id: entity.id,
+                                type: entity.type,
+                                name: entity.name,
+                                slug: entity.slug,
+                              })
+                            }
+                          >
+                            <EntityResultItem entity={entity} onClick={() => {}} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                }
+
+                // External: places / books / movies
+                return (
+                  <div key={cat.key} className="border-b last:border-b-0 bg-background">
+                    {renderSectionHeader(title, total, categoryKey)}
+                    {cat.visible.map((item: any, idx: number) => {
+                      const myIdx = kbdIdx++;
+                      return (
+                        <div
+                          key={`${item.api_source}-${item.api_ref || idx}`}
+                          id={`search-opt-${myIdx}`}
+                          role="option"
+                          aria-selected={highlightedIdx === myIdx}
+                          className={highlightedIdx === myIdx ? 'bg-accent/40' : ''}
+                          onMouseEnter={() => schedulePrefetch(item.slug)}
+                        >
+                          <SearchResultHandler
+                            result={item}
+                            query={trimmedQuery}
+                            onClose={() => {
+                              setIsDropdownDismissed(true);
+                              setIsFocused(false);
+                            }}
+                            isProcessing={isProcessingEntity}
+                            onProcessingStart={handleProcessingStart}
+                            onProcessingUpdate={handleProcessingUpdate}
+                            onProcessingEnd={handleProcessingEnd}
+                            useExternalOverlay={true}
+                          />
+                        </div>
+                      );
+                    })}
+                    {cat.hidden.length > 0 && (
+                      <button
+                        type="button"
+                        className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={handleShowMoreInFullSearch}
+                      >
+                        Show {cat.hidden.length} more in full search
+                      </button>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+
+            {/* Hashtags (kept separate — not part of ranking pipeline) */}
+            {results.hashtags?.length > 0 && (() => {
+              // Recompute hashtag base index so option ids align with flatKeyboardItems
+              let kbdIdx = showRecentsBranch ? recents.slice(0, 6).length : 0;
+              if (collapsed) {
+                collapsed.forEach((cat) => { kbdIdx += cat.visible.length; });
+              }
+              return (
+                <div className="border-b last:border-b-0 bg-background">
+                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
+                    # Hashtags ({results.hashtags.length})
+                  </div>
+                  {results.hashtags.slice(0, 3).map((hashtag: any) => {
+                    const myIdx = kbdIdx++;
+                    return (
+                      <div
+                        key={hashtag.id}
+                        id={`search-opt-${myIdx}`}
+                        role="option"
+                        aria-selected={highlightedIdx === myIdx}
+                        onClick={() => {
+                          navigate(`/t/${hashtag.name_norm}`);
+                          setIsDropdownDismissed(true);
+                          setIsFocused(false);
+                        }}
+                        className={cn(
+                          'flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors',
+                          highlightedIdx === myIdx ? 'bg-accent/40' : '',
+                        )}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-primary font-medium">#{hashtag.name_original}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {hashtag.post_count} posts
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* Add Entity CTA — once at bottom when query ≥ 1 char */}
+            <div className="p-3 text-center bg-muted/30 border-t">
+              <p className="text-xs text-muted-foreground mb-2">
+                Couldn't find "<span className="font-medium text-foreground">{trimmedQuery}</span>"?
+              </p>
+              <button
+                type="button"
+                className="text-sm text-brand-orange hover:text-brand-orange/80 font-medium flex items-center justify-center w-full"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setCreateEntityQuery(trimmedQuery);
+                  setShowCreateEntityDialog(true);
+                  setIsDropdownDismissed(true);
+                  setIsFocused(false);
+                }}
+              >
+                <Plus className="w-3 h-3 mr-1" />
+                Add Entity
+              </button>
+            </div>
+          </>
         )}
       </div>
     );
@@ -801,14 +888,14 @@ const Search = () => {
         
         <div className={cn(
           "flex-1 min-w-0",
-          "pt-16 xl:pt-0 xl:pl-64" // Mobile top padding, desktop left padding
+          "pt-16 xl:pt-0 xl:pl-64"
         )}>
           <div className="container max-w-4xl mx-auto p-4 md:p-8 min-w-0">
             <h1 className="text-3xl font-bold mb-6">Search</h1>
             
             <form onSubmit={handleSearch} className="mb-6">
               <div className="flex gap-2 min-w-0">
-                <div className="relative flex-grow search-dropdown-container min-w-0">
+                <div className="relative flex-grow min-w-0">
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                     <SearchIcon className="h-4 w-4 text-muted-foreground" />
                   </div>
@@ -819,7 +906,10 @@ const Search = () => {
                     value={searchQuery}
                     onChange={handleSearchInputChange}
                     onFocus={() => {
-                      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+                      if (blurTimerRef.current) {
+                        clearTimeout(blurTimerRef.current);
+                        blurTimerRef.current = null;
+                      }
                       setIsFocused(true);
                       setIsDropdownDismissed(false);
                     }}
@@ -827,8 +917,11 @@ const Search = () => {
                       blurTimerRef.current = setTimeout(() => {
                         setIsFocused(false);
                         setIsDropdownDismissed(false);
+                        setHighlightedIdx(-1);
                       }, 150);
                     }}
+                    onCompositionStart={() => { isComposingRef.current = true; }}
+                    onCompositionEnd={() => { isComposingRef.current = false; }}
                     onKeyDown={handleInputKeyDown}
                     role="combobox"
                     aria-expanded={shouldShowDropdown}
@@ -860,14 +953,10 @@ const Search = () => {
             
             {query ? (
               <>
-                {/* Responsive Navigation - Pills for mobile/tablet, TubelightTabs for desktop */}
+                {/* Responsive Navigation */}
                 {isTablet ? (
                   <div className="mb-6 overflow-x-auto">
-                    <PillTabs
-                      items={tabItems}
-                      activeTab={activeTab}
-                      onTabChange={setActiveTab}
-                    />
+                    <PillTabs items={tabItems} activeTab={activeTab} onTabChange={setActiveTab} />
                   </div>
                 ) : (
                   <div className="mb-6 overflow-x-auto">
@@ -877,9 +966,7 @@ const Search = () => {
                       onValueChange={setActiveTab}
                       className="mb-6"
                     >
-                      <TabsContent value={activeTab}>
-                        {/* Content will be rendered below */}
-                      </TabsContent>
+                      <TabsContent value={activeTab} />
                     </TubelightTabs>
                   </div>
                 )}
@@ -896,7 +983,7 @@ const Search = () => {
                     <>
                       {activeTab === 'all' && (
                         <>
-                          {/* Already on Groundz section - Priority 1 */}
+                          {/* Already on Groundz section */}
                           {filteredResults.localResults.length > 0 && (
                             <div className="mb-8 min-w-0">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -907,10 +994,7 @@ const Search = () => {
                               </div>
                               {filteredResults.localResults.length > 5 && (
                                 <div className="mt-4 text-center">
-                                  <Button 
-                                    variant="outline"
-                                    onClick={() => handleViewAll('localResults')}
-                                  >
+                                  <Button variant="outline" onClick={() => handleViewAll('localResults')}>
                                     {showAllStates.localResults ? 'Show less' : `View all ${filteredResults.localResults.length} items`}
                                   </Button>
                                 </div>
@@ -938,10 +1022,7 @@ const Search = () => {
                               </div>
                               {filteredResults.externalResults.length > 8 && (
                                 <div className="mt-4 text-center">
-                                  <Button 
-                                    variant="outline"
-                                    onClick={() => handleViewAll('externalResults')}
-                                  >
+                                  <Button variant="outline" onClick={() => handleViewAll('externalResults')}>
                                     {showAllStates.externalResults ? 'Show less' : `View all ${filteredResults.externalResults.length} items`}
                                   </Button>
                                 </div>
@@ -957,19 +1038,12 @@ const Search = () => {
                               </h2>
                               <div className="border rounded-md overflow-hidden min-w-0">
                                 {results.users.slice(0, 5).map((user) => (
-                                  <UserResultItem
-                                    key={user.id}
-                                    user={user}
-                                    onClick={() => {}}
-                                  />
+                                  <UserResultItem key={user.id} user={user} onClick={() => {}} />
                                 ))}
                               </div>
                               {results.users.length > 5 && (
                                 <div className="mt-4 text-center">
-                                  <Button 
-                                    variant="outline"
-                                    onClick={() => handleViewAll('users')}
-                                  >
+                                  <Button variant="outline" onClick={() => handleViewAll('users')}>
                                     View all {results.users.length} people
                                   </Button>
                                 </div>
@@ -977,7 +1051,7 @@ const Search = () => {
                             </div>
                           )}
                           
-                          {/* Add Entity CTA for all tabs */}
+                          {/* Add Entity CTA */}
                           {searchMode === 'quick' && (
                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
                               <h3 className="text-lg font-semibold mb-2">❓ Couldn't find what you're looking for?</h3>
@@ -987,7 +1061,7 @@ const Search = () => {
                               <p className="text-xs text-muted-foreground/70 mb-4 max-w-lg mx-auto italic">
                                 Contribute books, movies, places, products, and more to help other users discover great content
                               </p>
-                              <Button 
+                              <Button
                                 onClick={() => {
                                   setCreateEntityQuery(query);
                                   setShowCreateEntityDialog(true);
@@ -1003,7 +1077,6 @@ const Search = () => {
                         </>
                       )}
                       
-                      {/* Category-specific content */}
                       {activeTab === 'movies' && (
                         <>
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
@@ -1135,8 +1208,6 @@ const Search = () => {
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <ShoppingBag className="h-5 w-5" /> Products
                           </h2>
-                          
-                          {/* Add Entity CTA for products tab */}
                           {searchMode === 'quick' && filteredResults.externalResults.length === 0 && (
                             <div className="mb-8 p-6 border border-dashed rounded-lg text-center bg-gradient-to-br from-muted/30 to-muted/10 min-w-0">
                               <h3 className="text-lg font-semibold mb-2">❓ Couldn't find what you're looking for?</h3>
@@ -1146,7 +1217,7 @@ const Search = () => {
                               <p className="text-xs text-muted-foreground/70 mb-4 max-w-lg mx-auto italic">
                                 Contribute books, movies, places, products, and more to help other users discover great content
                               </p>
-                              <Button 
+                              <Button
                                 onClick={() => {
                                   setCreateEntityQuery(query);
                                   setShowCreateEntityDialog(true);
@@ -1159,7 +1230,6 @@ const Search = () => {
                               </Button>
                             </div>
                           )}
-                          
                           {(filteredResults.localResults.length > 0 || filteredResults.externalResults.length > 0) && (
                             <div className="space-y-6 min-w-0">
                               {filteredResults.localResults.length > 0 && (
@@ -1196,7 +1266,7 @@ const Search = () => {
                         </>
                       )}
                       
-                       {activeTab === 'hashtags' && (
+                      {activeTab === 'hashtags' && (
                         <>
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <Hash className="h-5 w-5" /> Hashtags
@@ -1235,11 +1305,7 @@ const Search = () => {
                           {results.users.length > 0 ? (
                             <div className="border rounded-md overflow-hidden min-w-0">
                               {results.users.map((user) => (
-                                <UserResultItem
-                                  key={user.id}
-                                  user={user}
-                                  onClick={() => {}}
-                                />
+                                <UserResultItem key={user.id} user={user} onClick={() => {}} />
                               ))}
                             </div>
                           ) : (
@@ -1277,11 +1343,45 @@ const Search = () => {
         prefillName={createEntityQuery}
         showPreviewTab={false}
       />
-      
-      {/* Mobile Bottom Navigation - only show on screens smaller than xl */}
+
+      {/* Mobile Bottom Navigation */}
       <div className="xl:hidden">
         <BottomNavigation />
       </div>
+
+      {/* Full-Screen Loading Overlay (mirrors Explore) */}
+      {isProcessingEntity && (
+        <div className="fixed inset-0 z-[100] pointer-events-auto">
+          <div className="absolute inset-0 bg-white" />
+          <div className="flex items-center justify-center h-full">
+            <div className="bg-white border rounded-2xl shadow-2xl p-8 mx-4 max-w-md w-full animate-fade-in relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-3 right-3 h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                onClick={handleCancelProcessing}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <div className="flex flex-col items-center gap-6 pt-4">
+                <div className="relative">
+                  <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                  <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-r-primary/40 animate-spin animation-delay-150" />
+                </div>
+                <div className="text-center space-y-3">
+                  <h3 className="font-semibold text-lg text-foreground">{processingEntityName}</h3>
+                  <div className="flex items-center justify-center">
+                    <span className="text-center leading-relaxed animate-fade-in text-sm text-muted-foreground px-4">
+                      {processingMessage || '✨ Processing your selection...'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground/80">Click X to cancel</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
