@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useEntityCache } from '@/hooks/use-entity-cache';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import SEOHead from '@/components/seo/SEOHead';
