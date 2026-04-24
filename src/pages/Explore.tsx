@@ -549,6 +549,12 @@ const Explore = () => {
                       setSearchQuery(e.target.value);
                       setIsDropdownDismissed(false);
                     }}
+                    onMouseDown={() => {
+                      // Re-click into already-focused input → reopen dropdown
+                      if (isFocused && (searchQuery.trim().length >= 1 || recents.length > 0)) {
+                        setIsDropdownDismissed(false);
+                      }
+                    }}
                     onFocus={() => {
                       if (blurTimerRef.current) {
                         clearTimeout(blurTimerRef.current);
