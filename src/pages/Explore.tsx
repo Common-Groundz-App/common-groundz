@@ -441,18 +441,28 @@ const Explore = () => {
                             results.categorized.places.length > 0;
   const hasHashtagResults = results.hashtags?.length > 0;
 
-  const renderSectionHeader = (title: string, count: number, categoryKey?: keyof typeof showAllResults) => (
+  const renderSectionHeader = (
+    title: string,
+    count: number,
+    categoryKey?: string,
+    hiddenCount: number = 0,
+  ) => (
     <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
       <span>{title} ({count})</span>
       <div className="flex items-center gap-2">
-        {categoryKey && count > 3 && (
+        {categoryKey && hiddenCount > 0 && (
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             className="h-6 px-2 text-xs text-brand-orange font-semibold hover:text-brand-orange/80"
-            onClick={() => toggleShowAll(categoryKey)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDropdownToggle(categoryKey, hiddenCount);
+            }}
           >
-            {showAllResults[categoryKey] ? (
+            {dropdownShowAll[categoryKey] ? (
               <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
             ) : (
               <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
