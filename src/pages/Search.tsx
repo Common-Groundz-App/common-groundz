@@ -918,6 +918,12 @@ const Search = () => {
                     placeholder="Search for people, places, products..."
                     value={searchQuery}
                     onChange={handleSearchInputChange}
+                    onMouseDown={() => {
+                      // Re-click into already-focused input → reopen dropdown if there's content
+                      if (isFocused && (trimmedQuery.length >= 1 || recents.length > 0)) {
+                        setIsDropdownDismissed(false);
+                      }
+                    }}
                     onFocus={() => {
                       if (blurTimerRef.current) {
                         clearTimeout(blurTimerRef.current);
