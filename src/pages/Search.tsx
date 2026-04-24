@@ -153,16 +153,19 @@ const Search = () => {
   // Trimmed query — reused everywhere
   const trimmedQuery = searchQuery.trim();
 
-  // Reset show-all state when query changes (skip during IME composition)
+  // Reset expansion + highlight when query changes (skip during IME composition)
   useEffect(() => {
     if (isComposingRef.current) return;
-    setDropdownShowAll({
-      localResults: false,
-      books: false,
-      movies: false,
-      places: false
-    });
+    setDropdownShowAll(initialDropdownExpansion);
+    setHighlightedIdx(-1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimmedQuery]);
+
+  // Reset expansion when route changes (defensive)
+  useEffect(() => {
+    setDropdownShowAll(initialDropdownExpansion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   // Reset last-prefetched slug when query changes so same-named entity re-prefetches in new results
   useEffect(() => {
