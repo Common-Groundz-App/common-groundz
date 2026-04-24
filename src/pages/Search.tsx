@@ -36,6 +36,7 @@ const Search = () => {
   const isTablet = useIsMobile(630); // Custom breakpoint for pill tabs
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const query = searchParams.get('q') || '';
   const mode = searchParams.get('mode') || 'quick';
   const [searchQuery, setSearchQuery] = useState(query);
