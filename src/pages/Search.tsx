@@ -305,13 +305,7 @@ const Search = () => {
     }
   };
 
-  // Handle dropdown "See More/Less" clicks
-  const handleDropdownViewAll = (section: keyof typeof dropdownShowAll) => {
-    setDropdownShowAll(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
+  // (legacy `handleDropdownViewAll` removed — use `handleDropdownToggle` defined above)
 
   // Filter results based on active tab using backend categorization (page-results)
   const getFilteredResults = () => {
