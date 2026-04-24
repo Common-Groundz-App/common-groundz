@@ -600,18 +600,23 @@ const Search = () => {
   const renderSectionHeader = (
     title: string,
     count: number,
-    categoryKey?: keyof typeof dropdownShowAll,
+    categoryKey?: string,
+    hiddenCount: number = 0,
   ) => (
     <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
       <span>{title} ({count})</span>
       <div className="flex items-center gap-2">
-        {categoryKey && count > 3 && (
+        {categoryKey && hiddenCount > 0 && (
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             className="h-6 px-2 text-xs text-brand-orange font-semibold hover:text-brand-orange/80"
             onMouseDown={(e) => e.preventDefault()}
-            onClick={() => handleDropdownViewAll(categoryKey)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDropdownToggle(categoryKey, hiddenCount);
+            }}
           >
             {dropdownShowAll[categoryKey] ? (
               <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
@@ -692,21 +697,17 @@ const Search = () => {
               // Compute global flat-row index across keyboard-nav items so highlight maps correctly
               let kbdIdx = showRecentsBranch ? recents.slice(0, 6).length : 0;
               return collapsed.map((cat) => {
-                if (cat.visible.length === 0) return null;
+                if (!cat.allItems?.length) return null; // empty guard
                 const title = dropdownCategoryTitle[cat.key] || cat.key;
-                const total = cat.visible.length + cat.hidden.length;
-                const categoryKey =
-                  cat.key === 'entities' ? 'localResults'
-                  : cat.key === 'books' ? 'books'
-                  : cat.key === 'movies' ? 'movies'
-                  : cat.key === 'places' ? 'places'
-                  : undefined;
+                const total = cat.allItems.length;
+                const isExpanded = !!dropdownShowAll[cat.key];
+                const itemsToRender = isExpanded ? cat.allItems : cat.visible;
 
                 if (cat.key === 'users') {
                   return (
                     <div key={cat.key} className="border-b last:border-b-0 bg-background">
-                      {renderSectionHeader(title, total)}
-                      {cat.visible.map((u: any) => {
+                      {renderSectionHeader(title, total, cat.key, cat.hidden.length)}
+                      {itemsToRender.map((u: any) => {
                         const myIdx = kbdIdx++;
                         return (
                           <div
@@ -727,8 +728,8 @@ const Search = () => {
                 if (cat.key === 'entities') {
                   return (
                     <div key={cat.key} className="border-b last:border-b-0 bg-background">
-                      {renderSectionHeader(title, total, categoryKey)}
-                      {cat.visible.map((entity: any) => {
+                      {renderSectionHeader(title, total, cat.key, cat.hidden.length)}
+                      {itemsToRender.map((entity: any) => {
                         const myIdx = kbdIdx++;
                         return (
                           <div
@@ -761,12 +762,12 @@ const Search = () => {
                 // External: places / books / movies
                 return (
                   <div key={cat.key} className="border-b last:border-b-0 bg-background">
-                    {renderSectionHeader(title, total, categoryKey)}
-                    {cat.visible.map((item: any, idx: number) => {
+                    {renderSectionHeader(title, total, cat.key, cat.hidden.length)}
+                    {itemsToRender.map((item: any, idx: number) => {
                       const myIdx = kbdIdx++;
                       return (
                         <div
-                          key={`${item.api_source}-${item.api_ref || idx}`}
+                          key={`${item.api_source}-${item.api_ref ?? idx}`}
                           id={`search-opt-${myIdx}`}
                           role="option"
                           aria-selected={highlightedIdx === myIdx}
@@ -789,12 +790,15 @@ const Search = () => {
                         </div>
                       );
                     })}
-                    {cat.hidden.length > 0 && (
+                    {!isExpanded && cat.hidden.length > 0 && (
                       <button
                         type="button"
                         className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={handleShowMoreInFullSearch}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShowMoreInFullSearch();
+                        }}
                       >
                         Show {cat.hidden.length} more in full search
                       </button>
@@ -811,12 +815,13 @@ const Search = () => {
               if (collapsed) {
                 collapsed.forEach((cat) => { kbdIdx += cat.visible.length; });
               }
+              const isExpanded = !!dropdownShowAll['hashtags'];
+              const hashtagsToRender = isExpanded ? results.hashtags : results.hashtags.slice(0, 3);
+              const hiddenCount = Math.max(0, results.hashtags.length - 3);
               return (
                 <div className="border-b last:border-b-0 bg-background">
-                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20">
-                    # Hashtags ({results.hashtags.length})
-                  </div>
-                  {results.hashtags.slice(0, 3).map((hashtag: any) => {
+                  {renderSectionHeader('# Hashtags', results.hashtags.length, 'hashtags', hiddenCount)}
+                  {hashtagsToRender.map((hashtag: any) => {
                     const myIdx = kbdIdx++;
                     return (
                       <div
