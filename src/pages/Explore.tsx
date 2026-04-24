@@ -52,6 +52,23 @@ const Explore = () => {
   const [activeTab, setActiveTab] = useState('featured');
   const [isDropdownClosing, setIsDropdownClosing] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Per-category inline expand state (canonical keys: entities/books/movies/places/users/hashtags)
+  const [dropdownShowAll, setDropdownShowAll] = useState<Record<string, boolean>>({
+    entities: false,
+    books: false,
+    movies: false,
+    places: false,
+    users: false,
+    hashtags: false,
+  });
+
+  const handleDropdownToggle = useCallback((key: string, hiddenCount: number) => {
+    if (hiddenCount === 0) return; // defensive guard
+    setDropdownShowAll((prev) => ({ ...prev, [key]: !prev[key] }));
+    setHighlightedIdx(() => -1);
+  }, []);
 
   // Create entity dialog state
   const [showCreateEntityDialog, setShowCreateEntityDialog] = useState(false);
