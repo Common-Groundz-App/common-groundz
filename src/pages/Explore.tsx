@@ -647,15 +647,17 @@ const Explore = () => {
                         // Compute global flat-row index so the very first row gets top weight.
                         let flatIdx = 0;
                         return collapsed.map((cat) => {
-                          if (cat.visible.length === 0) return null;
+                          if (!cat.allItems?.length) return null; // empty guard
                           const title = exploreCategoryTitle[cat.key] || cat.key;
-                          const total = cat.visible.length + cat.hidden.length;
+                          const total = cat.allItems.length;
+                          const isExpanded = !!dropdownShowAll[cat.key];
+                          const itemsToRender = isExpanded ? cat.allItems : cat.visible;
 
                           if (cat.key === 'users') {
-                            const node = (
+                            return (
                               <div key={cat.key} className="border-b last:border-b-0 bg-background">
-                                {renderSectionHeader(title, total)}
-                                {cat.visible.map((u: any) => {
+                                {renderSectionHeader(title, total, cat.key, cat.hidden.length)}
+                                {itemsToRender.map((u: any) => {
                                   const isTop = flatIdx === 0;
                                   flatIdx += 1;
                                   return (
@@ -669,14 +671,13 @@ const Explore = () => {
                                 })}
                               </div>
                             );
-                            return node;
                           }
 
                           if (cat.key === 'entities') {
                             return (
                               <div key={cat.key} className="border-b last:border-b-0 bg-background">
-                                {renderSectionHeader(title, total)}
-                                {cat.visible.map((entity: any) => {
+                                {renderSectionHeader(title, total, cat.key, cat.hidden.length)}
+                                {itemsToRender.map((entity: any) => {
                                   const isTop = flatIdx === 0;
                                   flatIdx += 1;
                                   return (
@@ -698,13 +699,13 @@ const Explore = () => {
                           // External: places / books / movies
                           return (
                             <div key={cat.key} className="border-b last:border-b-0 bg-background">
-                              {renderSectionHeader(title, total)}
-                              {cat.visible.map((item: any, idx: number) => {
+                              {renderSectionHeader(title, total, cat.key, cat.hidden.length)}
+                              {itemsToRender.map((item: any, idx: number) => {
                                 const isTop = flatIdx === 0;
                                 flatIdx += 1;
                                 return (
                                   <div
-                                    key={`${item.api_source}-${item.api_ref || idx}`}
+                                    key={`${item.api_source}-${item.api_ref ?? idx}`}
                                     className={isTop ? 'border-b border-border/40 [&_*]:font-medium' : ''}
                                   >
                                     <SearchResultHandler
@@ -720,11 +721,15 @@ const Explore = () => {
                                   </div>
                                 );
                               })}
-                              {cat.hidden.length > 0 && (
+                              {!isExpanded && cat.hidden.length > 0 && (
                                 <button
                                   type="button"
                                   className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
-                                  onClick={handleComplexProductSearch}
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleComplexProductSearch();
+                                  }}
                                 >
                                   Show {cat.hidden.length} more in full search
                                 </button>
@@ -735,30 +740,35 @@ const Explore = () => {
                       })()}
 
                       {/* Hashtags (kept separate — not part of ranking pipeline) */}
-                      {results.hashtags?.length > 0 && (
-                        <div className="border-b last:border-b-0 bg-background">
-                          {renderSectionHeader('# Hashtags', results.hashtags.length, 'hashtags')}
-                          {(showAllResults.hashtags ? results.hashtags : results.hashtags.slice(0, 3)).map((hashtag) => (
-                            <div
-                              key={hashtag.id}
-                              onClick={() => {
-                                navigate(`/t/${hashtag.name_norm}`);
-                                handleResultClick();
-                              }}
-                              className="flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-primary font-medium">#{hashtag.name_original}</span>
+                      {results.hashtags?.length > 0 && (() => {
+                        const isExpanded = !!dropdownShowAll['hashtags'];
+                        const hiddenCount = Math.max(0, results.hashtags.length - 3);
+                        const hashtagsToRender = isExpanded ? results.hashtags : results.hashtags.slice(0, 3);
+                        return (
+                          <div className="border-b last:border-b-0 bg-background">
+                            {renderSectionHeader('# Hashtags', results.hashtags.length, 'hashtags', hiddenCount)}
+                            {hashtagsToRender.map((hashtag: any) => (
+                              <div
+                                key={hashtag.id}
+                                onClick={() => {
+                                  navigate(`/t/${hashtag.name_norm}`);
+                                  handleResultClick();
+                                }}
+                                className="flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-primary font-medium">#{hashtag.name_original}</span>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mt-0.5">
+                                    {hashtag.post_count} posts
+                                  </p>
                                 </div>
-                                <p className="text-sm text-muted-foreground mt-0.5">
-                                  {hashtag.post_count} posts
-                                </p>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </>
                   )}
 
