@@ -1,158 +1,200 @@
 
+# Restore inline “See More / See Less” on Explore + Search — final ship version
 
-# Make Search dropdown identical to Explore dropdown — final
+The orange inline toggle exists in the UI but was disconnected from rendering during the ranking refactor. We will restore real expand/collapse on **both** dropdowns, with every reviewer-recommended safeguard included.
 
-The two search boxes drifted apart. We'll align Search with Explore as the reference, fixing all observed bugs (slowness, missing "Already on Groundz", See More closing dropdown) and bringing UX to parity, with full guards for IME users, race conditions, and timer leaks.
-
----
-
-## Confirmed root causes
-
-1. **Slowness** — Search.tsx runs **two** `useEnhancedRealtimeSearch` calls per keystroke. Doubles backend traffic.
-2. **Missing "Already on Groundz" for typo'd queries** — Search dropdown skips the ranking pipeline (`dedupeResults` → `rankCategories` → `applyExactMatchOverride` → `softCollapse`) that Explore runs.
-3. **See More / See Less closes dropdown** — Toggle buttons don't `preventDefault` on `mousedown`, so clicking blurs the input → 150ms timer → unmount.
-4. **External item clicks misbehave** — Search wraps `SearchResultHandler` in an outer `<div onClick={...}>` that intercepts the click and just refills the input.
-5. **Other drift** — 2-char threshold (vs 1), no hashtags, no "Show N more in full search" link, no hover-prefetch, redundant `handleClickOutside`, different loading text, double Add Entity CTA.
+Scope: `src/utils/searchRanking.ts`, `src/pages/Search.tsx`, `src/pages/Explore.tsx`. We will **not** touch `EnhancedSearchInput.tsx` or `SearchDialog.tsx` (separate, working surfaces).
 
 ---
 
-## The fix — apply Explore's pattern to Search
+## What's broken today
 
-### A. Single search hook
-Remove the dropdown's separate `useEnhancedRealtimeSearch(searchQuery, ...)` call. Drive both page and dropdown from one hook keyed off `searchQuery`. **Do not delete the hook itself** — Explore and other consumers use it. We only stop the duplicate *call*.
+1. Search renders only `cat.visible`, so clicking “See More” changes the label but not the list.
+2. Explore stopped passing the canonical category key into `renderSectionHeader`, so the toggle no longer appears at all.
+3. Search's toggle button has no `type="button"`, so clicking it submits the form and closes the dropdown.
+4. Expand state isn't reset on query change (or page switch), so it leaks across searches.
+5. Keyboard `aria-activedescendant` can point at a row that no longer exists after collapse or after a new query.
+6. Search uses `'localResults'` as a state key while the ranking pipeline emits `'entities'` — keys drift.
 
-### B. Keep URL ↔ input in sync (Codex earlier guardrail)
-- On mount and on `searchParams` change → `setSearchQuery(searchParams.get('q') || '')`. Handles initial load, back/forward, pasted links.
-- Form submit and dropdown selection continue to call `setSearchParams({ q, mode: 'quick' })`.
-- Clearing the input does **not** wipe `?q=` — only explicit submit/selection updates URL (current behavior preserved).
+---
 
-### C. Apply ranking pipeline to dropdown, gated on trimmed query (ChatGPT guardrail)
+## Fix plan
+
+### 1. Make `softCollapse` carry the full ranked list — same array reference
+
+In `src/utils/searchRanking.ts`, extend `CollapsedCategory<T>` with a new field. **Additive only** — do not rename or remove `visible`/`hidden`/`topScore`:
+
 ```ts
-const trimmedQuery = searchQuery.trim();
-const collapsed = useMemo(() => {
-  if (trimmedQuery.length < 1) return null;          // prevent stale flicker
-  // dedupeResults → rankCategories → applyExactMatchOverride → softCollapse
-}, [results, trimmedQuery]);
-```
-Render the dropdown body only when `collapsed` is non-null.
-
-### D. Fix See More / See Less closing dropdown
-1. Add `onMouseDown={(e) => e.preventDefault()}` to every "See More / See Less" `<Button>` so the input never loses focus.
-2. **Reset show-all state when query changes**, but only outside IME composition:
-   ```ts
-   useEffect(() => {
-     if (isComposingRef.current) return;
-     setDropdownShowAll({ localResults: false, books: false, movies: false, places: false });
-   }, [trimmedQuery]);
-   ```
-
-### E. Fix external-item click behavior
-Remove the outer `<div onClick={handleDropdownItemClick}>` wrapper. Wire `SearchResultHandler` exactly like Explore: `onClose`, `onProcessingStart`, `onProcessingUpdate`, `onProcessingEnd`, `useExternalOverlay={true}`. Mirror Explore's page-level `isProcessingEntity` / `processingEntityName` / `processingMessage` state and the full-screen overlay component.
-
-### F. Dismiss dropdown during entity processing (ChatGPT guardrail)
-```ts
-onProcessingStart={(name, msg) => {
-  setIsDropdownDismissed(true);
-  setIsFocused(false);
-  setIsProcessingEntity(true);
-  setProcessingEntityName(name);
-  setProcessingMessage(msg);
-}}
+export interface CollapsedCategory<T> {
+  key: string;
+  visible: T[];
+  hidden: T[];
+  allItems: T[];   // NEW: same ranked array, NOT re-sorted
+  topScore: number;
+}
 ```
 
-### G. Lower threshold to 1 character
-Change `>= 2` → `>= 1` in both `shouldShowDropdown` and `showRecentsBranch`.
+`softCollapse` populates `allItems` from the **same already-sorted reference**, so slices are guaranteed prefixes — expanding can never reorder visible rows:
 
-### H. Add the missing pieces
-- **Hashtags section** — copy Explore's block; click navigates to `/t/<name_norm>`.
-- **"Show N more in full search"** footer per external category when `cat.hidden.length > 0`.
-- **Add Entity CTA** — once at the bottom when `searchQuery.length >= 1` (consolidate the current two copies).
-- **Loading text**: "Searching with enhanced reliability…".
-- **Hover prefetch** on entity rows via existing `schedulePrefetch` on `onMouseEnter`.
-
-### I. Drop redundant click-outside handler
-Remove the `handleClickOutside` effect. The 150ms blur grace timer matches Explore and avoids race conditions with internal clicks.
-
-### J. Preserve keyboard / ARIA parity (Codex earlier guardrail)
-- Stable `aria-activedescendant` ids (`search-opt-${idx}`).
-- `flatKeyboardItems` index aligned with rendered DOM order: recents → entities → places → books → movies → hashtags. Footer/CTA rows excluded from nav.
-- Preserve `Escape` (dismiss without blur), `ArrowUp`/`ArrowDown` (wrap), `Enter` (activate highlighted or submit).
-- `aria-expanded`, `aria-controls`, `aria-autocomplete="list"`, `role="combobox"` on input; `role="listbox"` / `role="option"` on dropdown.
-
-### K. IME composition guard (Codex final)
-Add a composition ref and short-circuit keyboard handling while composing:
 ```ts
-const isComposingRef = useRef(false);
+return ranked.map((cat) => {
+  const items = cat.items;            // already sorted by rankCategories
+  let visibleCount: number;
+  if (cat.topScore >= 50) visibleCount = 5;
+  else if (cat.topScore >= 30) visibleCount = 3;
+  else visibleCount = Math.min(2, items.length);
+  return {
+    key: cat.key,
+    visible: items.slice(0, visibleCount),
+    hidden: items.slice(visibleCount),
+    allItems: items,                  // SAME reference — no re-sort, no copy
+    topScore: cat.topScore,
+  };
+});
+```
 
-<Input
-  onCompositionStart={() => { isComposingRef.current = true; }}
-  onCompositionEnd={() => { isComposingRef.current = false; }}
-  onKeyDown={(e) => {
-    if (isComposingRef.current || e.nativeEvent.isComposing) return; // skip nav during IME
-    handleInputKeyDown(e);
+### 2. Treat `allItems` / `cat.items` as immutable (Codex)
+
+The whole correctness story depends on `allItems` being the same array `rankCategories` produced.
+
+- Audit consumers for any `.sort()`, `.reverse()`, `.push()`, `.splice()`, or index assignment against `cat.items`, `cat.visible`, `cat.hidden`, or `cat.allItems`.
+- If any are found, replace with non-mutating equivalents (`[...arr].sort(...)`, etc.).
+- Add a JSDoc note on `CollapsedCategory.allItems`: _“Same reference as the ranked source; treat as read-only.”_
+
+### 3. Use canonical category keys everywhere
+
+Standardize on the keys the ranking pipeline emits:
+`entities`, `books`, `movies`, `places`, `users`, `hashtags`.
+
+In `Search.tsx`, drop the `'localResults'` remap. Use `entities` directly so toggle state lookups can't drift between the two pages.
+
+Sanity grep before coding: confirm no consumer is doing `[...cat.visible, ...cat.hidden]`. After this change, **everything reads `cat.allItems`** when expanded.
+
+### 4. Render from expand state using `allItems`, with empty guard
+
+For each ranked category on both pages:
+
+```ts
+if (!cat.allItems?.length) return null;          // empty render guard
+const isExpanded = !!showAllResults[cat.key];
+const itemsToRender = isExpanded ? cat.allItems : cat.visible;
+```
+
+Apply consistently to entities, users, hashtags, and external (books/movies/places) render branches.
+
+### 5. Toggle visibility uses the pipeline's own collapse decision
+
+```ts
+const canToggle = cat.hidden.length > 0;
+```
+
+Not a hardcoded `> 3` threshold. `softCollapse` already chose 5/3/2 based on score; the header just respects that.
+
+Label: `See Less` when expanded, `See More` when collapsed.
+
+### 6. Form-safe, focus-safe toggle button
+
+In `Search.tsx` (and same shape on Explore for parity):
+
+```tsx
+<Button
+  type="button"                                  // never submit
+  variant="ghost"
+  size="sm"
+  className="h-6 px-2 text-xs text-brand-orange ..."
+  onMouseDown={(e) => e.preventDefault()}        // keep input focus
+  onClick={(e) => {
+    e.stopPropagation();                         // don't bubble to form/blur
+    handleToggle(cat.key, cat.hidden.length);
   }}
-/>
+>
+  {isExpanded ? <>See Less <ChevronUp .../></> : <>See More <ChevronDown .../></>}
+</Button>
 ```
-Applies to Enter, ArrowUp, ArrowDown, Escape — and the show-all reset effect (section D2).
 
-### L. Cleanup pending timers (Codex final + my addition)
-Clean up in three places, not just unmount:
+### 7. Toggle handler: guard, then functional updates
+
 ```ts
-// On unmount
-useEffect(() => () => {
-  if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
-  if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
-}, []);
-
-// When dropdown closes — cancel queued prefetch so it doesn't fire after navigation
-useEffect(() => {
-  if (!shouldShowDropdown && prefetchTimerRef.current) {
-    clearTimeout(prefetchTimerRef.current);
-    prefetchTimerRef.current = null;
-  }
-}, [shouldShowDropdown]);
-
-// When query changes — reset last-prefetched slug so same-named entity in new results re-prefetches
-useEffect(() => {
-  lastPrefetchedSlugRef.current = null;
-}, [trimmedQuery]);
+const handleToggle = (key: string, hiddenCount: number) => {
+  if (hiddenCount === 0) return;                              // defensive guard
+  setShowAllResults(prev => ({ ...prev, [key]: !prev[key] })); // functional
+  setHighlightedIdx(() => -1);                                // Search only — clamp aria
+};
 ```
 
-### M. Visual parity
-Replace `p-2` wrapper + `rounded p-2` rows with Explore's `border-b last:border-b-0 bg-background` section structure. Reuse the same `renderSectionHeader` helper signature.
+### 8. Reset state on query change AND route change
+
+Both pages:
+
+```ts
+const initialExpansion = {
+  entities: false, books: false, movies: false,
+  places: false, users: false, hashtags: false,
+};
+
+useEffect(() => {
+  setShowAllResults(initialExpansion);
+  setHighlightedIdx(-1);              // ChatGPT: also reset highlight on new query
+}, [trimmedQuery]);
+
+useEffect(() => {
+  setShowAllResults(initialExpansion);
+}, [location.pathname]);
+```
+
+Resetting `highlightedIdx` on query change prevents stale `aria-activedescendant` and broken Enter behavior when results change underneath the highlight.
+
+### 9. Stable React keys (no array index alone)
+
+Audit every row render and confirm the `key` is a stable identity, never just the loop index:
+
+- entities: `key={entity.id}`
+- users: `key={user.id}`
+- hashtags: `key={hashtag.id}`
+- external: `key={`${result.api_source}-${result.api_ref ?? index}`}` (id-first, index only as fallback)
+
+Guarantees the first 5 DOM nodes are reused when the list grows from 5 → 20 — no flicker, no lost hover/focus.
+
+### 10. Reopen Search dropdown when input is re-clicked while still focused
+
+Add `onMouseDown` on the Search input that clears `isDropdownDismissed` when the input already has focus and there is a query or recents to show. Escape-to-dismiss is preserved.
+
+### 11. Keep “Show N more in full search” footer separate
+
+The footer remains its own row that navigates to the full Search page. It is not the inline toggle. Both can coexist:
+- inline orange toggle = expand/collapse within dropdown
+- footer link = jump to full results page
 
 ---
 
 ## Files changed
 
-- **`src/pages/Search.tsx`** — all of the above. Single file.
+- `src/utils/searchRanking.ts` — additive `allItems` on `CollapsedCategory`; populate from same ranked array reference; immutability JSDoc.
+- `src/pages/Explore.tsx` — pass canonical `cat.key` to `renderSectionHeader`; render from `allItems` when expanded; empty-category guard; reset state on query + route change; `type="button"` + `stopPropagation` + `hiddenCount === 0` guard; verify stable keys.
+- `src/pages/Search.tsx` — same as Explore plus: drop `'localResults'` remap, clamp `highlightedIdx` on toggle and on query change via functional updater, restore re-click reopen.
 
-Untouched:
-- `src/hooks/use-enhanced-realtime-search.ts` (still used by Explore + others — only stop calling twice)
-- `src/hooks/useRecentSearches.ts`
-- `src/components/search/RecentSearchesPanel.tsx`
-- `src/pages/Explore.tsx` (reference)
-- `src/pages/EntityDetail.tsx` / `EntityDetailV2.tsx`
+No changes to `EnhancedSearchInput.tsx` or `SearchDialog.tsx`.
 
 ---
 
 ## Acceptance checks
 
-1. "malika briyani" on Search → "✨ Already on Groundz" appears, same ordering as Explore.
-2. DevTools Network shows **one** request per keystroke debounce (not two).
-3. "See More" / "See Less" → dropdown stays open; expands/collapses smoothly.
-4. Type → click "See More" → type more → show-all resets to default.
-5. Click book/movie/place → entity materializes via overlay → navigates (parity with Explore).
-6. During processing, dropdown is closed; no overlay/dropdown overlap.
-7. URL `?q=foo` direct-load hydrates input + searches; back/forward stays in sync; clearing input keeps URL until submit.
-8. Recents shared with Explore (same items/icons; hover-prefetch works).
-9. Hashtags appear; click → `/t/<name>`.
-10. Single character "m" opens dropdown.
-11. Escape dismisses without blur; arrows highlight rows; `aria-activedescendant` updates; Enter activates highlighted or submits.
-12. Add Entity CTA appears once when query ≥ 1 char.
-13. **IME**: Typing Japanese/Korean/Chinese/Indic via IME — Enter/Arrow during composition does NOT trigger nav or submit; show-all not reset mid-composition.
-14. **Timer cleanup**: navigate away mid-debounce → no React "unmounted component" warnings; no late prefetch firing.
-15. **Stale-slug guard**: type "mal" → hover "Mallika" (prefetch) → clear & type "ram" → hover "Ramen" (different entity, same-named slug edge case) → prefetch fires.
-16. **No stale flicker**: type fast — dropdown never shows results from a previous query.
-17. No regressions on Explore page or other consumers of `useEnhancedRealtimeSearch`.
-
+1. Explore dropdown shows the orange “See More / See Less” when a category has hidden items.
+2. Search dropdown shows the same toggle, in the same position, with the same styling.
+3. Clicking “See More” on Search does not close the dropdown and does not submit the form.
+4. Clicking “See More” actually expands to the full ranked list (not just label change).
+5. Clicking “See Less” collapses back to the preview count.
+6. Expanded list order is identical to collapsed preview order for the first N rows (no re-sort drift).
+7. First 5 rows do not flicker / lose focus when expanding from 5 → 20.
+8. Toggle does nothing and label does not flip when `hidden.length === 0`.
+9. Empty category never renders a stray header + toggle.
+10. Typing a new query resets all sections to collapsed AND resets the keyboard highlight.
+11. Navigating between `/explore` and `/search` resets expansion state.
+12. Arrow-key navigation never points `aria-activedescendant` at a missing row after toggling or after a new query.
+13. After dismissing the Search dropdown, clicking back into the still-focused input reopens it.
+14. “Show N more in full search” footer still works and is visually distinct from the inline toggle.
+15. Ranked ordering, “Already on Groundz”, IME guard, hover prefetch, and external-result processing all continue to work.
+16. `EnhancedSearchInput.tsx` and `SearchDialog.tsx` behavior is unchanged.
+17. No code path mutates `cat.items` / `cat.visible` / `cat.hidden` / `cat.allItems` in place.
+18. No code path reconstructs the expanded list as `[...cat.visible, ...cat.hidden]` — everything uses `cat.allItems`.
+19. Project still type-checks — no other consumer of `CollapsedCategory` / `softCollapse` is broken by the additive `allItems` field.

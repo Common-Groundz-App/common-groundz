@@ -289,6 +289,13 @@ export interface CollapsedCategory<T> {
   key: string;
   visible: T[];
   hidden: T[];
+  /**
+   * Full ranked list — same array reference as the ranked source from
+   * `rankCategories`. Treat as READ-ONLY. Mutating this (sort/push/splice)
+   * will silently break the invariant that `visible` and `hidden` are
+   * exact prefixes/suffixes of `allItems`, causing expand/collapse drift.
+   */
+  allItems: T[];
   topScore: number;
 }
 
@@ -296,14 +303,16 @@ export function softCollapse<T extends ScorableResult>(
   ranked: RankedCategory<T>[],
 ): CollapsedCategory<T>[] {
   return ranked.map((cat) => {
+    const items = cat.items; // already sorted by rankCategories — DO NOT re-sort or copy
     let visibleCount: number;
     if (cat.topScore >= 50) visibleCount = 5;          // strong
     else if (cat.topScore >= 30) visibleCount = 3;     // medium
-    else visibleCount = Math.min(2, cat.items.length); // weak (1–2)
+    else visibleCount = Math.min(2, items.length);     // weak (1–2)
     return {
       key: cat.key,
-      visible: cat.items.slice(0, visibleCount),
-      hidden: cat.items.slice(visibleCount),
+      visible: items.slice(0, visibleCount),
+      hidden: items.slice(visibleCount),
+      allItems: items, // SAME reference — guarantees prefix consistency
       topScore: cat.topScore,
     };
   });

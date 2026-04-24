@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useEntityCache } from '@/hooks/use-entity-cache';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import SEOHead from '@/components/seo/SEOHead';
@@ -52,6 +52,7 @@ const Explore = () => {
   const [activeTab, setActiveTab] = useState('featured');
   const [isDropdownClosing, setIsDropdownClosing] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Create entity dialog state
   const [showCreateEntityDialog, setShowCreateEntityDialog] = useState(false);
@@ -72,6 +73,36 @@ const Explore = () => {
   const blurTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPrefetchedSlugRef = useRef<string | null>(null);
+
+  // Per-category inline expand state (canonical keys: entities/books/movies/places/users/hashtags)
+  const initialExpansion = {
+    entities: false,
+    books: false,
+    movies: false,
+    places: false,
+    users: false,
+    hashtags: false,
+  };
+  const [dropdownShowAll, setDropdownShowAll] = useState<Record<string, boolean>>(initialExpansion);
+
+  const handleDropdownToggle = useCallback((key: string, hiddenCount: number) => {
+    if (hiddenCount === 0) return; // defensive guard
+    setDropdownShowAll((prev) => ({ ...prev, [key]: !prev[key] }));
+    setHighlightedIdx(() => -1);
+  }, []);
+
+  // Reset expansion + highlight when query changes
+  useEffect(() => {
+    setDropdownShowAll(initialExpansion);
+    setHighlightedIdx(-1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
+  // Reset expansion when route changes (defensive against shared lifecycle edge cases)
+  useEffect(() => {
+    setDropdownShowAll(initialExpansion);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   // Entity prefetch (TanStack Query cache)
   const { prefetchEntity } = useEntityCache({ slugOrId: '', enabled: false });
@@ -410,18 +441,28 @@ const Explore = () => {
                             results.categorized.places.length > 0;
   const hasHashtagResults = results.hashtags?.length > 0;
 
-  const renderSectionHeader = (title: string, count: number, categoryKey?: keyof typeof showAllResults) => (
+  const renderSectionHeader = (
+    title: string,
+    count: number,
+    categoryKey?: string,
+    hiddenCount: number = 0,
+  ) => (
     <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/20 flex items-center justify-between">
       <span>{title} ({count})</span>
       <div className="flex items-center gap-2">
-        {categoryKey && count > 3 && (
+        {categoryKey && hiddenCount > 0 && (
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             className="h-6 px-2 text-xs text-brand-orange font-semibold hover:text-brand-orange/80"
-            onClick={() => toggleShowAll(categoryKey)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDropdownToggle(categoryKey, hiddenCount);
+            }}
           >
-            {showAllResults[categoryKey] ? (
+            {dropdownShowAll[categoryKey] ? (
               <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
             ) : (
               <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
@@ -507,6 +548,12 @@ const Explore = () => {
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
                       setIsDropdownDismissed(false);
+                    }}
+                    onMouseDown={() => {
+                      // Re-click into already-focused input → reopen dropdown
+                      if (isFocused && (searchQuery.trim().length >= 1 || recents.length > 0)) {
+                        setIsDropdownDismissed(false);
+                      }
                     }}
                     onFocus={() => {
                       if (blurTimerRef.current) {
@@ -606,15 +653,17 @@ const Explore = () => {
                         // Compute global flat-row index so the very first row gets top weight.
                         let flatIdx = 0;
                         return collapsed.map((cat) => {
-                          if (cat.visible.length === 0) return null;
+                          if (!cat.allItems?.length) return null; // empty guard
                           const title = exploreCategoryTitle[cat.key] || cat.key;
-                          const total = cat.visible.length + cat.hidden.length;
+                          const total = cat.allItems.length;
+                          const isExpanded = !!dropdownShowAll[cat.key];
+                          const itemsToRender = isExpanded ? cat.allItems : cat.visible;
 
                           if (cat.key === 'users') {
-                            const node = (
+                            return (
                               <div key={cat.key} className="border-b last:border-b-0 bg-background">
-                                {renderSectionHeader(title, total)}
-                                {cat.visible.map((u: any) => {
+                                {renderSectionHeader(title, total, cat.key, cat.hidden.length)}
+                                {itemsToRender.map((u: any) => {
                                   const isTop = flatIdx === 0;
                                   flatIdx += 1;
                                   return (
@@ -628,14 +677,13 @@ const Explore = () => {
                                 })}
                               </div>
                             );
-                            return node;
                           }
 
                           if (cat.key === 'entities') {
                             return (
                               <div key={cat.key} className="border-b last:border-b-0 bg-background">
-                                {renderSectionHeader(title, total)}
-                                {cat.visible.map((entity: any) => {
+                                {renderSectionHeader(title, total, cat.key, cat.hidden.length)}
+                                {itemsToRender.map((entity: any) => {
                                   const isTop = flatIdx === 0;
                                   flatIdx += 1;
                                   return (
@@ -657,13 +705,13 @@ const Explore = () => {
                           // External: places / books / movies
                           return (
                             <div key={cat.key} className="border-b last:border-b-0 bg-background">
-                              {renderSectionHeader(title, total)}
-                              {cat.visible.map((item: any, idx: number) => {
+                              {renderSectionHeader(title, total, cat.key, cat.hidden.length)}
+                              {itemsToRender.map((item: any, idx: number) => {
                                 const isTop = flatIdx === 0;
                                 flatIdx += 1;
                                 return (
                                   <div
-                                    key={`${item.api_source}-${item.api_ref || idx}`}
+                                    key={`${item.api_source}-${item.api_ref ?? idx}`}
                                     className={isTop ? 'border-b border-border/40 [&_*]:font-medium' : ''}
                                   >
                                     <SearchResultHandler
@@ -679,11 +727,15 @@ const Explore = () => {
                                   </div>
                                 );
                               })}
-                              {cat.hidden.length > 0 && (
+                              {!isExpanded && cat.hidden.length > 0 && (
                                 <button
                                   type="button"
                                   className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
-                                  onClick={handleComplexProductSearch}
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleComplexProductSearch();
+                                  }}
                                 >
                                   Show {cat.hidden.length} more in full search
                                 </button>
@@ -694,30 +746,35 @@ const Explore = () => {
                       })()}
 
                       {/* Hashtags (kept separate — not part of ranking pipeline) */}
-                      {results.hashtags?.length > 0 && (
-                        <div className="border-b last:border-b-0 bg-background">
-                          {renderSectionHeader('# Hashtags', results.hashtags.length, 'hashtags')}
-                          {(showAllResults.hashtags ? results.hashtags : results.hashtags.slice(0, 3)).map((hashtag) => (
-                            <div
-                              key={hashtag.id}
-                              onClick={() => {
-                                navigate(`/t/${hashtag.name_norm}`);
-                                handleResultClick();
-                              }}
-                              className="flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
-                            >
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-primary font-medium">#{hashtag.name_original}</span>
+                      {results.hashtags?.length > 0 && (() => {
+                        const isExpanded = !!dropdownShowAll['hashtags'];
+                        const hiddenCount = Math.max(0, results.hashtags.length - 3);
+                        const hashtagsToRender = isExpanded ? results.hashtags : results.hashtags.slice(0, 3);
+                        return (
+                          <div className="border-b last:border-b-0 bg-background">
+                            {renderSectionHeader('# Hashtags', results.hashtags.length, 'hashtags', hiddenCount)}
+                            {hashtagsToRender.map((hashtag: any) => (
+                              <div
+                                key={hashtag.id}
+                                onClick={() => {
+                                  navigate(`/t/${hashtag.name_norm}`);
+                                  handleResultClick();
+                                }}
+                                className="flex items-center px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-primary font-medium">#{hashtag.name_original}</span>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground mt-0.5">
+                                    {hashtag.post_count} posts
+                                  </p>
                                 </div>
-                                <p className="text-sm text-muted-foreground mt-0.5">
-                                  {hashtag.post_count} posts
-                                </p>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </>
                   )}
 
