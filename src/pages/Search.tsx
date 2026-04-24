@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import SEOHead from '@/components/seo/SEOHead';
 import { useRecentSearches } from '@/hooks/useRecentSearches';
 import { RecentSearchesPanel } from '@/components/search/RecentSearchesPanel';
