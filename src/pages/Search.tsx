@@ -352,26 +352,31 @@ const Search = () => {
 
   // (legacy `handleDropdownViewAll` removed — use `handleDropdownToggle` defined above)
 
-  // Filter results based on active tab using backend categorization (page-results)
+  // Filter results based on active tab using backend categorization (page-results).
+  // Sourced from the COMMITTED snapshot ONLY. While the user is typing, pageResults
+  // stays on the last settled query so the page doesn't flicker. On first load
+  // (pageResults === null) we return empty buckets — the loading gate above hides
+  // this section entirely until the commit effect fires.
   const getFilteredResults = () => {
-    // Source the page from the COMMITTED snapshot. While the user is typing,
-    // pageResults stays on the last settled query so the page doesn't flicker.
-    // On first load (no snapshot yet), fall back to live results so the page
-    // can still render once results arrive (the loading gate above hides this
-    // until the commit effect fires).
-    const src: any = pageResults ?? results;
+    if (!pageResults) {
+      return { localResults: [] as TaggedLocalResult[], externalResults: [], users: [], hashtags: [] };
+    }
+    const src = pageResults;
 
-    const allLocalResults = [
-      ...src.entities,
-      ...src.reviews,
-      ...src.recommendations
+    // Trust backend buckets — tag at merge time so renderLocalResultItem can
+    // dispatch by source rather than shape-sniffing fields. Use ?? [] to stay
+    // safe against partial responses.
+    const allLocalResults: TaggedLocalResult[] = [
+      ...(src.entities ?? []).map((e: EntitySearchResult): TaggedLocalResult => ({ ...e, __cg_kind: 'entity' })),
+      ...(src.reviews ?? []).map((r: ReviewSearchResult): TaggedLocalResult => ({ ...r, __cg_kind: 'review' })),
+      ...(src.recommendations ?? []).map((r: RecommendationSearchResult): TaggedLocalResult => ({ ...r, __cg_kind: 'recommendation' })),
     ];
 
     const categorizedProducts = {
       movies: src.categorized?.movies || [],
       books: src.categorized?.books || [],
       places: src.categorized?.places || [],
-      products: src.products.filter(p => {
+      products: (src.products ?? []).filter(p => {
         const movieRefs = (src.categorized?.movies || []).map(item => item.api_ref);
         const bookRefs = (src.categorized?.books || []).map(item => item.api_ref);
         const placeRefs = (src.categorized?.places || []).map(item => item.api_ref);
@@ -383,12 +388,12 @@ const Search = () => {
 
     switch (activeTab) {
       case 'hashtags':
-        return { localResults: [], externalResults: [], hashtags: src.hashtags || [] };
+        return { localResults: [] as TaggedLocalResult[], externalResults: [], hashtags: src.hashtags || [] };
       case 'movies':
         return {
           localResults: allLocalResults.filter(item => {
-            if ('type' in item && item.type === 'movie') return true;
-            if ('category' in item && item.category === 'movie') return true;
+            if (item.__cg_kind === 'entity' && item.type === 'movie') return true;
+            if (item.__cg_kind === 'recommendation' && item.category === 'movie') return true;
             return false;
           }),
           externalResults: categorizedProducts.movies,
@@ -397,8 +402,8 @@ const Search = () => {
       case 'books':
         return {
           localResults: allLocalResults.filter(item => {
-            if ('type' in item && item.type === 'book') return true;
-            if ('category' in item && item.category === 'book') return true;
+            if (item.__cg_kind === 'entity' && item.type === 'book') return true;
+            if (item.__cg_kind === 'recommendation' && item.category === 'book') return true;
             return false;
           }),
           externalResults: categorizedProducts.books,
@@ -407,8 +412,8 @@ const Search = () => {
       case 'places':
         return {
           localResults: allLocalResults.filter(item => {
-            if ('type' in item && item.type === 'place') return true;
-            if ('category' in item && item.category === 'place') return true;
+            if (item.__cg_kind === 'entity' && item.type === 'place') return true;
+            if (item.__cg_kind === 'recommendation' && item.category === 'place') return true;
             return false;
           }),
           externalResults: categorizedProducts.places,
@@ -417,20 +422,20 @@ const Search = () => {
       case 'products':
         return {
           localResults: allLocalResults.filter(item => {
-            if ('type' in item && item.type === 'product') return true;
-            if ('category' in item && item.category === 'product') return true;
+            if (item.__cg_kind === 'entity' && item.type === 'product') return true;
+            if (item.__cg_kind === 'recommendation' && item.category === 'product') return true;
             return false;
           }),
           externalResults: categorizedProducts.products,
           hashtags: []
         };
       case 'users':
-        return { localResults: [], externalResults: [], users: src.users, hashtags: [] };
+        return { localResults: [] as TaggedLocalResult[], externalResults: [], users: src.users ?? [], hashtags: [] };
       default:
         return {
           localResults: allLocalResults,
-          externalResults: src.products,
-          users: src.users,
+          externalResults: src.products ?? [],
+          users: src.users ?? [],
           hashtags: src.hashtags || []
         };
     }
@@ -438,12 +443,11 @@ const Search = () => {
 
   const filteredResults = getFilteredResults();
 
-  // Page-render shortcuts that read from the committed snapshot (or live
-  // results on first load before the commit gate has fired). Used outside
-  // getFilteredResults() for sections that aren't tab-filtered.
-  const pageSrc: any = pageResults ?? results;
-  const pageUsers = pageSrc.users || [];
-  const pageHashtags = pageSrc.hashtags || [];
+  // Page-render shortcuts that read from the committed snapshot. The render
+  // gate ensures these are only consumed when pageResults !== null, but we
+  // guard with ?? [] anyway for safety.
+  const pageUsers = pageResults?.users ?? [];
+  const pageHashtags = pageResults?.hashtags ?? [];
 
   // Enhanced loading screen with category-based loading facts
   const renderEnhancedLoadingState = () => {
