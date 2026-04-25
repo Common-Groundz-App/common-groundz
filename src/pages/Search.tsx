@@ -1089,7 +1089,7 @@ const Search = () => {
                                 <Star className="h-5 w-5 text-yellow-500" /> Already on Groundz
                               </h2>
                               <div className="border rounded-md overflow-hidden min-w-0">
-                                {(showAllStates.localResults ? filteredResults.localResults : filteredResults.localResults.slice(0, 5)).map((item) => renderLocalResultItem(item))}
+                                {(showAllStates.localResults ? filteredResults.localResults : filteredResults.localResults.slice(0, 5)).map((item, index) => renderLocalResultItem(item, index))}
                               </div>
                               {filteredResults.localResults.length > 5 && (
                                 <div className="mt-4 text-center">
@@ -1189,7 +1189,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden min-w-0">
-                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                    {filteredResults.localResults.map((item, index) => renderLocalResultItem(item, index))}
                                   </div>
                                 </div>
                               )}
@@ -1231,7 +1231,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden min-w-0">
-                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                    {filteredResults.localResults.map((item, index) => renderLocalResultItem(item, index))}
                                   </div>
                                 </div>
                               )}
@@ -1273,7 +1273,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden min-w-0">
-                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                    {filteredResults.localResults.map((item, index) => renderLocalResultItem(item, index))}
                                   </div>
                                 </div>
                               )}
@@ -1337,7 +1337,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden min-w-0">
-                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                    {filteredResults.localResults.map((item, index) => renderLocalResultItem(item, index))}
                                   </div>
                                 </div>
                               )}
