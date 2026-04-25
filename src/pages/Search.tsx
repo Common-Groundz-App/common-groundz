@@ -20,6 +20,11 @@ import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
 import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Star, Globe, ChevronDown, ChevronUp, Hash, Plus, X } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
+import type {
+  EntitySearchResult,
+  ReviewSearchResult,
+  RecommendationSearchResult,
+} from '@/hooks/use-unified-search';
 import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
 import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
