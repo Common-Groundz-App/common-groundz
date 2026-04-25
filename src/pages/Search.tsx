@@ -192,7 +192,7 @@ const Search = () => {
   // This prevents the page from clearing/flickering while the user is typing.
   //
   // `pageResults === null` means "never committed yet" → show first-load skeleton.
-  const [pageResults, setPageResults] = useState<UnifiedSearchResults | null>(null);
+  const [pageResults, setPageResults] = useState<any | null>(null);
   const [pageQuery, setPageQuery] = useState<string>(query);
 
   // Commit gate: only snapshot results when the live input matches the URL query
