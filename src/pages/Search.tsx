@@ -1061,9 +1061,16 @@ const Search = () => {
                 )}
                 
                 <div className="mt-6 min-w-0">
-                  {isLoading || Object.values(loadingStates).some(Boolean) ? (
+                  {/*
+                    Page-level loading/error UI is gated to FIRST LOAD only
+                    (pageResults === null). Once a snapshot has been committed,
+                    we keep rendering it while the user types — no flicker,
+                    no "results disappearing" mid-typing. The dropdown still
+                    shows live loading state independently.
+                  */}
+                  {pageResults === null && (isLoading || Object.values(loadingStates).some(Boolean)) ? (
                     renderEnhancedLoadingState()
-                  ) : error ? (
+                  ) : pageResults === null && error ? (
                     <div className="flex flex-col items-center justify-center py-12">
                       <AlertCircle className="h-8 w-8 text-destructive mb-4" />
                       <p className="text-muted-foreground">{error}</p>
