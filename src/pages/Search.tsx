@@ -367,20 +367,27 @@ const Search = () => {
 
   // Filter results based on active tab using backend categorization (page-results)
   const getFilteredResults = () => {
+    // Source the page from the COMMITTED snapshot. While the user is typing,
+    // pageResults stays on the last settled query so the page doesn't flicker.
+    // On first load (no snapshot yet), fall back to live results so the page
+    // can still render once results arrive (the loading gate above hides this
+    // until the commit effect fires).
+    const src: UnifiedSearchResults = pageResults ?? results;
+
     const allLocalResults = [
-      ...results.entities,
-      ...results.reviews,
-      ...results.recommendations
+      ...src.entities,
+      ...src.reviews,
+      ...src.recommendations
     ];
 
     const categorizedProducts = {
-      movies: results.categorized?.movies || [],
-      books: results.categorized?.books || [],
-      places: results.categorized?.places || [],
-      products: results.products.filter(p => {
-        const movieRefs = (results.categorized?.movies || []).map(item => item.api_ref);
-        const bookRefs = (results.categorized?.books || []).map(item => item.api_ref);
-        const placeRefs = (results.categorized?.places || []).map(item => item.api_ref);
+      movies: src.categorized?.movies || [],
+      books: src.categorized?.books || [],
+      places: src.categorized?.places || [],
+      products: src.products.filter(p => {
+        const movieRefs = (src.categorized?.movies || []).map(item => item.api_ref);
+        const bookRefs = (src.categorized?.books || []).map(item => item.api_ref);
+        const placeRefs = (src.categorized?.places || []).map(item => item.api_ref);
         return !movieRefs.includes(p.api_ref) &&
                !bookRefs.includes(p.api_ref) &&
                !placeRefs.includes(p.api_ref);
@@ -389,7 +396,7 @@ const Search = () => {
 
     switch (activeTab) {
       case 'hashtags':
-        return { localResults: [], externalResults: [], hashtags: results.hashtags || [] };
+        return { localResults: [], externalResults: [], hashtags: src.hashtags || [] };
       case 'movies':
         return {
           localResults: allLocalResults.filter(item => {
@@ -431,13 +438,13 @@ const Search = () => {
           hashtags: []
         };
       case 'users':
-        return { localResults: [], externalResults: [], users: results.users, hashtags: [] };
+        return { localResults: [], externalResults: [], users: src.users, hashtags: [] };
       default:
         return {
           localResults: allLocalResults,
-          externalResults: results.products,
-          users: results.users,
-          hashtags: results.hashtags || []
+          externalResults: src.products,
+          users: src.users,
+          hashtags: src.hashtags || []
         };
     }
   };
