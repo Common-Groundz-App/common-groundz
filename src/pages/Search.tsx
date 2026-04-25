@@ -1134,20 +1134,20 @@ const Search = () => {
                           )}
                           
                           {/* People section */}
-                          {results.users.length > 0 && (
+                          {pageUsers.length > 0 && (
                             <div className="mb-8 min-w-0">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                 <Users className="h-5 w-5" /> People
                               </h2>
                               <div className="border rounded-md overflow-hidden min-w-0">
-                                {results.users.slice(0, 5).map((user) => (
+                                {pageUsers.slice(0, 5).map((user: any) => (
                                   <UserResultItem key={user.id} user={user} onClick={() => {}} />
                                 ))}
                               </div>
-                              {results.users.length > 5 && (
+                              {pageUsers.length > 5 && (
                                 <div className="mt-4 text-center">
                                   <Button variant="outline" onClick={() => handleViewAll('users')}>
-                                    View all {results.users.length} people
+                                    View all {pageUsers.length} people
                                   </Button>
                                 </div>
                               )}
