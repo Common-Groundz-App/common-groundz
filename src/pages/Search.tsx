@@ -462,18 +462,23 @@ const Search = () => {
     );
   };
 
-  // Helper function to render mixed local results (page-results section)
+  // Helper function to render mixed local results (page-results section).
+  // Uses ordered classification to prevent reviews/recommendations being
+  // mis-rendered as users (the "AU avatar" bug).
   const renderLocalResultItem = (item: any) => {
-    if ('username' in item) {
-      return <UserResultItem key={item.id} user={item} onClick={() => {}} />;
-    } else if ('entity_id' in item && 'rating' in item && 'title' in item && 'description' in item) {
-      return <ReviewResultItem key={item.id} review={item} onClick={() => {}} />;
-    } else if ('entity_id' in item && 'title' in item && !('rating' in item)) {
-      return <RecommendationResultItem key={item.id} recommendation={item} onClick={() => {}} />;
-    } else if ('name' in item && 'type' in item) {
-      return <EntityResultItem key={item.id} entity={item} onClick={() => {}} />;
+    const kind = classifyLocalItem(item);
+    switch (kind) {
+      case 'review':
+        return <ReviewResultItem key={item.id} review={item} onClick={() => {}} />;
+      case 'recommendation':
+        return <RecommendationResultItem key={item.id} recommendation={item} onClick={() => {}} />;
+      case 'entity':
+        return <EntityResultItem key={item.id} entity={item} onClick={() => {}} />;
+      case 'user':
+        return <UserResultItem key={item.id} user={item} onClick={() => {}} />;
+      default:
+        return null;
     }
-    return null;
   };
 
   // Render search dropdown — focus-gated, with Escape dismissal flag
