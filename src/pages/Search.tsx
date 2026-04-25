@@ -372,7 +372,7 @@ const Search = () => {
     // On first load (no snapshot yet), fall back to live results so the page
     // can still render once results arrive (the loading gate above hides this
     // until the commit effect fires).
-    const src: UnifiedSearchResults = pageResults ?? results;
+    const src: any = pageResults ?? results;
 
     const allLocalResults = [
       ...src.entities,
