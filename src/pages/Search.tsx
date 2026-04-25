@@ -20,6 +20,11 @@ import { SearchResultHandler } from '@/components/search/SearchResultHandler';
 import { cn } from '@/lib/utils';
 import { Search as SearchIcon, Users, MapPin, Film, Book, ShoppingBag, AlertCircle, Loader2, Star, Globe, ChevronDown, ChevronUp, Hash, Plus, X } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
+import type {
+  EntitySearchResult,
+  ReviewSearchResult,
+  RecommendationSearchResult,
+} from '@/hooks/use-unified-search';
 import { Badge } from '@/components/ui/badge';
 import { getRandomLoadingMessage, type EntityCategory } from '@/utils/loadingMessages';
 import { CreateEntityDialog } from '@/components/admin/CreateEntityDialog';
@@ -35,31 +40,13 @@ import {
 // Locale-safe query normalization (handles Turkish "İ"/"i" and other locale quirks)
 const normalize = (q: string) => q.trim().toLocaleLowerCase();
 
-// Ordered classification for items in the merged "local results" list.
-// Order matters: review/recommendation BEFORE user, because reviews/recs may
-// also carry user-shaped fields and would otherwise be mis-rendered as users.
-type LocalItemKind = 'review' | 'recommendation' | 'entity' | 'user' | 'unknown';
-
-const classifyLocalItem = (item: any): LocalItemKind => {
-  if (!item || typeof item !== 'object') return 'unknown';
-  // Reviews: have entity_id + rating + (title or description)
-  if ('entity_id' in item && 'rating' in item && ('title' in item || 'description' in item)) {
-    return 'review';
-  }
-  // Recommendations: have entity_id + title, but no rating
-  if ('entity_id' in item && 'title' in item && !('rating' in item)) {
-    return 'recommendation';
-  }
-  // Entities: have name + type, but no entity_id (they ARE the entity)
-  if ('name' in item && 'type' in item && !('entity_id' in item)) {
-    return 'entity';
-  }
-  // Users: fall through last — username can appear on review authors etc.
-  if ('username' in item) {
-    return 'user';
-  }
-  return 'unknown';
-};
+// Tagged union for "local results" (Already on Groundz section).
+// We trust the backend buckets (entities/reviews/recommendations) instead of
+// shape-sniffing fields, which previously misclassified review authors as users.
+type TaggedLocalResult =
+  | (EntitySearchResult & { __cg_kind: 'entity' })
+  | (ReviewSearchResult & { __cg_kind: 'review' })
+  | (RecommendationSearchResult & { __cg_kind: 'recommendation' });
 
 const Search = () => {
   const isMobile = useIsMobile();
@@ -365,26 +352,31 @@ const Search = () => {
 
   // (legacy `handleDropdownViewAll` removed — use `handleDropdownToggle` defined above)
 
-  // Filter results based on active tab using backend categorization (page-results)
+  // Filter results based on active tab using backend categorization (page-results).
+  // Sourced from the COMMITTED snapshot ONLY. While the user is typing, pageResults
+  // stays on the last settled query so the page doesn't flicker. On first load
+  // (pageResults === null) we return empty buckets — the loading gate above hides
+  // this section entirely until the commit effect fires.
   const getFilteredResults = () => {
-    // Source the page from the COMMITTED snapshot. While the user is typing,
-    // pageResults stays on the last settled query so the page doesn't flicker.
-    // On first load (no snapshot yet), fall back to live results so the page
-    // can still render once results arrive (the loading gate above hides this
-    // until the commit effect fires).
-    const src: any = pageResults ?? results;
+    if (!pageResults) {
+      return { localResults: [] as TaggedLocalResult[], externalResults: [], users: [], hashtags: [] };
+    }
+    const src = pageResults;
 
-    const allLocalResults = [
-      ...src.entities,
-      ...src.reviews,
-      ...src.recommendations
+    // Trust backend buckets — tag at merge time so renderLocalResultItem can
+    // dispatch by source rather than shape-sniffing fields. Use ?? [] to stay
+    // safe against partial responses.
+    const allLocalResults: TaggedLocalResult[] = [
+      ...(src.entities ?? []).map((e: EntitySearchResult): TaggedLocalResult => ({ ...e, __cg_kind: 'entity' })),
+      ...(src.reviews ?? []).map((r: ReviewSearchResult): TaggedLocalResult => ({ ...r, __cg_kind: 'review' })),
+      ...(src.recommendations ?? []).map((r: RecommendationSearchResult): TaggedLocalResult => ({ ...r, __cg_kind: 'recommendation' })),
     ];
 
     const categorizedProducts = {
       movies: src.categorized?.movies || [],
       books: src.categorized?.books || [],
       places: src.categorized?.places || [],
-      products: src.products.filter(p => {
+      products: (src.products ?? []).filter(p => {
         const movieRefs = (src.categorized?.movies || []).map(item => item.api_ref);
         const bookRefs = (src.categorized?.books || []).map(item => item.api_ref);
         const placeRefs = (src.categorized?.places || []).map(item => item.api_ref);
@@ -396,12 +388,12 @@ const Search = () => {
 
     switch (activeTab) {
       case 'hashtags':
-        return { localResults: [], externalResults: [], hashtags: src.hashtags || [] };
+        return { localResults: [] as TaggedLocalResult[], externalResults: [], hashtags: src.hashtags || [] };
       case 'movies':
         return {
           localResults: allLocalResults.filter(item => {
-            if ('type' in item && item.type === 'movie') return true;
-            if ('category' in item && item.category === 'movie') return true;
+            if (item.__cg_kind === 'entity' && item.type === 'movie') return true;
+            if (item.__cg_kind === 'recommendation' && item.category === 'movie') return true;
             return false;
           }),
           externalResults: categorizedProducts.movies,
@@ -410,8 +402,8 @@ const Search = () => {
       case 'books':
         return {
           localResults: allLocalResults.filter(item => {
-            if ('type' in item && item.type === 'book') return true;
-            if ('category' in item && item.category === 'book') return true;
+            if (item.__cg_kind === 'entity' && item.type === 'book') return true;
+            if (item.__cg_kind === 'recommendation' && item.category === 'book') return true;
             return false;
           }),
           externalResults: categorizedProducts.books,
@@ -420,8 +412,8 @@ const Search = () => {
       case 'places':
         return {
           localResults: allLocalResults.filter(item => {
-            if ('type' in item && item.type === 'place') return true;
-            if ('category' in item && item.category === 'place') return true;
+            if (item.__cg_kind === 'entity' && item.type === 'place') return true;
+            if (item.__cg_kind === 'recommendation' && item.category === 'place') return true;
             return false;
           }),
           externalResults: categorizedProducts.places,
@@ -430,20 +422,20 @@ const Search = () => {
       case 'products':
         return {
           localResults: allLocalResults.filter(item => {
-            if ('type' in item && item.type === 'product') return true;
-            if ('category' in item && item.category === 'product') return true;
+            if (item.__cg_kind === 'entity' && item.type === 'product') return true;
+            if (item.__cg_kind === 'recommendation' && item.category === 'product') return true;
             return false;
           }),
           externalResults: categorizedProducts.products,
           hashtags: []
         };
       case 'users':
-        return { localResults: [], externalResults: [], users: src.users, hashtags: [] };
+        return { localResults: [] as TaggedLocalResult[], externalResults: [], users: src.users ?? [], hashtags: [] };
       default:
         return {
           localResults: allLocalResults,
-          externalResults: src.products,
-          users: src.users,
+          externalResults: src.products ?? [],
+          users: src.users ?? [],
           hashtags: src.hashtags || []
         };
     }
@@ -451,12 +443,11 @@ const Search = () => {
 
   const filteredResults = getFilteredResults();
 
-  // Page-render shortcuts that read from the committed snapshot (or live
-  // results on first load before the commit gate has fired). Used outside
-  // getFilteredResults() for sections that aren't tab-filtered.
-  const pageSrc: any = pageResults ?? results;
-  const pageUsers = pageSrc.users || [];
-  const pageHashtags = pageSrc.hashtags || [];
+  // Page-render shortcuts that read from the committed snapshot. The render
+  // gate ensures these are only consumed when pageResults !== null, but we
+  // guard with ?? [] anyway for safety.
+  const pageUsers = pageResults?.users ?? [];
+  const pageHashtags = pageResults?.hashtags ?? [];
 
   // Enhanced loading screen with category-based loading facts
   const renderEnhancedLoadingState = () => {
@@ -505,21 +496,26 @@ const Search = () => {
   };
 
   // Helper function to render mixed local results (page-results section).
-  // Uses ordered classification to prevent reviews/recommendations being
+  // Dispatch is by source bucket (__cg_kind tagged at merge time), not by
+  // shape-sniffing — this prevents reviews/recommendations from being
   // mis-rendered as users (the "AU avatar" bug).
-  const renderLocalResultItem = (item: any) => {
-    const kind = classifyLocalItem(item);
-    switch (kind) {
-      case 'review':
-        return <ReviewResultItem key={item.id} review={item} onClick={() => {}} />;
-      case 'recommendation':
-        return <RecommendationResultItem key={item.id} recommendation={item} onClick={() => {}} />;
+  const renderLocalResultItem = (item: TaggedLocalResult, index: number) => {
+    // Deterministic-first key fallback: id is always present on DB rows;
+    // index is a true last-resort fallback only.
+    const key = `${item.__cg_kind}-${item.id ?? index}`;
+    switch (item.__cg_kind) {
       case 'entity':
-        return <EntityResultItem key={item.id} entity={item} onClick={() => {}} />;
-      case 'user':
-        return <UserResultItem key={item.id} user={item} onClick={() => {}} />;
-      default:
+        return <EntityResultItem key={key} entity={item} onClick={() => {}} />;
+      case 'review':
+        return <ReviewResultItem key={key} review={item} onClick={() => {}} />;
+      case 'recommendation':
+        return <RecommendationResultItem key={key} recommendation={item} onClick={() => {}} />;
+      default: {
+        // Exhaustiveness check — TS will error here if a new kind is added
+        // to TaggedLocalResult without a matching case.
+        const _exhaustive: never = item;
         return null;
+      }
     }
   };
 
@@ -1093,7 +1089,7 @@ const Search = () => {
                                 <Star className="h-5 w-5 text-yellow-500" /> Already on Groundz
                               </h2>
                               <div className="border rounded-md overflow-hidden min-w-0">
-                                {(showAllStates.localResults ? filteredResults.localResults : filteredResults.localResults.slice(0, 5)).map((item) => renderLocalResultItem(item))}
+                                {(showAllStates.localResults ? filteredResults.localResults : filteredResults.localResults.slice(0, 5)).map((item, index) => renderLocalResultItem(item, index))}
                               </div>
                               {filteredResults.localResults.length > 5 && (
                                 <div className="mt-4 text-center">
@@ -1193,7 +1189,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden min-w-0">
-                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                    {filteredResults.localResults.map((item, index) => renderLocalResultItem(item, index))}
                                   </div>
                                 </div>
                               )}
@@ -1235,7 +1231,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden min-w-0">
-                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                    {filteredResults.localResults.map((item, index) => renderLocalResultItem(item, index))}
                                   </div>
                                 </div>
                               )}
@@ -1277,7 +1273,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden min-w-0">
-                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                    {filteredResults.localResults.map((item, index) => renderLocalResultItem(item, index))}
                                   </div>
                                 </div>
                               )}
@@ -1341,7 +1337,7 @@ const Search = () => {
                                     <Star className="h-4 w-4 text-yellow-500" /> Already on Groundz
                                   </h3>
                                   <div className="border rounded-md overflow-hidden min-w-0">
-                                    {filteredResults.localResults.map((item) => renderLocalResultItem(item))}
+                                    {filteredResults.localResults.map((item, index) => renderLocalResultItem(item, index))}
                                   </div>
                                 </div>
                               )}
