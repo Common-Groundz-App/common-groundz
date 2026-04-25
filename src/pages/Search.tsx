@@ -451,6 +451,13 @@ const Search = () => {
 
   const filteredResults = getFilteredResults();
 
+  // Page-render shortcuts that read from the committed snapshot (or live
+  // results on first load before the commit gate has fired). Used outside
+  // getFilteredResults() for sections that aren't tab-filtered.
+  const pageSrc: any = pageResults ?? results;
+  const pageUsers = pageSrc.users || [];
+  const pageHashtags = pageSrc.hashtags || [];
+
   // Enhanced loading screen with category-based loading facts
   const renderEnhancedLoadingState = () => {
     const capitalizedQuery = query.charAt(0).toUpperCase() + query.slice(1);
