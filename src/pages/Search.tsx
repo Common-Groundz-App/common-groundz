@@ -31,6 +31,36 @@ import {
   softCollapse,
 } from '@/utils/searchRanking';
 
+
+// Locale-safe query normalization (handles Turkish "İ"/"i" and other locale quirks)
+const normalize = (q: string) => q.trim().toLocaleLowerCase();
+
+// Ordered classification for items in the merged "local results" list.
+// Order matters: review/recommendation BEFORE user, because reviews/recs may
+// also carry user-shaped fields and would otherwise be mis-rendered as users.
+type LocalItemKind = 'review' | 'recommendation' | 'entity' | 'user' | 'unknown';
+
+const classifyLocalItem = (item: any): LocalItemKind => {
+  if (!item || typeof item !== 'object') return 'unknown';
+  // Reviews: have entity_id + rating + (title or description)
+  if ('entity_id' in item && 'rating' in item && ('title' in item || 'description' in item)) {
+    return 'review';
+  }
+  // Recommendations: have entity_id + title, but no rating
+  if ('entity_id' in item && 'title' in item && !('rating' in item)) {
+    return 'recommendation';
+  }
+  // Entities: have name + type, but no entity_id (they ARE the entity)
+  if ('name' in item && 'type' in item && !('entity_id' in item)) {
+    return 'entity';
+  }
+  // Users: fall through last — username can appear on review authors etc.
+  if ('username' in item) {
+    return 'user';
+  }
+  return 'unknown';
+};
+
 const Search = () => {
   const isMobile = useIsMobile();
   const isTablet = useIsMobile(630); // Custom breakpoint for pill tabs
@@ -152,6 +182,34 @@ const Search = () => {
 
   // Trimmed query — reused everywhere
   const trimmedQuery = searchQuery.trim();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Committed page snapshot
+  // ─────────────────────────────────────────────────────────────────────────
+  // The dropdown reads `results` live (so it updates as you type).
+  // The MAIN PAGE renders `pageResults` — a snapshot that only updates when
+  // the live query has caught up to the URL query AND results are settled.
+  // This prevents the page from clearing/flickering while the user is typing.
+  //
+  // `pageResults === null` means "never committed yet" → show first-load skeleton.
+  const [pageResults, setPageResults] = useState<any | null>(null);
+  const [pageQuery, setPageQuery] = useState<string>(query);
+
+  // Commit gate: only snapshot results when the live input matches the URL query
+  // and the hook has finished loading. The hook's internal AbortController
+  // already guarantees `results` is from the latest in-flight request, so we
+  // do NOT need an extra stale-result ref guard (which can wrongly block
+  // legitimate re-commits, e.g. refetch on the same query).
+  useEffect(() => {
+    if (
+      normalize(searchQuery) === normalize(query) &&
+      !isLoading &&
+      query.trim().length >= 1
+    ) {
+      setPageResults(results);
+      setPageQuery(query);
+    }
+  }, [searchQuery, query, isLoading, results]);
 
   // Reset expansion + highlight when query changes (skip during IME composition)
   useEffect(() => {
@@ -309,20 +367,27 @@ const Search = () => {
 
   // Filter results based on active tab using backend categorization (page-results)
   const getFilteredResults = () => {
+    // Source the page from the COMMITTED snapshot. While the user is typing,
+    // pageResults stays on the last settled query so the page doesn't flicker.
+    // On first load (no snapshot yet), fall back to live results so the page
+    // can still render once results arrive (the loading gate above hides this
+    // until the commit effect fires).
+    const src: any = pageResults ?? results;
+
     const allLocalResults = [
-      ...results.entities,
-      ...results.reviews,
-      ...results.recommendations
+      ...src.entities,
+      ...src.reviews,
+      ...src.recommendations
     ];
 
     const categorizedProducts = {
-      movies: results.categorized?.movies || [],
-      books: results.categorized?.books || [],
-      places: results.categorized?.places || [],
-      products: results.products.filter(p => {
-        const movieRefs = (results.categorized?.movies || []).map(item => item.api_ref);
-        const bookRefs = (results.categorized?.books || []).map(item => item.api_ref);
-        const placeRefs = (results.categorized?.places || []).map(item => item.api_ref);
+      movies: src.categorized?.movies || [],
+      books: src.categorized?.books || [],
+      places: src.categorized?.places || [],
+      products: src.products.filter(p => {
+        const movieRefs = (src.categorized?.movies || []).map(item => item.api_ref);
+        const bookRefs = (src.categorized?.books || []).map(item => item.api_ref);
+        const placeRefs = (src.categorized?.places || []).map(item => item.api_ref);
         return !movieRefs.includes(p.api_ref) &&
                !bookRefs.includes(p.api_ref) &&
                !placeRefs.includes(p.api_ref);
@@ -331,7 +396,7 @@ const Search = () => {
 
     switch (activeTab) {
       case 'hashtags':
-        return { localResults: [], externalResults: [], hashtags: results.hashtags || [] };
+        return { localResults: [], externalResults: [], hashtags: src.hashtags || [] };
       case 'movies':
         return {
           localResults: allLocalResults.filter(item => {
@@ -373,18 +438,25 @@ const Search = () => {
           hashtags: []
         };
       case 'users':
-        return { localResults: [], externalResults: [], users: results.users, hashtags: [] };
+        return { localResults: [], externalResults: [], users: src.users, hashtags: [] };
       default:
         return {
           localResults: allLocalResults,
-          externalResults: results.products,
-          users: results.users,
-          hashtags: results.hashtags || []
+          externalResults: src.products,
+          users: src.users,
+          hashtags: src.hashtags || []
         };
     }
   };
 
   const filteredResults = getFilteredResults();
+
+  // Page-render shortcuts that read from the committed snapshot (or live
+  // results on first load before the commit gate has fired). Used outside
+  // getFilteredResults() for sections that aren't tab-filtered.
+  const pageSrc: any = pageResults ?? results;
+  const pageUsers = pageSrc.users || [];
+  const pageHashtags = pageSrc.hashtags || [];
 
   // Enhanced loading screen with category-based loading facts
   const renderEnhancedLoadingState = () => {
@@ -432,18 +504,23 @@ const Search = () => {
     );
   };
 
-  // Helper function to render mixed local results (page-results section)
+  // Helper function to render mixed local results (page-results section).
+  // Uses ordered classification to prevent reviews/recommendations being
+  // mis-rendered as users (the "AU avatar" bug).
   const renderLocalResultItem = (item: any) => {
-    if ('username' in item) {
-      return <UserResultItem key={item.id} user={item} onClick={() => {}} />;
-    } else if ('entity_id' in item && 'rating' in item && 'title' in item && 'description' in item) {
-      return <ReviewResultItem key={item.id} review={item} onClick={() => {}} />;
-    } else if ('entity_id' in item && 'title' in item && !('rating' in item)) {
-      return <RecommendationResultItem key={item.id} recommendation={item} onClick={() => {}} />;
-    } else if ('name' in item && 'type' in item) {
-      return <EntityResultItem key={item.id} entity={item} onClick={() => {}} />;
+    const kind = classifyLocalItem(item);
+    switch (kind) {
+      case 'review':
+        return <ReviewResultItem key={item.id} review={item} onClick={() => {}} />;
+      case 'recommendation':
+        return <RecommendationResultItem key={item.id} recommendation={item} onClick={() => {}} />;
+      case 'entity':
+        return <EntityResultItem key={item.id} entity={item} onClick={() => {}} />;
+      case 'user':
+        return <UserResultItem key={item.id} user={item} onClick={() => {}} />;
+      default:
+        return null;
     }
-    return null;
   };
 
   // Render search dropdown — focus-gated, with Escape dismissal flag
@@ -991,9 +1068,16 @@ const Search = () => {
                 )}
                 
                 <div className="mt-6 min-w-0">
-                  {isLoading || Object.values(loadingStates).some(Boolean) ? (
+                  {/*
+                    Page-level loading/error UI is gated to FIRST LOAD only
+                    (pageResults === null). Once a snapshot has been committed,
+                    we keep rendering it while the user types — no flicker,
+                    no "results disappearing" mid-typing. The dropdown still
+                    shows live loading state independently.
+                  */}
+                  {pageResults === null && (isLoading || Object.values(loadingStates).some(Boolean)) ? (
                     renderEnhancedLoadingState()
-                  ) : error ? (
+                  ) : pageResults === null && error ? (
                     <div className="flex flex-col items-center justify-center py-12">
                       <AlertCircle className="h-8 w-8 text-destructive mb-4" />
                       <p className="text-muted-foreground">{error}</p>
@@ -1050,20 +1134,20 @@ const Search = () => {
                           )}
                           
                           {/* People section */}
-                          {results.users.length > 0 && (
+                          {pageUsers.length > 0 && (
                             <div className="mb-8 min-w-0">
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                 <Users className="h-5 w-5" /> People
                               </h2>
                               <div className="border rounded-md overflow-hidden min-w-0">
-                                {results.users.slice(0, 5).map((user) => (
+                                {pageUsers.slice(0, 5).map((user: any) => (
                                   <UserResultItem key={user.id} user={user} onClick={() => {}} />
                                 ))}
                               </div>
-                              {results.users.length > 5 && (
+                              {pageUsers.length > 5 && (
                                 <div className="mt-4 text-center">
                                   <Button variant="outline" onClick={() => handleViewAll('users')}>
-                                    View all {results.users.length} people
+                                    View all {pageUsers.length} people
                                   </Button>
                                 </div>
                               )}
@@ -1321,15 +1405,15 @@ const Search = () => {
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <Users className="h-5 w-5" /> People
                           </h2>
-                          {results.users.length > 0 ? (
+                          {pageUsers.length > 0 ? (
                             <div className="border rounded-md overflow-hidden min-w-0">
-                              {results.users.map((user) => (
+                              {pageUsers.map((user: any) => (
                                 <UserResultItem key={user.id} user={user} onClick={() => {}} />
                               ))}
                             </div>
                           ) : (
                             <div className="py-12 text-center">
-                              <p className="text-muted-foreground">No people found for "{query}"</p>
+                              <p className="text-muted-foreground">No people found for "{pageQuery}"</p>
                             </div>
                           )}
                         </>
