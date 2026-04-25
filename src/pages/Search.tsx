@@ -496,21 +496,26 @@ const Search = () => {
   };
 
   // Helper function to render mixed local results (page-results section).
-  // Uses ordered classification to prevent reviews/recommendations being
+  // Dispatch is by source bucket (__cg_kind tagged at merge time), not by
+  // shape-sniffing — this prevents reviews/recommendations from being
   // mis-rendered as users (the "AU avatar" bug).
-  const renderLocalResultItem = (item: any) => {
-    const kind = classifyLocalItem(item);
-    switch (kind) {
-      case 'review':
-        return <ReviewResultItem key={item.id} review={item} onClick={() => {}} />;
-      case 'recommendation':
-        return <RecommendationResultItem key={item.id} recommendation={item} onClick={() => {}} />;
+  const renderLocalResultItem = (item: TaggedLocalResult, index: number) => {
+    // Deterministic-first key fallback: id is always present on DB rows;
+    // index is a true last-resort fallback only.
+    const key = `${item.__cg_kind}-${item.id ?? index}`;
+    switch (item.__cg_kind) {
       case 'entity':
-        return <EntityResultItem key={item.id} entity={item} onClick={() => {}} />;
-      case 'user':
-        return <UserResultItem key={item.id} user={item} onClick={() => {}} />;
-      default:
+        return <EntityResultItem key={key} entity={item} onClick={() => {}} />;
+      case 'review':
+        return <ReviewResultItem key={key} review={item} onClick={() => {}} />;
+      case 'recommendation':
+        return <RecommendationResultItem key={key} recommendation={item} onClick={() => {}} />;
+      default: {
+        // Exhaustiveness check — TS will error here if a new kind is added
+        // to TaggedLocalResult without a matching case.
+        const _exhaustive: never = item;
         return null;
+      }
     }
   };
 
