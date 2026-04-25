@@ -1405,15 +1405,15 @@ const Search = () => {
                           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                             <Users className="h-5 w-5" /> People
                           </h2>
-                          {results.users.length > 0 ? (
+                          {pageUsers.length > 0 ? (
                             <div className="border rounded-md overflow-hidden min-w-0">
-                              {results.users.map((user) => (
+                              {pageUsers.map((user: any) => (
                                 <UserResultItem key={user.id} user={user} onClick={() => {}} />
                               ))}
                             </div>
                           ) : (
                             <div className="py-12 text-center">
-                              <p className="text-muted-foreground">No people found for "{query}"</p>
+                              <p className="text-muted-foreground">No people found for "{pageQuery}"</p>
                             </div>
                           )}
                         </>
