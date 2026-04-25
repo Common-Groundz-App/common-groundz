@@ -183,6 +183,34 @@ const Search = () => {
   // Trimmed query — reused everywhere
   const trimmedQuery = searchQuery.trim();
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Committed page snapshot
+  // ─────────────────────────────────────────────────────────────────────────
+  // The dropdown reads `results` live (so it updates as you type).
+  // The MAIN PAGE renders `pageResults` — a snapshot that only updates when
+  // the live query has caught up to the URL query AND results are settled.
+  // This prevents the page from clearing/flickering while the user is typing.
+  //
+  // `pageResults === null` means "never committed yet" → show first-load skeleton.
+  const [pageResults, setPageResults] = useState<UnifiedSearchResults | null>(null);
+  const [pageQuery, setPageQuery] = useState<string>(query);
+
+  // Commit gate: only snapshot results when the live input matches the URL query
+  // and the hook has finished loading. The hook's internal AbortController
+  // already guarantees `results` is from the latest in-flight request, so we
+  // do NOT need an extra stale-result ref guard (which can wrongly block
+  // legitimate re-commits, e.g. refetch on the same query).
+  useEffect(() => {
+    if (
+      normalize(searchQuery) === normalize(query) &&
+      !isLoading &&
+      query.trim().length >= 1
+    ) {
+      setPageResults(results);
+      setPageQuery(query);
+    }
+  }, [searchQuery, query, isLoading, results]);
+
   // Reset expansion + highlight when query changes (skip during IME composition)
   useEffect(() => {
     if (isComposingRef.current) return;
