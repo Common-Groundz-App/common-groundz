@@ -30,7 +30,7 @@ import {
   applyExactMatchOverride,
   softCollapse,
 } from '@/utils/searchRanking';
-import type { UnifiedSearchResults } from '@/hooks/use-unified-search';
+
 
 // Locale-safe query normalization (handles Turkish "İ"/"i" and other locale quirks)
 const normalize = (q: string) => q.trim().toLocaleLowerCase();
