@@ -30,6 +30,36 @@ import {
   applyExactMatchOverride,
   softCollapse,
 } from '@/utils/searchRanking';
+import type { UnifiedSearchResults } from '@/hooks/use-unified-search';
+
+// Locale-safe query normalization (handles Turkish "İ"/"i" and other locale quirks)
+const normalize = (q: string) => q.trim().toLocaleLowerCase();
+
+// Ordered classification for items in the merged "local results" list.
+// Order matters: review/recommendation BEFORE user, because reviews/recs may
+// also carry user-shaped fields and would otherwise be mis-rendered as users.
+type LocalItemKind = 'review' | 'recommendation' | 'entity' | 'user' | 'unknown';
+
+const classifyLocalItem = (item: any): LocalItemKind => {
+  if (!item || typeof item !== 'object') return 'unknown';
+  // Reviews: have entity_id + rating + (title or description)
+  if ('entity_id' in item && 'rating' in item && ('title' in item || 'description' in item)) {
+    return 'review';
+  }
+  // Recommendations: have entity_id + title, but no rating
+  if ('entity_id' in item && 'title' in item && !('rating' in item)) {
+    return 'recommendation';
+  }
+  // Entities: have name + type, but no entity_id (they ARE the entity)
+  if ('name' in item && 'type' in item && !('entity_id' in item)) {
+    return 'entity';
+  }
+  // Users: fall through last — username can appear on review authors etc.
+  if ('username' in item) {
+    return 'user';
+  }
+  return 'unknown';
+};
 
 const Search = () => {
   const isMobile = useIsMobile();
