@@ -1397,7 +1397,7 @@ const Search = () => {
                             <Users className="h-5 w-5" /> People
                           </h2>
                           {pageUsers.length > 0 ? (
-                            <div className="min-w-0">
+                            <div className="border rounded-md overflow-hidden min-w-0">
                               {pageUsers.map((user: any) => (
                                 <UserResultItem key={user.id} user={user} onClick={() => {}} />
                               ))}
