@@ -139,7 +139,20 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
     places: false,
     hashtags: false
   });
-  
+
+  // Additive "settled" signal — last query for which BOTH tiers have reached
+  // a terminal state (success / handled error / abort / skipped). Consumers
+  // like the Search page use this to gate result commits, avoiding the race
+  // where loadingStates briefly flip to false between the local and external
+  // debounce windows. Other consumers (Explore dropdown) can ignore it.
+  const [settledQuery, setSettledQuery] = useState<string | null>(null);
+
+  // Per-tier "this query has reached a terminal state" tracking. We compute
+  // settledQuery from these so it ONLY advances when both tiers agree, for
+  // the SAME normalized query.
+  const localSettledForRef = useRef<string | null>(null);
+  const externalSettledForRef = useRef<string | null>(null);
+
   // Refs for managing debounce timers and abort
   const localTimerRef = useRef<NodeJS.Timeout | null>(null);
   const externalTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -148,8 +161,23 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
   const externalAbortRef = useRef<AbortController | null>(null);
   const lastLocalQueryRef = useRef<string>('');
   const lastExternalQueryRef = useRef<string>('');
-  
+
   const searchMode = options?.mode || 'quick';
+
+  // Mark a tier as terminal for a given query, and advance settledQuery
+  // ONLY when both tiers (or the only required tier, in local-only mode)
+  // agree on the same normalized query.
+  const markTierSettled = useCallback((tier: 'local' | 'external', normalizedQuery: string) => {
+    if (tier === 'local') localSettledForRef.current = normalizedQuery;
+    else externalSettledForRef.current = normalizedQuery;
+
+    const requireExternal = searchMode === 'quick';
+    const localOk = localSettledForRef.current === normalizedQuery;
+    const externalOk = !requireExternal || externalSettledForRef.current === normalizedQuery;
+    if (localOk && externalOk) {
+      setSettledQuery(normalizedQuery);
+    }
+  }, [searchMode]);
 
   const toggleShowAll = (category: keyof typeof showAllResults) => {
     setShowAllResults(prev => ({
