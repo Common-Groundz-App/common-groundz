@@ -1077,7 +1077,7 @@ const Search = () => {
                     no "results disappearing" mid-typing. The dropdown still
                     shows live loading state independently.
                   */}
-                  {pageResults === null && (isLoading || Object.values(loadingStates).some(Boolean)) ? (
+                  {(pageResults === null || isSearchPending) && !error ? (
                     renderEnhancedLoadingState()
                   ) : pageResults === null && error ? (
                     <div className="flex flex-col items-center justify-center py-12">
