@@ -504,19 +504,14 @@ const Search = () => {
     );
   };
 
-  // Helper function to render local results. Currently entities-only —
-  // the tagged switch keeps an exhaustiveness check so future kinds
-  // (reviews/recommendations) trigger a TS error if reintroduced.
+  // Helper function to render local results. Currently entities-only.
+  // If new kinds are added back to TaggedLocalResult, add cases here.
   const renderLocalResultItem = (item: TaggedLocalResult, index: number) => {
     const key = `${item.__cg_kind}-${item.id ?? index}`;
-    switch (item.__cg_kind) {
-      case 'entity':
-        return <EntityResultItem key={key} entity={item} onClick={() => {}} />;
-      default: {
-        const _exhaustive: never = item;
-        return null;
-      }
+    if (item.__cg_kind === 'entity') {
+      return <EntityResultItem key={key} entity={item} onClick={() => {}} />;
     }
+    return null;
   };
 
   // Render search dropdown — focus-gated, with Escape dismissal flag
