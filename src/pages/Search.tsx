@@ -408,41 +408,33 @@ const Search = () => {
         return { localResults: [] as TaggedLocalResult[], externalResults: [], hashtags: src.hashtags || [] };
       case 'movies':
         return {
-          localResults: allLocalResults.filter(item => {
-            if (item.__cg_kind === 'entity' && item.type === 'movie') return true;
-            if (item.__cg_kind === 'recommendation' && item.category === 'movie') return true;
-            return false;
-          }),
+          localResults: allLocalResults.filter(item =>
+            item.__cg_kind === 'entity' && item.type === 'movie'
+          ),
           externalResults: categorizedProducts.movies,
           hashtags: []
         };
       case 'books':
         return {
-          localResults: allLocalResults.filter(item => {
-            if (item.__cg_kind === 'entity' && item.type === 'book') return true;
-            if (item.__cg_kind === 'recommendation' && item.category === 'book') return true;
-            return false;
-          }),
+          localResults: allLocalResults.filter(item =>
+            item.__cg_kind === 'entity' && item.type === 'book'
+          ),
           externalResults: categorizedProducts.books,
           hashtags: []
         };
       case 'places':
         return {
-          localResults: allLocalResults.filter(item => {
-            if (item.__cg_kind === 'entity' && item.type === 'place') return true;
-            if (item.__cg_kind === 'recommendation' && item.category === 'place') return true;
-            return false;
-          }),
+          localResults: allLocalResults.filter(item =>
+            item.__cg_kind === 'entity' && item.type === 'place'
+          ),
           externalResults: categorizedProducts.places,
           hashtags: []
         };
       case 'products':
         return {
-          localResults: allLocalResults.filter(item => {
-            if (item.__cg_kind === 'entity' && item.type === 'product') return true;
-            if (item.__cg_kind === 'recommendation' && item.category === 'product') return true;
-            return false;
-          }),
+          localResults: allLocalResults.filter(item =>
+            item.__cg_kind === 'entity' && item.type === 'product'
+          ),
           externalResults: categorizedProducts.products,
           hashtags: []
         };
@@ -512,24 +504,15 @@ const Search = () => {
     );
   };
 
-  // Helper function to render mixed local results (page-results section).
-  // Dispatch is by source bucket (__cg_kind tagged at merge time), not by
-  // shape-sniffing — this prevents reviews/recommendations from being
-  // mis-rendered as users (the "AU avatar" bug).
+  // Helper function to render local results. Currently entities-only —
+  // the tagged switch keeps an exhaustiveness check so future kinds
+  // (reviews/recommendations) trigger a TS error if reintroduced.
   const renderLocalResultItem = (item: TaggedLocalResult, index: number) => {
-    // Deterministic-first key fallback: id is always present on DB rows;
-    // index is a true last-resort fallback only.
     const key = `${item.__cg_kind}-${item.id ?? index}`;
     switch (item.__cg_kind) {
       case 'entity':
         return <EntityResultItem key={key} entity={item} onClick={() => {}} />;
-      case 'review':
-        return <ReviewResultItem key={key} review={item} onClick={() => {}} />;
-      case 'recommendation':
-        return <RecommendationResultItem key={key} recommendation={item} onClick={() => {}} />;
       default: {
-        // Exhaustiveness check — TS will error here if a new kind is added
-        // to TaggedLocalResult without a matching case.
         const _exhaustive: never = item;
         return null;
       }
