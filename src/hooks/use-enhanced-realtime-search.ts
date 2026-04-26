@@ -367,6 +367,10 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
       if (externalAbortRef.current) externalAbortRef.current.abort();
       lastLocalQueryRef.current = '';
       lastExternalQueryRef.current = '';
+      // Reset settled tracking — there's nothing to wait for.
+      localSettledForRef.current = null;
+      externalSettledForRef.current = null;
+      setSettledQuery(null);
 
       setResults({
         users: [],
@@ -420,20 +424,27 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
   const refetch = useCallback(() => {
     lastLocalQueryRef.current = '';
     lastExternalQueryRef.current = ''; // Reset to allow re-fetch
+    // Reset settled tracking too — refetch is a fresh lifecycle.
+    localSettledForRef.current = null;
+    externalSettledForRef.current = null;
     performLocalSearch(query);
     if (searchMode === 'quick') {
       performExternalSearch(query);
     }
   }, [query, performLocalSearch, performExternalSearch, searchMode]);
 
-  return { 
-    results, 
-    isLoading, 
-    loadingStates, 
+  return {
+    results,
+    isLoading,
+    loadingStates,
     error,
     showAllResults,
     toggleShowAll,
     searchMode, // Return the original searchMode passed in options
-    refetch
+    refetch,
+    // Additive: last query for which both required tiers have terminally
+    // resolved. Consumers can use this to gate result commits and avoid
+    // the local→external race. Other consumers may safely ignore it.
+    settledQuery,
   };
 };
