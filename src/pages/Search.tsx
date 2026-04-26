@@ -35,10 +35,11 @@ import {
   applyExactMatchOverride,
   softCollapse,
 } from '@/utils/searchRanking';
+import { normalizeSearchQuery as normalize } from '@/utils/searchNormalize';
 
 
-// Locale-safe query normalization (handles Turkish "İ"/"i" and other locale quirks)
-const normalize = (q: string) => q.trim().toLocaleLowerCase();
+// (Locale-safe query normalization is now imported from @/utils/searchNormalize
+// so the search hook and this page agree exactly on equality.)
 
 // Tagged union for "local results" (Already on Groundz section).
 // Currently entities-only — reviews and recommendations are intentionally hidden
