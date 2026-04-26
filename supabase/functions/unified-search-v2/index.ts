@@ -618,7 +618,39 @@ serve(async (req) => {
       }
       
       const hydratedEntities = await hydrateParents(mergedEntities)
-      
+
+      // Merge aggregated rating stats from entity_stats_view (non-blocking).
+      // Fired as a separate parallel query — NOT a SQL JOIN — so a failure here
+      // never blocks the entity payload. Skipped entirely when no entities.
+      let entitiesWithStats = hydratedEntities
+      if (hydratedEntities.length > 0) {
+        try {
+          const entityIds = hydratedEntities.map((e: any) => e.id)
+          const { data: statsRows, error: statsError } = await supabase
+            .from('entity_stats_view')
+            .select('entity_id, average_rating, review_count')
+            .in('entity_id', entityIds)
+
+          if (statsError) {
+            console.warn('⚠️ entity_stats_view query failed, returning entities without stats:', statsError.message)
+          } else {
+            const statsMap = new Map(
+              (statsRows ?? []).map((s: any) => [s.entity_id, s])
+            )
+            entitiesWithStats = hydratedEntities.map((entity: any) => {
+              const s: any = statsMap.get(entity.id)
+              return {
+                ...entity,
+                average_rating: s?.average_rating ?? null,
+                review_count: s?.review_count ?? 0,
+              }
+            })
+          }
+        } catch (statsErr) {
+          console.warn('⚠️ entity_stats_view merge threw, returning entities without stats:', (statsErr as Error).message)
+        }
+      }
+
       // Search other tables in parallel
       const [usersResult, reviewsResult, recommendationsResult] = await Promise.allSettled([
         supabase.from('profiles').select('id, username, avatar_url, bio').or(`username.ilike.%${query}%, bio.ilike.%${query}%`).limit(limit),
@@ -645,8 +677,8 @@ serve(async (req) => {
         profilesMap = new Map(userProfiles?.map((p: any) => [p.id, p]) || [])
       }
 
-      // Set hydrated entity results
-      results.entities = hydratedEntities
+      // Set hydrated entity results (with merged stats when available)
+      results.entities = entitiesWithStats
       
       if (usersResult.status === 'fulfilled') {
         if (usersResult.value.error) {
