@@ -14,6 +14,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UnifiedSearchResults } from '@/hooks/use-unified-search';
 import { searchHashtags } from '@/services/hashtagService';
+import { normalizeSearchQuery } from '@/utils/searchNormalize';
 
 export interface SearchLoading {
   local: boolean;
@@ -138,7 +139,20 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
     places: false,
     hashtags: false
   });
-  
+
+  // Additive "settled" signal — last query for which BOTH tiers have reached
+  // a terminal state (success / handled error / abort / skipped). Consumers
+  // like the Search page use this to gate result commits, avoiding the race
+  // where loadingStates briefly flip to false between the local and external
+  // debounce windows. Other consumers (Explore dropdown) can ignore it.
+  const [settledQuery, setSettledQuery] = useState<string | null>(null);
+
+  // Per-tier "this query has reached a terminal state" tracking. We compute
+  // settledQuery from these so it ONLY advances when both tiers agree, for
+  // the SAME normalized query.
+  const localSettledForRef = useRef<string | null>(null);
+  const externalSettledForRef = useRef<string | null>(null);
+
   // Refs for managing debounce timers and abort
   const localTimerRef = useRef<NodeJS.Timeout | null>(null);
   const externalTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -147,8 +161,23 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
   const externalAbortRef = useRef<AbortController | null>(null);
   const lastLocalQueryRef = useRef<string>('');
   const lastExternalQueryRef = useRef<string>('');
-  
+
   const searchMode = options?.mode || 'quick';
+
+  // Mark a tier as terminal for a given query, and advance settledQuery
+  // ONLY when both tiers (or the only required tier, in local-only mode)
+  // agree on the same normalized query.
+  const markTierSettled = useCallback((tier: 'local' | 'external', normalizedQuery: string) => {
+    if (tier === 'local') localSettledForRef.current = normalizedQuery;
+    else externalSettledForRef.current = normalizedQuery;
+
+    const requireExternal = searchMode === 'quick';
+    const localOk = localSettledForRef.current === normalizedQuery;
+    const externalOk = !requireExternal || externalSettledForRef.current === normalizedQuery;
+    if (localOk && externalOk) {
+      setSettledQuery(normalizedQuery);
+    }
+  }, [searchMode]);
 
   const toggleShowAll = (category: keyof typeof showAllResults) => {
     setShowAllResults(prev => ({
@@ -159,22 +188,27 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
 
   // Tier 1: Local-only search (fast, 450ms debounce)
   const performLocalSearch = useCallback(async (searchQuery: string) => {
+    const normalizedQuery = normalizeSearchQuery(searchQuery);
+
     if (!searchQuery || searchQuery.trim().length < 2) {
-      setResults(prev => ({ 
-        ...prev, 
-        users: [], 
-        entities: [], 
-        reviews: [], 
-        recommendations: [] 
+      setResults(prev => ({
+        ...prev,
+        users: [],
+        entities: [],
+        reviews: [],
+        recommendations: []
       }));
       setLoadingStates(prev => ({ ...prev, local: false }));
+      // Terminal: short/empty query — mark settled so consumers don't wait.
+      markTierSettled('local', normalizedQuery);
       return;
     }
 
-    const normalizedQuery = searchQuery.toLowerCase().trim();
-
     // Dedupe — same query already in flight or just resolved.
     if (lastLocalQueryRef.current === normalizedQuery) {
+      // Already terminal for this query — re-assert settled in case caller
+      // is waiting (e.g. refetch on identical query).
+      markTierSettled('local', normalizedQuery);
       return;
     }
 
@@ -190,10 +224,10 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
 
     try {
       const { data, error: searchError } = await supabase.functions.invoke('unified-search-v2', {
-        body: { 
-          query: searchQuery, 
-          limit: 20, 
-          type: 'all', 
+        body: {
+          query: searchQuery,
+          limit: 20,
+          type: 'all',
           mode: 'local-only'  // Forces local-only, no external API calls
         },
         // @ts-expect-error supabase-js types may not expose `signal` yet
@@ -201,6 +235,8 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
       });
 
       // Belt-and-braces: even if the SDK ignored signal, drop stale responses.
+      // Aborted = superseded by a newer query; do NOT mark settled (the newer
+      // query will reach its own terminal state).
       if (controller.signal.aborted) return;
 
       if (!searchError && data) {
@@ -227,29 +263,37 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
       if (!isAbortLike(err)) {
         console.error('Local search failed:', err);
       }
+      // Errors (other than abort) are still terminal — fall through to mark settled.
     } finally {
       if (!controller.signal.aborted) {
         setLoadingStates(prev => ({ ...prev, local: false }));
+        // Terminal: success or handled error.
+        markTierSettled('local', normalizedQuery);
       }
     }
-  }, []);
+  }, [markTierSettled]);
 
   // Tier 2: External API search (slower, 1100ms debounce, ≥4 chars, cached)
   const performExternalSearch = useCallback(async (searchQuery: string) => {
+    const normalizedQuery = normalizeSearchQuery(searchQuery);
+
     // Length guard — runs BEFORE any invoke, so short queries never hit the wire.
+    // Terminal: external tier is intentionally skipped → mark settled so the
+    // commit gate doesn't wait forever for a tier that will never run.
     if (!searchQuery || searchQuery.trim().length < MIN_EXTERNAL_QUERY_LENGTH) {
       setLoadingStates(prev => ({ ...prev, external: false }));
+      markTierSettled('external', normalizedQuery);
       return;
     }
-
-    const normalizedQuery = searchQuery.toLowerCase().trim();
 
     // Prevent duplicate calls for same query
     if (lastExternalQueryRef.current === normalizedQuery) {
+      // Already terminal for this query — re-assert settled.
+      markTierSettled('external', normalizedQuery);
       return;
     }
 
-    // Check cache first
+    // Check cache first — terminal: cached hit counts as settled.
     const cached = getCachedExternalResults(searchQuery);
     if (cached) {
       setResults(prev => ({
@@ -258,6 +302,8 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
         categorized: cached.categorized || { books: [], movies: [], places: [] }
       }));
       setLoadingStates(prev => ({ ...prev, external: false }));
+      lastExternalQueryRef.current = normalizedQuery;
+      markTierSettled('external', normalizedQuery);
       return;
     }
 
@@ -273,17 +319,18 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
 
     try {
       const { data, error: searchError } = await supabase.functions.invoke('unified-search-v2', {
-        body: { 
-          query: searchQuery, 
-          limit: 20, 
-          type: 'all', 
+        body: {
+          query: searchQuery,
+          limit: 20,
+          type: 'all',
           mode: 'quick'  // Calls external APIs (Books, Movies, Places)
         },
         // @ts-expect-error supabase-js types may not expose `signal` yet
         signal: controller.signal,
       });
 
-      // Belt-and-braces: drop stale responses if we've moved on.
+      // Belt-and-braces: drop stale responses if we've moved on. Aborted =
+      // superseded; the newer query will reach its own terminal state.
       if (controller.signal.aborted) return;
 
       if (!searchError && data) {
@@ -291,22 +338,25 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
           products: data?.products || [],
           categorized: data?.categorized || { books: [], movies: [], places: [] }
         };
-        
+
         // Cache the results to prevent duplicate API calls
         setCachedExternalResults(searchQuery, externalData);
-        
+
         setResults(prev => ({ ...prev, ...externalData }));
       }
     } catch (err: any) {
       if (!isAbortLike(err)) {
         console.error('External search failed:', err);
       }
+      // Errors (other than abort) are still terminal — fall through.
     } finally {
       if (!controller.signal.aborted) {
         setLoadingStates(prev => ({ ...prev, external: false }));
+        // Terminal: success or handled error.
+        markTierSettled('external', normalizedQuery);
       }
     }
-  }, []);
+  }, [markTierSettled]);
 
   // Main effect: coordinate tiered debounce
   useEffect(() => {
@@ -317,6 +367,10 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
       if (externalAbortRef.current) externalAbortRef.current.abort();
       lastLocalQueryRef.current = '';
       lastExternalQueryRef.current = '';
+      // Reset settled tracking — there's nothing to wait for.
+      localSettledForRef.current = null;
+      externalSettledForRef.current = null;
+      setSettledQuery(null);
 
       setResults({
         users: [],
@@ -370,20 +424,27 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
   const refetch = useCallback(() => {
     lastLocalQueryRef.current = '';
     lastExternalQueryRef.current = ''; // Reset to allow re-fetch
+    // Reset settled tracking too — refetch is a fresh lifecycle.
+    localSettledForRef.current = null;
+    externalSettledForRef.current = null;
     performLocalSearch(query);
     if (searchMode === 'quick') {
       performExternalSearch(query);
     }
   }, [query, performLocalSearch, performExternalSearch, searchMode]);
 
-  return { 
-    results, 
-    isLoading, 
-    loadingStates, 
+  return {
+    results,
+    isLoading,
+    loadingStates,
     error,
     showAllResults,
     toggleShowAll,
     searchMode, // Return the original searchMode passed in options
-    refetch
+    refetch,
+    // Additive: last query for which both required tiers have terminally
+    // resolved. Consumers can use this to gate result commits and avoid
+    // the local→external race. Other consumers may safely ignore it.
+    settledQuery,
   };
 };
