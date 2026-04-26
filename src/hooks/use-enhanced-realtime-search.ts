@@ -188,22 +188,27 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
 
   // Tier 1: Local-only search (fast, 450ms debounce)
   const performLocalSearch = useCallback(async (searchQuery: string) => {
+    const normalizedQuery = normalizeSearchQuery(searchQuery);
+
     if (!searchQuery || searchQuery.trim().length < 2) {
-      setResults(prev => ({ 
-        ...prev, 
-        users: [], 
-        entities: [], 
-        reviews: [], 
-        recommendations: [] 
+      setResults(prev => ({
+        ...prev,
+        users: [],
+        entities: [],
+        reviews: [],
+        recommendations: []
       }));
       setLoadingStates(prev => ({ ...prev, local: false }));
+      // Terminal: short/empty query — mark settled so consumers don't wait.
+      markTierSettled('local', normalizedQuery);
       return;
     }
 
-    const normalizedQuery = searchQuery.toLowerCase().trim();
-
     // Dedupe — same query already in flight or just resolved.
     if (lastLocalQueryRef.current === normalizedQuery) {
+      // Already terminal for this query — re-assert settled in case caller
+      // is waiting (e.g. refetch on identical query).
+      markTierSettled('local', normalizedQuery);
       return;
     }
 
@@ -219,10 +224,10 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
 
     try {
       const { data, error: searchError } = await supabase.functions.invoke('unified-search-v2', {
-        body: { 
-          query: searchQuery, 
-          limit: 20, 
-          type: 'all', 
+        body: {
+          query: searchQuery,
+          limit: 20,
+          type: 'all',
           mode: 'local-only'  // Forces local-only, no external API calls
         },
         // @ts-expect-error supabase-js types may not expose `signal` yet
@@ -230,6 +235,8 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
       });
 
       // Belt-and-braces: even if the SDK ignored signal, drop stale responses.
+      // Aborted = superseded by a newer query; do NOT mark settled (the newer
+      // query will reach its own terminal state).
       if (controller.signal.aborted) return;
 
       if (!searchError && data) {
@@ -256,12 +263,15 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
       if (!isAbortLike(err)) {
         console.error('Local search failed:', err);
       }
+      // Errors (other than abort) are still terminal — fall through to mark settled.
     } finally {
       if (!controller.signal.aborted) {
         setLoadingStates(prev => ({ ...prev, local: false }));
+        // Terminal: success or handled error.
+        markTierSettled('local', normalizedQuery);
       }
     }
-  }, []);
+  }, [markTierSettled]);
 
   // Tier 2: External API search (slower, 1100ms debounce, ≥4 chars, cached)
   const performExternalSearch = useCallback(async (searchQuery: string) => {
