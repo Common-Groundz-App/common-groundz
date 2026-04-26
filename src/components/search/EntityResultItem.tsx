@@ -87,7 +87,7 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
           )}
 
           {hasRating && (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               <ConnectedRingsRating
                 value={ratingValue}
                 size="badge"
@@ -96,7 +96,7 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
                 isInteractive={false}
                 minimal
               />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
                 {ratingValue.toFixed(1)} · {reviewCount} {reviewLabel}
               </span>
             </div>
