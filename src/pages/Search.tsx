@@ -201,6 +201,13 @@ const Search = () => {
     }
   }, [searchQuery, query, settledQuery, results]);
 
+  // INTENT-based loader gate: "user asked for something new, we haven't shown it yet."
+  // This is derived from URL query vs last committed pageQuery, so it cannot
+  // false-positive during the local→external debounce gap (which the previous
+  // loadingStates-based check could). Empty queries don't trigger the loader.
+  const isSearchPending =
+    query.trim().length > 0 && normalize(query) !== normalize(pageQuery);
+
   // Reset expansion + highlight when query changes (skip during IME composition)
   useEffect(() => {
     if (isComposingRef.current) return;
