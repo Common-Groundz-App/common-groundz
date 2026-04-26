@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Clock, X, Bookmark } from 'lucide-react';
+import { History, X } from 'lucide-react';
 import type { RecentSearchItem } from '@/hooks/useRecentSearches';
 import { useEntityCache } from '@/hooks/use-entity-cache';
 
