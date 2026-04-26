@@ -275,20 +275,25 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
 
   // Tier 2: External API search (slower, 1100ms debounce, ≥4 chars, cached)
   const performExternalSearch = useCallback(async (searchQuery: string) => {
+    const normalizedQuery = normalizeSearchQuery(searchQuery);
+
     // Length guard — runs BEFORE any invoke, so short queries never hit the wire.
+    // Terminal: external tier is intentionally skipped → mark settled so the
+    // commit gate doesn't wait forever for a tier that will never run.
     if (!searchQuery || searchQuery.trim().length < MIN_EXTERNAL_QUERY_LENGTH) {
       setLoadingStates(prev => ({ ...prev, external: false }));
+      markTierSettled('external', normalizedQuery);
       return;
     }
-
-    const normalizedQuery = searchQuery.toLowerCase().trim();
 
     // Prevent duplicate calls for same query
     if (lastExternalQueryRef.current === normalizedQuery) {
+      // Already terminal for this query — re-assert settled.
+      markTierSettled('external', normalizedQuery);
       return;
     }
 
-    // Check cache first
+    // Check cache first — terminal: cached hit counts as settled.
     const cached = getCachedExternalResults(searchQuery);
     if (cached) {
       setResults(prev => ({
@@ -297,6 +302,8 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
         categorized: cached.categorized || { books: [], movies: [], places: [] }
       }));
       setLoadingStates(prev => ({ ...prev, external: false }));
+      lastExternalQueryRef.current = normalizedQuery;
+      markTierSettled('external', normalizedQuery);
       return;
     }
 
@@ -312,17 +319,18 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
 
     try {
       const { data, error: searchError } = await supabase.functions.invoke('unified-search-v2', {
-        body: { 
-          query: searchQuery, 
-          limit: 20, 
-          type: 'all', 
+        body: {
+          query: searchQuery,
+          limit: 20,
+          type: 'all',
           mode: 'quick'  // Calls external APIs (Books, Movies, Places)
         },
         // @ts-expect-error supabase-js types may not expose `signal` yet
         signal: controller.signal,
       });
 
-      // Belt-and-braces: drop stale responses if we've moved on.
+      // Belt-and-braces: drop stale responses if we've moved on. Aborted =
+      // superseded; the newer query will reach its own terminal state.
       if (controller.signal.aborted) return;
 
       if (!searchError && data) {
@@ -330,22 +338,25 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
           products: data?.products || [],
           categorized: data?.categorized || { books: [], movies: [], places: [] }
         };
-        
+
         // Cache the results to prevent duplicate API calls
         setCachedExternalResults(searchQuery, externalData);
-        
+
         setResults(prev => ({ ...prev, ...externalData }));
       }
     } catch (err: any) {
       if (!isAbortLike(err)) {
         console.error('External search failed:', err);
       }
+      // Errors (other than abort) are still terminal — fall through.
     } finally {
       if (!controller.signal.aborted) {
         setLoadingStates(prev => ({ ...prev, external: false }));
+        // Terminal: success or handled error.
+        markTierSettled('external', normalizedQuery);
       }
     }
-  }, []);
+  }, [markTierSettled]);
 
   // Main effect: coordinate tiered debounce
   useEffect(() => {
