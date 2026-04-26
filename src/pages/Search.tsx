@@ -183,21 +183,23 @@ const Search = () => {
   const [pageResults, setPageResults] = useState<any | null>(null);
   const [pageQuery, setPageQuery] = useState<string>(query);
 
-  // Commit gate: only snapshot results when the live input matches the URL query
-  // and the hook has finished loading. The hook's internal AbortController
-  // already guarantees `results` is from the latest in-flight request, so we
-  // do NOT need an extra stale-result ref guard (which can wrongly block
-  // legitimate re-commits, e.g. refetch on the same query).
+  // Commit gate (TRUTH-based): snapshot results only when the hook reports
+  // it has terminally settled for the URL query. `settledQuery` only advances
+  // once both required tiers (local + external in 'quick' mode) have reached
+  // a terminal state for the same normalized query, eliminating the race
+  // where loadingStates briefly flip to false between debounce windows.
   useEffect(() => {
+    const q = normalize(query);
     if (
-      normalize(searchQuery) === normalize(query) &&
-      !isLoading &&
-      query.trim().length >= 1
+      q.length >= 1 &&
+      settledQuery !== null &&
+      normalize(settledQuery) === q &&
+      normalize(searchQuery) === q
     ) {
       setPageResults(results);
       setPageQuery(query);
     }
-  }, [searchQuery, query, isLoading, results]);
+  }, [searchQuery, query, settledQuery, results]);
 
   // Reset expansion + highlight when query changes (skip during IME composition)
   useEffect(() => {
