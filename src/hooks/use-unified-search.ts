@@ -29,6 +29,9 @@ export interface EntitySearchResult {
   parent_id?: string | null;
   parent_slug?: string | null;
   category_id?: string | null;
+  // Aggregated rating signals from entity_stats_view (optional, backward compatible)
+  average_rating?: number | null;
+  review_count?: number;
 }
 
 export interface ReviewSearchResult {
