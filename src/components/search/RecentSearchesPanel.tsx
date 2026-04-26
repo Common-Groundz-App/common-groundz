@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Clock, X, Bookmark } from 'lucide-react';
+import { History, X } from 'lucide-react';
 import type { RecentSearchItem } from '@/hooks/useRecentSearches';
 import { useEntityCache } from '@/hooks/use-entity-cache';
 
@@ -70,7 +70,7 @@ export function RecentSearchesPanel({
         <button
           type="button"
           onClick={onClearAll}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
         >
           Clear all
         </button>
@@ -91,11 +91,7 @@ export function RecentSearchesPanel({
                 isHighlighted ? 'bg-accent/40' : 'hover:bg-accent/30'
               }`}
             >
-              {isEntity ? (
-                <Bookmark className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              ) : (
-                <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-              )}
+              <History className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault() /* keep input focus */}
