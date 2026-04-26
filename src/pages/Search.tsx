@@ -164,7 +164,8 @@ const Search = () => {
     showAllResults,
     toggleShowAll,
     searchMode,
-    refetch
+    refetch,
+    settledQuery,
   } = useEnhancedRealtimeSearch(searchQuery, { mode: mode as 'quick' | 'deep' });
 
   // Trimmed query — reused everywhere
