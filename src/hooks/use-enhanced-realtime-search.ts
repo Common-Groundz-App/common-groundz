@@ -14,6 +14,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { UnifiedSearchResults } from '@/hooks/use-unified-search';
 import { searchHashtags } from '@/services/hashtagService';
+import { normalizeSearchQuery } from '@/utils/searchNormalize';
 
 export interface SearchLoading {
   local: boolean;
