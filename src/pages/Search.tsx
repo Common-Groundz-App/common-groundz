@@ -1130,7 +1130,7 @@ const Search = () => {
                               <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                                 <Users className="h-5 w-5" /> People
                               </h2>
-                              <div className="min-w-0">
+                              <div className="border rounded-md overflow-hidden min-w-0">
                                 {pageUsers.slice(0, 5).map((user: any) => (
                                   <UserResultItem key={user.id} user={user} onClick={() => {}} />
                                 ))}
