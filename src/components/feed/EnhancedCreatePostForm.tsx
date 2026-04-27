@@ -164,6 +164,76 @@ export function EnhancedCreatePostForm({
   // Visual fallback pulse on submit success (in case sound fails)
   const [submitPulse, setSubmitPulse] = useState(false);
 
+  // New UI state for redesigned composer
+  const [postTypeTagsOpen, setPostTypeTagsOpen] = useState(false);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+
+  // Draft autosave (create mode only). Stored as a flat object + timestamp;
+  // expires after 24h to avoid stale clutter.
+  const draftKey = `composer-draft-${user?.id ?? 'anon'}`;
+  const [draft, setDraft, clearDraft] = useLocalStorage<{
+    title: string;
+    content: string;
+    savedAt: number;
+  } | null>(draftKey, null);
+
+  // Restore draft on mount (CREATE mode only — never edit mode)
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (isEditMode || draftRestoredRef.current || !draft) return;
+    draftRestoredRef.current = true;
+    const ageMs = Date.now() - (draft.savedAt ?? 0);
+    if (ageMs > 24 * 60 * 60 * 1000) {
+      clearDraft();
+      return;
+    }
+    if (!title && draft.title) setTitle(draft.title);
+    if (!content && draft.content) setContent(draft.content);
+    // Intentionally only depend on isEditMode to run once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode]);
+
+  // Debounced autosave of title/content (create mode only)
+  useEffect(() => {
+    if (isEditMode) return;
+    const handle = setTimeout(() => {
+      if (title.trim() || content.trim()) {
+        setDraft({ title, content, savedAt: Date.now() });
+      }
+    }, 500);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, isEditMode]);
+
+  // Dirty check for close-guard
+  const isDirty = useMemo(() => {
+    if (isEditMode) {
+      // In edit mode, treat as dirty if anything changed from postToEdit
+      return (
+        (title.trim() || null) !== (postToEdit?.title ?? null) ||
+        content !== (postToEdit?.content ?? '') ||
+        media.length !== (postToEdit?.media?.length ?? 0) ||
+        entities.length !== (postToEdit?.tagged_entities?.length ?? 0)
+      );
+    }
+    return !!(title.trim() || content.trim() || media.length > 0 || entities.length > 0);
+  }, [isEditMode, title, content, media, entities, postToEdit]);
+
+  const handleCloseRequest = useCallback(() => {
+    if (isDirty) {
+      setDiscardDialogOpen(true);
+    } else {
+      onCancel?.();
+    }
+  }, [isDirty, onCancel]);
+
+  const handleDiscardConfirm = useCallback(() => {
+    setDiscardDialogOpen(false);
+    if (!isEditMode) clearDraft();
+    onCancel?.();
+  }, [isEditMode, clearDraft, onCancel]);
+
+
   // Prefill entity when passed from parent (e.g. "Share your experience").
   // Skip in edit mode — entities are already hydrated from postToEdit.
   useEffect(() => {
