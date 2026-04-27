@@ -11,6 +11,14 @@ import { Entity } from '@/services/recommendation/types';
 import { MediaItem } from '@/types/media';
 import { Badge } from '@/components/ui/badge';
 import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users, ChevronDown, Plus } from 'lucide-react';
+import { ComposerTopBar } from './composer/ComposerTopBar';
+import { ComposerBottomBar } from './composer/ComposerBottomBar';
+import { EntityHeroPill } from './composer/EntityHeroPill';
+import { EntitySelectorModal } from './composer/EntitySelectorModal';
+import { PostTypeAndTagsPill } from './composer/PostTypeAndTagsPill';
+import { PostTypeAndTagsModal } from './composer/PostTypeAndTagsModal';
+import { DiscardDraftDialog } from './composer/DiscardDraftDialog';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
@@ -155,6 +163,76 @@ export function EnhancedCreatePostForm({
   );
   // Visual fallback pulse on submit success (in case sound fails)
   const [submitPulse, setSubmitPulse] = useState(false);
+
+  // New UI state for redesigned composer
+  const [postTypeTagsOpen, setPostTypeTagsOpen] = useState(false);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+
+  // Draft autosave (create mode only). Stored as a flat object + timestamp;
+  // expires after 24h to avoid stale clutter.
+  const draftKey = `composer-draft-${user?.id ?? 'anon'}`;
+  const [draft, setDraft, clearDraft] = useLocalStorage<{
+    title: string;
+    content: string;
+    savedAt: number;
+  } | null>(draftKey, null);
+
+  // Restore draft on mount (CREATE mode only — never edit mode)
+  const draftRestoredRef = useRef(false);
+  useEffect(() => {
+    if (isEditMode || draftRestoredRef.current || !draft) return;
+    draftRestoredRef.current = true;
+    const ageMs = Date.now() - (draft.savedAt ?? 0);
+    if (ageMs > 24 * 60 * 60 * 1000) {
+      clearDraft();
+      return;
+    }
+    if (!title && draft.title) setTitle(draft.title);
+    if (!content && draft.content) setContent(draft.content);
+    // Intentionally only depend on isEditMode to run once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode]);
+
+  // Debounced autosave of title/content (create mode only)
+  useEffect(() => {
+    if (isEditMode) return;
+    const handle = setTimeout(() => {
+      if (title.trim() || content.trim()) {
+        setDraft({ title, content, savedAt: Date.now() });
+      }
+    }, 500);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, isEditMode]);
+
+  // Dirty check for close-guard
+  const isDirty = useMemo(() => {
+    if (isEditMode) {
+      // In edit mode, treat as dirty if anything changed from postToEdit
+      return (
+        (title.trim() || null) !== (postToEdit?.title ?? null) ||
+        content !== (postToEdit?.content ?? '') ||
+        media.length !== (postToEdit?.media?.length ?? 0) ||
+        entities.length !== (postToEdit?.tagged_entities?.length ?? 0)
+      );
+    }
+    return !!(title.trim() || content.trim() || media.length > 0 || entities.length > 0);
+  }, [isEditMode, title, content, media, entities, postToEdit]);
+
+  const handleCloseRequest = useCallback(() => {
+    if (isDirty) {
+      setDiscardDialogOpen(true);
+    } else {
+      onCancel?.();
+    }
+  }, [isDirty, onCancel]);
+
+  const handleDiscardConfirm = useCallback(() => {
+    setDiscardDialogOpen(false);
+    if (!isEditMode) clearDraft();
+    onCancel?.();
+  }, [isEditMode, clearDraft, onCancel]);
+
 
   // Prefill entity when passed from parent (e.g. "Share your experience").
   // Skip in edit mode — entities are already hydrated from postToEdit.
@@ -748,6 +826,7 @@ export function EnhancedCreatePostForm({
       setReuseIntent('');
       setStructuredOpen(false);
       setPostType('story');
+      clearDraft();
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
@@ -866,583 +945,390 @@ export function EnhancedCreatePostForm({
   // Get avatar URL from profileData
   const avatarUrl = profileData?.avatar_url || null;
 
-  return (
-    <div 
-      ref={formRef} 
-      className={`bg-background rounded-xl shadow-sm p-5 transition-all ${showLocationInput ? 'location-search-active' : ''}`}
+  // Emoji picker rendered as a slot inside the bottom bar (parent owns cursor logic)
+  const emojiPickerNode = emojiPickerVisible && !showLocationInput ? (
+    <div
+      ref={emojiPickerRef}
+      className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper"
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+      onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+      onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+      onKeyDown={(e) => { e.stopPropagation(); }}
     >
-      {/* User Info + Text Input */}
-      <div className="flex gap-3">
-        <Avatar className="h-10 w-10 cursor-pointer hover:opacity-90 transition-opacity">
-          <AvatarImage src={avatarUrl || ''} alt={userDisplayName} />
-          <AvatarFallback className="bg-brand-orange text-white font-semibold">
-            {getInitialsFromName(userDisplayName)}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-1 space-y-1">
-          <p className="text-sm font-medium">{userDisplayName}</p>
-          
-          {/* Title Input */}
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Add a title (optional)"
-            maxLength={120}
-            aria-label="Post title"
-            className="text-lg font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/50"
-           />
+      <Picker
+        data={data}
+        onEmojiSelect={handleEmojiSelect}
+        theme="light"
+        previewPosition="none"
+        set="native"
+        skinTonePosition="none"
+        emojiSize={20}
+        emojiButtonSize={28}
+        maxFrequentRows={2}
+        modalish={false}
+        showSkinTones={false}
+      />
+    </div>
+  ) : null;
 
-          {/* Post Type Chips */}
-          <div className="flex flex-wrap gap-1.5 py-1">
-            {POST_TYPE_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => {
-                  setPostType((prev) => (prev === option.value ? 'story' : option.value));
-                }}
-                className={cn(
-                  'px-2.5 py-0.5 rounded-full text-xs border transition-colors',
-                  postType === option.value
-                    ? 'bg-brand-orange text-white border-brand-orange'
-                    : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+  return (
+    <div
+      ref={formRef}
+      className={cn(
+        'flex flex-col min-h-[100dvh] bg-background transition-all',
+        showLocationInput && 'location-search-active'
+      )}
+    >
+      {/* Sticky top bar — X (with dirty-guard) + Post */}
+      <ComposerTopBar
+        onClose={handleCloseRequest}
+        onSubmit={handleSubmit}
+        isSubmitting={isSubmitting}
+        isPostDisabled={isPostButtonDisabled || showLocationInput}
+        isEditMode={isEditMode}
+        submitPulse={submitPulse}
+      />
 
-          {/* Entity Section — compact-expandable */}
-          {entities.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1 py-1">
-              {entities.map((entity) => (
-                <Badge 
-                  key={entity.id} 
-                  variant="outline" 
-                  className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
-                >
-                  <span>{getEntityIcon(entity.type)}</span>
-                  <span>{entity.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-4 w-4 p-0 rounded-full hover:bg-muted"
-                    onClick={() => removeEntity(entity.id)}
-                  >
-                    <X size={10} />
-                  </Button>
+      {/* Scrollable composer surface — no card wrapper */}
+      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+        {/* Subtle identity */}
+        <p className="text-sm text-muted-foreground">{userDisplayName}</p>
+
+        {/* Hero entity pill */}
+        <EntityHeroPill
+          entities={entities}
+          onOpenSelector={() => {
+            setSelectorPrefillQuery('');
+            setEntitySelectorVisible(true);
+            setEmojiPickerVisible(false);
+            setShowLocationInput(false);
+          }}
+          onRemoveEntity={removeEntity}
+        />
+
+        {/* Title — large, borderless */}
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Add a title (optional)"
+          maxLength={120}
+          aria-label="Post title"
+          className="text-2xl font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
+        />
+
+        {/* Body */}
+        <Textarea
+          ref={textareaRef}
+          placeholder={getPlaceholderForType(postType)}
+          value={content}
+          onChange={(e) => {
+            const newContent = e.target.value;
+            setContent(newContent);
+
+            // Check for @ mention trigger (preserved verbatim)
+            const textarea = e.target;
+            const cursorPos = textarea.selectionStart;
+            const textBeforeCursor = newContent.substring(0, cursorPos);
+            const mentionMatch = textBeforeCursor.match(/(^|\s)@(\w*)$/);
+
+            if (mentionMatch) {
+              const mentionText = mentionMatch[2];
+              setSelectorPrefillQuery(mentionText);
+              setEntitySelectorVisible(true);
+              setEmojiPickerVisible(false);
+              setShowLocationInput(false);
+            }
+          }}
+          className="min-h-[140px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60"
+          onClick={saveCursorPosition}
+          onKeyUp={saveCursorPosition}
+          onFocus={saveCursorPosition}
+        />
+        <p className="text-xs text-muted-foreground/60 -mt-2">
+          What worked? · What didn't? · Who is this useful for?
+        </p>
+
+        {/* Detected hashtags chip row (visible inline per refinement) */}
+        {detectedHashtagsForChips.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1.5">Tags</p>
+            <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {detectedHashtagsForChips.map((tag) => (
+                <Badge key={tag} variant="secondary" className="shrink-0 font-normal">
+                  #{tag}
                 </Badge>
               ))}
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectorPrefillQuery('');
-                  setEntitySelectorVisible(true);
-                  setEmojiPickerVisible(false);
-                  setShowLocationInput(false);
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                + Add more
-              </button>
             </div>
-          ) : !entitySelectorVisible ? (
-            <button
-              type="button"
-              onClick={() => {
-                setSelectorPrefillQuery('');
-                setEntitySelectorVisible(true);
-                setEmojiPickerVisible(false);
-                setShowLocationInput(false);
-              }}
-              className="flex items-center gap-2 w-full text-left cursor-pointer hover:bg-muted/50 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors"
-            >
-              <Tag className="h-4 w-4" />
-              <span>What are you sharing about?</span>
-            </button>
-          ) : null}
+          </div>
+        )}
 
-          {/* Inline Entity Selector */}
-          {entitySelectorVisible && (
-            <div className="p-3 border rounded-lg bg-background animate-fade-in">
-              <UnifiedEntitySelector 
-                onEntitiesChange={handleEntitiesChange}
-                initialEntities={entities}
-                initialQuery={selectorPrefillQuery}
-                autoFocusSearch={true}
-                maxEntities={3}
-                onMentionInsert={(username) => {
-                  const sanitized = username.replace(/[^a-z0-9._]/gi, '');
-                  if (!sanitized) return;
-                  const mentionText = `@${sanitized} `;
-                  
-                  // Use live cursor from textarea ref
-                  const liveCursor = textareaRef.current?.selectionStart ?? cursorPosition.start;
-                  const result = replaceAtTrigger(content, liveCursor, mentionText);
-                  
-                  let newContent: string;
-                  let newCursorPos: number;
-                  
-                  if (result) {
-                    newContent = result.newContent;
-                    newCursorPos = result.newCursorPos;
-                  } else {
-                    // Fallback: insert at cursor
-                    const start = liveCursor;
-                    newContent = content.substring(0, start) + mentionText + content.substring(start);
-                    newCursorPos = start + mentionText.length;
-                  }
-                  
-                  setContent(newContent);
-                  setCursorPosition({ start: newCursorPos, end: newCursorPos });
-                  
-                  setTimeout(() => {
-                    if (textareaRef.current) {
-                      textareaRef.current.focus();
-                      textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
-                    }
-                  }, 10);
-                  
-                  setEntitySelectorVisible(false);
-                  setSelectorPrefillQuery('');
-                }}
-              />
+        {/* Suggested hashtags chip row (clickable) */}
+        {suggestedHashtags.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Suggested</p>
+            <div className="flex flex-wrap gap-1.5">
+              {suggestedHashtags.map((tag) => (
+                <Badge
+                  key={tag}
+                  variant="outline"
+                  onClick={() => handleSuggestedHashtagClick(tag)}
+                  className="cursor-pointer hover:bg-accent gap-1 font-normal"
+                >
+                  <Plus className="h-3 w-3" />
+                  #{tag}
+                </Badge>
+              ))}
             </div>
-          )}
+          </div>
+        )}
 
-          <Textarea
-            ref={textareaRef}
-            placeholder={getPlaceholderForType(postType)}
-            value={content}
-            onChange={(e) => {
-              const newContent = e.target.value;
-              setContent(newContent);
-              
-              // Check for @ mention trigger
-              const textarea = e.target;
-              const cursorPos = textarea.selectionStart;
-              
-              // Look for @ symbol followed by text
-              const textBeforeCursor = newContent.substring(0, cursorPos);
-              const mentionMatch = textBeforeCursor.match(/(^|\s)@(\w*)$/);
-              
-              if (mentionMatch) {
-                const mentionText = mentionMatch[2]; // Text after @
-                setSelectorPrefillQuery(mentionText);
-                setEntitySelectorVisible(true);
-                setEmojiPickerVisible(false);
-                setShowLocationInput(false);
-              }
-            }}
-            className="min-h-[100px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/70"
-            onClick={saveCursorPosition}
-            onKeyUp={saveCursorPosition}
-            onFocus={saveCursorPosition}
+        {/* Post type & tags pill */}
+        <div className="flex flex-wrap items-center gap-2">
+          <PostTypeAndTagsPill
+            postType={postType}
+            tagCount={detectedHashtagsForChips.length}
+            onOpen={() => setPostTypeTagsOpen(true)}
           />
-          <p className="text-xs text-muted-foreground/60 mt-1">What worked? · What didn't? · Who is this useful for?</p>
+        </div>
 
-          {/* Suggested hashtags chip row (clickable, Phase 2) */}
-          {suggestedHashtags.length > 0 && (
-            <div className="mt-3 space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">Suggested</p>
-              <div className="flex flex-wrap gap-1.5">
-                {suggestedHashtags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="outline"
-                    onClick={() => handleSuggestedHashtagClick(tag)}
-                    className="cursor-pointer hover:bg-accent gap-1 font-normal"
-                  >
-                    <Plus className="h-3 w-3" />
-                    #{tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Detected hashtags chip row (read-only preview) */}
-          {detectedHashtagsForChips.length > 0 && (
-            <div className="mt-3">
-              <p className="text-xs font-medium text-muted-foreground mb-1.5">Tags</p>
-              <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {detectedHashtagsForChips.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="shrink-0 font-normal"
-                  >
-                    #{tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Structured Experience Fields — Collapsible */}
-          <Collapsible open={structuredOpen} onOpenChange={(open) => {
+        {/* Add details — collapsible structured fields (verbatim) */}
+        <Collapsible
+          open={structuredOpen}
+          onOpenChange={(open) => {
             setStructuredOpen(open);
             if (open) {
               setTimeout(() => whatWorkedRef.current?.focus(), 100);
             }
-          }}>
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex items-center gap-1.5 mt-3 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", structuredOpen && "rotate-180")} />
-                Add more about your experience
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3 space-y-3 animate-fade-in">
-              {/* What worked */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">What worked?</label>
-                <Textarea
-                  ref={whatWorkedRef}
-                  value={whatWorked}
-                  onChange={(e) => setWhatWorked(e.target.value)}
-                  onBlur={() => setWhatWorked(prev => prev.trim().replace(/\s{2,}/g, ' '))}
-                  placeholder="The best part was..."
-                  maxLength={500}
-                  className="min-h-[60px] resize-none text-sm"
-                />
-                <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatWorked.length}/500</p>
-              </div>
-
-              {/* What didn't work */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">What didn't work?</label>
-                <Textarea
-                  value={whatDidnt}
-                  onChange={(e) => setWhatDidnt(e.target.value)}
-                  onBlur={() => setWhatDidnt(prev => prev.trim().replace(/\s{2,}/g, ' '))}
-                  placeholder="I wish it had..."
-                  maxLength={500}
-                  className="min-h-[60px] resize-none text-sm"
-                />
-                <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatDidnt.length}/500</p>
-              </div>
-
-              {/* Duration */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">How long have you used it?</label>
-                <Select value={duration} onValueChange={setDuration}>
-                  <SelectTrigger className="h-8 text-sm">
-                    <SelectValue placeholder="Select duration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(DURATION_OPTIONS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Good for */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Good for</label>
-                <input
-                  type="text"
-                  value={goodFor}
-                  onChange={(e) => setGoodFor(e.target.value)}
-                  onBlur={() => setGoodFor(prev => prev.trim().replace(/\s{2,}/g, ' '))}
-                  placeholder="e.g. Dry skin, Beginners, Date night"
-                  maxLength={300}
-                  className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-                <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{goodFor.length}/300</p>
-              </div>
-
-              {/* Would use again */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Would you use it again?</label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setReuseIntent(reuseIntent === 'yes' ? '' : 'yes')}
-                    className={cn(
-                      "px-3 py-1 rounded-full text-xs border transition-colors",
-                      reuseIntent === 'yes'
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "border-input text-muted-foreground hover:text-foreground hover:border-foreground/30"
-                    )}
-                  >
-                    Yes, I'd use it again
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setReuseIntent(reuseIntent === 'no' ? '' : 'no')}
-                    className={cn(
-                      "px-3 py-1 rounded-full text-xs border transition-colors",
-                      reuseIntent === 'no'
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "border-input text-muted-foreground hover:text-foreground hover:border-foreground/30"
-                    )}
-                  >
-                    No, I wouldn't
-                  </button>
-                </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-      </div>
-
-      {/* Twitter Style Media Preview */}
-      {media.length > 0 && (
-        <TwitterStyleMediaPreview
-          media={media}
-          onRemove={removeMedia}
-        />
-      )}
-
-      {/* Location Tag */}
-      {location && (
-        <div className="flex items-center gap-1 mt-3">
-          <Badge 
-            variant="outline" 
-            className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
-          >
-            <MapPin className="h-3 w-3" />
-            <span>{location.name}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-4 w-4 p-0 rounded-full hover:bg-muted"
-              onClick={() => setLocation(null)}
+          }}
+        >
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
-              <X size={10} />
-            </Button>
-          </Badge>
-          {location.address && (
-            <span className="text-xs text-muted-foreground">{location.address}</span>
-          )}
-        </div>
-      )}
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', structuredOpen && 'rotate-180')} />
+              Add details
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 space-y-3 animate-fade-in">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">What worked?</label>
+              <Textarea
+                ref={whatWorkedRef}
+                value={whatWorked}
+                onChange={(e) => setWhatWorked(e.target.value)}
+                onBlur={() => setWhatWorked((prev) => prev.trim().replace(/\s{2,}/g, ' '))}
+                placeholder="The best part was..."
+                maxLength={500}
+                className="min-h-[60px] resize-none text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatWorked.length}/500</p>
+            </div>
 
-      {/* Location Search Input (only shown when location button is clicked) */}
-      {showLocationInput && !location && (
-        <div className="mt-3 animate-fade-in location-search-wrapper">
-          <LocationSearchInput
-            onLocationSelect={(selectedLocation) => {
-              setLocation(selectedLocation);
-              setShowLocationInput(false);
-            }}
-            onClear={() => setShowLocationInput(false)}
-          />
-        </div>
-      )}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">What didn't work?</label>
+              <Textarea
+                value={whatDidnt}
+                onChange={(e) => setWhatDidnt(e.target.value)}
+                onBlur={() => setWhatDidnt((prev) => prev.trim().replace(/\s{2,}/g, ' '))}
+                placeholder="I wish it had..."
+                maxLength={500}
+                className="min-h-[60px] resize-none text-sm"
+              />
+              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatDidnt.length}/500</p>
+            </div>
 
-      {/* Bottom Toolbar */}
-      <div className={`flex items-center justify-between mt-4 pt-3 border-t bottom-toolbar ${showLocationInput ? 'opacity-50 pointer-events-none' : ''}`}>
-        {/* Left: Toolbar */}
-        <div className="flex items-center gap-1">
-          <MediaUploader
-            sessionId={sessionId}
-            onMediaUploaded={handleMediaUpload}
-            initialMedia={media}
-            maxMediaCount={MAX_MEDIA_COUNT}
-            customButton={
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">How long have you used it?</label>
+              <Select value={duration} onValueChange={setDuration}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Select duration" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(DURATION_OPTIONS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Good for</label>
+              <input
+                type="text"
+                value={goodFor}
+                onChange={(e) => setGoodFor(e.target.value)}
+                onBlur={() => setGoodFor((prev) => prev.trim().replace(/\s{2,}/g, ' '))}
+                placeholder="e.g. Dry skin, Beginners, Date night"
+                maxLength={300}
+                className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{goodFor.length}/300</p>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-1 block">Would you use it again?</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReuseIntent(reuseIntent === 'yes' ? '' : 'yes')}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs border transition-colors',
+                    reuseIntent === 'yes'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                  )}
+                >
+                  Yes, I'd use it again
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReuseIntent(reuseIntent === 'no' ? '' : 'no')}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs border transition-colors',
+                    reuseIntent === 'no'
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground/30'
+                  )}
+                >
+                  No, I wouldn't
+                </button>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Media preview */}
+        {media.length > 0 && (
+          <TwitterStyleMediaPreview media={media} onRemove={removeMedia} />
+        )}
+
+        {/* Location chip */}
+        {location && (
+          <div className="flex items-center gap-1">
+            <Badge
+              variant="outline"
+              className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
+            >
+              <MapPin className="h-3 w-3" />
+              <span>{location.name}</span>
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn(
-                  "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
-                  media.length >= MAX_MEDIA_COUNT && "opacity-50 cursor-not-allowed"
-                )}
-                disabled={media.length >= MAX_MEDIA_COUNT}
+                className="h-4 w-4 p-0 rounded-full hover:bg-muted"
+                onClick={() => setLocation(null)}
+                aria-label="Remove location"
               >
-                <Image className="h-5 w-5" />
-                {media.length > 0 && (
-                  <span className="ml-1 text-xs font-medium">
-                    {media.length}/{MAX_MEDIA_COUNT}
-                  </span>
-                )}
+                <X size={10} />
               </Button>
-            }
-          />
-          
-          {/* Emoji Button - Improved implementation */}
-          <div className="relative">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
-                emojiPickerVisible && "bg-accent/50 text-accent-foreground"
-              )}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                saveCursorPosition();
-                setEmojiPickerVisible(!emojiPickerVisible);
-                if (!emojiPickerVisible) {
-                  setShowLocationInput(false);
-                }
-              }}
-              disabled={showLocationInput}
-            >
-              <Smile className="h-5 w-5" />
-            </Button>
-            
-            {emojiPickerVisible && !showLocationInput && (
-              <div 
-                ref={emojiPickerRef}
-                className="absolute z-50 bottom-full mb-2 left-0 emoji-picker-wrapper"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onPointerDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                }}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                }}
-              >
-                <Picker 
-                  data={data}
-                  onEmojiSelect={handleEmojiSelect}
-                  theme="light"
-                  previewPosition="none"
-                  set="native"
-                  skinTonePosition="none"
-                  emojiSize={20}
-                  emojiButtonSize={28}
-                  maxFrequentRows={2}
-                  modalish={false}
-                  showSkinTones={false}
-                />
-              </div>
+            </Badge>
+            {location.address && (
+              <span className="text-xs text-muted-foreground">{location.address}</span>
             )}
           </div>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
-              entitySelectorVisible && "bg-accent/50 text-accent-foreground"
-            )}
-            onClick={() => {
-              setEntitySelectorVisible(!entitySelectorVisible);
-              if (!entitySelectorVisible) {
-                setShowLocationInput(false);
-                setEmojiPickerVisible(false);
-                setSelectorPrefillQuery(''); // Clear prefill when manually opening
-              }
-            }}
-            disabled={showLocationInput}
-          >
-            <Tag className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "rounded-full p-2 hover:bg-accent hover:text-accent-foreground",
-              showLocationInput && "bg-accent/50 text-accent-foreground"
-            )}
-            onClick={() => {
-              setShowLocationInput(!showLocationInput);
-              if (!showLocationInput) {
-                setEmojiPickerVisible(false);
-                setEntitySelectorVisible(false);
-              }
-            }}
-          >
-            <MapPin className="h-5 w-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-full p-2 hover:bg-accent hover:text-accent-foreground"
-            disabled={showLocationInput}
-          >
-            <MoreHorizontal className="h-5 w-5" />
-          </Button>
-        </div>
+        )}
 
-        {/* Right: Visibility + Post Actions */}
-        <div className="flex items-center gap-2">
-          <Select
-            value={visibility}
-            onValueChange={(value: VisibilityOption) => setVisibility(value)}
-            disabled={showLocationInput}
-          >
-            <SelectTrigger className="w-[130px] h-9 border-none">
-              <SelectValue>
-                <div className="flex items-center gap-2">
-                  {getVisibilityIcon()}
-                  <span>
-                    {visibility === 'public' ? 'Public' : 
-                     visibility === 'private' ? 'Only Me' : 
-                     'Circle Only'}
-                  </span>
-                </div>
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="public">
-                <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4" />
-                  <span>Public</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="private">
-                <div className="flex items-center gap-2">
-                  <Lock className="h-4 w-4" />
-                  <span>Only Me</span>
-                </div>
-              </SelectItem>
-              <SelectItem value="circle">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  <span>Circle Only</span>
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          
-          <Button 
-            variant="outline" 
-            onClick={onCancel} 
-            disabled={isSubmitting || showLocationInput}
-            className="hover:bg-accent/50"
-          >
-            Cancel
-          </Button>
-          
-          <Button 
-            className={cn(
-              "bg-brand-orange hover:bg-brand-orange/90 transition-all",
-              (!isPostButtonDisabled && !isSubmitting) && "animate-fade-in",
-              submitPulse && "scale-95 opacity-80"
-            )}
-            onClick={handleSubmit} 
-            disabled={isPostButtonDisabled || showLocationInput}
-          >
-            {isSubmitting ? (
-              <div className="flex items-center gap-2">
-                <div className="h-4 w-4 border-2 border-t-transparent rounded-full animate-spin" /> 
-                <span>{isEditMode ? 'Updating...' : 'Posting...'}</span>
-              </div>
-            ) : (
-              <span>{isEditMode ? 'Update' : 'Post'}</span>
-            )}
-          </Button>
-        </div>
+        {/* Inline location search */}
+        {showLocationInput && !location && (
+          <div className="animate-fade-in location-search-wrapper">
+            <LocationSearchInput
+              onLocationSelect={(selectedLocation) => {
+                setLocation(selectedLocation);
+                setShowLocationInput(false);
+              }}
+              onClear={() => setShowLocationInput(false)}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Sticky bottom bar */}
+      <ComposerBottomBar
+        sessionId={sessionId}
+        media={media}
+        maxMediaCount={MAX_MEDIA_COUNT}
+        onMediaUploaded={handleMediaUpload}
+        emojiPickerVisible={emojiPickerVisible}
+        onToggleEmojiPicker={(e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          saveCursorPosition();
+          setEmojiPickerVisible(!emojiPickerVisible);
+          if (!emojiPickerVisible) setShowLocationInput(false);
+        }}
+        visibility={visibility}
+        onVisibilityChange={(v) => setVisibility(v)}
+        onOpenLocation={() => {
+          setShowLocationInput((prev) => !prev);
+          setEmojiPickerVisible(false);
+          setEntitySelectorVisible(false);
+        }}
+        locationActive={showLocationInput}
+        disabled={showLocationInput}
+        emojiPickerSlot={emojiPickerNode}
+      />
+
+      {/* Modals */}
+      <EntitySelectorModal
+        open={entitySelectorVisible}
+        onOpenChange={(open) => {
+          setEntitySelectorVisible(open);
+          if (!open) setSelectorPrefillQuery('');
+        }}
+        initialEntities={entities}
+        initialQuery={selectorPrefillQuery}
+        onEntitiesChange={handleEntitiesChange}
+        onMentionInsert={(username) => {
+          const sanitized = username.replace(/[^a-z0-9._]/gi, '');
+          if (!sanitized) return;
+          const mentionText = `@${sanitized} `;
+
+          const liveCursor = textareaRef.current?.selectionStart ?? cursorPosition.start;
+          const result = replaceAtTrigger(content, liveCursor, mentionText);
+
+          let newContent: string;
+          let newCursorPos: number;
+
+          if (result) {
+            newContent = result.newContent;
+            newCursorPos = result.newCursorPos;
+          } else {
+            const start = liveCursor;
+            newContent = content.substring(0, start) + mentionText + content.substring(start);
+            newCursorPos = start + mentionText.length;
+          }
+
+          setContent(newContent);
+          setCursorPosition({ start: newCursorPos, end: newCursorPos });
+
+          setTimeout(() => {
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+            }
+          }, 10);
+
+          setEntitySelectorVisible(false);
+          setSelectorPrefillQuery('');
+        }}
+      />
+
+      <PostTypeAndTagsModal
+        open={postTypeTagsOpen}
+        onOpenChange={setPostTypeTagsOpen}
+        postType={postType}
+        setPostType={setPostType}
+        detectedHashtags={detectedHashtagsForChips}
+        suggestedHashtags={suggestedHashtags}
+        onSuggestedHashtagClick={handleSuggestedHashtagClick}
+      />
+
+      <DiscardDraftDialog
+        open={discardDialogOpen}
+        onConfirm={handleDiscardConfirm}
+        onCancel={() => setDiscardDialogOpen(false)}
+      />
     </div>
   );
 }
