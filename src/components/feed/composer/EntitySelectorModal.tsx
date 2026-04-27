@@ -39,10 +39,11 @@ export const EntitySelectorModal: React.FC<EntitySelectorModalProps> = ({
         <div className="p-3">
           <UnifiedEntitySelector
             onEntitiesChange={(next) => {
-              onEntitiesChange(next);
+              // EntityAdapter -> Entity at boundary (same cast pattern used by parent form)
+              onEntitiesChange(next as unknown as Entity[]);
               onOpenChange(false);
             }}
-            initialEntities={initialEntities}
+            initialEntities={initialEntities as unknown as any}
             initialQuery={initialQuery}
             autoFocusSearch={true}
             maxEntities={3}
