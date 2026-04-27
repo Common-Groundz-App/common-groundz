@@ -826,6 +826,7 @@ export function EnhancedCreatePostForm({
       setReuseIntent('');
       setStructuredOpen(false);
       setPostType('story');
+      clearDraft();
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
