@@ -7,8 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { fetchUserProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
-import Logo from '@/components/Logo';
-import { ArrowLeft } from 'lucide-react';
 import type { Entity } from '@/services/recommendation/types';
 import type { UIPostType } from '@/components/feed/utils/postUtils';
 
@@ -82,51 +80,22 @@ const CreatePost = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
-      {/* Mobile Header */}
-      <div className="xl:hidden fixed top-0 left-0 right-0 z-40 bg-background/90 backdrop-blur-sm border-b">
-        <div className="container p-3 mx-auto flex justify-between items-center">
-          <button
-            onClick={navigateBack}
-            className="p-2 rounded-full hover:bg-accent"
-            aria-label="Go back"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="text-base font-semibold">Share your experience</h1>
-          <div className="w-9" /> {/* Spacer for centering */}
-        </div>
-      </div>
-
+    <div className="min-h-[100dvh] flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0 bg-background">
       <div className="flex flex-1">
         {/* Desktop Left Nav */}
         <div className="hidden xl:block">
           <VerticalTubelightNavbar className="fixed left-0 top-0 h-screen pt-4 pl-4 z-50" />
         </div>
 
-        <div className="flex-1 pt-16 xl:pt-0 xl:ml-64 min-w-0">
-          <div className="w-full mx-auto max-w-xl px-4 py-6">
-            <div className="hidden xl:flex items-center gap-3 mb-6">
-              <button
-                onClick={navigateBack}
-                className="p-2 rounded-full hover:bg-accent"
-                aria-label="Go back"
-              >
-                <ArrowLeft size={20} />
-              </button>
-              <h1 className="text-xl font-semibold">Share your experience</h1>
-            </div>
-
-            <div className="bg-card rounded-lg border shadow-sm">
-              <EnhancedCreatePostForm
-                profileData={profileData}
-                onSuccess={handleSuccess}
-                onCancel={navigateBack}
-                initialEntity={initialEntity}
-                defaultPostType={defaultPostType}
-              />
-            </div>
-          </div>
+        <div className="flex-1 xl:ml-64 min-w-0">
+          {/* Composer is now full-bleed — owns its own sticky top + bottom bars */}
+          <EnhancedCreatePostForm
+            profileData={profileData}
+            onSuccess={handleSuccess}
+            onCancel={navigateBack}
+            initialEntity={initialEntity}
+            defaultPostType={defaultPostType}
+          />
         </div>
       </div>
 
