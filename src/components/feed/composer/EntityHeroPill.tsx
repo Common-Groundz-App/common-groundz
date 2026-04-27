@@ -1,7 +1,5 @@
 import React from 'react';
-import { Tag, X, ChevronDown } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Tag, X, ChevronDown, Plus } from 'lucide-react';
 import type { Entity } from '@/services/recommendation/types';
 
 interface EntityHeroPillProps {
@@ -21,10 +19,15 @@ const getEntityIcon = (type: string) => {
   }
 };
 
+// Shared pill sizing so empty state, selected chips, and "Add more" share one visual family.
+const PILL_BASE =
+  'inline-flex items-center gap-1.5 h-8 rounded-full border text-sm font-medium transition-colors';
+
 /**
- * Hero pill that promotes entity tagging to the top of the composer.
- * - Empty state: prominent dashed pill encouraging selection
- * - Selected state: chips inline with "+ Add more" affordance
+ * Compact entity selector pill.
+ * - Empty state: left-aligned, content-sized pill with solid border (Reddit-inspired shape).
+ * - Selected state: chips share the pill family with a subtle primary tint.
+ * - "Add more" is a matching ghost pill, not a tiny text link.
  */
 export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
   entities,
@@ -33,46 +36,46 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
 }) => {
   if (entities.length === 0) {
     return (
-      <button
-        type="button"
-        onClick={onOpenSelector}
-        className="group flex w-full items-center gap-2 rounded-full border border-dashed border-border bg-accent/20 hover:bg-accent/40 hover:border-foreground/30 px-4 py-2.5 text-sm text-muted-foreground transition-colors"
-      >
-        <Tag className="h-4 w-4" />
-        <span className="flex-1 text-left">Tag entities (optional but recommended)</span>
-        <ChevronDown className="h-4 w-4 opacity-60 group-hover:opacity-100" />
-      </button>
+      <div className="flex">
+        <button
+          type="button"
+          onClick={onOpenSelector}
+          className={`${PILL_BASE} border-border bg-background text-foreground px-3.5 hover:bg-accent/40`}
+        >
+          <Tag className="h-3.5 w-3.5" />
+          <span>Select entities</span>
+          <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+        </button>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {entities.map((entity) => (
-        <Badge
+        <span
           key={entity.id}
-          variant="outline"
-          className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
+          className={`${PILL_BASE} border-primary/20 bg-primary/5 text-foreground pl-3 pr-1`}
         >
-          <span>{getEntityIcon(entity.type)}</span>
+          <span className="text-base leading-none">{getEntityIcon(entity.type)}</span>
           <span>{entity.name}</span>
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            size="sm"
-            className="h-4 w-4 p-0 rounded-full hover:bg-muted"
             onClick={() => onRemoveEntity(entity.id)}
             aria-label={`Remove ${entity.name}`}
+            className="ml-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full text-muted-foreground hover:bg-primary/10 hover:text-foreground transition-colors"
           >
-            <X size={10} />
-          </Button>
-        </Badge>
+            <X size={12} />
+          </button>
+        </span>
       ))}
       <button
         type="button"
         onClick={onOpenSelector}
-        className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-full hover:bg-accent/30"
+        className={`${PILL_BASE} border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent/40 px-3`}
       >
-        + Add more
+        <Plus className="h-3.5 w-3.5" />
+        <span>Add more</span>
       </button>
     </div>
   );
