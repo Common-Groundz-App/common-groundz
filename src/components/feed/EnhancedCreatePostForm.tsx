@@ -1006,8 +1006,10 @@ export function EnhancedCreatePostForm({
           </Button>
         </div>
 
-        {/* Subtle identity */}
-        <p className="text-sm text-muted-foreground">{userDisplayName}</p>
+        {/* Desktop-only page header — gives the centered column a clear anchor */}
+        <h1 className="hidden md:block text-2xl font-semibold tracking-tight">
+          {isEditMode ? 'Edit your experience' : 'Share an experience'}
+        </h1>
 
         {/* Hero entity pill */}
         <EntityHeroPill
