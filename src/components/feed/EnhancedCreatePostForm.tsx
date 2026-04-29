@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users, ChevronDown, Plus } from 'lucide-react';
 import { ComposerTopBar } from './composer/ComposerTopBar';
 import { ComposerBottomBar } from './composer/ComposerBottomBar';
+import { MoreToolsPopover } from './composer/MoreToolsPopover';
 import { EntityHeroPill } from './composer/EntityHeroPill';
 import { EntitySelectorModal } from './composer/EntitySelectorModal';
 import { PostTypeAndTagsPill } from './composer/PostTypeAndTagsPill';
@@ -991,6 +992,20 @@ export function EnhancedCreatePostForm({
 
       {/* Scrollable composer surface — no card wrapper */}
       <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+        {/* Desktop-only inline header — X anchored to content column */}
+        <div className="hidden md:flex items-center justify-between border-b border-border pb-2 -mt-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleCloseRequest}
+            aria-label="Close composer"
+            className="rounded-full"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
         {/* Subtle identity */}
         <p className="text-sm text-muted-foreground">{userDisplayName}</p>
 
@@ -1241,6 +1256,138 @@ export function EnhancedCreatePostForm({
             />
           </div>
         )}
+
+        {/* Desktop-only inline footer — toolbar + visibility + Post anchored to content column */}
+        <div className="hidden md:flex items-center justify-between gap-2 border-t border-border pt-3 mt-4">
+          <div className="flex items-center gap-1">
+            <MediaUploader
+              sessionId={sessionId}
+              onMediaUploaded={handleMediaUpload}
+              initialMedia={media}
+              maxMediaCount={MAX_MEDIA_COUNT}
+              customButton={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    'rounded-full p-2 hover:bg-accent hover:text-accent-foreground',
+                    media.length >= MAX_MEDIA_COUNT && 'opacity-50 cursor-not-allowed'
+                  )}
+                  disabled={media.length >= MAX_MEDIA_COUNT}
+                  aria-label="Add media"
+                >
+                  <Image className="h-5 w-5" />
+                  {media.length > 0 && (
+                    <span className="ml-1 text-xs font-medium">
+                      {media.length}/{MAX_MEDIA_COUNT}
+                    </span>
+                  )}
+                </Button>
+              }
+            />
+
+            <div className="relative">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  'rounded-full p-2 hover:bg-accent hover:text-accent-foreground',
+                  emojiPickerVisible && 'bg-accent/50 text-accent-foreground'
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  saveCursorPosition();
+                  setEmojiPickerVisible(!emojiPickerVisible);
+                  if (!emojiPickerVisible) setShowLocationInput(false);
+                }}
+                aria-label="Insert emoji"
+              >
+                <Smile className="h-5 w-5" />
+              </Button>
+              {emojiPickerNode}
+            </div>
+
+            <MoreToolsPopover
+              onOpenLocation={() => {
+                setShowLocationInput((prev) => !prev);
+                setEmojiPickerVisible(false);
+                setEntitySelectorVisible(false);
+              }}
+              locationActive={showLocationInput}
+              disabled={showLocationInput}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select value={visibility} onValueChange={(v: VisibilityOption) => setVisibility(v)}>
+              <SelectTrigger
+                className="h-9 w-auto gap-1.5 rounded-full border border-border bg-background px-3 text-xs"
+                aria-label="Change visibility"
+              >
+                <SelectValue>
+                  <div className="flex items-center gap-1.5">
+                    {visibility === 'private' ? (
+                      <Lock className="h-4 w-4" />
+                    ) : visibility === 'circle' ? (
+                      <Users className="h-4 w-4" />
+                    ) : (
+                      <Globe className="h-4 w-4" />
+                    )}
+                    <span>
+                      {visibility === 'public'
+                        ? 'Public'
+                        : visibility === 'private'
+                        ? 'Only Me'
+                        : 'Circle Only'}
+                    </span>
+                  </div>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent align="end">
+                <SelectItem value="public">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4" />
+                    <span>Public</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="private">
+                  <div className="flex items-center gap-2">
+                    <Lock className="h-4 w-4" />
+                    <span>Only Me</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="circle">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    <span>Circle Only</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isPostButtonDisabled || showLocationInput}
+              className={cn(
+                'bg-brand-orange hover:bg-brand-orange/90 text-white rounded-full px-5 h-9 transition-all',
+                submitPulse && 'scale-95 opacity-80'
+              )}
+            >
+              {isSubmitting ? (
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 border-2 border-t-transparent rounded-full animate-spin" />
+                  <span>{isEditMode ? 'Updating…' : 'Posting…'}</span>
+                </div>
+              ) : (
+                <span>{isEditMode ? 'Update' : 'Post'}</span>
+              )}
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Sticky bottom bar */}

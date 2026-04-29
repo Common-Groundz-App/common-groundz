@@ -29,7 +29,7 @@ export const ComposerTopBar: React.FC<ComposerTopBarProps> = ({
     <div
       role="toolbar"
       aria-label="Composer actions"
-      className="sticky top-0 z-30 flex items-center justify-between gap-3 bg-background/90 backdrop-blur-md border-b border-border px-3 py-2"
+      className="md:hidden sticky top-0 z-30 flex items-center justify-between gap-3 bg-background/90 backdrop-blur-md border-b border-border px-3 py-2"
     >
       <Button
         type="button"

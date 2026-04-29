@@ -1,70 +1,81 @@
-# Step 1: Refine the Entity Selector
+# Step 2: Anchor composer actions to content (desktop), keep sticky bars (mobile)
 
-Polish only the entity selector pill on `/create`. Nothing else on the page changes. First step in a planned series (entity → title → post type & tags → spacing).
-
-## The problem with the current pill
-
-The empty-state pill in `EntityHeroPill.tsx`:
-- Spans full width like an input field
-- Uses a **dashed border** which reads as "placeholder / not yet filled in"
-- Says "Tag entities (optional but recommended)" — long, hedge-y, and the parenthetical makes it feel skippable
-- Uses muted grey text on a faint background, so it visually disappears
-
-The selected-state chips look like a different component — tiny grey outlined badges with no relation to the empty pill. The two states feel disconnected.
+Make the composer feel like a centered card on desktop and an action-anchored sheet on mobile. No identity changes in this step (next step).
 
 ## Principle
 
-Borrow Reddit's **shape and restraint** (compact left-aligned pill, solid border, single clear action), but keep slightly more visual weight than Reddit because for us entity tagging is **optional but central to the product**. Reddit can be ultra-minimal because community selection is mandatory; we cannot.
+> Anchor actions to content, not viewport.
 
-We are *not* copying Reddit pixel-for-pixel. We are adopting the pattern.
+- Desktop (≥ md): X and Post live **inside** the centered `max-w-2xl` column. Toolbar (media, emoji, more, visibility, Post) sits at the bottom of that column. No full-width sticky bars.
+- Mobile (< md): Keep current sticky `ComposerTopBar` and `ComposerBottomBar` for thumb-reachable actions and keyboard-friendly behavior.
 
-## Microcopy decision
+Identity row ("Hana Li") is **not** touched here — that's Step 3.
 
-Label: **"Select entities ⌄"**
+## What changes
 
-- "Select" (not "Add" or "Tag") signals seriousness — the user is picking from a real set of products/places/books, not casually tagging
-- No "(optional but recommended)" hedge text
-- No helper subtitle below the pill — the whole point of the redesign is removing visual noise; a label-plus-helper-text pattern would re-introduce the form-field feel we are killing
-- "entities" is internal jargon but stays for now: matches the modal title, matches how the rest of the app refers to them, and is what you prefer. Can be revisited later based on real usage.
+### 1. `src/components/feed/composer/ComposerTopBar.tsx`
+Wrap the returned root element with `md:hidden` so the sticky top bar only renders on mobile. No prop changes.
 
-## What the pill will look like
+### 2. `src/components/feed/composer/ComposerBottomBar.tsx`
+Wrap the returned root element with `md:hidden` so the sticky bottom toolbar only renders on mobile. No prop changes.
 
-**Empty state** — compact pill, left-aligned, sized to its content (not full width):
+### 3. `src/components/feed/EnhancedCreatePostForm.tsx`
+Add a desktop-only inline header and inline footer **inside** the existing centered content column (the same `max-w-2xl` wrapper that already centers the form body). Reuse all existing handlers and state — no new logic.
+
+**Desktop inline header** (rendered `hidden md:flex`, at the top of the content column, above the title field):
+- Left: `X` ghost icon button → calls `handleCloseRequest`
+- Right: empty (Post button moves to footer)
+- Light `border-b border-border` separator, `py-2`
+
+**Desktop inline footer** (rendered `hidden md:flex`, at the bottom of the content column, below everything else including the structured-fields collapsible):
+- `border-t border-border pt-3 mt-4 flex items-center justify-between gap-2`
+- Left cluster (reuse the exact same controls already wired into `ComposerBottomBar`):
+  - `MediaUploader` trigger button (Image icon + count)
+  - Emoji ghost button (toggles `emojiPickerVisible`, renders `emojiPickerNode` in a relative wrapper — same pattern already used)
+  - `MoreToolsPopover` (location, etc.)
+- Right cluster:
+  - Visibility `Select` pill (same Public / Only Me / Circle Only options, same icons/labels)
+  - Primary **Post / Update** button → calls `handleSubmit`, same disabled rule (`(!content.trim() && media.length === 0) || isSubmitting`), same `submitPulse` styling, same brand-orange treatment
+
+Both inline clusters use the same JSX/icons that already exist in `ComposerBottomBar` and `ComposerTopBar` — copied inline so we don't have to refactor the bar components into shared primitives this round. (We can extract shared sub-components later if it becomes painful; for one duplication it's not worth the abstraction tax.)
+
+The mobile sticky bars continue to render the Post button in the top bar and the toolbar at the bottom — mobile UX unchanged.
+
+## Visual outcome
+
+Desktop:
 
 ```text
-[ 🏷  Select entities  ⌄ ]
+┌──────────────────────────────┐  ← max-w-2xl centered column
+│ X                            │  ← inline header (border-b)
+│                              │
+│ Title (large)                │
+│ Body…                        │
+│ [Select entities ⌄]          │
+│ [Post type & tags]           │
+│ Add details ⌄                │
+│ ──────────────────────────── │  ← border-t
+│ 🖼  😊  ⋯       [Public ⌄] [Post] │  ← inline footer
+└──────────────────────────────┘
 ```
 
-- Solid 1px border using `border-border` (no dashed)
-- Background: `bg-background` with `hover:bg-accent/40`
-- Text: `text-foreground` (darker than current `text-muted-foreground`), `font-medium`
-- Padding: `px-3.5 py-1.5`, `rounded-full`
-- Tag icon on left, chevron on right, both at small size
-- Sits inline at natural width — does **not** stretch to fill the row
+Mobile: unchanged — sticky `X … Post` top bar + sticky bottom toolbar.
 
-**Selected state** — same pill family, just filled with chips:
+## What is explicitly NOT changing
 
-- Each entity chip uses the same height, radius, and border treatment as the empty pill so they read as one component family
-- Chip background gets a **very subtle primary tint** (`bg-primary/5` with `border-primary/20`) so selected entities feel like a small win, not a grey afterthought
-- Entity icon + name + small `×` remove button (same logic as today)
-- "+ Add more" becomes a matching ghost pill (same height/radius, dashed-free) instead of a tiny text link, so it visually belongs to the row
-
-Both states share: same height (~32px), same `rounded-full`, same border weight. Switching between them feels like the pill *filling up*, not swapping for a different component.
-
-## What is explicitly NOT changing in this step
-
-- The modal that opens (`EntitySelectorModal` + `UnifiedEntitySelector`) — untouched
-- All entity selection logic, `@` mention handling, max-3 limit, autofocus behavior — untouched
-- The title field, body field, suggested hashtags, "Post type & tags" button, "Add details" link, top bar, bottom bar — untouched
-- Any other page on the app — untouched
-- No helper text added below the pill
-
-This is purely a visual refinement of `EntityHeroPill.tsx`.
+- Identity ("Hana Li") line — Step 3
+- Title field styling — later step
+- Post type & tags pill — later step
+- Entity pill (already done in Step 1) — untouched
+- All handler logic, state, draft/autosave, hashtag processing, submit flow — untouched
+- Mobile layout — untouched
 
 ## Files touched
 
-- `src/components/feed/composer/EntityHeroPill.tsx` — rewrite the empty-state and selected-state markup with new classes and label. No prop changes, no logic changes, no parent component edits needed.
+- `src/components/feed/composer/ComposerTopBar.tsx` — add `md:hidden` wrapper class
+- `src/components/feed/composer/ComposerBottomBar.tsx` — add `md:hidden` wrapper class
+- `src/components/feed/EnhancedCreatePostForm.tsx` — add desktop-only inline header (X) above the form and inline footer (toolbar + visibility + Post) below the form, both inside the existing centered column
 
 ## After approval
 
-You review in preview. If it looks right, we move to Step 2 (Title prominence). If it needs another nudge (tint too strong, label tweak, etc.), we iterate on just this pill before moving on.
+You review on desktop (current viewport 1202px) and mobile preview. If layout reads right, we move to Step 3 (identity row cleanup — desktop removes "Hana Li", mobile gets a compact avatar+name row).
