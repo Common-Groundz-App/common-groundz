@@ -992,20 +992,6 @@ export function EnhancedCreatePostForm({
 
       {/* Scrollable composer surface — no card wrapper */}
       <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 space-y-4">
-        {/* Desktop-only inline header — X anchored to content column */}
-        <div className="hidden md:flex items-center justify-between border-b border-border pb-2 -mt-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleCloseRequest}
-            aria-label="Close composer"
-            className="rounded-full"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
         {/* Desktop-only page header — gives the centered column a clear anchor */}
         <h1 className="hidden md:block text-2xl font-semibold tracking-tight">
           {isEditMode ? 'Edit your experience' : 'Share an experience'}
@@ -1369,6 +1355,16 @@ export function EnhancedCreatePostForm({
                 </SelectItem>
               </SelectContent>
             </Select>
+
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleCloseRequest}
+              disabled={isSubmitting}
+              className="rounded-full px-4 h-9"
+            >
+              Cancel
+            </Button>
 
             <Button
               type="button"
