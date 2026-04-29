@@ -67,7 +67,7 @@ export const ComposerBottomBar: React.FC<ComposerBottomBarProps> = ({
       role="toolbar"
       aria-label="Composer tools"
       className={cn(
-        'sticky bottom-0 z-30 flex items-center justify-between gap-2 bg-background/95 backdrop-blur-md border-t border-border px-3 py-2',
+        'md:hidden sticky bottom-0 z-30 flex items-center justify-between gap-2 bg-background/95 backdrop-blur-md border-t border-border px-3 py-2',
         'pb-[calc(0.5rem+env(safe-area-inset-bottom))]',
         disabled && 'opacity-50 pointer-events-none'
       )}
