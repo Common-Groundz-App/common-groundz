@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { X, Image, Smile, Tag, MapPin, MoreHorizontal, Globe, Lock, Users, ChevronDown, Plus } from 'lucide-react';
 import { ComposerTopBar } from './composer/ComposerTopBar';
 import { ComposerBottomBar } from './composer/ComposerBottomBar';
+import { MoreToolsPopover } from './composer/MoreToolsPopover';
 import { EntityHeroPill } from './composer/EntityHeroPill';
 import { EntitySelectorModal } from './composer/EntitySelectorModal';
 import { PostTypeAndTagsPill } from './composer/PostTypeAndTagsPill';
