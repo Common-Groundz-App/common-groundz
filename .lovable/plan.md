@@ -1,50 +1,62 @@
-# Step 3 — Identity Row Cleanup + Desktop Page Header
+# Step 4 — Desktop composer cleanup (Cancel next to Post)
 
-Building on Step 2's content-anchored desktop / action-anchored mobile split. This step removes redundant identity UI and gives the desktop composer a proper page anchor — matching Reddit's principle (not its exact text).
+Polish the desktop create-post layout to match the Reddit reference: remove the floating top `X` and its divider line, and put a labeled `Cancel` button immediately to the left of `Post` in the bottom action row. **Mobile composer stays exactly as it is today** (sticky top bar with X + Post is preserved).
 
-## What changes
+No logic changes — only UI. The new `Cancel` button reuses the existing close handler, so the unsaved-changes "Discard draft?" dialog continues to fire correctly.
 
-### 1. Remove the "Hana Li" identity row everywhere
-- Currently rendered above the `Select entities` pill in `EnhancedCreatePostForm.tsx`.
-- **Desktop**: redundant — sidebar already shows `Hana Li @hana.li` with avatar at bottom-left.
-- **Mobile**: no real value — user knows who they are; it's noise before the task.
-- **Action**: delete the row on both breakpoints. Clean start: `X` → `Select entities` → title → body.
+---
 
-### 2. Add a desktop-only page header: "Share an experience"
-- Renders inside the centered `max-w-2xl` content column, aligned with everything else.
-- **Desktop only** (`hidden md:block`) — placed just below the inline `X` close button, above the `Select entities` pill.
-- **Mobile**: no header. Sticky top bar (`X` + `Post`) already signals composer context; screen real estate is precious.
-- **Copy choice**: "Share an experience" — matches the existing `Share your experience…` textarea placeholder and the platform's "experience over broadcast" voice (instead of Reddit's "Create post").
-- **Style**: large, semibold, matches existing typography scale (e.g. `text-2xl font-semibold tracking-tight`). Not a giant hero — a clear page anchor.
+## Visual change (desktop only, ≥ md)
 
-## Layout result
-
+Before:
 ```text
-DESKTOP (≥md)                          MOBILE (<md)
-┌────────────────────────────┐         ┌──────────────────────┐
-│ [X]                        │         │ [X]            [Post]│ ← sticky
-│ Share an experience        │ ← new   ├──────────────────────┤
-│                            │         │ [⌖ Select entities]  │
-│ [⌖ Select entities ▾]      │         │                      │
-│                            │         │ Add a title…         │
-│ Add a title (optional)     │         │ Share your experience│
-│ Share your experience…     │         │   …                  │
-│ ...                        │         │ ...                  │
-│ ─────────────────────────  │         ├──────────────────────┤
-│ 🖼 😊 ⋯       [Public] Post│         │ 🖼 😊 ⋯     [Public] │ ← sticky
-└────────────────────────────┘         └──────────────────────┘
+┌──────────────────────────────────┐
+│  X                               │  ← icon button
+│ ──────────────────────────────── │  ← divider
+│  Share an experience             │
+│  [Select entities ▾]             │
+│  Title…                          │
+│  …                               │
+│  [🖼 😊 ⋯]            [Public] [Post] │
+└──────────────────────────────────┘
 ```
 
-No "Hana Li" anywhere. Desktop gets a clear page identity; mobile stays minimal.
+After:
+```text
+┌──────────────────────────────────┐
+│  Share an experience             │  ← clean, no X, no divider
+│  [Select entities ▾]             │
+│  Title…                          │
+│  …                               │
+│  [🖼 😊 ⋯]   [Public] [Cancel] [Post] │
+└──────────────────────────────────┘
+```
 
-## Files touched
+Mobile (< md): unchanged. The sticky `ComposerTopBar` continues to render `X` (left) and `Post` (right).
 
-- `src/components/feed/EnhancedCreatePostForm.tsx` — remove the identity row block; add the desktop header `<h1 className="hidden md:block ...">Share an experience</h1>` between the inline close button and the entity pill.
+---
 
-That's it. No other components, no behavior changes, no prop changes. Step 2's responsive scaffolding does the heavy lifting.
+## Scope (one file)
 
-## Out of scope (for later if you want)
+`src/components/feed/EnhancedCreatePostForm.tsx`
 
-- Drafts indicator (Reddit's "Drafts 2" link) — separate feature.
-- Post-type tabs (Text / Images / Link / Poll) — your composer model is different (entity-first, not type-first), so this likely never applies.
-- Any change to `profileData` plumbing — left intact in case future steps need it (e.g. avatar in submitted post metadata).
+1. **Remove the desktop top-bar block** (lines 995–1007): the `<div className="hidden md:flex … border-b …">` that wraps the desktop `X` button. Delete the whole wrapper. The `h1` "Share an experience" heading directly below it stays and becomes the new top of the desktop column.
+
+2. **Add a `Cancel` button to the desktop bottom action row** (around lines 1371–1390), inserted **between** the visibility `Select` and the `Post` button.
+   - `variant="ghost"`, `size` matching Post (`h-9 px-4 rounded-full`), text `Cancel`.
+   - `onClick={handleCloseRequest}` — same handler the removed X used, so the unsaved-changes guard (`DiscardDraftDialog`) still fires.
+   - `disabled={isSubmitting}` so it can't be clicked mid-post.
+   - In edit mode the label stays `Cancel` (Reddit pattern; matches the existing `Update` button on the right).
+
+3. **No changes** to:
+   - `ComposerTopBar.tsx` (mobile-only, already `md:hidden`)
+   - `ComposerBottomBar.tsx` (mobile-only, already `md:hidden`)
+   - Submit logic, dirty-check logic, draft autosave, keyboard shortcuts, or any handler implementations.
+
+---
+
+## Acceptance check
+
+- Desktop (≥ md, viewport like 1202 px): no `X` icon, no divider line under it; heading "Share an experience" is the first visible element in the centered column. Bottom-right reads `[Public ▾] [Cancel] [Post]`. Clicking `Cancel` with unsaved content opens the discard-confirmation dialog; clicking it on an empty form closes immediately.
+- Mobile (< md): identical to today — sticky top bar with `X` (left) and `Post` (right), bottom toolbar with media/emoji/more + visibility pill.
+- Edit mode: same change; right-side button still reads `Update`, left of it now says `Cancel`.
