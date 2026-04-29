@@ -992,6 +992,20 @@ export function EnhancedCreatePostForm({
 
       {/* Scrollable composer surface — no card wrapper */}
       <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 space-y-4">
+        {/* Desktop-only inline header — X anchored to content column */}
+        <div className="hidden md:flex items-center justify-between border-b border-border pb-2 -mt-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={handleCloseRequest}
+            aria-label="Close composer"
+            className="rounded-full"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
         {/* Subtle identity */}
         <p className="text-sm text-muted-foreground">{userDisplayName}</p>
 
