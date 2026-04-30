@@ -760,7 +760,8 @@ export function UnifiedEntitySelector({
                       )}
                     </div>
                   );
-                })}
+                });
+                })()}
               </>
             )}
 
