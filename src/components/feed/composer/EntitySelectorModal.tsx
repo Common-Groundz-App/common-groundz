@@ -39,7 +39,7 @@ export const EntitySelectorModal: React.FC<EntitySelectorModalProps> = ({
       <DialogContent
         className="w-[calc(100vw-2rem)] max-w-xl min-w-0 p-0 gap-0 sm:rounded-2xl overflow-hidden border-border/60 shadow-2xl"
       >
-        <DialogHeader className="px-6 pt-6 pb-2 text-center sm:text-center space-y-1">
+        <DialogHeader className="px-6 pt-6 pb-2 text-center sm:text-center space-y-1 min-w-0">
           <DialogTitle className="text-xl font-semibold tracking-tight">
             Tag entities
           </DialogTitle>
@@ -47,7 +47,7 @@ export const EntitySelectorModal: React.FC<EntitySelectorModalProps> = ({
             Search for places, products, books, movies or people to tag in your post.
           </DialogDescription>
         </DialogHeader>
-        <div className="px-5 pt-4 pb-5">
+        <div className="px-5 pt-4 pb-5 min-w-0">
           <UnifiedEntitySelector
             variant="modal"
             onEntitiesChange={(next) => {
