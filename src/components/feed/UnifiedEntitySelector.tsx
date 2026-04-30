@@ -621,7 +621,7 @@ export function UnifiedEntitySelector({
             ref={resultsRef}
             className={
               isModal
-                ? 'mt-3 bg-background rounded-xl border border-border/60 max-h-[420px] overflow-y-auto'
+                ? 'mt-3 w-full min-w-0 bg-background rounded-xl border border-border/60 max-h-[420px] overflow-y-auto overflow-x-hidden'
                 : 'absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-[300px] overflow-y-auto'
             }
           >
