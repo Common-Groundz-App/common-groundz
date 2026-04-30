@@ -1,62 +1,57 @@
-# Step 4 — Desktop composer cleanup (Cancel next to Post)
+# Fix: "Tag entities" modal stretches when results appear
 
-Polish the desktop create-post layout to match the Reddit reference: remove the floating top `X` and its divider line, and put a labeled `Cancel` button immediately to the left of `Post` in the bottom action row. **Mobile composer stays exactly as it is today** (sticky top bar with X + Post is preserved).
+## What's wrong
 
-No logic changes — only UI. The new `Cancel` button reuses the existing close handler, so the unsaved-changes "Discard draft?" dialog continues to fire correctly.
+When you start typing in the "Tag entities" modal, results like *"Isha Yoga Center, Mumbai"* with the long venue line *"B-6, Theosophical Society, Juhu Tara Rd Near J. W. Marriott Juhu Mumbai Mah…"* appear. That row pushes the modal **wider than its `max-w-xl` cap**, which then:
 
----
+- Shifts the centered header (`Tag entities` + subtitle) so it visually looks left-aligned (it's actually overflowing off the right edge of the viewport).
+- Makes the row content bleed past the rounded modal frame.
+- Makes the close `×` and other elements feel "incomplete."
 
-## Visual change (desktop only, ≥ md)
+## Root cause
 
-Before:
-```text
-┌──────────────────────────────────┐
-│  X                               │  ← icon button
-│ ──────────────────────────────── │  ← divider
-│  Share an experience             │
-│  [Select entities ▾]             │
-│  Title…                          │
-│  …                               │
-│  [🖼 😊 ⋯]            [Public] [Post] │
-└──────────────────────────────────┘
-```
+The base `DialogContent` (in `src/components/ui/dialog.tsx`) is a CSS **grid** container (`grid w-full max-w-lg`). A grid item's default `min-width` is `auto`, which means a single long unbreakable line of text inside a grid child can **expand the track past `max-w-*`**. Our `EntitySelectorModal` overrides `max-w-xl` but inherits the same grid behavior — and the inner row's `truncate` never kicks in because its grid ancestor never tells it "you have a finite width."
 
-After:
-```text
-┌──────────────────────────────────┐
-│  Share an experience             │  ← clean, no X, no divider
-│  [Select entities ▾]             │
-│  Title…                          │
-│  …                               │
-│  [🖼 😊 ⋯]   [Public] [Cancel] [Post] │
-└──────────────────────────────────┘
-```
+In short: `truncate` needs a constrained parent, and the grid is letting the parent grow to fit the text.
 
-Mobile (< md): unchanged. The sticky `ComposerTopBar` continues to render `X` (left) and `Post` (right).
+## Fix (UI-only, no logic changes)
 
----
+Two small, surgical edits — both pure CSS class adjustments.
 
-## Scope (one file)
+### 1. `src/components/feed/composer/EntitySelectorModal.tsx`
 
-`src/components/feed/EnhancedCreatePostForm.tsx`
+On the `<DialogContent>` wrapper, add **width-locking utilities**:
+- `w-[calc(100vw-2rem)]` — never exceed viewport minus a small gutter (mobile safety).
+- `min-w-0` — kill the grid auto-min-width so children can't push it wider.
 
-1. **Remove the desktop top-bar block** (lines 995–1007): the `<div className="hidden md:flex … border-b …">` that wraps the desktop `X` button. Delete the whole wrapper. The `h1` "Share an experience" heading directly below it stays and becomes the new top of the desktop column.
+Result: modal stays exactly at `max-w-xl` on desktop and snaps to viewport-minus-gutter on mobile, no matter what's inside.
 
-2. **Add a `Cancel` button to the desktop bottom action row** (around lines 1371–1390), inserted **between** the visibility `Select` and the `Post` button.
-   - `variant="ghost"`, `size` matching Post (`h-9 px-4 rounded-full`), text `Cancel`.
-   - `onClick={handleCloseRequest}` — same handler the removed X used, so the unsaved-changes guard (`DiscardDraftDialog`) still fires.
-   - `disabled={isSubmitting}` so it can't be clicked mid-post.
-   - In edit mode the label stays `Cancel` (Reddit pattern; matches the existing `Update` button on the right).
+### 2. `src/components/feed/UnifiedEntitySelector.tsx`
 
-3. **No changes** to:
-   - `ComposerTopBar.tsx` (mobile-only, already `md:hidden`)
-   - `ComposerBottomBar.tsx` (mobile-only, already `md:hidden`)
-   - Submit logic, dirty-check logic, draft autosave, keyboard shortcuts, or any handler implementations.
+Two row-level tweaks so long venue addresses truncate cleanly inside the locked modal:
 
----
+- The outer wrapper of each `renderEntityRow` row (the flex container) gets `min-w-0` so its flex children can shrink below their content size.
+- The "results" container (`mt-3 bg-background rounded-xl …` for the modal variant) gets `w-full min-w-0` so it can't push the modal wider either.
 
-## Acceptance check
+No changes to search logic, ranking, selection, recents, or the inline (Explore) variant.
 
-- Desktop (≥ md, viewport like 1202 px): no `X` icon, no divider line under it; heading "Share an experience" is the first visible element in the centered column. Bottom-right reads `[Public ▾] [Cancel] [Post]`. Clicking `Cancel` with unsaved content opens the discard-confirmation dialog; clicking it on an empty form closes immediately.
-- Mobile (< md): identical to today — sticky top bar with `X` (left) and `Post` (right), bottom toolbar with media/emoji/more + visibility pill.
-- Edit mode: same change; right-side button still reads `Update`, left of it now says `Cancel`.
+## Visual outcome
+
+````text
+Before (broken):                  After (fixed):
+┌───────────── modal ───────────────────────►   ┌─────── modal (xl) ────────┐
+│  Tag entities (left-shifted)            │     │       Tag entities         │
+│                                         │     │   Search for places…       │
+│  🔍  isha                               │     │   🔍  isha                 │
+│  Isha Yoga Center, Mumbai (Yoga Cla…    │     │   Isha Yoga Center, Mum…   │
+│  B-6, Theosophical Society, Juhu Tara…  │     │   B-6, Theosophical Soc…   │
+└─────────────────────────────────────────►     └────────────────────────────┘
+        ^ overflows viewport                          ^ stays within max-w-xl
+````
+
+## Files touched
+
+- `src/components/feed/composer/EntitySelectorModal.tsx` — add `w-[calc(100vw-2rem)] min-w-0` to `DialogContent` className.
+- `src/components/feed/UnifiedEntitySelector.tsx` — add `min-w-0` to the row wrapper and `w-full min-w-0` to the modal-variant results container.
+
+That's it — no behavior, no copy, no other surfaces affected.
