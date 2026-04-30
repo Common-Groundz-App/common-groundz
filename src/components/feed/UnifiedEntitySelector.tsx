@@ -453,7 +453,7 @@ export function UnifiedEntitySelector({
   ) => (
     <div
       key={entity.id || `${entity.api_source}-${entity.api_ref}`}
-      className={`flex items-center gap-3 cursor-pointer transition-colors ${
+      className={`flex items-center gap-3 cursor-pointer transition-colors min-w-0 ${
         isModal ? 'px-4 py-3 rounded-lg mx-1' : 'px-3 py-2'
       } ${
         isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/50'
