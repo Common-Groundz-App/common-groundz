@@ -556,7 +556,11 @@ export function UnifiedEntitySelector({
       {/* Search input */}
       <div className="relative">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search
+            className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground ${
+              isModal ? 'left-4 h-5 w-5' : 'left-2.5 h-4 w-4'
+            }`}
+          />
           <Input
             ref={inputRef}
             placeholder="Search for places, products, books, movies..."
@@ -568,7 +572,11 @@ export function UnifiedEntitySelector({
             onKeyDown={handleKeyDown}
             onFocus={() => setShowResults(true)}
             autoFocus={autoFocusSearch}
-            className="pl-8 pr-8"
+            className={
+              isModal
+                ? 'h-12 pl-12 pr-10 rounded-full bg-muted/40 border-border/60 text-base focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary/40'
+                : 'pl-8 pr-8'
+            }
             disabled={isMaxReached}
           />
           {searchQuery && (
@@ -579,17 +587,20 @@ export function UnifiedEntitySelector({
                 setShowResults(false);
                 inputRef.current?.focus();
               }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted"
+              className={`absolute top-1/2 -translate-y-1/2 rounded-full hover:bg-muted ${
+                isModal ? 'right-3 p-1' : 'right-2 p-0.5'
+              }`}
               type="button"
+              aria-label="Clear search"
             >
-              <X className="h-3.5 w-3.5 text-muted-foreground" />
+              <X className={isModal ? 'h-4 w-4 text-muted-foreground' : 'h-3.5 w-3.5 text-muted-foreground'} />
             </button>
           )}
         </div>
 
         {/* Location toggle */}
         {showLocationToggle && (
-          <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex items-center gap-2 mt-2">
             <Button
               type="button"
               variant={locationEnabled ? 'secondary' : 'outline'}
@@ -604,11 +615,15 @@ export function UnifiedEntitySelector({
           </div>
         )}
 
-        {/* Results dropdown */}
+        {/* Results — inline (flat) in modal variant, floating dropdown in inline variant */}
         {showResults && (
           <div
             ref={resultsRef}
-            className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-[300px] overflow-y-auto"
+            className={
+              isModal
+                ? 'mt-3 bg-background rounded-xl border border-border/60 max-h-[420px] overflow-y-auto'
+                : 'absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-[300px] overflow-y-auto'
+            }
           >
             {/* Recent searches — shown when input is empty / under 2 chars */}
             {searchQuery.trim().length < 2 && (
