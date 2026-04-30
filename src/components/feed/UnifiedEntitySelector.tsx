@@ -43,6 +43,13 @@ interface UnifiedEntitySelectorProps {
   initialQuery?: string;
   autoFocusSearch?: boolean;
   maxEntities?: number;
+  /**
+   * Visual variant.
+   * - `inline` (default): compact dropdown, used inside the explore search bar.
+   * - `modal`: premium hero search + inline scrollable results, used inside
+   *   the composer's "Select entities" modal.
+   */
+  variant?: 'inline' | 'modal';
 }
 
 interface CreatedEntityShape {
@@ -92,7 +99,9 @@ export function UnifiedEntitySelector({
   initialQuery = '',
   autoFocusSearch = false,
   maxEntities = 3,
+  variant = 'inline',
 }: UnifiedEntitySelectorProps) {
+  const isModal = variant === 'modal';
   const [selectedEntities, setSelectedEntities] = useState<EntityAdapter[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
@@ -444,30 +453,51 @@ export function UnifiedEntitySelector({
   ) => (
     <div
       key={entity.id || `${entity.api_source}-${entity.api_ref}`}
-      className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
-        isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/30'
-      } ${opts.isActive ? 'bg-accent/40' : ''} ${opts.isTop ? 'border-b border-border/40' : ''}`}
+      className={`flex items-center gap-3 cursor-pointer transition-colors ${
+        isModal ? 'px-4 py-3 rounded-lg mx-1' : 'px-3 py-2'
+      } ${
+        isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/50'
+      } ${opts.isActive ? 'bg-accent/60' : ''} ${
+        opts.isTop && !isModal ? 'border-b border-border/40' : ''
+      }`}
       onClick={isDisabled ? undefined : onClick}
     >
       <div className="flex-shrink-0">
         <ImageWithFallback
           src={getImageUrl(entity)}
           alt={entity.name}
-          className="w-8 h-8 object-cover rounded"
+          className={`object-cover ${
+            isModal ? 'w-10 h-10 rounded-lg' : 'w-8 h-8 rounded'
+          }`}
           fallbackSrc={getEntityTypeFallbackImage(entity.type || 'product')}
           entityType={entity.type}
           suppressConsoleErrors
         />
       </div>
       <div className="flex-1 min-w-0">
-        <div className={`text-sm truncate ${opts.isTop ? 'font-medium' : ''}`}>
+        <div
+          className={`truncate ${
+            isModal ? 'text-[15px] font-medium' : `text-sm ${opts.isTop ? 'font-medium' : ''}`
+          }`}
+        >
           <HighlightMatch text={entity.name} query={searchQuery} />
         </div>
-        {entity.venue && (
-          <div className="text-xs text-muted-foreground truncate">{entity.venue}</div>
+        {isModal ? (
+          <div className="text-xs text-muted-foreground truncate capitalize">
+            {entity.venue ? entity.venue : (entity.type || 'product')}
+          </div>
+        ) : (
+          entity.venue && (
+            <div className="text-xs text-muted-foreground truncate">{entity.venue}</div>
+          )
         )}
       </div>
-      <span className="text-xs text-muted-foreground">{getEntityIcon(entity.type || 'product')}</span>
+      <span
+        className={`text-muted-foreground ${isModal ? 'text-base' : 'text-xs'}`}
+        aria-hidden
+      >
+        {getEntityIcon(entity.type || 'product')}
+      </span>
     </div>
   );
 
@@ -526,7 +556,11 @@ export function UnifiedEntitySelector({
       {/* Search input */}
       <div className="relative">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search
+            className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground ${
+              isModal ? 'left-4 h-5 w-5' : 'left-2.5 h-4 w-4'
+            }`}
+          />
           <Input
             ref={inputRef}
             placeholder="Search for places, products, books, movies..."
@@ -538,7 +572,11 @@ export function UnifiedEntitySelector({
             onKeyDown={handleKeyDown}
             onFocus={() => setShowResults(true)}
             autoFocus={autoFocusSearch}
-            className="pl-8 pr-8"
+            className={
+              isModal
+                ? 'h-12 pl-12 pr-10 rounded-full bg-muted/40 border-border/60 text-base focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary/40'
+                : 'pl-8 pr-8'
+            }
             disabled={isMaxReached}
           />
           {searchQuery && (
@@ -549,17 +587,20 @@ export function UnifiedEntitySelector({
                 setShowResults(false);
                 inputRef.current?.focus();
               }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted"
+              className={`absolute top-1/2 -translate-y-1/2 rounded-full hover:bg-muted ${
+                isModal ? 'right-3 p-1' : 'right-2 p-0.5'
+              }`}
               type="button"
+              aria-label="Clear search"
             >
-              <X className="h-3.5 w-3.5 text-muted-foreground" />
+              <X className={isModal ? 'h-4 w-4 text-muted-foreground' : 'h-3.5 w-3.5 text-muted-foreground'} />
             </button>
           )}
         </div>
 
         {/* Location toggle */}
         {showLocationToggle && (
-          <div className="flex items-center gap-2 mt-1.5">
+          <div className="flex items-center gap-2 mt-2">
             <Button
               type="button"
               variant={locationEnabled ? 'secondary' : 'outline'}
@@ -574,11 +615,15 @@ export function UnifiedEntitySelector({
           </div>
         )}
 
-        {/* Results dropdown */}
+        {/* Results — inline (flat) in modal variant, floating dropdown in inline variant */}
         {showResults && (
           <div
             ref={resultsRef}
-            className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-[300px] overflow-y-auto"
+            className={
+              isModal
+                ? 'mt-3 bg-background rounded-xl border border-border/60 max-h-[420px] overflow-y-auto'
+                : 'absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-[300px] overflow-y-auto'
+            }
           >
             {/* Recent searches — shown when input is empty / under 2 chars */}
             {searchQuery.trim().length < 2 && (
