@@ -679,47 +679,49 @@ export function UnifiedEntitySelector({
                 )}
 
                 {/* Ranked categories (collapsed) */}
-                {collapsed.map((cat) => {
-                  if (cat.visible.length === 0) return null;
-                  const title = categoryTitle[cat.key] || cat.key;
-                  const total = cat.visible.length + cat.hidden.length;
+                {(() => {
+                  const visibleCats = collapsed.filter((c) => c.visible.length > 0);
+                  return visibleCats.map((cat, catIdx) => {
+                    const title = categoryTitle[cat.key] || cat.key;
+                    const total = cat.visible.length + cat.hidden.length;
+                    const isFirst = catIdx === 0;
 
-                  // People: render as @mention rows (no entity-add).
-                  if (cat.key === 'people') {
+                    // People: render as @mention rows (no entity-add).
+                    if (cat.key === 'people') {
+                      return (
+                        <div key={cat.key}>
+                          {renderSectionHeader(title, total, isFirst)}
+                          {cat.visible.map((user: any) => (
+                            <div
+                              key={user.id}
+                              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent/30 transition-colors"
+                              onClick={() => handlePeopleClick(user)}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
+                                {user.avatar_url ? (
+                                  <img src={user.avatar_url} alt={user.username || ''} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span>{(user.username || '?')[0].toUpperCase()}</span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm truncate">
+                                  <HighlightMatch text={user.username || ''} query={searchQuery} />
+                                </div>
+                                {user.username && (
+                                  <div className="text-xs text-muted-foreground">@{user.username}</div>
+                                )}
+                              </div>
+                              <span className="text-xs text-primary">@mention</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={cat.key}>
-                        {renderSectionHeader(title, total)}
-                        {cat.visible.map((user: any) => (
-                          <div
-                            key={user.id}
-                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent/30 transition-colors"
-                            onClick={() => handlePeopleClick(user)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
-                              {user.avatar_url ? (
-                                <img src={user.avatar_url} alt={user.username || ''} className="w-full h-full object-cover" />
-                              ) : (
-                                <span>{(user.username || '?')[0].toUpperCase()}</span>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm truncate">
-                                <HighlightMatch text={user.username || ''} query={searchQuery} />
-                              </div>
-                              {user.username && (
-                                <div className="text-xs text-muted-foreground">@{user.username}</div>
-                              )}
-                            </div>
-                            <span className="text-xs text-primary">@mention</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={cat.key}>
-                      {renderSectionHeader(title, total)}
+                        {renderSectionHeader(title, total, isFirst)}
                       {cat.visible.map((item: any, rowIdx: number) => {
                         const flatIdx = flatIndexFor(cat.key, rowIdx);
                         // Only the very first item across all categories gets the "top" weight.
