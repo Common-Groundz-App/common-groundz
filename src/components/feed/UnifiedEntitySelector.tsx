@@ -43,6 +43,13 @@ interface UnifiedEntitySelectorProps {
   initialQuery?: string;
   autoFocusSearch?: boolean;
   maxEntities?: number;
+  /**
+   * Visual variant.
+   * - `inline` (default): compact dropdown, used inside the explore search bar.
+   * - `modal`: premium hero search + inline scrollable results, used inside
+   *   the composer's "Select entities" modal.
+   */
+  variant?: 'inline' | 'modal';
 }
 
 interface CreatedEntityShape {
