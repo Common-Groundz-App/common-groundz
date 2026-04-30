@@ -436,14 +436,34 @@ export function UnifiedEntitySelector({
   }, [activeIdx, pickableItems, handleEntitySelect, handleExternalSelect]);
 
   // Section rendering helper
-  const renderSectionHeader = (title: string, count: number) => (
-    <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b">
-      <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
-      {count > MAX_RESULTS_PER_CATEGORY && (
-        <span className="text-xs text-muted-foreground">{count} results</span>
-      )}
-    </div>
-  );
+  const renderSectionHeader = (title: string, count: number, isFirst = false) => {
+    if (isModal) {
+      return (
+        <div
+          className={`flex items-center justify-between px-4 pb-1.5 ${
+            isFirst ? 'pt-3' : 'pt-4 border-t border-border/40'
+          }`}
+        >
+          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+            {title}
+          </h4>
+          {count > MAX_RESULTS_PER_CATEGORY && (
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground/60">
+              {count} results
+            </span>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b">
+        <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
+        {count > MAX_RESULTS_PER_CATEGORY && (
+          <span className="text-xs text-muted-foreground">{count} results</span>
+        )}
+      </div>
+    );
+  };
 
   const renderEntityRow = (
     entity: any,
@@ -453,8 +473,8 @@ export function UnifiedEntitySelector({
   ) => (
     <div
       key={entity.id || `${entity.api_source}-${entity.api_ref}`}
-      className={`flex items-center gap-3 cursor-pointer transition-colors min-w-0 ${
-        isModal ? 'px-4 py-3 rounded-lg mx-1' : 'px-3 py-2'
+      className={`flex items-center cursor-pointer transition-colors min-w-0 ${
+        isModal ? 'px-4 py-3.5 gap-4' : 'px-3 py-2 gap-3'
       } ${
         isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/50'
       } ${opts.isActive ? 'bg-accent/60' : ''} ${
@@ -467,7 +487,7 @@ export function UnifiedEntitySelector({
           src={getImageUrl(entity)}
           alt={entity.name}
           className={`object-cover ${
-            isModal ? 'w-10 h-10 rounded-lg' : 'w-8 h-8 rounded'
+            isModal ? 'w-11 h-11 rounded-lg' : 'w-8 h-8 rounded'
           }`}
           fallbackSrc={getEntityTypeFallbackImage(entity.type || 'product')}
           entityType={entity.type}
@@ -477,13 +497,13 @@ export function UnifiedEntitySelector({
       <div className="flex-1 min-w-0">
         <div
           className={`truncate ${
-            isModal ? 'text-[15px] font-medium' : `text-sm ${opts.isTop ? 'font-medium' : ''}`
+            isModal ? 'text-[15px] font-semibold' : `text-sm ${opts.isTop ? 'font-medium' : ''}`
           }`}
         >
           <HighlightMatch text={entity.name} query={searchQuery} />
         </div>
         {isModal ? (
-          <div className="text-xs text-muted-foreground truncate capitalize">
+          <div className="text-[13px] text-muted-foreground truncate capitalize">
             {entity.venue ? entity.venue : (entity.type || 'product')}
           </div>
         ) : (
@@ -493,7 +513,7 @@ export function UnifiedEntitySelector({
         )}
       </div>
       <span
-        className={`text-muted-foreground ${isModal ? 'text-base' : 'text-xs'}`}
+        className={`${isModal ? 'text-base text-muted-foreground/60 ml-2' : 'text-xs text-muted-foreground'}`}
         aria-hidden
       >
         {getEntityIcon(entity.type || 'product')}
@@ -621,7 +641,7 @@ export function UnifiedEntitySelector({
             ref={resultsRef}
             className={
               isModal
-                ? 'mt-3 w-full min-w-0 bg-background rounded-xl border border-border/60 max-h-[420px] overflow-y-auto overflow-x-hidden'
+                ? 'mt-2 w-full min-w-0 max-h-[460px] overflow-y-auto overflow-x-hidden'
                 : 'absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-[300px] overflow-y-auto'
             }
           >
@@ -659,47 +679,49 @@ export function UnifiedEntitySelector({
                 )}
 
                 {/* Ranked categories (collapsed) */}
-                {collapsed.map((cat) => {
-                  if (cat.visible.length === 0) return null;
-                  const title = categoryTitle[cat.key] || cat.key;
-                  const total = cat.visible.length + cat.hidden.length;
+                {(() => {
+                  const visibleCats = collapsed.filter((c) => c.visible.length > 0);
+                  return visibleCats.map((cat, catIdx) => {
+                    const title = categoryTitle[cat.key] || cat.key;
+                    const total = cat.visible.length + cat.hidden.length;
+                    const isFirst = catIdx === 0;
 
-                  // People: render as @mention rows (no entity-add).
-                  if (cat.key === 'people') {
+                    // People: render as @mention rows (no entity-add).
+                    if (cat.key === 'people') {
+                      return (
+                        <div key={cat.key}>
+                          {renderSectionHeader(title, total, isFirst)}
+                          {cat.visible.map((user: any) => (
+                            <div
+                              key={user.id}
+                              className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent/30 transition-colors"
+                              onClick={() => handlePeopleClick(user)}
+                            >
+                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
+                                {user.avatar_url ? (
+                                  <img src={user.avatar_url} alt={user.username || ''} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span>{(user.username || '?')[0].toUpperCase()}</span>
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm truncate">
+                                  <HighlightMatch text={user.username || ''} query={searchQuery} />
+                                </div>
+                                {user.username && (
+                                  <div className="text-xs text-muted-foreground">@{user.username}</div>
+                                )}
+                              </div>
+                              <span className="text-xs text-primary">@mention</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+
                     return (
                       <div key={cat.key}>
-                        {renderSectionHeader(title, total)}
-                        {cat.visible.map((user: any) => (
-                          <div
-                            key={user.id}
-                            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-accent/30 transition-colors"
-                            onClick={() => handlePeopleClick(user)}
-                          >
-                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium overflow-hidden">
-                              {user.avatar_url ? (
-                                <img src={user.avatar_url} alt={user.username || ''} className="w-full h-full object-cover" />
-                              ) : (
-                                <span>{(user.username || '?')[0].toUpperCase()}</span>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm truncate">
-                                <HighlightMatch text={user.username || ''} query={searchQuery} />
-                              </div>
-                              {user.username && (
-                                <div className="text-xs text-muted-foreground">@{user.username}</div>
-                              )}
-                            </div>
-                            <span className="text-xs text-primary">@mention</span>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div key={cat.key}>
-                      {renderSectionHeader(title, total)}
+                        {renderSectionHeader(title, total, isFirst)}
                       {cat.visible.map((item: any, rowIdx: number) => {
                         const flatIdx = flatIndexFor(cat.key, rowIdx);
                         // Only the very first item across all categories gets the "top" weight.
@@ -738,7 +760,8 @@ export function UnifiedEntitySelector({
                       )}
                     </div>
                   );
-                })}
+                });
+                })()}
               </>
             )}
 
