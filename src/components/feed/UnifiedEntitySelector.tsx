@@ -453,30 +453,51 @@ export function UnifiedEntitySelector({
   ) => (
     <div
       key={entity.id || `${entity.api_source}-${entity.api_ref}`}
-      className={`flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors ${
-        isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/30'
-      } ${opts.isActive ? 'bg-accent/40' : ''} ${opts.isTop ? 'border-b border-border/40' : ''}`}
+      className={`flex items-center gap-3 cursor-pointer transition-colors ${
+        isModal ? 'px-4 py-3 rounded-lg mx-1' : 'px-3 py-2'
+      } ${
+        isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/50'
+      } ${opts.isActive ? 'bg-accent/60' : ''} ${
+        opts.isTop && !isModal ? 'border-b border-border/40' : ''
+      }`}
       onClick={isDisabled ? undefined : onClick}
     >
       <div className="flex-shrink-0">
         <ImageWithFallback
           src={getImageUrl(entity)}
           alt={entity.name}
-          className="w-8 h-8 object-cover rounded"
+          className={`object-cover ${
+            isModal ? 'w-10 h-10 rounded-lg' : 'w-8 h-8 rounded'
+          }`}
           fallbackSrc={getEntityTypeFallbackImage(entity.type || 'product')}
           entityType={entity.type}
           suppressConsoleErrors
         />
       </div>
       <div className="flex-1 min-w-0">
-        <div className={`text-sm truncate ${opts.isTop ? 'font-medium' : ''}`}>
+        <div
+          className={`truncate ${
+            isModal ? 'text-[15px] font-medium' : `text-sm ${opts.isTop ? 'font-medium' : ''}`
+          }`}
+        >
           <HighlightMatch text={entity.name} query={searchQuery} />
         </div>
-        {entity.venue && (
-          <div className="text-xs text-muted-foreground truncate">{entity.venue}</div>
+        {isModal ? (
+          <div className="text-xs text-muted-foreground truncate capitalize">
+            {entity.venue ? entity.venue : (entity.type || 'product')}
+          </div>
+        ) : (
+          entity.venue && (
+            <div className="text-xs text-muted-foreground truncate">{entity.venue}</div>
+          )
         )}
       </div>
-      <span className="text-xs text-muted-foreground">{getEntityIcon(entity.type || 'product')}</span>
+      <span
+        className={`text-muted-foreground ${isModal ? 'text-base' : 'text-xs'}`}
+        aria-hidden
+      >
+        {getEntityIcon(entity.type || 'product')}
+      </span>
     </div>
   );
 
