@@ -453,7 +453,7 @@ export function UnifiedEntitySelector({
   ) => (
     <div
       key={entity.id || `${entity.api_source}-${entity.api_ref}`}
-      className={`flex items-center gap-3 cursor-pointer transition-colors ${
+      className={`flex items-center gap-3 cursor-pointer transition-colors min-w-0 ${
         isModal ? 'px-4 py-3 rounded-lg mx-1' : 'px-3 py-2'
       } ${
         isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/50'
@@ -621,7 +621,7 @@ export function UnifiedEntitySelector({
             ref={resultsRef}
             className={
               isModal
-                ? 'mt-3 bg-background rounded-xl border border-border/60 max-h-[420px] overflow-y-auto'
+                ? 'mt-3 w-full min-w-0 bg-background rounded-xl border border-border/60 max-h-[420px] overflow-y-auto overflow-x-hidden'
                 : 'absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-50 max-h-[300px] overflow-y-auto'
             }
           >

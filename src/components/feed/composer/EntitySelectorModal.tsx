@@ -37,7 +37,7 @@ export const EntitySelectorModal: React.FC<EntitySelectorModalProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-xl p-0 gap-0 sm:rounded-2xl overflow-hidden border-border/60 shadow-2xl"
+        className="w-[calc(100vw-2rem)] max-w-xl min-w-0 p-0 gap-0 sm:rounded-2xl overflow-hidden border-border/60 shadow-2xl"
       >
         <DialogHeader className="px-6 pt-6 pb-2 text-center sm:text-center space-y-1">
           <DialogTitle className="text-xl font-semibold tracking-tight">
