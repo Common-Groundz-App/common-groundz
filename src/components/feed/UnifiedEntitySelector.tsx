@@ -99,7 +99,9 @@ export function UnifiedEntitySelector({
   initialQuery = '',
   autoFocusSearch = false,
   maxEntities = 3,
+  variant = 'inline',
 }: UnifiedEntitySelectorProps) {
+  const isModal = variant === 'modal';
   const [selectedEntities, setSelectedEntities] = useState<EntityAdapter[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
