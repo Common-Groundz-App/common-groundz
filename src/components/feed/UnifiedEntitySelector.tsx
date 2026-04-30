@@ -436,14 +436,34 @@ export function UnifiedEntitySelector({
   }, [activeIdx, pickableItems, handleEntitySelect, handleExternalSelect]);
 
   // Section rendering helper
-  const renderSectionHeader = (title: string, count: number) => (
-    <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b">
-      <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
-      {count > MAX_RESULTS_PER_CATEGORY && (
-        <span className="text-xs text-muted-foreground">{count} results</span>
-      )}
-    </div>
-  );
+  const renderSectionHeader = (title: string, count: number, isFirst = false) => {
+    if (isModal) {
+      return (
+        <div
+          className={`flex items-center justify-between px-4 pb-1.5 ${
+            isFirst ? 'pt-3' : 'pt-4 border-t border-border/40'
+          }`}
+        >
+          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+            {title}
+          </h4>
+          {count > MAX_RESULTS_PER_CATEGORY && (
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground/60">
+              {count} results
+            </span>
+          )}
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b">
+        <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
+        {count > MAX_RESULTS_PER_CATEGORY && (
+          <span className="text-xs text-muted-foreground">{count} results</span>
+        )}
+      </div>
+    );
+  };
 
   const renderEntityRow = (
     entity: any,
@@ -453,8 +473,8 @@ export function UnifiedEntitySelector({
   ) => (
     <div
       key={entity.id || `${entity.api_source}-${entity.api_ref}`}
-      className={`flex items-center gap-3 cursor-pointer transition-colors min-w-0 ${
-        isModal ? 'px-4 py-3 rounded-lg mx-1' : 'px-3 py-2'
+      className={`flex items-center cursor-pointer transition-colors min-w-0 ${
+        isModal ? 'px-4 py-3.5 gap-4' : 'px-3 py-2 gap-3'
       } ${
         isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/50'
       } ${opts.isActive ? 'bg-accent/60' : ''} ${
@@ -467,7 +487,7 @@ export function UnifiedEntitySelector({
           src={getImageUrl(entity)}
           alt={entity.name}
           className={`object-cover ${
-            isModal ? 'w-10 h-10 rounded-lg' : 'w-8 h-8 rounded'
+            isModal ? 'w-11 h-11 rounded-lg' : 'w-8 h-8 rounded'
           }`}
           fallbackSrc={getEntityTypeFallbackImage(entity.type || 'product')}
           entityType={entity.type}
@@ -477,13 +497,13 @@ export function UnifiedEntitySelector({
       <div className="flex-1 min-w-0">
         <div
           className={`truncate ${
-            isModal ? 'text-[15px] font-medium' : `text-sm ${opts.isTop ? 'font-medium' : ''}`
+            isModal ? 'text-[15px] font-semibold' : `text-sm ${opts.isTop ? 'font-medium' : ''}`
           }`}
         >
           <HighlightMatch text={entity.name} query={searchQuery} />
         </div>
         {isModal ? (
-          <div className="text-xs text-muted-foreground truncate capitalize">
+          <div className="text-[13px] text-muted-foreground truncate capitalize">
             {entity.venue ? entity.venue : (entity.type || 'product')}
           </div>
         ) : (
@@ -493,7 +513,7 @@ export function UnifiedEntitySelector({
         )}
       </div>
       <span
-        className={`text-muted-foreground ${isModal ? 'text-base' : 'text-xs'}`}
+        className={`${isModal ? 'text-base text-muted-foreground/60 ml-2' : 'text-xs text-muted-foreground'}`}
         aria-hidden
       >
         {getEntityIcon(entity.type || 'product')}
