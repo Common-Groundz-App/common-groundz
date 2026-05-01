@@ -548,6 +548,11 @@ export function UnifiedEntitySelector({
             <div className="text-xs text-muted-foreground truncate">{entity.venue}</div>
           )
         )}
+        {entity.metadata?.distance_label && (
+          <div className="text-[11px] text-primary font-medium mt-0.5">
+            {entity.metadata.distance_label}
+          </div>
+        )}
       </div>
       <span
         className={`${isModal ? 'text-base text-muted-foreground/60 ml-2' : 'text-xs text-muted-foreground'}`}
