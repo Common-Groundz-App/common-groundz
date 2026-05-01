@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Loader2, Search, Plus, Navigation } from 'lucide-react';
+import { X, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
@@ -446,8 +446,17 @@ export function UnifiedEntitySelector({
   }, [collapsed]);
 
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [dropdownShowAll, setDropdownShowAll] = useState<Record<string, boolean>>({});
+
+  const handleDropdownToggle = useCallback((key: string, hiddenCount: number) => {
+    if (hiddenCount === 0) return;
+    setDropdownShowAll((prev) => ({ ...prev, [key]: !prev[key] }));
+    setActiveIdx(-1);
+  }, []);
+
   useEffect(() => {
     setActiveIdx(-1);
+    setDropdownShowAll({});
   }, [searchQuery]);
 
   // Trigger pick on the currently-highlighted item (or first item if none highlighted).
@@ -472,7 +481,26 @@ export function UnifiedEntitySelector({
   }, [activeIdx, pickableItems, handleEntitySelect, handleExternalSelect]);
 
   // Section rendering helper
-  const renderSectionHeader = (title: string, count: number, isFirst = false) => {
+  const renderSectionHeader = (title: string, count: number, isFirst = false, categoryKey?: string, hiddenCount: number = 0) => {
+    const toggleButton = categoryKey && hiddenCount > 0 ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-xs text-brand-orange font-semibold hover:text-brand-orange/80"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDropdownToggle(categoryKey, hiddenCount);
+        }}
+      >
+        {dropdownShowAll[categoryKey] ? (
+          <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+        ) : (
+          <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+        )}
+      </Button>
+    ) : null;
+
     if (isModal) {
       return (
         <div
@@ -483,20 +511,26 @@ export function UnifiedEntitySelector({
           <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
             {title}
           </h4>
-          {count > MAX_RESULTS_PER_CATEGORY && (
-            <span className="text-[11px] uppercase tracking-wider text-muted-foreground/60">
-              {count} results
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {toggleButton}
+            {!toggleButton && count > MAX_RESULTS_PER_CATEGORY && (
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground/60">
+                {count} results
+              </span>
+            )}
+          </div>
         </div>
       );
     }
     return (
       <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b">
         <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
-        {count > MAX_RESULTS_PER_CATEGORY && (
-          <span className="text-xs text-muted-foreground">{count} results</span>
-        )}
+        <div className="flex items-center gap-2">
+          {toggleButton}
+          {!toggleButton && count > MAX_RESULTS_PER_CATEGORY && (
+            <span className="text-xs text-muted-foreground">{count} results</span>
+          )}
+        </div>
       </div>
     );
   };
@@ -788,12 +822,14 @@ export function UnifiedEntitySelector({
                       );
                     }
 
+                    const isExpanded = !!dropdownShowAll[cat.key];
+                    const itemsToRender = isExpanded ? [...cat.visible, ...cat.hidden] : cat.visible;
+
                     return (
                       <div key={cat.key}>
-                        {renderSectionHeader(title, total, isFirst)}
-                      {cat.visible.map((item: any, rowIdx: number) => {
+                        {renderSectionHeader(title, total, isFirst, cat.key, cat.hidden.length)}
+                      {itemsToRender.map((item: any, rowIdx: number) => {
                         const flatIdx = flatIndexFor(cat.key, rowIdx);
-                        // Only the very first item across all categories gets the "top" weight.
                         const isTop = flatIdx === 0;
                         const isActive = flatIdx === activeIdx;
                         const onPick =
@@ -818,13 +854,17 @@ export function UnifiedEntitySelector({
                       {cat.hidden.length > 0 && (
                         <button
                           type="button"
-                          className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
-                          onClick={() => {
-                            // Cheap UX: if user wants more, run the broader search page.
-                            // Inline expansion would need state per category — defer.
+                          className="w-full flex items-center justify-center gap-1 text-xs text-brand-orange font-medium hover:text-brand-orange/80 hover:bg-accent/20 px-3 py-1.5 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDropdownToggle(cat.key, cat.hidden.length);
                           }}
                         >
-                          Show {cat.hidden.length} more
+                          {isExpanded ? (
+                            <>See less <ChevronUp className="w-3 h-3" /></>
+                          ) : (
+                            <>See {cat.hidden.length} more results <ChevronDown className="w-3 h-3" /></>
+                          )}
                         </button>
                       )}
                     </div>
