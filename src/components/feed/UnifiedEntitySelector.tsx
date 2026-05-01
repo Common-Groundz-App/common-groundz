@@ -481,7 +481,26 @@ export function UnifiedEntitySelector({
   }, [activeIdx, pickableItems, handleEntitySelect, handleExternalSelect]);
 
   // Section rendering helper
-  const renderSectionHeader = (title: string, count: number, isFirst = false) => {
+  const renderSectionHeader = (title: string, count: number, isFirst = false, categoryKey?: string, hiddenCount: number = 0) => {
+    const toggleButton = categoryKey && hiddenCount > 0 ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-6 px-2 text-xs text-brand-orange font-semibold hover:text-brand-orange/80"
+        onClick={(e) => {
+          e.stopPropagation();
+          handleDropdownToggle(categoryKey, hiddenCount);
+        }}
+      >
+        {dropdownShowAll[categoryKey] ? (
+          <>See Less <ChevronUp className="w-3 h-3 ml-1" /></>
+        ) : (
+          <>See More <ChevronDown className="w-3 h-3 ml-1" /></>
+        )}
+      </Button>
+    ) : null;
+
     if (isModal) {
       return (
         <div
@@ -492,20 +511,26 @@ export function UnifiedEntitySelector({
           <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
             {title}
           </h4>
-          {count > MAX_RESULTS_PER_CATEGORY && (
-            <span className="text-[11px] uppercase tracking-wider text-muted-foreground/60">
-              {count} results
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {toggleButton}
+            {!toggleButton && count > MAX_RESULTS_PER_CATEGORY && (
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground/60">
+                {count} results
+              </span>
+            )}
+          </div>
         </div>
       );
     }
     return (
       <div className="flex items-center justify-between px-3 py-1.5 bg-muted/30 border-b">
         <h4 className="text-xs font-medium text-muted-foreground">{title}</h4>
-        {count > MAX_RESULTS_PER_CATEGORY && (
-          <span className="text-xs text-muted-foreground">{count} results</span>
-        )}
+        <div className="flex items-center gap-2">
+          {toggleButton}
+          {!toggleButton && count > MAX_RESULTS_PER_CATEGORY && (
+            <span className="text-xs text-muted-foreground">{count} results</span>
+          )}
+        </div>
       </div>
     );
   };
