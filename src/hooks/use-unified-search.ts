@@ -32,6 +32,7 @@ export interface EntitySearchResult {
   // Aggregated rating signals from entity_stats_view (optional, backward compatible)
   average_rating?: number | null;
   review_count?: number;
+  metadata?: Record<string, any>;
 }
 
 export interface ReviewSearchResult {

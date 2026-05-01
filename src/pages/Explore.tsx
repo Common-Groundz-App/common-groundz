@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation as useRouterLocation } from 'react-router-dom';
+import { useLocation as useLocationContext } from '@/contexts/LocationContext';
 import { useEntityCache } from '@/hooks/use-entity-cache';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import SEOHead from '@/components/seo/SEOHead';
@@ -47,12 +48,14 @@ import { useToast } from '@/hooks/use-toast';
 const Explore = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const { locationEnabled, position } = useLocationContext();
+  const locationActive = locationEnabled && !!position;
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('featured');
   const [isDropdownClosing, setIsDropdownClosing] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useRouterLocation();
 
   // Create entity dialog state
   const [showCreateEntityDialog, setShowCreateEntityDialog] = useState(false);
@@ -154,7 +157,14 @@ const Explore = () => {
     toggleShowAll,
     searchMode,
     refetch
-  } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
+  } = useEnhancedRealtimeSearch(searchQuery, {
+    mode: 'quick',
+    location: {
+      enabled: locationActive,
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+    },
+  });
 
   // Recent searches (explore surface)
   const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('explore');

@@ -238,6 +238,11 @@ export function SearchResultHandler({
         <div className="flex-1 min-w-0">
           <h3 className="font-medium text-sm truncate">{result.name}</h3>
           <p className="text-xs text-muted-foreground truncate">{result.venue}</p>
+          {result.metadata?.distance_label && (
+            <span className="text-[11px] text-primary font-medium">
+              {result.metadata.distance_label}
+            </span>
+          )}
           {result.description && (
             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
               {result.description}
