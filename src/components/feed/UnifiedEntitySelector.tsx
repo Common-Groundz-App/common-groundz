@@ -109,6 +109,7 @@ export function UnifiedEntitySelector({
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   const [isCreatingEntity, setIsCreatingEntity] = useState(false);
@@ -193,8 +194,7 @@ export function UnifiedEntitySelector({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
-        resultsRef.current && !resultsRef.current.contains(event.target as Node) &&
-        inputRef.current && !inputRef.current.contains(event.target as Node)
+        containerRef.current && !containerRef.current.contains(event.target as Node)
       ) {
         setShowResults(false);
       }
@@ -649,7 +649,7 @@ export function UnifiedEntitySelector({
       )}
 
       {/* Search input */}
-      <div className="relative">
+      <div ref={containerRef} className="relative">
         <div className="relative">
           <Search
             className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground ${
