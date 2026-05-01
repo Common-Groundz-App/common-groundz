@@ -436,7 +436,17 @@ serve(async (req) => {
   }
 
   try {
-    const { query, limit = 20, type = 'all', mode = 'quick' } = await req.json()
+    const {
+      query,
+      limit = 20,
+      type = 'all',
+      mode = 'quick',
+      latitude,
+      longitude,
+      radius = 10000,
+      accuracy,
+      locationEnabled = false,
+    } = await req.json()
     
     if (!query) {
       return new Response(
