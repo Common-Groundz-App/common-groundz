@@ -737,17 +737,21 @@ const Explore = () => {
                                   </div>
                                 );
                               })}
-                              {!isExpanded && cat.hidden.length > 0 && (
+                              {cat.hidden.length > 0 && (
                                 <button
                                   type="button"
-                                  className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
+                                  className="w-full flex items-center justify-center gap-1 text-xs text-brand-orange font-medium hover:text-brand-orange/80 hover:bg-accent/20 px-3 py-1.5 transition-colors"
                                   onMouseDown={(e) => e.preventDefault()}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleComplexProductSearch();
+                                    handleDropdownToggle(cat.key, cat.hidden.length);
                                   }}
                                 >
-                                  Show {cat.hidden.length} more in full search
+                                  {isExpanded ? (
+                                    <>See less <ChevronUp className="w-3 h-3" /></>
+                                  ) : (
+                                    <>See {cat.hidden.length} more results <ChevronDown className="w-3 h-3" /></>
+                                  )}
                                 </button>
                               )}
                             </div>
