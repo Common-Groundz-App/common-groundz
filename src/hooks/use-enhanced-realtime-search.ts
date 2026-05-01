@@ -108,7 +108,17 @@ const isAbortLike = (err: any): boolean => {
   return msg.includes('aborted') || msg.includes('failed to fetch');
 };
 
-export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'quick' | 'deep' }) => {
+export interface SearchLocationOptions {
+  enabled: boolean;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+}
+
+export const useEnhancedRealtimeSearch = (
+  query: string,
+  options?: { mode?: 'quick' | 'deep'; location?: SearchLocationOptions },
+) => {
   const [results, setResults] = useState<UnifiedSearchResults & { 
     categorized: Record<string, any[]>; 
     hashtags?: any[] 
