@@ -64,9 +64,9 @@ export function EntityResultItem({ entity, onClick }: EntityResultItemProps) {
             <span className="truncate">{entity.venue}</span>
           </div>
         )}
-        {(entity as any).metadata?.distance_label && (
+        {entity.metadata?.distance_label && (
           <span className="text-[11px] text-primary font-medium">
-            {(entity as any).metadata.distance_label}
+            {entity.metadata.distance_label}
           </span>
         )}
 
