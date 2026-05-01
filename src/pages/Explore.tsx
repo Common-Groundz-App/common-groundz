@@ -53,7 +53,7 @@ const Explore = () => {
   const [activeTab, setActiveTab] = useState('featured');
   const [isDropdownClosing, setIsDropdownClosing] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useRouterLocation();
 
   // Create entity dialog state
   const [showCreateEntityDialog, setShowCreateEntityDialog] = useState(false);
