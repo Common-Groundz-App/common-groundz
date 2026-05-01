@@ -822,12 +822,14 @@ export function UnifiedEntitySelector({
                       );
                     }
 
+                    const isExpanded = !!dropdownShowAll[cat.key];
+                    const itemsToRender = isExpanded ? [...cat.visible, ...cat.hidden] : cat.visible;
+
                     return (
                       <div key={cat.key}>
-                        {renderSectionHeader(title, total, isFirst)}
-                      {cat.visible.map((item: any, rowIdx: number) => {
+                        {renderSectionHeader(title, total, isFirst, cat.key, cat.hidden.length)}
+                      {itemsToRender.map((item: any, rowIdx: number) => {
                         const flatIdx = flatIndexFor(cat.key, rowIdx);
-                        // Only the very first item across all categories gets the "top" weight.
                         const isTop = flatIdx === 0;
                         const isActive = flatIdx === activeIdx;
                         const onPick =
@@ -852,13 +854,17 @@ export function UnifiedEntitySelector({
                       {cat.hidden.length > 0 && (
                         <button
                           type="button"
-                          className="w-full text-left text-xs text-muted-foreground hover:text-foreground hover:bg-accent/20 px-3 py-1.5 transition-colors"
-                          onClick={() => {
-                            // Cheap UX: if user wants more, run the broader search page.
-                            // Inline expansion would need state per category — defer.
+                          className="w-full flex items-center justify-center gap-1 text-xs text-brand-orange font-medium hover:text-brand-orange/80 hover:bg-accent/20 px-3 py-1.5 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDropdownToggle(cat.key, cat.hidden.length);
                           }}
                         >
-                          Show {cat.hidden.length} more
+                          {isExpanded ? (
+                            <>See less <ChevronUp className="w-3 h-3" /></>
+                          ) : (
+                            <>See {cat.hidden.length} more results <ChevronDown className="w-3 h-3" /></>
+                          )}
                         </button>
                       )}
                     </div>
