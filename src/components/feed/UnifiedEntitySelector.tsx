@@ -120,7 +120,6 @@ export function UnifiedEntitySelector({
   const {
     position,
     locationEnabled: globalLocationEnabled,
-    enableLocation,
     isLoading: geoLoading,
     permissionStatus,
     formatDistance,
