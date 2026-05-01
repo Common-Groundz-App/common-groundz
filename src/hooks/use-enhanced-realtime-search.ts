@@ -398,7 +398,24 @@ export const useEnhancedRealtimeSearch = (
         markTierSettled('external', normalizedQuery);
       }
     }
-  }, [markTierSettled]);
+  }, [markTierSettled, buildLocationKey, buildLocationBody]);
+
+  // Re-run external search when the user toggles location on/off mid-session.
+  // We trip the dedupe by clearing lastExternalQueryRef and letting the main
+  // effect schedule a fresh debounce on the next tick.
+  const locEnabled = options?.location?.enabled ?? false;
+  const locLat = options?.location?.latitude;
+  const locLng = options?.location?.longitude;
+  useEffect(() => {
+    lastExternalQueryRef.current = '';
+    externalSettledForRef.current = null;
+    if (query && query.trim().length >= MIN_EXTERNAL_QUERY_LENGTH && searchMode === 'quick') {
+      // Trigger immediately rather than wait the full debounce — the user just
+      // made an intentional choice and expects fresh results.
+      performExternalSearch(query);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locEnabled, locLat, locLng]);
 
   // Main effect: coordinate tiered debounce
   useEffect(() => {
