@@ -114,16 +114,52 @@ export function UnifiedEntitySelector({
   const [isCreatingEntity, setIsCreatingEntity] = useState(false);
   const isCreatingRef = useRef(false);
 
-  const { results, isLoading, loadingStates } = useEnhancedRealtimeSearch(debouncedQuery);
+  // Session-only override: lets the user enable location for THIS modal even
+  // if the global Settings → Privacy toggle is off (and vice-versa). Defaults
+  // to whatever the global setting says when the component mounts.
   const {
     position,
-    locationEnabled,
-    enableLocation,
-    disableLocation,
+    locationEnabled: globalLocationEnabled,
     isLoading: geoLoading,
     permissionStatus,
-    formatDistance
+    formatDistance,
+    getPosition,
+    isGeolocationSupported,
   } = useLocation();
+  const [sessionLocationEnabled, setSessionLocationEnabled] = useState<boolean>(globalLocationEnabled);
+  // Keep session in sync whenever the global flag flips (e.g., user opens
+  // settings, toggles, comes back to the modal).
+  useEffect(() => {
+    setSessionLocationEnabled(globalLocationEnabled);
+  }, [globalLocationEnabled]);
+
+  const locationActive = sessionLocationEnabled && !!position;
+
+  const { results, isLoading, loadingStates } = useEnhancedRealtimeSearch(debouncedQuery, {
+    location: {
+      enabled: locationActive,
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+    },
+  });
+
+  const handleEnableLocationInSession = useCallback(() => {
+    setSessionLocationEnabled(true);
+    if (!position) {
+      // Will trigger the browser permission prompt if not yet granted.
+      getPosition();
+    }
+    if (!globalLocationEnabled) {
+      // Don't flip the global setting — session-only.
+      // (enableLocation() would persist; we deliberately skip it.)
+    }
+  }, [position, getPosition, globalLocationEnabled]);
+
+  const handleDisableLocationInSession = useCallback(() => {
+    // Session-only OFF; do NOT touch the global setting.
+    setSessionLocationEnabled(false);
+  }, []);
+
 
   const isMaxReached = selectedEntities.length >= maxEntities;
 
@@ -511,6 +547,11 @@ export function UnifiedEntitySelector({
             <div className="text-xs text-muted-foreground truncate">{entity.venue}</div>
           )
         )}
+        {entity.metadata?.distance_label && (
+          <div className="text-[11px] text-primary font-medium mt-0.5">
+            {entity.metadata.distance_label}
+          </div>
+        )}
       </div>
       <span
         className={`${isModal ? 'text-base text-muted-foreground/60 ml-2' : 'text-xs text-muted-foreground'}`}
@@ -618,22 +659,50 @@ export function UnifiedEntitySelector({
           )}
         </div>
 
-        {/* Location toggle */}
+        {/* Location indicator: subtle link when OFF, dismissible pill when ON */}
         {showLocationToggle && (
-          <div className="flex items-center gap-2 mt-2">
-            <Button
-              type="button"
-              variant={locationEnabled ? 'secondary' : 'outline'}
-              size="sm"
-              className="flex items-center gap-1 text-xs h-6"
-              onClick={() => locationEnabled ? disableLocation() : enableLocation()}
-              disabled={geoLoading || permissionStatus === 'denied'}
-            >
-              <Navigation className={`h-3 w-3 ${geoLoading ? 'animate-pulse' : ''}`} />
-              {geoLoading ? 'Getting location...' : locationEnabled ? 'Near me' : 'Use my location'}
-            </Button>
+          <div className="flex items-center gap-2 mt-2 min-h-[24px]">
+            {locationActive ? (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary text-xs px-2.5 py-1"
+                title="Results are biased toward your current location for this search."
+              >
+                <Navigation className="h-3 w-3" />
+                <span>Using your location</span>
+                <button
+                  type="button"
+                  onClick={handleDisableLocationInSession}
+                  className="ml-0.5 rounded-full hover:bg-primary/20 p-0.5"
+                  aria-label="Stop using my location for this search"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleEnableLocationInSession}
+                disabled={
+                  !isGeolocationSupported || geoLoading || permissionStatus === 'denied'
+                }
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={
+                  permissionStatus === 'denied'
+                    ? 'Location permission was denied. Update your browser settings to enable.'
+                    : 'Show nearby places first'
+                }
+              >
+                <Navigation
+                  className={`h-3 w-3 ${geoLoading ? 'animate-pulse' : ''}`}
+                />
+                <span className="underline-offset-2 hover:underline">
+                  {geoLoading ? 'Getting location…' : 'Use my location'}
+                </span>
+              </button>
+            )}
           </div>
         )}
+
 
         {/* Results — inline (flat) in modal variant, floating dropdown in inline variant */}
         {showResults && (

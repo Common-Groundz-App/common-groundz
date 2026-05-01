@@ -291,7 +291,33 @@ async function searchMovies(query: string, maxResults: number = 5) {
   }
 }
 
-async function searchPlaces(query: string, maxResults: number = 20) {
+// Haversine distance in km
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function formatDistanceLabel(km: number): string {
+  if (km < 1) return `${Math.round(km * 1000)} m away`;
+  if (km < 10) return `${(Math.round(km * 10) / 10).toFixed(1)} km away`;
+  return `${Math.round(km)} km away`;
+}
+
+interface PlacesSearchOpts {
+  latitude?: number;
+  longitude?: number;
+  radius?: number;   // meters
+  accuracy?: number; // meters
+  locationEnabled?: boolean;
+}
+
+async function searchPlaces(query: string, maxResults: number = 20, opts: PlacesSearchOpts = {}) {
   if (isCircuitOpen('places')) {
     console.log('Places circuit breaker is open, skipping search')
     return []
@@ -300,40 +326,66 @@ async function searchPlaces(query: string, maxResults: number = 20) {
   try {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 5000)
-    
+
     const googlePlacesApiKey = Deno.env.get("GOOGLE_PLACES_API_KEY")
     if (!googlePlacesApiKey) {
       console.log('Google Places API key not available, skipping places search')
       return []
     }
-    
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${googlePlacesApiKey}`,
-      { 
-        signal: controller.signal,
-        headers: { 'User-Agent': 'Supabase Edge Function/1.0' }
-      }
-    )
-    
+
+    const { latitude, longitude, radius = 10000, accuracy, locationEnabled } = opts;
+    const hasCoords =
+      locationEnabled === true &&
+      typeof latitude === 'number' &&
+      typeof longitude === 'number' &&
+      Number.isFinite(latitude) &&
+      Number.isFinite(longitude);
+
+    let url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${googlePlacesApiKey}`;
+    if (hasCoords) {
+      url += `&location=${latitude},${longitude}&radius=${radius}`;
+    }
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Supabase Edge Function/1.0' }
+    })
+
     clearTimeout(timeoutId)
-    
+
     if (!response.ok) {
       throw new Error(`Google Places API error: ${response.status}`)
     }
 
     const data = await response.json()
-    
+
     if (data.status !== 'OK' || !data.results?.length) {
       return []
     }
 
-    const results = data.results.slice(0, maxResults).map((place: any) => {
+    const total = data.results.length;
+    const showDistanceLabels = hasCoords && (accuracy == null || accuracy <= 2000);
+
+    let results = data.results.slice(0, maxResults).map((place: any, position: number) => {
       let imageUrl = getEntityTypeFallbackImage('place')
-      
-      // Use our proxy for Google Places photos
       if (place.photos?.[0]?.photo_reference) {
         imageUrl = `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/proxy-google-image?ref=${place.photos[0].photo_reference}&maxWidth=400`
       }
+
+      const googleRelevance = total > 0 ? 1 - position / total : 0;
+      let distanceKm: number | null = null;
+      let distanceLabel: string | null = null;
+      let proximityScore = 0;
+      if (hasCoords && place.geometry?.location) {
+        const pLat = place.geometry.location.lat;
+        const pLng = place.geometry.location.lng;
+        if (typeof pLat === 'number' && typeof pLng === 'number') {
+          distanceKm = haversineKm(latitude!, longitude!, pLat, pLng);
+          if (showDistanceLabels) distanceLabel = formatDistanceLabel(distanceKm);
+          proximityScore = Math.max(0, 1 - distanceKm / 20);
+        }
+      }
+      const finalScore = hasCoords ? 0.7 * googleRelevance + 0.3 * proximityScore : googleRelevance;
 
       return {
         id: place.place_id,
@@ -351,18 +403,29 @@ async function searchPlaces(query: string, maxResults: number = 20) {
           user_ratings_total: place.user_ratings_total,
           vicinity: place.vicinity,
           place_id: place.place_id,
-          photo_reference: place.photos?.[0]?.photo_reference
+          photo_reference: place.photos?.[0]?.photo_reference,
+          location: place.geometry?.location || null,
+          distance_km: distanceKm,
+          distance_label: distanceLabel,
+          _final_score: finalScore,
         }
       }
     })
 
+    if (hasCoords) {
+      results.sort(
+        (a: any, b: any) =>
+          (b.metadata._final_score ?? 0) - (a.metadata._final_score ?? 0),
+      );
+    }
+
     recordSuccess('places')
-    console.log(`✅ Found ${results.length} places from Google Places`)
+    console.log(`✅ Found ${results.length} places from Google Places (location_used=${hasCoords})`)
     return results
 
   } catch (error) {
     recordFailure('places')
-    console.error('Places search failed:', error.message)
+    console.error('Places search failed:', (error as Error).message)
     return []
   }
 }
@@ -373,7 +436,17 @@ serve(async (req) => {
   }
 
   try {
-    const { query, limit = 20, type = 'all', mode = 'quick' } = await req.json()
+    const {
+      query,
+      limit = 20,
+      type = 'all',
+      mode = 'quick',
+      latitude,
+      longitude,
+      radius = 10000,
+      accuracy,
+      locationEnabled = false,
+    } = await req.json()
     
     if (!query) {
       return new Response(
@@ -727,7 +800,7 @@ serve(async (req) => {
       const [booksResult, moviesResult, placesResult] = await Promise.allSettled([
         searchBooks(query, 8),
         searchMovies(query, 5),
-        searchPlaces(query, 20)
+        searchPlaces(query, 20, { latitude, longitude, radius, accuracy, locationEnabled })
       ])
 
       if (booksResult.status === 'fulfilled') {

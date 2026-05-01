@@ -67,8 +67,8 @@ const writePersistedCache = (cache: PersistedCache) => {
   }
 };
 
-const getCachedExternalResults = (query: string) => {
-  const key = query.toLowerCase().trim();
+const getCachedExternalResults = (query: string, locationKey = '') => {
+  const key = `${query.toLowerCase().trim()}${locationKey}`;
   // 1) In-memory first.
   const mem = externalSearchCache.get(key);
   if (mem && Date.now() - mem.timestamp < EXTERNAL_CACHE_TTL_MS) {
@@ -85,8 +85,8 @@ const getCachedExternalResults = (query: string) => {
   return null;
 };
 
-const setCachedExternalResults = (query: string, data: any) => {
-  const key = query.toLowerCase().trim();
+const setCachedExternalResults = (query: string, data: any, locationKey = '') => {
+  const key = `${query.toLowerCase().trim()}${locationKey}`;
   const entry = { data, timestamp: Date.now() };
   externalSearchCache.set(key, entry);
   // Clean up old in-memory entries (keep last 20)
@@ -108,7 +108,17 @@ const isAbortLike = (err: any): boolean => {
   return msg.includes('aborted') || msg.includes('failed to fetch');
 };
 
-export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'quick' | 'deep' }) => {
+export interface SearchLocationOptions {
+  enabled: boolean;
+  latitude?: number;
+  longitude?: number;
+  accuracy?: number;
+}
+
+export const useEnhancedRealtimeSearch = (
+  query: string,
+  options?: { mode?: 'quick' | 'deep'; location?: SearchLocationOptions },
+) => {
   const [results, setResults] = useState<UnifiedSearchResults & { 
     categorized: Record<string, any[]>; 
     hashtags?: any[] 
@@ -163,6 +173,34 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
   const lastExternalQueryRef = useRef<string>('');
 
   const searchMode = options?.mode || 'quick';
+
+  // Stable ref to current location options so callbacks don't re-create
+  // on every coord change (which would cancel in-flight requests).
+  const locationRef = useRef<SearchLocationOptions | undefined>(options?.location);
+  locationRef.current = options?.location;
+
+  // Build a cache-key suffix from current location (bucketed to ~1km)
+  const buildLocationKey = useCallback(() => {
+    const loc = locationRef.current;
+    if (!loc?.enabled || loc.latitude == null || loc.longitude == null) return '';
+    return `|loc:${loc.latitude.toFixed(2)},${loc.longitude.toFixed(2)}`;
+  }, []);
+
+  // Build the body fragment to send to edge functions
+  const buildLocationBody = useCallback(() => {
+    const loc = locationRef.current;
+    if (!loc?.enabled || loc.latitude == null || loc.longitude == null) {
+      return { locationEnabled: false };
+    }
+    return {
+      locationEnabled: true,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      accuracy: loc.accuracy,
+      radius: 10000,
+    };
+  }, []);
+
 
   // Mark a tier as terminal for a given query, and advance settledQuery
   // ONLY when both tiers (or the only required tier, in local-only mode)
@@ -286,15 +324,18 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
       return;
     }
 
-    // Prevent duplicate calls for same query
-    if (lastExternalQueryRef.current === normalizedQuery) {
+    const locationKey = buildLocationKey();
+    const dedupeKey = `${normalizedQuery}${locationKey}`;
+
+    // Prevent duplicate calls for same query + location combo
+    if (lastExternalQueryRef.current === dedupeKey) {
       // Already terminal for this query — re-assert settled.
       markTierSettled('external', normalizedQuery);
       return;
     }
 
     // Check cache first — terminal: cached hit counts as settled.
-    const cached = getCachedExternalResults(searchQuery);
+    const cached = getCachedExternalResults(searchQuery, locationKey);
     if (cached) {
       setResults(prev => ({
         ...prev,
@@ -302,7 +343,7 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
         categorized: cached.categorized || { books: [], movies: [], places: [] }
       }));
       setLoadingStates(prev => ({ ...prev, external: false }));
-      lastExternalQueryRef.current = normalizedQuery;
+      lastExternalQueryRef.current = dedupeKey;
       markTierSettled('external', normalizedQuery);
       return;
     }
@@ -315,7 +356,7 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
     externalAbortRef.current = controller;
 
     setLoadingStates(prev => ({ ...prev, external: true }));
-    lastExternalQueryRef.current = normalizedQuery;
+    lastExternalQueryRef.current = dedupeKey;
 
     try {
       const { data, error: searchError } = await supabase.functions.invoke('unified-search-v2', {
@@ -323,7 +364,8 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
           query: searchQuery,
           limit: 20,
           type: 'all',
-          mode: 'quick'  // Calls external APIs (Books, Movies, Places)
+          mode: 'quick',  // Calls external APIs (Books, Movies, Places)
+          ...buildLocationBody(),
         },
         // @ts-expect-error supabase-js types may not expose `signal` yet
         signal: controller.signal,
@@ -340,7 +382,7 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
         };
 
         // Cache the results to prevent duplicate API calls
-        setCachedExternalResults(searchQuery, externalData);
+        setCachedExternalResults(searchQuery, externalData, locationKey);
 
         setResults(prev => ({ ...prev, ...externalData }));
       }
@@ -356,7 +398,24 @@ export const useEnhancedRealtimeSearch = (query: string, options?: { mode?: 'qui
         markTierSettled('external', normalizedQuery);
       }
     }
-  }, [markTierSettled]);
+  }, [markTierSettled, buildLocationKey, buildLocationBody]);
+
+  // Re-run external search when the user toggles location on/off mid-session.
+  // We trip the dedupe by clearing lastExternalQueryRef and letting the main
+  // effect schedule a fresh debounce on the next tick.
+  const locEnabled = options?.location?.enabled ?? false;
+  const locLat = options?.location?.latitude;
+  const locLng = options?.location?.longitude;
+  useEffect(() => {
+    lastExternalQueryRef.current = '';
+    externalSettledForRef.current = null;
+    if (query && query.trim().length >= MIN_EXTERNAL_QUERY_LENGTH && searchMode === 'quick') {
+      // Trigger immediately rather than wait the full debounce — the user just
+      // made an intentional choice and expects fresh results.
+      performExternalSearch(query);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locEnabled, locLat, locLng]);
 
   // Main effect: coordinate tiered debounce
   useEffect(() => {
