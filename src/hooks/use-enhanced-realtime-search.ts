@@ -174,6 +174,34 @@ export const useEnhancedRealtimeSearch = (
 
   const searchMode = options?.mode || 'quick';
 
+  // Stable ref to current location options so callbacks don't re-create
+  // on every coord change (which would cancel in-flight requests).
+  const locationRef = useRef<SearchLocationOptions | undefined>(options?.location);
+  locationRef.current = options?.location;
+
+  // Build a cache-key suffix from current location (bucketed to ~1km)
+  const buildLocationKey = useCallback(() => {
+    const loc = locationRef.current;
+    if (!loc?.enabled || loc.latitude == null || loc.longitude == null) return '';
+    return `|loc:${loc.latitude.toFixed(2)},${loc.longitude.toFixed(2)}`;
+  }, []);
+
+  // Build the body fragment to send to edge functions
+  const buildLocationBody = useCallback(() => {
+    const loc = locationRef.current;
+    if (!loc?.enabled || loc.latitude == null || loc.longitude == null) {
+      return { locationEnabled: false };
+    }
+    return {
+      locationEnabled: true,
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+      accuracy: loc.accuracy,
+      radius: 10000,
+    };
+  }, []);
+
+
   // Mark a tier as terminal for a given query, and advance settledQuery
   // ONLY when both tiers (or the only required tier, in local-only mode)
   // agree on the same normalized query.
