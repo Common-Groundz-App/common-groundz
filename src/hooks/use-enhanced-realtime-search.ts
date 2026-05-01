@@ -324,15 +324,18 @@ export const useEnhancedRealtimeSearch = (
       return;
     }
 
-    // Prevent duplicate calls for same query
-    if (lastExternalQueryRef.current === normalizedQuery) {
+    const locationKey = buildLocationKey();
+    const dedupeKey = `${normalizedQuery}${locationKey}`;
+
+    // Prevent duplicate calls for same query + location combo
+    if (lastExternalQueryRef.current === dedupeKey) {
       // Already terminal for this query — re-assert settled.
       markTierSettled('external', normalizedQuery);
       return;
     }
 
     // Check cache first — terminal: cached hit counts as settled.
-    const cached = getCachedExternalResults(searchQuery);
+    const cached = getCachedExternalResults(searchQuery, locationKey);
     if (cached) {
       setResults(prev => ({
         ...prev,
@@ -340,7 +343,7 @@ export const useEnhancedRealtimeSearch = (
         categorized: cached.categorized || { books: [], movies: [], places: [] }
       }));
       setLoadingStates(prev => ({ ...prev, external: false }));
-      lastExternalQueryRef.current = normalizedQuery;
+      lastExternalQueryRef.current = dedupeKey;
       markTierSettled('external', normalizedQuery);
       return;
     }
@@ -353,7 +356,7 @@ export const useEnhancedRealtimeSearch = (
     externalAbortRef.current = controller;
 
     setLoadingStates(prev => ({ ...prev, external: true }));
-    lastExternalQueryRef.current = normalizedQuery;
+    lastExternalQueryRef.current = dedupeKey;
 
     try {
       const { data, error: searchError } = await supabase.functions.invoke('unified-search-v2', {
@@ -361,7 +364,8 @@ export const useEnhancedRealtimeSearch = (
           query: searchQuery,
           limit: 20,
           type: 'all',
-          mode: 'quick'  // Calls external APIs (Books, Movies, Places)
+          mode: 'quick',  // Calls external APIs (Books, Movies, Places)
+          ...buildLocationBody(),
         },
         // @ts-expect-error supabase-js types may not expose `signal` yet
         signal: controller.signal,
@@ -378,7 +382,7 @@ export const useEnhancedRealtimeSearch = (
         };
 
         // Cache the results to prevent duplicate API calls
-        setCachedExternalResults(searchQuery, externalData);
+        setCachedExternalResults(searchQuery, externalData, locationKey);
 
         setResults(prev => ({ ...prev, ...externalData }));
       }
