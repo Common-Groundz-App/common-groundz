@@ -410,6 +410,12 @@ export const useEnhancedRealtimeSearch = (
   useEffect(() => {
     lastExternalQueryRef.current = '';
     externalSettledForRef.current = null;
+    lastLocalQueryRef.current = '';
+    localSettledForRef.current = null;
+    if (query && query.trim().length >= 1) {
+      // Re-trigger local search immediately for fresh distance labels
+      performLocalSearch(query);
+    }
     if (query && query.trim().length >= MIN_EXTERNAL_QUERY_LENGTH && searchMode === 'quick') {
       // Trigger immediately rather than wait the full debounce — the user just
       // made an intentional choice and expects fresh results.
