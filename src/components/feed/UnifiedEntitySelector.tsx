@@ -655,22 +655,50 @@ export function UnifiedEntitySelector({
           )}
         </div>
 
-        {/* Location toggle */}
+        {/* Location indicator: subtle link when OFF, dismissible pill when ON */}
         {showLocationToggle && (
-          <div className="flex items-center gap-2 mt-2">
-            <Button
-              type="button"
-              variant={locationEnabled ? 'secondary' : 'outline'}
-              size="sm"
-              className="flex items-center gap-1 text-xs h-6"
-              onClick={() => locationEnabled ? disableLocation() : enableLocation()}
-              disabled={geoLoading || permissionStatus === 'denied'}
-            >
-              <Navigation className={`h-3 w-3 ${geoLoading ? 'animate-pulse' : ''}`} />
-              {geoLoading ? 'Getting location...' : locationEnabled ? 'Near me' : 'Use my location'}
-            </Button>
+          <div className="flex items-center gap-2 mt-2 min-h-[24px]">
+            {locationActive ? (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary text-xs px-2.5 py-1"
+                title="Results are biased toward your current location for this search."
+              >
+                <Navigation className="h-3 w-3" />
+                <span>Using your location</span>
+                <button
+                  type="button"
+                  onClick={handleDisableLocationInSession}
+                  className="ml-0.5 rounded-full hover:bg-primary/20 p-0.5"
+                  aria-label="Stop using my location for this search"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleEnableLocationInSession}
+                disabled={
+                  !isGeolocationSupported || geoLoading || permissionStatus === 'denied'
+                }
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={
+                  permissionStatus === 'denied'
+                    ? 'Location permission was denied. Update your browser settings to enable.'
+                    : 'Show nearby places first'
+                }
+              >
+                <Navigation
+                  className={`h-3 w-3 ${geoLoading ? 'animate-pulse' : ''}`}
+                />
+                <span className="underline-offset-2 hover:underline">
+                  {geoLoading ? 'Getting location…' : 'Use my location'}
+                </span>
+              </button>
+            )}
           </div>
         )}
+
 
         {/* Results — inline (flat) in modal variant, floating dropdown in inline variant */}
         {showResults && (
