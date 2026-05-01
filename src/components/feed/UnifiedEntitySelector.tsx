@@ -194,8 +194,7 @@ export function UnifiedEntitySelector({
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
-        resultsRef.current && !resultsRef.current.contains(event.target as Node) &&
-        inputRef.current && !inputRef.current.contains(event.target as Node)
+        containerRef.current && !containerRef.current.contains(event.target as Node)
       ) {
         setShowResults(false);
       }
