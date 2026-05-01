@@ -800,7 +800,7 @@ serve(async (req) => {
       const [booksResult, moviesResult, placesResult] = await Promise.allSettled([
         searchBooks(query, 8),
         searchMovies(query, 5),
-        searchPlaces(query, 20)
+        searchPlaces(query, 20, { latitude, longitude, radius, accuracy, locationEnabled })
       ])
 
       if (booksResult.status === 'fulfilled') {
