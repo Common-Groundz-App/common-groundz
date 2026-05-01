@@ -114,16 +114,53 @@ export function UnifiedEntitySelector({
   const [isCreatingEntity, setIsCreatingEntity] = useState(false);
   const isCreatingRef = useRef(false);
 
-  const { results, isLoading, loadingStates } = useEnhancedRealtimeSearch(debouncedQuery);
+  // Session-only override: lets the user enable location for THIS modal even
+  // if the global Settings → Privacy toggle is off (and vice-versa). Defaults
+  // to whatever the global setting says when the component mounts.
   const {
     position,
-    locationEnabled,
+    locationEnabled: globalLocationEnabled,
     enableLocation,
-    disableLocation,
     isLoading: geoLoading,
     permissionStatus,
-    formatDistance
+    formatDistance,
+    getPosition,
+    isGeolocationSupported,
   } = useLocation();
+  const [sessionLocationEnabled, setSessionLocationEnabled] = useState<boolean>(globalLocationEnabled);
+  // Keep session in sync whenever the global flag flips (e.g., user opens
+  // settings, toggles, comes back to the modal).
+  useEffect(() => {
+    setSessionLocationEnabled(globalLocationEnabled);
+  }, [globalLocationEnabled]);
+
+  const locationActive = sessionLocationEnabled && !!position;
+
+  const { results, isLoading, loadingStates } = useEnhancedRealtimeSearch(debouncedQuery, {
+    location: {
+      enabled: locationActive,
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+    },
+  });
+
+  const handleEnableLocationInSession = useCallback(() => {
+    setSessionLocationEnabled(true);
+    if (!position) {
+      // Will trigger the browser permission prompt if not yet granted.
+      getPosition();
+    }
+    if (!globalLocationEnabled) {
+      // Don't flip the global setting — session-only.
+      // (enableLocation() would persist; we deliberately skip it.)
+    }
+  }, [position, getPosition, globalLocationEnabled]);
+
+  const handleDisableLocationInSession = useCallback(() => {
+    // Session-only OFF; do NOT touch the global setting.
+    setSessionLocationEnabled(false);
+  }, []);
+
 
   const isMaxReached = selectedEntities.length >= maxEntities;
 
