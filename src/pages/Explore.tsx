@@ -48,6 +48,8 @@ import { useToast } from '@/hooks/use-toast';
 const Explore = () => {
   const { user } = useAuth();
   const isMobile = useIsMobile();
+  const { locationEnabled, position } = useLocationContext();
+  const locationActive = locationEnabled && !!position;
   const [sortOption, setSortOption] = useState('popular');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('featured');
