@@ -67,8 +67,8 @@ const writePersistedCache = (cache: PersistedCache) => {
   }
 };
 
-const getCachedExternalResults = (query: string) => {
-  const key = query.toLowerCase().trim();
+const getCachedExternalResults = (query: string, locationKey = '') => {
+  const key = `${query.toLowerCase().trim()}${locationKey}`;
   // 1) In-memory first.
   const mem = externalSearchCache.get(key);
   if (mem && Date.now() - mem.timestamp < EXTERNAL_CACHE_TTL_MS) {
@@ -85,8 +85,8 @@ const getCachedExternalResults = (query: string) => {
   return null;
 };
 
-const setCachedExternalResults = (query: string, data: any) => {
-  const key = query.toLowerCase().trim();
+const setCachedExternalResults = (query: string, data: any, locationKey = '') => {
+  const key = `${query.toLowerCase().trim()}${locationKey}`;
   const entry = { data, timestamp: Date.now() };
   externalSearchCache.set(key, entry);
   // Clean up old in-memory entries (keep last 20)
