@@ -157,7 +157,14 @@ const Explore = () => {
     toggleShowAll,
     searchMode,
     refetch
-  } = useEnhancedRealtimeSearch(searchQuery, { mode: 'quick' });
+  } = useEnhancedRealtimeSearch(searchQuery, {
+    mode: 'quick',
+    location: {
+      enabled: locationActive,
+      latitude: position?.latitude,
+      longitude: position?.longitude,
+    },
+  });
 
   // Recent searches (explore surface)
   const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('explore');
