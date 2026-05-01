@@ -1,6 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
+// Haversine distance in km
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+function formatDistanceLabel(km: number): string {
+  if (km < 1) return `${Math.round(km * 1000)} m away`;
+  if (km < 10) return `${(Math.round(km * 10) / 10).toFixed(1)} km away`;
+  return `${Math.round(km)} km away`;
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -751,6 +769,33 @@ serve(async (req) => {
       }
 
       // Set hydrated entity results (with merged stats when available)
+      // Inject distance labels for local entities that have metadata.location
+      const hasUserCoords =
+        locationEnabled === true &&
+        typeof latitude === 'number' &&
+        typeof longitude === 'number' &&
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude);
+      const showLocalDistanceLabels = hasUserCoords && (accuracy == null || accuracy <= 2000);
+
+      if (hasUserCoords) {
+        entitiesWithStats = entitiesWithStats.map((entity: any) => {
+          const loc = entity.metadata?.location;
+          if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+            const distanceKm = haversineKm(latitude, longitude, loc.lat, loc.lng);
+            return {
+              ...entity,
+              metadata: {
+                ...entity.metadata,
+                distance_km: distanceKm,
+                distance_label: showLocalDistanceLabels ? formatDistanceLabel(distanceKm) : null,
+              },
+            };
+          }
+          return entity;
+        });
+      }
+
       results.entities = entitiesWithStats
       
       if (usersResult.status === 'fulfilled') {
