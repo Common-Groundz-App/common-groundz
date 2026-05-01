@@ -769,6 +769,33 @@ serve(async (req) => {
       }
 
       // Set hydrated entity results (with merged stats when available)
+      // Inject distance labels for local entities that have metadata.location
+      const hasUserCoords =
+        locationEnabled === true &&
+        typeof latitude === 'number' &&
+        typeof longitude === 'number' &&
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude);
+      const showLocalDistanceLabels = hasUserCoords && (accuracy == null || accuracy <= 2000);
+
+      if (hasUserCoords) {
+        entitiesWithStats = entitiesWithStats.map((entity: any) => {
+          const loc = entity.metadata?.location;
+          if (loc && typeof loc.lat === 'number' && typeof loc.lng === 'number') {
+            const distanceKm = haversineKm(latitude, longitude, loc.lat, loc.lng);
+            return {
+              ...entity,
+              metadata: {
+                ...entity.metadata,
+                distance_km: distanceKm,
+                distance_label: showLocalDistanceLabels ? formatDistanceLabel(distanceKm) : null,
+              },
+            };
+          }
+          return entity;
+        });
+      }
+
       results.entities = entitiesWithStats
       
       if (usersResult.status === 'fulfilled') {
