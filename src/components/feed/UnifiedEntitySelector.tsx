@@ -649,7 +649,7 @@ export function UnifiedEntitySelector({
       )}
 
       {/* Search input */}
-      <div className="relative">
+      <div ref={containerRef} className="relative">
         <div className="relative">
           <Search
             className={`absolute top-1/2 -translate-y-1/2 text-muted-foreground ${
