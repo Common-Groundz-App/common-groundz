@@ -109,6 +109,7 @@ export function UnifiedEntitySelector({
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   const [isCreatingEntity, setIsCreatingEntity] = useState(false);
