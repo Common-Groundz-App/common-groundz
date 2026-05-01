@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { X, Loader2, Search, Plus, Navigation } from 'lucide-react';
+import { X, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
@@ -446,8 +446,17 @@ export function UnifiedEntitySelector({
   }, [collapsed]);
 
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [dropdownShowAll, setDropdownShowAll] = useState<Record<string, boolean>>({});
+
+  const handleDropdownToggle = useCallback((key: string, hiddenCount: number) => {
+    if (hiddenCount === 0) return;
+    setDropdownShowAll((prev) => ({ ...prev, [key]: !prev[key] }));
+    setActiveIdx(-1);
+  }, []);
+
   useEffect(() => {
     setActiveIdx(-1);
+    setDropdownShowAll({});
   }, [searchQuery]);
 
   // Trigger pick on the currently-highlighted item (or first item if none highlighted).
