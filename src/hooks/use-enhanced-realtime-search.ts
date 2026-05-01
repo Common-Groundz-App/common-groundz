@@ -266,7 +266,8 @@ export const useEnhancedRealtimeSearch = (
           query: searchQuery,
           limit: 20,
           type: 'all',
-          mode: 'local-only'  // Forces local-only, no external API calls
+          mode: 'local-only',  // Forces local-only, no external API calls
+          ...buildLocationBody(),
         },
         // @ts-expect-error supabase-js types may not expose `signal` yet
         signal: controller.signal,
