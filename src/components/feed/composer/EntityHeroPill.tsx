@@ -79,7 +79,7 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
                 {getEntityEmoji(entity.type)}
               </span>
             )}
-            <span className="font-semibold truncate max-w-[180px]">{entity.name}</span>
+            <span className="font-semibold text-base truncate max-w-[180px]">{entity.name}</span>
             <button
               type="button"
               onClick={() => onRemoveEntity(entity.id)}
