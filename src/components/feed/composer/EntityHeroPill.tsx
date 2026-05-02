@@ -30,7 +30,7 @@ const TYPE_BG: Record<string, string> = {
 
 // Shared pill sizing so empty state, selected chips, and "Add more" share one visual family.
 const PILL_BASE =
-  'inline-flex items-center gap-1.5 h-9 rounded-full border text-sm transition-colors';
+  'inline-flex items-center gap-1.5 h-10 rounded-full border text-sm transition-colors';
 
 /**
  * Reddit-inspired entity pill with circular entity image and bold name.
@@ -63,23 +63,23 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
         return (
           <span
             key={entity.id}
-            className={`${PILL_BASE} border-primary/20 bg-primary/5 text-foreground pl-1 pr-1`}
+            className={`${PILL_BASE} border-primary/20 bg-primary/5 text-foreground pl-1.5 pr-1.5`}
           >
             {/* Circular entity image – Reddit-style avatar */}
             {imageUrl ? (
               <img
                 src={imageUrl}
                 alt=""
-                className="h-6 w-6 rounded-full object-cover flex-shrink-0"
+                className="h-7 w-7 rounded-full object-cover flex-shrink-0"
               />
             ) : (
               <span
-                className={`inline-flex items-center justify-center h-6 w-6 rounded-full flex-shrink-0 text-xs ${TYPE_BG[entity.type] || 'bg-muted'}`}
+                className={`inline-flex items-center justify-center h-7 w-7 rounded-full flex-shrink-0 text-xs ${TYPE_BG[entity.type] || 'bg-muted'}`}
               >
                 {getEntityEmoji(entity.type)}
               </span>
             )}
-            <span className="font-semibold truncate max-w-[180px]">{entity.name}</span>
+            <span className="font-semibold text-base truncate max-w-[180px]">{entity.name}</span>
             <button
               type="button"
               onClick={() => onRemoveEntity(entity.id)}
