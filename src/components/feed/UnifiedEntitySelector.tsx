@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { X as XIcon, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
 import { X, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { EntityAdapter } from '@/components/profile/circles/types';
