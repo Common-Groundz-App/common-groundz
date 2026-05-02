@@ -1042,6 +1042,7 @@ export function EnhancedCreatePostForm({
 
               if (mentionMatch) {
                 const mentionText = mentionMatch[2];
+                atTriggerCursorRef.current = cursorPos;
                 setSelectorPrefillQuery(mentionText);
                 setEntitySelectorVisible(true);
                 setEmojiPickerVisible(false);
