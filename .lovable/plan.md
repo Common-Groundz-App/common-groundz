@@ -1,38 +1,18 @@
 
 ## Problem
 
-When picking an entity from "recent searches" in the Tag Entities modal, the chip renders without an avatar because `image_url` is not stored in the recent search item or passed through when constructing the `EntityAdapter`.
+When deleting text like `@rishab.devp` with backspace, once the content becomes `@rishab`, the `@` mention regex matches and opens the Entity Selector Modal. The modal steals focus, so subsequent backspaces edit the modal's search input instead of the textarea.
 
 ## Solution
 
-Extend the recent search system to carry `image_url` for entity-kind items, and pass it through when adding the chip from recents.
+Only trigger the `@` mention detection when the user is typing forward (content length increased), not when deleting (backspace). Targeted single-file fix.
 
-## Changes
+## Technical Change
 
-### 1. `src/hooks/useRecentSearches.ts`
+**`src/components/feed/EnhancedCreatePostForm.tsx`**:
 
-- Add optional `image_url?: string` to the `RecentSearchItem` interface.
-- Accept `image_url` in the `addRecent` meta parameter and persist it.
+1. Add a `prevContentLengthRef = useRef(content.length)` near the existing refs.
+2. In the `<Textarea onChange>` handler (~line 1028), wrap the mention-trigger block (lines 1038-1044) with a guard: only run if `newContent.length > prevContentLengthRef.current`.
+3. Update `prevContentLengthRef.current = newContent.length` at the end of the handler.
 
-### 2. `src/components/feed/UnifiedEntitySelector.tsx`
-
-- In `handleEntitySelect` (line 213): pass `image_url` when saving the recent:
-  ```
-  addRecent(entity.name, 'entity', {
-    entityId: entity.id,
-    entityType: entity.type,
-    image_url: entity.image_url,
-  });
-  ```
-
-- In the `onPick` callback (line 785): include `image_url` from the recent item when constructing the adapter:
-  ```
-  const adapter: EntityAdapter = {
-    id: item.entityId,
-    name: item.query,
-    type: item.entityType || 'other',
-    image_url: item.image_url,
-  };
-  ```
-
-This is a minimal 2-file change. Old recents without `image_url` will still work -- the chip just won't show an avatar (same as today), and they'll naturally cycle out.
+No changes to the modal, entity selector, tagging logic, or mention insertion logic.
