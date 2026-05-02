@@ -20,6 +20,7 @@ export interface RecentSearchItem {
   entityId?: string;
   entityType?: string;
   slug?: string;
+  image_url?: string;
 }
 
 const STORAGE_PREFIX = 'cg_recent_searches_v1__';
@@ -90,7 +91,7 @@ export function useRecentSearches(surface: string) {
     (
       query: string,
       kind: RecentSearchKind = 'query',
-      meta?: { entityId?: string; entityType?: string; slug?: string },
+      meta?: { entityId?: string; entityType?: string; slug?: string; image_url?: string },
     ) => {
       const trimmed = (query || '').trim();
       if (!trimmed) return;
@@ -104,6 +105,7 @@ export function useRecentSearches(surface: string) {
               entityId: meta?.entityId,
               entityType: meta?.entityType,
               slug: meta?.slug,
+              image_url: meta?.image_url,
             }
           : {}),
       };

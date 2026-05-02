@@ -213,6 +213,7 @@ export function UnifiedEntitySelector({
     addRecent(entity.name, 'entity', {
       entityId: entity.id,
       entityType: entity.type,
+      image_url: entity.image_url,
     });
     setSearchQuery('');
     setDebouncedQuery('');
@@ -786,6 +787,7 @@ export function UnifiedEntitySelector({
                       id: item.entityId,
                       name: item.query,
                       type: item.entityType || 'other',
+                      image_url: item.image_url,
                     };
                     const newEntities = [...selectedEntities, adapter];
                     setSelectedEntities(newEntities);
