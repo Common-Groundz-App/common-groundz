@@ -1028,20 +1028,24 @@ export function EnhancedCreatePostForm({
           value={content}
           onChange={(e) => {
             const newContent = e.target.value;
+            const isTypingForward = newContent.length > prevContentLengthRef.current;
+            prevContentLengthRef.current = newContent.length;
             setContent(newContent);
 
-            // Check for @ mention trigger (preserved verbatim)
-            const textarea = e.target;
-            const cursorPos = textarea.selectionStart;
-            const textBeforeCursor = newContent.substring(0, cursorPos);
-            const mentionMatch = textBeforeCursor.match(/(^|\s)@(\w*)$/);
+            // Only trigger @ mention detection when typing forward (not on backspace/delete)
+            if (isTypingForward) {
+              const textarea = e.target;
+              const cursorPos = textarea.selectionStart;
+              const textBeforeCursor = newContent.substring(0, cursorPos);
+              const mentionMatch = textBeforeCursor.match(/(^|\s)@(\w*)$/);
 
-            if (mentionMatch) {
-              const mentionText = mentionMatch[2];
-              setSelectorPrefillQuery(mentionText);
-              setEntitySelectorVisible(true);
-              setEmojiPickerVisible(false);
-              setShowLocationInput(false);
+              if (mentionMatch) {
+                const mentionText = mentionMatch[2];
+                setSelectorPrefillQuery(mentionText);
+                setEntitySelectorVisible(true);
+                setEmojiPickerVisible(false);
+                setShowLocationInput(false);
+              }
             }
           }}
           className="min-h-[140px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60"
