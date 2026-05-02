@@ -189,8 +189,9 @@ export function UnifiedEntitySelector({
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [searchQuery]);
 
-  // Click outside handler
+  // Click outside handler — skip in modal variant where Dialog overlay handles dismissal
   useEffect(() => {
+    if (isModal) return;
     function handleClickOutside(event: MouseEvent) {
       if (
         containerRef.current && !containerRef.current.contains(event.target as Node)
@@ -200,7 +201,7 @@ export function UnifiedEntitySelector({
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [isModal]);
 
   // Select a local entity
   const handleEntitySelect = useCallback((entity: EntityAdapter) => {
