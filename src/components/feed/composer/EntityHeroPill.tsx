@@ -70,9 +70,7 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
               <img
                 src={imageUrl}
                 alt=""
-                className="h-6 w-6 rounded-full object-cover flex-shrink-0"
-              />
-            ) : (
+                className="h-7 w-7 rounded-full object-cover flex-shrink-0"
               <span
                 className={`inline-flex items-center justify-center h-6 w-6 rounded-full flex-shrink-0 text-xs ${TYPE_BG[entity.type] || 'bg-muted'}`}
               >
