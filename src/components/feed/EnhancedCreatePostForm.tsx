@@ -1427,7 +1427,10 @@ export function EnhancedCreatePostForm({
         open={entitySelectorVisible}
         onOpenChange={(open) => {
           setEntitySelectorVisible(open);
-          if (!open) setSelectorPrefillQuery('');
+           if (!open) {
+             setSelectorPrefillQuery('');
+             atTriggerCursorRef.current = null;
+           }
         }}
         initialEntities={entities}
         initialQuery={selectorPrefillQuery}
