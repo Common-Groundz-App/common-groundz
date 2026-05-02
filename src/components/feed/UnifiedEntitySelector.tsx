@@ -210,7 +210,10 @@ export function UnifiedEntitySelector({
     const newEntities = [...selectedEntities, entity];
     setSelectedEntities(newEntities);
     onEntitiesChange(newEntities);
-    if (searchQuery.trim()) addRecent(searchQuery.trim());
+    addRecent(entity.name, 'entity', {
+      entityId: entity.id,
+      entityType: entity.type,
+    });
     setSearchQuery('');
     setDebouncedQuery('');
     setShowResults(false);
