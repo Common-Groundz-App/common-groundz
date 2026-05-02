@@ -1440,7 +1440,8 @@ export function EnhancedCreatePostForm({
           if (!sanitized) return;
           const mentionText = `@${sanitized} `;
 
-          const liveCursor = textareaRef.current?.selectionStart ?? cursorPosition.start;
+           const liveCursor = atTriggerCursorRef.current ?? textareaRef.current?.selectionStart ?? cursorPosition.start;
+           atTriggerCursorRef.current = null;
           const result = replaceAtTrigger(content, liveCursor, mentionText);
 
           let newContent: string;
