@@ -63,7 +63,7 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
         return (
           <span
             key={entity.id}
-            className={`${PILL_BASE} border-primary/20 bg-primary/5 text-foreground pl-1 pr-1`}
+            className={`${PILL_BASE} border-primary/20 bg-primary/5 text-foreground pl-1.5 pr-1.5`}
           >
             {/* Circular entity image – Reddit-style avatar */}
             {imageUrl ? (
