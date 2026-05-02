@@ -420,7 +420,8 @@ export function EnhancedCreatePostForm({
   const handleEntitiesChange = (newEntities: Entity[]) => {
     // If triggered via @, clean up the @query text from content
     if (selectorPrefillQuery !== '') {
-      const liveCursor = textareaRef.current?.selectionStart ?? cursorPosition.start;
+      const liveCursor = atTriggerCursorRef.current ?? textareaRef.current?.selectionStart ?? cursorPosition.start;
+      atTriggerCursorRef.current = null;
       const result = replaceAtTrigger(content, liveCursor, '');
       if (result) {
         setContent(result.newContent);
