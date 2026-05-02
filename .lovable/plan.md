@@ -1,18 +1,34 @@
 
 ## Problem
 
-When deleting text like `@rishab.devp` with backspace, once the content becomes `@rishab`, the `@` mention regex matches and opens the Entity Selector Modal. The modal steals focus, so subsequent backspaces edit the modal's search input instead of the textarea.
+When typing `@isha` and selecting an entity from the modal, the `@isha` text remains in the composer body. Entities become pills (not inline text), so the typed `@query` should be removed. The cleanup fails because the textarea loses focus when the modal opens, making the live cursor position unreliable.
 
-## Solution
+## Fix
 
-Only trigger the `@` mention detection when the user is typing forward (content length increased), not when deleting (backspace). Targeted single-file fix.
+**File: `src/components/feed/EnhancedCreatePostForm.tsx`**
 
-## Technical Change
+1. Add `atTriggerCursorRef = useRef<number | null>(null)` near existing refs.
 
-**`src/components/feed/EnhancedCreatePostForm.tsx`**:
+2. In the `onChange` handler (~line 1042), save the cursor when `@` is detected:
+   ```
+   atTriggerCursorRef.current = cursorPos;
+   ```
 
-1. Add a `prevContentLengthRef = useRef(content.length)` near the existing refs.
-2. In the `<Textarea onChange>` handler (~line 1028), wrap the mention-trigger block (lines 1038-1044) with a guard: only run if `newContent.length > prevContentLengthRef.current`.
-3. Update `prevContentLengthRef.current = newContent.length` at the end of the handler.
+3. In `handleEntitiesChange` (~line 422), use the saved cursor instead of the live one:
+   ```
+   const liveCursor = atTriggerCursorRef.current ?? textareaRef.current?.selectionStart ?? cursorPosition.start;
+   atTriggerCursorRef.current = null;
+   ```
 
-No changes to the modal, entity selector, tagging logic, or mention insertion logic.
+4. In `onMentionInsert` (~line 1437), same change for consistency:
+   ```
+   const liveCursor = atTriggerCursorRef.current ?? textareaRef.current?.selectionStart ?? cursorPosition.start;
+   atTriggerCursorRef.current = null;
+   ```
+
+5. Reset the ref when modal closes without selection (~line 1427):
+   ```
+   atTriggerCursorRef.current = null;
+   ```
+
+Person mention behavior is unchanged -- people still insert as `@username` text. Only entities (pills) benefit from the cleanup fix.
