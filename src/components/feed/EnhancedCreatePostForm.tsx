@@ -151,6 +151,7 @@ export function EnhancedCreatePostForm({
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
   const prevContentLengthRef = useRef(postToEdit?.content?.length ?? 0);
+  const atTriggerCursorRef = useRef<number | null>(null);
   const MAX_MEDIA_COUNT = 4;
   // postType holds a UIPostType — 'journal' / 'watching' are UI-only and
   // get mapped to DB 'note' on submit (with ui_post_type stamped in
@@ -419,7 +420,8 @@ export function EnhancedCreatePostForm({
   const handleEntitiesChange = (newEntities: Entity[]) => {
     // If triggered via @, clean up the @query text from content
     if (selectorPrefillQuery !== '') {
-      const liveCursor = textareaRef.current?.selectionStart ?? cursorPosition.start;
+      const liveCursor = atTriggerCursorRef.current ?? textareaRef.current?.selectionStart ?? cursorPosition.start;
+      atTriggerCursorRef.current = null;
       const result = replaceAtTrigger(content, liveCursor, '');
       if (result) {
         setContent(result.newContent);
@@ -1041,6 +1043,7 @@ export function EnhancedCreatePostForm({
 
               if (mentionMatch) {
                 const mentionText = mentionMatch[2];
+                atTriggerCursorRef.current = cursorPos;
                 setSelectorPrefillQuery(mentionText);
                 setEntitySelectorVisible(true);
                 setEmojiPickerVisible(false);
@@ -1424,7 +1427,10 @@ export function EnhancedCreatePostForm({
         open={entitySelectorVisible}
         onOpenChange={(open) => {
           setEntitySelectorVisible(open);
-          if (!open) setSelectorPrefillQuery('');
+           if (!open) {
+             setSelectorPrefillQuery('');
+             atTriggerCursorRef.current = null;
+           }
         }}
         initialEntities={entities}
         initialQuery={selectorPrefillQuery}
@@ -1434,7 +1440,8 @@ export function EnhancedCreatePostForm({
           if (!sanitized) return;
           const mentionText = `@${sanitized} `;
 
-          const liveCursor = textareaRef.current?.selectionStart ?? cursorPosition.start;
+           const liveCursor = atTriggerCursorRef.current ?? textareaRef.current?.selectionStart ?? cursorPosition.start;
+           atTriggerCursorRef.current = null;
           const result = replaceAtTrigger(content, liveCursor, mentionText);
 
           let newContent: string;
