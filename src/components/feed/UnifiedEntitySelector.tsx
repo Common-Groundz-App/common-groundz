@@ -1,7 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { X, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
 import { useEnhancedRealtimeSearch } from '@/hooks/use-enhanced-realtime-search';
 import { EntityAdapter } from '@/components/profile/circles/types';
@@ -619,27 +618,48 @@ export function UnifiedEntitySelector({
 
   return (
     <div className="space-y-3">
-      {/* Selected entities as badges */}
+      {/* Selected entities – compact pills matching composer's EntityHeroPill style */}
       {selectedEntities.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {selectedEntities.map(entity => (
-            <Badge
-              key={entity.id}
-              variant="outline"
-              className="gap-1 pl-2 pr-1 py-1 flex items-center text-xs bg-accent/30"
-            >
-              <span>{getEntityIcon(entity.type)}</span>
-              <span>{entity.name}</span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-4 w-4 p-0 rounded-full hover:bg-muted"
-                onClick={() => removeEntity(entity.id)}
+          {selectedEntities.map(entity => {
+            const imgUrl = entity.image_url || getOptimalEntityImageUrl(entity as any);
+            const typeBg: Record<string, string> = {
+              place: 'bg-emerald-100 dark:bg-emerald-900/40',
+              food: 'bg-orange-100 dark:bg-orange-900/40',
+              movie: 'bg-violet-100 dark:bg-violet-900/40',
+              book: 'bg-blue-100 dark:bg-blue-900/40',
+              product: 'bg-pink-100 dark:bg-pink-900/40',
+            };
+            return (
+              <span
+                key={entity.id}
+                className="inline-flex items-center gap-1.5 h-8 rounded-full border border-primary/20 bg-primary/5 text-foreground pl-1 pr-1 text-xs transition-colors"
               >
-                <X size={10} />
-              </Button>
-            </Badge>
-          ))}
+                {imgUrl ? (
+                  <img
+                    src={imgUrl}
+                    alt=""
+                    className="h-5 w-5 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <span
+                    className={`inline-flex items-center justify-center h-5 w-5 rounded-full flex-shrink-0 text-[10px] ${typeBg[entity.type] || 'bg-muted'}`}
+                  >
+                    {getEntityIcon(entity.type)}
+                  </span>
+                )}
+                <span className="font-semibold truncate max-w-[160px]">{entity.name}</span>
+                <button
+                  type="button"
+                  onClick={() => removeEntity(entity.id)}
+                  aria-label={`Remove ${entity.name}`}
+                  className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-muted-foreground hover:bg-primary/10 hover:text-foreground transition-colors"
+                >
+                  <X size={10} />
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
 
