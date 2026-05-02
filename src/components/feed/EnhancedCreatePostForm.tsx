@@ -150,6 +150,7 @@ export function EnhancedCreatePostForm({
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const [selectorPrefillQuery, setSelectorPrefillQuery] = useState('');
+  const prevContentLengthRef = useRef(postToEdit?.content?.length ?? 0);
   const MAX_MEDIA_COUNT = 4;
   // postType holds a UIPostType — 'journal' / 'watching' are UI-only and
   // get mapped to DB 'note' on submit (with ui_post_type stamped in
