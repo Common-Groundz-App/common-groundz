@@ -776,7 +776,24 @@ export function UnifiedEntitySelector({
             {searchQuery.trim().length < 2 && (
               <RecentSearchesPanel
                 recents={recents}
-                onPick={(q) => {
+                onPick={(q, item) => {
+                  // Entity-kind recent: add directly as a tag chip
+                  if (item?.kind === 'entity' && item.entityId) {
+                    if (isMaxReached) return;
+                    if (selectedEntities.some(e => e.id === item.entityId)) return;
+
+                    const adapter: EntityAdapter = {
+                      id: item.entityId,
+                      name: item.query,
+                      type: item.entityType || 'other',
+                    };
+                    const newEntities = [...selectedEntities, adapter];
+                    setSelectedEntities(newEntities);
+                    onEntitiesChange(newEntities);
+                    return;
+                  }
+
+                  // Query-kind recent: fill search input (existing behavior)
                   setSearchQuery(q);
                   setDebouncedQuery(q);
                   setShowResults(true);
