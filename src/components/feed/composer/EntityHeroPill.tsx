@@ -30,7 +30,7 @@ const TYPE_BG: Record<string, string> = {
 
 // Shared pill sizing so empty state, selected chips, and "Add more" share one visual family.
 const PILL_BASE =
-  'inline-flex items-center gap-1.5 h-9 rounded-full border text-sm transition-colors';
+  'inline-flex items-center gap-1.5 h-10 rounded-full border text-sm transition-colors';
 
 /**
  * Reddit-inspired entity pill with circular entity image and bold name.
