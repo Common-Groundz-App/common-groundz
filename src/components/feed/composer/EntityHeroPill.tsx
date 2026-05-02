@@ -5,6 +5,7 @@ import { getOptimalEntityImageUrl, getEntityTypeFallbackImage } from '@/utils/en
 
 interface EntityHeroPillProps {
   entities: Entity[];
+  maxEntities?: number;
   onOpenSelector: () => void;
   onRemoveEntity: (entityId: string) => void;
 }
@@ -37,6 +38,7 @@ const PILL_BASE =
  */
 export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
   entities,
+  maxEntities = 3,
   onOpenSelector,
   onRemoveEntity,
 }) => {
@@ -91,14 +93,16 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
           </span>
         );
       })}
-      <button
-        type="button"
-        onClick={onOpenSelector}
-        className={`${PILL_BASE} font-medium border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent/40 px-3`}
-      >
-        <Plus className="h-3.5 w-3.5" />
-        <span>Add more</span>
-      </button>
+      {entities.length < maxEntities && (
+        <button
+          type="button"
+          onClick={onOpenSelector}
+          className={`${PILL_BASE} font-medium border-border bg-background text-muted-foreground hover:text-foreground hover:bg-accent/40 px-3`}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span>Add more</span>
+        </button>
+      )}
     </div>
   );
 };

@@ -665,7 +665,7 @@ export function UnifiedEntitySelector({
 
       {/* Max reached message */}
       {isMaxReached && (
-        <p className="text-xs text-muted-foreground">You can add up to {maxEntities} tags</p>
+        <p className="text-xs text-muted-foreground">You've selected {maxEntities} entities. Remove one to add another.</p>
       )}
 
       {/* Search input */}
