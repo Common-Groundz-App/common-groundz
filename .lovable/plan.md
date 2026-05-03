@@ -1,30 +1,34 @@
-## Problem
 
-When the user types `@is` in the composer, the draft autosave stores `"@is"` in localStorage. After selecting an entity, the `@is` text is correctly removed from the live content state. However, if the user navigates away without posting, the draft still contains the old `@is` text because:
-
-- The autosave only writes when `title.trim() || content.trim()` is truthy (line 203)
-- After cleanup, if both title and content are empty, the old draft is never overwritten
-- When the user returns, the stale draft with `@is` is restored
-
-## Fix
+## Changes
 
 **File: `src/components/feed/EnhancedCreatePostForm.tsx`**
 
-Update the debounced autosave effect (~line 200-209) to also handle the case where content becomes empty after previously having content. When both `title` and `content` are empty, **clear the draft** instead of silently skipping the save:
+### 1. Suggested hashtags orange tint (lines 1086-1094)
 
-```typescript
-useEffect(() => {
-  if (isEditMode) return;
-  const handle = setTimeout(() => {
-    if (title.trim() || content.trim()) {
-      setDraft({ title, content, savedAt: Date.now() });
-    } else {
-      // Content was cleared (e.g. after entity selection cleanup) — remove stale draft
-      clearDraft();
-    }
-  }, 500);
-  return () => clearTimeout(handle);
-}, [title, content, isEditMode]);
+Change suggested hashtag badges from neutral `variant="outline"` to a soft orange-tinted style: `bg-primary/5 border-primary/20 text-primary`. Keep user-typed/detected tags neutral.
+
+```tsx
+<Badge
+  key={tag}
+  variant="outline"
+  onClick={() => handleSuggestedHashtagClick(tag)}
+  className="cursor-pointer hover:bg-primary/10 gap-1 font-normal bg-primary/5 border-primary/20 text-primary"
+>
 ```
 
-This ensures that when the `@query` text is cleaned up and the composer is effectively empty, the stale draft is cleared from localStorage. No other files or logic need to change.
+### 2. Dynamic body placeholder (line 1032)
+
+Replace the static `getPlaceholderForType(postType)` with entity-aware copy:
+
+- No entity selected: `"Tag a product, place, book, or movie to give your experience context..."`
+- Entity selected: `"Tell us about your experience with [first entity name]..."`
+
+```tsx
+placeholder={
+  entities.length > 0
+    ? `Tell us about your experience with ${entities[0].name}...`
+    : 'Tag a product, place, book, or movie to give your experience context...'
+}
+```
+
+No other files or components are modified.
