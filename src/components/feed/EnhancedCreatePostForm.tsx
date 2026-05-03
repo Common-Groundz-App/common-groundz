@@ -1119,10 +1119,13 @@ export function EnhancedCreatePostForm({
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="flex items-center gap-3 w-full rounded-lg border border-border bg-muted/30 hover:bg-muted/50 px-4 py-3 text-left transition-colors cursor-pointer"
             >
-              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', structuredOpen && 'rotate-180')} />
-              Add details
+              <div className="flex-1">
+                <span className="text-sm font-medium text-foreground">Add details</span>
+                <p className="text-xs text-muted-foreground mt-0.5">Pros, cons, duration & more</p>
+              </div>
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', structuredOpen && 'rotate-180')} />
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-3 animate-fade-in">
