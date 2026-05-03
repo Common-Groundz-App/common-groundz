@@ -1029,7 +1029,11 @@ export function EnhancedCreatePostForm({
         {/* Body */}
         <Textarea
           ref={textareaRef}
-          placeholder={getPlaceholderForType(postType)}
+          placeholder={
+            entities.length > 0
+              ? `Tell us about your experience with ${entities[0].name}...`
+              : 'Tag a product, place, book, or movie to give your experience context...'
+          }
           value={content}
           onChange={(e) => {
             const newContent = e.target.value;
@@ -1087,7 +1091,7 @@ export function EnhancedCreatePostForm({
                   key={tag}
                   variant="outline"
                   onClick={() => handleSuggestedHashtagClick(tag)}
-                  className="cursor-pointer hover:bg-accent gap-1 font-normal"
+                  className="cursor-pointer gap-1 font-normal bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
                 >
                   <Plus className="h-3 w-3" />
                   #{tag}
