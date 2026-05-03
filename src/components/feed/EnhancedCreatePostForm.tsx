@@ -36,7 +36,7 @@ import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cleanStructuredFields, DURATION_OPTIONS, isValidStoredLocation } from '@/types/structuredFields';
 import { analytics } from '@/services/analytics';
-import { POST_TYPE_OPTIONS, getPlaceholderForType, mapPostTypeToDatabase } from './utils/postUtils';
+import { POST_TYPE_OPTIONS, mapPostTypeToDatabase } from './utils/postUtils';
 import type { DatabasePostType, UIPostType } from './utils/postUtils';
 import { extractHashtagsDetailed, normalizeHashtag, extractHashtags } from '@/utils/hashtag';
 import { getSuggestedTags } from '@/utils/hashtagSuggestions';
