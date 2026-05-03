@@ -202,6 +202,9 @@ export function EnhancedCreatePostForm({
     const handle = setTimeout(() => {
       if (title.trim() || content.trim()) {
         setDraft({ title, content, savedAt: Date.now() });
+      } else {
+        // Content was cleared (e.g. after entity selection cleanup) — remove stale draft
+        clearDraft();
       }
     }, 500);
     return () => clearTimeout(handle);
