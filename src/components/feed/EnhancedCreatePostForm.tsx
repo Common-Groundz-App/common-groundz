@@ -1023,7 +1023,7 @@ export function EnhancedCreatePostForm({
           placeholder="Add a title (optional)"
           maxLength={120}
           aria-label="Post title"
-          className="text-[26px] font-bold tracking-tight border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
+          className="text-2xl font-semibold tracking-tight border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
         />
 
         {/* Body */}
