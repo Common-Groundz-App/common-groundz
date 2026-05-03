@@ -997,7 +997,7 @@ export function EnhancedCreatePostForm({
       />
 
       {/* Scrollable composer surface — no card wrapper */}
-      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 md:pt-10 space-y-5">
+      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 md:pt-10 space-y-4">
         {/* Desktop-only page header — gives the centered column a clear anchor */}
         <h1 className="hidden md:block text-2xl font-semibold tracking-tight">
           {isEditMode ? 'Edit your experience' : 'Share an experience'}
@@ -1023,7 +1023,7 @@ export function EnhancedCreatePostForm({
           placeholder="Add a title (optional)"
           maxLength={120}
           aria-label="Post title"
-          className="text-[26px] font-bold tracking-tight border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
+          className="text-2xl font-semibold tracking-tight border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
         />
 
         {/* Body */}
@@ -1054,7 +1054,7 @@ export function EnhancedCreatePostForm({
               }
             }
           }}
-          className="min-h-[140px] resize-none border-none p-0 focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60 transition-shadow"
+          className="min-h-[140px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60"
           onClick={saveCursorPosition}
           onKeyUp={saveCursorPosition}
           onFocus={saveCursorPosition}
@@ -1116,18 +1116,16 @@ export function EnhancedCreatePostForm({
             }
           }}
         >
-          <CollapsibleTrigger asChild>
-            <button
-              type="button"
-              className="flex items-center gap-3 w-full rounded-lg border border-border bg-muted/30 hover:bg-muted/50 px-4 py-3 text-left transition-colors cursor-pointer"
-            >
-              <div className="flex-1">
-                <span className="text-sm font-medium text-foreground">Add details</span>
-                <p className="text-xs text-muted-foreground mt-0.5">Pros, cons, duration & more</p>
-              </div>
-              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', structuredOpen && 'rotate-180')} />
-            </button>
-          </CollapsibleTrigger>
+           <CollapsibleTrigger asChild>
+             <button
+               type="button"
+               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1"
+             >
+               <ChevronDown className={cn('h-4 w-4 transition-transform', structuredOpen && 'rotate-180')} />
+               <span>Add details</span>
+               <span className="text-xs">· Pros, cons, duration & more</span>
+             </button>
+           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-3 animate-fade-in">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">What worked?</label>
