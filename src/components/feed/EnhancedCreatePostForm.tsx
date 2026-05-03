@@ -997,7 +997,7 @@ export function EnhancedCreatePostForm({
       />
 
       {/* Scrollable composer surface — no card wrapper */}
-      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 md:pt-10 space-y-5">
+      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 md:pt-10 space-y-4">
         {/* Desktop-only page header — gives the centered column a clear anchor */}
         <h1 className="hidden md:block text-2xl font-semibold tracking-tight">
           {isEditMode ? 'Edit your experience' : 'Share an experience'}
