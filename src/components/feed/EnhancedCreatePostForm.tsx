@@ -1029,7 +1029,7 @@ export function EnhancedCreatePostForm({
         {/* Body */}
         <Textarea
           ref={textareaRef}
-          placeholder={getPlaceholderForType(postType)}
+          placeholder={entities.length > 0 ? `Tell us about your experience with ${entities[0].name}...` : 'Tag a product, place, book, or movie to give your experience context...'}
           value={content}
           onChange={(e) => {
             const newContent = e.target.value;
