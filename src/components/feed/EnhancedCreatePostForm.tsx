@@ -1054,7 +1054,7 @@ export function EnhancedCreatePostForm({
               }
             }
           }}
-          className="min-h-[140px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60"
+          className="min-h-[140px] resize-none border-none p-0 focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60 transition-shadow"
           onClick={saveCursorPosition}
           onKeyUp={saveCursorPosition}
           onFocus={saveCursorPosition}
