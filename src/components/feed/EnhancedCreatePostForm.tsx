@@ -36,7 +36,7 @@ import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cleanStructuredFields, DURATION_OPTIONS, isValidStoredLocation } from '@/types/structuredFields';
 import { analytics } from '@/services/analytics';
-import { POST_TYPE_OPTIONS, mapPostTypeToDatabase } from './utils/postUtils';
+import { POST_TYPE_OPTIONS, getPlaceholderForType, mapPostTypeToDatabase } from './utils/postUtils';
 import type { DatabasePostType, UIPostType } from './utils/postUtils';
 import { extractHashtagsDetailed, normalizeHashtag, extractHashtags } from '@/utils/hashtag';
 import { getSuggestedTags } from '@/utils/hashtagSuggestions';
@@ -1023,13 +1023,13 @@ export function EnhancedCreatePostForm({
           placeholder="Add a title (optional)"
           maxLength={120}
           aria-label="Post title"
-          className="text-2xl font-semibold tracking-tight border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
+          className="text-2xl font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
         />
 
         {/* Body */}
         <Textarea
           ref={textareaRef}
-          placeholder={entities.length > 0 ? `Tell us about your experience with ${entities[0].name}...` : 'Tag a product, place, book, or movie to give your experience context...'}
+          placeholder={getPlaceholderForType(postType)}
           value={content}
           onChange={(e) => {
             const newContent = e.target.value;
@@ -1087,7 +1087,7 @@ export function EnhancedCreatePostForm({
                   key={tag}
                   variant="outline"
                   onClick={() => handleSuggestedHashtagClick(tag)}
-                  className="cursor-pointer bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 gap-1 font-normal"
+                  className="cursor-pointer hover:bg-accent gap-1 font-normal"
                 >
                   <Plus className="h-3 w-3" />
                   #{tag}
@@ -1116,16 +1116,15 @@ export function EnhancedCreatePostForm({
             }
           }}
         >
-           <CollapsibleTrigger asChild>
-             <button
-               type="button"
-               className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1"
-             >
-               <ChevronDown className={cn('h-4 w-4 transition-transform', structuredOpen && 'rotate-180')} />
-               <span>Add details</span>
-               <span className="text-xs">· Pros, cons, duration & more</span>
-             </button>
-           </CollapsibleTrigger>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            >
+              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', structuredOpen && 'rotate-180')} />
+              Add details
+            </button>
+          </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-3 animate-fade-in">
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-1 block">What worked?</label>
