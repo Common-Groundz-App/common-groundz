@@ -1,34 +1,30 @@
-
 ## Problem
 
-When typing `@isha` and selecting an entity from the modal, the `@isha` text remains in the composer body. Entities become pills (not inline text), so the typed `@query` should be removed. The cleanup fails because the textarea loses focus when the modal opens, making the live cursor position unreliable.
+When the user types `@is` in the composer, the draft autosave stores `"@is"` in localStorage. After selecting an entity, the `@is` text is correctly removed from the live content state. However, if the user navigates away without posting, the draft still contains the old `@is` text because:
+
+- The autosave only writes when `title.trim() || content.trim()` is truthy (line 203)
+- After cleanup, if both title and content are empty, the old draft is never overwritten
+- When the user returns, the stale draft with `@is` is restored
 
 ## Fix
 
 **File: `src/components/feed/EnhancedCreatePostForm.tsx`**
 
-1. Add `atTriggerCursorRef = useRef<number | null>(null)` near existing refs.
+Update the debounced autosave effect (~line 200-209) to also handle the case where content becomes empty after previously having content. When both `title` and `content` are empty, **clear the draft** instead of silently skipping the save:
 
-2. In the `onChange` handler (~line 1042), save the cursor when `@` is detected:
-   ```
-   atTriggerCursorRef.current = cursorPos;
-   ```
+```typescript
+useEffect(() => {
+  if (isEditMode) return;
+  const handle = setTimeout(() => {
+    if (title.trim() || content.trim()) {
+      setDraft({ title, content, savedAt: Date.now() });
+    } else {
+      // Content was cleared (e.g. after entity selection cleanup) — remove stale draft
+      clearDraft();
+    }
+  }, 500);
+  return () => clearTimeout(handle);
+}, [title, content, isEditMode]);
+```
 
-3. In `handleEntitiesChange` (~line 422), use the saved cursor instead of the live one:
-   ```
-   const liveCursor = atTriggerCursorRef.current ?? textareaRef.current?.selectionStart ?? cursorPosition.start;
-   atTriggerCursorRef.current = null;
-   ```
-
-4. In `onMentionInsert` (~line 1437), same change for consistency:
-   ```
-   const liveCursor = atTriggerCursorRef.current ?? textareaRef.current?.selectionStart ?? cursorPosition.start;
-   atTriggerCursorRef.current = null;
-   ```
-
-5. Reset the ref when modal closes without selection (~line 1427):
-   ```
-   atTriggerCursorRef.current = null;
-   ```
-
-Person mention behavior is unchanged -- people still insert as `@username` text. Only entities (pills) benefit from the cleanup fix.
+This ensures that when the `@query` text is cleaned up and the composer is effectively empty, the stale draft is cleared from localStorage. No other files or logic need to change.
