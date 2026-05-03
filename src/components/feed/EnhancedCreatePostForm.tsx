@@ -1087,7 +1087,7 @@ export function EnhancedCreatePostForm({
                   key={tag}
                   variant="outline"
                   onClick={() => handleSuggestedHashtagClick(tag)}
-                  className="cursor-pointer hover:bg-accent gap-1 font-normal"
+                  className="cursor-pointer bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 gap-1 font-normal"
                 >
                   <Plus className="h-3 w-3" />
                   #{tag}
