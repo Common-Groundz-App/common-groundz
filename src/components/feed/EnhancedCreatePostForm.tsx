@@ -36,7 +36,7 @@ import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cleanStructuredFields, DURATION_OPTIONS, isValidStoredLocation } from '@/types/structuredFields';
 import { analytics } from '@/services/analytics';
-import { POST_TYPE_OPTIONS, getPlaceholderForType, mapPostTypeToDatabase } from './utils/postUtils';
+import { POST_TYPE_OPTIONS, mapPostTypeToDatabase } from './utils/postUtils';
 import type { DatabasePostType, UIPostType } from './utils/postUtils';
 import { extractHashtagsDetailed, normalizeHashtag, extractHashtags } from '@/utils/hashtag';
 import { getSuggestedTags } from '@/utils/hashtagSuggestions';
@@ -997,7 +997,7 @@ export function EnhancedCreatePostForm({
       />
 
       {/* Scrollable composer surface — no card wrapper */}
-      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 md:pt-10 space-y-4">
+      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 md:pt-10 space-y-5">
         {/* Desktop-only page header — gives the centered column a clear anchor */}
         <h1 className="hidden md:block text-2xl font-semibold tracking-tight">
           {isEditMode ? 'Edit your experience' : 'Share an experience'}
@@ -1023,13 +1023,13 @@ export function EnhancedCreatePostForm({
           placeholder="Add a title (optional)"
           maxLength={120}
           aria-label="Post title"
-          className="text-2xl font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
+          className="text-[26px] font-bold tracking-tight border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
         />
 
         {/* Body */}
         <Textarea
           ref={textareaRef}
-          placeholder={getPlaceholderForType(postType)}
+          placeholder={entities.length > 0 ? `Tell us about your experience with ${entities[0].name}...` : 'Tag a product, place, book, or movie to give your experience context...'}
           value={content}
           onChange={(e) => {
             const newContent = e.target.value;
@@ -1054,7 +1054,7 @@ export function EnhancedCreatePostForm({
               }
             }
           }}
-          className="min-h-[140px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60"
+          className="min-h-[140px] resize-none border-none p-0 focus-visible:ring-1 focus-visible:ring-primary/20 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60 transition-shadow"
           onClick={saveCursorPosition}
           onKeyUp={saveCursorPosition}
           onFocus={saveCursorPosition}
@@ -1087,7 +1087,7 @@ export function EnhancedCreatePostForm({
                   key={tag}
                   variant="outline"
                   onClick={() => handleSuggestedHashtagClick(tag)}
-                  className="cursor-pointer hover:bg-accent gap-1 font-normal"
+                  className="cursor-pointer bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 gap-1 font-normal"
                 >
                   <Plus className="h-3 w-3" />
                   #{tag}
@@ -1119,10 +1119,13 @@ export function EnhancedCreatePostForm({
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="flex items-center gap-3 w-full rounded-lg border border-border bg-muted/30 hover:bg-muted/50 px-4 py-3 text-left transition-colors cursor-pointer"
             >
-              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', structuredOpen && 'rotate-180')} />
-              Add details
+              <div className="flex-1">
+                <span className="text-sm font-medium text-foreground">Add details</span>
+                <p className="text-xs text-muted-foreground mt-0.5">Pros, cons, duration & more</p>
+              </div>
+              <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', structuredOpen && 'rotate-180')} />
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-3 animate-fade-in">

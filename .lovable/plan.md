@@ -1,30 +1,34 @@
-## Problem
 
-When the user types `@is` in the composer, the draft autosave stores `"@is"` in localStorage. After selecting an entity, the `@is` text is correctly removed from the live content state. However, if the user navigates away without posting, the draft still contains the old `@is` text because:
+# Composer Visual Refinement Pass
 
-- The autosave only writes when `title.trim() || content.trim()` is truthy (line 203)
-- After cleanup, if both title and content are empty, the old draft is never overwritten
-- When the user returns, the stale draft with `@is` is restored
+Six targeted changes to improve clarity and premium feel without disrupting the current Reddit-inspired layout.
 
-## Fix
+## Changes
 
-**File: `src/components/feed/EnhancedCreatePostForm.tsx`**
+### 1. "Add details" card upgrade (lines ~1109-1127)
+Replace the small collapsible text link with a soft-bordered card/row. The trigger becomes a rounded container with an icon, label ("Add details"), and subtitle ("Pros, cons, duration & more"). Still collapsible, just visually elevated so users notice this differentiator.
 
-Update the debounced autosave effect (~line 200-209) to also handle the case where content becomes empty after previously having content. When both `title` and `content` are empty, **clear the draft** instead of silently skipping the save:
+### 2. Dynamic body placeholder (line 1032)
+Replace the static `getPlaceholderForType(postType)` with entity-aware copy:
+- No entity selected: "Tag a product, place, book, or movie to give your post context..."
+- Entity selected: "Tell us about your experience with [first entity name]..."
 
-```typescript
-useEffect(() => {
-  if (isEditMode) return;
-  const handle = setTimeout(() => {
-    if (title.trim() || content.trim()) {
-      setDraft({ title, content, savedAt: Date.now() });
-    } else {
-      // Content was cleared (e.g. after entity selection cleanup) — remove stale draft
-      clearDraft();
-    }
-  }, 500);
-  return () => clearTimeout(handle);
-}, [title, content, isEditMode]);
-```
+### 3. Suggested hashtags orange tint (lines 1086-1094)
+Change suggested hashtag badges from neutral `variant="outline"` to a soft orange-tinted style: `bg-primary/5 border-primary/20 text-primary`. Keep user-typed/detected tags neutral.
 
-This ensures that when the `@query` text is cleaned up and the composer is effectively empty, the stale draft is cleared from localStorage. No other files or logic need to change.
+### 4. Spacing rhythm (line 1000)
+Increase the main `space-y-4` to `space-y-5` for better breathing room between sections. No separators added.
+
+### 5. Title typography (line 1026)
+Bump the title input from `text-2xl font-semibold` to `text-[26px] font-bold tracking-tight` for stronger presence without shouting.
+
+### 6. Focus polish (line 1057)
+Add a subtle `focus-within` ring to the body textarea: a soft `ring-1 ring-primary/20` transition when focused.
+
+## What's deferred for later
+- #2 Post type promotion (keeping current pill/modal)
+- #13 Mobile header changes (skipped)
+- #14 Textarea min-height increase (skipped)
+
+## Files modified
+- `src/components/feed/EnhancedCreatePostForm.tsx` — all 6 changes
