@@ -1067,19 +1067,6 @@ export function EnhancedCreatePostForm({
           What worked? · What didn't? · Who is this useful for?
         </p>
 
-        {/* Detected hashtags chip row (visible inline per refinement) */}
-        {detectedHashtagsForChips.length > 0 && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1.5">Tags</p>
-            <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {detectedHashtagsForChips.map((tag) => (
-                <Badge key={tag} variant="secondary" className="shrink-0 font-normal">
-                  #{tag}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Suggested hashtags chip row (clickable) */}
         {suggestedHashtags.length > 0 && (
@@ -1101,11 +1088,10 @@ export function EnhancedCreatePostForm({
           </div>
         )}
 
-        {/* Post type & tags pill */}
+        {/* Post type pill */}
         <div className="flex flex-wrap items-center gap-2">
           <PostTypeAndTagsPill
             postType={postType}
-            tagCount={detectedHashtagsForChips.length}
             onOpen={() => setPostTypeTagsOpen(true)}
           />
         </div>
@@ -1483,9 +1469,6 @@ export function EnhancedCreatePostForm({
         onOpenChange={setPostTypeTagsOpen}
         postType={postType}
         setPostType={setPostType}
-        detectedHashtags={detectedHashtagsForChips}
-        suggestedHashtags={suggestedHashtags}
-        onSuggestedHashtagClick={handleSuggestedHashtagClick}
       />
 
       <DiscardDraftDialog
