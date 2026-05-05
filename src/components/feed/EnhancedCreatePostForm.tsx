@@ -36,8 +36,8 @@ import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cleanStructuredFields, DURATION_OPTIONS, isValidStoredLocation } from '@/types/structuredFields';
 import { analytics } from '@/services/analytics';
-import { POST_TYPE_OPTIONS, getPlaceholderForType, mapPostTypeToDatabase } from './utils/postUtils';
-import type { DatabasePostType, UIPostType } from './utils/postUtils';
+import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
+import type { DatabasePostType } from './utils/postUtils';
 import { extractHashtagsDetailed, normalizeHashtag, extractHashtags } from '@/utils/hashtag';
 import { getSuggestedTags } from '@/utils/hashtagSuggestions';
 import { processPostHashtags, updatePostHashtags } from '@/services/hashtagService';
@@ -63,8 +63,8 @@ interface EnhancedCreatePostFormProps {
   profileData?: any;
   initialEntity?: Entity;
   postToEdit?: PostToEdit;
-  /** Accepts UI types ('journal' | 'watching') in addition to DB types. */
-  defaultPostType?: UIPostType;
+  /** Default post type for the composer. */
+  defaultPostType?: DatabasePostType;
 }
 
 type VisibilityOption = 'public' | 'private' | 'circle';
@@ -153,16 +153,10 @@ export function EnhancedCreatePostForm({
   const prevContentLengthRef = useRef(postToEdit?.content?.length ?? 0);
   const atTriggerCursorRef = useRef<number | null>(null);
   const MAX_MEDIA_COUNT = 4;
-  // postType holds a UIPostType — 'journal' / 'watching' are UI-only and
-  // get mapped to DB 'note' on submit (with ui_post_type stamped in
-  // structured_fields so we can re-hydrate the chip on edit).
-  const hydratedUiType =
-    (postToEdit?.structured_fields as any)?.ui_post_type as UIPostType | undefined;
-  const [postType, setPostType] = useState<UIPostType>(
-    hydratedUiType ??
-      (postToEdit?.post_type as UIPostType | undefined) ??
+  const [postType, setPostType] = useState<DatabasePostType>(
+      (postToEdit?.post_type as DatabasePostType | undefined) ??
       defaultPostType ??
-      'story'
+      'experience'
   );
   // Visual fallback pulse on submit success (in case sound fails)
   const [submitPulse, setSubmitPulse] = useState(false);
@@ -526,17 +520,7 @@ export function EnhancedCreatePostForm({
           : {};
 
       let mergedStructured: Record<string, any> | null;
-      if (postType === 'journal' || postType === 'watching') {
-        mergedStructured = {
-          ...existingStructured,
-          ...safeCleaned,
-          ui_post_type: postType,
-        };
-      } else {
-        // Switched to a non-UI type: drop stale ui_post_type marker
-        const { ui_post_type: _drop, ...rest } = existingStructured;
-        mergedStructured = { ...rest, ...safeCleaned };
-      }
+      mergedStructured = { ...existingStructured, ...safeCleaned };
 
       // Stale-clear: if user removed the location chip during edit, drop the
       // key from merged output (don't store as null forever).
@@ -550,7 +534,7 @@ export function EnhancedCreatePostForm({
       }
 
       // Map UI-only post types to a valid DB enum value.
-      const dbPostType = mapPostTypeToDatabase(postType || 'story');
+      const dbPostType = postType || 'experience';
 
       const basePostData: Record<string, any> = {
         title: title.trim() || null,
@@ -575,7 +559,7 @@ export function EnhancedCreatePostForm({
         });
       }
 
-      if (postType && postType !== 'story') {
+      if (postType && postType !== 'experience') {
         analytics.track('post_type_selected', { post_type: postType });
       }
 
@@ -663,7 +647,7 @@ export function EnhancedCreatePostForm({
         const hasChanged =
           (title.trim() || null) !== (postToEdit.title ?? null) ||
           content !== (postToEdit.content ?? '') ||
-          dbPostType !== (postToEdit.post_type ?? 'story') ||
+          dbPostType !== (postToEdit.post_type ?? 'experience') ||
           hasStructuredChanged;
 
         if (hasChanged) {
@@ -832,7 +816,7 @@ export function EnhancedCreatePostForm({
       setGoodFor('');
       setReuseIntent('');
       setStructuredOpen(false);
-      setPostType('story');
+      setPostType('experience');
       clearDraft();
       onSuccess();
     } catch (error) {

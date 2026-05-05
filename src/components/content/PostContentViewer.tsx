@@ -337,10 +337,10 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
       />
 
       {/* Post Type Badge (detail view) */}
-      {shouldShowTypeBadge(post.post_type ?? 'story') && (
+      {shouldShowTypeBadge(post.post_type ?? 'experience') && (
         <div className="mt-2 mb-1 px-1">
           <span className="text-xs text-muted-foreground/70 border border-border/50 rounded-full px-2 py-0.5">
-            {getPostTypeLabel(post.post_type ?? 'story')}
+            {getPostTypeLabel(post.post_type ?? 'experience')}
           </span>
         </div>
       )}

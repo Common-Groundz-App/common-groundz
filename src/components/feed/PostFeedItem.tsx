@@ -410,10 +410,10 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                     </Tooltip>
                   </TooltipProvider>
                 )}
-                {shouldShowTypeBadge(post.post_type ?? 'story') && (
+                {shouldShowTypeBadge(post.post_type ?? 'experience') && (
                   <>
                     <span>·</span>
-                    <span className="text-muted-foreground/70">{getPostTypeLabel(post.post_type ?? 'story')}</span>
+                    <span className="text-muted-foreground/70">{getPostTypeLabel(post.post_type ?? 'experience')}</span>
                   </>
                 )}
                 {post.visibility !== 'public' && (
