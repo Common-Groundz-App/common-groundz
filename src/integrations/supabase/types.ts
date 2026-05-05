@@ -4530,14 +4530,12 @@ export type Database = {
         | "duplicate"
         | "other"
       post_type:
-        | "story"
-        | "routine"
-        | "project"
-        | "note"
+        | "experience"
+        | "review"
+        | "recommendation"
         | "comparison"
         | "question"
         | "tip"
-        | "update"
       recommendation_category: "food" | "movie" | "product" | "book" | "place"
       recommendation_visibility: "public" | "private" | "circle_only"
       suggestion_status: "pending" | "approved" | "rejected" | "applied"
@@ -4696,14 +4694,12 @@ export const Constants = {
         "other",
       ],
       post_type: [
-        "story",
-        "routine",
-        "project",
-        "note",
+        "experience",
+        "review",
+        "recommendation",
         "comparison",
         "question",
         "tip",
-        "update",
       ],
       recommendation_category: ["food", "movie", "product", "book", "place"],
       recommendation_visibility: ["public", "private", "circle_only"],
