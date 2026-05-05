@@ -647,7 +647,7 @@ export function EnhancedCreatePostForm({
         const hasChanged =
           (title.trim() || null) !== (postToEdit.title ?? null) ||
           content !== (postToEdit.content ?? '') ||
-          dbPostType !== (postToEdit.post_type ?? 'story') ||
+          dbPostType !== (postToEdit.post_type ?? 'experience') ||
           hasStructuredChanged;
 
         if (hasChanged) {
