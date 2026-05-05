@@ -520,17 +520,7 @@ export function EnhancedCreatePostForm({
           : {};
 
       let mergedStructured: Record<string, any> | null;
-      if (postType === 'journal' || postType === 'watching') {
-        mergedStructured = {
-          ...existingStructured,
-          ...safeCleaned,
-          ui_post_type: postType,
-        };
-      } else {
-        // Switched to a non-UI type: drop stale ui_post_type marker
-        const { ui_post_type: _drop, ...rest } = existingStructured;
-        mergedStructured = { ...rest, ...safeCleaned };
-      }
+      mergedStructured = { ...existingStructured, ...safeCleaned };
 
       // Stale-clear: if user removed the location chip during edit, drop the
       // key from merged output (don't store as null forever).
@@ -544,7 +534,7 @@ export function EnhancedCreatePostForm({
       }
 
       // Map UI-only post types to a valid DB enum value.
-      const dbPostType = mapPostTypeToDatabase(postType || 'story');
+      const dbPostType = postType || 'experience';
 
       const basePostData: Record<string, any> = {
         title: title.trim() || null,
@@ -569,7 +559,7 @@ export function EnhancedCreatePostForm({
         });
       }
 
-      if (postType && postType !== 'story') {
+      if (postType && postType !== 'experience') {
         analytics.track('post_type_selected', { post_type: postType });
       }
 
@@ -826,7 +816,7 @@ export function EnhancedCreatePostForm({
       setGoodFor('');
       setReuseIntent('');
       setStructuredOpen(false);
-      setPostType('story');
+      setPostType('experience');
       clearDraft();
       onSuccess();
     } catch (error) {
