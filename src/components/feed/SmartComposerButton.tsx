@@ -241,10 +241,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
         </PopoverContent>
       </Popover>
       
-      {/* Review still uses an in-page dialog. Journal/Watching/Post all
-          navigate to /create (handled in popover + 'open-create-post-dialog'
-          listener), so the legacy ModernCreatePostForm dialog branches were
-          removed when the composer was unified onto EnhancedCreatePostForm. */}
+      {/* Review uses an in-page dialog; Post navigates to /create */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
           {selectedContentType === 'review' && (
