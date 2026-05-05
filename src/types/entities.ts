@@ -63,7 +63,7 @@ export interface PostWithUser extends WithUserProfile, InteractionData, Timestam
   id: string;
   title?: string;
   content?: string;
-  post_type: 'story' | 'routine' | 'project' | 'note';
+  post_type: 'experience' | 'review' | 'recommendation' | 'comparison' | 'question' | 'tip';
   visibility: Visibility;
   view_count: number;
   comment_count: number;

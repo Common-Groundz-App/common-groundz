@@ -47,7 +47,7 @@ interface Post {
   id: string;
   title: string;
   content: string;
-  post_type: 'story' | 'routine' | 'project' | 'note' | 'journal' | 'watching' | 'comparison' | 'question' | 'tip' | 'update';
+  post_type: 'experience' | 'review' | 'recommendation' | 'comparison' | 'question' | 'tip';
   visibility: 'public' | 'circle_only' | 'private';
   created_at: string;
   updated_at: string;

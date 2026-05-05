@@ -27,7 +27,7 @@ export interface PostFeedItem {
   id: string;
   title: string;
   content: string;
-  post_type: 'story' | 'routine' | 'project' | 'note' | 'comparison' | 'question' | 'tip' | 'update';
+  post_type: 'experience' | 'review' | 'recommendation' | 'comparison' | 'question' | 'tip';
   visibility: 'public' | 'circle_only' | 'private';
   user_id: string;
   created_at: string;
