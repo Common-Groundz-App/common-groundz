@@ -1,9 +1,9 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
-import { POST_TYPE_OPTIONS, type UIPostType } from '@/components/feed/utils/postUtils';
+import { POST_TYPE_OPTIONS, type DatabasePostType } from '@/components/feed/utils/postUtils';
 
 interface PostTypeAndTagsPillProps {
-  postType: UIPostType;
+  postType: DatabasePostType;
   onOpen: () => void;
 }
 
@@ -16,7 +16,7 @@ export const PostTypeAndTagsPill: React.FC<PostTypeAndTagsPillProps> = ({
   onOpen,
 }) => {
   const typeLabel =
-    postType === 'story'
+    postType === 'experience'
       ? null
       : POST_TYPE_OPTIONS.find((o) => o.value === postType)?.label ?? null;
 

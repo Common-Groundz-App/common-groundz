@@ -8,9 +8,9 @@ import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { fetchUserProfile } from '@/services/profileService';
 import { useToast } from '@/hooks/use-toast';
 import type { Entity } from '@/services/recommendation/types';
-import type { UIPostType } from '@/components/feed/utils/postUtils';
+import type { DatabasePostType } from '@/components/feed/utils/postUtils';
 
-const VALID_UI_POST_TYPES: ReadonlyArray<UIPostType> = ['journal', 'watching'];
+const VALID_POST_TYPES: ReadonlyArray<DatabasePostType> = ['experience', 'review', 'recommendation', 'comparison', 'question', 'tip'];
 
 const CreatePost = () => {
   const navigate = useNavigate();
@@ -42,10 +42,10 @@ const CreatePost = () => {
 
   // Whitelisted postType param — anything else is ignored to keep state safe
   const rawPostType = searchParams.get('postType');
-  const defaultPostType: UIPostType | undefined = VALID_UI_POST_TYPES.includes(
-    rawPostType as UIPostType
+  const defaultPostType: DatabasePostType | undefined = VALID_POST_TYPES.includes(
+    rawPostType as DatabasePostType
   )
-    ? (rawPostType as UIPostType)
+    ? (rawPostType as DatabasePostType)
     : undefined;
 
   // Load profile data
@@ -88,7 +88,6 @@ const CreatePost = () => {
         </div>
 
         <div className="flex-1 xl:ml-64 min-w-0">
-          {/* Composer is now full-bleed — owns its own sticky top + bottom bars */}
           <EnhancedCreatePostForm
             profileData={profileData}
             onSuccess={handleSuccess}

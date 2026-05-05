@@ -6,13 +6,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { POST_TYPE_OPTIONS, type UIPostType } from '@/components/feed/utils/postUtils';
+import { POST_TYPE_OPTIONS, type DatabasePostType } from '@/components/feed/utils/postUtils';
 
 interface PostTypeAndTagsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  postType: UIPostType;
-  setPostType: (next: UIPostType) => void;
+  postType: DatabasePostType;
+  setPostType: (next: DatabasePostType) => void;
 }
 
 /**
@@ -40,7 +40,7 @@ export const PostTypeAndTagsModal: React.FC<PostTypeAndTagsModalProps> = ({
                 key={option.value}
                 type="button"
                 onClick={() => {
-                  setPostType(postType === option.value ? 'story' : option.value);
+                  setPostType(postType === option.value ? 'experience' : option.value);
                 }}
                 className={cn(
                   'px-2.5 py-1 rounded-full text-xs border transition-colors',

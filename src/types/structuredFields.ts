@@ -17,12 +17,6 @@ export interface StructuredFields {
   good_for?: string;
   reuse_intent?: 'yes' | 'no';
   /**
-   * UI-only post type marker for types that don't have a dedicated DB enum
-   * value (journal, watching → both stored as DB post_type 'note'). Lets the
-   * composer re-hydrate the correct chip on edit.
-   */
-  ui_post_type?: 'journal' | 'watching';
-  /**
    * Structured location data captured from the composer's location chip.
    * Stored here (not in a dedicated `metadata` column) to avoid a schema
    * migration. Always validated via `isValidStoredLocation` on read/write.
@@ -70,11 +64,8 @@ export const ALLOWED_STRUCTURED_KEYS = [
   'duration',
   'good_for',
   'reuse_intent',
-  'ui_post_type',
   'location',
 ] as const;
-
-const VALID_UI_POST_TYPES = ['journal', 'watching'];
 
 const LEGACY_KEY_MAP: Record<string, string> = {
   pros: 'what_worked',
@@ -137,11 +128,6 @@ export function cleanStructuredFields(
   // Reuse intent
   if (typeof mapped.reuse_intent === 'string' && VALID_REUSE.includes(mapped.reuse_intent)) {
     result.reuse_intent = mapped.reuse_intent as 'yes' | 'no';
-  }
-
-  // UI-only post type marker (journal | watching)
-  if (typeof mapped.ui_post_type === 'string' && VALID_UI_POST_TYPES.includes(mapped.ui_post_type)) {
-    result.ui_post_type = mapped.ui_post_type as 'journal' | 'watching';
   }
 
   // Structured location — gated by isValidStoredLocation; normalize fields
