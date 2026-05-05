@@ -237,7 +237,6 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
                 <span>Review</span>
               </button>
             </div>
-            </div>
           </div>
         </PopoverContent>
       </Popover>
