@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { PlusCircle, Star, Book, FileText, Eye } from 'lucide-react';
+import { PlusCircle, Star, FileText } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -17,7 +17,7 @@ interface SmartComposerButtonProps {
   onPostCreated?: () => void; // Add compatibility with old prop name
 }
 
-type ContentType = 'review' | 'journal' | 'recommendation' | 'watching';
+type ContentType = 'review' | 'recommendation';
 
 export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartComposerButtonProps) {
   const { user, isLoading } = useAuth();
@@ -236,26 +236,7 @@ export function SmartComposerButton({ onContentCreated, onPostCreated }: SmartCo
                 <Star size={16} className="text-yellow-500" />
                 <span>Review</span>
               </button>
-              <button
-                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
-                onClick={() => {
-                  setIsPopoverOpen(false);
-                  navigate('/create?postType=journal');
-                }}
-              >
-                <Book size={16} className="text-green-500" />
-                <span>Journal</span>
-              </button>
-              <button
-                className="flex w-full items-center px-3 py-2 text-sm hover:bg-accent gap-2 transition-colors"
-                onClick={() => {
-                  setIsPopoverOpen(false);
-                  navigate('/create?postType=watching');
-                }}
-              >
-                <Eye size={16} className="text-purple-500" />
-                <span>Currently Watching/Using</span>
-              </button>
+            </div>
             </div>
           </div>
         </PopoverContent>
