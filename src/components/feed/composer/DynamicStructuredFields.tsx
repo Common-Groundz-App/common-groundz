@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import { DURATION_OPTIONS, getFieldsForType } from '@/types/structuredFields';
 import type { DatabasePostType } from '@/components/feed/utils/postUtils';
-import { ConnectedRingsRating } from '@/components/recommendations/ConnectedRingsRating';
+import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
 
 interface DynamicStructuredFieldsProps {
   postType: DatabasePostType;
