@@ -1085,15 +1085,10 @@ export function EnhancedCreatePostForm({
           />
         </div>
 
-        {/* Add details — collapsible structured fields (verbatim) */}
+        {/* Add details — collapsible structured fields (dynamic per post type) */}
         <Collapsible
           open={structuredOpen}
-          onOpenChange={(open) => {
-            setStructuredOpen(open);
-            if (open) {
-              setTimeout(() => whatWorkedRef.current?.focus(), 100);
-            }
-          }}
+          onOpenChange={setStructuredOpen}
         >
           <CollapsibleTrigger asChild>
             <button
@@ -1104,91 +1099,12 @@ export function EnhancedCreatePostForm({
               Add details
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-3 animate-fade-in">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">What worked?</label>
-              <Textarea
-                ref={whatWorkedRef}
-                value={whatWorked}
-                onChange={(e) => setWhatWorked(e.target.value)}
-                onBlur={() => setWhatWorked((prev) => prev.trim().replace(/\s{2,}/g, ' '))}
-                placeholder="The best part was..."
-                maxLength={500}
-                className="min-h-[60px] resize-none text-sm"
-              />
-              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatWorked.length}/500</p>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">What didn't work?</label>
-              <Textarea
-                value={whatDidnt}
-                onChange={(e) => setWhatDidnt(e.target.value)}
-                onBlur={() => setWhatDidnt((prev) => prev.trim().replace(/\s{2,}/g, ' '))}
-                placeholder="I wish it had..."
-                maxLength={500}
-                className="min-h-[60px] resize-none text-sm"
-              />
-              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatDidnt.length}/500</p>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">How long have you used it?</label>
-              <Select value={duration} onValueChange={setDuration}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Select duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(DURATION_OPTIONS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Good for</label>
-              <input
-                type="text"
-                value={goodFor}
-                onChange={(e) => setGoodFor(e.target.value)}
-                onBlur={() => setGoodFor((prev) => prev.trim().replace(/\s{2,}/g, ' '))}
-                placeholder="e.g. Dry skin, Beginners, Date night"
-                maxLength={300}
-                className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              />
-              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{goodFor.length}/300</p>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Would you use it again?</label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setReuseIntent(reuseIntent === 'yes' ? '' : 'yes')}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-xs border transition-colors',
-                    reuseIntent === 'yes'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                  )}
-                >
-                  Yes, I'd use it again
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReuseIntent(reuseIntent === 'no' ? '' : 'no')}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-xs border transition-colors',
-                    reuseIntent === 'no'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                  )}
-                >
-                  No, I wouldn't
-                </button>
-              </div>
-            </div>
+          <CollapsibleContent className="mt-3 animate-fade-in">
+            <DynamicStructuredFields
+              postType={postType}
+              values={structuredValues}
+              onChange={handleStructuredFieldChange}
+            />
           </CollapsibleContent>
         </Collapsible>
 
