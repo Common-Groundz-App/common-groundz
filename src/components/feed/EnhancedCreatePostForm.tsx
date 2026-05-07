@@ -34,7 +34,7 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cleanStructuredFields, DURATION_OPTIONS, isValidStoredLocation, getFieldsForType, filterFieldsForType } from '@/types/structuredFields';
+import { cleanStructuredFields, isValidStoredLocation, filterFieldsForType } from '@/types/structuredFields';
 import { DynamicStructuredFields } from './composer/DynamicStructuredFields';
 import { analytics } from '@/services/analytics';
 import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
