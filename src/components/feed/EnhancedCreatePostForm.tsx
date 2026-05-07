@@ -34,7 +34,8 @@ import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
 import { LocationSearchInput } from './LocationSearchInput';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cleanStructuredFields, DURATION_OPTIONS, isValidStoredLocation } from '@/types/structuredFields';
+import { cleanStructuredFields, isValidStoredLocation, filterFieldsForType } from '@/types/structuredFields';
+import { DynamicStructuredFields } from './composer/DynamicStructuredFields';
 import { analytics } from '@/services/analytics';
 import { POST_TYPE_OPTIONS, getPlaceholderForType } from './utils/postUtils';
 import type { DatabasePostType } from './utils/postUtils';
@@ -132,19 +133,33 @@ export function EnhancedCreatePostForm({
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Structured fields state — hydrate from postToEdit if editing
+  // Structured fields state — single object, hydrated from postToEdit if editing
   const sf = (postToEdit?.structured_fields ?? {}) as Record<string, any>;
-  const [structuredOpen, setStructuredOpen] = useState(
-    !!(sf.what_worked || sf.what_didnt || sf.duration || sf.good_for || sf.reuse_intent)
+  const [structuredValues, setStructuredValues] = useState<Record<string, any>>(() => {
+    const initial: Record<string, any> = {};
+    // Hydrate all known keys from existing data
+    const keysToHydrate = [
+      'what_worked', 'what_didnt', 'duration', 'good_for', 'reuse_intent',
+      'rating', 'worth_it', 'recommend_intent', 'why_recommend', 'not_for',
+      'winner', 'reasoning', 'options_considered', 'what_matters', 'budget',
+      'tip_summary', 'when_to_use', 'mistakes_to_avoid',
+    ];
+    for (const key of keysToHydrate) {
+      if (sf[key] !== undefined && sf[key] !== null) {
+        initial[key] = sf[key];
+      }
+    }
+    return initial;
+  });
+  const hasAnyStructuredValue = Object.values(structuredValues).some(
+    (v) => v !== undefined && v !== null && v !== ''
   );
-  const [whatWorked, setWhatWorked] = useState<string>(sf.what_worked ?? '');
-  const [whatDidnt, setWhatDidnt] = useState<string>(sf.what_didnt ?? '');
-  const [duration, setDuration] = useState<string>(sf.duration ?? '');
-  const [goodFor, setGoodFor] = useState<string>(sf.good_for ?? '');
-  const [reuseIntent, setReuseIntent] = useState<'' | 'yes' | 'no'>(
-    (sf.reuse_intent as 'yes' | 'no' | undefined) ?? ''
-  );
-  const whatWorkedRef = useRef<HTMLTextAreaElement>(null);
+  const [structuredOpen, setStructuredOpen] = useState(hasAnyStructuredValue);
+
+  const handleStructuredFieldChange = useCallback((key: string, value: any) => {
+    setStructuredValues(prev => ({ ...prev, [key]: value }));
+  }, []);
+
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
@@ -500,14 +515,12 @@ export function EnhancedCreatePostForm({
           }
         : null;
 
-      const cleanedStructured = cleanStructuredFields({
-        what_worked: whatWorked,
-        what_didnt: whatDidnt,
-        duration: duration || undefined,
-        good_for: goodFor,
-        reuse_intent: reuseIntent || undefined,
-        location: locationPayload ?? undefined,
-      });
+      // Filter structured values to only keys valid for the current post type
+      const filteredValues = filterFieldsForType(
+        { ...structuredValues, location: locationPayload ?? undefined },
+        postType
+      );
+      const cleanedStructured = cleanStructuredFields(filteredValues);
 
       // -------- Safe structured_fields merge (Guard A + stale clear) --------
       // Never wipe user data on null/empty cleaned. Strip ui_post_type when
@@ -634,13 +647,9 @@ export function EnhancedCreatePostForm({
         const cleanedExisting = cleanStructuredFields(
           (postToEdit?.structured_fields as Record<string, any>) ?? {}
         ) ?? {};
-        const cleanedNow = cleanStructuredFields({
-          what_worked: whatWorked,
-          what_didnt: whatDidnt,
-          duration: duration || undefined,
-          good_for: goodFor,
-          reuse_intent: reuseIntent || undefined,
-        }) ?? {};
+        const cleanedNow = cleanStructuredFields(
+          filterFieldsForType(structuredValues, postType)
+        ) ?? {};
         const hasStructuredChanged =
           JSON.stringify(cleanedNow) !== JSON.stringify(cleanedExisting);
 
@@ -810,11 +819,7 @@ export function EnhancedCreatePostForm({
 
       // Reset form and notify parent
       setTitle('');
-      setWhatWorked('');
-      setWhatDidnt('');
-      setDuration('');
-      setGoodFor('');
-      setReuseIntent('');
+      setStructuredValues({});
       setStructuredOpen(false);
       setPostType('experience');
       clearDraft();
@@ -1080,15 +1085,10 @@ export function EnhancedCreatePostForm({
           />
         </div>
 
-        {/* Add details — collapsible structured fields (verbatim) */}
+        {/* Add details — collapsible structured fields (dynamic per post type) */}
         <Collapsible
           open={structuredOpen}
-          onOpenChange={(open) => {
-            setStructuredOpen(open);
-            if (open) {
-              setTimeout(() => whatWorkedRef.current?.focus(), 100);
-            }
-          }}
+          onOpenChange={setStructuredOpen}
         >
           <CollapsibleTrigger asChild>
             <button
@@ -1099,91 +1099,12 @@ export function EnhancedCreatePostForm({
               Add details
             </button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-3 animate-fade-in">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">What worked?</label>
-              <Textarea
-                ref={whatWorkedRef}
-                value={whatWorked}
-                onChange={(e) => setWhatWorked(e.target.value)}
-                onBlur={() => setWhatWorked((prev) => prev.trim().replace(/\s{2,}/g, ' '))}
-                placeholder="The best part was..."
-                maxLength={500}
-                className="min-h-[60px] resize-none text-sm"
-              />
-              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatWorked.length}/500</p>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">What didn't work?</label>
-              <Textarea
-                value={whatDidnt}
-                onChange={(e) => setWhatDidnt(e.target.value)}
-                onBlur={() => setWhatDidnt((prev) => prev.trim().replace(/\s{2,}/g, ' '))}
-                placeholder="I wish it had..."
-                maxLength={500}
-                className="min-h-[60px] resize-none text-sm"
-              />
-              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{whatDidnt.length}/500</p>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">How long have you used it?</label>
-              <Select value={duration} onValueChange={setDuration}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue placeholder="Select duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(DURATION_OPTIONS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Good for</label>
-              <input
-                type="text"
-                value={goodFor}
-                onChange={(e) => setGoodFor(e.target.value)}
-                onBlur={() => setGoodFor((prev) => prev.trim().replace(/\s{2,}/g, ' '))}
-                placeholder="e.g. Dry skin, Beginners, Date night"
-                maxLength={300}
-                className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              />
-              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">{goodFor.length}/300</p>
-            </div>
-
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">Would you use it again?</label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setReuseIntent(reuseIntent === 'yes' ? '' : 'yes')}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-xs border transition-colors',
-                    reuseIntent === 'yes'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                  )}
-                >
-                  Yes, I'd use it again
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setReuseIntent(reuseIntent === 'no' ? '' : 'no')}
-                  className={cn(
-                    'px-3 py-1 rounded-full text-xs border transition-colors',
-                    reuseIntent === 'no'
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'border-input text-muted-foreground hover:text-foreground hover:border-foreground/30'
-                  )}
-                >
-                  No, I wouldn't
-                </button>
-              </div>
-            </div>
+          <CollapsibleContent className="mt-3 animate-fade-in">
+            <DynamicStructuredFields
+              postType={postType}
+              values={structuredValues}
+              onChange={handleStructuredFieldChange}
+            />
           </CollapsibleContent>
         </Collapsible>
 
