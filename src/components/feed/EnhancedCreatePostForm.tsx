@@ -819,11 +819,7 @@ export function EnhancedCreatePostForm({
 
       // Reset form and notify parent
       setTitle('');
-      setWhatWorked('');
-      setWhatDidnt('');
-      setDuration('');
-      setGoodFor('');
-      setReuseIntent('');
+      setStructuredValues({});
       setStructuredOpen(false);
       setPostType('experience');
       clearDraft();
