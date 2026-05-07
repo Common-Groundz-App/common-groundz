@@ -347,7 +347,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
 
       {/* Structured Experience Fields */}
       {post.structured_fields && typeof post.structured_fields === 'object' && (
-        <StructuredFieldsDisplay data={post.structured_fields} />
+        <StructuredFieldsDisplay data={post.structured_fields} postType={post.post_type ?? 'experience'} />
       )}
 
       {/* Inline Comments */}
