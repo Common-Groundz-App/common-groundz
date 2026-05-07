@@ -647,13 +647,9 @@ export function EnhancedCreatePostForm({
         const cleanedExisting = cleanStructuredFields(
           (postToEdit?.structured_fields as Record<string, any>) ?? {}
         ) ?? {};
-        const cleanedNow = cleanStructuredFields({
-          what_worked: whatWorked,
-          what_didnt: whatDidnt,
-          duration: duration || undefined,
-          good_for: goodFor,
-          reuse_intent: reuseIntent || undefined,
-        }) ?? {};
+        const cleanedNow = cleanStructuredFields(
+          filterFieldsForType(structuredValues, postType)
+        ) ?? {};
         const hasStructuredChanged =
           JSON.stringify(cleanedNow) !== JSON.stringify(cleanedExisting);
 
