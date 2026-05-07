@@ -133,19 +133,33 @@ export function EnhancedCreatePostForm({
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Structured fields state — hydrate from postToEdit if editing
+  // Structured fields state — single object, hydrated from postToEdit if editing
   const sf = (postToEdit?.structured_fields ?? {}) as Record<string, any>;
-  const [structuredOpen, setStructuredOpen] = useState(
-    !!(sf.what_worked || sf.what_didnt || sf.duration || sf.good_for || sf.reuse_intent)
+  const [structuredValues, setStructuredValues] = useState<Record<string, any>>(() => {
+    const initial: Record<string, any> = {};
+    // Hydrate all known keys from existing data
+    const keysToHydrate = [
+      'what_worked', 'what_didnt', 'duration', 'good_for', 'reuse_intent',
+      'rating', 'worth_it', 'recommend_intent', 'why_recommend', 'not_for',
+      'winner', 'reasoning', 'options_considered', 'what_matters', 'budget',
+      'tip_summary', 'when_to_use', 'mistakes_to_avoid',
+    ];
+    for (const key of keysToHydrate) {
+      if (sf[key] !== undefined && sf[key] !== null) {
+        initial[key] = sf[key];
+      }
+    }
+    return initial;
+  });
+  const hasAnyStructuredValue = Object.values(structuredValues).some(
+    (v) => v !== undefined && v !== null && v !== ''
   );
-  const [whatWorked, setWhatWorked] = useState<string>(sf.what_worked ?? '');
-  const [whatDidnt, setWhatDidnt] = useState<string>(sf.what_didnt ?? '');
-  const [duration, setDuration] = useState<string>(sf.duration ?? '');
-  const [goodFor, setGoodFor] = useState<string>(sf.good_for ?? '');
-  const [reuseIntent, setReuseIntent] = useState<'' | 'yes' | 'no'>(
-    (sf.reuse_intent as 'yes' | 'no' | undefined) ?? ''
-  );
-  const whatWorkedRef = useRef<HTMLTextAreaElement>(null);
+  const [structuredOpen, setStructuredOpen] = useState(hasAnyStructuredValue);
+
+  const handleStructuredFieldChange = useCallback((key: string, value: any) => {
+    setStructuredValues(prev => ({ ...prev, [key]: value }));
+  }, []);
+
   const formRef = useRef<HTMLDivElement>(null);
   const sessionId = useRef(uuidv4()).current;
   const [cursorPosition, setCursorPosition] = useState<{ start: number, end: number }>({ start: 0, end: 0 });
