@@ -515,14 +515,12 @@ export function EnhancedCreatePostForm({
           }
         : null;
 
-      const cleanedStructured = cleanStructuredFields({
-        what_worked: whatWorked,
-        what_didnt: whatDidnt,
-        duration: duration || undefined,
-        good_for: goodFor,
-        reuse_intent: reuseIntent || undefined,
-        location: locationPayload ?? undefined,
-      });
+      // Filter structured values to only keys valid for the current post type
+      const filteredValues = filterFieldsForType(
+        { ...structuredValues, location: locationPayload ?? undefined },
+        postType
+      );
+      const cleanedStructured = cleanStructuredFields(filteredValues);
 
       // -------- Safe structured_fields merge (Guard A + stale clear) --------
       // Never wipe user data on null/empty cleaned. Strip ui_post_type when
