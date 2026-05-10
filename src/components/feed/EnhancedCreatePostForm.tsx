@@ -1011,6 +1011,7 @@ export function EnhancedCreatePostForm({
             setShowLocationInput(false);
           }}
           onRemoveEntity={removeEntity}
+          postType={postType}
         />
 
         {/* Title — large, borderless, auto-growing textarea (wraps; never scrolls horizontally) */}
