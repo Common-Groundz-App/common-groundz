@@ -1,58 +1,66 @@
-# Composer UX Fixes — Final Plan
+# Composer reorder — Post type pill moves up (final)
 
-Frontend-only. No DB migration. No category/topic system. Existing posts keep working.
+Frontend-only. Two files touched. No schema/behavior changes beyond placement and pill styling.
 
-## Phase 1 — Grouped duration dropdown
+## New composer order
 
-**File:** `src/types/structuredFields.ts`, `src/components/feed/composer/DynamicStructuredFields.tsx`, `src/components/content/StructuredFieldsDisplay.tsx`
+```
+1. Entity pill                  (primary, dominant)
+2. Post type pill               (secondary, own row — NEW POSITION)
+3. Title
+4. Body + helper hint
+5. Suggested hashtags
+6. Add details (collapsible)
+7. Toolbar / visibility / submit
+```
 
-- Keep storage key `duration` (no rename, no migration).
-- Replace flat `DURATION_OPTIONS` with a grouped structure:
-  - **Frequency:** `once` (Once), `few_times` (A few times), `often` (Often), `daily` (Daily)
-  - **Duration:** `lt_1w` (Less than a week), `1_4w` (1–4 weeks), `1_3m` (1–3 months), `3_6m` (3–6 months), `6_12m` (6–12 months), `1y_plus` (Over a year)
-- Render with shadcn `<SelectGroup>` + `<SelectLabel>` ("Frequency" / "Duration" headers).
-- Extend `VALID_DURATIONS` in `cleanStructuredFields` with the 4 new frequency keys so submission accepts them.
-- `StructuredFieldsDisplay` lookup table covers all 10 keys; old enum values keep rendering.
-- **Label change (only one):** Recommendation's duration field label updates from "How long / when did you try it?" → **"How often have you used / visited / read / watched it?"** since Frequency is now the dominant intent for that type. All other labels untouched.
+## Changes
 
-## Phase 2 — Auto-growing title textarea
+### 1. `src/components/feed/composer/PostTypeAndTagsPill.tsx`
 
-**File:** `src/components/feed/EnhancedCreatePostForm.tsx`
+- Always show the **current selected type** as the label — never the literal text "Post type" and never the `+` icon.
+  - `experience` → `Experience`
+  - `review` → `Review`
+  - `recommendation` → `Recommendation`
+  - `comparison` → `Comparison`
+  - `question` → `Question`
+  - `tip` → `Tip`
+- Remove the leading `Plus` icon. Keep only a trailing `ChevronDown`.
+- Restyle as a quiet "mode pill" — visually lighter than `EntityHeroPill`:
+  - `h-8`, `text-sm`, `font-medium`
+  - Neutral `border-border`, `bg-background`
+  - Hover: `hover:bg-accent/40`
+  - **No orange tint** — orange stays reserved for entities, hashtags, primary actions.
+- Click behavior unchanged (opens existing `PostTypeAndTagsModal`).
 
-- Replace single-line title `<input>` with `<textarea rows={1}>`.
-- Auto-resize via `useLayoutEffect`: `el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'` on value change (stable across re-renders, no jump while typing).
-- `maxLength={200}`.
-- `onKeyDown`: Enter → `preventDefault()` and move focus to body textarea (no newlines in title).
-- `resize-none`, `overflow-hidden`, same font/size/styling as before so visual layout is preserved.
+### 2. `src/components/feed/EnhancedCreatePostForm.tsx`
 
-## Phase 3 — Post-type-aware entity selector copy
+- **Insert** a new block immediately after `<EntityHeroPill ... />` (after line ~1015):
+  ```tsx
+  {/* Post type pill — own row, secondary weight */}
+  <div className="flex">
+    <PostTypeAndTagsPill
+      postType={postType}
+      onOpen={() => setPostTypeTagsOpen(true)}
+    />
+  </div>
+  ```
+- **Remove** the existing post-type pill block at lines ~1097–1103 (currently sitting between "Suggested hashtags" and "Add details").
+- No other markup, state, or handler changes.
 
-**Files:** `src/components/feed/composer/EntitySelectorModal.tsx`, `src/components/feed/composer/PostTypeAndTagsPill.tsx` (or wherever the entity-tag trigger lives in `EnhancedCreatePostForm`)
+## Why a separate row (not same row as entity)
 
-- Accept `postType` prop.
-- Copy map (used for both modal title/description and trigger pill label where it makes sense):
-  - `experience` / `review` / `recommendation` → **"Tag what this is about"**
-  - `comparison` → **"Tag what you're comparing"**
-  - `question` → **"Tag options, if you have any"**
-  - `tip` → **"Tag an entity if specific"**
-- Tagging stays technically optional for ALL types — no validation change.
+- Up to 3 entity chips + an "Add more" button can wrap.
+- Mobile width down to 320px can't comfortably fit both controls inline.
+- Stacked rows = consistent layout across all breakpoints regardless of entity count.
 
-## Phase 4 — Smart empty-state hint
+## Out of scope
 
-**File:** `src/components/feed/UnifiedEntitySelector.tsx` (the modal-variant results area)
-
-- When search returns 0 entity results AND query length ≥ 2, render a single muted helper line below the empty state:
-  > **"No specific entity found. For broad topics, use a hashtag like #{query} in your post."**
-- `{query}` = user's typed search string, lowercased and stripped of spaces/special chars (e.g. "oily skin moisturizer" → `#oilyskinmoisturizer`). Falls back to `#yourtopic` if sanitization yields empty.
-- "Create entity" CTA stays visible — users may genuinely be looking for a missing specific entity.
-
-## Out of scope (deliberately deferred)
-
-- Category/topic tagging system, category pages
-- Renaming `duration` storage key
-- DB migration
-- Display/feed/detail page changes beyond duration label fallback
+- No copy label above the pill ("Type" prefix etc.) — keep it clean as a single pill.
+- No changes to `PostTypeAndTagsModal` contents or the type set.
+- No changes to suggested hashtags, Add details, structured fields, title/body, or toolbar.
+- No analytics changes.
 
 ## Validation
 
-After each phase: open composer for each of the 6 post types, verify field renders, submit with new + legacy values, view post in detail page to confirm display fallback works.
+Open the composer and confirm: (1) post-type pill sits on its own row directly under the entity pill, (2) label always shows the current type with a trailing chevron and no leading icon, (3) styling is lighter/neutral (no orange) compared to entity pill, (4) clicking opens the existing modal, (5) layout is clean with 0, 1, 2, and 3 tagged entities on both mobile and desktop, (6) the old position below "Suggested" is gone.
