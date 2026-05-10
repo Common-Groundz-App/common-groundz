@@ -2,13 +2,24 @@ import React from 'react';
 import { Tag, X, ChevronDown, Plus } from 'lucide-react';
 import type { Entity } from '@/services/recommendation/types';
 import { getOptimalEntityImageUrl, getEntityTypeFallbackImage } from '@/utils/entityImageUtils';
+import type { DatabasePostType } from '@/components/feed/utils/postUtils';
 
 interface EntityHeroPillProps {
   entities: Entity[];
   maxEntities?: number;
   onOpenSelector: () => void;
   onRemoveEntity: (entityId: string) => void;
+  postType?: DatabasePostType;
 }
+
+const PILL_LABEL_BY_TYPE: Record<DatabasePostType, string> = {
+  experience: 'Tag what this is about',
+  review: 'Tag what this is about',
+  recommendation: 'Tag what this is about',
+  comparison: "Tag what you're comparing",
+  question: 'Tag options, if you have any',
+  tip: 'Tag an entity if specific',
+};
 
 const getEntityEmoji = (type: string) => {
   switch (type) {
