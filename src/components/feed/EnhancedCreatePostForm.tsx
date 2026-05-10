@@ -1004,15 +1004,22 @@ export function EnhancedCreatePostForm({
           onRemoveEntity={removeEntity}
         />
 
-        {/* Title — large, borderless */}
-        <input
-          type="text"
+        {/* Title — large, borderless, auto-growing textarea (wraps; never scrolls horizontally) */}
+        <textarea
+          ref={titleRef}
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => setTitle(e.target.value.replace(/\n/g, ''))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              textareaRef.current?.focus();
+            }
+          }}
+          rows={1}
           placeholder="Add a title (optional)"
-          maxLength={120}
+          maxLength={200}
           aria-label="Post title"
-          className="text-2xl font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
+          className="text-2xl font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40 resize-none overflow-hidden leading-tight"
         />
 
         {/* Body */}
