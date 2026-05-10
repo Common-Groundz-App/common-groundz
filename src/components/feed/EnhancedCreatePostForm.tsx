@@ -1092,7 +1092,7 @@ export function EnhancedCreatePostForm({
         {/* Suggested hashtags chip row (clickable) */}
         {suggestedHashtags.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">Suggested</p>
+            <p className="text-xs font-medium text-muted-foreground">Suggested tags</p>
             <div className="flex flex-wrap gap-1.5">
               {suggestedHashtags.map((tag) => (
                 <Badge
