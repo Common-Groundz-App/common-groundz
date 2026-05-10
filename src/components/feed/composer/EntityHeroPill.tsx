@@ -52,8 +52,10 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
   maxEntities = 3,
   onOpenSelector,
   onRemoveEntity,
+  postType = 'experience',
 }) => {
   if (entities.length === 0) {
+    const label = PILL_LABEL_BY_TYPE[postType] ?? PILL_LABEL_BY_TYPE.experience;
     return (
       <div className="flex">
         <button
@@ -62,7 +64,7 @@ export const EntityHeroPill: React.FC<EntityHeroPillProps> = ({
           className={`${PILL_BASE} font-medium border-border bg-background text-foreground px-3.5 hover:bg-accent/40`}
         >
           <Tag className="h-3.5 w-3.5" />
-          <span>Select entities</span>
+          <span>{label}</span>
           <ChevronDown className="h-3.5 w-3.5 opacity-70" />
         </button>
       </div>
