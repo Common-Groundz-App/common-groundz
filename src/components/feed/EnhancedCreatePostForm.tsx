@@ -1123,7 +1123,7 @@ export function EnhancedCreatePostForm({
               <span className="shrink-0">Add details</span>
               {!structuredOpen && (
                 <span
-                  className="hidden sm:inline text-muted-foreground/60 truncate min-w-0"
+                  className="inline text-muted-foreground/60 truncate min-w-0"
                   aria-hidden="true"
                 >
                   · {POST_TYPE_DETAIL_HINTS[postType] ?? POST_TYPE_DETAIL_HINTS.experience}
