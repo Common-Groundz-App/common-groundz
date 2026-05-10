@@ -89,6 +89,17 @@ const mapVisibilityFromDatabase = (visibility?: string | null): VisibilityOption
   }
 };
 
+// Type-aware hint shown next to the "Add details" trigger when the
+// section is collapsed. Copy mirrors the actual structured fields per type.
+const POST_TYPE_DETAIL_HINTS: Record<DatabasePostType, string> = {
+  experience: "What worked, what didn't, good for",
+  review: 'Rating, pros, cons',
+  recommendation: 'Why recommend, best for, not for',
+  comparison: 'Winner, reasoning, best for each',
+  question: 'Options, what matters, budget',
+  tip: 'The tip, when to use, mistakes to avoid',
+};
+
 export function EnhancedCreatePostForm({
   onSuccess,
   onCancel,
