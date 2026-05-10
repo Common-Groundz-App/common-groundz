@@ -2,7 +2,7 @@ import React from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { DURATION_OPTIONS, getFieldsForType } from '@/types/structuredFields';
+import { DURATION_OPTIONS_GROUPED, getFieldsForType } from '@/types/structuredFields';
 import type { DatabasePostType } from '@/components/feed/utils/postUtils';
 import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
 
