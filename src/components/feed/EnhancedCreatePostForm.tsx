@@ -89,6 +89,17 @@ const mapVisibilityFromDatabase = (visibility?: string | null): VisibilityOption
   }
 };
 
+// Type-aware hint shown next to the "Add details" trigger when the
+// section is collapsed. Copy mirrors the actual structured fields per type.
+const POST_TYPE_DETAIL_HINTS: Record<DatabasePostType, string> = {
+  experience: "What worked, what didn't, good for",
+  review: 'Rating, pros, cons',
+  recommendation: 'Why recommend, best for, not for',
+  comparison: 'Winner, reasoning, best for each',
+  question: 'Options, what matters, budget',
+  tip: 'The tip, when to use, mistakes to avoid',
+};
+
 export function EnhancedCreatePostForm({
   onSuccess,
   onCancel,
@@ -1077,10 +1088,6 @@ export function EnhancedCreatePostForm({
           onKeyUp={saveCursorPosition}
           onFocus={saveCursorPosition}
         />
-        <p className="text-xs text-muted-foreground/60 -mt-2">
-          What worked? · What didn't? · Who is this useful for?
-        </p>
-
 
         {/* Suggested hashtags chip row (clickable) */}
         {suggestedHashtags.length > 0 && (
@@ -1110,10 +1117,18 @@ export function EnhancedCreatePostForm({
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer min-w-0 max-w-full"
             >
-              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', structuredOpen && 'rotate-180')} />
-              Add details
+              <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 transition-transform', structuredOpen && 'rotate-180')} />
+              <span className="shrink-0">Add details</span>
+              {!structuredOpen && (
+                <span
+                  className="hidden sm:inline text-muted-foreground/60 truncate min-w-0"
+                  aria-hidden="true"
+                >
+                  · {POST_TYPE_DETAIL_HINTS[postType] ?? POST_TYPE_DETAIL_HINTS.experience}
+                </span>
+              )}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 animate-fade-in">
