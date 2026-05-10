@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { POST_TYPE_OPTIONS, type DatabasePostType } from '@/components/feed/utils/postUtils';
 
 interface PostTypeAndTagsPillProps {
@@ -8,28 +8,26 @@ interface PostTypeAndTagsPillProps {
 }
 
 /**
- * Single pill showing the current post type.
- * Opens the PostType modal on click.
+ * Quiet "mode pill" showing the current post type.
+ * Always shows the selected type label with a trailing chevron.
+ * Visually lighter than EntityHeroPill — neutral, no orange tint.
  */
 export const PostTypeAndTagsPill: React.FC<PostTypeAndTagsPillProps> = ({
   postType,
   onOpen,
 }) => {
-  const typeLabel =
-    postType === 'experience'
-      ? null
-      : POST_TYPE_OPTIONS.find((o) => o.value === postType)?.label ?? null;
-
-  const label = typeLabel || 'Post type';
+  const label =
+    POST_TYPE_OPTIONS.find((o) => o.value === postType)?.label ?? 'Experience';
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background hover:bg-accent/40 px-3 py-1.5 text-xs text-foreground transition-colors"
+      aria-label={`Post type: ${label}. Click to change.`}
+      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background hover:bg-accent/40 h-8 px-3 text-sm font-medium text-foreground transition-colors"
     >
-      <Plus className="h-3.5 w-3.5" />
       <span>{label}</span>
+      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
     </button>
   );
 };

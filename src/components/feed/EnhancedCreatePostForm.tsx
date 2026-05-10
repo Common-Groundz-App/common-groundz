@@ -1014,6 +1014,14 @@ export function EnhancedCreatePostForm({
           postType={postType}
         />
 
+        {/* Post type pill — own row, secondary weight */}
+        <div className="flex">
+          <PostTypeAndTagsPill
+            postType={postType}
+            onOpen={() => setPostTypeTagsOpen(true)}
+          />
+        </div>
+
         {/* Title — large, borderless, auto-growing textarea (wraps; never scrolls horizontally) */}
         <textarea
           ref={titleRef}
@@ -1093,14 +1101,6 @@ export function EnhancedCreatePostForm({
             </div>
           </div>
         )}
-
-        {/* Post type pill */}
-        <div className="flex flex-wrap items-center gap-2">
-          <PostTypeAndTagsPill
-            postType={postType}
-            onOpen={() => setPostTypeTagsOpen(true)}
-          />
-        </div>
 
         {/* Add details — collapsible structured fields (dynamic per post type) */}
         <Collapsible
