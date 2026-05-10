@@ -1117,10 +1117,18 @@ export function EnhancedCreatePostForm({
           <CollapsibleTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer min-w-0 max-w-full"
             >
-              <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', structuredOpen && 'rotate-180')} />
-              Add details
+              <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 transition-transform', structuredOpen && 'rotate-180')} />
+              <span className="shrink-0">Add details</span>
+              {!structuredOpen && (
+                <span
+                  className="hidden sm:inline text-muted-foreground/60 truncate min-w-0"
+                  aria-hidden="true"
+                >
+                  · {POST_TYPE_DETAIL_HINTS[postType] ?? POST_TYPE_DETAIL_HINTS.experience}
+                </span>
+              )}
             </button>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 animate-fade-in">
