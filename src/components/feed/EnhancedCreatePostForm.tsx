@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -132,6 +132,7 @@ export function EnhancedCreatePostForm({
     };
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   // Structured fields state — single object, hydrated from postToEdit if editing
   const sf = (postToEdit?.structured_fields ?? {}) as Record<string, any>;
@@ -260,13 +261,21 @@ export function EnhancedCreatePostForm({
     }
   }, [initialEntity, isEditMode]);
 
-  // Auto-resize textarea as content changes
+  // Auto-resize body textarea as content changes
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [content]);
+
+  // Auto-resize title textarea (synchronous to avoid jump while typing)
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
 
   // Handle click outside for emoji picker
   useEffect(() => {
@@ -1002,17 +1011,25 @@ export function EnhancedCreatePostForm({
             setShowLocationInput(false);
           }}
           onRemoveEntity={removeEntity}
+          postType={postType}
         />
 
-        {/* Title — large, borderless */}
-        <input
-          type="text"
+        {/* Title — large, borderless, auto-growing textarea (wraps; never scrolls horizontally) */}
+        <textarea
+          ref={titleRef}
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => setTitle(e.target.value.replace(/\n/g, ''))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              textareaRef.current?.focus();
+            }
+          }}
+          rows={1}
           placeholder="Add a title (optional)"
-          maxLength={120}
+          maxLength={200}
           aria-label="Post title"
-          className="text-2xl font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40"
+          className="text-2xl font-semibold border-none outline-none bg-transparent w-full placeholder:text-muted-foreground/40 resize-none overflow-hidden leading-tight"
         />
 
         {/* Body */}
@@ -1332,6 +1349,7 @@ export function EnhancedCreatePostForm({
         }}
         initialEntities={entities}
         initialQuery={selectorPrefillQuery}
+        postType={postType}
         onEntitiesChange={handleEntitiesChange}
         onMentionInsert={(username) => {
           const sanitized = username.replace(/[^a-z0-9._]/gi, '');

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { DURATION_OPTIONS, getFieldsForType } from '@/types/structuredFields';
+import { DURATION_OPTIONS_GROUPED, getFieldsForType } from '@/types/structuredFields';
 import type { DatabasePostType } from '@/components/feed/utils/postUtils';
 import ConnectedRingsRating from '@/components/recommendations/ConnectedRingsRating';
 
@@ -51,8 +51,13 @@ export const DynamicStructuredFields: React.FC<DynamicStructuredFieldsProps> = (
                   <SelectValue placeholder={field.placeholder} />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(DURATION_OPTIONS).map(([val, label]) => (
-                    <SelectItem key={val} value={val}>{label}</SelectItem>
+                  {DURATION_OPTIONS_GROUPED.map((group) => (
+                    <SelectGroup key={group.label}>
+                      <SelectLabel>{group.label}</SelectLabel>
+                      {Object.entries(group.options).map(([val, label]) => (
+                        <SelectItem key={val} value={val}>{label}</SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>

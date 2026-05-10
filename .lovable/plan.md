@@ -1,144 +1,58 @@
-# Dynamic Structured Fields Per Post Type
+# Composer UX Fixes — Final Plan
 
-## Architecture (unchanged)
+Frontend-only. No DB migration. No category/topic system. Existing posts keep working.
 
-- All fields stored in the existing `structured_fields` JSONB column
-- No database migration required
-- Config-driven field rendering per post type
-- `Add details` collapsed by default
-- Location stays independent (3-dots menu, any post type)
-- On submit, only save fields relevant to the currently selected post type (plus `location` and `_v`). Hidden fields from a previously selected type are preserved in local state but stripped before saving.
+## Phase 1 — Grouped duration dropdown
 
----
+**File:** `src/types/structuredFields.ts`, `src/components/feed/composer/DynamicStructuredFields.tsx`, `src/components/content/StructuredFieldsDisplay.tsx`
 
-## Rating Contract
+- Keep storage key `duration` (no rename, no migration).
+- Replace flat `DURATION_OPTIONS` with a grouped structure:
+  - **Frequency:** `once` (Once), `few_times` (A few times), `often` (Often), `daily` (Daily)
+  - **Duration:** `lt_1w` (Less than a week), `1_4w` (1–4 weeks), `1_3m` (1–3 months), `3_6m` (3–6 months), `6_12m` (6–12 months), `1y_plus` (Over a year)
+- Render with shadcn `<SelectGroup>` + `<SelectLabel>` ("Frequency" / "Duration" headers).
+- Extend `VALID_DURATIONS` in `cleanStructuredFields` with the 4 new frequency keys so submission accepts them.
+- `StructuredFieldsDisplay` lookup table covers all 10 keys; old enum values keep rendering.
+- **Label change (only one):** Recommendation's duration field label updates from "How long / when did you try it?" → **"How often have you used / visited / read / watched it?"** since Frequency is now the dominant intent for that type. All other labels untouched.
 
-The existing `ConnectedRingsRating` uses a 1-5 integer scale (5 rings). The `rating` field in structured fields will store the same `number` type and range. No new scale or data shape.
+## Phase 2 — Auto-growing title textarea
 
----
+**File:** `src/components/feed/EnhancedCreatePostForm.tsx`
 
-## Field Map
+- Replace single-line title `<input>` with `<textarea rows={1}>`.
+- Auto-resize via `useLayoutEffect`: `el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'` on value change (stable across re-renders, no jump while typing).
+- `maxLength={200}`.
+- `onKeyDown`: Enter → `preventDefault()` and move focus to body textarea (no newlines in title).
+- `resize-none`, `overflow-hidden`, same font/size/styling as before so visual layout is preserved.
 
-All fields are optional.
+## Phase 3 — Post-type-aware entity selector copy
 
-### 1. Experience (baseline)
+**Files:** `src/components/feed/composer/EntitySelectorModal.tsx`, `src/components/feed/composer/PostTypeAndTagsPill.tsx` (or wherever the entity-tag trigger lives in `EnhancedCreatePostForm`)
 
-| UI Label | Key | Type |
-|---|---|---|
-| What worked? | `what_worked` | string (max 500) |
-| What didn't? | `what_didnt` | string (max 500) |
-| Good for | `good_for` | string (max 300) |
-| How long / when did you try it? | `duration` | enum |
-| Would you use / visit / read / watch / try it again? | `reuse_intent` | yes / no |
+- Accept `postType` prop.
+- Copy map (used for both modal title/description and trigger pill label where it makes sense):
+  - `experience` / `review` / `recommendation` → **"Tag what this is about"**
+  - `comparison` → **"Tag what you're comparing"**
+  - `question` → **"Tag options, if you have any"**
+  - `tip` → **"Tag an entity if specific"**
+- Tagging stays technically optional for ALL types — no validation change.
 
-### 2. Review
+## Phase 4 — Smart empty-state hint
 
-| UI Label | Key | Type |
-|---|---|---|
-| Overall rating | `rating` | number 1-5 (ConnectedRingsRating) |
-| Pros | `what_worked` | string (max 500) |
-| Cons | `what_didnt` | string (max 500) |
-| How long / when did you try it? | `duration` | enum |
-| Worth it? | `worth_it` | yes / no |
-| Would you recommend it? | `recommend_intent` | yes / no |
+**File:** `src/components/feed/UnifiedEntitySelector.tsx` (the modal-variant results area)
 
-### 3. Recommendation
+- When search returns 0 entity results AND query length ≥ 2, render a single muted helper line below the empty state:
+  > **"No specific entity found. For broad topics, use a hashtag like #{query} in your post."**
+- `{query}` = user's typed search string, lowercased and stripped of spaces/special chars (e.g. "oily skin moisturizer" → `#oilyskinmoisturizer`). Falls back to `#yourtopic` if sanitization yields empty.
+- "Create entity" CTA stays visible — users may genuinely be looking for a missing specific entity.
 
-| UI Label | Key | Type |
-|---|---|---|
-| Why do you recommend it? | `why_recommend` | string (max 500) |
-| Best for | `good_for` | string (max 300) |
-| Not for | `not_for` | string (max 300) |
-| How often have you used / visited / read / watched it? | `duration` | enum |
-| Would you recommend it? | `recommend_intent` | yes / no |
+## Out of scope (deliberately deferred)
 
-Note: Recommendation uses "How often..." instead of "How long..." because recommendation needs strength of confidence / usage depth.
+- Category/topic tagging system, category pages
+- Renaming `duration` storage key
+- DB migration
+- Display/feed/detail page changes beyond duration label fallback
 
-### 4. Comparison
+## Validation
 
-| UI Label | Key | Type |
-|---|---|---|
-| Winner for you | `winner` | string (max 300) |
-| Why did you choose it? | `reasoning` | string (max 500) |
-| Best for each | `good_for` | string (max 300) |
-
-### 5. Question
-
-| UI Label | Key | Type |
-|---|---|---|
-| Options you're considering | `options_considered` | string (max 500) |
-| What matters to you? | `what_matters` | string (max 300) |
-| Budget / constraints | `budget` | string (max 100) |
-
-### 6. Tip
-
-| UI Label | Key | Type |
-|---|---|---|
-| The tip | `tip_summary` | string (max 300) |
-| When should someone use this? | `when_to_use` | string (max 300) |
-| Mistakes to avoid | `mistakes_to_avoid` | string (max 300) |
-| Works best for | `good_for` | string (max 300) |
-
----
-
-## New JSON Keys to Add
-
-`rating`, `worth_it`, `recommend_intent`, `why_recommend`, `not_for`, `winner`, `reasoning`, `options_considered`, `what_matters`, `budget`, `tip_summary`, `when_to_use`, `mistakes_to_avoid`
-
-Existing keys kept: `what_worked`, `what_didnt`, `duration`, `good_for`, `reuse_intent`, `location`, `_v`
-
----
-
-## Implementation Phases
-
-### Phase 1 — Types and config map
-
-Files: `src/types/structuredFields.ts`
-
-1. Add all 13 new keys to `ALLOWED_STRUCTURED_KEYS`
-2. Expand `StructuredFields` interface with new optional fields
-3. Add validation for new keys in `cleanStructuredFields`:
-   - `rating`: number, 1-5 integer
-   - `worth_it`, `recommend_intent`: enum `yes` / `no`
-   - String fields: trim, collapse whitespace, enforce max lengths
-4. Create `STRUCTURED_FIELDS_BY_TYPE` config map that defines, for each post type, the ordered list of fields with: key, UI label, input type (text/textarea/enum/rating/yesno), placeholder, and max length
-5. Export a `getFieldsForType(postType)` helper
-
-### Phase 2 — Composer
-
-Files: `src/components/feed/EnhancedCreatePostForm.tsx`, possibly a new `DynamicStructuredFields.tsx` component
-
-1. Replace the current hardcoded `Add details` fields with a loop over `getFieldsForType(postType)`
-2. For each field config, render the appropriate input:
-   - `text` / `textarea`: standard text input
-   - `enum` (duration): existing dropdown
-   - `yesno` (reuse_intent, worth_it, recommend_intent): pill toggle
-   - `rating`: compact `ConnectedRingsRating` with `isInteractive={true}`, `size="sm"`, reusing the exact same component and value contract already in the app
-3. Preserve all field values in local state when user switches post types
-4. On submit, filter structured fields to only include keys valid for the currently selected post type (plus `location` and `_v`), then pass through `cleanStructuredFields`
-5. Use entity-agnostic label wording throughout
-6. Recommendation's duration label reads "How often have you used / visited / read / watched it?"
-
-### Phase 3 — Display
-
-Files: `src/components/content/StructuredFieldsDisplay.tsx`, `src/components/feed/PostFeedItem.tsx`, `src/components/content/PostContentViewer.tsx`
-
-1. `StructuredFieldsDisplay` accepts a new `postType` prop
-2. Render type-aware labels:
-   - Experience: "What worked" / "What didn't"
-   - Review: "Pros" / "Cons"
-   - Others: use their specific field labels
-3. Render `rating` using read-only `ConnectedRingsRating` (`isInteractive={false}`, `minimal={true}`, `size="xs"`)
-4. Render new fields: `worth_it`, `recommend_intent`, `why_recommend`, `not_for`, `winner`, `reasoning`, `options_considered`, `what_matters`, `budget`, `tip_summary`, `when_to_use`, `mistakes_to_avoid`
-5. Pass `postType` from `PostFeedItem` and `PostContentViewer` into `StructuredFieldsDisplay`
-
----
-
-## Files Changed
-
-1. `src/types/structuredFields.ts` — expanded keys, interface, config map, validation
-2. `src/components/feed/EnhancedCreatePostForm.tsx` — dynamic field rendering
-3. `src/components/content/StructuredFieldsDisplay.tsx` — type-aware display
-4. `src/components/feed/PostFeedItem.tsx` — pass postType prop
-5. `src/components/content/PostContentViewer.tsx` — pass postType prop
-6. Possibly new: `src/components/feed/composer/DynamicStructuredFields.tsx` — extracted field renderer component
+After each phase: open composer for each of the 6 post types, verify field renders, submit with new + legacy values, view post in detail page to confirm display fallback works.

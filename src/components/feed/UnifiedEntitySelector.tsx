@@ -939,21 +939,28 @@ export function UnifiedEntitySelector({
             )}
 
             {/* No results */}
-            {!isLoading && !hasAnyResults && searchQuery.length >= 2 && (
-              <div className="p-3 text-center">
-                <p className="text-sm text-muted-foreground mb-2">No results found</p>
-                {searchQuery.trim().length >= 3 && !isMaxReached && (
-                  <button
-                    type="button"
-                    className="text-sm text-primary hover:underline flex items-center justify-center gap-1 w-full"
-                    onClick={() => setShowCreateDialog(true)}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Add "{searchQuery.trim()}" as a new entity
-                  </button>
-                )}
-              </div>
-            )}
+            {!isLoading && !hasAnyResults && searchQuery.length >= 2 && (() => {
+              const hashtag = searchQuery.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'yourtopic';
+              return (
+                <div className="p-3 text-center space-y-2">
+                  <p className="text-sm text-muted-foreground">No specific entity found.</p>
+                  <p className="text-xs text-muted-foreground/80">
+                    For broad topics, use a hashtag like{' '}
+                    <span className="font-medium text-foreground">#{hashtag}</span> in your post.
+                  </p>
+                  {searchQuery.trim().length >= 3 && !isMaxReached && (
+                    <button
+                      type="button"
+                      className="text-sm text-primary hover:underline flex items-center justify-center gap-1 w-full pt-1"
+                      onClick={() => setShowCreateDialog(true)}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add "{searchQuery.trim()}" as a new entity
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* External search still loading indicator */}
             {searchQuery.length >= 2 && loadingStates.external && !loadingStates.local && (

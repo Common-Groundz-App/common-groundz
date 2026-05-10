@@ -63,14 +63,39 @@ export function isValidStoredLocation(loc: any): loc is PostLocation {
   return true;
 }
 
-export const DURATION_OPTIONS: Record<string, string> = {
-  lt_1w: 'Less than a week',
-  '1_4w': '1–4 weeks',
-  '1_3m': '1–3 months',
-  '3_6m': '3–6 months',
-  '6_12m': '6–12 months',
-  '1y_plus': 'Over a year',
-};
+/**
+ * Grouped duration / frequency options.
+ * Stored under the same `duration` key for backwards compatibility — the
+ * field now captures both "how often" (frequency) and "how long" (duration).
+ */
+export const DURATION_OPTIONS_GROUPED: { label: string; options: Record<string, string> }[] = [
+  {
+    label: 'Frequency',
+    options: {
+      once: 'Once',
+      few_times: 'A few times',
+      often: 'Often',
+      daily: 'Daily',
+    },
+  },
+  {
+    label: 'Duration',
+    options: {
+      lt_1w: 'Less than a week',
+      '1_4w': '1–4 weeks',
+      '1_3m': '1–3 months',
+      '3_6m': '3–6 months',
+      '6_12m': '6–12 months',
+      '1y_plus': 'Over a year',
+    },
+  },
+];
+
+/** Flat lookup of all duration keys → label (for display + validation). */
+export const DURATION_OPTIONS: Record<string, string> = DURATION_OPTIONS_GROUPED.reduce(
+  (acc, group) => ({ ...acc, ...group.options }),
+  {} as Record<string, string>,
+);
 
 export const ALLOWED_STRUCTURED_KEYS = [
   'what_worked',
