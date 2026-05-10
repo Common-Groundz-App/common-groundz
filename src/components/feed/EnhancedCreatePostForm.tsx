@@ -1349,6 +1349,7 @@ export function EnhancedCreatePostForm({
         }}
         initialEntities={entities}
         initialQuery={selectorPrefillQuery}
+        postType={postType}
         onEntitiesChange={handleEntitiesChange}
         onMentionInsert={(username) => {
           const sanitized = username.replace(/[^a-z0-9._]/gi, '');
