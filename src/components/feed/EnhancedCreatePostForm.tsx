@@ -1077,10 +1077,6 @@ export function EnhancedCreatePostForm({
           onKeyUp={saveCursorPosition}
           onFocus={saveCursorPosition}
         />
-        <p className="text-xs text-muted-foreground/60 -mt-2">
-          What worked? · What didn't? · Who is this useful for?
-        </p>
-
 
         {/* Suggested hashtags chip row (clickable) */}
         {suggestedHashtags.length > 0 && (
