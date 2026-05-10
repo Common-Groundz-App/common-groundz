@@ -132,6 +132,7 @@ export function EnhancedCreatePostForm({
     };
   });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   // Structured fields state — single object, hydrated from postToEdit if editing
   const sf = (postToEdit?.structured_fields ?? {}) as Record<string, any>;
