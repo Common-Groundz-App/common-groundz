@@ -261,13 +261,21 @@ export function EnhancedCreatePostForm({
     }
   }, [initialEntity, isEditMode]);
 
-  // Auto-resize textarea as content changes
+  // Auto-resize body textarea as content changes
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [content]);
+
+  // Auto-resize title textarea (synchronous to avoid jump while typing)
+  useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [title]);
 
   // Handle click outside for emoji picker
   useEffect(() => {
