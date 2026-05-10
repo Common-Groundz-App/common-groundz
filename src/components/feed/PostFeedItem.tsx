@@ -33,7 +33,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getPostTypeLabel, shouldShowTypeBadge } from './utils/postUtils';
+import { getPostTypeLabel, shouldShowTypeBadge, getPostTypeColors } from './utils/postUtils';
 import TagBadge from './TagBadge';
 import { feedbackActions } from '@/services/feedbackService';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
