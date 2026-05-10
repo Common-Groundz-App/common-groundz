@@ -12,6 +12,10 @@ interface DynamicStructuredFieldsProps {
   onChange: (key: string, value: any) => void;
 }
 
+const LABEL_CLASS = 'text-sm font-medium text-foreground/80 mb-1 block';
+const LABEL_CLASS_WIDE = 'text-sm font-medium text-foreground/80 mb-1.5 block';
+const COUNTER_CLASS = 'text-xs text-muted-foreground/60 text-right mt-0.5';
+
 export const DynamicStructuredFields: React.FC<DynamicStructuredFieldsProps> = ({
   postType,
   values,
@@ -27,7 +31,7 @@ export const DynamicStructuredFields: React.FC<DynamicStructuredFieldsProps> = (
         if (field.inputType === 'rating') {
           return (
             <div key={field.key}>
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+              <label className={LABEL_CLASS_WIDE}>
                 {field.label}
               </label>
               <ConnectedRingsRating
@@ -43,11 +47,11 @@ export const DynamicStructuredFields: React.FC<DynamicStructuredFieldsProps> = (
         if (field.inputType === 'enum') {
           return (
             <div key={field.key}>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              <label className={LABEL_CLASS}>
                 {field.label}
               </label>
               <Select value={value || ''} onValueChange={(v) => onChange(field.key, v)}>
-                <SelectTrigger className="h-8 text-sm">
+                <SelectTrigger className={cn('h-8 text-sm', !value && 'text-muted-foreground')}>
                   <SelectValue placeholder={field.placeholder} />
                 </SelectTrigger>
                 <SelectContent>
@@ -68,7 +72,7 @@ export const DynamicStructuredFields: React.FC<DynamicStructuredFieldsProps> = (
         if (field.inputType === 'yesno') {
           return (
             <div key={field.key}>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              <label className={LABEL_CLASS}>
                 {field.label}
               </label>
               <div className="flex gap-2">
@@ -104,7 +108,7 @@ export const DynamicStructuredFields: React.FC<DynamicStructuredFieldsProps> = (
         if (field.inputType === 'textarea') {
           return (
             <div key={field.key}>
-              <label className="text-xs font-medium text-muted-foreground mb-1 block">
+              <label className={LABEL_CLASS}>
                 {field.label}
               </label>
               <Textarea
@@ -113,10 +117,10 @@ export const DynamicStructuredFields: React.FC<DynamicStructuredFieldsProps> = (
                 onBlur={() => onChange(field.key, (value as string).trim().replace(/\s{2,}/g, ' '))}
                 placeholder={field.placeholder}
                 maxLength={field.maxLength}
-                className="min-h-[60px] resize-none text-sm"
+                className="min-h-[60px] resize-none text-sm placeholder:text-muted-foreground/50"
               />
               {field.maxLength && (
-                <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">
+                <p className={COUNTER_CLASS}>
                   {(value as string).length}/{field.maxLength}
                 </p>
               )}
@@ -127,7 +131,7 @@ export const DynamicStructuredFields: React.FC<DynamicStructuredFieldsProps> = (
         // text input
         return (
           <div key={field.key}>
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">
+            <label className={LABEL_CLASS}>
               {field.label}
             </label>
             <input
@@ -137,10 +141,10 @@ export const DynamicStructuredFields: React.FC<DynamicStructuredFieldsProps> = (
               onBlur={() => onChange(field.key, (value as string).trim().replace(/\s{2,}/g, ' '))}
               placeholder={field.placeholder}
               maxLength={field.maxLength}
-              className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             {field.maxLength && (
-              <p className="text-[10px] text-muted-foreground/50 text-right mt-0.5">
+              <p className={COUNTER_CLASS}>
                 {(value as string).length}/{field.maxLength}
               </p>
             )}
