@@ -5,7 +5,8 @@ import PostFeedItem from '@/components/feed/PostFeedItem';
 import FeedSkeleton from '@/components/feed/FeedSkeleton';
 import InlineCommentThread from '@/components/comments/InlineCommentThread';
 import StructuredFieldsDisplay from '@/components/content/StructuredFieldsDisplay';
-import { shouldShowTypeBadge, getPostTypeLabel } from '@/components/feed/utils/postUtils';
+import { shouldShowTypeBadge, getPostTypeLabel, getPostTypeColors } from '@/components/feed/utils/postUtils';
+import { cn } from '@/lib/utils';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
@@ -339,7 +340,12 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
       {/* Post Type Badge (detail view) */}
       {shouldShowTypeBadge(post.post_type ?? 'experience') && (
         <div className="mt-2 mb-1 px-1">
-          <span className="text-xs text-muted-foreground/70 border border-border/50 rounded-full px-2 py-0.5">
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none',
+              getPostTypeColors(post.post_type ?? 'experience').pill
+            )}
+          >
             {getPostTypeLabel(post.post_type ?? 'experience')}
           </span>
         </div>

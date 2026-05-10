@@ -33,7 +33,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getPostTypeLabel, shouldShowTypeBadge } from './utils/postUtils';
+import { getPostTypeLabel, shouldShowTypeBadge, getPostTypeColors } from './utils/postUtils';
 import TagBadge from './TagBadge';
 import { feedbackActions } from '@/services/feedbackService';
 import { getEntityUrl } from '@/utils/entityUrlUtils';
@@ -411,10 +411,14 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                   </TooltipProvider>
                 )}
                 {shouldShowTypeBadge(post.post_type ?? 'experience') && (
-                  <>
-                    <span>·</span>
-                    <span className="text-muted-foreground/70">{getPostTypeLabel(post.post_type ?? 'experience')}</span>
-                  </>
+                  <span
+                    className={cn(
+                      'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none',
+                      getPostTypeColors(post.post_type ?? 'experience').pill
+                    )}
+                  >
+                    {getPostTypeLabel(post.post_type ?? 'experience')}
+                  </span>
                 )}
                 {post.visibility !== 'public' && (
                   <>
