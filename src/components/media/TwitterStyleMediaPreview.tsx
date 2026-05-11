@@ -5,6 +5,7 @@ import { MediaItem } from '@/types/media';
 import { ChevronLeft, ChevronRight, X, Loader2, Maximize2, Images } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { FeedVideo } from '@/components/media/FeedVideo';
 
 interface TwitterStyleMediaPreviewProps {
   media: MediaItem[];
@@ -305,15 +306,11 @@ export function TwitterStyleMediaPreview({
                 onClick={() => onImageClick && onImageClick(0)}
               />
             ) : (
-              <video 
-                src={item.url} 
-                poster={item.thumbnail_url}
-                controls
-                className={cn(
-                  "max-w-full max-h-full rounded-md shadow-md",
-                  objectFit === 'contain' ? "object-contain" : "object-cover"
-                )}
-                onLoadedData={() => handleImageLoad(item.id || '0')}
+              <FeedVideo
+                item={item}
+                objectFit={objectFit}
+                onTap={onImageClick ? () => onImageClick(0) : undefined}
+                className="max-w-full max-h-full"
               />
             )}
           </div>
