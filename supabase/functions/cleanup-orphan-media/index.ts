@@ -16,7 +16,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
+    'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
 const BUCKET = 'post_media';
@@ -145,6 +145,16 @@ function bucketPathFromPublicUrl(url: string): string | null {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
+  // Auth gate: require shared cron secret. No anon-key / JWT path.
+  const expected = Deno.env.get('CLEANUP_CRON_SECRET');
+  const provided = req.headers.get('x-cron-secret');
+  if (!expected || !provided || provided !== expected) {
+    return new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
   const startedAt = Date.now();
   console.log('[cleanup-orphan-media] DRY RUN starting');
