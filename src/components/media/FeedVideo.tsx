@@ -3,6 +3,7 @@ import { Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoMute } from '@/hooks/useVideoMute';
 import { useVideoAutoplay } from '@/hooks/useVideoAutoplay';
+import { useVideoMilestones } from '@/hooks/useVideoMilestones';
 import { formatDuration } from '@/utils/videoPoster';
 import { analytics } from '@/services/analytics';
 import { MediaItem } from '@/types/media';
@@ -23,7 +24,7 @@ interface FeedVideoProps {
  * - Muted autoplay when in viewport (data-saver / reduced-motion safe)
  * - Tap toggles global persistent mute
  * - Duration badge overlay
- * - Fires video_played once on first play
+ * - Fires video_played once on first play, plus 25/50/75/100% milestones
  */
 export function FeedVideo({
   item,
@@ -35,8 +36,10 @@ export function FeedVideo({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, toggleMute] = useVideoMute();
   const playedRef = useRef(false);
+  const autoplayRef = useRef<boolean>(true);
 
   useVideoAutoplay(videoRef, { threshold: 0.5 });
+  useVideoMilestones(videoRef, { src: item.url, autoplayRef });
 
   // Keep video.muted in sync with global mute state.
   useEffect(() => {
@@ -48,7 +51,9 @@ export function FeedVideo({
   const handlePlay = () => {
     if (playedRef.current) return;
     playedRef.current = true;
-    analytics.trackVideoPlayed({ autoplay: videoRef.current?.muted ?? true, src: item.url });
+    const wasAutoplay = videoRef.current?.muted ?? true;
+    autoplayRef.current = wasAutoplay;
+    analytics.trackVideoPlayed({ autoplay: wasAutoplay, src: item.url });
   };
 
   const handleClick = (e: React.MouseEvent) => {

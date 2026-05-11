@@ -86,6 +86,27 @@ class AnalyticsService {
   }
 
   /**
+   * Track a watch-time milestone (25 / 50 / 75 / 100). Caller is responsible
+   * for ensuring each milestone fires at most once per <video> instance.
+   */
+  trackVideoProgress(props: {
+    src?: string;
+    duration: number;
+    milestone: 25 | 50 | 75 | 100;
+    autoplay: boolean;
+  }) {
+    this.track('video_progress', props);
+  }
+
+  /**
+   * Convenience event emitted at the 100% milestone — easier to filter in
+   * downstream dashboards than scanning video_progress for milestone===100.
+   */
+  trackVideoCompleted(props: { src?: string; duration: number; autoplay: boolean }) {
+    this.track('video_completed', props);
+  }
+
+  /**
    * Get recent events (for debugging)
    */
   getRecentEvents(limit: number = 10): AnalyticsEvent[] {

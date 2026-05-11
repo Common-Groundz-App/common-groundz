@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.send-weekly-digest]
 verify_jwt = false
 
+[functions.cleanup-orphan-media]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321
