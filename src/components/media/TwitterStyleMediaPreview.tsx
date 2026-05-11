@@ -449,17 +449,13 @@ export function TwitterStyleMediaPreview({
                     onLoad={() => handleImageLoad(item.id || actualIndex.toString())}
                   />
                 ) : (
-                  <div className="relative w-full h-full">
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                      <Maximize2 className="h-6 w-6 text-white" />
-                    </div>
-                    <img 
-                      src={item.thumbnail_url || item.url} 
-                      alt={`Video thumbnail ${actualIndex + 1}`}
-                      className="w-full h-full object-cover"
-                      onLoad={() => handleImageLoad(item.id || actualIndex.toString())}
-                    />
-                  </div>
+                  <FeedVideo
+                    item={item}
+                    objectFit="cover"
+                    onTap={() => handleImageClick(actualIndex)}
+                    className="w-full h-full"
+                  />
+                )}
                 )}
                 
                 {/* Enhanced "more" overlay with improved styling */}
