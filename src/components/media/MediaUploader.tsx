@@ -8,6 +8,7 @@ import { MediaUploadState, MediaItem } from '@/types/media';
 import { useAuth } from '@/contexts/AuthContext';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
+import { detectHEVCRisk } from '@/utils/codecSupport';
 
 interface MediaUploaderProps {
   sessionId: string;
@@ -74,6 +75,17 @@ export function MediaUploader({
           variant: 'destructive',
         });
         return;
+      }
+
+      // Soft HEVC warning for iPhone MOV files — non-blocking.
+      if (file.type === 'video/quicktime' || /\.mov$/i.test(file.name)) {
+        const warning = await detectHEVCRisk(file);
+        if (warning) {
+          toast({
+            title: 'Heads up about this video',
+            description: warning,
+          });
+        }
       }
       
       const newUpload: MediaUploadState = {
@@ -266,7 +278,7 @@ export function MediaUploader({
           <div>
             <p className="font-medium">Click to upload or drag and drop</p>
             <p className="text-sm text-muted-foreground">
-              Images up to 10MB, videos up to 25MB (max 60 seconds)
+              Images up to 10 MB · Video up to 100 MB, 60 seconds (MP4, MOV, WebM)
             </p>
             <p className="text-xs font-medium mt-1">
               {currentMediaCount}/{maxMediaCount} media items used
