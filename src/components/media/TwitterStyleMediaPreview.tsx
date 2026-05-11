@@ -285,8 +285,8 @@ export function TwitterStyleMediaPreview({
             imageOrientation === 'portrait' ? 'max-w-[80%] mx-auto' : 'w-full',
             "transition-all duration-200"
           )}>
-            {/* Loading indicator */}
-            {!isLoaded && (
+            {/* Loading indicator (images only — video has its own poster) */}
+            {!isLoaded && item.type === 'image' && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/70" />
               </div>
