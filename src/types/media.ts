@@ -11,6 +11,7 @@ export interface MediaItem {
   id?: string;
   width?: number;
   height?: number;
+  duration?: number;
   orientation?: 'portrait' | 'landscape' | 'square';
   source?: string; // Added this optional property to track the source of media items
   category?: string; // Category for photos/videos (general, interior, exterior, menu, etc.)

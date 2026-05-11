@@ -66,6 +66,26 @@ class AnalyticsService {
   }
 
   /**
+   * Track a video being uploaded successfully.
+   */
+  trackVideoUploaded(props: {
+    size: number;
+    duration: number;
+    format: string;
+    orientation: 'portrait' | 'landscape' | 'square';
+  }) {
+    this.track('video_uploaded', props);
+  }
+
+  /**
+   * Track the first time a given video instance starts playing.
+   * Caller should ensure this fires once per <video> element.
+   */
+  trackVideoPlayed(props: { autoplay: boolean; src?: string }) {
+    this.track('video_played', props);
+  }
+
+  /**
    * Get recent events (for debugging)
    */
   getRecentEvents(limit: number = 10): AnalyticsEvent[] {

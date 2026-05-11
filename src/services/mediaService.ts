@@ -3,23 +3,22 @@ import { generateUUID } from '@/lib/uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { MediaItem } from '@/types/media';
 import { ensureBucketPolicies } from '@/services/storageService';
+import { generateVideoPoster } from '@/utils/videoPoster';
+import { analytics } from '@/services/analytics';
 
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+// Phase 1: only formats with broad cross-browser support.
+// MOV is allowed but may carry HEVC — we surface a soft warning at the composer.
 export const ALLOWED_VIDEO_TYPES = [
-  'video/mp4', 
-  'video/webm', 
-  'video/quicktime', // .MOV - iPhone/macOS
-  'video/x-msvideo', // .AVI - Windows
-  'video/3gpp', // .3GP - Mobile/Android
-  'video/x-matroska', // .MKV
-  'video/x-ms-wmv', // .WMV - Windows
-  'video/x-flv', // .FLV
-  'video/x-m4v' // .M4V - iTunes
+  'video/mp4',
+  'video/webm',
+  'video/quicktime', // .MOV — iPhone/macOS
 ];
 export const ALLOWED_MEDIA_TYPES = [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES];
-export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
-export const MAX_VIDEO_SIZE = 25 * 1024 * 1024; // 25MB
-export const MAX_VIDEO_DURATION = 60; // 60 seconds
+export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+export const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100 MB
+export const MAX_VIDEO_DURATION = 60; // seconds
+export const MAX_VIDEOS_PER_POST = 1;
 
 // Helper function to get video duration
 export const getVideoDuration = (file: File): Promise<number> => {
@@ -38,48 +37,62 @@ export const getVideoDuration = (file: File): Promise<number> => {
   });
 };
 
+const orientationFor = (w: number, h: number): 'portrait' | 'landscape' | 'square' => {
+  if (!w || !h) return 'landscape';
+  const r = w / h;
+  if (r > 1.05) return 'landscape';
+  if (r < 0.95) return 'portrait';
+  return 'square';
+};
+
 export const validateMediaFile = async (file: File): Promise<{ valid: boolean; error?: string }> => {
+  const isVideo = file.type.startsWith('video/');
+
   if (!ALLOWED_MEDIA_TYPES.includes(file.type)) {
-    return { 
-      valid: false, 
-      error: `Unsupported file type. Supported formats: Images (JPEG, PNG, GIF, WebP) and Videos (MP4, WebM, MOV, AVI, 3GP, MKV, WMV, FLV, M4V)` 
+    if (isVideo) {
+      return {
+        valid: false,
+        error: 'Format not supported. Use MP4, MOV, or WebM.',
+      };
+    }
+    return {
+      valid: false,
+      error: 'Format not supported. Use JPEG, PNG, GIF, or WebP.',
     };
   }
-  
-  const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+
   const maxSize = isVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
-  const maxSizeMB = maxSize / (1024 * 1024);
-  
   if (file.size > maxSize) {
-    return { 
-      valid: false, 
-      error: `File too large. Maximum size for ${isVideo ? 'videos' : 'images'} is ${maxSizeMB}MB` 
+    return {
+      valid: false,
+      error: isVideo
+        ? 'Video too large. Max 100 MB.'
+        : 'Image too large. Max 10 MB.',
     };
   }
-  
-  // Check video duration
+
   if (isVideo) {
     try {
       const duration = await getVideoDuration(file);
       if (duration > MAX_VIDEO_DURATION) {
         return {
           valid: false,
-          error: `Video too long. Maximum duration is ${MAX_VIDEO_DURATION} seconds`
+          error: 'Video too long. Keep it under 60 seconds.',
         };
       }
     } catch (error) {
       return {
         valid: false,
-        error: 'Unable to process video file'
+        error: 'Unable to read video. Try MP4, MOV, or WebM.',
       };
     }
   }
-  
+
   return { valid: true };
 };
 
 export const uploadMedia = async (
-  file: File, 
+  file: File,
   userId: string,
   sessionId: string,
   onProgress?: (progress: number) => void
@@ -90,52 +103,91 @@ export const uploadMedia = async (
       throw new Error(error);
     }
 
-    // Ensure bucket policies are set up
     await ensureBucketPolicies('post_media');
 
-    // Create a unique file name
     const fileExt = file.name.split('.').pop();
     const fileName = `${generateUUID()}.${fileExt}`;
     const filePath = `${userId}/${sessionId}/${fileName}`;
-    
-    // Determine the media type
+
     const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
     const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
-    
-    // Upload the file
-    const { error: uploadError, data } = await supabase.storage
+
+    // For videos, generate the poster BEFORE uploading the video itself,
+    // so we have intrinsic dimensions + duration to attach to the MediaItem.
+    let posterUrl: string | undefined;
+    let videoWidth: number | undefined;
+    let videoHeight: number | undefined;
+    let videoDuration: number | undefined;
+
+    if (isVideo) {
+      try {
+        const poster = await generateVideoPoster(file);
+        videoWidth = poster.width;
+        videoHeight = poster.height;
+        videoDuration = poster.duration;
+
+        const posterPath = `${userId}/${sessionId}/${generateUUID()}_poster.jpg`;
+        const { error: posterErr } = await supabase.storage
+          .from('post_media')
+          .upload(posterPath, poster.posterBlob, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: 'image/jpeg',
+          });
+        if (!posterErr) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('post_media')
+            .getPublicUrl(posterPath);
+          posterUrl = publicUrl;
+        }
+      } catch (err) {
+        // Non-fatal: video still uploads without a poster.
+        console.warn('Poster generation failed:', err);
+      }
+    }
+
+    const { error: uploadError } = await supabase.storage
       .from('post_media')
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
       });
 
-    // Use the progress event manually if onProgress is provided
-    if (onProgress) {
-      onProgress(100); // Since we can't track progress, mark as complete
-    }
-
+    if (onProgress) onProgress(100);
     if (uploadError) throw uploadError;
-    
-    // Get the public URL
+
     const { data: { publicUrl } } = supabase.storage
       .from('post_media')
       .getPublicUrl(filePath);
-      
-    // Create media item with UUID for stable reordering
+
+    const orientation = isVideo && videoWidth && videoHeight
+      ? orientationFor(videoWidth, videoHeight)
+      : undefined;
+
     const mediaItem: MediaItem = {
-      id: generateUUID(), // Add stable ID for reordering
+      id: generateUUID(),
       url: publicUrl,
       type: isImage ? 'image' : 'video',
       caption: '',
-      alt: file.name.split('.')[0], // Default alt text from filename
-      order: 0, // Will be set when adding to the array
+      alt: file.name.split('.')[0],
+      order: 0,
       session_id: sessionId,
+      ...(posterUrl ? { thumbnail_url: posterUrl } : {}),
+      ...(videoWidth ? { width: videoWidth } : {}),
+      ...(videoHeight ? { height: videoHeight } : {}),
+      ...(videoDuration ? { duration: videoDuration } : {}),
+      ...(orientation ? { orientation } : {}),
     };
-    
-    // Log session ID for future implementation
-    console.log('Media uploaded with session ID:', sessionId);
-    
+
+    if (isVideo) {
+      analytics.trackVideoUploaded({
+        size: file.size,
+        duration: videoDuration ?? 0,
+        format: file.type,
+        orientation: orientation ?? 'landscape',
+      });
+    }
+
     return mediaItem;
   } catch (error) {
     console.error('Error uploading media:', error);
