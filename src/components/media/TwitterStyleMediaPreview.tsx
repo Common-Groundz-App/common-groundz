@@ -456,7 +456,6 @@ export function TwitterStyleMediaPreview({
                     className="w-full h-full"
                   />
                 )}
-                )}
                 
                 {/* Enhanced "more" overlay with improved styling */}
                 {showMoreOverlay && (
