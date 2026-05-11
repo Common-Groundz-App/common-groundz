@@ -1,49 +1,39 @@
-# Phase 1.5 — Secure cron auth for `cleanup-orphan-media`
+## Next steps
 
-Lock down the weekly dry-run cron with a dedicated shared secret, replacing the anon-key call. Function stays dry-run only. Cron schedule is idempotent so the migration can be re-run safely.
-
-## 1. Add the runtime secret
-
-Use the secrets tool to create `CLEANUP_CRON_SECRET` (32+ random bytes, value entered by the user). Available to the edge function as `Deno.env.get('CLEANUP_CRON_SECRET')`. Never written to source or migration SQL.
-
-## 2. Gate the edge function
-
-In `supabase/functions/cleanup-orphan-media/index.ts`, immediately after the CORS preflight branch:
-
-```ts
-const expected = Deno.env.get('CLEANUP_CRON_SECRET');
-const provided = req.headers.get('x-cron-secret');
-if (!expected || !provided || provided !== expected) {
-  return new Response(JSON.stringify({ error: 'unauthorized' }), {
-    status: 401,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
-```
-
-Confirm there is still **no delete code path** — function only returns `{ scanned, wouldDelete, skipped, sampleOrphans }`.
-
-## 3. Store the same secret in Vault (one-off manual step)
-
-Edge-function env vars aren't visible to Postgres, so `pg_cron` needs its own copy. The user runs this once in the Supabase SQL editor with the same value used in step 1:
+### 1. Verify Vault secret is readable
+Run a quick read-only query to confirm `cleanup_cron_secret` exists in `vault.decrypted_secrets` (without exposing the value):
 
 ```sql
-select vault.create_secret(
-  '<paste CLEANUP_CRON_SECRET value here>',
-  'cleanup_cron_secret',
-  'Shared secret for cleanup-orphan-media cron auth'
-);
+select name, length(decrypted_secret) as secret_length, updated_at
+from vault.decrypted_secrets
+where name = 'cleanup_cron_secret';
 ```
 
-The agent never sees or writes the value.
+Expect one row with `secret_length >= 32`.
 
-## 4. Schedule the cron job (idempotent migration, no secret in SQL)
+### 2. About testing the correct-secret path directly
+
+I cannot curl the edge function with the correct secret myself — the value lives only in your Vault and in `CLEANUP_CRON_SECRET` (a runtime secret I cannot read). The 401 path is already verified.
+
+Two options for the 200 path:
+- **(A) Skip direct curl and validate via the cron run.** Schedule the job, trigger it once, and verify HTTP 200 in `cron.job_run_details`. This is the real production path anyway.
+- **(B) You manually curl** with the same value you stored, e.g.:
+  ```
+  curl -i -X POST \
+    -H "x-cron-secret: <your value>" \
+    -H "Content-Type: application/json" \
+    -d '{"mode":"dry-run"}' \
+    https://uyjtgybbktgapspodajy.supabase.co/functions/v1/cleanup-orphan-media
+  ```
+
+Recommended: **(A)** — it tests the full Vault → pg_net → edge function chain end-to-end.
+
+### 3. Run idempotent cron migration
 
 ```sql
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
--- Idempotent: drop any prior job with the same name before re-scheduling
 do $$
 begin
   if exists (select 1 from cron.job where jobname = 'cleanup-orphan-media-weekly-dryrun') then
@@ -53,7 +43,7 @@ end $$;
 
 select cron.schedule(
   'cleanup-orphan-media-weekly-dryrun',
-  '0 3 * * 0',  -- Sundays 03:00 UTC
+  '0 3 * * 0',
   $$
   select net.http_post(
     url := 'https://uyjtgybbktgapspodajy.supabase.co/functions/v1/cleanup-orphan-media',
@@ -67,23 +57,27 @@ select cron.schedule(
 );
 ```
 
-No anon key, no Authorization header — function is `verify_jwt = false` and authorizes purely on `x-cron-secret`.
+No secret in SQL, no anon key, idempotent on re-run.
 
-## 5. Verification
+### 4. Trigger one run now and verify
 
-- `curl` without header → **401**
-- `curl` with correct `x-cron-secret` → **200** with `{ scanned, wouldDelete, skipped, sampleOrphans }`
-- `select * from cron.job where jobname = 'cleanup-orphan-media-weekly-dryrun'` → exactly one row
-- After next run, `cron.job_run_details` shows HTTP 200; edge function logs show the dry-run summary
+After the migration, run the same `net.http_post` body once manually so we don't have to wait until Sunday 03:00 UTC, then check:
 
-## 6. Stage B (deferred)
+```sql
+select status, status_code, content::text
+from net._http_response
+order by created desc
+limit 1;
+```
 
-No deletion code, no second function, no enable flag in this phase. Separate plan after Stage A output is reviewed.
+Expect `status_code = 200` with the dry-run JSON summary in `content`.
 
-## Execution order
+Also confirm the schedule:
+```sql
+select jobname, schedule, active from cron.job
+where jobname = 'cleanup-orphan-media-weekly-dryrun';
+```
 
-1. `secrets--add_secret` for `CLEANUP_CRON_SECRET` (user enters value)
-2. Edit `supabase/functions/cleanup-orphan-media/index.ts` to add the gate
-3. Tell user to run the `vault.create_secret(...)` SQL with the same value
-4. `supabase--migration` with the idempotent unschedule + `cron.schedule`
-5. Test with `supabase--curl_edge_functions` (with and without header) — confirm 401/200
+### 5. Stage B remains deferred
+
+No deletion code, no second function. Separate plan after you review the dry-run output.
