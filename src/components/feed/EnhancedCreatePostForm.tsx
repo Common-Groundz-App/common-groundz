@@ -1006,7 +1006,7 @@ export function EnhancedCreatePostForm({
       />
 
       {/* Scrollable composer surface — no card wrapper */}
-      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 py-5 md:pt-10 pb-16 md:pb-24 space-y-4">
+      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 pt-3 md:pt-10 pb-2 md:pb-24 space-y-4">
         {/* Desktop-only page header — gives the centered column a clear anchor */}
         <h1 className="hidden md:block text-2xl font-semibold tracking-tight">
           {isEditMode ? 'Edit your experience' : 'Share an experience'}
@@ -1083,7 +1083,7 @@ export function EnhancedCreatePostForm({
               }
             }
           }}
-          className="min-h-[140px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60"
+          className="min-h-[96px] md:min-h-[140px] resize-none border-none p-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/60"
           onClick={saveCursorPosition}
           onKeyUp={saveCursorPosition}
           onFocus={saveCursorPosition}
