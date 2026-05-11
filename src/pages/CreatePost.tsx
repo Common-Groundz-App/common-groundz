@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
-import { BottomNavigation } from '@/components/navigation/BottomNavigation';
+
 import { EnhancedCreatePostForm } from '@/components/feed/EnhancedCreatePostForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
@@ -80,7 +80,7 @@ const CreatePost = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-[100dvh] flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0 bg-background">
+    <div className="min-h-[100dvh] flex flex-col bg-background">
       <div className="flex flex-1">
         {/* Desktop Left Nav */}
         <div className="hidden xl:block">
@@ -98,10 +98,6 @@ const CreatePost = () => {
         </div>
       </div>
 
-      {/* Mobile Bottom Nav */}
-      <div className="xl:hidden">
-        <BottomNavigation />
-      </div>
     </div>
   );
 };
