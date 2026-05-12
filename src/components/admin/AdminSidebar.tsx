@@ -108,6 +108,8 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         return 'Product Relationships';
       case 'user-management':
         return 'User Management';
+      case 'media-cleanup':
+        return 'Media Cleanup';
       default:
         return 'Overview';
     }
