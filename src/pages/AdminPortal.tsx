@@ -252,6 +252,16 @@ const AdminPortal = () => {
                 >
                   Users
                 </button>
+                <button
+                  onClick={() => setActiveTab('media-cleanup')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'media-cleanup'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Media
+                </button>
               </div>
             </div>
 
