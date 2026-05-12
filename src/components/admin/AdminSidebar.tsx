@@ -79,6 +79,15 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         setCurrentActiveTab('User Management');
         onTabChange('user-management');
       }
+    },
+    {
+      name: 'Media Cleanup',
+      url: '#media-cleanup',
+      icon: HardDrive,
+      onClick: () => {
+        setCurrentActiveTab('Media Cleanup');
+        onTabChange('media-cleanup');
+      }
     }
   ];
 
