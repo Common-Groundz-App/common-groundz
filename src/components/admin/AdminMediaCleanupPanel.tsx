@@ -168,6 +168,23 @@ const RunRow: React.FC<{ run: CleanupRun }> = ({ run }) => {
 };
 
 export const AdminMediaCleanupPanel: React.FC = () => {
+  const queryClient = useQueryClient();
+  const [isTriggering, setIsTriggering] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [cooldownTick, setCooldownTick] = useState(0);
+
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const id = setInterval(() => setCooldownTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [cooldownUntil]);
+
+  const cooldownRemaining = cooldownUntil
+    ? Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000))
+    : 0;
+  // referenced so eslint doesn't complain about unused tick
+  void cooldownTick;
+
   const { data: runs, isLoading, error } = useQuery({
     queryKey: ['admin-media-cleanup-runs'],
     queryFn: async () => {
@@ -183,6 +200,44 @@ export const AdminMediaCleanupPanel: React.FC = () => {
     },
     refetchOnWindowFocus: false,
   });
+
+  const handleRunDryRun = async () => {
+    if (isTriggering || cooldownRemaining > 0) return;
+    setIsTriggering(true);
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke(
+        'admin-media-cleanup-trigger',
+        { method: 'POST' }
+      );
+      if (invokeErr) throw invokeErr;
+
+      const result = (data?.result ?? {}) as {
+        wouldDelete?: number;
+        scanned?: number;
+      };
+      const auditWritten = !!data?.auditWritten;
+      const wouldDelete = typeof result.wouldDelete === 'number' ? result.wouldDelete : null;
+
+      if (!auditWritten) {
+        toast.warning('Scan completed but audit row was not written — check edge function logs.');
+      } else if (wouldDelete === 0) {
+        toast.success('Dry-run complete — 0 orphan files found');
+      } else if (wouldDelete != null) {
+        toast.success(`Dry-run complete — ${wouldDelete} orphan files need review`);
+      } else {
+        toast.success('Dry-run complete');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['admin-media-cleanup-runs'] });
+      setCooldownUntil(Date.now() + 30_000);
+    } catch (e) {
+      const msg = (e as Error)?.message || 'Failed to trigger dry-run';
+      toast.error(msg);
+    } finally {
+      setIsTriggering(false);
+    }
+  };
+
 
   const latestDryRun = useMemo(
     () => runs?.find((r) => r.mode === 'dry-run'),
