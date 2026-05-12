@@ -313,11 +313,39 @@ export const AdminMediaCleanupPanel: React.FC = () => {
                 <Clock className="h-3 w-3 mr-1" />
                 Last dry-run: {stale.label}
               </Badge>
+              <Button
+                size="sm"
+                onClick={handleRunDryRun}
+                disabled={isTriggering || isLoading || cooldownRemaining > 0}
+              >
+                {isTriggering ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Scanning…
+                  </>
+                ) : cooldownRemaining > 0 ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-1" />
+                    Wait {cooldownRemaining}s
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 mr-1" />
+                    Run dry-run now
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Staleness thresholds: green &lt; {STALE_AMBER_DAYS}d · amber {STALE_AMBER_DAYS}–{STALE_RED_DAYS}d · red &gt; {STALE_RED_DAYS}d.
+        <CardContent className="text-sm text-muted-foreground space-y-1">
+          <p className="flex items-center gap-1.5">
+            <CalendarClock className="h-3.5 w-3.5" />
+            Scheduled: weekly dry-run · Sundays 03:00 UTC
+          </p>
+          <p>
+            Staleness thresholds: green &lt; {STALE_AMBER_DAYS}d · amber {STALE_AMBER_DAYS}–{STALE_RED_DAYS}d · red &gt; {STALE_RED_DAYS}d.
+          </p>
         </CardContent>
       </Card>
 
