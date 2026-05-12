@@ -31,7 +31,7 @@ const PAGE_SIZE = 1000;
 const DELETE_BATCH_SIZE = 100;
 
 // Hard ceiling. Body `maxDeletions` is clamped to this. Raise deliberately.
-const MAX_DELETIONS_HARD_CAP = 200;
+const MAX_DELETIONS_HARD_CAP = 50;
 
 interface ObjectMeta {
   path: string;
