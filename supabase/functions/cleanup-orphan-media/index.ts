@@ -195,6 +195,9 @@ Deno.serve(async (req) => {
       if (sampleOrphans.length < SAMPLE_LIMIT) sampleOrphans.push(obj.path);
     }
 
+    const tookMs = Date.now() - startedAt;
+    const finishedAt = new Date().toISOString();
+
     const result = {
       mode: 'dry-run',
       bucket: BUCKET,
@@ -207,12 +210,38 @@ Deno.serve(async (req) => {
       },
       referencedPathCount: referencedPaths.size,
       sampleOrphans,
-      tookMs: Date.now() - startedAt,
+      tookMs,
       note:
         'DRY RUN — no objects were deleted. Verify sampleOrphans against the DB before enabling destructive cleanup.',
     };
 
     console.log('[cleanup-orphan-media]', JSON.stringify(result));
+
+    // Audit row so the admin dashboard can show dry-run history.
+    // sample_deleted is reused to hold sample orphan paths for dry-run rows;
+    // the UI labels this column based on `mode`.
+    try {
+      const { error: insertErr } = await supabase.from('media_cleanup_runs').insert({
+        mode: 'dry-run',
+        scanned,
+        would_delete: wouldDelete,
+        deleted: 0,
+        skipped_young: skippedYoung,
+        skipped_referenced: skippedReferenced,
+        referenced_path_count: referencedPaths.size,
+        max_deletions: null,
+        errors: [],
+        sample_deleted: sampleOrphans,
+        started_at: new Date(startedAt).toISOString(),
+        finished_at: finishedAt,
+        took_ms: tookMs,
+      });
+      if (insertErr) {
+        console.error('[cleanup-orphan-media] failed to insert audit row', insertErr);
+      }
+    } catch (auditErr) {
+      console.error('[cleanup-orphan-media] audit insert threw', auditErr);
+    }
 
     return new Response(JSON.stringify(result, null, 2), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

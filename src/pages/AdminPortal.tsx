@@ -18,6 +18,7 @@ import { AdminSuggestionsPanel } from '@/components/admin/AdminSuggestionsPanel'
 import { AdminClaimsPanel } from '@/components/admin/AdminClaimsPanel';
 import { AdminProductRelationshipsPanel } from '@/components/admin/AdminProductRelationshipsPanel';
 import { AdminUserManagementPanel } from '@/components/admin/AdminUserManagementPanel';
+import { AdminMediaCleanupPanel } from '@/components/admin/AdminMediaCleanupPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -126,6 +127,12 @@ const AdminPortal = () => {
     </div>
   );
 
+  const renderMediaCleanupContent = () => (
+    <div className="space-y-6">
+      <AdminMediaCleanupPanel />
+    </div>
+  );
+
   const renderActiveContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -142,6 +149,8 @@ const AdminPortal = () => {
         return renderProductRelationshipsContent();
       case 'user-management':
         return renderUserManagementContent();
+      case 'media-cleanup':
+        return renderMediaCleanupContent();
       default:
         return renderOverviewContent();
     }
@@ -242,6 +251,16 @@ const AdminPortal = () => {
                   }`}
                 >
                   Users
+                </button>
+                <button
+                  onClick={() => setActiveTab('media-cleanup')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'media-cleanup'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Media
                 </button>
               </div>
             </div>
