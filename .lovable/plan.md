@@ -1,118 +1,91 @@
-## Goal
 
-Add an **Admin → Media Cleanup** tab so you can see orphan-media health at a glance without opening the SQL editor. Ship in phases. **Phase 1 is read-only monitoring only — no destructive buttons.**
+## Phase 2 — "Run dry-run now" button
+
+Goal: let an admin manually trigger a dry-run from the Media Cleanup panel without opening the SQL editor or knowing the cron secret. **Still non-destructive** — the existing `cleanup-orphan-media` function only scans and reports.
 
 ---
 
-## Phase 1 — Read-only monitoring dashboard (this PR)
+### Step 0 — Prerequisite: verify Phase 1 audit logging (do this FIRST)
 
-### Backend prerequisite (the audit gap)
+Confirmed via DB: `media_cleanup_runs` currently has only 2 rows, both `mode='execute'`. The dry-run audit-insert code shipped in Phase 1 has never actually run in production, because the weekly cron hasn't ticked since deploy.
 
-Currently only `execute` runs write to `media_cleanup_runs`. Dry-runs return JSON but leave no row, so the dashboard would show nothing fresh after each weekly cron tick.
+Before building the button, manually invoke the existing `cleanup-orphan-media` function once with the cron secret and verify:
+1. A new row appears in `media_cleanup_runs` with `mode = 'dry-run'`.
+2. The row has non-null `scanned`, `would_delete`, `skipped_young`, `skipped_referenced`, `referenced_path_count`, `took_ms`.
+3. `sample_deleted` is populated with sample orphan paths (or empty array if none).
+4. The admin panel flips from "No dry-run history yet" to showing real numbers + status badge + staleness pill.
 
-**Edit `supabase/functions/cleanup-orphan-media/index.ts`** to insert a row at the end of every dry-run with:
-- `mode = 'dry-run'`
-- `scanned`, `would_delete`, `skipped_young`, `skipped_referenced`, `referenced_path_count`, `took_ms`
-- `deleted = 0`, `errors = []`, `max_deletions = null`
-- `sample_deleted` reused to hold up to ~10 sample orphan paths *(see UI labeling below — column reuse is intentional to avoid a migration; if confusion grows later we can add `sample_paths` in a follow-up)*
+If the row does not appear → fix the insert (likely an RLS/role issue, schema mismatch, or thrown error suppressed in the try/catch) **before** continuing. Without this, the Phase 2 button would appear to succeed but leave the dashboard empty.
 
-No table schema migration. Only an RLS policy addition:
+### Step 1 — New edge function: `admin-media-cleanup-trigger`
 
-```sql
-CREATE POLICY "Admins can read media cleanup runs"
-ON public.media_cleanup_runs FOR SELECT
-TO authenticated
-USING (has_role(auth.uid(), 'admin'));
-```
+Path: `supabase/functions/admin-media-cleanup-trigger/index.ts`
 
-Writes stay service-role only.
+Responsibilities:
+- `OPTIONS` → CORS preflight
+- `POST` only; reject others with 405
+- Validate the caller's JWT using the anon client + `Authorization` header → get `user.id` via `getClaims()`
+- Check `has_role(user.id, 'admin')` via the service-role client; reject with 403 if not admin
+- Read `CLEANUP_CRON_SECRET` from env; if missing, return 500 with a clear "secret not configured" message
+- Capture `triggerStartedAt = new Date().toISOString()` *before* the upstream call
+- Server-side `fetch` to `${SUPABASE_URL}/functions/v1/cleanup-orphan-media` with header `x-cron-secret: <secret>` and `Authorization: Bearer <SERVICE_ROLE_KEY>`
+- After the upstream returns 200, **read back** `media_cleanup_runs` for the most recent `mode='dry-run'` row where `started_at >= triggerStartedAt`. Include `auditWritten: boolean` in the response
+- Forward the upstream JSON `result` + `auditWritten` flag + status to the caller
+- Wrap everything in try/catch; never echo the secret in logs or responses
 
-### UI — `AdminMediaCleanupPanel.tsx`
+Body: ignored (mode is always dry-run because that's the only mode this function reaches).
 
-Always-visible layout (no conditional sections — consistency over compactness):
+Config: `verify_jwt = false` in `supabase/config.toml` (we validate JWT in code, project convention).
 
-**1. Status header**
-- Big status badge from latest dry-run `would_delete`:
-  - `Healthy` — 0
-  - `Needs review` — 1–50
-  - `Warning` — 51–200
-  - `Danger` — > 200
-- **Tiered staleness pill** for "Last dry-run":
-  - Green: < 7 days
-  - Amber: 7–10 days
-  - Red: > 10 days
-- **Cron context line:** "Weekly dry-run — next expected ~{day, time UTC}" (read from `cron.job`, fall back to "weekly" if unavailable).
-- **Errors callout** (red banner) if the latest run's `errors` array is non-empty — surfaced at the top, not buried.
+Secret: `CLEANUP_CRON_SECRET` already exists. No new secrets.
 
-**2. Latest dry-run card**
-Scanned · Would delete · Skipped (too young) · Skipped (referenced) · Referenced path count · Took (ms) · Started at
+### Step 2 — Frontend changes — `AdminMediaCleanupPanel.tsx` only
 
-**3. Latest execute card**
-Deleted · Errors · Max deletions · Took (ms) · Started at
+Add to the **status header card** (right side, next to the badges):
+- A **"Run dry-run now"** button (primary variant, `Play` icon)
+- Loading state: spinner + "Scanning…" label, button disabled
+- Disabled also while `isLoading` (initial query) or if `!isAdmin` (defensive — page is already admin-gated, but cheap belt-and-suspenders)
+- On success **with** `auditWritten = true`: `toast.success("Dry-run complete — N orphan files {found|need review}")` (use "found" if 0, "need review" if >0)
+- On success **with** `auditWritten = false`: `toast.warning("Scan completed but audit row was not written — check edge function logs.")`
+- On failure: `toast.error(<sanitized message>)`. Secret cannot leak — it never reaches the browser
+- After success: `queryClient.invalidateQueries(['admin-media-cleanup-runs'])` so cards/table/sparkline refresh
+- 30-second client-side cooldown after a successful run
 
-**4. Trend sparkline**
-Tiny inline chart of `would_delete` across the last ~8 dry-runs. One glance shows whether orphan count is flat, growing, or noisy — catches drift the "latest" cards can't.
+Trigger via `supabase.functions.invoke('admin-media-cleanup-trigger', { method: 'POST' })`.
 
-**5. Recent runs table** (last 20 rows from `media_cleanup_runs`)
-Columns: Date · Mode · Scanned · Would delete · Deleted · Skipped young · Skipped ref · Errors · Took
-Click row → expand to show:
-- For `mode = 'dry-run'` rows: section labeled **"Sample orphan paths"**
-- For `mode = 'execute'` rows: section labeled **"Sample deleted paths"**
-- Full `errors` JSON if non-empty
+Also add a small **schedule line** under the panel description (closes the Phase 1 cron-context-line gap with zero added complexity):
+> "Scheduled: weekly dry-run · Sundays 03:00 UTC"
 
-**6. Empty state**
-Before the first dry-run audit row exists (right after deploy): *"No dry-run history yet — next scheduled run will populate this."* Don't render an empty/broken-looking card.
+Static text — no DB lookup. Update the literal day/time to match the actual `cron.job` entry (verify when implementing).
 
-### Frontend file changes
+### Out of scope (still)
 
-- **New** `src/components/admin/AdminMediaCleanupPanel.tsx` — reads `media_cleanup_runs` via `supabase.from(...).order('started_at', desc).limit(20)` using React Query.
-- **Edit** `src/pages/AdminPortal.tsx` — add `media-cleanup` case + render panel.
-- **Edit** `src/components/admin/AdminSidebar.tsx` — add nav item ("Media Cleanup", `HardDrive` icon).
-- **Edit** mobile tab row in `AdminPortal.tsx` — add "Media" entry.
-
-### Out of scope for Phase 1 (deferred)
-
-- "Run dry-run now" button → Phase 2
-- "Run cleanup" button → Phase 3
-- Email/notification alerts on stale or high `would_delete`
-- CSV export of run history
+- "Run cleanup" / execute button → Phase 3
+- Schedule editing
+- Email alerts
 - Per-bucket breakdown
-- Renaming `sample_deleted` → `sample_paths` (only if reuse causes real confusion)
-- Any change to `cleanup-orphan-media-execute` or the weekly cron schedule
+- In-flight scan cancellation
+- Renaming `sample_deleted` → `sample_paths`
+- Any change to `cleanup-orphan-media` scan logic, the weekly cron, or `cleanup-orphan-media-execute`
 
 ---
 
-## Phase 2 — "Run dry-run now" button (separate PR, later)
+### Technical details
 
-Safe — deletes nothing. New `admin-media-cleanup-trigger` edge function:
-- Verifies `has_role(uid, 'admin')` via `getClaims()`
-- Server-side calls `cleanup-orphan-media` with the cron secret (secret never reaches the browser)
-- Panel gains a single button + toast + auto-refresh
+**Security model:**
+- Browser → `admin-media-cleanup-trigger` (admin-gated via JWT + `has_role`)
+- Trigger function → `cleanup-orphan-media` (gated via `x-cron-secret`, server-only)
+- `CLEANUP_CRON_SECRET` and `SUPABASE_SERVICE_ROLE_KEY` never reach the browser
 
----
+**Files touched:**
+- New: `supabase/functions/admin-media-cleanup-trigger/index.ts`
+- Edit: `supabase/config.toml` — register the new function with `verify_jwt = false`
+- Edit: `src/components/admin/AdminMediaCleanupPanel.tsx` — add button, mutation, toast, cooldown, static schedule line
 
-## Phase 3 — "Run cleanup" button (much later, only after Phase 2 is proven)
-
-Destructive action with all guardrails:
-- Disabled unless latest dry-run is < 24 h old
-- Disabled if `would_delete > 50` (safety threshold)
-- Confirm dialog requiring typed `DELETE`
-- Max cap (50) shown prominently
-- Same admin-gated wrapper edge function with `mode='execute'`
-- Audit row already written by execute function
-
----
-
-## Summary of changes vs prior plan
-
-| Added | From |
-|---|---|
-| Mode-aware row-expand label ("Sample orphan paths" vs "Sample deleted paths") | ChatGPT |
-| Tiered staleness 7 / 10 days | ChatGPT |
-| Trend sparkline of last ~8 dry-runs | new |
-| Top-level errors callout | new |
-| Cron next-run context line | new |
-| Explicit empty state | new |
-| Always-visible cards (no conditional layout) | new |
-
-Stale threshold confirmed at **7 days amber / 10 days red**. Writes stay service-role only.
+**Acceptance:**
+- Step 0 passes — manual dry-run produces a `mode='dry-run'` audit row visible in the panel
+- Non-admin POST to trigger → 403, no scan happens
+- Admin click → button disables → toast → cards/table/sparkline update with a fresh `dry-run` row
+- If audit row is missing post-scan → distinct warning toast
+- Errors from the underlying scan surface in the toast and (next refresh) in the top-level errors callout
+- No new database migration
