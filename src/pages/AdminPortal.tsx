@@ -18,6 +18,7 @@ import { AdminSuggestionsPanel } from '@/components/admin/AdminSuggestionsPanel'
 import { AdminClaimsPanel } from '@/components/admin/AdminClaimsPanel';
 import { AdminProductRelationshipsPanel } from '@/components/admin/AdminProductRelationshipsPanel';
 import { AdminUserManagementPanel } from '@/components/admin/AdminUserManagementPanel';
+import { AdminMediaCleanupPanel } from '@/components/admin/AdminMediaCleanupPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
