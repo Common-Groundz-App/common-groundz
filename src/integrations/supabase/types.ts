@@ -1643,6 +1643,57 @@ export type Database = {
         }
         Relationships: []
       }
+      media_cleanup_runs: {
+        Row: {
+          deleted: number
+          errors: Json
+          finished_at: string | null
+          id: string
+          max_deletions: number | null
+          mode: string
+          referenced_path_count: number
+          sample_deleted: string[]
+          scanned: number
+          skipped_referenced: number
+          skipped_young: number
+          started_at: string
+          took_ms: number | null
+          would_delete: number
+        }
+        Insert: {
+          deleted?: number
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          max_deletions?: number | null
+          mode: string
+          referenced_path_count?: number
+          sample_deleted?: string[]
+          scanned?: number
+          skipped_referenced?: number
+          skipped_young?: number
+          started_at?: string
+          took_ms?: number | null
+          would_delete?: number
+        }
+        Update: {
+          deleted?: number
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          max_deletions?: number | null
+          mode?: string
+          referenced_path_count?: number
+          sample_deleted?: string[]
+          scanned?: number
+          skipped_referenced?: number
+          skipped_young?: number
+          started_at?: string
+          took_ms?: number | null
+          would_delete?: number
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
