@@ -127,6 +127,12 @@ const AdminPortal = () => {
     </div>
   );
 
+  const renderMediaCleanupContent = () => (
+    <div className="space-y-6">
+      <AdminMediaCleanupPanel />
+    </div>
+  );
+
   const renderActiveContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -143,6 +149,8 @@ const AdminPortal = () => {
         return renderProductRelationshipsContent();
       case 'user-management':
         return renderUserManagementContent();
+      case 'media-cleanup':
+        return renderMediaCleanupContent();
       default:
         return renderOverviewContent();
     }
