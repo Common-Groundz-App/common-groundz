@@ -185,14 +185,24 @@ export const AdminMediaCleanupPanel: React.FC = () => {
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const [cooldownTick, setCooldownTick] = useState(0);
 
+  // Execute (destructive) state
+  const [executeOpen, setExecuteOpen] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executeCooldownUntil, setExecuteCooldownUntil] = useState<number | null>(null);
+  const [confirmText, setConfirmText] = useState('');
+  const [maxDeletionsInput, setMaxDeletionsInput] = useState<number>(50);
+
   useEffect(() => {
-    if (!cooldownUntil) return;
+    if (!cooldownUntil && !executeCooldownUntil) return;
     const id = setInterval(() => setCooldownTick((t) => t + 1), 1000);
     return () => clearInterval(id);
-  }, [cooldownUntil]);
+  }, [cooldownUntil, executeCooldownUntil]);
 
   const cooldownRemaining = cooldownUntil
     ? Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000))
+    : 0;
+  const executeCooldownRemaining = executeCooldownUntil
+    ? Math.max(0, Math.ceil((executeCooldownUntil - Date.now()) / 1000))
     : 0;
   // referenced so eslint doesn't complain about unused tick
   void cooldownTick;
