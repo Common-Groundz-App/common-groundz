@@ -442,6 +442,26 @@ export const AdminMediaCleanupPanel: React.FC = () => {
                   </>
                 )}
               </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={openExecuteDialog}
+                disabled={!canExecute || isExecuting || executeCooldownRemaining > 0}
+                title={executeDisabledReason ?? undefined}
+              >
+                {executeCooldownRemaining > 0 ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-1" />
+                    Wait {executeCooldownRemaining}s
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Run cleanup now
+                    {canExecute && dryRunWouldDelete > 0 ? ` (${dryRunWouldDelete})` : ''}
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -453,6 +473,9 @@ export const AdminMediaCleanupPanel: React.FC = () => {
           <p>
             Staleness thresholds: green &lt; {STALE_AMBER_DAYS}d · amber {STALE_AMBER_DAYS}–{STALE_RED_DAYS}d · red &gt; {STALE_RED_DAYS}d.
           </p>
+          {executeDisabledReason && (
+            <p className="text-xs italic">Cleanup disabled: {executeDisabledReason}.</p>
+          )}
         </CardContent>
       </Card>
 
