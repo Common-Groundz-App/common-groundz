@@ -292,6 +292,91 @@ export const AdminMediaCleanupPanel: React.FC = () => {
         ? latestExecute.errors
         : null;
 
+  // Execute button gating
+  const dryRunAgeHours = latestDryRun
+    ? (Date.now() - new Date(latestDryRun.started_at).getTime()) / (1000 * 60 * 60)
+    : null;
+  const dryRunWouldDelete = latestDryRun?.would_delete ?? 0;
+  const dryRunSamples = Array.isArray(latestDryRun?.sample_deleted)
+    ? (latestDryRun!.sample_deleted as string[])
+    : [];
+
+  let executeDisabledReason: string | null = null;
+  if (!latestDryRun) executeDisabledReason = 'Run a dry-run first';
+  else if (dryRunAgeHours != null && dryRunAgeHours > 24)
+    executeDisabledReason = 'Latest dry-run is stale — run a fresh one';
+  else if (dryRunWouldDelete <= 0) executeDisabledReason = 'Nothing to clean up';
+
+  const canExecute = executeDisabledReason === null;
+  const defaultMaxDeletions = Math.min(50, Math.max(1, dryRunWouldDelete || 1));
+
+  const openExecuteDialog = () => {
+    setMaxDeletionsInput(defaultMaxDeletions);
+    setConfirmText('');
+    setExecuteOpen(true);
+  };
+
+  const handleRunExecute = async () => {
+    if (isExecuting || executeCooldownRemaining > 0) return;
+    const clamped = Math.min(50, Math.max(1, Math.floor(maxDeletionsInput || 0)));
+    setIsExecuting(true);
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke(
+        'admin-media-cleanup-execute-trigger',
+        { body: { confirm: 'DELETE', maxDeletions: clamped } }
+      );
+      if (invokeErr) {
+        // FunctionsHttpError carries response context; try to surface preflight code
+        const ctx: any = (invokeErr as any)?.context;
+        let detail: any = null;
+        try {
+          detail = ctx && typeof ctx.json === 'function' ? await ctx.json() : null;
+        } catch {
+          detail = null;
+        }
+        const code = detail?.code as string | undefined;
+        const codeMessages: Record<string, string> = {
+          NO_DRY_RUN: 'Run a dry-run first',
+          STALE_DRY_RUN: 'Latest dry-run is stale — run a fresh one',
+          NOTHING_TO_DELETE: 'Nothing to clean up',
+          DRY_RUN_DRIFT: 'Orphan count drifted — re-run dry-run',
+          NOT_ADMIN: 'Not authorized',
+          MISSING_AUTH: 'Not authorized',
+          INVALID_TOKEN: 'Not authorized',
+          MISSING_CONFIRM: 'Confirmation missing',
+          INVALID_MAX_DELETIONS: 'Invalid max deletions value',
+        };
+        toast.error(code ? codeMessages[code] ?? `Cleanup failed (${code})` : invokeErr.message);
+        return;
+      }
+
+      const result = (data?.result ?? {}) as {
+        deleted?: number;
+        errors?: unknown[];
+      };
+      const deleted = typeof result.deleted === 'number' ? result.deleted : 0;
+      const errCount = Array.isArray(result.errors) ? result.errors.length : 0;
+      const auditWritten = !!data?.auditWritten;
+
+      if (errCount > 0) {
+        toast.warning(`Deleted ${deleted}, ${errCount} errors — see Recent runs`);
+      } else {
+        toast.success(`Deleted ${deleted} files`);
+      }
+      if (!auditWritten) {
+        toast.warning('Cleanup ran but audit row not found — check edge function logs');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['admin-media-cleanup-runs'] });
+      setExecuteOpen(false);
+      setExecuteCooldownUntil(Date.now() + 60_000);
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Failed to run cleanup');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
