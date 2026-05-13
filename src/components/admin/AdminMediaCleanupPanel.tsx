@@ -18,6 +18,18 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
   AlertTriangle,
   CalendarClock,
   CheckCircle2,
@@ -173,14 +185,24 @@ export const AdminMediaCleanupPanel: React.FC = () => {
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const [cooldownTick, setCooldownTick] = useState(0);
 
+  // Execute (destructive) state
+  const [executeOpen, setExecuteOpen] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executeCooldownUntil, setExecuteCooldownUntil] = useState<number | null>(null);
+  const [confirmText, setConfirmText] = useState('');
+  const [maxDeletionsInput, setMaxDeletionsInput] = useState<number>(50);
+
   useEffect(() => {
-    if (!cooldownUntil) return;
+    if (!cooldownUntil && !executeCooldownUntil) return;
     const id = setInterval(() => setCooldownTick((t) => t + 1), 1000);
     return () => clearInterval(id);
-  }, [cooldownUntil]);
+  }, [cooldownUntil, executeCooldownUntil]);
 
   const cooldownRemaining = cooldownUntil
     ? Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000))
+    : 0;
+  const executeCooldownRemaining = executeCooldownUntil
+    ? Math.max(0, Math.ceil((executeCooldownUntil - Date.now()) / 1000))
     : 0;
   // referenced so eslint doesn't complain about unused tick
   void cooldownTick;
@@ -270,6 +292,91 @@ export const AdminMediaCleanupPanel: React.FC = () => {
         ? latestExecute.errors
         : null;
 
+  // Execute button gating
+  const dryRunAgeHours = latestDryRun
+    ? (Date.now() - new Date(latestDryRun.started_at).getTime()) / (1000 * 60 * 60)
+    : null;
+  const dryRunWouldDelete = latestDryRun?.would_delete ?? 0;
+  const dryRunSamples = Array.isArray(latestDryRun?.sample_deleted)
+    ? (latestDryRun!.sample_deleted as string[])
+    : [];
+
+  let executeDisabledReason: string | null = null;
+  if (!latestDryRun) executeDisabledReason = 'Run a dry-run first';
+  else if (dryRunAgeHours != null && dryRunAgeHours > 24)
+    executeDisabledReason = 'Latest dry-run is stale — run a fresh one';
+  else if (dryRunWouldDelete <= 0) executeDisabledReason = 'Nothing to clean up';
+
+  const canExecute = executeDisabledReason === null;
+  const defaultMaxDeletions = Math.min(50, Math.max(1, dryRunWouldDelete || 1));
+
+  const openExecuteDialog = () => {
+    setMaxDeletionsInput(defaultMaxDeletions);
+    setConfirmText('');
+    setExecuteOpen(true);
+  };
+
+  const handleRunExecute = async () => {
+    if (isExecuting || executeCooldownRemaining > 0) return;
+    const clamped = Math.min(50, Math.max(1, Math.floor(maxDeletionsInput || 0)));
+    setIsExecuting(true);
+    try {
+      const { data, error: invokeErr } = await supabase.functions.invoke(
+        'admin-media-cleanup-execute-trigger',
+        { body: { confirm: 'DELETE', maxDeletions: clamped } }
+      );
+      if (invokeErr) {
+        // FunctionsHttpError carries response context; try to surface preflight code
+        const ctx: any = (invokeErr as any)?.context;
+        let detail: any = null;
+        try {
+          detail = ctx && typeof ctx.json === 'function' ? await ctx.json() : null;
+        } catch {
+          detail = null;
+        }
+        const code = detail?.code as string | undefined;
+        const codeMessages: Record<string, string> = {
+          NO_DRY_RUN: 'Run a dry-run first',
+          STALE_DRY_RUN: 'Latest dry-run is stale — run a fresh one',
+          NOTHING_TO_DELETE: 'Nothing to clean up',
+          DRY_RUN_DRIFT: 'Orphan count drifted — re-run dry-run',
+          NOT_ADMIN: 'Not authorized',
+          MISSING_AUTH: 'Not authorized',
+          INVALID_TOKEN: 'Not authorized',
+          MISSING_CONFIRM: 'Confirmation missing',
+          INVALID_MAX_DELETIONS: 'Invalid max deletions value',
+        };
+        toast.error(code ? codeMessages[code] ?? `Cleanup failed (${code})` : invokeErr.message);
+        return;
+      }
+
+      const result = (data?.result ?? {}) as {
+        deleted?: number;
+        errors?: unknown[];
+      };
+      const deleted = typeof result.deleted === 'number' ? result.deleted : 0;
+      const errCount = Array.isArray(result.errors) ? result.errors.length : 0;
+      const auditWritten = !!data?.auditWritten;
+
+      if (errCount > 0) {
+        toast.warning(`Deleted ${deleted}, ${errCount} errors — see Recent runs`);
+      } else {
+        toast.success(`Deleted ${deleted} files`);
+      }
+      if (!auditWritten) {
+        toast.warning('Cleanup ran but audit row not found — check edge function logs');
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['admin-media-cleanup-runs'] });
+      setExecuteOpen(false);
+      setExecuteCooldownUntil(Date.now() + 60_000);
+    } catch (e) {
+      toast.error((e as Error)?.message || 'Failed to run cleanup');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -335,6 +442,26 @@ export const AdminMediaCleanupPanel: React.FC = () => {
                   </>
                 )}
               </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={openExecuteDialog}
+                disabled={!canExecute || isExecuting || executeCooldownRemaining > 0}
+                title={executeDisabledReason ?? undefined}
+              >
+                {executeCooldownRemaining > 0 ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-1" />
+                    Wait {executeCooldownRemaining}s
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Run cleanup now
+                    {canExecute && dryRunWouldDelete > 0 ? ` (${dryRunWouldDelete})` : ''}
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -346,6 +473,9 @@ export const AdminMediaCleanupPanel: React.FC = () => {
           <p>
             Staleness thresholds: green &lt; {STALE_AMBER_DAYS}d · amber {STALE_AMBER_DAYS}–{STALE_RED_DAYS}d · red &gt; {STALE_RED_DAYS}d.
           </p>
+          {executeDisabledReason && (
+            <p className="text-xs italic">Cleanup disabled: {executeDisabledReason}.</p>
+          )}
         </CardContent>
       </Card>
 
@@ -512,6 +642,102 @@ export const AdminMediaCleanupPanel: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Destructive cleanup confirmation */}
+      <AlertDialog open={executeOpen} onOpenChange={(o) => !isExecuting && setExecuteOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-destructive" />
+              Permanently delete orphan media?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  Bucket: <span className="font-mono">post_media</span>. This deletes objects from
+                  storage. There is no undo.
+                </p>
+                {latestDryRun && (
+                  <p>
+                    Based on dry-run from{' '}
+                    <span className="font-medium">
+                      {formatDistanceToNow(new Date(latestDryRun.started_at), { addSuffix: true })}
+                    </span>{' '}
+                    · would delete <span className="font-semibold">{dryRunWouldDelete}</span> files.
+                  </p>
+                )}
+                {dryRunSamples.length > 0 && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                      Sample orphan paths
+                    </p>
+                    <ul className="text-xs font-mono space-y-0.5 max-h-28 overflow-y-auto bg-muted/40 rounded p-2">
+                      {dryRunSamples.slice(0, 5).map((p, i) => (
+                        <li key={i} className="break-all text-foreground/80">{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="max-deletions">Max files to delete this run</Label>
+              <Input
+                id="max-deletions"
+                type="number"
+                min={1}
+                max={50}
+                value={maxDeletionsInput}
+                onChange={(e) => setMaxDeletionsInput(Number(e.target.value))}
+                disabled={isExecuting}
+              />
+              <p className="text-xs text-muted-foreground">Hard cap: 50 per run.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-delete">
+                Type <span className="font-mono font-semibold">DELETE</span> to confirm
+              </Label>
+              <Input
+                id="confirm-delete"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="DELETE"
+                disabled={isExecuting}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isExecuting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleRunExecute();
+              }}
+              disabled={
+                isExecuting ||
+                confirmText !== 'DELETE' ||
+                !Number.isFinite(maxDeletionsInput) ||
+                maxDeletionsInput < 1
+              }
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                `Permanently delete ${Math.min(50, Math.max(1, Math.floor(maxDeletionsInput || 0)))} files`
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
