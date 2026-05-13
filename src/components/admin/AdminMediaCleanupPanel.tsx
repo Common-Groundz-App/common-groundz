@@ -642,6 +642,102 @@ export const AdminMediaCleanupPanel: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Destructive cleanup confirmation */}
+      <AlertDialog open={executeOpen} onOpenChange={(o) => !isExecuting && setExecuteOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-destructive" />
+              Permanently delete orphan media?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <p>
+                  Bucket: <span className="font-mono">post_media</span>. This deletes objects from
+                  storage. There is no undo.
+                </p>
+                {latestDryRun && (
+                  <p>
+                    Based on dry-run from{' '}
+                    <span className="font-medium">
+                      {formatDistanceToNow(new Date(latestDryRun.started_at), { addSuffix: true })}
+                    </span>{' '}
+                    · would delete <span className="font-semibold">{dryRunWouldDelete}</span> files.
+                  </p>
+                )}
+                {dryRunSamples.length > 0 && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
+                      Sample orphan paths
+                    </p>
+                    <ul className="text-xs font-mono space-y-0.5 max-h-28 overflow-y-auto bg-muted/40 rounded p-2">
+                      {dryRunSamples.slice(0, 5).map((p, i) => (
+                        <li key={i} className="break-all text-foreground/80">{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="max-deletions">Max files to delete this run</Label>
+              <Input
+                id="max-deletions"
+                type="number"
+                min={1}
+                max={50}
+                value={maxDeletionsInput}
+                onChange={(e) => setMaxDeletionsInput(Number(e.target.value))}
+                disabled={isExecuting}
+              />
+              <p className="text-xs text-muted-foreground">Hard cap: 50 per run.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-delete">
+                Type <span className="font-mono font-semibold">DELETE</span> to confirm
+              </Label>
+              <Input
+                id="confirm-delete"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                placeholder="DELETE"
+                disabled={isExecuting}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isExecuting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleRunExecute();
+              }}
+              disabled={
+                isExecuting ||
+                confirmText !== 'DELETE' ||
+                !Number.isFinite(maxDeletionsInput) ||
+                maxDeletionsInput < 1
+              }
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  Deleting…
+                </>
+              ) : (
+                `Permanently delete ${Math.min(50, Math.max(1, Math.floor(maxDeletionsInput || 0)))} files`
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
