@@ -1694,6 +1694,48 @@ export type Database = {
         }
         Relationships: []
       }
+      media_views: {
+        Row: {
+          anon_session_id: string | null
+          id: string
+          ip_hash: string | null
+          media_path: string
+          source: string
+          source_id: string
+          tracker_version: string
+          user_id: string | null
+          viewed_at: string
+          was_autoplay: boolean
+          watch_ms: number
+        }
+        Insert: {
+          anon_session_id?: string | null
+          id?: string
+          ip_hash?: string | null
+          media_path: string
+          source?: string
+          source_id: string
+          tracker_version?: string
+          user_id?: string | null
+          viewed_at?: string
+          was_autoplay?: boolean
+          watch_ms?: number
+        }
+        Update: {
+          anon_session_id?: string | null
+          id?: string
+          ip_hash?: string | null
+          media_path?: string
+          source?: string
+          source_id?: string
+          tracker_version?: string
+          user_id?: string | null
+          viewed_at?: string
+          was_autoplay?: boolean
+          watch_ms?: number
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
