@@ -38,7 +38,7 @@ export function MediaCompatibilityBadge({ state, note, className }: Props) {
         title={note}
       >
         <CheckCircle2 className="h-3 w-3" aria-hidden />
-        Compatible video
+        Should play everywhere
       </span>
     );
   }
@@ -53,7 +53,7 @@ export function MediaCompatibilityBadge({ state, note, className }: Props) {
       title={note}
     >
       <AlertTriangle className="h-3 w-3" aria-hidden />
-      May not play on all devices
+      May not play on some devices
     </span>
   );
 }
