@@ -34,4 +34,8 @@ export interface MediaUploadState {
   localPosterUrl?: string;
   /** Client-detected duration (seconds) shown during upload. */
   localDuration?: number;
+  /** Coarse upload stage; drives the staged progress UI. */
+  stage?: 'preparing' | 'uploading' | 'finalizing' | 'done';
 }
+
+export type MediaUploadStage = NonNullable<MediaUploadState['stage']>;
