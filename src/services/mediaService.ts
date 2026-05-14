@@ -195,6 +195,7 @@ export const uploadMedia = async (
       });
     }
 
+    onProgress?.(100, 'done');
     return mediaItem;
   } catch (error) {
     console.error('Error uploading media:', error);
