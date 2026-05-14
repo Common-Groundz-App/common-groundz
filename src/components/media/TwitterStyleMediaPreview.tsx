@@ -314,6 +314,8 @@ export function TwitterStyleMediaPreview({
             ) : (
               <FeedVideo
                 item={item}
+                source={source}
+                sourceId={sourceId}
                 objectFit={objectFit}
                 onTap={onImageClick ? () => onImageClick(0) : undefined}
                 className="max-w-full max-h-full"
@@ -389,6 +391,8 @@ export function TwitterStyleMediaPreview({
               ) : (
                 <FeedVideo
                   item={media[0]}
+                  source={source}
+                  sourceId={sourceId}
                   objectFit="cover"
                   onTap={() => handleImageClick(0)}
                   className="w-full h-full"
@@ -457,6 +461,8 @@ export function TwitterStyleMediaPreview({
                 ) : (
                   <FeedVideo
                     item={item}
+                    source={source}
+                    sourceId={sourceId}
                     objectFit="cover"
                     onTap={() => handleImageClick(actualIndex)}
                     className="w-full h-full"
