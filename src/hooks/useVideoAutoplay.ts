@@ -49,6 +49,12 @@ export function useVideoAutoplay(
     const safePlay = () => {
       if (cancelled) return;
       el.muted = true;
+      // Sync the global mute state so the UI icon reflects reality.
+      // Browsers force-mute autoplaying videos, so any persisted "unmuted"
+      // value from a prior session would otherwise show a wrong sound icon.
+      if (!readGlobalVideoMuted()) {
+        setGlobalVideoMuted(true);
+      }
       const p = el.play();
       if (p && typeof p.catch === 'function') {
         p.catch(() => {
