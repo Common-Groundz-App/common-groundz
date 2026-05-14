@@ -1,74 +1,57 @@
-## Goal
-Make the upload progress feel alive on slow internet. Today the bar sits at 0% until Supabase finishes, then jumps to 100% — looks frozen. Fix with a **staged + smoothly animated** progress UI. No upload-pipeline rewrite.
+# Composer media preview fix
 
-## Why staged (not real bytes)
-`supabase.storage.from('post_media').upload(...)` is `fetch`-based and does not expose byte-level progress. Real % would require XHR or signed upload URLs — out of scope. The actual user pain is "is this frozen?", not "what % exactly?".
+## Root causes (verified)
 
-## Changes
+1. **The grid CSS classes don't exist.** `TwitterStyleMediaPreview` in grid mode applies `twitter-media-two` / `twitter-media-three` / `twitter-media-four`, but none of those classes are defined in `src/index.css`, `src/App.css`, or anywhere else. Result: tiles render as unstyled stacked divs, so X buttons overlap neighboring tiles (your 3-media screenshot) and the layout looks broken.
 
-### 1. `src/services/mediaService.ts` — emit stage events
-Add an optional second arg to the `onProgress` callback so it can report stages:
-- `'preparing'` — fired right after the function is entered (videos and images)
-- `'uploading'` — fired right before `supabase.storage...upload(...)` for the main file
-- `'finalizing'` — fired right after upload returns, before building the `MediaItem`
-- `'done'` — fired at the very end
+2. **Videos in multi-media grid lose their player.** Lines 562–574 of `TwitterStyleMediaPreview.tsx` render videos as a plain thumbnail `<img>` with a `Maximize2` icon overlay (the "double arrow" you see). No `FeedVideo`, no autoplay, no mute control — only when there's exactly 1 media item does it use `FeedVideo`.
 
-Backwards compatible: old `onProgress(100)` numeric calls stay (used as the "done" signal by older callers, if any).
+3. **Clicking a tile breaks everything.** `handleImageClick` (line 154) flips `viewMode` to `'carousel'` when no `onImageClick` prop is passed (composer doesn't pass one). The carousel branch:
+   - shrinks the layout via `getOrientationStyles()` (the "everything shrinks" effect),
+   - renders a grey background while items load (the "grey thumbnail"),
+   - hides the "back to grid" button (it only shows when `onImageClick` is set, line 710), so the user is stuck,
+   - and the X button styling is z-fighting with the carousel overlay.
 
-### 2. `src/types/media.ts` — add stage to upload state
-```ts
-stage?: 'preparing' | 'uploading' | 'finalizing' | 'done';
-```
+The carousel mode is built for the **public feed**, not the composer. It should never engage inside `EnhancedCreatePostForm`.
 
-### 3. `src/components/media/MediaUploader.tsx` — drive a smooth bar
+## Fix
 
-**Start movement immediately** (ChatGPT point #4): when the upload row is first added (before validation / poster gen / network), set `stage: 'preparing'` and kick off the animator on the same frame.
+Create a small, dedicated composer-only preview component and use it in the composer. Leave `TwitterStyleMediaPreview` untouched (it's used by `PostMediaDisplay`, `ProfilePostItem`, and the feed-side copy).
 
-Pass a stage handler into `uploadMedia` that updates `stage` on the matching upload row when each milestone fires.
+### New file: `src/components/feed/composer/ComposerMediaPreview.tsx`
 
-**Smooth animator** (replaces the current 0→100 jump):
-- A `requestAnimationFrame` loop per in-flight row eases `progress` toward a per-stage **ceiling**:
-  - `preparing` → ceiling 15%
-  - `uploading` → ceiling 90%
-  - `finalizing` → ceiling 97%
-  - `done` → snap to 100%, then row removes (existing instant-handoff behavior)
-- Easing: `next = current + max((ceiling - current) * 0.04, 0.15)` per frame — guarantees a **minimum forward creep** so the bar never visually freezes when it nears a ceiling on very slow connections (ChatGPT point #2). Capped at the ceiling.
-- Cleanup the rAF on row removal / unmount / error.
+A presentational component built specifically for the composer:
 
-**No percentage text** (ChatGPT point #1): show only the stage label, not a number.
+- **Props:** `media: MediaItem[]`, `onRemove: (item: MediaItem) => void`.
+- **Layout** (Tailwind grid, no missing custom classes):
+  - 1 item → full width, max-h ~480px, `object-contain`.
+  - 2 items → `grid-cols-2 gap-1`, each `aspect-square`.
+  - 3 items → `grid-cols-2 gap-1` with first tile spanning `row-span-2` (`aspect-[1/2]`), other two stacked square. This matches the layout intent and keeps each X inside its own cell.
+  - 4 items → `grid-cols-2 grid-rows-2 gap-1`, each `aspect-square`.
+- **Image tiles:** `<img>` with `object-cover` (or `object-contain` on the single-item case), rounded.
+- **Video tiles:** render `<FeedVideo item={item} source="post" objectFit="cover" />` so autoplay / mute / duration badge keep working in **every** count, including multi-media. For the 1-item case use `objectFit="contain"` to match current single-video behavior.
+- **Remove (X) button:** absolutely positioned `top-2 right-2` inside each tile with `z-10`, `bg-black/60`, `rounded-full`, identical visual to today's button. Because each tile is a real grid cell with `overflow-hidden`, the X can no longer sit on top of an adjacent image.
+- **No click-to-expand.** Tiles don't switch modes. The only interactive element on top of a tile is the X (and the FeedVideo's own controls). This eliminates the "click → everything goes messy" bug entirely.
+- **Wrapper:** `mt-3 rounded-xl overflow-hidden`, no extra background tint, matches current spacing.
 
-### 4. `src/components/media/MediaUploader.tsx` — stage label + shimmer in `UploadRow`
-Under the file name, show a small status line that reflects `stage`:
-- `Preparing video…` (videos) / `Preparing…` (images)
-- `Uploading…`
-- `Finalizing…`
-- (no label once `done` — row disappears immediately)
+### Edit `src/components/feed/EnhancedCreatePostForm.tsx`
 
-**Subtle shimmer overlay** on the progress bar while not in `done`/`error` state (ChatGPT point #2 belt-and-suspenders): a thin diagonal gradient sliding across the filled portion, reusing the existing `animate-pulse` or a small bespoke `bg-gradient-to-r ... animate-[shimmer_1.6s_linear_infinite]`. Add the keyframe in `tailwind.config.ts` only if not already present. No new deps.
+- Replace the import on line 31 with `import { ComposerMediaPreview } from './composer/ComposerMediaPreview';`.
+- Replace line 1158 `<TwitterStyleMediaPreview media={media} onRemove={removeMedia} />` with `<ComposerMediaPreview media={media} onRemove={removeMedia} />`.
 
-### 5. Error path (ChatGPT point #5)
-On error: stop the rAF, leave `progress` where it is, set `status: 'error'`, hide shimmer, keep row visible until user dismisses. Unchanged behavior, just animation stops cleanly.
-
-### 6. Cancel (ChatGPT point #3)
-Cancel keeps current behavior — removes the row from the UI and stops the animator/rAF. We do **not** add an `AbortController` to the Supabase upload in this pass; the in-flight network request continues in the background as it does today. Documented in code comment.
-
-### 7. (My addition) Safety cap on `preparing`
-If `generateVideoPoster` / `validateMediaFile` somehow take > 8s, the bar will already be parked at the 15% ceiling with shimmer running — fine. But add a tiny guard: if `stage` is still `preparing` after 10s with no transition, bump ceiling to 25% so it visibly nudges once more. Cheap reassurance against pathological cases (huge MOV on a slow CPU).
-
-### 8. (My addition) Reduced motion
-Wrap the shimmer keyframe in `motion-safe:` so users with `prefers-reduced-motion: reduce` only see the eased bar, no shimmer. Aligns with existing a11y norms in the project.
+That's the entire change set.
 
 ## Out of scope
-- No XHR/signed-URL rewrite, no edge function changes, no schema changes, no new deps.
-- No `AbortController` wiring.
-- No changes to `FeedVideo`, `useVideoMute`, composer layout, or any other component.
+
+- No changes to `TwitterStyleMediaPreview` itself, `PostMediaDisplay`, `FeedItem`, `ProfilePostItem`, or any feed-side rendering — the published-post preview already looks correct per your screenshots.
+- No changes to `MediaUploader`, the upload pipeline, `FeedVideo`, `useVideoAutoplay`, `useVideoMute`, or the in-flight upload row work from prior turns.
+- No new dependencies, no schema changes, no design-token changes.
 
 ## Verification
-- DevTools → Network → "Slow 3G", upload a 40 MB MOV:
-  - Row appears with `Preparing video…` + bar already creeping from 0.
-  - Transitions to `Uploading…`; bar smoothly creeps toward ~90% with visible shimmer; never sits still for more than a frame.
-  - On completion: snaps to 100, row vanishes instantly (existing handoff), final preview is already there.
-- Image upload: same staged feel, label says `Preparing…` then `Uploading…`.
-- Cancel mid-upload: row disappears, animator stops, no console errors. (Network request continues in background — pre-existing behavior.)
-- Failed upload (e.g. force a 4xx): animator stops, bar stays where it was, `✗` shows, row remains until cancelled.
-- `prefers-reduced-motion: reduce`: bar still eases; shimmer is gone.
+
+On `/create`, with viewport at desktop and mobile widths:
+1. Upload 1 video → autoplay + mute toggle + duration badge present (unchanged).
+2. Add 1 image (now 1 video + 1 image) → both render side-by-side as squares; the video tile keeps autoplay/mute/duration; both Xs sit cleanly inside their own tile; clicking either tile does **nothing** (no carousel, no shrink, no grey state); X removes the correct item.
+3. Upload 1 video + 2 images → 2-column layout with the first tile (video) spanning two rows; X buttons no longer overlap the second image.
+4. Upload 1 video + 3 images → 2×2 grid; every tile has a working X; video keeps playing.
+5. After posting, the feed page render is unchanged (still uses `TwitterStyleMediaPreview`).
