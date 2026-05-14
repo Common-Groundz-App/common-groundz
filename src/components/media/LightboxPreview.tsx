@@ -191,24 +191,23 @@ export function LightboxPreview({
           }
         }}
       >
-        {/* Close button - smaller on mobile */}
-        <Button 
-          className={cn(
-            "absolute right-4 z-50 rounded-full bg-gray-800/70 hover:bg-gray-700",
-            isMobile ? "right-2 top-2 h-8 w-8" : "right-4 top-4 h-10 w-10"
-          )}
+        {/* Close button - always visible, respects safe-area */}
+        <Button
+          className="absolute right-3 z-50 h-10 w-10 rounded-full bg-background/20 hover:bg-background/40 backdrop-blur"
+          style={{ top: 'max(env(safe-area-inset-top), 0.75rem)' }}
           size="icon"
           variant="ghost"
+          aria-label="Close"
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
             onClose();
           }}
         >
-          <X className={cn("text-white", isMobile ? "h-5 w-5" : "h-6 w-6")} />
+          <X className="h-5 w-5 text-white" />
           <span className="sr-only">Close</span>
         </Button>
-        
+
         {/* Main image container - reduced padding on mobile */}
         <div className={cn(
           "relative flex h-full w-full items-center justify-center",
