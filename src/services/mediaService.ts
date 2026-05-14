@@ -91,13 +91,17 @@ export const validateMediaFile = async (file: File): Promise<{ valid: boolean; e
   return { valid: true };
 };
 
+export type UploadStage = 'preparing' | 'uploading' | 'finalizing' | 'done';
+
 export const uploadMedia = async (
   file: File,
   userId: string,
   sessionId: string,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number, stage?: UploadStage) => void
 ): Promise<MediaItem | null> => {
   try {
+    onProgress?.(0, 'preparing');
+
     const { valid, error } = await validateMediaFile(file);
     if (!valid) {
       throw new Error(error);
@@ -146,6 +150,8 @@ export const uploadMedia = async (
       }
     }
 
+    onProgress?.(0, 'uploading');
+
     const { error: uploadError } = await supabase.storage
       .from('post_media')
       .upload(filePath, file, {
@@ -153,8 +159,9 @@ export const uploadMedia = async (
         upsert: false,
       });
 
-    if (onProgress) onProgress(100);
     if (uploadError) throw uploadError;
+
+    onProgress?.(0, 'finalizing');
 
     const { data: { publicUrl } } = supabase.storage
       .from('post_media')
