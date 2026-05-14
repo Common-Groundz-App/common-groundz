@@ -19,10 +19,15 @@ export interface MediaItem {
 
 export type MediaUploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 
+export type MediaCompatibility = 'checking' | 'compatible' | 'risky';
+
 export interface MediaUploadState {
   file: File;
   progress: number;
   status: MediaUploadStatus;
   error?: string;
   item?: MediaItem;
+  /** Soft compatibility hint for video uploads. Not persisted to MediaItem. */
+  compatibility?: MediaCompatibility;
+  compatibilityNote?: string;
 }

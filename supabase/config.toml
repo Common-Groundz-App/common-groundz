@@ -115,3 +115,6 @@ verify_jwt = false
 
 [functions.admin-media-cleanup-execute-trigger]
 verify_jwt = false
+
+[functions.track-media-view]
+verify_jwt = false
