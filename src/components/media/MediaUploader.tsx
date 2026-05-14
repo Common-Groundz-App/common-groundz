@@ -177,32 +177,41 @@ export function MediaUploader({
   const renderUploadRow = (upload: MediaUploadState, index: number) => {
     const isVideo = upload.file.type.startsWith('video/');
     const posterReady = !!upload.item?.thumbnail_url;
+    const duration = upload.item?.duration;
+    const ext = upload.file.name.split('.').pop()?.toUpperCase() || (isVideo ? 'VIDEO' : 'IMAGE');
 
     return (
-      <div key={index} className="flex items-center space-x-2 border rounded-md p-2">
-        <div className="flex-shrink-0">
+      <div key={index} className="flex items-center space-x-2 border border-border rounded-md p-2">
+        <div className="flex-shrink-0 relative w-16 h-16 rounded-md overflow-hidden bg-muted flex items-center justify-center">
           {isVideo ? (
-            <Film size={20} className="text-purple-500" />
+            posterReady ? (
+              <>
+                <img
+                  src={upload.item!.thumbnail_url}
+                  alt=""
+                  className="w-full h-full object-cover"
+                />
+                {duration ? (
+                  <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 py-0.5 text-[10px] font-medium text-white leading-none">
+                    {formatDuration(duration)}
+                  </span>
+                ) : null}
+              </>
+            ) : upload.status === 'uploading' ? (
+              <Skeleton className="w-full h-full" />
+            ) : (
+              <Film size={20} className="text-muted-foreground" />
+            )
           ) : (
-            <ImageIcon size={20} className="text-blue-500" />
+            <ImageIcon size={20} className="text-muted-foreground" />
           )}
         </div>
-        {isVideo && (
-          <div className="flex-shrink-0 w-12 h-12 rounded overflow-hidden">
-            {posterReady ? (
-              <img
-                src={upload.item!.thumbnail_url}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              // Skeleton while we generate/upload the poster (project standard: skeletons not spinners).
-              <Skeleton className="w-full h-full" />
-            )}
-          </div>
-        )}
         <div className="flex-1 min-w-0">
           <p className="text-sm truncate">{upload.file.name}</p>
+          <p className="text-xs text-muted-foreground">
+            {ext} · {formatBytes(upload.file.size)}
+            {duration ? ` · ${formatDuration(duration)}` : ''}
+          </p>
           {isVideo && upload.compatibility ? (
             <div className="mt-1">
               <MediaCompatibilityBadge
@@ -215,15 +224,16 @@ export function MediaUploader({
         </div>
         <div className="flex-shrink-0">
           {upload.status === 'success' ? (
-            <div className="text-green-500 text-sm">✓</div>
+            <div className="text-success text-sm" aria-label="Upload complete">✓</div>
           ) : upload.status === 'error' ? (
-            <div className="text-red-500 text-sm">✗</div>
+            <div className="text-destructive text-sm" aria-label="Upload failed">✗</div>
           ) : (
             <Button
               variant="ghost"
               size="icon"
               className="h-6 w-6"
               onClick={() => cancelUpload(upload)}
+              aria-label="Cancel upload"
             >
               <X size={14} />
             </Button>
