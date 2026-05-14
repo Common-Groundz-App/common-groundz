@@ -322,6 +322,7 @@ export function MediaUploader({
         file,
         progress: 0,
         status: 'uploading',
+        stage: 'preparing',
         compatibility: isVideo ? 'checking' : undefined,
       };
       setUploads((prev) => [...prev, newUpload]);
