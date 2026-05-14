@@ -65,6 +65,8 @@ export const ComposerBottomBar: React.FC<ComposerBottomBarProps> = ({
   locationActive,
   disabled,
   emojiPickerSlot,
+  renderUploadsInline,
+  onUploadsChange,
 }) => {
   return (
     <div
