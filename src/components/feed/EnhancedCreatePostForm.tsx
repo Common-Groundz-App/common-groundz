@@ -119,6 +119,10 @@ export function EnhancedCreatePostForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [media, setMedia] = useState<MediaItem[]>(postToEdit?.media ?? []);
   const [entities, setEntities] = useState<Entity[]>(postToEdit?.tagged_entities ?? []);
+  const [inFlightUploads, setInFlightUploads] = useState<MediaUploadState[]>([]);
+  const handleCancelUpload = useCallback((u: MediaUploadState) => {
+    setInFlightUploads((prev) => prev.filter((x) => x !== u));
+  }, []);
   const [entitySelectorVisible, setEntitySelectorVisible] = useState(false);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [visibility, setVisibility] = useState<VisibilityOption>(
