@@ -287,22 +287,18 @@ export function MediaUploader({
         );
       }).then((mediaItem) => {
         if (mediaItem) {
-          setUploads((prev) =>
-            prev.map((u) =>
-              u.file === file ? { ...u, status: 'success', item: mediaItem } : u
-            )
-          );
           onMediaUploaded(mediaItem);
           setCurrentMediaCount((prev) => prev + 1);
           if (mediaItem.type === 'video') setCurrentVideoCount((prev) => prev + 1);
 
-          setTimeout(() => {
-            setUploads((prev) => {
-              const target = prev.find((u) => u.file === file);
-              if (target?.localPosterUrl) revokePoster(target.localPosterUrl);
-              return prev.filter((u) => u.file !== file);
-            });
-          }, 2000);
+          // Remove the in-flight row immediately — the final preview is
+          // already mounting in the same React commit, so the handoff feels
+          // instant instead of lingering for ~2s.
+          setUploads((prev) => {
+            const target = prev.find((u) => u.file === file);
+            if (target?.localPosterUrl) revokePoster(target.localPosterUrl);
+            return prev.filter((u) => u.file !== file);
+          });
         } else {
           setUploads((prev) =>
             prev.map((u) =>
