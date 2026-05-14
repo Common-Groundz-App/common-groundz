@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { MoreToolsPopover } from './MoreToolsPopover';
 import { cn } from '@/lib/utils';
-import type { MediaItem } from '@/types/media';
+import type { MediaItem, MediaUploadState } from '@/types/media';
 
 export type VisibilityOption = 'public' | 'private' | 'circle';
 
