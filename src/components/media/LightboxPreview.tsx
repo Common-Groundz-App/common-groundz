@@ -21,6 +21,8 @@ export function LightboxPreview({
 }: LightboxPreviewProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
+  const [chromeVisible, setChromeVisible] = useState(true);
+  const chromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaRef = useRef<MediaItem[]>([]);
   const isMobile = useIsMobile();
   
