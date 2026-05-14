@@ -10,6 +10,7 @@ import {
   validateMediaFile,
   MAX_VIDEOS_PER_POST,
 } from '@/services/mediaService';
+import { formatDuration, formatBytes } from '@/utils/videoPoster';
 import { MediaUploadState, MediaItem } from '@/types/media';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
