@@ -71,7 +71,27 @@ export function LightboxPreview({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
-  
+
+  // Auto-fade nav chrome (not the close button) after inactivity
+  useEffect(() => {
+    const reset = () => {
+      setChromeVisible(true);
+      if (chromeTimerRef.current) clearTimeout(chromeTimerRef.current);
+      chromeTimerRef.current = setTimeout(() => setChromeVisible(false), 3000);
+    };
+    reset();
+    window.addEventListener('pointermove', reset);
+    window.addEventListener('keydown', reset);
+    window.addEventListener('touchstart', reset);
+    return () => {
+      if (chromeTimerRef.current) clearTimeout(chromeTimerRef.current);
+      window.removeEventListener('pointermove', reset);
+      window.removeEventListener('keydown', reset);
+      window.removeEventListener('touchstart', reset);
+    };
+  }, []);
+
+
   // Preload adjacent images
   const preloadAdjacentImages = () => {
     if (!media || media.length <= 1) return;
