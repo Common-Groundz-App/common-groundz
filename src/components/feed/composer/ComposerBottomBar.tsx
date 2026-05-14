@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { MediaUploader } from '@/components/media/MediaUploader';
 import { MoreToolsPopover } from './MoreToolsPopover';
 import { cn } from '@/lib/utils';
-import type { MediaItem } from '@/types/media';
+import type { MediaItem, MediaUploadState } from '@/types/media';
 
 export type VisibilityOption = 'public' | 'private' | 'circle';
 
@@ -28,6 +28,10 @@ interface ComposerBottomBarProps {
 
   /** Slot for the emoji picker rendered by parent (keeps cursor logic owned upstream). */
   emojiPickerSlot?: React.ReactNode;
+
+  /** Forwarded to inner MediaUploader so the parent can render in-flight rows above the toolbar. */
+  renderUploadsInline?: boolean;
+  onUploadsChange?: (uploads: MediaUploadState[], cancel: (u: MediaUploadState) => void) => void;
 }
 
 const getVisibilityIcon = (v: VisibilityOption) => {
@@ -61,6 +65,8 @@ export const ComposerBottomBar: React.FC<ComposerBottomBarProps> = ({
   locationActive,
   disabled,
   emojiPickerSlot,
+  renderUploadsInline,
+  onUploadsChange,
 }) => {
   return (
     <div
@@ -79,6 +85,8 @@ export const ComposerBottomBar: React.FC<ComposerBottomBarProps> = ({
           onMediaUploaded={onMediaUploaded}
           initialMedia={media}
           maxMediaCount={maxMediaCount}
+          renderUploadsInline={renderUploadsInline}
+          onUploadsChange={onUploadsChange}
           customButton={
             <Button
               type="button"

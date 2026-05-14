@@ -1379,6 +1379,8 @@ export function EnhancedCreatePostForm({
         locationActive={showLocationInput}
         disabled={showLocationInput}
         emojiPickerSlot={emojiPickerNode}
+        renderUploadsInline={false}
+        onUploadsChange={handleUploadsChange}
       />
 
       {/* Modals */}
