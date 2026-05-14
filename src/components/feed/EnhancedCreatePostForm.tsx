@@ -1155,7 +1155,7 @@ export function EnhancedCreatePostForm({
 
         {/* Media preview */}
         {media.length > 0 && (
-          <TwitterStyleMediaPreview media={media} onRemove={removeMedia} />
+          <ComposerMediaPreview media={media} onRemove={removeMedia} />
         )}
 
         {/* Location chip */}
