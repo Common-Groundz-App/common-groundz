@@ -282,7 +282,7 @@ export function MediaUploader({
         className={cn(
           'border-2 border-dashed rounded-lg p-6 text-center transition-all',
           disabled ? 'opacity-30 cursor-not-allowed pointer-events-none' : 'cursor-pointer',
-          !disabled && isDragging ? 'border-primary bg-primary/10' : 'border-gray-300',
+          !disabled && isDragging ? 'border-primary bg-primary/10' : 'border-border',
           !disabled && !isDragging && 'hover:border-primary/50',
           currentMediaCount >= maxMediaCount && 'opacity-50 cursor-not-allowed'
         )}
