@@ -156,7 +156,7 @@ export function MediaUploader({
 
   // Notify parent of upload list changes (used when renderUploadsInline=false).
   useEffect(() => {
-    onUploadsChange?.(uploads);
+    onUploadsChange?.(uploads, cancelUpload);
   }, [uploads, onUploadsChange]);
 
   // Revoke any leftover object URLs on unmount.
