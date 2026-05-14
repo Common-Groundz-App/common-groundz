@@ -1,77 +1,143 @@
-## Phase 3 — manual destructive cleanup (revised)
+# Private Video Views + Composer Compatibility Badge
 
-ChatGPT's correction is accepted: **do not create a new execute function.** `supabase/functions/cleanup-orphan-media-execute/index.ts` already exists, is cron-secret gated, hard-caps at `MAX_DELETIONS_HARD_CAP = 50`, writes its own `media_cleanup_runs` audit row, and was verified by the 50/181 deletes in the Recent runs table.
+Quietly collect reliable private video view data and improve upload confidence. No public view counts. No transcoding.
 
-Phase 3 only adds (a) an admin-gated wrapper and (b) the UI button + confirm modal.
+## What we're building
 
-### 1. New edge function `admin-media-cleanup-execute-trigger`
+1. **`media_views` table** — private, future-proof schema for video view events.
+2. **`track-media-view` edge function** — only entry point for inserts; enforces the "real view" rule.
+3. **`useVideoViewTracker` hook** — fires once per visible+playing video after ≥ 2500ms.
+4. **`FeedVideo` wiring** — opt-in via `sourceId` (only `source = 'post'` for now).
+5. **Composer compatibility badge** — soft, persistent inline status on the upload row.
 
-Same shape as `admin-media-cleanup-trigger`. Admin-only, never callable from the browser without a valid admin JWT.
+No UI surface shows view counts anywhere.
 
-- **Auth gate:** require `Authorization: Bearer <jwt>`, validate via `auth.getClaims`, then `has_role(user.id, 'admin')` via service-role client. Reject with 401 / 403 + sanitized error codes.
-- **Body validation (zod):** `{ confirm: 'DELETE', maxDeletions: number (1-50 integer) }`. Reject with 400 on mismatch. Server clamps `maxDeletions` to `[1, 50]` regardless of payload (matches the existing `MAX_DELETIONS_HARD_CAP` in the execute function).
-- **Pre-flight safety gate** (read-only, server-side):
-  1. Fetch latest `media_cleanup_runs` row where `mode='dry-run'`.
-  2. Reject 409 `NO_DRY_RUN` if none exists.
-  3. Reject 409 `STALE_DRY_RUN` if `started_at` is older than 24h.
-  4. Reject 409 `NOTHING_TO_DELETE` if `would_delete = 0`.
-  5. Reject 409 `DRY_RUN_DRIFT` if `would_delete > maxDeletions * 4` (drift guard — orphan count grew way beyond the operator's expectation).
-- **Capture `triggerStartedAt`** before upstream call.
-- **Server-side fetch** to `cleanup-orphan-media-execute` with `x-cron-secret`, `Authorization: Bearer <SERVICE_ROLE_KEY>`, body `{ mode: 'execute', maxDeletions }`.
-- **Audit read-back:** query newest `media_cleanup_runs` row with `mode='execute'` and `started_at >= triggerStartedAt`. Surface `auditWritten` boolean + new `runId` in response.
-- Return `{ ok, auditWritten, runId, result }`. Never echo service role key or cron secret.
-- Register in `supabase/config.toml` with `verify_jwt = false` (in-code validation, matching project convention).
+---
 
-### 2. Frontend — `AdminMediaCleanupPanel.tsx`
+## 1. `media_views` table (migration)
 
-Add a destructive action region directly under the schedule/staleness lines.
+Columns:
+- `id` uuid pk
+- `source` text — `'post' | 'review' | 'entity'`, default `'post'`
+- `source_id` uuid not null
+- `media_path` text not null — storage path, no protocol/host, no query string, **original casing preserved**
+- `user_id` uuid nullable (logged-in viewer)
+- `anon_session_id` text nullable (guest viewer, from localStorage)
+- `was_autoplay` bool
+- `watch_ms` int (>= 0 in DB; function enforces >= 2500)
+- `ip_hash` text nullable (SHA-256 with `VIEW_IP_SALT`)
+- `tracker_version` text default `'v1'`
+- `viewed_at` timestamptz default `now()`
 
-**Button states (derived from latest dry-run row already in the panel's query):**
+Indexes:
+- Unique partial: `(user_id, source, source_id, media_path) WHERE user_id IS NOT NULL`
+- Unique partial: `(anon_session_id, source, source_id, media_path) WHERE user_id IS NULL AND anon_session_id IS NOT NULL`
+- `(source, source_id)` for future aggregation
+- `(viewed_at)` for time-window reads
 
-| Condition | Button | Inline reason text |
-|---|---|---|
-| No dry-run row | disabled | "Run a dry-run first" |
-| Latest dry-run > 24h old | disabled | "Latest dry-run is stale — run a fresh one" |
-| `would_delete = 0` | disabled | "Nothing to clean up" |
-| Otherwise | enabled (`variant="destructive"`, `Trash2` icon) | shows `would_delete` count |
+RLS:
+- Enabled.
+- **No public INSERT, no public SELECT.**
+- `service_role`: full access (function writes; admins read via future tooling).
 
-**Confirmation modal** (`AlertDialog`):
-- Title: `Permanently delete orphan media?`
-- Body shows: bucket (`post_media`), latest dry-run timestamp ("Based on dry-run from 12 minutes ago"), `would_delete` count, first 5 sample paths from `sample_deleted` (monospace, truncated).
-- `maxDeletions` numeric `Input`, label "Max files to delete this run", default `Math.min(50, would_delete)`, `min={1}` `max={50}`.
-- Type-to-confirm `Input`, placeholder `Type DELETE to confirm`. Confirm button stays disabled until value === `'DELETE'`.
-- Confirm copy: `Permanently delete N files` (N = clamped maxDeletions).
-- Cancel button always enabled (except while loading).
+Constraint: `watch_ms >= 0`, `source IN ('post','review','entity')`.
 
-**Submit handler:**
-- `supabase.functions.invoke('admin-media-cleanup-execute-trigger', { body: { confirm: 'DELETE', maxDeletions } })`.
-- On success: toast `Deleted N files` (N from `result.deleted`); if `result.errors.length > 0` use warning toast `Deleted N, M errors — see Recent runs`; if `auditWritten === false` show separate warning `Cleanup ran but audit row not found — check edge function logs`.
-- On 409 from preflight: toast the human reason mapped from error code (e.g. `Nothing to clean up`, `Latest dry-run is stale`, `Orphan count drifted — re-run dry-run`).
-- On 401/403: toast `Not authorized` (should never happen since the panel itself is admin-gated, but defend anyway).
-- `queryClient.invalidateQueries(['admin-media-cleanup-runs'])` so the new execute row, sparkline, and "Latest execute" card refresh immediately.
-- 60s cooldown after success or failure (vs 30s for dry-run), tracked the same way as the existing dry-run cooldown.
+## 2. Edge function `track-media-view`
 
-### 3. Out of scope (explicit non-goals)
+`supabase/functions/track-media-view/index.ts`, `verify_jwt = false` in `config.toml`.
 
-- No automatic execute cron. Cron stays dry-run only.
-- No raising `MAX_DELETIONS_HARD_CAP` above 50 in this phase.
-- No editing schedule from UI, no email/Slack alerts, no per-bucket breakdown.
-- No undo / soft-delete buffer.
-- No rename of `sample_deleted` column.
+- CORS preflight handled.
+- Zod body: `{ source: 'post'|'review'|'entity', sourceId: uuid, mediaPath: string, wasAutoplay: bool, watchMs: int, anonSessionId?: string, trackerVersion?: string }`.
+- Reject if `watchMs < 2500` → `{ ok: false, reason: 'too_short' }` 200.
+- Resolve `user_id` from JWT if present (anon key call still gives us the bearer).
+- If `VIEW_IP_SALT` set: hash first IP from `x-forwarded-for` (SHA-256). Otherwise skip.
+- Optional in-memory per-IP throttle (60/min). Skip silently if salt missing.
+- Normalize `mediaPath` server-side too (defense in depth): strip protocol/host + query, **keep casing**.
+- Insert via service-role client. Swallow unique violation as `{ ok: true, deduped: true }`.
+- Errors return generic `{ ok: false }` 200 (never throws to client).
 
-### 4. Files
+Secret needed: `VIEW_IP_SALT` (best-effort, function works without it).
 
-- New: `supabase/functions/admin-media-cleanup-execute-trigger/index.ts`
-- Edit: `supabase/config.toml` — register the new function with `verify_jwt = false`
-- Edit: `src/components/admin/AdminMediaCleanupPanel.tsx` — add disabled-aware button, confirm modal, mutation, cooldown, toasts
+## 3. `useVideoViewTracker` hook
 
-No DB migration. No changes to `cleanup-orphan-media-execute` or `cleanup-orphan-media`.
+`src/hooks/useVideoViewTracker.ts`
 
-### 5. Why this is safe
+- Args: `{ videoRef, source?: 'post'|'review'|'entity', sourceId?: string, mediaPath: string, autoplayRef }`.
+- **No-op silently** if `sourceId` missing.
+- IntersectionObserver (≥ 50% visible) + `playing` state → start a timer; accumulates `watch_ms` while visible+playing+tab-visible.
+- When `watch_ms >= 2500` and not yet sent for this mount → POST once, mark sent.
+- `anon_session_id`: read/create in `localStorage` (`cg_anon_session_id`), uuid v4.
+- Silent on failure.
 
-Three independent gates must all pass before a single object is deleted:
-1. Browser: type-to-confirm `DELETE` + admin-only route.
-2. Wrapper function: admin JWT + `has_role` + preflight checks against latest dry-run.
-3. Execute function: cron-secret + server-side hard cap of 50.
+## 4. `FeedVideo` wiring
 
-A misclick, a stolen anon key, or a single compromised gate is not enough to cause data loss.
+- Add optional props `source?: 'post'|'review'|'entity'` (default `'post'`) and `sourceId?: string`.
+- Compute `mediaPath` via new helper `extractMediaPath(item.url)` in `src/utils/mediaPath.ts`:
+  - Parse URL, drop protocol+host, drop search/hash.
+  - **Preserve original casing** (Supabase Storage is case-sensitive).
+  - Fall back to raw input if URL parse fails.
+- Call `useVideoViewTracker` with `videoRef`, `autoplayRef`, `source`, `sourceId`, `mediaPath`.
+- Existing `analytics.trackVideoPlayed/Progress/Completed` console events untouched.
+- Pass `sourceId` from post feed/post detail call sites (post id).
+
+## 5. Composer compatibility badge
+
+`src/components/media/MediaCompatibilityBadge.tsx` — three states using semantic tokens (no hardcoded colors):
+- `checking` — `bg-muted text-muted-foreground` "Checking compatibility…"
+- `compatible` — success-tinted "Compatible video"
+- `risky` — warning-tinted "May not play on all devices"
+
+Wiring in `MediaUploader.tsx`:
+- Extend `MediaUploadState` with `compatibility?: 'checking' | 'compatible' | 'risky'` and optional `compatibilityNote`.
+- For video files, set `checking` immediately, run `detectHEVCRisk` in background, then set `compatible` or `risky`.
+- Replace the one-shot HEIC/MOV toast with the inline badge in `renderUploadRow`. Suppress repeat toasts via `sessionStorage` key.
+- Compatibility lives **only on `MediaUploadState`** — never persisted to `MediaItem`.
+
+If success-tinted/warning-tinted tokens don't already exist, add them to `index.css` (HSL, both themes).
+
+## 6. Files
+
+New:
+- `supabase/migrations/<ts>_media_views.sql`
+- `supabase/functions/track-media-view/index.ts`
+- `src/hooks/useVideoViewTracker.ts`
+- `src/utils/mediaPath.ts`
+- `src/components/media/MediaCompatibilityBadge.tsx`
+
+Edited:
+- `src/components/media/FeedVideo.tsx` (props + tracker wiring)
+- `src/components/media/MediaUploader.tsx` (badge + state)
+- `src/types/media.ts` (`MediaUploadState.compatibility` only)
+- `src/index.css` (success/warning surface tokens if missing)
+- `supabase/config.toml` (`[functions.track-media-view] verify_jwt = false`)
+- Post feed + post detail call sites of `FeedVideo` (pass `sourceId={post.id}`)
+
+Secret:
+- `VIEW_IP_SALT` (optional but recommended)
+
+## 7. Build order
+
+1. Migration (table + RLS + indexes).
+2. Edge function + `config.toml`.
+3. `mediaPath.ts` helper.
+4. `useVideoViewTracker` hook.
+5. `FeedVideo` wiring + call-site `sourceId`.
+6. `MediaCompatibilityBadge` + `MediaUploader` integration + `MediaUploadState` type.
+
+## 8. Verification
+
+- SQL: confirm table, RLS denies anon SELECT/INSERT, indexes exist.
+- `supabase--curl_edge_functions`: short watch (1000ms) → `too_short`; valid call → ok; repeat call → `deduped: true`.
+- Browser: play a feed video for 3s → one row in `media_views`; replay same session → no new row.
+- Composer: attach iPhone MOV → badge shows `checking` then `risky`; attach MP4 → `compatible`.
+
+## 9. Known limitation
+
+`watch_ms` is client-reported. Acceptable for MVP; can be tightened later with server beacons.
+
+## Out of scope
+
+- Public view count UI.
+- Admin analytics view.
+- Backend transcoding.
+- Wiring `source = 'review' | 'entity'` (schema ready, not used yet).
