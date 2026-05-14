@@ -367,9 +367,13 @@ export function MediaUploader({
         })();
       }
 
-      uploadMedia(file, user.id, sessionId, (progress) => {
+      uploadMedia(file, user.id, sessionId, (progress, stage) => {
         setUploads((prev) =>
-          prev.map((u) => (u.file === file ? { ...u, progress } : u))
+          prev.map((u) =>
+            u.file === file
+              ? { ...u, progress, ...(stage ? { stage } : {}) }
+              : u
+          )
         );
       }).then((mediaItem) => {
         if (mediaItem) {
