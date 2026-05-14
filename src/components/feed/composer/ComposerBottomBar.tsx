@@ -85,6 +85,8 @@ export const ComposerBottomBar: React.FC<ComposerBottomBarProps> = ({
           onMediaUploaded={onMediaUploaded}
           initialMedia={media}
           maxMediaCount={maxMediaCount}
+          renderUploadsInline={renderUploadsInline}
+          onUploadsChange={onUploadsChange}
           customButton={
             <Button
               type="button"
