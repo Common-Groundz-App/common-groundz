@@ -1,37 +1,35 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useVideoMute } from '@/hooks/useVideoMute';
 import { useVideoAutoplay } from '@/hooks/useVideoAutoplay';
 import { useVideoMilestones } from '@/hooks/useVideoMilestones';
+import { useVideoViewTracker } from '@/hooks/useVideoViewTracker';
 import { formatDuration } from '@/utils/videoPoster';
+import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
 import { MediaItem } from '@/types/media';
 
 interface FeedVideoProps {
   item: MediaItem;
   className?: string;
-  /** Tap handler — used to open the lightbox on mobile. */
   onTap?: () => void;
-  /** Show the duration badge overlay. */
   showBadge?: boolean;
   objectFit?: 'contain' | 'cover';
+  /** Source type for view tracking. Defaults to 'post'. */
+  source?: 'post' | 'review' | 'entity';
+  /** Source id (e.g. post id) — required to track views. No-op if missing. */
+  sourceId?: string;
 }
 
-/**
- * Feed-friendly video tile:
- * - Uses generated poster (no black flash)
- * - Muted autoplay when in viewport (data-saver / reduced-motion safe)
- * - Tap toggles global persistent mute
- * - Duration badge overlay
- * - Fires video_played once on first play, plus 25/50/75/100% milestones
- */
 export function FeedVideo({
   item,
   className,
   onTap,
   showBadge = true,
   objectFit = 'contain',
+  source = 'post',
+  sourceId,
 }: FeedVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [muted, toggleMute] = useVideoMute();
@@ -40,8 +38,14 @@ export function FeedVideo({
 
   useVideoAutoplay(videoRef, { threshold: 0.5 });
   useVideoMilestones(videoRef, { src: item.url, autoplayRef });
+  useVideoViewTracker({
+    videoRef,
+    source,
+    sourceId,
+    mediaPath: extractMediaPath(item.url),
+    autoplayRef,
+  });
 
-  // Keep video.muted in sync with global mute state.
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -62,7 +66,6 @@ export function FeedVideo({
       onTap();
       return;
     }
-    // Default behaviour: toggle mute globally
     toggleMute();
   };
 
@@ -83,7 +86,6 @@ export function FeedVideo({
         )}
       />
 
-      {/* Mute / unmute affordance */}
       <button
         type="button"
         aria-label={muted ? 'Unmute video' : 'Mute video'}
