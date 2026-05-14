@@ -30,13 +30,17 @@ function throttled(ipHash: string | null): boolean {
 
 function normalizeMediaPath(input: string): string {
   // Strip protocol/host and query/hash; preserve casing.
+  let path: string;
   try {
     const u = new URL(input);
-    return u.pathname.replace(/^\/+/, '');
+    path = u.pathname;
   } catch {
-    // Not a full URL — strip just query/hash, keep as-is
-    return input.split('?')[0].split('#')[0].replace(/^\/+/, '');
+    path = input.split('?')[0].split('#')[0];
   }
+  path = path.replace(/^\/+/, '');
+  // Strip Supabase Storage prefix (public or signed URLs) so dedupe key is bucket-relative
+  path = path.replace(/^storage\/v1\/object\/(public|sign)\/[^/]+\//, '');
+  return path;
 }
 
 async function sha256Hex(s: string): Promise<string> {
