@@ -504,6 +504,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                 maxHeight="h-80"
                 aspectRatio="maintain"
                 objectFit="contain"
+                source="post"
+                sourceId={post.id}
               />
             </div>
           )}
