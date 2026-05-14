@@ -130,8 +130,8 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      return new Response(JSON.stringify({ ok: false }), {
-        status: 200,
+      return new Response(JSON.stringify({ ok: false, error: 'server_error' }), {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
