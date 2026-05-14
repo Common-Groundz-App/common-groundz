@@ -59,6 +59,69 @@ export function UploadRow({
   const ext =
     upload.file.name.split('.').pop()?.toUpperCase() || (isVideo ? 'VIDEO' : 'IMAGE');
 
+  // Staged animator. We don't have real byte-level progress (Supabase Storage
+  // upload uses fetch and doesn't expose it), so we ease a local `display`
+  // value toward a per-stage ceiling. Guarantees a minimum forward creep so
+  // the bar never visually freezes on slow connections.
+  const stage = upload.stage ?? 'preparing';
+  const isError = upload.status === 'error';
+  const [display, setDisplay] = useState(0);
+  // Bumped ceiling for pathologically slow `preparing` (e.g. huge MOV on a
+  // slow CPU). Reassures the user that work is still happening.
+  const [preparingBoost, setPreparingBoost] = useState(false);
+
+  // After 10s still in `preparing`, nudge the ceiling up once.
+  useEffect(() => {
+    if (stage !== 'preparing') {
+      setPreparingBoost(false);
+      return;
+    }
+    const t = setTimeout(() => setPreparingBoost(true), 10000);
+    return () => clearTimeout(t);
+  }, [stage]);
+
+  useEffect(() => {
+    if (isError) return; // Freeze on error.
+    if (stage === 'done') {
+      setDisplay(100);
+      return;
+    }
+    const ceiling =
+      stage === 'preparing'
+        ? preparingBoost
+          ? 25
+          : 15
+        : stage === 'uploading'
+        ? 90
+        : /* finalizing */ 97;
+
+    let raf = 0;
+    const tick = () => {
+      setDisplay((cur) => {
+        if (cur >= ceiling) return ceiling;
+        const next = cur + Math.max((ceiling - cur) * 0.04, 0.15);
+        return next > ceiling ? ceiling : next;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [stage, preparingBoost, isError]);
+
+  const stageLabel = isError
+    ? 'Upload failed'
+    : stage === 'preparing'
+    ? isVideo
+      ? 'Preparing video…'
+      : 'Preparing…'
+    : stage === 'uploading'
+    ? 'Uploading…'
+    : stage === 'finalizing'
+    ? 'Finalizing…'
+    : '';
+
+  const showShimmer = !isError && stage !== 'done';
+
   return (
     <div className="flex items-center space-x-2 border border-border rounded-md p-2">
       <div className="flex-shrink-0 relative w-16 h-16 rounded-md overflow-hidden bg-muted flex items-center justify-center">
@@ -99,7 +162,29 @@ export function UploadRow({
             />
           </div>
         ) : null}
-        <Progress value={upload.progress} className="h-1 mt-1" />
+        {stageLabel ? (
+          <p
+            className={cn(
+              'text-[11px] mt-1 leading-none',
+              isError ? 'text-destructive' : 'text-muted-foreground'
+            )}
+          >
+            {stageLabel}
+          </p>
+        ) : null}
+        <div className="relative h-1 mt-1 overflow-hidden rounded-full bg-secondary">
+          <div
+            className="h-full bg-primary transition-[width] duration-150 ease-out"
+            style={{ width: `${display}%` }}
+          />
+          {showShimmer ? (
+            <div
+              className="pointer-events-none absolute inset-0 motion-safe:animate-shimmer-slide bg-gradient-to-r from-transparent via-white/40 to-transparent"
+              style={{ width: '40%' }}
+              aria-hidden
+            />
+          ) : null}
+        </div>
       </div>
       <div className="flex-shrink-0">
         {upload.status === 'success' ? (
