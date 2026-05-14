@@ -1196,6 +1196,20 @@ export function EnhancedCreatePostForm({
           </div>
         )}
 
+        {/* In-flight uploads — rendered above the toolbar so the toolbar
+            icons (Image / Smile / More) stay aligned during upload. */}
+        {inFlightUploads.length > 0 && (
+          <div className="space-y-2 mt-3">
+            {inFlightUploads.map((upload, index) => (
+              <UploadRow
+                key={index}
+                upload={upload}
+                onCancel={handleCancelInFlight}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Desktop-only inline footer — toolbar + visibility + Post anchored to content column */}
         <div className="hidden md:flex items-center justify-between gap-2 border-t border-border pt-3 mt-4">
           <div className="flex items-center gap-1">
