@@ -268,14 +268,17 @@ export function LightboxPreview({
         
         {/* Navigation controls - only shown when there are multiple items */}
         {media.length > 1 && (
-          <>
-            {/* Previous button - smaller on mobile */}
+          <div
+            className={cn(
+              "motion-safe:transition-opacity motion-safe:duration-200",
+              chromeVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+            )}
+          >
+            {/* Previous button */}
             <Button
               className={cn(
                 "absolute top-1/2 -translate-y-1/2 rounded-full bg-gray-800/70 hover:bg-gray-700",
-                isMobile 
-                  ? "left-1 h-8 w-8" 
-                  : "left-4 h-12 w-12"
+                isMobile ? "left-1 h-8 w-8" : "left-4 h-12 w-12"
               )}
               size="icon"
               variant="ghost"
@@ -288,14 +291,12 @@ export function LightboxPreview({
               <ChevronLeft className={cn("text-white", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               <span className="sr-only">Previous image</span>
             </Button>
-            
-            {/* Next button - smaller on mobile */}
+
+            {/* Next button */}
             <Button
               className={cn(
                 "absolute top-1/2 -translate-y-1/2 rounded-full bg-gray-800/70 hover:bg-gray-700",
-                isMobile 
-                  ? "right-1 h-8 w-8" 
-                  : "right-4 h-12 w-12"
+                isMobile ? "right-1 h-8 w-8" : "right-4 h-12 w-12"
               )}
               size="icon"
               variant="ghost"
@@ -308,35 +309,33 @@ export function LightboxPreview({
               <ChevronRight className={cn("text-white", isMobile ? "h-5 w-5" : "h-8 w-8")} />
               <span className="sr-only">Next image</span>
             </Button>
-            
-            {/* Image counter - more compact on mobile */}
-            <div className="absolute bottom-6 left-0 right-0 flex justify-center">
-              <div className={cn(
-                "flex items-center gap-2",
-                isMobile && "scale-90"
-              )}>
-                {/* Navigation dots - simplified on mobile */}
+
+            {/* Image counter */}
+            <div
+              className="absolute left-0 right-0 flex justify-center"
+              style={{ bottom: 'max(env(safe-area-inset-bottom), 1.5rem)' }}
+            >
+              <div className={cn("flex items-center gap-2", isMobile && "scale-90")}>
                 <div className={cn("flex gap-2", isMobile && "gap-1")}>
-                   {media.map((item, idx) => (
-                     <button
-                       key={getImageKey(item, idx)}
-                       className={cn(
-                         "h-2 rounded-full transition-all focus:outline-none",
-                         idx === currentIndex 
-                           ? isMobile ? "w-6 bg-brand-orange" : "w-8 bg-brand-orange"
-                           : "w-2 bg-white opacity-70 hover:opacity-100"
-                       )}
-                       onClick={(e) => {
-                         e.stopPropagation();
-                         e.preventDefault();
-                         setCurrentIndex(idx);
-                       }}
-                       aria-label={`Go to image ${idx + 1}`}
-                     />
-                   ))}
+                  {media.map((item, idx) => (
+                    <button
+                      key={getImageKey(item, idx)}
+                      className={cn(
+                        "h-2 rounded-full transition-all focus:outline-none",
+                        idx === currentIndex
+                          ? isMobile ? "w-6 bg-brand-orange" : "w-8 bg-brand-orange"
+                          : "w-2 bg-white opacity-70 hover:opacity-100"
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setCurrentIndex(idx);
+                      }}
+                      aria-label={`Go to image ${idx + 1}`}
+                    />
+                  ))}
                 </div>
-                
-                {/* Image counter text - more compact on mobile */}
+
                 <span className={cn(
                   "ml-4 rounded-full bg-black/60 px-3 py-1 text-white",
                   isMobile ? "text-xs" : "text-sm"
@@ -345,7 +344,8 @@ export function LightboxPreview({
                 </span>
               </div>
             </div>
-           </>
+           </div>
+
          )}
        </div>
       </div>
