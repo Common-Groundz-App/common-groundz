@@ -28,6 +28,10 @@ interface ComposerBottomBarProps {
 
   /** Slot for the emoji picker rendered by parent (keeps cursor logic owned upstream). */
   emojiPickerSlot?: React.ReactNode;
+
+  /** Forwarded to inner MediaUploader so the parent can render in-flight rows above the toolbar. */
+  renderUploadsInline?: boolean;
+  onUploadsChange?: (uploads: MediaUploadState[], cancel: (u: MediaUploadState) => void) => void;
 }
 
 const getVisibilityIcon = (v: VisibilityOption) => {
