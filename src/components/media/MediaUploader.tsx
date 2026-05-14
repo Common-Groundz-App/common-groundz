@@ -14,6 +14,7 @@ import { MediaUploadState, MediaItem } from '@/types/media';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { detectHEVCRisk } from '@/utils/codecSupport';
+import { MediaCompatibilityBadge } from '@/components/media/MediaCompatibilityBadge';
 
 interface MediaUploaderProps {
   sessionId: string;
@@ -95,17 +96,36 @@ export function MediaUploader({
 
       if (isVideo) {
         pendingVideoCount += 1;
-
-        if (file.type === 'video/quicktime' || /\.mov$/i.test(file.name)) {
-          const warning = await detectHEVCRisk(file);
-          if (warning) {
-            toast({ title: 'Heads up about this video', description: warning });
-          }
-        }
       }
 
-      const newUpload: MediaUploadState = { file, progress: 0, status: 'uploading' };
+      const newUpload: MediaUploadState = {
+        file,
+        progress: 0,
+        status: 'uploading',
+        compatibility: isVideo ? 'checking' : undefined,
+      };
       setUploads((prev) => [...prev, newUpload]);
+
+      if (isVideo) {
+        // Soft, non-blocking compatibility hint shown inline as a badge.
+        const isMov = file.type === 'video/quicktime' || /\.mov$/i.test(file.name);
+        (async () => {
+          let compatibility: 'compatible' | 'risky' = 'compatible';
+          let note: string | undefined;
+          if (isMov) {
+            const warning = await detectHEVCRisk(file);
+            if (warning) {
+              compatibility = 'risky';
+              note = warning;
+            }
+          }
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.file === file ? { ...u, compatibility, compatibilityNote: note } : u
+            )
+          );
+        })();
+      }
 
       uploadMedia(file, user.id, sessionId, (progress) => {
         setUploads((prev) =>
@@ -182,6 +202,14 @@ export function MediaUploader({
         )}
         <div className="flex-1 min-w-0">
           <p className="text-sm truncate">{upload.file.name}</p>
+          {isVideo && upload.compatibility ? (
+            <div className="mt-1">
+              <MediaCompatibilityBadge
+                state={upload.compatibility}
+                note={upload.compatibilityNote}
+              />
+            </div>
+          ) : null}
           <Progress value={upload.progress} className="h-1 mt-1" />
         </div>
         <div className="flex-shrink-0">
