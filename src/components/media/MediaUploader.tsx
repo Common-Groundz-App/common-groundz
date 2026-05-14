@@ -34,7 +34,10 @@ interface MediaUploaderProps {
    */
   renderUploadsInline?: boolean;
   /** Callback fired whenever the in-flight upload list changes. */
-  onUploadsChange?: (uploads: MediaUploadState[]) => void;
+  onUploadsChange?: (
+    uploads: MediaUploadState[],
+    cancel: (upload: MediaUploadState) => void
+  ) => void;
 }
 
 /**
