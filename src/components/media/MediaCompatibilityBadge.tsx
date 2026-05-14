@@ -38,7 +38,7 @@ export function MediaCompatibilityBadge({ state, note, className }: Props) {
         title={note}
       >
         <CheckCircle2 className="h-3 w-3" aria-hidden />
-        Compatible video
+        Should play everywhere
       </span>
     );
   }
