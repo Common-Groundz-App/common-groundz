@@ -120,8 +120,16 @@ export function EnhancedCreatePostForm({
   const [media, setMedia] = useState<MediaItem[]>(postToEdit?.media ?? []);
   const [entities, setEntities] = useState<Entity[]>(postToEdit?.tagged_entities ?? []);
   const [inFlightUploads, setInFlightUploads] = useState<MediaUploadState[]>([]);
-  const handleCancelUpload = useCallback((u: MediaUploadState) => {
-    setInFlightUploads((prev) => prev.filter((x) => x !== u));
+  const cancelUploadRef = useRef<((u: MediaUploadState) => void) | null>(null);
+  const handleUploadsChange = useCallback(
+    (uploads: MediaUploadState[], cancel: (u: MediaUploadState) => void) => {
+      cancelUploadRef.current = cancel;
+      setInFlightUploads(uploads);
+    },
+    []
+  );
+  const handleCancelInFlight = useCallback((u: MediaUploadState) => {
+    cancelUploadRef.current?.(u);
   }, []);
   const [entitySelectorVisible, setEntitySelectorVisible] = useState(false);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
