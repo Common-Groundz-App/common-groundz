@@ -15,6 +15,10 @@ interface PostMediaDisplayProps {
   enableBackground?: boolean;
   thumbnailDisplay?: 'always' | 'hover' | 'none';
   enableLazyLoading?: boolean;
+  /** Source type for video view tracking. Defaults to 'post'. */
+  source?: 'post' | 'review' | 'entity';
+  /** Source id (post id, review id, etc.) for video view tracking. */
+  sourceId?: string;
 }
 
 export function PostMediaDisplay({ 
@@ -26,7 +30,9 @@ export function PostMediaDisplay({
   objectFit = 'contain',
   enableBackground = true,
   thumbnailDisplay = 'always',
-  enableLazyLoading = true
+  enableLazyLoading = true,
+  source = 'post',
+  sourceId
 }: PostMediaDisplayProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -106,8 +112,10 @@ export function PostMediaDisplay({
         enableLazyLoading={enableLazyLoading}
         displayMode={displayType}
         onImageClick={handleImageClick}
+        source={source}
+        sourceId={sourceId}
       />
-      
+
       {/* Replace Dialog with a direct render of LightboxPreview when lightbox is open */}
       {lightboxOpen && (
         <LightboxPreview

@@ -21,6 +21,10 @@ interface TwitterStyleMediaPreviewProps {
   displayMode?: 'grid' | 'carousel' | 'linkedin';
   onImageClick?: (index: number) => void;
   currentIndex?: number;
+  /** Optional view-tracking source. Defaults to 'post'. */
+  source?: 'post' | 'review' | 'entity';
+  /** Optional source id (e.g. post id) for video view tracking. */
+  sourceId?: string;
 }
 
 export function TwitterStyleMediaPreview({
@@ -36,7 +40,9 @@ export function TwitterStyleMediaPreview({
   enableLazyLoading = true,
   displayMode = 'grid',
   onImageClick,
-  currentIndex = 0
+  currentIndex = 0,
+  source = 'post',
+  sourceId
 }: TwitterStyleMediaPreviewProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(currentIndex);
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
