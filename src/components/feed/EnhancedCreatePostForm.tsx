@@ -1218,6 +1218,8 @@ export function EnhancedCreatePostForm({
               onMediaUploaded={handleMediaUpload}
               initialMedia={media}
               maxMediaCount={MAX_MEDIA_COUNT}
+              renderUploadsInline={false}
+              onUploadsChange={handleUploadsChange}
               customButton={
                 <Button
                   type="button"
