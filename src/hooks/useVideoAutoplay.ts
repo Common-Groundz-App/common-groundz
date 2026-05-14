@@ -1,4 +1,5 @@
 import { useEffect, RefObject } from 'react';
+import { readGlobalVideoMuted, setGlobalVideoMuted } from './useVideoMute';
 
 /**
  * Autoplay a video when at least `threshold` of it is in the viewport.
