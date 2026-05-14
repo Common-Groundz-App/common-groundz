@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,7 +10,7 @@ import {
   validateMediaFile,
   MAX_VIDEOS_PER_POST,
 } from '@/services/mediaService';
-import { formatDuration, formatBytes } from '@/utils/videoPoster';
+import { formatDuration, formatBytes, generateVideoPoster } from '@/utils/videoPoster';
 import { MediaUploadState, MediaItem } from '@/types/media';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -25,6 +25,105 @@ interface MediaUploaderProps {
   customButton?: React.ReactNode;
   maxMediaCount?: number;
   disabled?: boolean;
+  /**
+   * When false (and `customButton` is set), the uploader only renders the
+   * trigger and reports in-flight uploads via `onUploadsChange` so the
+   * parent can render the progress rows in a different region (e.g. above
+   * the toolbar instead of inside it).
+   * Default: true (current behavior).
+   */
+  renderUploadsInline?: boolean;
+  /** Callback fired whenever the in-flight upload list changes. */
+  onUploadsChange?: (
+    uploads: MediaUploadState[],
+    cancel: (upload: MediaUploadState) => void
+  ) => void;
+}
+
+/**
+ * Renders a single in-flight upload row. Exported so callers using
+ * `renderUploadsInline={false}` can render the rows themselves above
+ * the composer toolbar.
+ */
+export function UploadRow({
+  upload,
+  onCancel,
+}: {
+  upload: MediaUploadState;
+  onCancel: (upload: MediaUploadState) => void;
+}) {
+  const isVideo = upload.file.type.startsWith('video/');
+  const serverPoster = upload.item?.thumbnail_url;
+  const localPoster = upload.localPosterUrl;
+  const duration = upload.item?.duration ?? upload.localDuration;
+  const ext =
+    upload.file.name.split('.').pop()?.toUpperCase() || (isVideo ? 'VIDEO' : 'IMAGE');
+
+  return (
+    <div className="flex items-center space-x-2 border border-border rounded-md p-2">
+      <div className="flex-shrink-0 relative w-16 h-16 rounded-md overflow-hidden bg-muted flex items-center justify-center">
+        {isVideo ? (
+          serverPoster || localPoster ? (
+            <>
+              <img
+                src={serverPoster ?? localPoster}
+                alt=""
+                className="w-full h-full object-cover"
+              />
+              {duration ? (
+                <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 py-0.5 text-[10px] font-medium text-white leading-none">
+                  {formatDuration(duration)}
+                </span>
+              ) : null}
+            </>
+          ) : upload.status === 'uploading' || upload.status === 'idle' ? (
+            <Skeleton className="w-full h-full" />
+          ) : (
+            <Film size={20} className="text-muted-foreground" />
+          )
+        ) : (
+          <ImageIcon size={20} className="text-muted-foreground" />
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm truncate">{upload.file.name}</p>
+        <p className="text-xs text-muted-foreground">
+          {ext} · {formatBytes(upload.file.size)}
+          {duration ? ` · ${formatDuration(duration)}` : ''}
+        </p>
+        {isVideo && upload.compatibility ? (
+          <div className="mt-1">
+            <MediaCompatibilityBadge
+              state={upload.compatibility}
+              note={upload.compatibilityNote}
+            />
+          </div>
+        ) : null}
+        <Progress value={upload.progress} className="h-1 mt-1" />
+      </div>
+      <div className="flex-shrink-0">
+        {upload.status === 'success' ? (
+          <div className="text-success text-sm" aria-label="Upload complete">
+            ✓
+          </div>
+        ) : upload.status === 'error' ? (
+          <div className="text-destructive text-sm" aria-label="Upload failed">
+            ✗
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => onCancel(upload)}
+            aria-label="Cancel upload"
+          >
+            <X size={14} />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function MediaUploader({
@@ -35,6 +134,8 @@ export function MediaUploader({
   customButton,
   maxMediaCount = 4,
   disabled = false,
+  renderUploadsInline = true,
+  onUploadsChange,
 }: MediaUploaderProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -45,10 +146,42 @@ export function MediaUploader({
     initialMedia.filter((m) => m.type === 'video').length
   );
 
+  // Keep object URLs we create so we can revoke them on unmount.
+  const objectUrlsRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     setCurrentMediaCount(initialMedia.length);
     setCurrentVideoCount(initialMedia.filter((m) => m.type === 'video').length);
   }, [initialMedia]);
+
+  // Notify parent of upload list changes (used when renderUploadsInline=false).
+  useEffect(() => {
+    onUploadsChange?.(uploads, cancelUpload);
+  }, [uploads, onUploadsChange]);
+
+  // Revoke any leftover object URLs on unmount.
+  useEffect(() => {
+    return () => {
+      objectUrlsRef.current.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          /* ignore */
+        }
+      });
+      objectUrlsRef.current.clear();
+    };
+  }, []);
+
+  const revokePoster = (url?: string) => {
+    if (!url) return;
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      /* ignore */
+    }
+    objectUrlsRef.current.delete(url);
+  };
 
   const handleFileSelect = async (files: FileList | null) => {
     if (!files || !user || disabled) return;
@@ -74,7 +207,8 @@ export function MediaUploader({
     }
 
     // Enforce 1 video per post — count videos already selected in this batch too.
-    let pendingVideoCount = currentVideoCount + uploads.filter((u) => u.file.type.startsWith('video/')).length;
+    let pendingVideoCount =
+      currentVideoCount + uploads.filter((u) => u.file.type.startsWith('video/')).length;
 
     for (const file of filesToProcess) {
       const isVideo = file.type.startsWith('video/');
@@ -126,6 +260,25 @@ export function MediaUploader({
             )
           );
         })();
+
+        // Generate a local poster + duration so the row shows a thumbnail
+        // immediately, instead of waiting for the server upload to finish.
+        (async () => {
+          try {
+            const poster = await generateVideoPoster(file);
+            const url = URL.createObjectURL(poster.posterBlob);
+            objectUrlsRef.current.add(url);
+            setUploads((prev) =>
+              prev.map((u) =>
+                u.file === file
+                  ? { ...u, localPosterUrl: url, localDuration: poster.duration }
+                  : u
+              )
+            );
+          } catch {
+            // Generation failed — UploadRow falls back to the Film icon.
+          }
+        })();
       }
 
       uploadMedia(file, user.id, sessionId, (progress) => {
@@ -135,18 +288,26 @@ export function MediaUploader({
       }).then((mediaItem) => {
         if (mediaItem) {
           setUploads((prev) =>
-            prev.map((u) => (u.file === file ? { ...u, status: 'success', item: mediaItem } : u))
+            prev.map((u) =>
+              u.file === file ? { ...u, status: 'success', item: mediaItem } : u
+            )
           );
           onMediaUploaded(mediaItem);
           setCurrentMediaCount((prev) => prev + 1);
           if (mediaItem.type === 'video') setCurrentVideoCount((prev) => prev + 1);
 
           setTimeout(() => {
-            setUploads((prev) => prev.filter((u) => u.file !== file));
+            setUploads((prev) => {
+              const target = prev.find((u) => u.file === file);
+              if (target?.localPosterUrl) revokePoster(target.localPosterUrl);
+              return prev.filter((u) => u.file !== file);
+            });
           }, 2000);
         } else {
           setUploads((prev) =>
-            prev.map((u) => (u.file === file ? { ...u, status: 'error', error: 'Upload failed' } : u))
+            prev.map((u) =>
+              u.file === file ? { ...u, status: 'error', error: 'Upload failed' } : u
+            )
           );
         }
       });
@@ -171,76 +332,8 @@ export function MediaUploader({
   };
 
   const cancelUpload = (uploadToCancel: MediaUploadState) => {
+    revokePoster(uploadToCancel.localPosterUrl);
     setUploads((prev) => prev.filter((u) => u !== uploadToCancel));
-  };
-
-  const renderUploadRow = (upload: MediaUploadState, index: number) => {
-    const isVideo = upload.file.type.startsWith('video/');
-    const posterReady = !!upload.item?.thumbnail_url;
-    const duration = upload.item?.duration;
-    const ext = upload.file.name.split('.').pop()?.toUpperCase() || (isVideo ? 'VIDEO' : 'IMAGE');
-
-    return (
-      <div key={index} className="flex items-center space-x-2 border border-border rounded-md p-2">
-        <div className="flex-shrink-0 relative w-16 h-16 rounded-md overflow-hidden bg-muted flex items-center justify-center">
-          {isVideo ? (
-            posterReady ? (
-              <>
-                <img
-                  src={upload.item!.thumbnail_url}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
-                {duration ? (
-                  <span className="absolute bottom-0.5 right-0.5 rounded bg-black/70 px-1 py-0.5 text-[10px] font-medium text-white leading-none">
-                    {formatDuration(duration)}
-                  </span>
-                ) : null}
-              </>
-            ) : upload.status === 'uploading' ? (
-              <Skeleton className="w-full h-full" />
-            ) : (
-              <Film size={20} className="text-muted-foreground" />
-            )
-          ) : (
-            <ImageIcon size={20} className="text-muted-foreground" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm truncate">{upload.file.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {ext} · {formatBytes(upload.file.size)}
-            {duration ? ` · ${formatDuration(duration)}` : ''}
-          </p>
-          {isVideo && upload.compatibility ? (
-            <div className="mt-1">
-              <MediaCompatibilityBadge
-                state={upload.compatibility}
-                note={upload.compatibilityNote}
-              />
-            </div>
-          ) : null}
-          <Progress value={upload.progress} className="h-1 mt-1" />
-        </div>
-        <div className="flex-shrink-0">
-          {upload.status === 'success' ? (
-            <div className="text-success text-sm" aria-label="Upload complete">✓</div>
-          ) : upload.status === 'error' ? (
-            <div className="text-destructive text-sm" aria-label="Upload failed">✗</div>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => cancelUpload(upload)}
-              aria-label="Cancel upload"
-            >
-              <X size={14} />
-            </Button>
-          )}
-        </div>
-      </div>
-    );
   };
 
   if (customButton) {
@@ -262,15 +355,20 @@ export function MediaUploader({
             input.type = 'file';
             input.multiple = true;
             input.accept = ALLOWED_MEDIA_TYPES.join(',');
-            input.onchange = (e) => handleFileSelect((e.target as HTMLInputElement).files);
+            input.onchange = (e) =>
+              handleFileSelect((e.target as HTMLInputElement).files);
             input.click();
           }}
         >
           {customButton}
         </div>
 
-        {uploads.length > 0 && (
-          <div className="space-y-2 mt-2">{uploads.map(renderUploadRow)}</div>
+        {renderUploadsInline && uploads.length > 0 && (
+          <div className="space-y-2 mt-2">
+            {uploads.map((upload, index) => (
+              <UploadRow key={index} upload={upload} onCancel={cancelUpload} />
+            ))}
+          </div>
         )}
       </div>
     );
@@ -324,7 +422,13 @@ export function MediaUploader({
         </div>
       </div>
 
-      {uploads.length > 0 && <div className="space-y-2">{uploads.map(renderUploadRow)}</div>}
+      {uploads.length > 0 && (
+        <div className="space-y-2">
+          {uploads.map((upload, index) => (
+            <UploadRow key={index} upload={upload} onCancel={cancelUpload} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

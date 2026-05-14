@@ -20,6 +20,27 @@ const readInitial = (): boolean => {
   }
 };
 
+/** Read the persisted global mute value. Safe in non-DOM environments. */
+export function readGlobalVideoMuted(): boolean {
+  if (typeof window === 'undefined') return true;
+  return readInitial();
+}
+
+/**
+ * Set the global mute state and broadcast it to all subscribers.
+ * Used by `useVideoMute().toggle` and by `useVideoAutoplay` when autoplay
+ * forces the underlying <video> element to muted.
+ */
+export function setGlobalVideoMuted(muted: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(muted));
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent(EVENT, { detail: muted }));
+}
+
 export function useVideoMute(): [boolean, (next?: boolean) => void] {
   const [muted, setMuted] = useState<boolean>(() =>
     typeof window === 'undefined' ? true : readInitial()
@@ -36,12 +57,7 @@ export function useVideoMute(): [boolean, (next?: boolean) => void] {
 
   const toggle = useCallback((next?: boolean) => {
     const value = typeof next === 'boolean' ? next : !readInitial();
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-    } catch {
-      /* ignore */
-    }
-    window.dispatchEvent(new CustomEvent(EVENT, { detail: value }));
+    setGlobalVideoMuted(value);
   }, []);
 
   return [muted, toggle];

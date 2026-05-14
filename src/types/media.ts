@@ -30,4 +30,8 @@ export interface MediaUploadState {
   /** Soft compatibility hint for video uploads. Not persisted to MediaItem. */
   compatibility?: MediaCompatibility;
   compatibilityNote?: string;
+  /** Client-generated poster object URL shown during upload. Revoked on cleanup. */
+  localPosterUrl?: string;
+  /** Client-detected duration (seconds) shown during upload. */
+  localDuration?: number;
 }

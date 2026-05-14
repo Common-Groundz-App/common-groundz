@@ -4,7 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { MediaUploader } from '@/components/media/MediaUploader';
+import { MediaUploader, UploadRow } from '@/components/media/MediaUploader';
+import type { MediaUploadState } from '@/types/media';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UnifiedEntitySelector } from '@/components/feed/UnifiedEntitySelector';
 import { Entity } from '@/services/recommendation/types';
@@ -118,6 +119,18 @@ export function EnhancedCreatePostForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [media, setMedia] = useState<MediaItem[]>(postToEdit?.media ?? []);
   const [entities, setEntities] = useState<Entity[]>(postToEdit?.tagged_entities ?? []);
+  const [inFlightUploads, setInFlightUploads] = useState<MediaUploadState[]>([]);
+  const cancelUploadRef = useRef<((u: MediaUploadState) => void) | null>(null);
+  const handleUploadsChange = useCallback(
+    (uploads: MediaUploadState[], cancel: (u: MediaUploadState) => void) => {
+      cancelUploadRef.current = cancel;
+      setInFlightUploads(uploads);
+    },
+    []
+  );
+  const handleCancelInFlight = useCallback((u: MediaUploadState) => {
+    cancelUploadRef.current?.(u);
+  }, []);
   const [entitySelectorVisible, setEntitySelectorVisible] = useState(false);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [visibility, setVisibility] = useState<VisibilityOption>(
@@ -1183,6 +1196,20 @@ export function EnhancedCreatePostForm({
           </div>
         )}
 
+        {/* In-flight uploads — rendered above the toolbar so the toolbar
+            icons (Image / Smile / More) stay aligned during upload. */}
+        {inFlightUploads.length > 0 && (
+          <div className="space-y-2 mt-3">
+            {inFlightUploads.map((upload, index) => (
+              <UploadRow
+                key={index}
+                upload={upload}
+                onCancel={handleCancelInFlight}
+              />
+            ))}
+          </div>
+        )}
+
         {/* Desktop-only inline footer — toolbar + visibility + Post anchored to content column */}
         <div className="hidden md:flex items-center justify-between gap-2 border-t border-border pt-3 mt-4">
           <div className="flex items-center gap-1">
@@ -1191,6 +1218,8 @@ export function EnhancedCreatePostForm({
               onMediaUploaded={handleMediaUpload}
               initialMedia={media}
               maxMediaCount={MAX_MEDIA_COUNT}
+              renderUploadsInline={false}
+              onUploadsChange={handleUploadsChange}
               customButton={
                 <Button
                   type="button"
