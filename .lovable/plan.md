@@ -1,57 +1,76 @@
-# Composer media preview fix
+## Goal
 
-## Root causes (verified)
+Match Twitter/X behavior for **single media** rendering: the container hugs the media's true aspect ratio (within capped bounds), so there is no grey letterbox, the media is left-aligned, the card feels appropriately big, and video controls sit in clean opposite corners.
 
-1. **The grid CSS classes don't exist.** `TwitterStyleMediaPreview` in grid mode applies `twitter-media-two` / `twitter-media-three` / `twitter-media-four`, but none of those classes are defined in `src/index.css`, `src/App.css`, or anywhere else. Result: tiles render as unstyled stacked divs, so X buttons overlap neighboring tiles (your 3-media screenshot) and the layout looks broken.
+## Why our current build looks worse than Twitter
 
-2. **Videos in multi-media grid lose their player.** Lines 562–574 of `TwitterStyleMediaPreview.tsx` render videos as a plain thumbnail `<img>` with a `Maximize2` icon overlay (the "double arrow" you see). No `FeedVideo`, no autoplay, no mute control — only when there's exactly 1 media item does it use `FeedVideo`.
+We use a fixed outer aspect box (e.g. `aspect-[4/5]` for portrait, `aspect-[9/16]` for portrait video) and place the media inside with `object-contain`. That fixed box is wider than the media, so the empty horizontal space shows up as grey side gaps. Twitter instead **shapes the container to the media's own ratio** (within sane caps), so the box hugs the media and there is no letterbox to render.
 
-3. **Clicking a tile breaks everything.** `handleImageClick` (line 154) flips `viewMode` to `'carousel'` when no `onImageClick` prop is passed (composer doesn't pass one). The carousel branch:
-   - shrinks the layout via `getOrientationStyles()` (the "everything shrinks" effect),
-   - renders a grey background while items load (the "grey thumbnail"),
-   - hides the "back to grid" button (it only shows when `onImageClick` is set, line 710), so the user is stuck,
-   - and the X button styling is z-fighting with the carousel overlay.
+## Single-item rules (count === 1)
 
-The carousel mode is built for the **public feed**, not the composer. It should never engage inside `EnhancedCreatePostForm`.
+Compute `ratio = item.width / item.height`. Fallback when dimensions are missing: portrait→`3/4`, landscape→`16/9`, square→`1`.
 
-## Fix
+Clamp ratio per type:
 
-Create a small, dedicated composer-only preview component and use it in the composer. Leave `TwitterStyleMediaPreview` untouched (it's used by `PostMediaDisplay`, `ProfilePostItem`, and the feed-side copy).
+| Media | Ratio clamp | Hard max-height (safety cap) |
+|---|---|---|
+| Portrait image | `clamp(ratio, 3/4, 4/5)` | `min(620px, 80vh)` |
+| Portrait video | `clamp(ratio, 9/16, 3/4)` (allowed taller than photos) | `min(700px, 80vh)` |
+| Landscape image | use intrinsic ratio, clamped to `[5/4, 16/9]` (never narrower than ~5:4, never wider than 16:9) | `min(560px, 80vh)` |
+| Landscape video | same as landscape image | `min(560px, 80vh)` |
+| Square | `1/1` | `min(620px, 80vh)` |
 
-### New file: `src/components/feed/composer/ComposerMediaPreview.tsx`
+Apply via inline `style={{ aspectRatio: String(clampedRatio), maxHeight: '...' }}` (dynamic values, not Tailwind aspect classes).
 
-A presentational component built specifically for the composer:
+Use `object-cover` on the tile. Because the container already matches the media's ratio, `cover` produces no visible crop — and any tiny clamp-induced edge crop is far better than grey bars.
 
-- **Props:** `media: MediaItem[]`, `onRemove: (item: MediaItem) => void`.
-- **Layout** (Tailwind grid, no missing custom classes):
-  - 1 item → full width, max-h ~480px, `object-contain`.
-  - 2 items → `grid-cols-2 gap-1`, each `aspect-square`.
-  - 3 items → `grid-cols-2 gap-1` with first tile spanning `row-span-2` (`aspect-[1/2]`), other two stacked square. This matches the layout intent and keeps each X inside its own cell.
-  - 4 items → `grid-cols-2 grid-rows-2 gap-1`, each `aspect-square`.
-- **Image tiles:** `<img>` with `object-cover` (or `object-contain` on the single-item case), rounded.
-- **Video tiles:** render `<FeedVideo item={item} source="post" objectFit="cover" />` so autoplay / mute / duration badge keep working in **every** count, including multi-media. For the 1-item case use `objectFit="contain"` to match current single-video behavior.
-- **Remove (X) button:** absolutely positioned `top-2 right-2` inside each tile with `z-10`, `bg-black/60`, `rounded-full`, identical visual to today's button. Because each tile is a real grid cell with `overflow-hidden`, the X can no longer sit on top of an adjacent image.
-- **No click-to-expand.** Tiles don't switch modes. The only interactive element on top of a tile is the X (and the FeedVideo's own controls). This eliminates the "click → everything goes messy" bug entirely.
-- **Wrapper:** `mt-3 rounded-xl overflow-hidden`, no extra background tint, matches current spacing.
+**Max-height caps are mandatory**, not optional — they prevent ultra-tall media from dominating the feed.
 
-### Edit `src/components/feed/EnhancedCreatePostForm.tsx`
+## Left-align, not center
 
-- Replace the import on line 31 with `import { ComposerMediaPreview } from './composer/ComposerMediaPreview';`.
-- Replace line 1158 `<TwitterStyleMediaPreview media={media} onRemove={removeMedia} />` with `<ComposerMediaPreview media={media} onRemove={removeMedia} />`.
+Remove `mx-auto` from the single-item container wrapper. The block fills the post column up to its natural max-width, left-aligned, matching Twitter.
 
-That's the entire change set.
+## Video controls — opposite corners
 
-## Out of scope
+Twitter places the duration badge bottom-left. We will match that and move the mute button to bottom-right so the two never overlap:
 
-- No changes to `TwitterStyleMediaPreview` itself, `PostMediaDisplay`, `FeedItem`, `ProfilePostItem`, or any feed-side rendering — the published-post preview already looks correct per your screenshots.
-- No changes to `MediaUploader`, the upload pipeline, `FeedVideo`, `useVideoAutoplay`, `useVideoMute`, or the in-flight upload row work from prior turns.
-- No new dependencies, no schema changes, no design-token changes.
+- Duration badge → `absolute bottom-2 left-2`
+- Mute button → `absolute bottom-2 right-2` (currently bottom-left — moves to bottom-right)
 
-## Verification
+This applies to all video renders (single and multi). Keep the badge visible whenever `item.duration` is set.
 
-On `/create`, with viewport at desktop and mobile widths:
-1. Upload 1 video → autoplay + mute toggle + duration badge present (unchanged).
-2. Add 1 image (now 1 video + 1 image) → both render side-by-side as squares; the video tile keeps autoplay/mute/duration; both Xs sit cleanly inside their own tile; clicking either tile does **nothing** (no carousel, no shrink, no grey state); X removes the correct item.
-3. Upload 1 video + 2 images → 2-column layout with the first tile (video) spanning two rows; X buttons no longer overlap the second image.
-4. Upload 1 video + 3 images → 2×2 grid; every tile has a working X; video keeps playing.
-5. After posting, the feed page render is unchanged (still uses `TwitterStyleMediaPreview`).
+Also remove the redundant inner styling on the `<video>` element in `FeedVideo`:
+```
+isPortrait && 'aspect-[9/16] max-h-[560px] mx-auto'
+```
+That fragment was a second source of letterboxing and was hiding the badge in some cases. The outer container now drives sizing.
+
+## Square / portrait fix is the same fix
+
+Same aspect-ratio-driven container approach, just with `ratio = 1` for square. Container becomes square at full column width, no grey gaps. Solves the square-image complaint.
+
+## What stays unchanged
+
+- Multi-item collages (2/3/4+) — no layout changes. They will however inherit the **video controls swap** (duration bottom-left, mute bottom-right) for consistency.
+- Lightbox — still uses `object-contain`, still shows true uncropped aspect.
+- Composer preview — untouched.
+- `LightboxPreview`, `FeedVideo` autoplay/mute/analytics — untouched aside from corner repositioning and removing the redundant portrait class.
+
+## Files
+
+- `src/components/media/FeedCollage.tsx` — rewrite single-item branch: compute clamped aspect ratio + hard max-height per type, apply via inline style, use `object-cover`, drop `mx-auto`.
+- `src/components/media/FeedVideo.tsx` — (1) move mute button to `bottom-2 right-2`, (2) keep duration badge at `bottom-2 left-2`, (3) remove the `isPortrait && 'aspect-[9/16] max-h-[560px] mx-auto'` class fragment on the `<video>`.
+
+## Verification checklist (visual A/B against Twitter screenshots)
+
+- Landscape image: ~16:9, no regression.
+- Portrait image: container is portrait-shaped (3:4 to 4:5), no grey side bars, left-aligned, capped at ~620px / 80vh.
+- Landscape video: ~16:9, **duration badge bottom-left**, **mute bottom-right**.
+- Portrait video: portrait-shaped container (up to 9:16), no grey bars, left-aligned, capped at ~700px / 80vh, **duration badge bottom-left**, **mute bottom-right**.
+- Square image: square container at full column width, no grey bars.
+- Multi-item posts: collage layouts unchanged; videos inside them now show duration bottom-left, mute bottom-right.
+- Lightbox: still shows full uncropped media.
+
+## On "should the cards be bigger overall?"
+
+Most of the perceived size gap comes from the letterboxing, not the column width. Fixing the aspect-ratio container will close ~90% of it. If after this change the user still wants a wider feed column, that is a separate, larger layout change to evaluate then.

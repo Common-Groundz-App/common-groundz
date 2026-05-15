@@ -86,39 +86,51 @@ export function FeedCollage({
     );
   };
 
-  // Single item: respect orientation with caps
+  // Single item: shape the container to the media's intrinsic ratio (clamped),
+  // so there are no grey letterbox bars. Hard max-height caps prevent very tall
+  // media from dominating the feed.
   if (count === 1) {
     const entry = entries[0];
     const orientation = getOrientation(entry.item);
     const isVideo = entry.item.type === 'video';
+    const intrinsic =
+      entry.item.width && entry.item.height
+        ? entry.item.width / entry.item.height
+        : orientation === 'portrait'
+        ? 3 / 4
+        : orientation === 'square'
+        ? 1
+        : 16 / 9;
 
-    let aspectClass = 'aspect-[16/9]';
-    let maxHeightStyle: React.CSSProperties | undefined;
+    const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+
+    let ratio: number;
+    let maxHeight: string;
 
     if (orientation === 'square') {
-      aspectClass = 'aspect-square';
+      ratio = 1;
+      maxHeight = 'min(620px, 80vh)';
     } else if (orientation === 'portrait') {
       if (isVideo) {
-        aspectClass = 'aspect-[9/16]';
-        maxHeightStyle = { maxHeight: 700 };
+        ratio = clamp(intrinsic, 9 / 16, 3 / 4);
+        maxHeight = 'min(700px, 80vh)';
       } else {
-        aspectClass = 'aspect-[4/5]';
-        maxHeightStyle = { maxHeight: 600 };
+        ratio = clamp(intrinsic, 3 / 4, 4 / 5);
+        maxHeight = 'min(620px, 80vh)';
       }
     } else {
-      aspectClass = 'aspect-[16/9]';
+      // landscape (image or video)
+      ratio = clamp(intrinsic, 5 / 4, 16 / 9);
+      maxHeight = 'min(560px, 80vh)';
     }
 
     return (
       <div className={cn('w-full', className)}>
         <div
-          className={cn(
-            'relative mx-auto w-full overflow-hidden rounded-xl bg-muted',
-            aspectClass
-          )}
-          style={maxHeightStyle}
+          className="relative w-full overflow-hidden rounded-xl bg-muted"
+          style={{ aspectRatio: String(ratio), maxHeight }}
         >
-          {renderTile(entry, { objectFit: 'contain' })}
+          {renderTile(entry, { objectFit: 'cover' })}
         </div>
       </div>
     );
