@@ -20,6 +20,26 @@ export const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100 MB
 export const MAX_VIDEO_DURATION = 60; // seconds
 export const MAX_VIDEOS_PER_POST = 1;
 
+// Helper to get image intrinsic dimensions
+export const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      URL.revokeObjectURL(url);
+      if (!w || !h) reject(new Error('Image has no intrinsic dimensions'));
+      else resolve({ width: w, height: h });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Error loading image metadata'));
+    };
+    img.src = url;
+  });
+};
+
 // Helper function to get video duration
 export const getVideoDuration = (file: File): Promise<number> => {
   return new Promise((resolve, reject) => {
