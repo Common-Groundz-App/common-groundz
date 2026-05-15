@@ -191,18 +191,19 @@ function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
       fit: 'contain',
     };
   }
-  // Portrait
+  // Portrait — match intrinsic exactly (no lower clamp) so tall phone videos
+  // (e.g. 9:19.5) don't get pillarboxed inside a wider 9:16 frame.
   if (intrinsic < 0.95) {
     if (isVideo) {
       return {
-        ratio: clamp(intrinsic, 9 / 16, 3 / 4),
+        ratio: Math.min(intrinsic, 3 / 4),
         maxHeight: 'min(720px, 85vh)',
         maxWidth: '520px',
         fit: 'contain',
       };
     }
     return {
-      ratio: clamp(intrinsic, 9 / 16, 4 / 5),
+      ratio: Math.min(intrinsic, 4 / 5),
       maxHeight: 'min(680px, 85vh)',
       maxWidth: '520px',
       fit: 'contain',
