@@ -139,15 +139,15 @@ export const uploadMedia = async (
     // For videos, generate the poster BEFORE uploading the video itself,
     // so we have intrinsic dimensions + duration to attach to the MediaItem.
     let posterUrl: string | undefined;
-    let videoWidth: number | undefined;
-    let videoHeight: number | undefined;
+    let mediaWidth: number | undefined;
+    let mediaHeight: number | undefined;
     let videoDuration: number | undefined;
 
     if (isVideo) {
       try {
         const poster = await generateVideoPoster(file);
-        videoWidth = poster.width;
-        videoHeight = poster.height;
+        mediaWidth = poster.width;
+        mediaHeight = poster.height;
         videoDuration = poster.duration;
 
         const posterPath = `${userId}/${sessionId}/${generateUUID()}_poster.jpg`;
@@ -168,6 +168,15 @@ export const uploadMedia = async (
         // Non-fatal: video still uploads without a poster.
         console.warn('Poster generation failed:', err);
       }
+    } else if (isImage) {
+      try {
+        const dims = await getImageDimensions(file);
+        mediaWidth = dims.width;
+        mediaHeight = dims.height;
+      } catch (err) {
+        // Non-fatal: image still uploads; runtime fallback will measure later.
+        console.warn('Image dimension probe failed:', err);
+      }
     }
 
     onProgress?.(0, 'uploading');
@@ -187,8 +196,8 @@ export const uploadMedia = async (
       .from('post_media')
       .getPublicUrl(filePath);
 
-    const orientation = isVideo && videoWidth && videoHeight
-      ? orientationFor(videoWidth, videoHeight)
+    const orientation = mediaWidth && mediaHeight
+      ? orientationFor(mediaWidth, mediaHeight)
       : undefined;
 
     const mediaItem: MediaItem = {
