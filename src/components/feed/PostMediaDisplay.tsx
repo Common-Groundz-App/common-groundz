@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { MediaItem } from '@/types/media';
-import { TwitterStyleMediaPreview } from '@/components/media/TwitterStyleMediaPreview';
+import { FeedCollage } from '@/components/media/FeedCollage';
 import { cn } from '@/lib/utils';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 
