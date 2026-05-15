@@ -169,8 +169,7 @@ export function FeedVideo({
         onError={handleError}
         className={cn(
           'w-full h-full rounded-md',
-          objectFit === 'contain' ? 'object-contain' : 'object-cover',
-          isPortrait && 'aspect-[9/16] max-h-[560px] mx-auto'
+          objectFit === 'contain' ? 'object-contain' : 'object-cover'
         )}
       />
 
@@ -240,13 +239,13 @@ export function FeedVideo({
           e.stopPropagation();
           toggleMute();
         }}
-        className="absolute bottom-2 left-2 rounded-full bg-black/60 hover:bg-black/80 p-2 text-white min-h-9 min-w-9 flex items-center justify-center motion-safe:transition"
+        className="absolute bottom-2 right-2 rounded-full bg-black/60 hover:bg-black/80 p-2 text-white min-h-9 min-w-9 flex items-center justify-center motion-safe:transition"
       >
         {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
       </button>
 
       {showBadge && item.duration ? (
-        <div className="absolute bottom-2 right-2 rounded-md bg-black/70 px-2 py-0.5 text-xs font-medium text-white">
+        <div className="absolute bottom-2 left-2 rounded-md bg-black/70 px-2 py-0.5 text-xs font-medium text-white">
           {formatDuration(item.duration)}
         </div>
       ) : null}
