@@ -28,7 +28,15 @@ export const processMediaItems = (media: any[]): MediaItem[] => {
   if (!media || !Array.isArray(media)) return [];
   
   return media.map((item) => {
-    // Ensure each media item has the correct properties including 'order'
+    // Preserve dimension/orientation/duration metadata so renderers can
+    // size single-media frames correctly (Twitter-style portrait/square).
+    const width = item.width ?? item.metadata?.width;
+    const height = item.height ?? item.metadata?.height;
+    let orientation = item.orientation as MediaItem['orientation'] | undefined;
+    if (!orientation && width && height) {
+      const r = width / height;
+      orientation = r > 1.05 ? 'landscape' : r < 0.95 ? 'portrait' : 'square';
+    }
     return {
       id: item.id || '',
       url: item.url || '',
@@ -39,7 +47,11 @@ export const processMediaItems = (media: any[]): MediaItem[] => {
       caption: item.caption,
       alt: item.alt,
       is_deleted: item.is_deleted,
-      session_id: item.session_id
+      session_id: item.session_id,
+      width,
+      height,
+      orientation,
+      duration: item.duration ?? item.metadata?.duration,
     } as MediaItem;
   });
 };
