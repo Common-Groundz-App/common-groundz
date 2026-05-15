@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MediaItem } from '@/types/media';
 import { FeedVideo } from '@/components/media/FeedVideo';
 import { cn } from '@/lib/utils';
