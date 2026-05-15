@@ -100,20 +100,12 @@ export function PostMediaDisplay({
   
   return (
     <>
-      <TwitterStyleMediaPreview
+      <FeedCollage
         media={validMedia}
-        readOnly={true}
-        className={cn("mt-3", className)}
-        maxHeight={adaptiveMaxHeight()}
-        aspectRatio={aspectRatio}
-        objectFit={objectFit}
-        enableBackground={enableBackground}
-        thumbnailDisplay={thumbnailDisplay}
-        enableLazyLoading={enableLazyLoading}
-        displayMode={displayType}
-        onImageClick={handleImageClick}
+        onItemClick={handleImageClick}
         source={source}
         sourceId={sourceId}
+        className={cn("mt-3", className)}
       />
 
       {/* Replace Dialog with a direct render of LightboxPreview when lightbox is open */}
