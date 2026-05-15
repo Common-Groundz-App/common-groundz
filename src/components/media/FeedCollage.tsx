@@ -90,48 +90,14 @@ export function FeedCollage({
   // so there are no grey letterbox bars. Hard max-height caps prevent very tall
   // media from dominating the feed.
   if (count === 1) {
-    const entry = entries[0];
-    const orientation = getOrientation(entry.item);
-    const isVideo = entry.item.type === 'video';
-    const intrinsic =
-      entry.item.width && entry.item.height
-        ? entry.item.width / entry.item.height
-        : orientation === 'portrait'
-        ? 3 / 4
-        : orientation === 'square'
-        ? 1
-        : 16 / 9;
-
-    const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
-
-    let ratio: number;
-    let maxHeight: string;
-
-    if (orientation === 'square') {
-      ratio = 1;
-      maxHeight = 'min(620px, 80vh)';
-    } else if (orientation === 'portrait') {
-      if (isVideo) {
-        ratio = clamp(intrinsic, 9 / 16, 3 / 4);
-        maxHeight = 'min(700px, 80vh)';
-      } else {
-        ratio = clamp(intrinsic, 3 / 4, 4 / 5);
-        maxHeight = 'min(620px, 80vh)';
-      }
-    } else {
-      // landscape (image or video)
-      ratio = clamp(intrinsic, 5 / 4, 16 / 9);
-      maxHeight = 'min(560px, 80vh)';
-    }
-
     return (
       <div className={cn('w-full', className)}>
-        <div
-          className="relative w-full overflow-hidden rounded-xl bg-muted"
-          style={{ aspectRatio: String(ratio), maxHeight }}
-        >
-          {renderTile(entry, { objectFit: 'cover' })}
-        </div>
+        <SingleMediaTile
+          entry={entries[0]}
+          source={source}
+          sourceId={sourceId}
+          onItemClick={onItemClick}
+        />
       </div>
     );
   }
