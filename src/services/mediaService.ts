@@ -20,6 +20,26 @@ export const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100 MB
 export const MAX_VIDEO_DURATION = 60; // seconds
 export const MAX_VIDEOS_PER_POST = 1;
 
+// Helper to get image intrinsic dimensions
+export const getImageDimensions = (file: File): Promise<{ width: number; height: number }> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      URL.revokeObjectURL(url);
+      if (!w || !h) reject(new Error('Image has no intrinsic dimensions'));
+      else resolve({ width: w, height: h });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Error loading image metadata'));
+    };
+    img.src = url;
+  });
+};
+
 // Helper function to get video duration
 export const getVideoDuration = (file: File): Promise<number> => {
   return new Promise((resolve, reject) => {
@@ -119,15 +139,15 @@ export const uploadMedia = async (
     // For videos, generate the poster BEFORE uploading the video itself,
     // so we have intrinsic dimensions + duration to attach to the MediaItem.
     let posterUrl: string | undefined;
-    let videoWidth: number | undefined;
-    let videoHeight: number | undefined;
+    let mediaWidth: number | undefined;
+    let mediaHeight: number | undefined;
     let videoDuration: number | undefined;
 
     if (isVideo) {
       try {
         const poster = await generateVideoPoster(file);
-        videoWidth = poster.width;
-        videoHeight = poster.height;
+        mediaWidth = poster.width;
+        mediaHeight = poster.height;
         videoDuration = poster.duration;
 
         const posterPath = `${userId}/${sessionId}/${generateUUID()}_poster.jpg`;
@@ -148,6 +168,15 @@ export const uploadMedia = async (
         // Non-fatal: video still uploads without a poster.
         console.warn('Poster generation failed:', err);
       }
+    } else if (isImage) {
+      try {
+        const dims = await getImageDimensions(file);
+        mediaWidth = dims.width;
+        mediaHeight = dims.height;
+      } catch (err) {
+        // Non-fatal: image still uploads; runtime fallback will measure later.
+        console.warn('Image dimension probe failed:', err);
+      }
     }
 
     onProgress?.(0, 'uploading');
@@ -167,8 +196,8 @@ export const uploadMedia = async (
       .from('post_media')
       .getPublicUrl(filePath);
 
-    const orientation = isVideo && videoWidth && videoHeight
-      ? orientationFor(videoWidth, videoHeight)
+    const orientation = mediaWidth && mediaHeight
+      ? orientationFor(mediaWidth, mediaHeight)
       : undefined;
 
     const mediaItem: MediaItem = {
@@ -180,8 +209,8 @@ export const uploadMedia = async (
       order: 0,
       session_id: sessionId,
       ...(posterUrl ? { thumbnail_url: posterUrl } : {}),
-      ...(videoWidth ? { width: videoWidth } : {}),
-      ...(videoHeight ? { height: videoHeight } : {}),
+      ...(mediaWidth ? { width: mediaWidth } : {}),
+      ...(mediaHeight ? { height: mediaHeight } : {}),
       ...(videoDuration ? { duration: videoDuration } : {}),
       ...(orientation ? { orientation } : {}),
     };

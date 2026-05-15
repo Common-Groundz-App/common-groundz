@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { MediaItem } from '@/types/media';
 import { FeedVideo } from '@/components/media/FeedVideo';
 import { cn } from '@/lib/utils';
@@ -90,48 +90,14 @@ export function FeedCollage({
   // so there are no grey letterbox bars. Hard max-height caps prevent very tall
   // media from dominating the feed.
   if (count === 1) {
-    const entry = entries[0];
-    const orientation = getOrientation(entry.item);
-    const isVideo = entry.item.type === 'video';
-    const intrinsic =
-      entry.item.width && entry.item.height
-        ? entry.item.width / entry.item.height
-        : orientation === 'portrait'
-        ? 3 / 4
-        : orientation === 'square'
-        ? 1
-        : 16 / 9;
-
-    const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
-
-    let ratio: number;
-    let maxHeight: string;
-
-    if (orientation === 'square') {
-      ratio = 1;
-      maxHeight = 'min(620px, 80vh)';
-    } else if (orientation === 'portrait') {
-      if (isVideo) {
-        ratio = clamp(intrinsic, 9 / 16, 3 / 4);
-        maxHeight = 'min(700px, 80vh)';
-      } else {
-        ratio = clamp(intrinsic, 3 / 4, 4 / 5);
-        maxHeight = 'min(620px, 80vh)';
-      }
-    } else {
-      // landscape (image or video)
-      ratio = clamp(intrinsic, 5 / 4, 16 / 9);
-      maxHeight = 'min(560px, 80vh)';
-    }
-
     return (
       <div className={cn('w-full', className)}>
-        <div
-          className="relative w-full overflow-hidden rounded-xl bg-muted"
-          style={{ aspectRatio: String(ratio), maxHeight }}
-        >
-          {renderTile(entry, { objectFit: 'cover' })}
-        </div>
+        <SingleMediaTile
+          entry={entries[0]}
+          source={source}
+          sourceId={sourceId}
+          onItemClick={onItemClick}
+        />
       </div>
     );
   }
@@ -184,6 +150,96 @@ export function FeedCollage({
             renderTile(entry, idx === 3 && extra > 0 ? { overlayCount: extra } : undefined)
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+interface SingleMediaTileProps {
+  entry: DisplayEntry;
+  source: 'post' | 'review' | 'entity';
+  sourceId?: string;
+  onItemClick: (originalIndex: number) => void;
+}
+
+const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
+
+function computeShape(
+  intrinsic: number | null,
+  isVideo: boolean
+): { ratio: number; maxHeight: string } {
+  if (intrinsic == null) {
+    // Neutral placeholder while we measure — sits between portrait and landscape.
+    return { ratio: 4 / 5, maxHeight: 'min(620px, 80vh)' };
+  }
+  if (intrinsic >= 0.95 && intrinsic <= 1.05) {
+    return { ratio: 1, maxHeight: 'min(620px, 80vh)' };
+  }
+  if (intrinsic < 0.95) {
+    // Portrait
+    if (isVideo) {
+      return { ratio: clamp(intrinsic, 9 / 16, 3 / 4), maxHeight: 'min(700px, 80vh)' };
+    }
+    return { ratio: clamp(intrinsic, 3 / 4, 4 / 5), maxHeight: 'min(620px, 80vh)' };
+  }
+  // Landscape
+  return { ratio: clamp(intrinsic, 5 / 4, 16 / 9), maxHeight: 'min(560px, 80vh)' };
+}
+
+function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTileProps) {
+  const { item, originalIndex } = entry;
+  const isVideo = item.type === 'video';
+
+  const stored =
+    item.width && item.height ? item.width / item.height : null;
+
+  const [measured, setMeasured] = useState<number | null>(null);
+
+  // Preload to measure legacy images that have no stored dimensions.
+  useEffect(() => {
+    if (stored != null || isVideo) return;
+    const src = item.thumbnail_url || item.url;
+    if (!src) return;
+    let cancelled = false;
+    const probe = new Image();
+    probe.onload = () => {
+      if (cancelled) return;
+      const w = probe.naturalWidth;
+      const h = probe.naturalHeight;
+      if (w && h) setMeasured(w / h);
+    };
+    probe.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [stored, isVideo, item.thumbnail_url, item.url]);
+
+  const intrinsic = stored ?? measured;
+  const { ratio, maxHeight } = computeShape(intrinsic, isVideo);
+  const ready = intrinsic != null;
+
+  return (
+    <div
+      className="relative w-full overflow-hidden rounded-xl bg-muted"
+      style={{ aspectRatio: String(ratio), maxHeight }}
+    >
+      <div
+        className="relative w-full h-full overflow-hidden bg-muted cursor-pointer"
+        onClick={() => onItemClick(originalIndex)}
+      >
+        {item.type === 'image' ? (
+          <img
+            src={item.thumbnail_url || item.url}
+            alt={item.alt || item.caption || 'Media'}
+            className={cn(
+              'w-full h-full object-cover motion-safe:transition-opacity motion-safe:duration-150',
+              ready ? 'opacity-100' : 'opacity-0'
+            )}
+            loading="lazy"
+          />
+        ) : (
+          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit="cover" />
+        )}
       </div>
     </div>
   );
