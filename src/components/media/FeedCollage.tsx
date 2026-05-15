@@ -225,22 +225,62 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
 
   const [measured, setMeasured] = useState<number | null>(null);
 
-  // Preload to measure legacy images that have no stored dimensions.
+  // Preload to measure legacy media that has no stored dimensions.
+  // Image -> naturalWidth/Height; Video -> videoWidth/Height via a detached
+  // <video> probe. The probe is fully isolated from FeedVideo (separate element,
+  // no autoplay) so playback, mute, and view tracking are unaffected.
   useEffect(() => {
-    if (stored != null || isVideo) return;
-    const src = item.thumbnail_url || item.url;
-    if (!src) return;
+    if (stored != null) return;
     let cancelled = false;
-    const probe = new Image();
-    probe.onload = () => {
+
+    if (!isVideo) {
+      const src = item.thumbnail_url || item.url;
+      if (!src) return;
+      const probe = new Image();
+      probe.onload = () => {
+        if (cancelled) return;
+        const w = probe.naturalWidth;
+        const h = probe.naturalHeight;
+        if (w && h) setMeasured(w / h);
+      };
+      probe.src = src;
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const src = item.url;
+    if (!src) return;
+    const probe = document.createElement('video');
+    probe.preload = 'metadata';
+    probe.muted = true;
+    probe.playsInline = true;
+    probe.crossOrigin = 'anonymous';
+
+    const handleLoaded = () => {
       if (cancelled) return;
-      const w = probe.naturalWidth;
-      const h = probe.naturalHeight;
+      const w = probe.videoWidth;
+      const h = probe.videoHeight;
       if (w && h) setMeasured(w / h);
     };
+    const handleError = () => {
+      // Graceful fallback: leave measured null; computeShape keeps placeholder.
+    };
+
+    probe.addEventListener('loadedmetadata', handleLoaded);
+    probe.addEventListener('error', handleError);
     probe.src = src;
+
     return () => {
       cancelled = true;
+      probe.removeEventListener('loadedmetadata', handleLoaded);
+      probe.removeEventListener('error', handleError);
+      try {
+        probe.removeAttribute('src');
+        probe.load();
+      } catch {
+        /* ignore */
+      }
     };
   }, [stored, isVideo, item.thumbnail_url, item.url]);
 
