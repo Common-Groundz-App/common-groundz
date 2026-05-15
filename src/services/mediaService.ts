@@ -209,8 +209,8 @@ export const uploadMedia = async (
       order: 0,
       session_id: sessionId,
       ...(posterUrl ? { thumbnail_url: posterUrl } : {}),
-      ...(videoWidth ? { width: videoWidth } : {}),
-      ...(videoHeight ? { height: videoHeight } : {}),
+      ...(mediaWidth ? { width: mediaWidth } : {}),
+      ...(mediaHeight ? { height: mediaHeight } : {}),
       ...(videoDuration ? { duration: videoDuration } : {}),
       ...(orientation ? { orientation } : {}),
     };
