@@ -164,26 +164,56 @@ interface SingleMediaTileProps {
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
 
-function computeShape(
-  intrinsic: number | null,
-  isVideo: boolean
-): { ratio: number; maxHeight: string } {
+interface Shape {
+  ratio: number;
+  maxHeight: string;
+  maxWidth?: string; // cap inner frame so portrait/square don't stretch full-width
+  fit: 'cover' | 'contain';
+}
+
+function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
   if (intrinsic == null) {
-    // Neutral placeholder while we measure — sits between portrait and landscape.
-    return { ratio: 4 / 5, maxHeight: 'min(620px, 80vh)' };
+    // Neutral placeholder while measuring — narrow portrait-ish frame so
+    // the eventual snap to portrait isn't a jarring 16:9-to-portrait jump.
+    return {
+      ratio: 4 / 5,
+      maxHeight: 'min(620px, 80vh)',
+      maxWidth: '520px',
+      fit: 'contain',
+    };
   }
+  // Square
   if (intrinsic >= 0.95 && intrinsic <= 1.05) {
-    return { ratio: 1, maxHeight: 'min(620px, 80vh)' };
+    return {
+      ratio: 1,
+      maxHeight: 'min(560px, 80vh)',
+      maxWidth: '560px',
+      fit: 'contain',
+    };
   }
+  // Portrait
   if (intrinsic < 0.95) {
-    // Portrait
     if (isVideo) {
-      return { ratio: clamp(intrinsic, 9 / 16, 3 / 4), maxHeight: 'min(700px, 80vh)' };
+      return {
+        ratio: clamp(intrinsic, 9 / 16, 3 / 4),
+        maxHeight: 'min(720px, 85vh)',
+        maxWidth: '520px',
+        fit: 'contain',
+      };
     }
-    return { ratio: clamp(intrinsic, 3 / 4, 4 / 5), maxHeight: 'min(620px, 80vh)' };
+    return {
+      ratio: clamp(intrinsic, 9 / 16, 4 / 5),
+      maxHeight: 'min(680px, 85vh)',
+      maxWidth: '520px',
+      fit: 'contain',
+    };
   }
-  // Landscape
-  return { ratio: clamp(intrinsic, 5 / 4, 16 / 9), maxHeight: 'min(560px, 80vh)' };
+  // Landscape — full-width feed column.
+  return {
+    ratio: clamp(intrinsic, 5 / 4, 16 / 9),
+    maxHeight: 'min(560px, 80vh)',
+    fit: 'cover',
+  };
 }
 
 function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTileProps) {
@@ -215,13 +245,17 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
   }, [stored, isVideo, item.thumbnail_url, item.url]);
 
   const intrinsic = stored ?? measured;
-  const { ratio, maxHeight } = computeShape(intrinsic, isVideo);
+  const { ratio, maxHeight, maxWidth, fit } = computeShape(intrinsic, isVideo);
   const ready = intrinsic != null;
 
   return (
     <div
-      className="relative w-full overflow-hidden rounded-xl bg-muted"
-      style={{ aspectRatio: String(ratio), maxHeight }}
+      className="relative overflow-hidden rounded-xl bg-muted"
+      style={{
+        aspectRatio: String(ratio),
+        maxHeight,
+        width: maxWidth ? `min(100%, ${maxWidth})` : '100%',
+      }}
     >
       <div
         className="relative w-full h-full overflow-hidden bg-muted cursor-pointer"
@@ -232,13 +266,14 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
             src={item.thumbnail_url || item.url}
             alt={item.alt || item.caption || 'Media'}
             className={cn(
-              'w-full h-full object-cover motion-safe:transition-opacity motion-safe:duration-150',
+              'w-full h-full motion-safe:transition-opacity motion-safe:duration-150',
+              fit === 'cover' ? 'object-cover' : 'object-contain',
               ready ? 'opacity-100' : 'opacity-0'
             )}
             loading="lazy"
           />
         ) : (
-          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit="cover" />
+          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit={fit} />
         )}
       </div>
     </div>
