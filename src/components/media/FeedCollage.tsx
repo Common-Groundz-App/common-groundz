@@ -171,8 +171,22 @@ interface Shape {
   fit: 'cover' | 'contain';
 }
 
-function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
+function computeShape(
+  intrinsic: number | null,
+  isVideo: boolean,
+  orientationHint?: Orientation
+): Shape {
   if (intrinsic == null) {
+    // Landscape hint: avoid a temporary portrait flash for videos whose
+    // metadata hasn't loaded yet by using a 16:9 landscape placeholder.
+    if (isVideo && orientationHint === 'landscape') {
+      return {
+        ratio: 16 / 9,
+        maxHeight: 'min(292px, 60vh)',
+        maxWidth: '518px',
+        fit: 'cover',
+      };
+    }
     // Placeholder while measuring. For videos use `cover` to avoid grey/black
     // letterbox during the brief loading window; for images we measure
     // synchronously via Image() so `contain` is fine.
@@ -209,7 +223,16 @@ function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
       fit: 'cover',
     };
   }
-  // Landscape — full-width feed column.
+  // Landscape video — cap to Twitter's 518×292 16:9 frame.
+  if (isVideo) {
+    return {
+      ratio: clamp(intrinsic, 5 / 4, 16 / 9),
+      maxHeight: 'min(292px, 60vh)',
+      maxWidth: '518px',
+      fit: 'cover',
+    };
+  }
+  // Landscape image — unchanged (full-width feed column); tuned separately.
   return {
     ratio: clamp(intrinsic, 5 / 4, 16 / 9),
     maxHeight: 'min(560px, 80vh)',
@@ -299,7 +322,8 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
   }, [stored, isVideo, item.thumbnail_url, item.url]);
 
   const intrinsic = stored ?? measured;
-  const { ratio, maxHeight, maxWidth, fit } = computeShape(intrinsic, isVideo);
+  const orientationHint = getOrientation(item);
+  const { ratio, maxHeight, maxWidth, fit } = computeShape(intrinsic, isVideo, orientationHint);
   const ready = intrinsic != null;
 
   return (
