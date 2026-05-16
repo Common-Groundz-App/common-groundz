@@ -197,6 +197,17 @@ function computeShape(
         fit: 'cover',
       };
     }
+    // Square video hint: Twitter displays square videos in a taller 4:5 frame
+    // (408×510) for better feed viewing. Match this before measurement settles
+    // so there is no width/height jump once intrinsic dimensions arrive.
+    if (orientationHint === 'square' && isVideo) {
+      return {
+        ratio: 4 / 5,
+        maxHeight: 'min(510px, 75vh)',
+        maxWidth: '408px',
+        fit: 'cover',
+      };
+    }
     // Placeholder while measuring. For videos use `cover` to avoid grey/black
     // letterbox during the brief loading window; for images we measure
     // synchronously via Image() so `contain` is fine.
@@ -209,6 +220,16 @@ function computeShape(
   }
   // Square
   if (intrinsic >= 0.95 && intrinsic <= 1.05) {
+    // Square video — Twitter shows square videos in a taller 4:5 display frame
+    // (408×510) with cover cropping for better in-feed viewing.
+    if (isVideo) {
+      return {
+        ratio: 4 / 5,
+        maxHeight: 'min(510px, 75vh)',
+        maxWidth: '408px',
+        fit: 'cover',
+      };
+    }
     return {
       ratio: 1,
       maxHeight: 'min(560px, 80vh)',
