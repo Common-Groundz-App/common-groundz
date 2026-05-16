@@ -55,11 +55,13 @@ export function FeedCollage({
     options?: { overlayCount?: number; objectFit?: 'cover' | 'contain' }
   ) => {
     const { item, originalIndex } = entry;
-    const fit = options?.objectFit ?? 'cover';
+    // In multi-item collages: videos letterbox (contain) on black so portrait/
+    // landscape clips aren't cropped; images keep cover crop to fill the tile.
+    const fit = options?.objectFit ?? (item.type === 'video' ? 'contain' : 'cover');
     return (
       <div
         key={item.id || `${item.url}-${originalIndex}`}
-        className="relative w-full h-full overflow-hidden bg-muted cursor-pointer"
+        className="relative w-full h-full overflow-hidden bg-black cursor-pointer"
         onClick={() => onItemClick(originalIndex)}
       >
         {item.type === 'image' ? (
