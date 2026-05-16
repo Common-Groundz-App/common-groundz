@@ -1,47 +1,33 @@
 ## Goal
 
-Make single portrait images in the feed match Twitter's exact sizing, based on the measured Computed values you provided.
+Match Twitter's sizing for single landscape images in the feed, without shrinking 4:3 / 3:2 photos.
 
-## Twitter's measured values (from your screenshots)
+## Twitter's measured values (wide 16:9 reference)
 
-- Outer frame width: **403.31px**
-- Outer frame height: **512px**
-- max-width: **403.314px**
-- Frame aspect ratio: 403/512 ≈ **0.787** (essentially 4:5 = 0.8)
-- Behavior: Twitter caps portrait images to a 4:5 frame and crops anything taller (cover), so there are no letterbox bars.
+- Frame width: 518px
+- Frame height: 292.89px (~16:9)
 
-## Current behavior (portrait image branch in `computeShape`)
+## Decision
 
-- `ratio: Math.min(intrinsic, 4/5)` ✅ already caps at 4:5
-- `maxWidth: '440px'` — too wide
-- `maxHeight: 'min(680px, 85vh)'` — too tall
-- `fit: 'contain'` — would show grey/black bars if intrinsic is taller than 4:5
+Use a width-driven cap (`maxWidth: 518px`) with a height cap derived from the lower-clamp ratio (5:4), so every landscape ratio renders at the full 518px width:
 
-## Changes (scoped to `src/components/media/FeedCollage.tsx` only)
+- 518 / (5/4) = 414.4 → `maxHeight: 'min(414px, 70vh)'`
 
-### `computeShape` — portrait image branch (the `else` after the `if (isVideo)` inside `intrinsic < 0.95`)
+Wide 16:9 images still land at ~518 × 292 (matching Twitter); 4:3 lands at 518 × 389; 5:4 at 518 × 414. None get visually shrunk.
 
-- `ratio: Math.min(intrinsic, 4/5)` — unchanged
-- `maxWidth: '403px'` (was `'440px'`)
-- `maxHeight: 'min(512px, 75vh)'` (was `'min(680px, 85vh)'`)
-- `fit: 'cover'` (was `'contain'`) — matches Twitter; safe because:
-  - When intrinsic ≤ 4:5, the frame ratio equals the intrinsic ratio → nothing is cropped, just eliminates subpixel seams.
-  - When intrinsic < 4:5 (taller than 4:5), Twitter crops to the 4:5 frame — `cover` reproduces this exactly.
+## Changes (scoped to `src/components/media/FeedCollage.tsx`)
 
-### Placeholder branch (image side)
+### `computeShape` — landscape image branch
+- `ratio: clamp(intrinsic, 5/4, 16/9)` — unchanged
+- `maxWidth: '518px'` (new)
+- `maxHeight: 'min(414px, 70vh)'` (was `'min(560px, 80vh)'`)
+- `fit: 'cover'` — unchanged
 
-- `maxWidth: '403px'` (was `'440px'`)
-- `maxHeight: 'min(512px, 75vh)'` (was `'min(620px, 80vh)'`)
-- Keep `fit: 'contain'` for the placeholder (it never actually shows media; just a brief frame before measurement).
+### Placeholder branch — landscape hint
+- Extend the existing `orientationHint === 'landscape'` placeholder to apply to images too.
+- Video placeholder: 518 × 292 (16:9, tight Twitter frame).
+- Image placeholder: 518 × 414 (16:9 ratio + loose height cap, matches final cap).
 
 ## Explicitly NOT changing
 
-- Portrait video (already tuned to 287×508)
-- Square images / videos
-- Landscape images / videos
-- Multi-item collages
-- `FeedVideo.tsx`, composer, lightbox, upload pipeline
-
-## Expected result
-
-Single portrait images render at ≤403px wide and ≤512px tall, capped at a 4:5 frame with no grey/black side bars — visually matching Twitter.
+Portrait image (403×512), portrait video (287×508), landscape video (518×292), square media, multi-item collages, `FeedVideo.tsx`, composer, lightbox, upload pipeline, view tracking.

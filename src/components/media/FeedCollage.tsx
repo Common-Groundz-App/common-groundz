@@ -177,12 +177,22 @@ function computeShape(
   orientationHint?: Orientation
 ): Shape {
   if (intrinsic == null) {
-    // Landscape hint: avoid a temporary portrait flash for videos whose
-    // metadata hasn't loaded yet by using a 16:9 landscape placeholder.
-    if (isVideo && orientationHint === 'landscape') {
+    // Landscape hint: avoid a temporary portrait flash when intrinsic
+    // dimensions haven't loaded yet. Videos use Twitter's tight 16:9 frame
+    // (518×292). Images use the looser 5:4-derived cap (518×414) so 4:3 and
+    // 3:2 photos aren't visually shrunk before measurement settles.
+    if (orientationHint === 'landscape') {
+      if (isVideo) {
+        return {
+          ratio: 16 / 9,
+          maxHeight: 'min(292px, 60vh)',
+          maxWidth: '518px',
+          fit: 'cover',
+        };
+      }
       return {
         ratio: 16 / 9,
-        maxHeight: 'min(292px, 60vh)',
+        maxHeight: 'min(414px, 70vh)',
         maxWidth: '518px',
         fit: 'cover',
       };
@@ -232,10 +242,14 @@ function computeShape(
       fit: 'cover',
     };
   }
-  // Landscape image — unchanged (full-width feed column); tuned separately.
+  // Landscape image — cap to 518px wide and 414px tall. 414 is derived from
+  // 518 / (5/4) so every ratio in the 5:4–16:9 clamp range renders at the
+  // full 518px width; only the height varies naturally. Wide 16:9 images
+  // still land around Twitter's 518×292 measurement.
   return {
     ratio: clamp(intrinsic, 5 / 4, 16 / 9),
-    maxHeight: 'min(560px, 80vh)',
+    maxHeight: 'min(414px, 70vh)',
+    maxWidth: '518px',
     fit: 'cover',
   };
 }
