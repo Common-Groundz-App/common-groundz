@@ -178,8 +178,8 @@ function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
     // synchronously via Image() so `contain` is fine.
     return {
       ratio: 4 / 5,
-      maxHeight: isVideo ? 'min(510px, 75vh)' : 'min(620px, 80vh)',
-      maxWidth: isVideo ? '300px' : '440px',
+      maxHeight: isVideo ? 'min(508px, 75vh)' : 'min(620px, 80vh)',
+      maxWidth: isVideo ? '287px' : '440px',
       fit: isVideo ? 'cover' : 'contain',
     };
   }
