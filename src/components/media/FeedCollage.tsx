@@ -223,7 +223,16 @@ function computeShape(
       fit: 'cover',
     };
   }
-  // Landscape — full-width feed column.
+  // Landscape video — cap to Twitter's 518×292 16:9 frame.
+  if (isVideo) {
+    return {
+      ratio: clamp(intrinsic, 5 / 4, 16 / 9),
+      maxHeight: 'min(292px, 60vh)',
+      maxWidth: '518px',
+      fit: 'cover',
+    };
+  }
+  // Landscape image — unchanged (full-width feed column); tuned separately.
   return {
     ratio: clamp(intrinsic, 5 / 4, 16 / 9),
     maxHeight: 'min(560px, 80vh)',
