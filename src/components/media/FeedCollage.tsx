@@ -226,17 +226,20 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
 
   const [measured, setMeasured] = useState<number | null>(null);
 
-  // Preload to measure legacy media that has no stored dimensions.
-  // Image -> naturalWidth/Height; Video -> videoWidth/Height via a detached
-  // <video> probe. The probe is fully isolated from FeedVideo (separate element,
-  // no autoplay) so playback, mute, and view tracking are unaffected.
+  // Measurement priority for legacy media (no stored width/height):
+  //   1. Stored dimensions (handled by `stored` above — no probe needed).
+  //   2. Poster image (item.thumbnail_url) via Image() — cheap, no CORS,
+  //      and for videos the poster carries the true videoWidth/videoHeight.
+  //   3. Detached <video preload="metadata"> probe — last resort, with a
+  //      2 s safety timeout so a hung request can't pin the placeholder.
   useEffect(() => {
     if (stored != null) return;
     let cancelled = false;
 
-    if (!isVideo) {
-      const src = item.thumbnail_url || item.url;
-      if (!src) return;
+    // Try image / poster first (works for image items and for video items
+    // that have a poster).
+    const posterSrc = item.thumbnail_url || (!isVideo ? item.url : null);
+    if (posterSrc) {
       const probe = new Image();
       probe.onload = () => {
         if (cancelled) return;
@@ -244,19 +247,23 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
         const h = probe.naturalHeight;
         if (w && h) setMeasured(w / h);
       };
-      probe.src = src;
-      return () => {
-        cancelled = true;
-      };
+      probe.src = posterSrc;
+      if (!isVideo || item.thumbnail_url) {
+        return () => {
+          cancelled = true;
+        };
+      }
     }
 
+    // Video fallback probe (legacy videos with no width/height AND no poster).
+    if (!isVideo) return;
     const src = item.url;
     if (!src) return;
+
     const probe = document.createElement('video');
     probe.preload = 'metadata';
     probe.muted = true;
     probe.playsInline = true;
-    probe.crossOrigin = 'anonymous';
 
     const handleLoaded = () => {
       if (cancelled) return;
@@ -265,15 +272,21 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
       if (w && h) setMeasured(w / h);
     };
     const handleError = () => {
-      // Graceful fallback: leave measured null; computeShape keeps placeholder.
+      /* graceful fallback: placeholder shape (cover) keeps no bars visible */
     };
 
     probe.addEventListener('loadedmetadata', handleLoaded);
     probe.addEventListener('error', handleError);
     probe.src = src;
 
+    // Safety timeout: if metadata never resolves, stop waiting.
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) cancelled = true;
+    }, 2000);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
       probe.removeEventListener('loadedmetadata', handleLoaded);
       probe.removeEventListener('error', handleError);
       try {
@@ -291,7 +304,7 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
 
   return (
     <div
-      className="relative overflow-hidden rounded-xl bg-muted"
+      className="relative overflow-hidden rounded-xl bg-black"
       style={{
         aspectRatio: String(ratio),
         maxHeight,
@@ -299,9 +312,10 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
       }}
     >
       <div
-        className="relative w-full h-full overflow-hidden bg-muted cursor-pointer"
+        className="relative w-full h-full overflow-hidden bg-black cursor-pointer"
         onClick={() => onItemClick(originalIndex)}
       >
+
         {item.type === 'image' ? (
           <img
             src={item.thumbnail_url || item.url}
