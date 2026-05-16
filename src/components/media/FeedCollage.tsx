@@ -178,8 +178,8 @@ function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
     // synchronously via Image() so `contain` is fine.
     return {
       ratio: 4 / 5,
-      maxHeight: isVideo ? 'min(508px, 75vh)' : 'min(620px, 80vh)',
-      maxWidth: isVideo ? '287px' : '440px',
+      maxHeight: isVideo ? 'min(508px, 75vh)' : 'min(512px, 75vh)',
+      maxWidth: isVideo ? '287px' : '403px',
       fit: isVideo ? 'cover' : 'contain',
     };
   }
@@ -204,9 +204,9 @@ function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
     }
     return {
       ratio: Math.min(intrinsic, 4 / 5),
-      maxHeight: 'min(680px, 85vh)',
-      maxWidth: '440px',
-      fit: 'contain',
+      maxHeight: 'min(512px, 75vh)',
+      maxWidth: '403px',
+      fit: 'cover',
     };
   }
   // Landscape — full-width feed column.
