@@ -173,13 +173,14 @@ interface Shape {
 
 function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
   if (intrinsic == null) {
-    // Neutral placeholder while measuring — narrow portrait-ish frame so
-    // the eventual snap to portrait isn't a jarring 16:9-to-portrait jump.
+    // Placeholder while measuring. For videos use `cover` to avoid grey/black
+    // letterbox during the brief loading window; for images we measure
+    // synchronously via Image() so `contain` is fine.
     return {
       ratio: 4 / 5,
       maxHeight: 'min(620px, 80vh)',
-      maxWidth: '520px',
-      fit: 'contain',
+      maxWidth: isVideo ? '380px' : '440px',
+      fit: isVideo ? 'cover' : 'contain',
     };
   }
   // Square
@@ -187,25 +188,24 @@ function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
     return {
       ratio: 1,
       maxHeight: 'min(560px, 80vh)',
-      maxWidth: '560px',
+      maxWidth: '480px',
       fit: 'contain',
     };
   }
-  // Portrait — match intrinsic exactly (no lower clamp) so tall phone videos
-  // (e.g. 9:19.5) don't get pillarboxed inside a wider 9:16 frame.
+  // Portrait — match intrinsic so the container hugs the media (no bars).
   if (intrinsic < 0.95) {
     if (isVideo) {
       return {
         ratio: Math.min(intrinsic, 3 / 4),
-        maxHeight: 'min(720px, 85vh)',
-        maxWidth: '520px',
+        maxHeight: 'min(680px, 85vh)',
+        maxWidth: '380px', // Twitter-like in-feed scale for portrait video
         fit: 'contain',
       };
     }
     return {
       ratio: Math.min(intrinsic, 4 / 5),
       maxHeight: 'min(680px, 85vh)',
-      maxWidth: '520px',
+      maxWidth: '440px',
       fit: 'contain',
     };
   }
