@@ -171,8 +171,22 @@ interface Shape {
   fit: 'cover' | 'contain';
 }
 
-function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
+function computeShape(
+  intrinsic: number | null,
+  isVideo: boolean,
+  orientationHint?: Orientation
+): Shape {
   if (intrinsic == null) {
+    // Landscape hint: avoid a temporary portrait flash for videos whose
+    // metadata hasn't loaded yet by using a 16:9 landscape placeholder.
+    if (isVideo && orientationHint === 'landscape') {
+      return {
+        ratio: 16 / 9,
+        maxHeight: 'min(292px, 60vh)',
+        maxWidth: '518px',
+        fit: 'cover',
+      };
+    }
     // Placeholder while measuring. For videos use `cover` to avoid grey/black
     // letterbox during the brief loading window; for images we measure
     // synchronously via Image() so `contain` is fine.
