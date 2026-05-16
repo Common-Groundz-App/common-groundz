@@ -178,8 +178,8 @@ function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
     // synchronously via Image() so `contain` is fine.
     return {
       ratio: 4 / 5,
-      maxHeight: 'min(620px, 80vh)',
-      maxWidth: isVideo ? '380px' : '440px',
+      maxHeight: isVideo ? 'min(510px, 75vh)' : 'min(620px, 80vh)',
+      maxWidth: isVideo ? '300px' : '440px',
       fit: isVideo ? 'cover' : 'contain',
     };
   }
@@ -196,9 +196,9 @@ function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
   if (intrinsic < 0.95) {
     if (isVideo) {
       return {
-        ratio: Math.min(intrinsic, 3 / 4),
-        maxHeight: 'min(680px, 85vh)',
-        maxWidth: '380px', // Twitter-like in-feed scale for portrait video
+        ratio: intrinsic,
+        maxHeight: 'min(510px, 75vh)',
+        maxWidth: '300px',
         fit: 'contain',
       };
     }
