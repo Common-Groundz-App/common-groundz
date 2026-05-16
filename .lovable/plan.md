@@ -1,49 +1,47 @@
 ## Goal
 
-Single portrait video in the feed should render at Twitter's exact size (~287×508) with zero black sidebars. Everything else stays untouched.
+Make single portrait images in the feed match Twitter's exact sizing, based on the measured Computed values you provided.
 
-## Diagnosis
+## Twitter's measured values (from your screenshots)
 
-The current `FeedCollage.tsx` already uses the intrinsic ratio for portrait video (no 3/4 cap) and `maxWidth: 300px` / `maxHeight: min(510px, 75vh)`. Two things still cause the issues the user sees:
+- Outer frame width: **403.31px**
+- Outer frame height: **512px**
+- max-width: **403.314px**
+- Frame aspect ratio: 403/512 ≈ **0.787** (essentially 4:5 = 0.8)
+- Behavior: Twitter caps portrait images to a 4:5 frame and crops anything taller (cover), so there are no letterbox bars.
 
-1. **Slightly too large** — caps are 300/510 instead of Twitter's measured 287/508.
-2. **Black sidebars** — the outer wrapper uses `bg-black` and the inner video uses `object-fit: contain`. Any subpixel rounding between the wrapper's `aspect-ratio: <intrinsic>` and the `<video>`'s own rendering can expose 1–2px of the black wrapper on the sides. Because the wrapper's aspect-ratio is already exactly the video's intrinsic ratio, `object-cover` cannot crop anything meaningful — it just removes the rounding gap.
+## Current behavior (portrait image branch in `computeShape`)
+
+- `ratio: Math.min(intrinsic, 4/5)` ✅ already caps at 4:5
+- `maxWidth: '440px'` — too wide
+- `maxHeight: 'min(680px, 85vh)'` — too tall
+- `fit: 'contain'` — would show grey/black bars if intrinsic is taller than 4:5
 
 ## Changes (scoped to `src/components/media/FeedCollage.tsx` only)
 
-### `computeShape` — portrait video branch
-- `ratio: intrinsic` (unchanged — already correct, no clamp)
-- `maxWidth: '287px'` (was `'300px'`)
-- `maxHeight: 'min(508px, 75vh)'` (was `'min(510px, 75vh)'`)
-- `fit: 'cover'` (was `'contain'`) — safe because the frame ratio equals the intrinsic ratio, so cover and contain are visually identical except cover hides subpixel gaps that produce the black bars.
+### `computeShape` — portrait image branch (the `else` after the `if (isVideo)` inside `intrinsic < 0.95`)
 
-### Placeholder branch (used only before metadata resolves)
-- For video: `maxWidth: '287px'`, `maxHeight: 'min(508px, 75vh)'`, keep `fit: 'cover'`.
-- Image placeholder values untouched.
+- `ratio: Math.min(intrinsic, 4/5)` — unchanged
+- `maxWidth: '403px'` (was `'440px'`)
+- `maxHeight: 'min(512px, 75vh)'` (was `'min(680px, 85vh)'`)
+- `fit: 'cover'` (was `'contain'`) — matches Twitter; safe because:
+  - When intrinsic ≤ 4:5, the frame ratio equals the intrinsic ratio → nothing is cropped, just eliminates subpixel seams.
+  - When intrinsic < 4:5 (taller than 4:5), Twitter crops to the 4:5 frame — `cover` reproduces this exactly.
 
-### `SingleMediaTile` wrapper
-- Keep `bg-black` as the brief pre-measurement fallback (prevents a white flash).
-- No other change. Inner `<video>` already gets `w-full h-full` via `FeedVideo`, and `FeedVideo` already passes `objectFit` straight to the `<video>` element.
+### Placeholder branch (image side)
 
-### Measurement order
-Already implemented and correct:
-1. Stored `width`/`height` on the `MediaItem`
-2. `thumbnail_url` via `new Image()` probe
-3. Detached `<video preload="metadata">` probe with 2s timeout
-
-Once `intrinsic` is non-null, `computeShape` uses it directly — no fallback to placeholder ratio. No change needed here.
+- `maxWidth: '403px'` (was `'440px'`)
+- `maxHeight: 'min(512px, 75vh)'` (was `'min(620px, 80vh)'`)
+- Keep `fit: 'contain'` for the placeholder (it never actually shows media; just a brief frame before measurement).
 
 ## Explicitly NOT changing
 
-- Portrait images, square media, landscape media
-- Multi-item collages (2/3/4+)
-- `FeedVideo.tsx` internals (controls, autoplay, mute, tracking)
-- Composer, lightbox, upload pipeline, view tracker
+- Portrait video (already tuned to 287×508)
+- Square images / videos
+- Landscape images / videos
+- Multi-item collages
+- `FeedVideo.tsx`, composer, lightbox, upload pipeline
 
 ## Expected result
 
-Single portrait video renders at ≤287px wide and ≤508px tall — visually matching Twitter — with no black sidebars in any state (placeholder, loading, playing).
-
-## Why `object-cover` is safe here
-
-`object-cover` only crops when the element's box ratio differs from the media's ratio. Since the wrapper is built with `aspectRatio: intrinsic`, the box ratio IS the media ratio, so there is nothing to crop — but it eliminates any 1px rounding seam that `object-contain` would letterbox in black.
+Single portrait images render at ≤403px wide and ≤512px tall, capped at a 4:5 frame with no grey/black side bars — visually matching Twitter.
