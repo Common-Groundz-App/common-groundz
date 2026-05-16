@@ -197,9 +197,9 @@ function computeShape(intrinsic: number | null, isVideo: boolean): Shape {
     if (isVideo) {
       return {
         ratio: intrinsic,
-        maxHeight: 'min(510px, 75vh)',
-        maxWidth: '300px',
-        fit: 'contain',
+        maxHeight: 'min(508px, 75vh)',
+        maxWidth: '287px',
+        fit: 'cover',
       };
     }
     return {
