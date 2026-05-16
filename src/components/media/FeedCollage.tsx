@@ -322,7 +322,8 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
   }, [stored, isVideo, item.thumbnail_url, item.url]);
 
   const intrinsic = stored ?? measured;
-  const { ratio, maxHeight, maxWidth, fit } = computeShape(intrinsic, isVideo);
+  const orientationHint = getOrientation(item);
+  const { ratio, maxHeight, maxWidth, fit } = computeShape(intrinsic, isVideo, orientationHint);
   const ready = intrinsic != null;
 
   return (
