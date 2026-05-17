@@ -1,37 +1,38 @@
 ## Goal
 
-Restore a small amount of vertical breathing room in the For You feed without going back to the old huge 32px gap, and fix the separate issue that the first post sits flush against the For You / Following tabs.
-
-## Why two different values
-
-`space-y-*` only inserts space *between* siblings, never before the first child. That is exactly why the old `space-y-8` (32px) felt huge between posts but still left the first post glued to the tabs. So we need to solve two things independently:
-
-1. Gap *between* posts — currently 0px, feels cramped.
-2. Gap *above* the first post (tabs → first post) — currently 0px, also cramped.
-
-## Proposed values
-
-- Between posts: `space-y-2` → **8px**
-  - Each `PostFeedItem` already has a `border-b` hairline, so 8px is enough to separate them visually without reintroducing the dead-air feeling of 32px. 10–12px (`space-y-2.5` / `space-y-3`) would also be defensible; I'd lean to 8px because of the existing divider.
-- Above the first post: `pt-3` on the list wrapper → **12px**
-  - A touch more than the inter-post gap so the tab row reads as a separate zone from the feed, matching how Twitter/Reddit separate their tab bar from the first card.
-
-If after seeing it 8px still feels tight, the easy next step is `space-y-3` (12px). I'd start at 8px and only bump up if needed.
+Remove the redundant top divider above the action row in `PostFeedItem.tsx`, while keeping all spacing and the bottom post divider untouched. This collapses media → actions into a single visual block, leaving the bottom card divider as the only separator between posts.
 
 ## Change
 
-File: `src/components/feed/EnhancedFeedForYou.tsx`
+File: `src/components/feed/PostFeedItem.tsx`
 
-Both `motion.div` wrappers that list the posts (the offline branch ~line 99 and the main branch ~line 136) currently use `className="space-y-0"`. Update both to:
+In the action row wrapper, change:
 
 ```
-className="space-y-2 pt-3"
+mt-4 pt-4 border-t
 ```
 
-That's the only change. No edits to `PostFeedItem.tsx`, `FeedCollage`, action row, CardContent padding, media sizing, composer, other feed variants, or the outer page container.
+to:
+
+```
+mt-4 pt-4
+```
+
+That is the only change. `border-t` is removed; `mt-4 pt-4` stays exactly as it is.
+
+## Not touched
+
+- Bottom post divider (`border-b` on the card)
+- `CardContent` padding
+- Feed list spacing (`space-y-*`, `pt-*` on the list wrapper)
+- `FeedCollage` / media sizing
+- Action icon spacing and internals
+- Composer, lightbox, other feed variants, `ProfilePostItem`
 
 ## Expected result
 
-- Tabs → first post: 12px breathing room (was 0px, was also 0px back when margin was 32 because `space-y` doesn't apply to the first child).
-- Post → next post: 8px gap on top of the existing hairline divider (was 0px now, was 32px originally).
-- No other layout or spacing changes anywhere else.
+Structure per post becomes: media → action row (no top line) → bottom card divider → next post. Vertical rhythm and all paddings remain identical to the current live state; only the hairline above the icons disappears.
+
+## Follow-up (not in this step)
+
+If after this change the gap between media and the action icons feels too loose, the next pass can reduce `mt-4 pt-4` to `mt-3 pt-3` or `mt-2 pt-2` as a separate isolated change.
