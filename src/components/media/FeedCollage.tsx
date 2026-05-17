@@ -77,6 +77,7 @@ export function FeedCollage({
             source={source}
             sourceId={sourceId}
             objectFit={fit}
+            onTap={() => onItemClick(originalIndex)}
           />
         )}
         {options?.overlayCount && options.overlayCount > 0 ? (
@@ -389,7 +390,7 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
             loading="lazy"
           />
         ) : (
-          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit={fit} />
+          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit={fit} onTap={() => onItemClick(originalIndex)} />
         )}
       </div>
     </div>
