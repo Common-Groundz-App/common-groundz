@@ -380,7 +380,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       role={!isDetailView ? "link" : undefined}
       tabIndex={!isDetailView ? 0 : undefined}
     >
-      <CardContent className="px-3 sm:px-4 pt-2 sm:pt-3 pb-3 sm:pb-4">
+      <CardContent className="px-3 sm:px-4 pt-1.5 sm:pt-2 pb-3 sm:pb-4">
         {/* User Info and Post Meta */}
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
@@ -483,7 +483,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           const hasContent = !!post.content;
           const hasTextAbove = hasTitle || hasContent;
           return (
-            <div className={cn(hasTextAbove ? "mt-2" : "mt-2")}>
+            <div className={cn(hasTextAbove ? "mt-1.5" : "mt-1")}>
               {/* Post Title */}
               {hasTitle && (
                 <h3 className="font-semibold text-base mb-1">{post.title}</h3>
