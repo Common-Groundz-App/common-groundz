@@ -1,38 +1,32 @@
 ## Goal
 
-Remove the redundant top divider above the action row in `PostFeedItem.tsx`, while keeping all spacing and the bottom post divider untouched. This collapses media → actions into a single visual block, leaving the bottom card divider as the only separator between posts.
+Tighten the gap between the media block and the action row in `PostFeedItem.tsx` now that the top `border-t` is gone. The earlier "cramped" feel from `mt-1 pt-1` was caused by the divider sitting in that small space — without the divider, the tighter spacing should read as clean rather than cramped.
 
 ## Change
 
-File: `src/components/feed/PostFeedItem.tsx`
+File: `src/components/feed/PostFeedItem.tsx` (line 534)
 
-In the action row wrapper, change:
-
+From:
 ```
-mt-4 pt-4 border-t
-```
-
-to:
-
-```
-mt-4 pt-4
+className="flex items-center justify-between mt-2 pt-2"
 ```
 
-That is the only change. `border-t` is removed; `mt-4 pt-4` stays exactly as it is.
+To:
+```
+className="flex items-center justify-between mt-1 pt-1"
+```
+
+That is the only edit. No `border-t`. Nothing else in the file changes.
 
 ## Not touched
 
-- Bottom post divider (`border-b` on the card)
-- `CardContent` padding
-- Feed list spacing (`space-y-*`, `pt-*` on the list wrapper)
-- `FeedCollage` / media sizing
-- Action icon spacing and internals
+- Bottom card divider (`border-b` on the Card)
+- `CardContent` padding (`px-3 sm:px-4 pt-2 pb-1 sm:pb-2`)
+- Feed list spacing
+- `FeedCollage` / `PostMediaDisplay` sizing
+- Action icon spacing (button `gap-3 sm:gap-6`, per-button padding)
 - Composer, lightbox, other feed variants, `ProfilePostItem`
 
 ## Expected result
 
-Structure per post becomes: media → action row (no top line) → bottom card divider → next post. Vertical rhythm and all paddings remain identical to the current live state; only the hairline above the icons disappears.
-
-## Follow-up (not in this step)
-
-If after this change the gap between media and the action icons feels too loose, the next pass can reduce `mt-4 pt-4` to `mt-3 pt-3` or `mt-2 pt-2` as a separate isolated change.
+Action row sits ~12px closer to the media block. No divider reappears. Vertical rhythm everywhere else is identical.
