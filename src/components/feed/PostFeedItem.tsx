@@ -543,7 +543,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               onClick={handleLikeClick}
             >
               <Heart className={cn("h-5 w-5", localIsLiked && "fill-current")} />
-              <span>{localLikes || 0}</span>
+              {localLikes > 0 && <span>{localLikes}</span>}
             </Button>
             
             <Button
@@ -553,7 +553,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
               onClick={handleCommentClick}
             >
               <MessageCircle className="h-5 w-5" />
-              <span>{displayCommentCount || 0}</span>
+              {(() => { const commentCount = displayCommentCount ?? 0; return commentCount > 0 && <span>{commentCount}</span>; })()}
             </Button>
             
             <Button
