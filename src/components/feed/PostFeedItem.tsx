@@ -531,7 +531,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
         })()}
 
         {/* Social Actions - Isolated from click area */}
-        <div className="flex items-center justify-between mt-4 pt-4 border-t" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mt-2 pt-2 border-t" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 sm:gap-6">
             <Button 
               variant="ghost" 
