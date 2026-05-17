@@ -366,9 +366,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   return (
     <Card 
       className={cn(
-        "overflow-hidden transition-colors",
-        !isDetailView && "cursor-pointer hover:bg-muted/30 shadow-sm",
-        isDetailView && "shadow-none",
+        "overflow-hidden transition-colors rounded-none border-x-0 border-t-0 border-b shadow-none",
+        !isDetailView && "cursor-pointer hover:bg-muted/30",
         showHighlight && "animate-highlight-fade"
       )}
       onAnimationEnd={(e) => {
