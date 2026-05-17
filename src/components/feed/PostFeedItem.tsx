@@ -476,38 +476,42 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
           )}
         </div>
         
-        {/* Content Area */}
-        <div className="mt-4">
-          {/* Post Title */}
-          {post.title && (
-            <h3 className="font-semibold text-base mb-1">{post.title}</h3>
-          )}
-
-          {/* Post Content */}
-          <div className="text-sm">
-            <div className={cn("min-w-0", !isDetailView && "line-clamp-3")}>
-              {post.content ? (
-                <PostTextRenderer content={post.content} />
-              ) : (
-                <RichTextDisplay content={post.content} />
+        {/* Content Area — only render text blocks that have content so the
+            "no text above media" case truly collapses to zero height. */}
+        {(() => {
+          const hasTitle = !!post.title;
+          const hasContent = !!post.content;
+          const hasTextAbove = hasTitle || hasContent;
+          return (
+            <div className={cn(hasTextAbove ? "mt-2" : "mt-2")}>
+              {/* Post Title */}
+              {hasTitle && (
+                <h3 className="font-semibold text-base mb-1">{post.title}</h3>
               )}
-            </div>
-          </div>
 
-          {/* Media Content */}
-          {post.media && post.media.length > 0 && (
-            <div onClick={e => e.stopPropagation()}>
-              <PostMediaDisplay 
-                media={post.media} 
-                className="mt-3"
-                maxHeight="h-80"
-                aspectRatio="maintain"
-                objectFit="contain"
-                source="post"
-                sourceId={post.id}
-              />
-            </div>
-          )}
+              {/* Post Content — only render when there is actual content */}
+              {hasContent && (
+                <div className="text-sm">
+                  <div className={cn("min-w-0", !isDetailView && "line-clamp-3")}>
+                    <PostTextRenderer content={post.content} />
+                  </div>
+                </div>
+              )}
+
+              {/* Media Content */}
+              {post.media && post.media.length > 0 && (
+                <div onClick={e => e.stopPropagation()}>
+                  <PostMediaDisplay
+                    media={post.media}
+                    className={hasTextAbove ? "mt-3" : "mt-0"}
+                    maxHeight="h-80"
+                    aspectRatio="maintain"
+                    objectFit="contain"
+                    source="post"
+                    sourceId={post.id}
+                  />
+                </div>
+              )}
 
           {/* Entity Tags - Below content */}
           {post.tagged_entities && post.tagged_entities.length > 0 && (
