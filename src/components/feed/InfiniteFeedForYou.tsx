@@ -105,7 +105,7 @@ const InfiniteFeedForYou: React.FC<InfiniteFeedForYouProps> = ({ refreshing = fa
       {!isOnline && items.length > 0 ? (
         <>
           <OfflineInlineState message="Showing cached posts" />
-          <motion.div className="space-y-8">
+          <motion.div className="space-y-0">
             {items.map((item, index) => (
               <motion.div
                 key={item.id}
@@ -154,7 +154,7 @@ const InfiniteFeedForYou: React.FC<InfiniteFeedForYouProps> = ({ refreshing = fa
           </AnimatePresence>
           
           <motion.div 
-            className="space-y-8"
+            className="space-y-0"
             animate={{ opacity: refreshing ? 0.7 : 1 }}
             transition={{ duration: 0.2 }}
           >

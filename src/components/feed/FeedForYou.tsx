@@ -82,7 +82,7 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
       {!isOnline && items.length > 0 ? (
         <>
           <OfflineInlineState message="Showing cached posts" />
-          <motion.div className="space-y-8">
+          <motion.div className="space-y-0">
             {items.map(item => (
               <FeedItem 
                 key={item.id} 
@@ -128,7 +128,7 @@ const FeedForYou: React.FC<FeedForYouProps> = ({ refreshing = false }) => {
           </AnimatePresence>
           
           <motion.div 
-            className="space-y-8"
+            className="space-y-0"
             animate={{ opacity: refreshing ? 0.7 : 1 }}
             transition={{ duration: 0.2 }}
           >
