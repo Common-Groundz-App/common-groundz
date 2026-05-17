@@ -1,30 +1,37 @@
-# Reduce inter-post gap at the list level
+## Goal
 
-## Root cause confirmed
+Restore a small amount of vertical breathing room in the For You feed without going back to the old huge 32px gap, and fix the separate issue that the first post sits flush against the For You / Following tabs.
 
-DevTools shows 32px **margin** above the selected post card — not padding inside `PostFeedItem`. That 32px = Tailwind `space-y-8` (2rem) injected by the list wrapper.
+## Why two different values
 
-Source: `src/components/feed/EnhancedFeedForYou.tsx` — the `motion.div` wrapping `items.map(...)` uses `className="space-y-8"` in **two** places (offline branch + main branch). This is the component actively rendering the For You feed (the other two variants, `FeedForYou.tsx` and `InfiniteFeedForYou.tsx`, already use `space-y-0`).
+`space-y-*` only inserts space *between* siblings, never before the first child. That is exactly why the old `space-y-8` (32px) felt huge between posts but still left the first post glued to the tabs. So we need to solve two things independently:
+
+1. Gap *between* posts — currently 0px, feels cramped.
+2. Gap *above* the first post (tabs → first post) — currently 0px, also cramped.
+
+## Proposed values
+
+- Between posts: `space-y-2` → **8px**
+  - Each `PostFeedItem` already has a `border-b` hairline, so 8px is enough to separate them visually without reintroducing the dead-air feeling of 32px. 10–12px (`space-y-2.5` / `space-y-3`) would also be defensible; I'd lean to 8px because of the existing divider.
+- Above the first post: `pt-3` on the list wrapper → **12px**
+  - A touch more than the inter-post gap so the tab row reads as a separate zone from the feed, matching how Twitter/Reddit separate their tab bar from the first card.
+
+If after seeing it 8px still feels tight, the easy next step is `space-y-3` (12px). I'd start at 8px and only bump up if needed.
 
 ## Change
 
-In `src/components/feed/EnhancedFeedForYou.tsx`, change both occurrences:
+File: `src/components/feed/EnhancedFeedForYou.tsx`
 
-- `<motion.div className="space-y-8">` (offline branch, ~line 100)
-- `<motion.div className="space-y-8" ...>` (main branch, ~line 137)
+Both `motion.div` wrappers that list the posts (the offline branch ~line 99 and the main branch ~line 136) currently use `className="space-y-0"`. Update both to:
 
-→ `space-y-0`
+```
+className="space-y-2 pt-3"
+```
 
-That's it. Posts will sit flush, separated only by each card's existing `border-b` hairline — Twitter/Reddit density.
-
-## Not touched
-
-- `PostFeedItem.tsx` (CardContent padding, action row `mt-2 pt-2 border-t`, media spacing — all stay as-is)
-- `FeedCollage`, media sizing, object-fit, lightbox, composer, upload pipeline
-- Action row internals
-- `FeedForYou.tsx` / `InfiniteFeedForYou.tsx` (already correct)
-- Outer page container `space-y-6` (that's between the tab bar and the feed, not between posts)
+That's the only change. No edits to `PostFeedItem.tsx`, `FeedCollage`, action row, CardContent padding, media sizing, composer, other feed variants, or the outer page container.
 
 ## Expected result
 
-Inter-post gap drops from ~32px of empty margin to 0px — just the 1px `border-b` divider between posts. If after seeing it you decide a touch of breathing room helps, we can bump to `space-y-1` or `space-y-2` in a follow-up.
+- Tabs → first post: 12px breathing room (was 0px, was also 0px back when margin was 32 because `space-y` doesn't apply to the first child).
+- Post → next post: 8px gap on top of the existing hairline divider (was 0px now, was 32px originally).
+- No other layout or spacing changes anywhere else.
