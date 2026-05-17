@@ -513,20 +513,22 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
                 </div>
               )}
 
-          {/* Entity Tags - Below content */}
-          {post.tagged_entities && post.tagged_entities.length > 0 && (
-            <div className="mt-3" onClick={e => e.stopPropagation()}>
-              {renderTaggedEntities(post.tagged_entities)}
-            </div>
-          )}
+              {/* Entity Tags - Below content */}
+              {post.tagged_entities && post.tagged_entities.length > 0 && (
+                <div className="mt-3" onClick={e => e.stopPropagation()}>
+                  {renderTaggedEntities(post.tagged_entities)}
+                </div>
+              )}
 
-          {/* Location Tags */}
-          {post.tags && post.tags.length > 0 && (
-            <div className="mt-2" onClick={e => e.stopPropagation()}>
-              {renderLocationTags(post.tags)}
+              {/* Location Tags */}
+              {post.tags && post.tags.length > 0 && (
+                <div className="mt-2" onClick={e => e.stopPropagation()}>
+                  {renderLocationTags(post.tags)}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Social Actions - Isolated from click area */}
         <div className="flex items-center justify-between mt-4 pt-4 border-t" onClick={e => e.stopPropagation()}>
