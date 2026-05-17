@@ -1,29 +1,30 @@
-## Goal
-In multi-item collages (2, 3, 4+), render video tiles with `object-fit: contain` so portrait/landscape videos are letterboxed on a black background instead of cropped. Images stay `cover`. Single-media layouts and everything else stay untouched.
+# Reduce inter-post gap at the list level
 
-## Change (one file: `src/components/media/FeedCollage.tsx`)
+## Root cause confirmed
 
-Update `renderTile` so the `fit` is decided per-item type:
+DevTools shows 32px **margin** above the selected post card — not padding inside `PostFeedItem`. That 32px = Tailwind `space-y-8` (2rem) injected by the list wrapper.
 
-- If `item.type === 'video'` → `fit = 'contain'`
-- Else (image) → `fit = 'cover'` (current behavior)
+Source: `src/components/feed/EnhancedFeedForYou.tsx` — the `motion.div` wrapping `items.map(...)` uses `className="space-y-8"` in **two** places (offline branch + main branch). This is the component actively rendering the For You feed (the other two variants, `FeedForYou.tsx` and `InfiniteFeedForYou.tsx`, already use `space-y-0`).
 
-The existing `options.objectFit` override is no longer needed for the multi-item branches — all call sites (`count === 2`, `count === 3`, `count === 4+`) already call `renderTile(entry)` without specifying fit, so the per-type rule kicks in automatically. The overlay-count call for the 4th tile is preserved as-is.
+## Change
 
-Tile container already has `bg-muted`; switch the multi-item tile background to `bg-black` so letterbox bars match the single-media tile look and feel polished against both light/dark themes.
+In `src/components/feed/EnhancedFeedForYou.tsx`, change both occurrences:
 
-`FeedVideo` is called with `objectFit="contain"` for video tiles — it already accepts this prop (used today by single-media), so mute button, duration badge, click handling, and lightbox routing all continue to work unchanged.
+- `<motion.div className="space-y-8">` (offline branch, ~line 100)
+- `<motion.div className="space-y-8" ...>` (main branch, ~line 137)
 
-## Not changed
-- `SingleMediaTile` and `computeShape` (single-media sizing logic)
-- Outer collage aspect ratios (`aspect-[16/9]`, `aspect-[4/3]` for two-portrait)
-- Grid structure for 2 / 3 / 4+ tiles
-- `FeedVideo` internals
-- Composer, lightbox, upload pipeline
-- Image tiles (still `object-cover`)
+→ `space-y-0`
+
+That's it. Posts will sit flush, separated only by each card's existing `border-b` hairline — Twitter/Reddit density.
+
+## Not touched
+
+- `PostFeedItem.tsx` (CardContent padding, action row `mt-2 pt-2 border-t`, media spacing — all stay as-is)
+- `FeedCollage`, media sizing, object-fit, lightbox, composer, upload pipeline
+- Action row internals
+- `FeedForYou.tsx` / `InfiniteFeedForYou.tsx` (already correct)
+- Outer page container `space-y-6` (that's between the tab bar and the feed, not between posts)
 
 ## Expected result
-- Portrait video in a 3- or 4-tile collage → shown portrait, black side bars
-- Landscape video in a collage → shown landscape, black top/bottom bars
-- Images → still crop-fill their tiles cleanly
-- Grid geometry identical to today; only the video fit mode and tile background change
+
+Inter-post gap drops from ~32px of empty margin to 0px — just the 1px `border-b` divider between posts. If after seeing it you decide a touch of breathing room helps, we can bump to `space-y-1` or `space-y-2` in a follow-up.
