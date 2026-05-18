@@ -1,38 +1,24 @@
-## Goal
+## Verification
 
-Move the scrubber/control layer slightly higher on real mobile so it sits comfortably inside the single portrait video frame, away from the rounded bottom edge.
+Checked `src/components/media/FeedVideo.tsx` line 476. The class is currently:
 
-## Scope
+`absolute inset-x-0 bottom-1 [@media(pointer:coarse)]:bottom-4 z-20 pointer-events-none`
 
-- Only `src/components/media/FeedVideo.tsx`.
-- No changes to FeedCollage, portrait dimensions, object-fit, feed layout, or interaction/lightbox logic.
+So `bottom-4` is still in the code — the revert hasn't taken effect on disk yet.
 
 ## Change
 
-In the bottom controls wrapper (currently `bottom-1 [@media(pointer:coarse)]:bottom-3 z-20`), bump the coarse-pointer inset from `bottom-3` (≈12px) to `bottom-4` (16px):
+Revert that one line back to the previous working value:
 
-`bottom-1 [@media(pointer:coarse)]:bottom-4 z-20`
+`absolute inset-x-0 bottom-1 [@media(pointer:coarse)]:bottom-3 z-20 pointer-events-none`
 
-That's the only edit.
+Nothing else will be touched.
 
-## Why this works
+## Scope
 
-The previous 12px inset cleared the rounded corner but the scrubber still reads as edge-hugging on real devices. 16px gives an extra ~4px of breathing room, making the placement feel intentional and visually consistent with the controls row above it, while staying subtle. Desktop is untouched because the rule is gated behind `@media(pointer:coarse)`.
+- Only `src/components/media/FeedVideo.tsx`, only line 476.
+- No changes to FeedCollage, dimensions, object-fit, interaction logic, or any other component.
 
-## What stays the same
+## Note on "affected all videos"
 
-- Desktop `bottom-1` (4px) unchanged.
-- Track thickness, thumb size, hit area, idle vs active opacity — unchanged.
-- stopPropagation on play/mute/scrub; tap on video body still opens the lightbox.
-- Collage videos unchanged.
-
-## Validation
-
-- Real mobile, single portrait: scrubber sits clearly inside the frame with visible margin below.
-- Desktop: visually identical.
-- Collage: unchanged.
-- Play/mute/scrub: do not open lightbox. Video body tap: opens lightbox.
-
-## Fallback
-
-If 16px ends up looking too high on shorter portrait videos, drop to `bottom-3.5` (14px). Unlikely to be needed.
+`FeedVideo` is the shared component used for both single videos and collage video cells, which is why the inset change applied everywhere. Reverting to `bottom-3` restores the previously working state for all of them. We can revisit a portrait-only solution in a follow-up if you want — but not in this step.
