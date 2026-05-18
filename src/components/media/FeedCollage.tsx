@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { MediaItem } from '@/types/media';
+import { MediaItem, VideoHandoff } from '@/types/media';
 import { FeedVideo } from '@/components/media/FeedVideo';
 import { cn } from '@/lib/utils';
 
 interface FeedCollageProps {
   media: MediaItem[];
-  onItemClick: (originalIndex: number) => void;
+  onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;
   source?: 'post' | 'review' | 'entity';
   sourceId?: string;
   className?: string;
@@ -77,7 +77,7 @@ export function FeedCollage({
             source={source}
             sourceId={sourceId}
             objectFit={fit}
-            onTap={() => onItemClick(originalIndex)}
+            onTap={(handoff) => onItemClick(originalIndex, handoff)}
           />
         )}
         {options?.overlayCount && options.overlayCount > 0 ? (
@@ -162,7 +162,7 @@ interface SingleMediaTileProps {
   entry: DisplayEntry;
   source: 'post' | 'review' | 'entity';
   sourceId?: string;
-  onItemClick: (originalIndex: number) => void;
+  onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
@@ -390,7 +390,7 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
             loading="lazy"
           />
         ) : (
-          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit={fit} onTap={() => onItemClick(originalIndex)} />
+          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit={fit} onTap={(handoff) => onItemClick(originalIndex, handoff)} />
         )}
       </div>
     </div>

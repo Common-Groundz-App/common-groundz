@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MediaItem } from '@/types/media';
+import { MediaItem, VideoHandoff } from '@/types/media';
 import { FeedCollage } from '@/components/media/FeedCollage';
 import { cn } from '@/lib/utils';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
@@ -36,6 +36,7 @@ export function PostMediaDisplay({
 }: PostMediaDisplayProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [videoHandoff, setVideoHandoff] = useState<VideoHandoff | null>(null);
   
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
     return null;
@@ -93,11 +94,18 @@ export function PostMediaDisplay({
     return 'h-auto max-h-[500px]';
   };
   
-  const handleImageClick = (index: number) => {
+  const handleImageClick = (index: number, handoff?: VideoHandoff) => {
     setActiveImageIndex(index);
+    setVideoHandoff(handoff ?? null);
     setLightboxOpen(true);
   };
-  
+
+  const handleLightboxClose = () => {
+    setLightboxOpen(false);
+    // Reset so a later open of a different post can't inherit stale state.
+    setVideoHandoff(null);
+  };
+
   return (
     <>
       <FeedCollage
@@ -113,7 +121,8 @@ export function PostMediaDisplay({
         <LightboxPreview
           media={validMedia}
           initialIndex={activeImageIndex}
-          onClose={() => setLightboxOpen(false)}
+          initialVideoState={videoHandoff ?? undefined}
+          onClose={handleLightboxClose}
         />
       )}
     </>

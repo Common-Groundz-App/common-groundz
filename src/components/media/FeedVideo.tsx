@@ -2,19 +2,19 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Volume2, VolumeX, Play, Pause, Film, AlertTriangle, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useVideoMute } from '@/hooks/useVideoMute';
+import { useVideoMute, readGlobalVideoMuted } from '@/hooks/useVideoMute';
 import { useVideoAutoplay } from '@/hooks/useVideoAutoplay';
 import { useVideoMilestones } from '@/hooks/useVideoMilestones';
 import { useVideoViewTracker } from '@/hooks/useVideoViewTracker';
 import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
-import { MediaItem } from '@/types/media';
+import { MediaItem, VideoHandoff } from '@/types/media';
 
 interface FeedVideoProps {
   item: MediaItem;
   className?: string;
-  onTap?: () => void;
+  onTap?: (handoff?: VideoHandoff) => void;
   showBadge?: boolean;
   objectFit?: 'contain' | 'cover';
   source?: 'post' | 'review' | 'entity';
@@ -319,12 +319,24 @@ export function FeedVideo({
   const handleContainerClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onTap) {
-      try {
-        videoRef.current?.pause();
-      } catch {
-        /* ignore */
+      const v = videoRef.current;
+      let handoff: VideoHandoff | undefined;
+      if (v) {
+        // Snapshot BEFORE pausing, otherwise wasPlaying would always be false.
+        // Use global mute intent rather than v.muted — browsers force-mute
+        // autoplaying videos even when the user has globally unmuted.
+        handoff = {
+          currentTime: v.currentTime,
+          wasPlaying: !v.paused,
+          muted: readGlobalVideoMuted(),
+        };
+        try {
+          v.pause();
+        } catch {
+          /* ignore */
+        }
       }
-      onTap();
+      onTap(handoff);
       return;
     }
     toggleMute();

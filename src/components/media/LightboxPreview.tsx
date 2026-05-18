@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { MediaItem } from '@/types/media';
+import { MediaItem, VideoHandoff } from '@/types/media';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,11 @@ import { useIsMobile } from '@/hooks/use-mobile';
 interface LightboxPreviewProps {
   media: MediaItem[];
   initialIndex?: number;
+  /**
+   * Optional playback handoff from a feed video — apply once on the entry
+   * item so the lightbox opens at the same timestamp / play state.
+   */
+  initialVideoState?: VideoHandoff;
   onClose: () => void;
   className?: string;
 }
@@ -16,6 +21,7 @@ interface LightboxPreviewProps {
 export function LightboxPreview({ 
   media,
   initialIndex = 0,
+  initialVideoState,
   onClose,
   className 
 }: LightboxPreviewProps) {
@@ -25,6 +31,11 @@ export function LightboxPreview({
   const chromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaRef = useRef<MediaItem[]>([]);
   const isMobile = useIsMobile();
+  // Apply the feed handoff at most once, on the entry video only.
+  const handoffAppliedRef = useRef(false);
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+  // Capture entry index so navigation away from it disables the handoff.
+  const entryIndexRef = useRef(initialIndex);
   
   // Prevent body scrolling when lightbox is open
   useEffect(() => {
@@ -240,26 +251,68 @@ export function LightboxPreview({
               )}
             </>
           ) : (
-            <video 
+            <video
               key={imageKey}
-              src={currentItem.url} 
+              ref={(el) => { videoElRef.current = el; }}
+              src={currentItem.url}
               poster={currentItem.thumbnail_url}
               controls
               className={cn(
                 "cursor-auto [&::-webkit-media-controls]:cursor-pointer [&::-webkit-media-controls-panel]:cursor-pointer",
-                isMobile && isLandscape 
-                  ? "h-auto w-full object-contain" 
+                isMobile && isLandscape
+                  ? "h-auto w-full object-contain"
                   : "max-h-[90vh] max-w-full object-contain"
               )}
               style={{ cursor: 'auto' }}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                if (
+                  handoffAppliedRef.current ||
+                  !initialVideoState ||
+                  currentIndex !== entryIndexRef.current
+                ) {
+                  return;
+                }
+                try { v.muted = initialVideoState.muted; } catch { /* ignore */ }
+                const dur = v.duration;
+                if (isFinite(dur) && dur > 0) {
+                  const target = Math.min(
+                    Math.max(0, initialVideoState.currentTime),
+                    Math.max(0, dur - 0.5)
+                  );
+                  try { v.currentTime = target; } catch { /* ignore */ }
+                }
+              }}
               onLoadedData={() => handleImageLoad(currentItem, currentIndex)}
+              onSeeked={(e) => {
+                e.stopPropagation();
+                if (
+                  handoffAppliedRef.current ||
+                  !initialVideoState ||
+                  currentIndex !== entryIndexRef.current
+                ) {
+                  return;
+                }
+                handoffAppliedRef.current = true;
+                if (!initialVideoState.wasPlaying) return;
+                const v = e.currentTarget;
+                const tryPlay = v.play();
+                if (tryPlay && typeof tryPlay.catch === 'function') {
+                  tryPlay.catch(() => {
+                    try { v.muted = true; } catch { /* ignore */ }
+                    const retry = v.play();
+                    if (retry && typeof retry.catch === 'function') {
+                      retry.catch(() => { /* still blocked; native controls visible */ });
+                    }
+                  });
+                }
+              }}
               onClick={(e) => e.stopPropagation()}
               onPlay={(e) => e.stopPropagation()}
               onPause={(e) => e.stopPropagation()}
               onVolumeChange={(e) => e.stopPropagation()}
               onTimeUpdate={(e) => e.stopPropagation()}
               onSeeking={(e) => e.stopPropagation()}
-              onSeeked={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             />
