@@ -142,7 +142,7 @@ function VideoProgressBar({
       <div
         className={cn(
           'relative w-full rounded-full bg-white/30 overflow-hidden motion-safe:transition-all',
-          isActive ? 'h-1' : 'h-0.5'
+          isActive ? 'h-1' : 'h-0.5 [@media(pointer:coarse)]:h-1'
         )}
       >
         <div
