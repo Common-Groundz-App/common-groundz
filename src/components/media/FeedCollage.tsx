@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 interface FeedCollageProps {
   media: MediaItem[];
-  onItemClick: (originalIndex: number) => void;
+  onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;
   source?: 'post' | 'review' | 'entity';
   sourceId?: string;
   className?: string;
