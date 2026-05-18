@@ -162,7 +162,7 @@ interface SingleMediaTileProps {
   entry: DisplayEntry;
   source: 'post' | 'review' | 'entity';
   sourceId?: string;
-  onItemClick: (originalIndex: number) => void;
+  onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
