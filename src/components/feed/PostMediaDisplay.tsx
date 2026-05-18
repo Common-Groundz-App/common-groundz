@@ -36,6 +36,7 @@ export function PostMediaDisplay({
 }: PostMediaDisplayProps) {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [videoHandoff, setVideoHandoff] = useState<VideoHandoff | null>(null);
   
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
     return null;
