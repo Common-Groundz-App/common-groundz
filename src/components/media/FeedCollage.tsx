@@ -390,7 +390,7 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
             loading="lazy"
           />
         ) : (
-          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit={fit} onTap={() => onItemClick(originalIndex)} />
+          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit={fit} onTap={(handoff) => onItemClick(originalIndex, handoff)} />
         )}
       </div>
     </div>
