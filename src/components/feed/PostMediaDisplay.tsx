@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { MediaItem } from '@/types/media';
+import { MediaItem, VideoHandoff } from '@/types/media';
 import { FeedCollage } from '@/components/media/FeedCollage';
 import { cn } from '@/lib/utils';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
