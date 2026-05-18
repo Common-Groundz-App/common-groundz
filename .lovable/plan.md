@@ -1,55 +1,31 @@
-## Verdict
+## Goal
 
-Yes — your direction is correct and this is achievable. ChatGPT's reasoning matches what the git history actually shows. Phase 1 only undid the *later* `bottom-3 / bottom-4 / z-20 / coarse-pointer h-1` additions. One piece of the **first** global mobile fix is still in the file and needs to come out before we start Phase 2.
+Restore mobile horizontal padding on the Home feed header ("Home" / "Your personalized feed" / Create button) without touching the edge-to-edge post cards below.
 
-## What the git history shows
+## Root cause
 
-I traced every revision of `src/components/media/FeedVideo.tsx`:
+In `src/pages/Feed.tsx`, the middle column wrapper (line 630) is `px-0 sm:px-4`, which correctly lets the post cards go edge-to-edge on mobile. But the header block at line 632 lives inside that same wrapper, so it also loses its mobile side padding and the text + Create button touch the screen edge.
 
-| Commit | line 145 (track height) | line 476 (controls wrapper) | Meaning |
-|---|---|---|---|
-| `05c8ab17` | `h-0.5` | `absolute inset-x-0 bottom-0 pointer-events-none` | **A. True original scrubber** |
-| `0a718d34` | `h-0.5` | `... bottom-1 z-20 ...` | **B. First global mobile fix** (added `bottom-1` + `z-20`) |
-| `7460a5e9` | `h-0.5 [@media(pointer:coarse)]:h-1` | `... bottom-1 z-20 ...` | B continued (coarse-pointer thickness) |
-| `833483ac` / `b3f71767` / `5ed66e83` | same | `... bottom-1 [@media(pointer:coarse)]:bottom-3/4 z-20 ...` | **C. Later bottom-3 / bottom-4 tweak** |
-| `499cec39` (current) | `h-0.5` ✓ | `absolute inset-x-0 bottom-1 pointer-events-none` | Phase 1 removed C and the coarse-pointer h-1, but **`bottom-1` from B is still here** |
+## Change (single file, one line)
 
-So classification:
-- **A (keep):** original scrubber feature, `h-0.5` idle, `h-1` active, `bottom-0`, all play/pause/mute/seek logic.
-- **B (remove):** `bottom-1` on the controls wrapper, the coarse-pointer `h-1` idle override, the `z-20`. Of these, only `bottom-1` is still in the file.
-- **C (remove):** `[@media(pointer:coarse)]:bottom-3 / bottom-4`. Already gone.
-
-## The change
-
-Single edit in `src/components/media/FeedVideo.tsx`, line 476:
+`src/pages/Feed.tsx`, line 632 — add mobile-only horizontal padding to the header block only:
 
 ```diff
-- 'absolute inset-x-0 bottom-1 pointer-events-none',
-+ 'absolute inset-x-0 bottom-0 pointer-events-none',
+- <div className="py-6 md:py-4 mb-2">
++ <div className="px-4 sm:px-0 py-6 md:py-4 mb-2">
 ```
 
-That's the only remaining piece of the first global mobile clipping fix. After this, `FeedVideo.tsx` matches the original scrubber baseline (`05c8ab17`) byte-for-byte in the scrubber-related lines.
+That's it.
 
 ## What stays untouched
 
-- The entire `VideoProgressBar` component (hit area, pointer logic, keyboard seek, thumb).
-- Play / pause / mute buttons, time display, gradient backdrop.
-- `isActive` visibility logic, auto-hide timer, scrubbing state.
-- `FeedCollage`, video dimensions, `objectFit`, lightbox, analytics.
-- No new props, no device detection, no conditional styling.
+- Middle column wrapper `px-0 sm:px-4` — unchanged, so post cards stay edge-to-edge on mobile.
+- Feed Tabs row (For You / Following) — unchanged.
+- `EnhancedFeedForYou`, `FeedFollowing`, `FeedItem`, post card layout, media/collage edges — unchanged.
+- Desktop / tablet (`sm:` and above) — `sm:px-0` cancels the mobile padding, so layout is identical to today.
+- Right column, mobile top header bar, bottom nav — unchanged.
 
-## Expected result
+## Verification
 
-- Collage videos: identical to the true original.
-- Single landscape videos: identical to the true original.
-- Desktop: unchanged.
-- Single portrait video on real mobile: original bug may return (scrubber clipped at the rounded edge). That is acceptable — Phase 2 will fix it with a targeted `controlInsetVariant="single-portrait"` prop from `FeedCollage`'s `SingleMediaTile`, applied only to that one path.
-
-## Phase 2 (not part of this step, for reference)
-
-Once you confirm this baseline on a real device, Phase 2 will:
-1. Add a `controlInsetVariant?: 'default' | 'single-portrait'` prop to `FeedVideo`.
-2. From `FeedCollage`'s `SingleMediaTile`, pass `"single-portrait"` only when the single media is a portrait video.
-3. In `FeedVideo`, when that variant is set **and** on coarse-pointer devices, apply the inner bottom inset and thicker idle line — scoped to that one case only.
-
-No other code paths get touched.
+- Mobile (<640px): "Home", "Your personalized feed", and Create button have ~16px side padding; post cards still touch screen edges.
+- sm and above: no visual change.
