@@ -319,12 +319,24 @@ export function FeedVideo({
   const handleContainerClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onTap) {
-      try {
-        videoRef.current?.pause();
-      } catch {
-        /* ignore */
+      const v = videoRef.current;
+      let handoff: VideoHandoff | undefined;
+      if (v) {
+        // Snapshot BEFORE pausing, otherwise wasPlaying would always be false.
+        // Use global mute intent rather than v.muted — browsers force-mute
+        // autoplaying videos even when the user has globally unmuted.
+        handoff = {
+          currentTime: v.currentTime,
+          wasPlaying: !v.paused,
+          muted: readGlobalVideoMuted(),
+        };
+        try {
+          v.pause();
+        } catch {
+          /* ignore */
+        }
       }
-      onTap();
+      onTap(handoff);
       return;
     }
     toggleMute();
