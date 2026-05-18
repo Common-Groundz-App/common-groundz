@@ -33,9 +33,22 @@ export function LightboxPreview({
   const isMobile = useIsMobile();
   // Apply the feed handoff at most once, on the entry video only.
   const handoffAppliedRef = useRef(false);
+  // Tracks whether the iOS synchronous ref-callback play() ran for this open.
+  // When true, onLoadedMetadata leaves `muted` alone and onSeeked handles the
+  // one-shot unmute attempt instead of re-attempting play().
+  const earlyPlayRanRef = useRef(false);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   // Capture entry index so navigation away from it disables the handoff.
   const entryIndexRef = useRef(initialIndex);
+
+  // iOS UA check — Safari/Chrome/etc on iPhone/iPad (including iPadOS desktop UA).
+  const isIOS = (): boolean => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    if (/iP(hone|ad|od)/.test(ua)) return true;
+    // iPadOS 13+ reports MacIntel with touch.
+    return navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1;
+  };
   
   // Prevent body scrolling when lightbox is open
   useEffect(() => {
