@@ -33,9 +33,22 @@ export function LightboxPreview({
   const isMobile = useIsMobile();
   // Apply the feed handoff at most once, on the entry video only.
   const handoffAppliedRef = useRef(false);
+  // Tracks whether the iOS synchronous ref-callback play() ran for this open.
+  // When true, onLoadedMetadata leaves `muted` alone and onSeeked handles the
+  // one-shot unmute attempt instead of re-attempting play().
+  const earlyPlayRanRef = useRef(false);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
   // Capture entry index so navigation away from it disables the handoff.
   const entryIndexRef = useRef(initialIndex);
+
+  // iOS UA check — Safari/Chrome/etc on iPhone/iPad (including iPadOS desktop UA).
+  const isIOS = (): boolean => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    if (/iP(hone|ad|od)/.test(ua)) return true;
+    // iPadOS 13+ reports MacIntel with touch.
+    return navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1;
+  };
   
   // Prevent body scrolling when lightbox is open
   useEffect(() => {
@@ -253,10 +266,40 @@ export function LightboxPreview({
           ) : (
             <video
               key={imageKey}
-              ref={(el) => { videoElRef.current = el; }}
+              ref={(el) => {
+                videoElRef.current = el;
+                if (!el) return;
+                // iOS-only synchronous early play, inside the originating tap
+                // gesture. Skip on non-iOS (already works), non-entry items,
+                // paused-handoff, or after the one-shot has run.
+                if (
+                  !isIOS() ||
+                  earlyPlayRanRef.current ||
+                  handoffAppliedRef.current ||
+                  !initialVideoState ||
+                  !initialVideoState.wasPlaying ||
+                  currentIndex !== entryIndexRef.current
+                ) {
+                  return;
+                }
+                earlyPlayRanRef.current = true;
+                try { el.muted = true; } catch { /* ignore */ }
+                // Best-effort sync seek to reduce 0:00 flash; authoritative
+                // clamped seek still runs in onLoadedMetadata.
+                try {
+                  if (initialVideoState.currentTime > 0) {
+                    el.currentTime = initialVideoState.currentTime;
+                  }
+                } catch { /* ignore — pre-metadata seeks may throw */ }
+                const p = el.play();
+                if (p && typeof p.catch === 'function') {
+                  p.catch(() => { /* iOS blocked; fall back to existing flow */ });
+                }
+              }}
               src={currentItem.url}
               poster={currentItem.thumbnail_url}
               controls
+              playsInline
               className={cn(
                 "cursor-auto [&::-webkit-media-controls]:cursor-pointer [&::-webkit-media-controls-panel]:cursor-pointer",
                 isMobile && isLandscape
@@ -273,7 +316,12 @@ export function LightboxPreview({
                 ) {
                   return;
                 }
-                try { v.muted = initialVideoState.muted; } catch { /* ignore */ }
+                // Only set muted here if the iOS early-play path did NOT run.
+                // If it did, we must keep muted=true until onSeeked attempts
+                // the one-shot unmute, otherwise iOS will pause playback.
+                if (!earlyPlayRanRef.current) {
+                  try { v.muted = initialVideoState.muted; } catch { /* ignore */ }
+                }
                 const dur = v.duration;
                 if (isFinite(dur) && dur > 0) {
                   const target = Math.min(
@@ -294,8 +342,20 @@ export function LightboxPreview({
                   return;
                 }
                 handoffAppliedRef.current = true;
-                if (!initialVideoState.wasPlaying) return;
                 const v = e.currentTarget;
+
+                if (earlyPlayRanRef.current) {
+                  // iOS early-play already started playback (muted). If the
+                  // user's global pref is unmuted, try once to unmute. If the
+                  // browser re-mutes or throws, leave it muted — no retries.
+                  if (!initialVideoState.muted) {
+                    try { v.muted = false; } catch { /* ignore */ }
+                  }
+                  return;
+                }
+
+                // Non-iOS / no early-play path: attempt play here as before.
+                if (!initialVideoState.wasPlaying) return;
                 const tryPlay = v.play();
                 if (tryPlay && typeof tryPlay.catch === 'function') {
                   tryPlay.catch(() => {
