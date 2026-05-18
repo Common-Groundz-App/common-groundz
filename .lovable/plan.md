@@ -1,81 +1,94 @@
-## Goal
+## Verdict
 
-Add a Twitter-style seekable progress bar to feed videos. Subtle by default (hairline), full controls on hover/focus/paused/scrubbing. Single-file change in `src/components/media/FeedVideo.tsx`. No other files touched.
+Yes — your diagnosis is stronger, and I would update the plan accordingly.
 
-## Visibility model
+This should be treated as a **real-device mobile rendering/clipping issue**, not a state/visibility bug and not a media-dimensions problem.
 
-`isActive = isHovered || isFocused || isScrubbing || !isPlaying`
+## Why it shows in Chrome responsive mode but not on a real phone
 
-- **Idle (playing, not hovered/focused/scrubbing):** only a hairline progress line at the bottom (`h-0.5`, low-opacity white track + white fill). No buttons, no time text, no backdrop.
-- **Active:** play/pause (left) · `currentTime / duration` (center-left, `tabular-nums`) · mute/unmute (right) · thicker progress bar (`h-1`) with a small thumb · subtle bottom gradient backdrop for legibility.
+Chrome desktop responsive mode matches viewport size, but it does **not** perfectly reproduce how a real mobile browser rasterizes and composites:
 
-Auto-hide: when the video resumes playing and pointer is no longer over the container, fade back to idle after a 2s grace period. Timer cleared on any new interaction and on unmount (per project setTimeout policy — no setInterval).
+- **Hairline lines at the exact clipped edge are fragile on mobile.** A `0.5px` or edge-pinned track can disappear when it lands on a rounded, `overflow-hidden` boundary.
+- **Video is often composited differently on real devices.** Mobile browsers, especially WebKit/iOS, handle `<video>` layers and overlays differently from desktop emulation.
+- **Subpixel rounding is different.** On a desktop emulator, the line may still land on a visible device pixel; on a real phone it can be rounded/clipped away.
+- **Single portrait videos are the most exposed case.** Their wrapper is tighter, so a scrubber pinned to `bottom: 0` has almost no interior buffer. In collage tiles, the geometry is different, so the bar remains visible.
 
-Mobile: no tap-to-show-controls mode. Tapping the video body continues to open the lightbox exactly as today. Mobile users see controls when the video is paused or while scrubbing the bottom bar.
+So the most reliable fix is exactly what you suggested: **pull the scrubber slightly inside the frame and give it a stronger rendering floor on coarse-pointer devices**, without changing the media box itself.
 
-## State to add in `FeedVideo`
+## Updated implementation plan
 
-- `currentTime: number` — updated from `<video>` `onTimeUpdate`
-- `duration: number` — captured in `handleLoadedData` (already exists)
-- `isHovered: boolean` — `onPointerEnter` / `onPointerLeave` on container
-- `isFocused: boolean` — explicit `onFocus` / `onBlur` on container (container already has `tabIndex={0}`)
-- `isScrubbing: boolean` — set by scrubber pointer handlers
-- `hideTimerRef: useRef<number | null>` — for the 2s auto-hide; cleared on cleanup
+### Scope
+Only update `src/components/media/FeedVideo.tsx`.
 
-Autoplay hook receives `enabled={autoplayEnabled && !isScrubbing}` so it doesn't fight the scrubber.
+No changes to:
+- single-media sizing
+- portrait dimensions
+- `FeedCollage` layout
+- object-fit behavior
+- feed layout
+- lightbox behavior
+- backend / analytics
 
-## Scrubber interaction
+### Changes to make
 
-New small `VideoProgressBar` subcomponent co-located in the same file, using Pointer Events for unified mouse + touch:
+1. **Move the bottom controls layer slightly inside the video frame**
+   - Stop pinning the scrubber/control stack visually to the exact bottom edge.
+   - Add a small inner bottom inset so the visible track sits safely inside the clipped rounded frame.
+   - Keep the hit area large, but decouple the **touch target** from the **visible line position**.
 
-- `onPointerDown`: `setPointerCapture`, record `wasPlaying`, pause video, `setIsScrubbing(true)`, seek to click x.
-- `onPointerMove` (while captured): seek to `clientX` relative to bar's `getBoundingClientRect()`, clamp 0..duration.
-- `onPointerUp` / `onPointerCancel`: release capture, restore play if `wasPlaying`, `setIsScrubbing(false)`.
-- All handlers call `e.stopPropagation()` so they never bubble to the container's lightbox handler.
+2. **Give the controls/scrubber layer an explicit stacking order**
+   - Add a reliable `z-index` above the video element so the overlay is never lost behind video compositing on mobile.
+   - Keep pointer behavior exactly as now.
 
-**Mobile hit target:** the visible bar is `h-0.5` (idle) / `h-1` (active), wrapped in a transparent `h-3` (≈12px) padded hit zone with extra vertical padding so finger taps land reliably even when the line is hairline-thin.
+3. **Improve coarse-pointer/mobile rendering only**
+   - On coarse-pointer devices, make the idle visible line slightly thicker (for example `h-1` / 2px equivalent).
+   - Desktop keeps the current more delicate hairline feel.
+   - Active state remains visually consistent with the current design.
 
-Keyboard: when the scrubber is focused, ArrowLeft/Right seek ±5s.
+4. **Keep the scrubber hit area large, but position the rendered track higher inside it**
+   - Maintain the mobile-friendly seek target.
+   - Ensure the visible line is centered within the hit zone and not sitting on the clipped boundary.
 
-A11y: `role="slider"`, `aria-valuemin=0`, `aria-valuemax={duration}`, `aria-valuenow={currentTime}`, `aria-label="Seek video"`.
+5. **Do not change the interaction model**
+   - Idle: subtle progress only.
+   - Active: controls on hover, focus, paused, scrubbing.
+   - Play/mute/scrub interactions still stop propagation.
+   - Video body tap still opens the lightbox.
 
-## Control buttons in the bar
+## Recommended technical approach
 
-- Play/pause → reuses existing `togglePlayPause()`.
-- Mute → reuses existing `toggleMute()`.
-- Both call `e.stopPropagation()` on click (matches the existing pattern already used by the centered play button and current mute button).
+### In `FeedVideo.tsx`
 
-Time text: `text-xs font-medium text-white tabular-nums`, formatted via existing `formatDuration` helper.
+- Update the bottom overlay wrapper so it has:
+  - a small inner bottom offset
+  - explicit `z-index`
+- Update the scrubber wrapper so:
+  - the **visible track** is vertically centered inside the larger hit area
+  - the track is not rendered at the exact clipped edge
+- Add a mobile/coarse-pointer-only thickness adjustment for the idle track
+- Leave all timing/state logic untouched unless required for layout cleanup
 
-## Lightbox-safety verification (must hold after change)
+## Why I think this is the best fix
 
-The container's `onClick` is the only path that calls `onTap()` → lightbox. Therefore:
+This solves the bug at the correct layer:
+- not by changing content sizing
+- not by changing collage behavior
+- not by introducing device-specific logic in layout selection
+- not by making the UI globally heavier on desktop
 
-- Scrubber pointer down/move/up/cancel + click → `stopPropagation` → no lightbox.
-- Play/pause button click → `stopPropagation` → no lightbox.
-- Mute button click → `stopPropagation` → no lightbox.
-- Tapping anywhere on the video body outside these controls → bubbles to container `onClick` → opens lightbox (unchanged).
+It directly addresses the likely failure mode: **edge clipping + subpixel rendering on real mobile video overlays**.
 
-Will be verified after implementation by clicking each control in the preview and confirming the lightbox does not open, then tapping the video body and confirming it does.
+## Validation checklist
 
-## Removed (replaced cleanly by the new bar)
+After implementation, verify:
 
-- Top/bottom-left **duration badge** (`{formatDuration(item.duration)}` block).
-- Floating **bottom-right mute button** — moves into the bar.
+- **Real mobile device:** single portrait video shows the idle progress line while playing
+- **Real mobile device:** single portrait video shows the full scrubber when paused/scrubbing
+- **Collage version of the same video:** unchanged
+- **Desktop:** unchanged visual behavior
+- **Play / mute / scrubber:** never open the lightbox
+- **Tap on video body outside controls:** still opens the lightbox
 
-Both are removed only after the new bar is rendering correctly, so there is no intermediate state without mute or duration affordances.
+## Fallback only if needed
 
-## Kept
-
-- Big centered play/pause button (Phase 1 keeps the obvious paused-state affordance).
-- All existing hooks: `useVideoMute`, `useVideoAutoplay`, `useVideoMilestones`, `useVideoViewTracker`.
-- All existing behaviors: autoplay-on-visibility, mute persistence, view tracking, object-fit, loop, poster fallback, error/unsupported overlays, retry, visibility-change pausing.
-- Container `onClick` → `handleContainerClick` → `onTap()` → lightbox. Unchanged.
-
-## Out of scope
-
-Fullscreen, volume slider, speed control, captions, settings, PiP, buffered-range UI, chapter markers. No changes to `FeedCollage`, `MediaLightbox`, post detail, other feed variants, hooks, backend, or analytics.
-
-## Risk
-
-Low. Single-file change. No new dependencies. `stopPropagation` discipline already proven for the existing mute and centered play buttons in this file. Auto-hide uses `setTimeout` with cleanup per project policy.
+If this still fails on a real device after the `FeedVideo.tsx` positioning fix, then the next step would be a very small wrapper adjustment in the single portrait path — but I would **not** start there. The first pass should stay in `FeedVideo.tsx` exactly as you proposed.
