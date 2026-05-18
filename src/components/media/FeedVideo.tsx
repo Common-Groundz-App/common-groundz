@@ -142,7 +142,7 @@ function VideoProgressBar({
       <div
         className={cn(
           'relative w-full rounded-full bg-white/30 overflow-hidden motion-safe:transition-all',
-          isActive ? 'h-1' : 'h-0.5 [@media(pointer:coarse)]:h-1'
+          isActive ? 'h-1' : 'h-0.5'
         )}
       >
         <div
@@ -473,7 +473,7 @@ export function FeedVideo({
       {status === 'ready' && (
         <div
           className={cn(
-            'absolute inset-x-0 bottom-1 [@media(pointer:coarse)]:bottom-3 z-20 pointer-events-none',
+            'absolute inset-x-0 bottom-1 pointer-events-none',
             'motion-safe:transition-opacity motion-safe:duration-200'
           )}
         >
