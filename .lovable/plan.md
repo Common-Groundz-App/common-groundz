@@ -1,38 +1,36 @@
 ## Goal
 
-Move the scrubber/control layer slightly higher on real mobile so it sits comfortably inside the single portrait video frame, away from the rounded bottom edge.
+Move the visible scrubber track and thumb higher inside the video frame on real mobile so they are fully visible above the rounded/clipped bottom edge. Desktop and collage behavior stay unchanged.
 
 ## Scope
 
 - Only `src/components/media/FeedVideo.tsx`.
-- No changes to FeedCollage, portrait dimensions, object-fit, feed layout, or interaction/lightbox logic.
+- No changes to `FeedCollage`, single portrait dimensions, object-fit, or feed layout.
+- No changes to interaction/lightbox logic.
 
-## Change
+## Changes
 
-In the bottom controls wrapper (currently `bottom-1 [@media(pointer:coarse)]:bottom-3 z-20`), bump the coarse-pointer inset from `bottom-3` (≈12px) to `bottom-4` (16px):
+1. **Increase bottom inset on coarse-pointer devices.**
+   - Current bottom controls wrapper uses `bottom-1` (4px) for all devices.
+   - Change to: `bottom-1 [@media(pointer:coarse)]:bottom-3` (≈12px on mobile, unchanged 4px on desktop).
+   - This shifts both the controls row and the scrubber strip up together so the visible track and thumb sit clearly inside the rounded frame.
 
-`bottom-1 [@media(pointer:coarse)]:bottom-4 z-20`
+2. **Keep hit area large; only the rendered position shifts.**
+   - `VideoProgressBar`'s outer `h-3` hit area, thumb size, and pointer logic stay identical.
+   - The 3px thumb that currently peeks at the edge will now be fully above the bottom curve on mobile.
 
-That's the only edit.
+3. **Preserve all other behavior.**
+   - `z-20`, idle vs active opacity, coarse-pointer thicker idle line, stopPropagation on play/mute/scrub, tap-to-lightbox on video body — all unchanged.
 
 ## Why this works
 
-The previous 12px inset cleared the rounded corner but the scrubber still reads as edge-hugging on real devices. 16px gives an extra ~4px of breathing room, making the placement feel intentional and visually consistent with the controls row above it, while staying subtle. Desktop is untouched because the rule is gated behind `@media(pointer:coarse)`.
-
-## What stays the same
-
-- Desktop `bottom-1` (4px) unchanged.
-- Track thickness, thumb size, hit area, idle vs active opacity — unchanged.
-- stopPropagation on play/mute/scrub; tap on video body still opens the lightbox.
-- Collage videos unchanged.
+The previous fix gave only 4px of inset, which on real mobile (after subpixel rounding + rounded-corner clipping on a tight portrait frame) leaves the thumb sitting on the clipped boundary. ~12px of inset is enough buffer to clear the rounded corner radius and any device-side compositing rounding, while remaining visually subtle. Desktop keeps the tighter 4px feel because the change is gated behind `@media(pointer:coarse)`.
 
 ## Validation
 
-- Real mobile, single portrait: scrubber sits clearly inside the frame with visible margin below.
-- Desktop: visually identical.
-- Collage: unchanged.
-- Play/mute/scrub: do not open lightbox. Video body tap: opens lightbox.
-
-## Fallback
-
-If 16px ends up looking too high on shorter portrait videos, drop to `bottom-3.5` (14px). Unlikely to be needed.
+- Real mobile, single portrait video playing → subtle progress line clearly visible, not on the edge.
+- Real mobile, paused/scrubbing → full track + thumb fully visible above the rounded bottom.
+- Collage videos: unchanged.
+- Desktop: visually unchanged.
+- Play / mute / scrub: still do not open the lightbox.
+- Tap on video body: still opens the lightbox.
