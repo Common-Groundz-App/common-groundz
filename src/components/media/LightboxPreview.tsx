@@ -9,6 +9,11 @@ import { useIsMobile } from '@/hooks/use-mobile';
 interface LightboxPreviewProps {
   media: MediaItem[];
   initialIndex?: number;
+  /**
+   * Optional playback handoff from a feed video — apply once on the entry
+   * item so the lightbox opens at the same timestamp / play state.
+   */
+  initialVideoState?: VideoHandoff;
   onClose: () => void;
   className?: string;
 }
@@ -16,6 +21,7 @@ interface LightboxPreviewProps {
 export function LightboxPreview({ 
   media,
   initialIndex = 0,
+  initialVideoState,
   onClose,
   className 
 }: LightboxPreviewProps) {
@@ -25,6 +31,11 @@ export function LightboxPreview({
   const chromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaRef = useRef<MediaItem[]>([]);
   const isMobile = useIsMobile();
+  // Apply the feed handoff at most once, on the entry video only.
+  const handoffAppliedRef = useRef(false);
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+  // Capture entry index so navigation away from it disables the handoff.
+  const entryIndexRef = useRef(initialIndex);
   
   // Prevent body scrolling when lightbox is open
   useEffect(() => {
