@@ -14,7 +14,7 @@ import { MediaItem, VideoHandoff } from '@/types/media';
 interface FeedVideoProps {
   item: MediaItem;
   className?: string;
-  onTap?: () => void;
+  onTap?: (handoff?: VideoHandoff) => void;
   showBadge?: boolean;
   objectFit?: 'contain' | 'cover';
   source?: 'post' | 'review' | 'entity';
