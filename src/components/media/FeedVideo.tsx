@@ -9,7 +9,7 @@ import { useVideoViewTracker } from '@/hooks/useVideoViewTracker';
 import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
-import { MediaItem } from '@/types/media';
+import { MediaItem, VideoHandoff } from '@/types/media';
 
 interface FeedVideoProps {
   item: MediaItem;
