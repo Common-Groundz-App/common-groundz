@@ -17,6 +17,16 @@ export interface MediaItem {
   category?: string; // Category for photos/videos (general, interior, exterior, menu, etc.)
 }
 
+/**
+ * Playback state handed off from a feed video to the lightbox so the
+ * lightbox can resume at the same timestamp instead of starting at 0:00.
+ */
+export interface VideoHandoff {
+  currentTime: number;
+  wasPlaying: boolean;
+  muted: boolean;
+}
+
 export type MediaUploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 
 export type MediaCompatibility = 'checking' | 'compatible' | 'risky';
