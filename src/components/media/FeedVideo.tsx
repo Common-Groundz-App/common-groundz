@@ -473,7 +473,7 @@ export function FeedVideo({
       {status === 'ready' && (
         <div
           className={cn(
-            'absolute inset-x-0 bottom-1 [@media(pointer:coarse)]:bottom-3 z-20 pointer-events-none',
+            'absolute inset-x-0 bottom-1 [@media(pointer:coarse)]:bottom-4 z-20 pointer-events-none',
             'motion-safe:transition-opacity motion-safe:duration-200'
           )}
         >
