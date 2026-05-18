@@ -251,26 +251,68 @@ export function LightboxPreview({
               )}
             </>
           ) : (
-            <video 
+            <video
               key={imageKey}
-              src={currentItem.url} 
+              ref={(el) => { videoElRef.current = el; }}
+              src={currentItem.url}
               poster={currentItem.thumbnail_url}
               controls
               className={cn(
                 "cursor-auto [&::-webkit-media-controls]:cursor-pointer [&::-webkit-media-controls-panel]:cursor-pointer",
-                isMobile && isLandscape 
-                  ? "h-auto w-full object-contain" 
+                isMobile && isLandscape
+                  ? "h-auto w-full object-contain"
                   : "max-h-[90vh] max-w-full object-contain"
               )}
               style={{ cursor: 'auto' }}
+              onLoadedMetadata={(e) => {
+                const v = e.currentTarget;
+                if (
+                  handoffAppliedRef.current ||
+                  !initialVideoState ||
+                  currentIndex !== entryIndexRef.current
+                ) {
+                  return;
+                }
+                try { v.muted = initialVideoState.muted; } catch { /* ignore */ }
+                const dur = v.duration;
+                if (isFinite(dur) && dur > 0) {
+                  const target = Math.min(
+                    Math.max(0, initialVideoState.currentTime),
+                    Math.max(0, dur - 0.5)
+                  );
+                  try { v.currentTime = target; } catch { /* ignore */ }
+                }
+              }}
               onLoadedData={() => handleImageLoad(currentItem, currentIndex)}
+              onSeeked={(e) => {
+                e.stopPropagation();
+                if (
+                  handoffAppliedRef.current ||
+                  !initialVideoState ||
+                  currentIndex !== entryIndexRef.current
+                ) {
+                  return;
+                }
+                handoffAppliedRef.current = true;
+                if (!initialVideoState.wasPlaying) return;
+                const v = e.currentTarget;
+                const tryPlay = v.play();
+                if (tryPlay && typeof tryPlay.catch === 'function') {
+                  tryPlay.catch(() => {
+                    try { v.muted = true; } catch { /* ignore */ }
+                    const retry = v.play();
+                    if (retry && typeof retry.catch === 'function') {
+                      retry.catch(() => { /* still blocked; native controls visible */ });
+                    }
+                  });
+                }
+              }}
               onClick={(e) => e.stopPropagation()}
               onPlay={(e) => e.stopPropagation()}
               onPause={(e) => e.stopPropagation()}
               onVolumeChange={(e) => e.stopPropagation()}
               onTimeUpdate={(e) => e.stopPropagation()}
               onSeeking={(e) => e.stopPropagation()}
-              onSeeked={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
             />
