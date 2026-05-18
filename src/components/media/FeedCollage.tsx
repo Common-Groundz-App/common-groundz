@@ -77,7 +77,7 @@ export function FeedCollage({
             source={source}
             sourceId={sourceId}
             objectFit={fit}
-            onTap={() => onItemClick(originalIndex)}
+            onTap={(handoff) => onItemClick(originalIndex, handoff)}
           />
         )}
         {options?.overlayCount && options.overlayCount > 0 ? (
