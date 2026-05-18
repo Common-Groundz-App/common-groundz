@@ -94,11 +94,18 @@ export function PostMediaDisplay({
     return 'h-auto max-h-[500px]';
   };
   
-  const handleImageClick = (index: number) => {
+  const handleImageClick = (index: number, handoff?: VideoHandoff) => {
     setActiveImageIndex(index);
+    setVideoHandoff(handoff ?? null);
     setLightboxOpen(true);
   };
-  
+
+  const handleLightboxClose = () => {
+    setLightboxOpen(false);
+    // Reset so a later open of a different post can't inherit stale state.
+    setVideoHandoff(null);
+  };
+
   return (
     <>
       <FeedCollage
@@ -114,7 +121,8 @@ export function PostMediaDisplay({
         <LightboxPreview
           media={validMedia}
           initialIndex={activeImageIndex}
-          onClose={() => setLightboxOpen(false)}
+          initialVideoState={videoHandoff ?? undefined}
+          onClose={handleLightboxClose}
         />
       )}
     </>
