@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Volume2, VolumeX, Play, Pause, Film, AlertTriangle, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useVideoMute } from '@/hooks/useVideoMute';
+import { useVideoMute, readGlobalVideoMuted } from '@/hooks/useVideoMute';
 import { useVideoAutoplay } from '@/hooks/useVideoAutoplay';
 import { useVideoMilestones } from '@/hooks/useVideoMilestones';
 import { useVideoViewTracker } from '@/hooks/useVideoViewTracker';
