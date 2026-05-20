@@ -395,6 +395,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               />
+              )
             ) : (
               <>
                 <img
