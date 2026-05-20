@@ -1736,6 +1736,84 @@ export type Database = {
         }
         Relationships: []
       }
+      mux_uploads: {
+        Row: {
+          aspect_ratio: string | null
+          asset_id: string | null
+          created_at: string
+          duration: number | null
+          error: string | null
+          expires_at: string
+          id: string
+          is_test: boolean
+          last_event_at: string | null
+          max_resolution: string | null
+          playback_id: string | null
+          status: Database["public"]["Enums"]["mux_upload_status"]
+          updated_at: string
+          upload_id: string
+          user_id: string
+        }
+        Insert: {
+          aspect_ratio?: string | null
+          asset_id?: string | null
+          created_at?: string
+          duration?: number | null
+          error?: string | null
+          expires_at: string
+          id?: string
+          is_test?: boolean
+          last_event_at?: string | null
+          max_resolution?: string | null
+          playback_id?: string | null
+          status?: Database["public"]["Enums"]["mux_upload_status"]
+          updated_at?: string
+          upload_id: string
+          user_id: string
+        }
+        Update: {
+          aspect_ratio?: string | null
+          asset_id?: string | null
+          created_at?: string
+          duration?: number | null
+          error?: string | null
+          expires_at?: string
+          id?: string
+          is_test?: boolean
+          last_event_at?: string | null
+          max_resolution?: string | null
+          playback_id?: string | null
+          status?: Database["public"]["Enums"]["mux_upload_status"]
+          updated_at?: string
+          upload_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mux_webhook_events: {
+        Row: {
+          asset_id: string | null
+          event_id: string
+          event_type: string
+          received_at: string
+          upload_id: string | null
+        }
+        Insert: {
+          asset_id?: string | null
+          event_id: string
+          event_type: string
+          received_at?: string
+          upload_id?: string | null
+        }
+        Update: {
+          asset_id?: string | null
+          event_id?: string
+          event_type?: string
+          received_at?: string
+          upload_id?: string | null
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           created_at: string
@@ -4622,6 +4700,12 @@ export type Database = {
         | "copyright_violation"
         | "duplicate"
         | "other"
+      mux_upload_status:
+        | "waiting"
+        | "asset_created"
+        | "ready"
+        | "errored"
+        | "cancelled"
       post_type:
         | "experience"
         | "review"
@@ -4785,6 +4869,13 @@ export const Constants = {
         "copyright_violation",
         "duplicate",
         "other",
+      ],
+      mux_upload_status: [
+        "waiting",
+        "asset_created",
+        "ready",
+        "errored",
+        "cancelled",
       ],
       post_type: [
         "experience",
