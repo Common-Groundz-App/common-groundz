@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, X, Loader2, Maximize2, Images } from 'lucide
 import { cn } from '@/lib/utils';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { FeedVideo } from '@/components/media/FeedVideo';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface TwitterStyleMediaPreviewProps {
   media: MediaItem[];
@@ -668,6 +670,15 @@ export function TwitterStyleMediaPreview({
                           "lightbox-image"
                         )}
                         onLoad={() => handleImageLoad(item.id || index.toString())}
+                      />
+                    ) : isMuxPreparing(item) ? (
+                      <MuxPreparingPoster
+                        item={item}
+                        className={cn(
+                          'max-w-full max-h-full rounded-md',
+                          objectFit === 'contain' ? 'object-contain' : 'object-cover',
+                        )}
+                        objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
                       />
                     ) : (
                       <video 

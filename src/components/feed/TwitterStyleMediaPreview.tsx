@@ -4,6 +4,8 @@ import { MediaItem } from '@/types/media';
 import { X, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface TwitterStyleMediaPreviewProps {
   media: MediaItem[];
@@ -43,6 +45,8 @@ export function TwitterStyleMediaPreview({
             alt={item.caption || "Media item"}
             className="object-cover w-full h-full"
           />
+        ) : isMuxPreparing(item) ? (
+          <MuxPreparingPoster item={item} className="w-full h-full" objectFit="cover" />
         ) : (
           <>
             <video

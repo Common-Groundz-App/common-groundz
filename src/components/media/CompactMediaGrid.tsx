@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { LightboxPreview } from './LightboxPreview';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface CompactMediaGridProps {
   media: MediaItem[];
@@ -78,6 +80,8 @@ export function CompactMediaGrid({
                 className="h-full w-full object-cover"
                 loading="lazy"
               />
+            ) : isMuxPreparing(item) ? (
+              <MuxPreparingPoster item={item} className="h-full w-full" objectFit="cover" hideBadge />
             ) : (
               <video 
                 src={item.url} 

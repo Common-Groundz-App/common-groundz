@@ -1,6 +1,8 @@
 import React from 'react';
 import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface YelpStyleMediaPreviewProps {
   media: MediaItem[];
