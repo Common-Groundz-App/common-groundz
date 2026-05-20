@@ -265,6 +265,12 @@ export function LightboxPreview({
                 </div>
               )}
             </>
+          ) : isMuxPreparing(currentItem) ? (
+            <MuxPreparingPoster
+              item={currentItem}
+              className="max-h-[90vh] max-w-full"
+              objectFit="contain"
+            />
           ) : (
             <video
               key={imageKey}
