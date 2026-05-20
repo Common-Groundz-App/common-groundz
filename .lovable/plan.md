@@ -1,134 +1,172 @@
-# Video Playback Continuity: Feed → Lightbox
+# Mux Phase 1 — Final plan (all reviewer guardrails included)
 
-## Goal
+Backend-only. Zero `src/` changes. Approve and I'll start with the migration.
 
-When a user taps a feed video, the lightbox should open at the same `currentTime`, preserve `wasPlaying`, and inherit the user's mute intent. Images are unchanged.
+---
 
-## Current behavior (root cause)
+## 1. Secrets (added via prompts, not committed)
+- `MUX_TOKEN_ID`
+- `MUX_TOKEN_SECRET`
+- `MUX_WEBHOOK_SIGNING_SECRET` — added after webhook deploys and you register the URL in Mux
+- `MUX_TEST_MODE` — `"true"` to start, `"false"` for real users
+- `MUX_ALLOWED_ORIGINS` — comma-separated, e.g. `https://common-groundz.lovable.app,https://id-preview--1ce0faa5-5842-4fa5-acb5-1f9e3bdad6b9.lovable.app`
 
-Feed and lightbox use two separate `<video>` elements:
+---
 
-- `FeedVideo` (`src/components/media/FeedVideo.tsx`) autoplays muted in the feed.
-- Tap → `FeedCollage.onItemClick(originalIndex)` → `PostMediaDisplay.handleImageClick(index)` → opens `LightboxPreview`.
-- `LightboxPreview` creates a fresh `<video>` with no `currentTime`, no autoplay, native `controls`. Always opens at `0:00`, paused.
+## 2. Database migration
 
-No state is currently passed between the two videos.
+Two tables, one enum, one trigger.
 
-## Target behavior
+```text
+type mux_upload_status =
+  'waiting' | 'asset_created' | 'ready' | 'errored' | 'cancelled'
 
-| Feed state when tapped | Lightbox opens at | Lightbox plays?         |
-|------------------------|-------------------|-------------------------|
-| Playing at 0:07        | 0:07              | Yes (muted if blocked)  |
-| Paused at 0:07         | 0:07              | No                      |
-| Image tapped           | unchanged         | unchanged               |
+mux_uploads
+  id              uuid pk
+  user_id         uuid not null
+  upload_id       text unique not null
+  asset_id        text unique
+  playback_id     text
+  status          mux_upload_status not null default 'waiting'
+  duration        numeric
+  aspect_ratio    text
+  max_resolution  text
+  error           text
+  is_test         boolean not null default false
+  expires_at      timestamptz not null
+  last_event_at   timestamptz
+  created_at      timestamptz default now()
+  updated_at      timestamptz default now()
 
-## Shared contract
-
-Add to `src/types/media.ts`:
-
-```ts
-export interface VideoHandoff {
-  currentTime: number;
-  wasPlaying: boolean;
-  muted: boolean;
-}
+mux_webhook_events           -- durable, global idempotency log
+  event_id     text primary key      -- Mux-Webhook-Id header
+  event_type   text not null
+  upload_id    text
+  asset_id     text
+  received_at  timestamptz default now()
 ```
 
-Used by every layer (no inline object types).
+**Indexes:** unique on `upload_id` and `asset_id`; composite on `(user_id, status, created_at desc)` for rate-limit query; `(user_id, created_at desc)`.
 
-## Implementation plan
+**RLS:**
+- `mux_uploads`: owner can select; only service role can write.
+- `mux_webhook_events`: service role only for everything.
 
-### 1. FeedVideo — snapshot, then pause, then call onTap
+**Monotonic-status trigger** on `mux_uploads`: blocks backwards transitions (`ready → asset_created`, etc.). Out-of-order webhooks become silent no-ops.
 
-Widen `onTap` to `onTap?: (handoff?: VideoHandoff) => void;`.
+---
 
-In `handleContainerClick`, **snapshot first, then pause** (order matters):
+## 3. `mux-create-upload` edge function
 
-```ts
-const v = videoRef.current;
-let handoff: VideoHandoff | undefined;
-if (v) {
-  handoff = {
-    currentTime: v.currentTime,
-    wasPlaying: !v.paused,
-    // Use global mute intent, not v.muted — browsers force-mute autoplay
-    // even when the user has globally unmuted.
-    muted: readGlobalVideoMuted(),
-  };
-  try { v.pause(); } catch { /* ignore */ }
-}
-onTap(handoff);
+- JWT validated in code via `getClaims()`.
+- **Origin policy (explicit):**
+  - If `Origin` header present → must be in `MUX_ALLOWED_ORIGINS`, else 403.
+  - If `Origin` absent (mobile/native/server-to-server) → allowed when JWT is valid. Documented in a top-of-file comment so it's not mistaken for an oversight.
+  - `cors_origin` sent to Mux = first entry of `MUX_ALLOWED_ORIGINS` (Mux only accepts one).
+- **Two-layer rate limit per user** (both must pass):
+  - In-flight cap: ≤10 rows where `status in ('waiting','asset_created')` AND `expires_at > now()`.
+  - Burst cap: ≤20 `created_at` in the last 10 minutes.
+  - Either → 429 with `Retry-After`.
+- POSTs to Mux `/video/v1/uploads`:
+  ```json
+  {
+    "cors_origin": "<from env>",
+    "timeout": 3600,
+    "test": <MUX_TEST_MODE>,
+    "new_asset_settings": {
+      "playback_policy": ["public"],
+      "video_quality": "basic"
+    }
+  }
+  ```
+  Field names are locked to a single `MUX_FIELDS` constant — verified against current Mux Direct Upload API docs before coding.
+- **`expires_at` precedence:** use Mux response's `data.timeout` (or expiry, if returned) to compute `expires_at = response.created_at + timeout`. Fallback: `now() + 1 hour`.
+- Inserts `mux_uploads` row with `status='waiting'`, `is_test=<env>`, `expires_at` per above.
+- Returns `{ uploadUrl, uploadId, expiresAt }`.
+
+---
+
+## 4. `mux-webhook` edge function
+
+- `verify_jwt = false` in `supabase/config.toml`.
+- **Raw-body-first ordering — structurally enforced:**
+  ```ts
+  const raw = await req.text();          // 1. raw body, never re-read
+  verifySignature(raw, headers);          // 2. HMAC over `${ts}.${raw}`
+  checkReplay(headers);                   // 3. reject if |now-ts| > 300s
+  const event = JSON.parse(raw);          // 4. only now
+  ```
+  No `req.json()` anywhere in the file.
+- Constant-time HMAC compare. Signature fail → 401 (so Mux's retry log surfaces drift).
+- **Durable idempotency:** `insert into mux_webhook_events(event_id,…) on conflict do nothing returning event_id`. No row returned → duplicate, return 200, skip downstream work.
+- **Explicit event correlation:**
+  - `video.upload.asset_created` → match by `upload_id`, set `asset_id`, `status='asset_created'`.
+  - `video.asset.ready` → match by `asset_id`; if 0 rows, fall back to `upload_id` from payload. Set `playback_id` (first public policy), `duration`, `aspect_ratio`, `max_resolution`, `status='ready'`.
+  - `video.asset.errored` → set `error`, `status='errored'`. Same fallback chain.
+  - Any other event type → still logged to `mux_webhook_events`, 200 returned.
+- Monotonic-status trigger handles out-of-order at the DB layer.
+
+---
+
+## 5. `supabase/config.toml`
+Append:
+```toml
+[functions.mux-webhook]
+verify_jwt = false
 ```
+`mux-create-upload` uses the default (JWT validated in code).
 
-Import `readGlobalVideoMuted` from `@/hooks/useVideoMute`.
+---
 
-### 2. FeedCollage — thread handoff through
+## 6. Your steps after deploy
+1. Mux dashboard → Settings → Webhooks → add `https://uyjtgybbktgapspodajy.supabase.co/functions/v1/mux-webhook`.
+2. Copy the signing secret → paste into the `MUX_WEBHOOK_SIGNING_SECRET` prompt I'll trigger.
 
-`onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;`
+---
 
-All three call sites (lines 65, 80, 393) forward it. Image tiles pass nothing.
+## Documented tradeoffs
+- `playback_policy: ['public']` — fine for open feed; Phase 6 can swap to signed.
+- `video_quality: 'basic'` — 720p cap, phone-first; easy upgrade for new uploads later.
+- `MUX_TEST_MODE=true` initially — test assets auto-deleted by Mux in 24h, zero billed minutes.
+- Single Mux token across envs for now (Phase 6 splits).
+- No `mux_uploads ↔ post_id` link yet — Phase 5 wires Mux fields into the post's `media` JSON.
+- Abandoned uploads age out via `expires_at`; rate-limit math ignores them. Sweep job is Phase 6.
+- Missing `Origin` is **allowed** with valid JWT (mobile/native).
 
-### 3. PostMediaDisplay — store handoff, pass to lightbox
+---
 
-```ts
-const [videoHandoff, setVideoHandoff] = useState<VideoHandoff | null>(null);
+## Acceptance test
+1. Call `mux-create-upload` from browser → 200 with `uploadUrl`/`uploadId`/`expiresAt`. Row exists, `is_test=true`, `expires_at` matches Mux response.
+2. PUT small MP4 to `uploadUrl` → within ~30s row reaches `status='ready'` with `asset_id`, `playback_id`, `duration`, `aspect_ratio`, `max_resolution`.
+3. Replay webhook delivery → 200, no DB writes (idempotency).
+4. Tamper body → 401.
+5. Stale signature timestamp → 401.
+6. 11th rapid create-upload → 429.
+7. 21st create-upload in 10 min → 429.
+8. Browser request with disallowed Origin → 403.
+9. Request without Origin + valid JWT → 200 (documents mobile path).
+10. Simulated out-of-order: replay `ready` before `asset_created` → ready handler succeeds via upload_id fallback; later `asset_created` no-ops via monotonic trigger.
+11. `git diff src/` → empty.
 
-const handleImageClick = (index: number, handoff?: VideoHandoff) => {
-  setActiveImageIndex(index);
-  setVideoHandoff(handoff ?? null);
-  setLightboxOpen(true);
-};
-```
+---
 
-Clear `videoHandoff` on lightbox close (reset before next open).
+## Files
+**Created**
+- `supabase/migrations/<ts>_mux_phase1.sql`
+- `supabase/functions/mux-create-upload/index.ts`
+- `supabase/functions/mux-webhook/index.ts`
 
-Pass as `initialVideoState={videoHandoff ?? undefined}`.
+**Modified**
+- `supabase/config.toml` (one block appended)
 
-### 4. LightboxPreview — apply once on entry item
+**Untouched**
+Everything in `src/`, every existing edge function, image upload, entity media, FeedVideo/FeedCollage/PostMediaDisplay/LightboxPreview, scrubber, iOS autoplay fix, VideoHandoff.
 
-Add prop `initialVideoState?: VideoHandoff`.
+---
 
-In the video render:
+## Rollback
+Drop both tables + enum, delete both functions, remove the config block, delete the five secrets. App unaffected — no `src/` code references any of it yet.
 
-- Add `ref` to the `<video>`.
-- Use an `appliedRef = useRef(false)` flag — apply only once, only when `currentIndex === initialIndex`.
-- On `onLoadedMetadata`:
-  - Clamp: `seekTime = clamp(initialVideoState.currentTime, 0, max(0, duration - 0.5))`. If `!isFinite(duration)`, skip seek.
-  - Set `video.muted = initialVideoState.muted`.
-  - Set `video.currentTime = seekTime`.
-- On `onSeeked` (one-time): if `initialVideoState.wasPlaying`, try `video.play()`. On rejection, set `video.muted = true` and retry once. If still blocked, leave paused — native controls show play button. Mark `appliedRef.current = true`.
-- Navigating next/prev: handoff does NOT apply — those videos behave normally.
+---
 
-### 5. Edge cases / safeguards
-
-- Only initial index gets the handoff; siblings start at 0.
-- Clamp prevents opening at end of clip.
-- Mute uses global intent, so unmuted users get unmuted lightbox playback (subject to browser policy).
-- Images: no handoff sent, behavior identical.
-- Don't change feed autoplay, scrubber, or layout.
-- Handoff reset on close prevents stale state leaking into a later open of a different post.
-
-## Files to edit
-
-- `src/types/media.ts` — add `VideoHandoff` interface.
-- `src/components/media/FeedVideo.tsx` — snapshot (before pause) in `handleContainerClick`, widen `onTap` signature.
-- `src/components/media/FeedCollage.tsx` — widen `onItemClick`, forward handoff from `FeedVideo`.
-- `src/components/feed/PostMediaDisplay.tsx` — store handoff, pass to `LightboxPreview`, reset on close.
-- `src/components/media/LightboxPreview.tsx` — accept `initialVideoState`, apply on `loadedmetadata` + `seeked`, autoplay with muted-retry fallback.
-
-## Out of scope
-
-- iOS scrubber inset (separate ticket).
-- `PhotoLightbox` (`src/components/ui/photo-lightbox.tsx`) — not used in feed path.
-- Native `controls` in lightbox.
-- Feed autoplay logic.
-
-## Verification
-
-1. Desktop Chrome: autoplaying feed video at ~0:05 → tap → lightbox opens at ~0:05 and continues playing.
-2. Pause feed video at 0:07 → tap → lightbox opens at 0:07, stays paused.
-3. Globally unmuted feed → tap playing video → lightbox opens unmuted and playing (if browser allows).
-4. Tap an image → lightbox behavior identical to today.
-5. Inside lightbox, navigate next/prev → those videos start at 0 normally.
-6. iOS Safari: if unmuted autoplay blocked → muted retry succeeds; if still blocked → paused at correct timestamp with native play button.
-7. Close lightbox, open a different post's video → no stale handoff from previous post.
+Approve and I'll start with the migration (its own approval step), deploy both functions, then trigger the secret prompts in order: Mux credentials + test mode + allowed origins first, then `MUX_WEBHOOK_SIGNING_SECRET` after you register the webhook URL.
