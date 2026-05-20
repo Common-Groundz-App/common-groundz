@@ -172,6 +172,19 @@ export function FeedVideo({
   source = 'post',
   sourceId,
 }: FeedVideoProps) {
+  // Phase 2A — Mux video still preparing. Never mount <video> for these;
+  // render the poster + Processing badge instead. Hooks below have not run
+  // yet, so an early return here is safe.
+  if (isMuxPreparing(item)) {
+    return (
+      <MuxPreparingPoster
+        item={item}
+        className={cn('rounded-md', className)}
+        objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
+      />
+    );
+  }
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [muted, toggleMute] = useVideoMute();
