@@ -118,3 +118,9 @@ verify_jwt = false
 
 [functions.track-media-view]
 verify_jwt = false
+
+[functions.mux-create-upload]
+verify_jwt = false
+
+[functions.mux-webhook]
+verify_jwt = false
