@@ -107,6 +107,34 @@ class AnalyticsService {
   }
 
   /**
+   * Mux upload telemetry — Phase 2B
+   */
+  trackMuxUploadAttempt(props: { size: number; format: string }) {
+    this.track('mux_upload_attempt', props);
+  }
+
+  trackMuxUploadSuccess(props: {
+    size: number;
+    duration: number;
+    format: string;
+    orientation: 'portrait' | 'landscape' | 'square';
+    upload_id: string;
+    is_test: boolean;
+  }) {
+    this.track('mux_upload_success', props);
+  }
+
+  trackMuxUploadFailure(props: {
+    stage: 'poster' | 'create_upload' | 'put';
+    error: string;
+    size?: number;
+    format?: string;
+    upload_id?: string;
+  }) {
+    this.track('mux_upload_failure', props);
+  }
+
+  /**
    * Get recent events (for debugging)
    */
   getRecentEvents(limit: number = 10): AnalyticsEvent[] {

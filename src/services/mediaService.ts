@@ -113,6 +113,9 @@ export const validateMediaFile = async (file: File): Promise<{ valid: boolean; e
 
 export type UploadStage = 'preparing' | 'uploading' | 'finalizing' | 'done';
 
+export const isMuxEnabled = (): boolean =>
+  (import.meta.env.VITE_MUX_UPLOAD_ENABLED ?? 'false').toString().toLowerCase() === 'true';
+
 export const uploadMedia = async (
   file: File,
   userId: string,
@@ -127,14 +130,23 @@ export const uploadMedia = async (
       throw new Error(error);
     }
 
+    const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
+    const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+
+    // ===== Phase 2B: Mux upload branch (videos only, behind flag) =====
+    if (isVideo && isMuxEnabled()) {
+      return await uploadVideoViaMux(file, userId, sessionId, onProgress);
+    }
+
+
     await ensureBucketPolicies('post_media');
 
     const fileExt = file.name.split('.').pop();
     const fileName = `${generateUUID()}.${fileExt}`;
     const filePath = `${userId}/${sessionId}/${fileName}`;
 
-    const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
-    const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+    // (isImage/isVideo already computed above)
+
 
     // For videos, generate the poster BEFORE uploading the video itself,
     // so we have intrinsic dimensions + duration to attach to the MediaItem.
@@ -273,3 +285,173 @@ export const cleanupUnusedMedia = async (userId: string, sessionId: string): Pro
     console.error('Error cleaning up unused media:', error);
   }
 };
+
+// ===== Phase 2B: Mux upload helpers =====
+// Edge function source of truth: supabase/functions/mux-create-upload/index.ts
+// Response shape: { upload_id, upload_url, is_test, expires_at }
+
+interface MuxCreateUploadResponse {
+  upload_id: string;
+  upload_url: string;
+  is_test: boolean;
+  expires_at: string;
+}
+
+/**
+ * Upload a video via Mux Direct Upload.
+ *
+ * Phase 2B: hard-fails (no Supabase fallback) so we can see real problems
+ * during testing. Requires a non-empty poster URL — poster failure aborts.
+ */
+async function uploadVideoViaMux(
+  file: File,
+  userId: string,
+  sessionId: string,
+  onProgress?: (progress: number, stage?: UploadStage) => void
+): Promise<MediaItem> {
+  analytics.trackMuxUploadAttempt({ size: file.size, format: file.type });
+
+  // ---- Step 1: poster (REQUIRED) ----
+  await ensureBucketPolicies('post_media');
+
+  let posterUrl: string;
+  let mediaWidth: number;
+  let mediaHeight: number;
+  let videoDuration: number;
+  let posterPath: string;
+
+  try {
+    const poster = await generateVideoPoster(file);
+    mediaWidth = poster.width;
+    mediaHeight = poster.height;
+    videoDuration = poster.duration;
+
+    posterPath = `${userId}/${sessionId}/${generateUUID()}_poster.jpg`;
+    const { error: posterErr } = await supabase.storage
+      .from('post_media')
+      .upload(posterPath, poster.posterBlob, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: 'image/jpeg',
+      });
+    if (posterErr) throw posterErr;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('post_media')
+      .getPublicUrl(posterPath);
+    if (!publicUrl) throw new Error('Empty poster public URL');
+    posterUrl = publicUrl;
+  } catch (err: any) {
+    analytics.trackMuxUploadFailure({
+      stage: 'poster',
+      error: err?.message ?? String(err),
+      size: file.size,
+      format: file.type,
+    });
+    throw new Error("Couldn't prepare video preview. Try again.");
+  }
+
+  // ---- Step 2: create Mux direct upload ----
+  let upload: MuxCreateUploadResponse;
+  try {
+    const { data, error } = await supabase.functions.invoke<MuxCreateUploadResponse>(
+      'mux-create-upload',
+      { body: {} }
+    );
+    if (error) throw error;
+    if (!data?.upload_id || !data?.upload_url) {
+      throw new Error('Invalid mux-create-upload response');
+    }
+    upload = data;
+  } catch (err: any) {
+    // Best-effort poster cleanup
+    deleteMedia(posterUrl).catch(() => {});
+    analytics.trackMuxUploadFailure({
+      stage: 'create_upload',
+      error: err?.message ?? String(err),
+      size: file.size,
+      format: file.type,
+    });
+    throw new Error("Couldn't start video upload. Try again.");
+  }
+
+  onProgress?.(0, 'uploading');
+
+  // ---- Step 3: PUT the file to Mux ----
+  try {
+    await putWithProgress(upload.upload_url, file, (pct) => {
+      onProgress?.(pct, 'uploading');
+    });
+  } catch (err: any) {
+    deleteMedia(posterUrl).catch(() => {});
+    analytics.trackMuxUploadFailure({
+      stage: 'put',
+      error: err?.message ?? String(err),
+      size: file.size,
+      format: file.type,
+      upload_id: upload.upload_id,
+    });
+    throw new Error("Video upload failed. Check your connection and try again.");
+  }
+
+  onProgress?.(0, 'finalizing');
+
+  const orientation = orientationFor(mediaWidth, mediaHeight);
+
+  analytics.trackMuxUploadSuccess({
+    size: file.size,
+    duration: videoDuration,
+    format: file.type,
+    orientation,
+    upload_id: upload.upload_id,
+    is_test: upload.is_test,
+  });
+
+  const mediaItem: MediaItem = {
+    id: generateUUID(),
+    url: posterUrl, // poster URL until mux_status === 'ready' (2A guards prevent playback)
+    thumbnail_url: posterUrl,
+    type: 'video',
+    caption: '',
+    alt: file.name.split('.')[0],
+    order: 0,
+    session_id: sessionId,
+    width: mediaWidth,
+    height: mediaHeight,
+    duration: videoDuration,
+    orientation,
+    provider: 'mux',
+    mux_upload_id: upload.upload_id,
+    mux_status: 'preparing',
+  };
+
+  onProgress?.(100, 'done');
+  return mediaItem;
+}
+
+/**
+ * PUT a file via XMLHttpRequest so we get real upload progress events
+ * (fetch() can't observe request-body progress in browsers).
+ */
+function putWithProgress(
+  url: string,
+  file: File,
+  onProgress?: (pct: number) => void
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url, true);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error(`Mux PUT failed: ${xhr.status} ${xhr.statusText}`));
+    };
+    xhr.onerror = () => reject(new Error('Network error during Mux PUT'));
+    xhr.onabort = () => reject(new Error('Mux PUT aborted'));
+    xhr.send(file);
+  });
+}
