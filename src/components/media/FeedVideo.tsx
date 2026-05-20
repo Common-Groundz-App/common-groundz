@@ -10,6 +10,8 @@ import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
 import { MediaItem, VideoHandoff } from '@/types/media';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface FeedVideoProps {
   item: MediaItem;
