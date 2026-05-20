@@ -67,50 +67,72 @@ Revert the PR. No data exists in Mux shape yet, so nothing to clean up.
 
 Only after 2A is merged and verified.
 
+## Confirmed contract — `mux-create-upload`
+Reads from `supabase/functions/mux-create-upload/index.ts` (deployed Phase 1):
+```json
+{ "upload_id": "...", "upload_url": "...", "is_test": false, "expires_at": "..." }
+```
+We use these snake_case names directly in `mediaService.ts` — no field-name normalization. A one-line comment above the invoke call points back to the edge function as the source of truth.
+
 ## Scope
 
-### 1. Flag — `src/services/mediaService.ts`
-```ts
-const isMuxEnabled = () => import.meta.env.VITE_MUX_UPLOAD_ENABLED === 'true';
-```
-Default unset in repo `.env`. Local dev flips it on.
+### 1. Flag — `.env` + `src/services/mediaService.ts`
+- Add `VITE_MUX_UPLOAD_ENABLED=false` to `.env` (documented, off by default).
+- Helper:
+  ```ts
+  const isMuxEnabled = () => import.meta.env.VITE_MUX_UPLOAD_ENABLED === 'true';
+  ```
 
 ### 2. Mux branch in `uploadMedia` (videos only, flag on)
-After validation + poster generation (we still need the poster for `url`/`thumbnail_url`):
-1. `analytics.trackMuxUploadAttempt({ size, duration, format })`
-2. `supabase.functions.invoke('mux-create-upload')` → `{ upload_id, upload_url }`. On error → `trackMuxUploadFailure({ stage: 'create_upload', error })` → throw user-facing `"Couldn't start video upload. Try again."`
-3. PUT file to `upload_url` via XHR (for progress). On non-2xx/network error → `trackMuxUploadFailure({ stage: 'put', status, error })` → throw `"Video upload failed. Try again."`
-4. Upload poster to Supabase storage (existing path) so `url`/`thumbnail_url` are populated.
-5. `trackMuxUploadSuccess({ upload_id, size, duration })`
+1. `analytics.trackMuxUploadAttempt({ size, duration, format })`.
+2. **Poster is required.** Generate poster from the file. Upload it to Supabase Storage (existing path). If generation OR upload fails → `trackMuxUploadFailure({ stage: 'poster', error })` → throw `"Couldn't prepare video preview. Try again."`. No empty `url` ever produced.
+3. `supabase.functions.invoke('mux-create-upload')`. On error or missing `upload_id` / `upload_url` → `trackMuxUploadFailure({ stage: 'create_upload', error })` → best-effort `deleteMedia(posterUrl)` (fire-and-forget, errors swallowed) → throw `"Couldn't start video upload. Try again."`.
+4. PUT file to `upload_url` via `XMLHttpRequest` (gives `upload.onprogress` → `onProgress(pct, 'uploading')`). On non-2xx / network error → `trackMuxUploadFailure({ stage: 'put', status, error })` → best-effort `deleteMedia(posterUrl)` → throw `"Video upload failed. Try again."`.
+5. `trackMuxUploadSuccess({ upload_id, size, duration })`.
 6. Return:
-```ts
-{
-  id, type: 'video', provider: 'mux',
-  mux_upload_id: upload_id, mux_status: 'preparing',
-  url: posterUrl, thumbnail_url: posterUrl,
-  width, height, duration, orientation,
-  order: 0, session_id, caption: '', alt: file.name.split('.')[0],
-}
-```
+   ```ts
+   {
+     id, type: 'video', provider: 'mux',
+     mux_upload_id: upload_id, mux_status: 'preparing',
+     url: posterUrl, thumbnail_url: posterUrl, // posterUrl guaranteed non-empty
+     width, height, duration, orientation,
+     order: 0, session_id, caption: '', alt: file.name.split('.')[0],
+   }
+   ```
 
-**No fallback to Supabase on failure.** Hard fail, existing composer error handling takes over.
+**No fallback to Supabase on failure.** Hard fail; existing composer error handling takes over.
 
 ### 3. Telemetry — `src/services/analytics.ts`
-Add `trackMuxUploadAttempt`, `trackMuxUploadSuccess`, `trackMuxUploadFailure({ stage: 'create_upload' | 'put', error, status? })`. Non-blocking.
+Add (non-blocking):
+```ts
+trackMuxUploadAttempt(props: { size: number; duration: number; format: string })
+trackMuxUploadSuccess(props: { upload_id: string; size: number; duration: number })
+trackMuxUploadFailure(props: { stage: 'poster' | 'create_upload' | 'put'; status?: number; error?: string })
+```
 
-### 4. Photos + flag-off video: unchanged code path.
+### 4. XHR helper
+Inline `putWithProgress(url, file, onProgress)` at the bottom of `mediaService.ts` — isolates `XMLHttpRequest` quirks (timeout, abort safety).
+
+### 5. Photos + flag-off video: unchanged code path.
+
+## Files touched
+- `src/services/mediaService.ts` — flag, Mux branch, XHR helper.
+- `src/services/analytics.ts` — three new events.
+- `.env` — `VITE_MUX_UPLOAD_ENABLED=false`.
 
 ## Verification gates
-1. Flag off, video upload → identical to today (`provider` undefined, Supabase URL).
+1. Flag off, video upload → identical to today (`provider` undefined, Supabase URL, no Mux events, no `mux_uploads` row).
 2. Flag off, image upload → identical.
 3. Flag on, image upload → identical (gated on `isVideo`).
-4. Flag on, video upload happy path → `MediaItem` has `provider:'mux'`, `mux_upload_id`, `mux_status:'preparing'`, `url` = poster URL. Row exists in `mux_uploads`. Analytics fires attempt + success.
-5. Flag on, video upload failure (kill network mid-PUT) → toast, console log, failure analytics, no `MediaItem` returned, composer recovers.
-6. Browser → `mux-create-upload` preflight: confirm callable from preview session (not just curl). One-time check before writing the branch.
-7. Post creation with a Mux MediaItem persists, JSONB round-trips, **renderers show poster + Processing badge** (validated by 2A's guards — this is the payoff).
+4. Flag on, video happy path → `MediaItem` has `provider:'mux'`, `mux_upload_id`, `mux_status:'preparing'`, `url` = non-empty poster URL. Row in `mux_uploads` with `status:'waiting'`. `mux_upload_attempt` + `mux_upload_success` fired.
+5. Flag on, poster failure (force `generateVideoPoster` to throw) → toast, `mux_upload_failure` with `stage:'poster'`, no `mux-create-upload` call, no orphan poster.
+6. Flag on, create_upload failure (sign out before upload) → toast, `mux_upload_failure` with `stage:'create_upload'`, poster cleanup attempted, no PUT, no `mux_uploads` row.
+7. Flag on, PUT failure (kill network mid-PUT) → toast, `mux_upload_failure` with `stage:'put'`, poster cleanup attempted, composer recovers and retry works.
+8. Browser preflight of `mux-create-upload` from the preview session (logged-in JWT) returns the snake_case contract above.
+9. Post creation with a Mux MediaItem round-trips through JSONB; feed / lightbox / edit-mode preview all show poster + Processing badge (validated by 2A's guards — the payoff).
 
 ## Rollback
-Set `VITE_MUX_UPLOAD_ENABLED=false`. Existing Mux items keep rendering their poster (2A guard handles them). No migration.
+Set `VITE_MUX_UPLOAD_ENABLED=false` and redeploy. Existing Mux MediaItems keep rendering their poster via 2A's guards. No migration.
 
 ---
 
