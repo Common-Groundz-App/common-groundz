@@ -113,6 +113,9 @@ export const validateMediaFile = async (file: File): Promise<{ valid: boolean; e
 
 export type UploadStage = 'preparing' | 'uploading' | 'finalizing' | 'done';
 
+export const isMuxEnabled = (): boolean =>
+  (import.meta.env.VITE_MUX_UPLOAD_ENABLED ?? 'false').toString().toLowerCase() === 'true';
+
 export const uploadMedia = async (
   file: File,
   userId: string,
@@ -126,6 +129,15 @@ export const uploadMedia = async (
     if (!valid) {
       throw new Error(error);
     }
+
+    const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
+    const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+
+    // ===== Phase 2B: Mux upload branch (videos only, behind flag) =====
+    if (isVideo && isMuxEnabled()) {
+      return await uploadVideoViaMux(file, userId, sessionId, onProgress);
+    }
+
 
     await ensureBucketPolicies('post_media');
 
