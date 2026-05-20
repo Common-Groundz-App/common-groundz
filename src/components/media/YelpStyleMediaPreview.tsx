@@ -34,12 +34,16 @@ export function YelpStyleMediaPreview({
         style={getMediaStyle(sortedMedia.length, index)}
       >
         {isVideo ? (
-          <video
-            src={item.url}
-            className="h-full w-full object-cover"
-            muted
-            playsInline
-          />
+          isMuxPreparing(item) ? (
+            <MuxPreparingPoster item={item} className="h-full w-full" objectFit="cover" hideBadge />
+          ) : (
+            <video
+              src={item.url}
+              className="h-full w-full object-cover"
+              muted
+              playsInline
+            />
+          )
         ) : (
           <img
             src={src}
