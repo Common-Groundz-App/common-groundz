@@ -95,11 +95,18 @@ Deno.serve(async (req) => {
   )
 
   // Correlate IDs.
+  // For video.upload.* events, Mux puts the upload id at data.id.
+  // For video.asset.* events, the asset id is at data.id and upload id at data.upload_id.
   const data = event?.data ?? {}
-  const assetId: string | undefined = data?.id && eventType.startsWith('video.asset')
-    ? data.id
+  const isAssetEvent = eventType.startsWith('video.asset')
+  const isUploadEvent = eventType.startsWith('video.upload')
+  const assetId: string | undefined = isAssetEvent
+    ? data?.id
     : data?.asset_id
-  const uploadId: string | undefined = data?.upload_id
+  const uploadId: string | undefined = isUploadEvent
+    ? (data?.id ?? data?.upload_id)
+    : data?.upload_id
+
 
   // 5. Durable idempotency: insert event_id, no-op on conflict.
   const { error: dedupErr, data: dedupRow } = await admin
@@ -127,16 +134,23 @@ Deno.serve(async (req) => {
   try {
     const nowIso = new Date().toISOString()
 
-    if (eventType === 'video.upload.asset_created') {
-      if (!uploadId) return new Response('ok', { status: 200 })
-      await admin
-        .from('mux_uploads')
-        .update({
-          asset_id: assetId ?? null,
-          status: 'asset_created',
-          last_event_at: nowIso,
-        })
-        .eq('upload_id', uploadId)
+    if (eventType === 'video.upload.asset_created' || eventType === 'video.asset.created') {
+      const patch: Record<string, unknown> = {
+        last_event_at: nowIso,
+      }
+      if (assetId) patch.asset_id = assetId
+      // Only advance status to asset_created; monotonic trigger guards terminal states.
+      patch.status = 'asset_created'
+
+      if (uploadId) {
+        const { data: updated } = await admin
+          .from('mux_uploads').update(patch).eq('upload_id', uploadId).select('id')
+        if (!updated?.length && assetId) {
+          await admin.from('mux_uploads').update(patch).eq('asset_id', assetId)
+        }
+      } else if (assetId) {
+        await admin.from('mux_uploads').update(patch).eq('asset_id', assetId)
+      }
     } else if (eventType === 'video.asset.ready') {
       const playbackId: string | undefined = data?.playback_ids?.[0]?.id
       const duration = typeof data?.duration === 'number' ? data.duration : null
@@ -151,6 +165,7 @@ Deno.serve(async (req) => {
         max_resolution: maxResolution,
         last_event_at: nowIso,
       }
+      if (assetId) patch.asset_id = assetId
 
       if (assetId) {
         const { data: updated } = await admin
@@ -163,7 +178,13 @@ Deno.serve(async (req) => {
       }
     } else if (eventType === 'video.asset.errored' || eventType === 'video.upload.errored') {
       const errMsg = data?.errors?.messages?.join('; ') ?? data?.error?.message ?? 'unknown'
-      const patch = { status: 'errored' as const, error: errMsg, last_event_at: nowIso }
+      const patch: Record<string, unknown> = {
+        status: 'errored',
+        error: errMsg,
+        last_event_at: nowIso,
+      }
+      if (assetId) patch.asset_id = assetId
+
       if (assetId) {
         const { data: updated } = await admin
           .from('mux_uploads').update(patch).eq('asset_id', assetId).select('id')
@@ -183,6 +204,7 @@ Deno.serve(async (req) => {
     } else {
       // Unhandled event — already logged for audit, ack 200.
     }
+
   } catch (e) {
     console.error('handler_error', eventType, e)
     return new Response('handler_error', { status: 500 })
