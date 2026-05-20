@@ -134,16 +134,23 @@ Deno.serve(async (req) => {
   try {
     const nowIso = new Date().toISOString()
 
-    if (eventType === 'video.upload.asset_created') {
-      if (!uploadId) return new Response('ok', { status: 200 })
-      await admin
-        .from('mux_uploads')
-        .update({
-          asset_id: assetId ?? null,
-          status: 'asset_created',
-          last_event_at: nowIso,
-        })
-        .eq('upload_id', uploadId)
+    if (eventType === 'video.upload.asset_created' || eventType === 'video.asset.created') {
+      const patch: Record<string, unknown> = {
+        last_event_at: nowIso,
+      }
+      if (assetId) patch.asset_id = assetId
+      // Only advance status to asset_created; monotonic trigger guards terminal states.
+      patch.status = 'asset_created'
+
+      if (uploadId) {
+        const { data: updated } = await admin
+          .from('mux_uploads').update(patch).eq('upload_id', uploadId).select('id')
+        if (!updated?.length && assetId) {
+          await admin.from('mux_uploads').update(patch).eq('asset_id', assetId)
+        }
+      } else if (assetId) {
+        await admin.from('mux_uploads').update(patch).eq('asset_id', assetId)
+      }
     } else if (eventType === 'video.asset.ready') {
       const playbackId: string | undefined = data?.playback_ids?.[0]?.id
       const duration = typeof data?.duration === 'number' ? data.duration : null
@@ -158,6 +165,7 @@ Deno.serve(async (req) => {
         max_resolution: maxResolution,
         last_event_at: nowIso,
       }
+      if (assetId) patch.asset_id = assetId
 
       if (assetId) {
         const { data: updated } = await admin
@@ -170,7 +178,13 @@ Deno.serve(async (req) => {
       }
     } else if (eventType === 'video.asset.errored' || eventType === 'video.upload.errored') {
       const errMsg = data?.errors?.messages?.join('; ') ?? data?.error?.message ?? 'unknown'
-      const patch = { status: 'errored' as const, error: errMsg, last_event_at: nowIso }
+      const patch: Record<string, unknown> = {
+        status: 'errored',
+        error: errMsg,
+        last_event_at: nowIso,
+      }
+      if (assetId) patch.asset_id = assetId
+
       if (assetId) {
         const { data: updated } = await admin
           .from('mux_uploads').update(patch).eq('asset_id', assetId).select('id')
@@ -190,6 +204,7 @@ Deno.serve(async (req) => {
     } else {
       // Unhandled event — already logged for audit, ack 200.
     }
+
   } catch (e) {
     console.error('handler_error', eventType, e)
     return new Response('handler_error', { status: 500 })
