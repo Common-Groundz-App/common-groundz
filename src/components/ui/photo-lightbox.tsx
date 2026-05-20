@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Flag, MoreVertical, Edit3, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { EntityPhoto } from '@/services/entityPhotoService';
@@ -361,6 +363,13 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
           {/* Current media item */}
           <div className="relative flex h-full max-h-[90vh] w-full items-center justify-center">
             {currentPhoto.type === 'video' ? (
+              isMuxPreparing(currentPhoto) ? (
+                <MuxPreparingPoster
+                  item={currentPhoto}
+                  className="max-h-[90vh] max-w-full"
+                  objectFit="contain"
+                />
+              ) : (
               <video
                 key={imageKey}
                 src={currentPhoto.url}
@@ -386,6 +395,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               />
+              )
             ) : (
               <>
                 <img

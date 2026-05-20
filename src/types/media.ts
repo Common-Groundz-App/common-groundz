@@ -1,4 +1,7 @@
 
+export type MediaProvider = 'supabase' | 'mux';
+export type MuxStatus = 'preparing' | 'ready' | 'errored';
+
 export interface MediaItem {
   url: string;
   type: 'image' | 'video';
@@ -15,6 +18,14 @@ export interface MediaItem {
   orientation?: 'portrait' | 'landscape' | 'square';
   source?: string; // Added this optional property to track the source of media items
   category?: string; // Category for photos/videos (general, interior, exterior, menu, etc.)
+  // ===== Mux integration (Phase 2A — additive, optional) =====
+  // Indicates which backend stores/serves this media. Absent = legacy Supabase.
+  provider?: MediaProvider;
+  mux_upload_id?: string;
+  mux_asset_id?: string;
+  mux_playback_id?: string;
+  mux_status?: MuxStatus;
+  mux_error?: string;
 }
 
 /**

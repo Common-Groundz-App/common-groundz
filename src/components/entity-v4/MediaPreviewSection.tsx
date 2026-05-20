@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Camera, ChevronRight, Play, Plus, MoreVertical, Edit3, Trash2, Flag } from 'lucide-react';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import { Button } from '@/components/ui/button';
 import { PhotoLightbox } from '@/components/ui/photo-lightbox';
 import { PhotoGalleryModal } from '@/components/ui/photo-gallery-modal';
@@ -290,13 +292,17 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
             {/* Main Image - Left Half */}
             <div className="relative group cursor-pointer overflow-hidden rounded-lg aspect-[4/3]">
               {mainPhoto.type === 'video' ? (
-                <video
-                  src={mainPhoto.url}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  onClick={() => handlePhotoClick(0)}
-                  muted
-                  playsInline
-                />
+                isMuxPreparing(mainPhoto) ? (
+                  <MuxPreparingPoster item={mainPhoto} className="w-full h-full" objectFit="cover" />
+                ) : (
+                  <video
+                    src={mainPhoto.url}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    onClick={() => handlePhotoClick(0)}
+                    muted
+                    playsInline
+                  />
+                )
               ) : (
                 <img
                   src={mainPhoto.url}
@@ -381,12 +387,16 @@ export const MediaPreviewSection: React.FC<MediaPreviewSectionProps> = ({
                   onClick={() => handlePhotoClick(index + 1)}
                 >
                   {photo.type === 'video' ? (
-                    <video
-                      src={photo.url}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      muted
-                      playsInline
-                    />
+                    isMuxPreparing(photo) ? (
+                      <MuxPreparingPoster item={photo} className="w-full h-full" objectFit="cover" hideBadge />
+                    ) : (
+                      <video
+                        src={photo.url}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        muted
+                        playsInline
+                      />
+                    )
                   ) : (
                     <img
                       src={photo.url}

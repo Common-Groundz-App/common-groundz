@@ -1,6 +1,8 @@
 import React from 'react';
 import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface YelpStyleMediaPreviewProps {
   media: MediaItem[];
@@ -32,12 +34,16 @@ export function YelpStyleMediaPreview({
         style={getMediaStyle(sortedMedia.length, index)}
       >
         {isVideo ? (
-          <video
-            src={item.url}
-            className="h-full w-full object-cover"
-            muted
-            playsInline
-          />
+          isMuxPreparing(item) ? (
+            <MuxPreparingPoster item={item} className="h-full w-full" objectFit="cover" hideBadge />
+          ) : (
+            <video
+              src={item.url}
+              className="h-full w-full object-cover"
+              muted
+              playsInline
+            />
+          )
         ) : (
           <img
             src={src}

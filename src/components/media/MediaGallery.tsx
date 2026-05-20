@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MediaItem } from '@/types/media';
 import { cn } from '@/lib/utils';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface MediaGalleryProps {
   media: MediaItem[];
@@ -74,6 +76,8 @@ export function MediaGallery({
                 alt={item.alt || item.caption || `Media ${index + 1}`}
                 className="w-full h-48 object-cover"
               />
+            ) : isMuxPreparing(item) ? (
+              <MuxPreparingPoster item={item} className="w-full h-48" objectFit="cover" />
             ) : (
               <video 
                 src={item.url}
