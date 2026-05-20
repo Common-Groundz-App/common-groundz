@@ -145,8 +145,8 @@ export const uploadMedia = async (
     const fileName = `${generateUUID()}.${fileExt}`;
     const filePath = `${userId}/${sessionId}/${fileName}`;
 
-    const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
-    const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+    // (isImage/isVideo already computed above)
+
 
     // For videos, generate the poster BEFORE uploading the video itself,
     // so we have intrinsic dimensions + duration to attach to the MediaItem.
