@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { X, Filter, SortAsc, MoreVertical, Edit3, Trash2, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
+import { isMuxPreparing } from '@/utils/muxMedia';
+import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { EntityPhoto } from '@/services/entityPhotoService';
@@ -280,13 +282,17 @@ export const PhotoGalleryModal: React.FC<PhotoGalleryModalProps> = ({
                   onClick={() => handlePhotoClick(photo)}
                 >
                   {photo.type === 'video' ? (
-                    <video
-                      src={photo.url}
-                      poster={photo.thumbnail_url}
-                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      muted
-                      playsInline
-                    />
+                    isMuxPreparing(photo) ? (
+                      <MuxPreparingPoster item={photo} className="h-full w-full" objectFit="cover" hideBadge />
+                    ) : (
+                      <video
+                        src={photo.url}
+                        poster={photo.thumbnail_url}
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                        muted
+                        playsInline
+                      />
+                    )
                   ) : (
                     <img
                       src={photo.thumbnail_url || photo.url}
