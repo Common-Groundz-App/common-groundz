@@ -95,11 +95,18 @@ Deno.serve(async (req) => {
   )
 
   // Correlate IDs.
+  // For video.upload.* events, Mux puts the upload id at data.id.
+  // For video.asset.* events, the asset id is at data.id and upload id at data.upload_id.
   const data = event?.data ?? {}
-  const assetId: string | undefined = data?.id && eventType.startsWith('video.asset')
-    ? data.id
+  const isAssetEvent = eventType.startsWith('video.asset')
+  const isUploadEvent = eventType.startsWith('video.upload')
+  const assetId: string | undefined = isAssetEvent
+    ? data?.id
     : data?.asset_id
-  const uploadId: string | undefined = data?.upload_id
+  const uploadId: string | undefined = isUploadEvent
+    ? (data?.id ?? data?.upload_id)
+    : data?.upload_id
+
 
   // 5. Durable idempotency: insert event_id, no-op on conflict.
   const { error: dedupErr, data: dedupRow } = await admin
