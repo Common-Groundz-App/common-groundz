@@ -520,7 +520,17 @@ export function EnhancedCreatePostForm({
         alt: item.alt || '',
         order: item.order,
         is_deleted: false,
-        thumbnail_url: item.thumbnail_url || item.url
+        thumbnail_url: item.thumbnail_url || item.url,
+        ...(item.width ? { width: item.width } : {}),
+        ...(item.height ? { height: item.height } : {}),
+        ...(item.duration ? { duration: item.duration } : {}),
+        ...(item.orientation ? { orientation: item.orientation } : {}),
+        ...(item.provider ? { provider: item.provider } : {}),
+        ...(item.mux_upload_id ? { mux_upload_id: item.mux_upload_id } : {}),
+        ...(item.mux_asset_id ? { mux_asset_id: item.mux_asset_id } : {}),
+        ...(item.mux_playback_id ? { mux_playback_id: item.mux_playback_id } : {}),
+        ...(item.mux_status ? { mux_status: item.mux_status } : {}),
+        ...(item.mux_error ? { mux_error: item.mux_error } : {}),
       }));
 
       const tags = location ? [location.name] : [];
