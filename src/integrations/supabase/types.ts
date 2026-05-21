@@ -1736,6 +1736,62 @@ export type Database = {
         }
         Relationships: []
       }
+      mux_upload_mappings: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string
+          id: string
+          last_error: string | null
+          media_index: number
+          mux_status_snapshot: string | null
+          mux_upload_id: string
+          patched_at: string | null
+          retry_count: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          media_index: number
+          mux_status_snapshot?: string | null
+          mux_upload_id: string
+          patched_at?: string | null
+          retry_count?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          media_index?: number
+          mux_status_snapshot?: string | null
+          mux_upload_id?: string
+          patched_at?: string | null
+          retry_count?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mux_upload_mappings_mux_upload_id_fkey"
+            columns: ["mux_upload_id"]
+            isOneToOne: true
+            referencedRelation: "mux_uploads"
+            referencedColumns: ["upload_id"]
+          },
+        ]
+      }
       mux_uploads: {
         Row: {
           aspect_ratio: string | null
@@ -4574,6 +4630,10 @@ export type Database = {
           entities_processed: string[]
           updated_count: number
         }[]
+      }
+      patch_content_media_from_mux: {
+        Args: { p_mapping_id: string }
+        Returns: string
       }
       preview_hierarchical_migration: {
         Args: never
