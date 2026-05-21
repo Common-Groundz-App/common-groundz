@@ -10,15 +10,23 @@ const corsBase: Record<string, string> = {
   'Vary': 'Origin',
 }
 
+function getAllowedOrigins(): string[] {
+  return (Deno.env.get('MUX_ALLOWED_ORIGINS') ?? '')
+    .split(',')
+    .map(s => s.trim().replace(/\/+$/, ''))
+    .filter(Boolean)
+}
+
 function buildCors(origin: string | null): Record<string, string> {
-  const allowed = (Deno.env.get('MUX_ALLOWED_ORIGINS') ?? '')
-    .split(',').map(s => s.trim()).filter(Boolean)
+  const allowed = getAllowedOrigins()
   const h = { ...corsBase }
+  // Only echo ACAO when origin exactly matches the allowlist.
+  // Never fall back to allowed[0] — a wrong ACAO causes browsers to silently
+  // reject the preflight before the request ever reaches us.
   if (origin && allowed.includes(origin)) {
     h['Access-Control-Allow-Origin'] = origin
-  } else if (allowed.length > 0) {
-    h['Access-Control-Allow-Origin'] = allowed[0]
-  } else {
+  } else if (!origin && allowed.length === 0) {
+    // No origin header (native/server) and no allowlist configured — permissive.
     h['Access-Control-Allow-Origin'] = '*'
   }
   return h
