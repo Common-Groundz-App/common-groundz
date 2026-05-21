@@ -47,7 +47,6 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405, cors)
 
   // Origin policy: if present, must be allowlisted. If absent, allow (mobile/native).
-  // Origin policy: if present, must be allowlisted. If absent, allow (mobile/native).
   const allowedOrigins = getAllowedOrigins()
   if (origin && allowedOrigins.length > 0 && !allowedOrigins.includes(origin)) {
     return json({ error: 'origin_not_allowed' }, 403, cors)
