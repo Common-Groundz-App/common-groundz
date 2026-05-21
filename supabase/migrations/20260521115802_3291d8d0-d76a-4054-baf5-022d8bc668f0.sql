@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public._mux_phase3a_verify_log;
