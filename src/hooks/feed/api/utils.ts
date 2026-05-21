@@ -52,6 +52,12 @@ export const processMediaItems = (media: any[]): MediaItem[] => {
       height,
       orientation,
       duration: item.duration ?? item.metadata?.duration,
+      ...(item.provider ? { provider: item.provider } : {}),
+      ...(item.mux_upload_id ? { mux_upload_id: item.mux_upload_id } : {}),
+      ...(item.mux_asset_id ? { mux_asset_id: item.mux_asset_id } : {}),
+      ...(item.mux_playback_id ? { mux_playback_id: item.mux_playback_id } : {}),
+      ...(item.mux_status ? { mux_status: item.mux_status } : {}),
+      ...(item.mux_error ? { mux_error: item.mux_error } : {}),
     } as MediaItem;
   });
 };
