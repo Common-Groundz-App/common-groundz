@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      _mux_phase3a_verify_log: {
+        Row: {
+          at: string | null
+          detail: Json | null
+          id: number
+          outcome: string | null
+          scenario: string | null
+        }
+        Insert: {
+          at?: string | null
+          detail?: Json | null
+          id?: number
+          outcome?: string | null
+          scenario?: string | null
+        }
+        Update: {
+          at?: string | null
+          detail?: Json | null
+          id?: number
+          outcome?: string | null
+          scenario?: string | null
+        }
+        Relationships: []
+      }
       admin_actions: {
         Row: {
           action_type: string
