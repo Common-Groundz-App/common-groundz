@@ -167,14 +167,26 @@ Deno.serve(async (req) => {
       }
       if (assetId) patch.asset_id = assetId
 
+      let updatedRows: { id: string }[] = []
       if (assetId) {
         const { data: updated } = await admin
           .from('mux_uploads').update(patch).eq('asset_id', assetId).select('id')
-        if (!updated?.length && uploadId) {
-          await admin.from('mux_uploads').update(patch).eq('upload_id', uploadId)
+        updatedRows = updated ?? []
+        if (updatedRows.length === 0 && uploadId) {
+          const { data: u2 } = await admin
+            .from('mux_uploads').update(patch).eq('upload_id', uploadId).select('id')
+          updatedRows = u2 ?? []
         }
       } else if (uploadId) {
-        await admin.from('mux_uploads').update(patch).eq('upload_id', uploadId)
+        const { data: updated } = await admin
+          .from('mux_uploads').update(patch).eq('upload_id', uploadId).select('id')
+        updatedRows = updated ?? []
+      }
+
+      if (updatedRows.length > 0) {
+        await reconcilePendingMappings(admin, { uploadId, assetId, eventId, eventType })
+      } else {
+        console.warn('mux_uploads_update_zero_rows', { event_id: eventId, event_type: eventType, upload_id: uploadId ?? null, asset_id: assetId ?? null })
       }
     } else if (eventType === 'video.asset.errored' || eventType === 'video.upload.errored') {
       const errMsg = data?.errors?.messages?.join('; ') ?? data?.error?.message ?? 'unknown'
@@ -185,14 +197,26 @@ Deno.serve(async (req) => {
       }
       if (assetId) patch.asset_id = assetId
 
+      let updatedRows: { id: string }[] = []
       if (assetId) {
         const { data: updated } = await admin
           .from('mux_uploads').update(patch).eq('asset_id', assetId).select('id')
-        if (!updated?.length && uploadId) {
-          await admin.from('mux_uploads').update(patch).eq('upload_id', uploadId)
+        updatedRows = updated ?? []
+        if (updatedRows.length === 0 && uploadId) {
+          const { data: u2 } = await admin
+            .from('mux_uploads').update(patch).eq('upload_id', uploadId).select('id')
+          updatedRows = u2 ?? []
         }
       } else if (uploadId) {
-        await admin.from('mux_uploads').update(patch).eq('upload_id', uploadId)
+        const { data: updated } = await admin
+          .from('mux_uploads').update(patch).eq('upload_id', uploadId).select('id')
+        updatedRows = updated ?? []
+      }
+
+      if (updatedRows.length > 0) {
+        await reconcilePendingMappings(admin, { uploadId, assetId, eventId, eventType })
+      } else {
+        console.warn('mux_uploads_update_zero_rows', { event_id: eventId, event_type: eventType, upload_id: uploadId ?? null, asset_id: assetId ?? null })
       }
     } else if (eventType === 'video.upload.cancelled') {
       if (uploadId) {
