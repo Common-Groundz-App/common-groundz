@@ -760,8 +760,74 @@ export function EnhancedCreatePostForm({
           if (entityError) {
             console.error('Error saving entity relationship:', entityError);
           }
+      }
+
+      // ===== Phase 3B: register Mux upload→post slot mappings (non-blocking) =====
+      if (newPost) {
+        const muxItems = mediaToSave
+          .map((m, idx) => ({ m, idx }))
+          .filter(({ m }) => m.provider === 'mux' && typeof m.mux_upload_id === 'string' && m.mux_upload_id.length > 0)
+          .map(({ m, idx }) => ({ mux_upload_id: m.mux_upload_id as string, media_index: idx }));
+
+        if (muxItems.length > 0) {
+          const invokeOnce = () =>
+            supabase.functions.invoke('mux-register-mappings', {
+              body: { content_type: 'post', content_id: newPost.id, items: muxItems },
+            });
+
+          const isTransport = (err: any) => {
+            if (!err) return false;
+            const status = err?.context?.status;
+            if (typeof status === 'number' && status >= 500) return true;
+            if (typeof status === 'number' && status >= 400 && status < 500) return false;
+            // No HTTP response (network/fetch error) → transport
+            const name = err?.name || '';
+            const msg = String(err?.message || '');
+            return name === 'FunctionsFetchError' || name === 'TypeError' || /fetch|network|failed to fetch/i.test(msg);
+          };
+
+          try {
+            let { error: invokeErr } = await invokeOnce();
+            if (invokeErr && isTransport(invokeErr)) {
+              const retry = await invokeOnce();
+              invokeErr = retry.error;
+            }
+            if (invokeErr) {
+              console.error('mux_register_mappings_failed', {
+                post_id: newPost.id,
+                mux_upload_ids: muxItems.map(i => i.mux_upload_id),
+                error: invokeErr?.message || String(invokeErr),
+              });
+              analytics.track('mux_register_mappings_failed', {
+                post_id: newPost.id,
+                item_count: muxItems.length,
+                error_code: (invokeErr as any)?.context?.status || invokeErr?.name || 'unknown',
+              });
+              toast({
+                title: 'Video processing pending',
+                description: 'Refresh in a minute to update.',
+              });
+            }
+          } catch (e: any) {
+            console.error('mux_register_mappings_failed', {
+              post_id: newPost.id,
+              mux_upload_ids: muxItems.map(i => i.mux_upload_id),
+              error: e?.message || String(e),
+            });
+            analytics.track('mux_register_mappings_failed', {
+              post_id: newPost.id,
+              item_count: muxItems.length,
+              error_code: e?.name || 'exception',
+            });
+            toast({
+              title: 'Video processing pending',
+              description: 'Refresh in a minute to update.',
+            });
+          }
         }
       }
+
+
 
       // ===== Hashtag persistence (non-blocking) =====
       const { all: detectedTags, source: hashtagSource } = extractHashtagsDetailed(title, content);
