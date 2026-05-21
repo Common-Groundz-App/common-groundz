@@ -760,7 +760,9 @@ export function EnhancedCreatePostForm({
           if (entityError) {
             console.error('Error saving entity relationship:', entityError);
           }
+        }
       }
+
 
       // ===== Phase 3B: register Mux upload→post slot mappings (non-blocking) =====
       if (newPost) {
