@@ -624,6 +624,7 @@ export function EnhancedCreatePostForm({
         // Note: last_edited_at is stamped server-side by the
         // enforce_post_edit_window trigger — only on meaningful changes.
         // Same trigger enforces the 1h window + admin bypass.
+        // TODO(phase 3C): reconcile mux mappings on media edits
         const { data: updatedPost, error } = await supabase
           .from('posts')
           .update(basePostData as any)
