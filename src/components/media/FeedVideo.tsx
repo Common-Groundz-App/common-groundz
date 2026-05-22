@@ -10,7 +10,7 @@ import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
 import { MediaItem, VideoHandoff } from '@/types/media';
-import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, maybeEmitBrokenReady } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, resolveVideoSrc, maybeEmitBrokenReady, muxPosterUrl } from '@/utils/muxMedia';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
@@ -164,22 +164,16 @@ function VideoProgressBar({
   );
 }
 
-export function FeedVideo({
-  item,
-  className,
-  onTap,
-  showBadge = true,
-  objectFit = 'contain',
-  source = 'post',
-  sourceId,
-}: FeedVideoProps) {
+export function FeedVideo(props: FeedVideoProps) {
   // ============================================================================
-  // LOCKED RENDER BRANCHING — order matters. See src/utils/renderBranching.ts
+  // Zero-hook dispatcher. Keeps the locked render branching order while
+  // ensuring FeedVideoPlayer's hook count is invariant for its lifetime.
+  // See src/utils/renderBranching.ts.
   //   1. errored or broken-ready  → errored poster + one-shot telemetry
   //   2. preparing                → preparing poster
-  //   3. mux + playable           → HLS <video> (handled below)
-  //   4. legacy                   → <video src={item.url}> (handled below)
+  //   3. otherwise                → FeedVideoPlayer (Mux HLS or legacy)
   // ============================================================================
+  const { item, className, objectFit = 'contain' } = props;
   if (isMuxErroredOrBroken(item)) {
     maybeEmitBrokenReady(item, (e, p) => analytics.track(e, p));
     return (
@@ -199,6 +193,19 @@ export function FeedVideo({
       />
     );
   }
+  return <FeedVideoPlayer {...props} />;
+}
+
+function FeedVideoPlayer({
+  item,
+  className,
+  onTap,
+  showBadge = true,
+  objectFit = 'contain',
+  source = 'post',
+  sourceId,
+}: FeedVideoProps) {
+
 
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -467,7 +474,7 @@ export function FeedVideo({
     >
       <video
         ref={videoRef}
-        poster={isMuxPlayable(item) ? (item.mux_playback_id ? `https://image.mux.com/${item.mux_playback_id}/thumbnail.jpg` : item.thumbnail_url) : item.thumbnail_url}
+        poster={muxPosterUrl(item)}
         muted={muted}
         playsInline
         loop
