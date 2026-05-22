@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import GuestNavBar from '@/components/profile/GuestNavBar';
@@ -12,6 +13,9 @@ import Logo from '@/components/Logo';
 import { Bell, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import { MuxOwnerHint } from '@/components/media/MuxOwnerHint';
+import { isPostOwner } from '@/lib/isPostOwner';
+import { analytics } from '@/services/analytics';
 
 interface PostMeta {
   title: string;
@@ -20,6 +24,7 @@ interface PostMeta {
   imageUrl?: string;
   authorId?: string;
   taggedEntities?: any[];
+  media?: any[];
 }
 
 const PostView = () => {
