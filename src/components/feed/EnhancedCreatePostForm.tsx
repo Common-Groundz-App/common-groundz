@@ -1236,7 +1236,17 @@ export function EnhancedCreatePostForm({
 
         {/* Media preview */}
         {media.length > 0 && (
-          <ComposerMediaPreview media={media} onRemove={removeMedia} />
+          <ComposerMediaPreview
+            media={media}
+            onRemove={removeMedia}
+            overlayForItem={(item) => {
+              const id = item.mux_upload_id;
+              if (!id || item.provider !== 'mux') return null;
+              const ui = muxStatuses[id]?.ui_status;
+              if (!ui) return null;
+              return <MuxUploadChip uploadId={id} status={ui} />;
+            }}
+          />
         )}
 
         {/* Location chip */}
