@@ -239,6 +239,34 @@ export function FeedVideo({
     v.muted = muted;
   }, [muted]);
 
+  // Phase 4 — source attachment. Mux-playable items go through attachHls
+  // (native HLS on Safari/iOS, lazy hls.js elsewhere). Legacy items get
+  // a plain src= assignment. Cancellation token guards against stale
+  // attach after unmount or item swap.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const { src, isHls } = resolveVideoSrc(item);
+    if (!src) return;
+    const token: AttachToken = { cancelled: false };
+    let detach: () => void;
+    if (isHls) {
+      detach = attachHls(v, src, token, {
+        onEvent: (e, p) => analytics.track(e, p),
+      });
+    } else {
+      try { v.src = src; } catch { /* ignore */ }
+      detach = () => {
+        try { v.removeAttribute('src'); v.load(); } catch { /* ignore */ }
+      };
+    }
+    return () => {
+      token.cancelled = true;
+      detach();
+    };
+  }, [item.url, item.mux_playback_id, item.mux_status, item.provider]);
+
+
   // Reset userPaused when video leaves viewport, so re-entry can autoplay again.
   useEffect(() => {
     const el = containerRef.current;
@@ -439,8 +467,7 @@ export function FeedVideo({
     >
       <video
         ref={videoRef}
-        src={item.url}
-        poster={item.thumbnail_url}
+        poster={isMuxPlayable(item) ? (item.mux_playback_id ? `https://image.mux.com/${item.mux_playback_id}/thumbnail.jpg` : item.thumbnail_url) : item.thumbnail_url}
         muted={muted}
         playsInline
         loop
