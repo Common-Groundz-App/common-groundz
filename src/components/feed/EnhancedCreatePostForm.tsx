@@ -120,6 +120,25 @@ export function EnhancedCreatePostForm({
   const [title, setTitle] = useState(postToEdit?.title ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [media, setMedia] = useState<MediaItem[]>(postToEdit?.media ?? []);
+  // Phase 5: live Mux upload status for tiles in this composer session.
+  const muxUploadIds = useMemo(
+    () =>
+      media
+        .filter((m) => m.provider === 'mux' && typeof m.mux_upload_id === 'string' && m.mux_upload_id.length > 0)
+        .map((m) => m.mux_upload_id as string),
+    [media],
+  );
+  const muxStatuses = useMuxStatus(muxUploadIds, {
+    onChange: (row) => {
+      try {
+        analytics.track('mux_upload_status_changed', {
+          upload_id: row.upload_id,
+          ui_status: row.ui_status,
+          surface: 'composer',
+        });
+      } catch {}
+    },
+  });
   const [entities, setEntities] = useState<Entity[]>(postToEdit?.tagged_entities ?? []);
   const [inFlightUploads, setInFlightUploads] = useState<MediaUploadState[]>([]);
   const cancelUploadRef = useRef<((u: MediaUploadState) => void) | null>(null);
