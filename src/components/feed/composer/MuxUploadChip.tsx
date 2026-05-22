@@ -42,7 +42,7 @@ export function MuxUploadChip({ uploadId, status, className }: Props) {
       return;
     }
     const t = setTimeout(() => {
-      dismissedReadyChips.add(uploadId);
+      rememberDismissed(uploadId);
       setReadyHidden(true);
     }, FADE_MS);
     return () => clearTimeout(t);
