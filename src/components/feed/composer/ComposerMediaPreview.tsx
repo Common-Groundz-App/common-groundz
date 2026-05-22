@@ -9,6 +9,10 @@ interface ComposerMediaPreviewProps {
   media: MediaItem[];
   onRemove: (item: MediaItem) => void;
   className?: string;
+  /**
+   * Optional per-tile overlay. Used by Phase 5 to render a Mux processing/ready/failed chip.
+   */
+  overlayForItem?: (item: MediaItem) => React.ReactNode;
 }
 
 /**
@@ -20,6 +24,7 @@ export function ComposerMediaPreview({
   media,
   onRemove,
   className,
+  overlayForItem,
 }: ComposerMediaPreviewProps) {
   if (media.length === 0) return null;
 
@@ -60,6 +65,8 @@ export function ComposerMediaPreview({
             loading="lazy"
           />
         )}
+
+        {overlayForItem?.(item)}
 
         <Button
           type="button"

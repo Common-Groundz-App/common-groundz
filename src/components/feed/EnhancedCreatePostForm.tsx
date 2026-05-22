@@ -29,6 +29,8 @@ import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { ComposerMediaPreview } from './composer/ComposerMediaPreview';
+import { MuxUploadChip } from './composer/MuxUploadChip';
+import { useMuxStatus } from '@/hooks/useMuxStatus';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
@@ -118,6 +120,25 @@ export function EnhancedCreatePostForm({
   const [title, setTitle] = useState(postToEdit?.title ?? '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [media, setMedia] = useState<MediaItem[]>(postToEdit?.media ?? []);
+  // Phase 5: live Mux upload status for tiles in this composer session.
+  const muxUploadIds = useMemo(
+    () =>
+      media
+        .filter((m) => m.provider === 'mux' && typeof m.mux_upload_id === 'string' && m.mux_upload_id.length > 0)
+        .map((m) => m.mux_upload_id as string),
+    [media],
+  );
+  const muxStatuses = useMuxStatus(muxUploadIds, {
+    onChange: (row) => {
+      try {
+        analytics.track('mux_upload_status_changed', {
+          upload_id: row.upload_id,
+          ui_status: row.ui_status,
+          surface: 'composer',
+        });
+      } catch {}
+    },
+  });
   const [entities, setEntities] = useState<Entity[]>(postToEdit?.tagged_entities ?? []);
   const [inFlightUploads, setInFlightUploads] = useState<MediaUploadState[]>([]);
   const cancelUploadRef = useRef<((u: MediaUploadState) => void) | null>(null);
@@ -1234,7 +1255,17 @@ export function EnhancedCreatePostForm({
 
         {/* Media preview */}
         {media.length > 0 && (
-          <ComposerMediaPreview media={media} onRemove={removeMedia} />
+          <ComposerMediaPreview
+            media={media}
+            onRemove={removeMedia}
+            overlayForItem={(item) => {
+              const id = item.mux_upload_id;
+              if (!id || item.provider !== 'mux') return null;
+              const ui = muxStatuses[id]?.ui_status;
+              if (!ui) return null;
+              return <MuxUploadChip uploadId={id} status={ui} />;
+            }}
+          />
         )}
 
         {/* Location chip */}

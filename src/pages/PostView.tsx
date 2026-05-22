@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import GuestNavBar from '@/components/profile/GuestNavBar';
@@ -12,6 +13,9 @@ import Logo from '@/components/Logo';
 import { Bell, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
+import { MuxOwnerHint } from '@/components/media/MuxOwnerHint';
+import { isPostOwner } from '@/lib/isPostOwner';
+import { analytics } from '@/services/analytics';
 
 interface PostMeta {
   title: string;
@@ -20,6 +24,7 @@ interface PostMeta {
   imageUrl?: string;
   authorId?: string;
   taggedEntities?: any[];
+  media?: any[];
 }
 
 const PostView = () => {
@@ -31,14 +36,49 @@ const PostView = () => {
 
   const [postMeta, setPostMeta] = useState<PostMeta | null>(null);
   const [loadComplete, setLoadComplete] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const hasTracked = useRef(false);
+  const queryClient = useQueryClient();
 
   // Reset state when route param changes
   useEffect(() => {
     setPostMeta(null);
     setLoadComplete(false);
+    setRefreshTick(0);
     hasTracked.current = false;
   }, [postId]);
+
+  const ownerPost = postId
+    ? { id: postId, user_id: postMeta?.authorId ?? null, media: postMeta?.media ?? null }
+    : null;
+  const isOwner = isPostOwner(ownerPost, user);
+
+  const invalidateFeeds = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['feed'] });
+    queryClient.invalidateQueries({ queryKey: ['infinite-feed'] });
+  }, [queryClient]);
+
+  const handleMuxReady = useCallback(() => {
+    // Immediate pass — refetch post + invalidate feed query keys.
+    setRefreshTick((t) => t + 1);
+    invalidateFeeds();
+    const hadPlaybackId = !!postMeta?.media?.some(
+      (m: any) => m?.provider === 'mux' && !!m?.mux_playback_id,
+    );
+    // Delayed second pass — guarded by tab visibility — covers race
+    // between mux_uploads.status='ready' and Phase 3B posts.media patch.
+    window.setTimeout(() => {
+      if (document.visibilityState !== 'visible') return;
+      setRefreshTick((t) => t + 1);
+      invalidateFeeds();
+      try {
+        analytics.track('mux_ready_refetch_double_fired', {
+          delay_ms: 1000,
+          had_playback_id_on_first_refetch: hadPlaybackId,
+        });
+      } catch {}
+    }, 1000);
+  }, [invalidateFeeds, postMeta?.media]);
 
   const handlePostLoaded = useCallback((meta: PostMeta | null) => {
     setPostMeta(meta);
@@ -88,10 +128,14 @@ const PostView = () => {
         />
         <GuestNavBar />
         <div className="flex-1 container max-w-3xl mx-auto py-6 px-4">
+          {isOwner && (
+            <MuxOwnerHint post={ownerPost} onReady={handleMuxReady} />
+          )}
           <PostContentViewer
             postId={postId}
             highlightCommentId={commentId}
             onPostLoaded={handlePostLoaded}
+            refreshTick={refreshTick}
             isDetailView
           />
         </div>
@@ -152,10 +196,14 @@ const PostView = () => {
 
             {/* Main content */}
             <div className="col-span-1 xl:col-span-4 max-w-3xl w-full mx-auto">
+              {isOwner && (
+                <MuxOwnerHint post={ownerPost} onReady={handleMuxReady} />
+              )}
               <PostContentViewer
                 postId={postId}
                 highlightCommentId={commentId}
                 onPostLoaded={handlePostLoaded}
+                refreshTick={refreshTick}
                 isDetailView
               />
             </div>

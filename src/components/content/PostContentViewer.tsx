@@ -22,10 +22,15 @@ interface PostContentViewerProps {
   highlightCommentId: string | null;
   isInModal?: boolean;
   isDetailView?: boolean;
-  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string; authorId?: string; taggedEntities?: any[] } | null) => void;
+  /**
+   * Bump to force a refetch of the post (Phase 5 — Mux ready → playback patch).
+   * Optional; backwards compatible.
+   */
+  refreshTick?: number;
+  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string; authorId?: string; taggedEntities?: any[]; media?: any[] } | null) => void;
 }
 
-const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDetailView = false, onPostLoaded }: PostContentViewerProps) => {
+const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDetailView = false, refreshTick, onPostLoaded }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
   const navigate = useNavigate();
@@ -139,6 +144,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         visibility: data.visibility || 'private',
         imageUrl: data.media?.[0]?.url || undefined,
         authorId: data.user_id || undefined,
+        media: Array.isArray(data.media) ? (data.media as any[]) : [],
         taggedEntities: taggedEntities.map((e: any) => ({
           id: e.id,
           name: e.name,
@@ -164,6 +170,15 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
       fetchPost();
     }
   }, [postId, fetchPost]);
+
+  // Phase 5: parent (PostView) bumps refreshTick when Mux upload reaches
+  // ready, so the post can be refetched to pick up patched media JSON.
+  React.useEffect(() => {
+    if (refreshTick && refreshTick > 0 && postId) {
+      fetchPost();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTick]);
 
   // Re-fetch on edit events from anywhere in the app (composer dialogs, etc.)
   React.useEffect(() => {

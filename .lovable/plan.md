@@ -1,93 +1,115 @@
-# Phase 4.1 — Hotfix: FeedVideo Rules of Hooks violation
 
-## Problem
+# Phase 5 — Processing / errored UI polish (final, v2)
 
-`src/components/media/FeedVideo.tsx` places two early `return`s **before** any hook calls:
+All review corrections incorporated. Verifications from v1 still hold (DB column `error`, enum `waiting|asset_created|ready|errored|cancelled`, feed query keys `['feed', ...]` / `['infinite-feed', ...]`, PostContentViewer uses local `fetchPost` not react-query).
 
-```tsx
-export function FeedVideo({ item, ... }) {
-  if (isMuxErroredOrBroken(item)) return <MuxPreparingPoster ... />;  // early return
-  if (isMuxPreparing(item))        return <MuxPreparingPoster ... />;  // early return
-
-  const videoRef = useRef(...);          // hooks start here
-  const [muted, toggleMute] = useVideoMute();
-  // ... 10+ more hooks
-}
-```
-
-If the same `<FeedVideo>` instance ever transitions across Mux states (preparing → ready via Phase 3B realtime reconciliation, ready → errored, ready → preparing, etc.), the number of hooks invoked changes between renders. React throws:
-
-> Rendered fewer hooks than expected. This may be caused by an accidental early return statement.
-
-This is a real regression from Phase 4 and will fire the first time a feed item open at the moment of webhook reconciliation flips state.
-
-## LightboxPreview scan — clean
-
-`src/components/media/LightboxPreview.tsx` was scanned for the same pattern. All Mux predicate checks (`isMuxErroredOrBroken`, `isMuxPreparing`) live inside the JSX return as a ternary (line ~286+), **after** all 6+ hooks have run. No early-return-before-hooks. No change required.
-
-## Fix (one file)
-
-Split the early-branch UI out of `FeedVideo` into an internal `FeedVideoPlayer` so hook order stays stable.
-
-1. Rename the existing `FeedVideo` body to `FeedVideoPlayer` — same props, owns all hooks and the `<video>` element.
-2. Reintroduce `FeedVideo` as a **zero-hook** dispatcher above it:
-
-   ```tsx
-   export function FeedVideo(props: FeedVideoProps) {
-     const { item, className, objectFit = 'contain' } = props;
-     if (isMuxErroredOrBroken(item)) {
-       maybeEmitBrokenReady(item, (e, p) => analytics.track(e, p));
-       return <MuxPreparingPoster item={item} className={cn('rounded-md', className)} objectFit={objectFit === 'contain' ? 'contain' : 'cover'} />;
-     }
-     if (isMuxPreparing(item)) {
-       return <MuxPreparingPoster item={item} className={cn('rounded-md', className)} objectFit={objectFit === 'contain' ? 'contain' : 'cover'} />;
-     }
-     return <FeedVideoPlayer {...props} />;
-   }
-   ```
-
-3. Because React identifies components by element type, switching between `<MuxPreparingPoster>` and `<FeedVideoPlayer>` unmounts/mounts a fresh tree on either side of every transition. Hook count inside `FeedVideoPlayer` is invariant for its lifetime — Rules of Hooks satisfied by construction.
-
-4. Minor cleanup: replace the inline poster ternary on the `<video>` tag with `muxPosterUrl(item)` for parity with `LightboxPreview`.
-
-## Files touched (1)
+## Files (8)
 
 | # | File | Change |
-|---|---|---|
-| 1 | `src/components/media/FeedVideo.tsx` | Rename inner function → `FeedVideoPlayer`; add zero-hook `FeedVideo` dispatcher; swap inline poster URL for `muxPosterUrl(item)`. |
+|---|------|--------|
+| 1 | `src/hooks/useMuxStatus.ts` (new) | Realtime hook. Input: `uploadIds: string[]`. Steps: (a) **initial fetch** via `supabase.from('mux_uploads').select('upload_id,status,playback_id,asset_id,error').in('upload_id', ids)` → seed cache + fire `onReady` for any already-`ready`. (b) Subscribe `postgres_changes` UPDATE on `public.mux_uploads` filtered `upload_id=in.(...)`. Caps at **N=8** ids/channel (one-time `console.warn` above). Normalizes DB → UI. Fires `onReady(upload_id)` **exactly once per upload_id per hook instance lifetime** (internal `Set<string> firedReady`), regardless of whether the first `ready` observation comes from initial fetch or realtime UPDATE. Clean unsubscribe on unmount/id-set change. Empty input → no-op. |
+| 2 | `src/lib/isPostOwner.ts` (new) | Shared `isPostOwner(post, user): boolean` used by both PostView gate and MuxOwnerHint internal gate. |
+| 3 | `src/components/feed/composer/MuxUploadChip.tsx` (new) | Overlay chip: spinner + "Processing"; checkmark + "Ready" with 1.5s CSS fade-out; ⚠ + "Upload failed". Semantic tokens. **Deterministic dismissal:** module-level `Set<string> dismissedReadyChips` persists "this upload's ready chip already faded" across component remounts within the composer session. On ready+fade, the upload_id is added to the set; subsequent renders skip the ready chip entirely for that id. No timers, no internal state machine. |
+| 4 | `src/components/feed/EnhancedCreatePostForm.tsx` | Collect Mux `upload_id`s from in-flight media items → `useMuxStatus(ids)` → render `<MuxUploadChip>` per tile. Submit not gated by UI status. `failed` → existing remove-tile handler. |
+| 5 | `src/components/media/MuxOwnerHint.tsx` (new) | Owner-only banner. Props: `post`, `onReady?(): void`. Gates internally via `isPostOwner` + `isMuxPreparing`/`isMuxErroredOrBroken` on `post.media`. Subscribes via `useMuxStatus` only when owner + has preparing/errored Mux items. Copy: "Your video is processing — usually under a minute" (processing) / "Video failed to process. Please edit if allowed or create a new post." (failed, dead-end, no CTA). Auto-unmounts when all observed uploads reach `ready`. |
+| 6 | `src/pages/PostView.tsx` | Mount `<MuxOwnerHint post={post} onReady={handleMuxReady} />` above content viewer, owner-gated via shared helper. `handleMuxReady` bumps `refreshTick` state + invalidates `['feed']` and `['infinite-feed']` query keys; schedules a second pass at 1000ms gated by `document.visibilityState === 'visible'`. Emits `mux_ready_refetch_double_fired` on the second pass. |
+| 7 | `src/components/content/PostContentViewer.tsx` | Add optional prop `refreshTick?: number`. Add sibling `useEffect(() => { if (refreshTick && refreshTick > 0) fetchPost(); }, [refreshTick])`. No other changes. |
+| 8 | `src/hooks/useMuxStatus.test.ts` (new) | Unit tests: (a) `onReady` fires on initial fetch if status already `ready`; (b) `onReady` fires on realtime processing→ready; (c) `onReady` never double-fires for the same upload_id within one hook instance; (d) id-set diffing on prop change; (e) N=8 cap enforced; (f) clean unsubscribe on unmount; (g) UI status normalization for all 5 DB enum values. |
 
-No new files, no prop changes, no call-site changes, no new deps.
+## Scope (locked)
 
-## Locked branching order preserved
+In: useMuxStatus hook, composer per-tile chip, PostView owner hint, ready-state refetch glue.
+
+Out (strict non-goals): re-upload / replaceMediaIndex flow (Phase 3C), edit-window changes, Mux Player swap, captions, signed URLs, backfill, orphan-cleanup cron, realtime on viewer feed cards, DB / edge function / webhook / playback changes.
+
+## Technical design
+
+### onReady contract (clarified)
+
+`useMuxStatus` fires `onReady(upload_id)` **once per upload_id per hook instance lifetime** when it **first observes** `ui_status === 'ready'`. Sources:
+- Initial `.in('upload_id', ids)` fetch returns `ready`.
+- Realtime UPDATE flips DB status to `ready`.
+
+Internal `firedReady: Set<string>` guards against double-fire from replayed events or rapid state updates.
+
+### Ready-chip persistence (composer)
+
+Module-level `const dismissedReadyChips = new Set<string>()` in `MuxUploadChip.tsx`. Once the ready chip's 1.5s fade completes for a given upload_id, that id is added to the set. On any future render (including after component remount within the same SPA session), the chip checks the set first and skips rendering the ready variant. Reset only on hard page reload — desired behavior.
+
+### Ready-state refetch glue
+
+PostContentViewer doesn't use react-query, so invalidation alone won't refetch the post. Flow:
 
 ```
-errored-or-broken → preparing → (FeedVideoPlayer handles playable + legacy)
+useMuxStatus.onReady(upload_id)
+  → PostView.handleMuxReady()
+    → setRefreshTick(t => t + 1)        // PostContentViewer refetches via new effect
+    → invalidateQueries(['feed'])
+    → invalidateQueries(['infinite-feed'])
+    → setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          setRefreshTick(t => t + 1)
+          invalidateQueries(['feed'])
+          invalidateQueries(['infinite-feed'])
+          analytics.track('mux_ready_refetch_double_fired', {
+            delay_ms: 1000,
+            had_playback_id_on_first_refetch
+          })
+        }
+      }, 1000)
 ```
 
-`renderBranching.test.ts` still describes the full 5-state matrix.
+### Status normalization
+
+```ts
+type MuxDbStatus = 'waiting' | 'asset_created' | 'ready' | 'errored' | 'cancelled';
+type MuxUiStatus = 'processing' | 'ready' | 'failed';
+
+const normalize = (s: MuxDbStatus): MuxUiStatus =>
+  s === 'ready' ? 'ready'
+  : (s === 'errored' || s === 'cancelled') ? 'failed'
+  : 'processing';
+```
+
+### Subscription shape
+
+```ts
+supabase
+  .channel(`mux-status-${instanceId}`)
+  .on('postgres_changes',
+    { event: 'UPDATE', schema: 'public', table: 'mux_uploads',
+      filter: `upload_id=in.(${ids.slice(0, 8).join(',')})` },
+    handler)
+  .subscribe();
+```
+Mux upload ids are alphanumeric — no escaping required. Realistic composer range 1–4; cap 8 with warn.
+
+### Analytics
+
+- `mux_upload_status_changed` `{ upload_id, ui_status, surface: 'composer'|'owner_hint' }`
+- `mux_owner_hint_shown` `{ post_id, ui_status }`
+- `mux_owner_hint_dismissed_ready` `{ post_id, elapsed_ms }`
+- `mux_owner_hint_failed_shown` `{ post_id }`
+- `mux_ready_refetch_double_fired` `{ delay_ms, had_playback_id_on_first_refetch }`
 
 ## Verification
 
-1. **TypeScript** — `tsc --noEmit` clean.
-2. **Static check** — `FeedVideo` body contains zero `use*(` calls; only branches + `<FeedVideoPlayer ... />`.
-3. **Functional smoke**
-   - Legacy `.mp4` → plays as before.
-   - Mux ready+playback_id → HLS plays.
-   - Mux preparing → preparing poster, no `<video>` mounted.
-   - Mux errored → errored poster.
-4. **🚧 Bidirectional hook-order regression gate** (the key new check)
-   - **Forward**: open a preparing post, trigger reconciliation flipping `mux_status` to `ready` → must transition to playing HLS with **no** "rendered fewer hooks" console error.
-   - **Reverse a**: ready → preparing (simulate by mutating cached item) → must transition back to preparing poster cleanly.
-   - **Reverse b**: ready → errored → must transition to errored poster cleanly.
-   - **Reverse c**: ready → ready-but-broken (drop `mux_playback_id`) → must transition to errored poster and fire `mux_ready_without_playback_id` exactly once.
-   - All four transitions verified in the same browser session (single `FeedVideo` instance lifetime) with the console open. Before this fix, the forward case throws; after, all four are clean.
-5. **iOS handoff** — unchanged (`LightboxPreview` not touched).
-6. **Bundle** — no new chunks, no new deps.
+1. `tsc --noEmit` clean.
+2. `useMuxStatus.test.ts` passes — all 7 cases including initial-fetch-ready and no-double-fire.
+3. Composer smoke: upload → "Processing" chip → DB flip `ready` → "Ready" chip fades after 1.5s → unmount/remount tile (e.g., reorder) → ready chip does NOT reappear.
+4. Composer failed path: simulate `errored` → "Upload failed" chip → submit enabled → existing remove-tile works.
+5. PostView owner: post a Mux video → banner shows → on `ready`, PostContentViewer refetches via `refreshTick`, FeedVideo (Phase 4) plays HLS, banner auto-dismisses.
+6. **Race coverage**: post a Mux video where webhook fires *before* PostView mounts → `useMuxStatus` initial fetch sees `ready` → `onReady` still fires → `refreshTick` bumps → playback works.
+7. PostView non-owner: no banner, no `mux-status-*` channel in DevTools.
+8. Owner errored: dead-end failed copy, no CTA, no navigation.
+9. Tab-visibility guard: background tab during 1s window → no second refetch.
+10. Feed cards do not subscribe (grep `useMuxStatus` → only 2 callers).
+11. Phase 4 regression: legacy `.mp4`, Mux ready, Mux preparing, Mux errored all unchanged.
 
 ## Rollback
 
-Revert the single file.
+Per-file revert. Hook is opt-in; removing the two call sites in `EnhancedCreatePostForm.tsx` and `PostView.tsx` fully disables Phase 5 without touching Phase 4 or DB. PostContentViewer's `refreshTick` prop is optional, so the prop addition is backwards-compatible.
 
 ---
 
-Approve to implement. After verification you'll define Phase 5 scope.
+Approve to implement.
