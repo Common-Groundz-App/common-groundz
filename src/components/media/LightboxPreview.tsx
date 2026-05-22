@@ -304,8 +304,39 @@ export function LightboxPreview({
             <video
               key={imageKey}
               ref={(el) => {
+                // Tear down previous attachment when the <video> unmounts
+                // (key={imageKey} change). Cancel async hls.js attach mid-flight.
+                if (!el) {
+                  if (hlsTokenRef.current) hlsTokenRef.current.cancelled = true;
+                  if (hlsDetachRef.current) {
+                    try { hlsDetachRef.current(); } catch { /* ignore */ }
+                  }
+                  hlsDetachRef.current = null;
+                  hlsTokenRef.current = null;
+                  videoElRef.current = null;
+                  return;
+                }
                 videoElRef.current = el;
-                if (!el) return;
+                // Phase 4 — attach source synchronously inside the ref callback,
+                // BEFORE the iOS early-play call below. Native HLS path is sync
+                // (just sets el.src), satisfying iOS first-tap autoplay gesture.
+                // hls.js MSE path is async but iOS uses native HLS anyway, so
+                // the gesture is preserved on iOS.
+                const { src, isHls } = resolveVideoSrc(currentItem);
+                if (src && !hlsDetachRef.current) {
+                  if (isHls) {
+                    const token: AttachToken = { cancelled: false };
+                    hlsTokenRef.current = token;
+                    hlsDetachRef.current = attachHls(el, src, token, {
+                      onEvent: (e, p) => analytics.track(e, p),
+                    });
+                  } else {
+                    try { el.src = src; } catch { /* ignore */ }
+                    hlsDetachRef.current = () => {
+                      try { el.removeAttribute('src'); el.load(); } catch { /* ignore */ }
+                    };
+                  }
+                }
                 // iOS-only synchronous early play, inside the originating tap
                 // gesture. Skip on non-iOS (already works), non-entry items,
                 // paused-handoff, or after the one-shot has run.
@@ -333,8 +364,7 @@ export function LightboxPreview({
                   p.catch(() => { /* iOS blocked; fall back to existing flow */ });
                 }
               }}
-              src={currentItem.url}
-              poster={currentItem.thumbnail_url}
+              poster={muxPosterUrl(currentItem)}
               controls
               playsInline
               className={cn(
