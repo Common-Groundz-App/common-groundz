@@ -10,7 +10,8 @@ import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
 import { MediaItem, VideoHandoff } from '@/types/media';
-import { isMuxPreparing } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, maybeEmitBrokenReady } from '@/utils/muxMedia';
+import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface FeedVideoProps {
@@ -172,9 +173,23 @@ export function FeedVideo({
   source = 'post',
   sourceId,
 }: FeedVideoProps) {
-  // Phase 2A — Mux video still preparing. Never mount <video> for these;
-  // render the poster + Processing badge instead. Hooks below have not run
-  // yet, so an early return here is safe.
+  // ============================================================================
+  // LOCKED RENDER BRANCHING — order matters. See src/utils/renderBranching.ts
+  //   1. errored or broken-ready  → errored poster + one-shot telemetry
+  //   2. preparing                → preparing poster
+  //   3. mux + playable           → HLS <video> (handled below)
+  //   4. legacy                   → <video src={item.url}> (handled below)
+  // ============================================================================
+  if (isMuxErroredOrBroken(item)) {
+    maybeEmitBrokenReady(item, (e, p) => analytics.track(e, p));
+    return (
+      <MuxPreparingPoster
+        item={item}
+        className={cn('rounded-md', className)}
+        objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
+      />
+    );
+  }
   if (isMuxPreparing(item)) {
     return (
       <MuxPreparingPoster
@@ -184,6 +199,7 @@ export function FeedVideo({
       />
     );
   }
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
