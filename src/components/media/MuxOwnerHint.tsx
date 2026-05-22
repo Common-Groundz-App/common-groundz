@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMuxStatus } from '@/hooks/useMuxStatus';
 import { isPostOwner } from '@/lib/isPostOwner';
 import { isMuxPreparing, isMuxErroredOrBroken } from '@/utils/muxMedia';
-import { analytics } from '@/services/analyticsService';
+import { analytics } from '@/services/analytics';
 import { cn } from '@/lib/utils';
 import type { MediaItem } from '@/types/media';
 
