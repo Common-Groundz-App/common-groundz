@@ -128,10 +128,14 @@ const PostView = () => {
         />
         <GuestNavBar />
         <div className="flex-1 container max-w-3xl mx-auto py-6 px-4">
+          {isOwner && (
+            <MuxOwnerHint post={ownerPost} onReady={handleMuxReady} />
+          )}
           <PostContentViewer
             postId={postId}
             highlightCommentId={commentId}
             onPostLoaded={handlePostLoaded}
+            refreshTick={refreshTick}
             isDetailView
           />
         </div>
@@ -192,10 +196,14 @@ const PostView = () => {
 
             {/* Main content */}
             <div className="col-span-1 xl:col-span-4 max-w-3xl w-full mx-auto">
+              {isOwner && (
+                <MuxOwnerHint post={ownerPost} onReady={handleMuxReady} />
+              )}
               <PostContentViewer
                 postId={postId}
                 highlightCommentId={commentId}
                 onPostLoaded={handlePostLoaded}
+                refreshTick={refreshTick}
                 isDetailView
               />
             </div>
