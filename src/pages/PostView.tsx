@@ -36,14 +36,49 @@ const PostView = () => {
 
   const [postMeta, setPostMeta] = useState<PostMeta | null>(null);
   const [loadComplete, setLoadComplete] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
   const hasTracked = useRef(false);
+  const queryClient = useQueryClient();
 
   // Reset state when route param changes
   useEffect(() => {
     setPostMeta(null);
     setLoadComplete(false);
+    setRefreshTick(0);
     hasTracked.current = false;
   }, [postId]);
+
+  const ownerPost = postId
+    ? { id: postId, user_id: postMeta?.authorId ?? null, media: postMeta?.media ?? null }
+    : null;
+  const isOwner = isPostOwner(ownerPost, user);
+
+  const invalidateFeeds = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['feed'] });
+    queryClient.invalidateQueries({ queryKey: ['infinite-feed'] });
+  }, [queryClient]);
+
+  const handleMuxReady = useCallback(() => {
+    // Immediate pass — refetch post + invalidate feed query keys.
+    setRefreshTick((t) => t + 1);
+    invalidateFeeds();
+    const hadPlaybackId = !!postMeta?.media?.some(
+      (m: any) => m?.provider === 'mux' && !!m?.mux_playback_id,
+    );
+    // Delayed second pass — guarded by tab visibility — covers race
+    // between mux_uploads.status='ready' and Phase 3B posts.media patch.
+    window.setTimeout(() => {
+      if (document.visibilityState !== 'visible') return;
+      setRefreshTick((t) => t + 1);
+      invalidateFeeds();
+      try {
+        analytics.track('mux_ready_refetch_double_fired', {
+          delay_ms: 1000,
+          had_playback_id_on_first_refetch: hadPlaybackId,
+        });
+      } catch {}
+    }, 1000);
+  }, [invalidateFeeds, postMeta?.media]);
 
   const handlePostLoaded = useCallback((meta: PostMeta | null) => {
     setPostMeta(meta);
