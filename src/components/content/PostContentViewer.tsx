@@ -171,6 +171,15 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
     }
   }, [postId, fetchPost]);
 
+  // Phase 5: parent (PostView) bumps refreshTick when Mux upload reaches
+  // ready, so the post can be refetched to pick up patched media JSON.
+  React.useEffect(() => {
+    if (refreshTick && refreshTick > 0 && postId) {
+      fetchPost();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTick]);
+
   // Re-fetch on edit events from anywhere in the app (composer dialogs, etc.)
   React.useEffect(() => {
     const handleRefresh = () => {
