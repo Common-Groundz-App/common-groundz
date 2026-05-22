@@ -1,3 +1,15 @@
+/**
+ * 🚫 HANDOFF INVARIANTS — DO NOT VIOLATE
+ *  1. <video>.currentTime is set from initialVideoState.currentTime BEFORE play().
+ *  2. <video>.muted is initialized from initialVideoState.muted (global mute intent).
+ *  3. If initialVideoState.wasPlaying, play() is invoked once on loadedmetadata.
+ *  4. First user tap on iOS triggers play()+unmute synchronously inside the
+ *     ref-callback handler (earlyPlayRanRef path).
+ *  5. Mux source attachment via attachHls() runs AFTER the iOS ref-callback
+ *     wiring, never before it.
+ * Regression of any of the above breaks iOS lightbox handoff.
+ * Backed by LightboxPreview.handoff.test.tsx.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { MediaItem, VideoHandoff } from '@/types/media';
@@ -5,7 +17,9 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { isMuxPreparing } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, maybeEmitBrokenReady } from '@/utils/muxMedia';
+import { attachHls, type AttachToken } from '@/utils/hlsAttach';
+import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface LightboxPreviewProps {
