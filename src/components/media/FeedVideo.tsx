@@ -474,7 +474,7 @@ function FeedVideoPlayer({
     >
       <video
         ref={videoRef}
-        poster={isMuxPlayable(item) ? (item.mux_playback_id ? `https://image.mux.com/${item.mux_playback_id}/thumbnail.jpg` : item.thumbnail_url) : item.thumbnail_url}
+        poster={muxPosterUrl(item)}
         muted={muted}
         playsInline
         loop
