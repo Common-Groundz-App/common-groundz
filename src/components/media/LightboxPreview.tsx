@@ -54,6 +54,10 @@ export function LightboxPreview({
   // one-shot unmute attempt instead of re-attempting play().
   const earlyPlayRanRef = useRef(false);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
+  // Phase 4 — attachHls detach handle for the current <video>. Cleared on
+  // ref-callback unmount (key change remounts the video).
+  const hlsDetachRef = useRef<(() => void) | null>(null);
+  const hlsTokenRef = useRef<AttachToken | null>(null);
   // Capture entry index so navigation away from it disables the handoff.
   const entryIndexRef = useRef(initialIndex);
 
