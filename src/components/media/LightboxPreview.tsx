@@ -283,6 +283,17 @@ export function LightboxPreview({
                 </div>
               )}
             </>
+          ) : isMuxErroredOrBroken(currentItem) ? (
+            (() => {
+              maybeEmitBrokenReady(currentItem, (e, p) => analytics.track(e, p));
+              return (
+                <MuxPreparingPoster
+                  item={currentItem}
+                  className="max-h-[90vh] max-w-full"
+                  objectFit="contain"
+                />
+              );
+            })()
           ) : isMuxPreparing(currentItem) ? (
             <MuxPreparingPoster
               item={currentItem}
