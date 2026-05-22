@@ -39,6 +39,14 @@ const PostView = () => {
   const [refreshTick, setRefreshTick] = useState(0);
   const hasTracked = useRef(false);
   const queryClient = useQueryClient();
+  const delayedRefetchTimerRef = useRef<number | null>(null);
+
+  const clearDelayedRefetch = useCallback(() => {
+    if (delayedRefetchTimerRef.current !== null) {
+      window.clearTimeout(delayedRefetchTimerRef.current);
+      delayedRefetchTimerRef.current = null;
+    }
+  }, []);
 
   // Reset state when route param changes
   useEffect(() => {
@@ -46,7 +54,11 @@ const PostView = () => {
     setLoadComplete(false);
     setRefreshTick(0);
     hasTracked.current = false;
-  }, [postId]);
+    clearDelayedRefetch();
+  }, [postId, clearDelayedRefetch]);
+
+  // Clear pending timer on unmount
+  useEffect(() => clearDelayedRefetch, [clearDelayedRefetch]);
 
   const ownerPost = postId
     ? { id: postId, user_id: postMeta?.authorId ?? null, media: postMeta?.media ?? null }
@@ -67,7 +79,10 @@ const PostView = () => {
     );
     // Delayed second pass — guarded by tab visibility — covers race
     // between mux_uploads.status='ready' and Phase 3B posts.media patch.
-    window.setTimeout(() => {
+    // Dedupe: only one pending delayed refetch at a time.
+    clearDelayedRefetch();
+    delayedRefetchTimerRef.current = window.setTimeout(() => {
+      delayedRefetchTimerRef.current = null;
       if (document.visibilityState !== 'visible') return;
       setRefreshTick((t) => t + 1);
       invalidateFeeds();
@@ -78,7 +93,7 @@ const PostView = () => {
         });
       } catch {}
     }, 1000);
-  }, [invalidateFeeds, postMeta?.media]);
+  }, [invalidateFeeds, postMeta?.media, clearDelayedRefetch]);
 
   const handlePostLoaded = useCallback((meta: PostMeta | null) => {
     setPostMeta(meta);
