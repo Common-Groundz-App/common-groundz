@@ -1,3 +1,15 @@
+/**
+ * 🚫 HANDOFF INVARIANTS — DO NOT VIOLATE
+ *  1. <video>.currentTime is set from initialVideoState.currentTime BEFORE play().
+ *  2. <video>.muted is initialized from initialVideoState.muted (global mute intent).
+ *  3. If initialVideoState.wasPlaying, play() is invoked once on loadedmetadata.
+ *  4. First user tap on iOS triggers play()+unmute synchronously inside the
+ *     ref-callback handler (earlyPlayRanRef path).
+ *  5. Mux source attachment via attachHls() runs AFTER the iOS ref-callback
+ *     wiring, never before it.
+ * Regression of any of the above breaks iOS lightbox handoff.
+ * Backed by LightboxPreview.handoff.test.tsx.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { MediaItem, VideoHandoff } from '@/types/media';
@@ -5,7 +17,9 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { isMuxPreparing } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, maybeEmitBrokenReady } from '@/utils/muxMedia';
+import { attachHls, type AttachToken } from '@/utils/hlsAttach';
+import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface LightboxPreviewProps {
@@ -40,6 +54,10 @@ export function LightboxPreview({
   // one-shot unmute attempt instead of re-attempting play().
   const earlyPlayRanRef = useRef(false);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
+  // Phase 4 — attachHls detach handle for the current <video>. Cleared on
+  // ref-callback unmount (key change remounts the video).
+  const hlsDetachRef = useRef<(() => void) | null>(null);
+  const hlsTokenRef = useRef<AttachToken | null>(null);
   // Capture entry index so navigation away from it disables the handoff.
   const entryIndexRef = useRef(initialIndex);
 
@@ -265,6 +283,17 @@ export function LightboxPreview({
                 </div>
               )}
             </>
+          ) : isMuxErroredOrBroken(currentItem) ? (
+            (() => {
+              maybeEmitBrokenReady(currentItem, (e, p) => analytics.track(e, p));
+              return (
+                <MuxPreparingPoster
+                  item={currentItem}
+                  className="max-h-[90vh] max-w-full"
+                  objectFit="contain"
+                />
+              );
+            })()
           ) : isMuxPreparing(currentItem) ? (
             <MuxPreparingPoster
               item={currentItem}
@@ -275,8 +304,39 @@ export function LightboxPreview({
             <video
               key={imageKey}
               ref={(el) => {
+                // Tear down previous attachment when the <video> unmounts
+                // (key={imageKey} change). Cancel async hls.js attach mid-flight.
+                if (!el) {
+                  if (hlsTokenRef.current) hlsTokenRef.current.cancelled = true;
+                  if (hlsDetachRef.current) {
+                    try { hlsDetachRef.current(); } catch { /* ignore */ }
+                  }
+                  hlsDetachRef.current = null;
+                  hlsTokenRef.current = null;
+                  videoElRef.current = null;
+                  return;
+                }
                 videoElRef.current = el;
-                if (!el) return;
+                // Phase 4 — attach source synchronously inside the ref callback,
+                // BEFORE the iOS early-play call below. Native HLS path is sync
+                // (just sets el.src), satisfying iOS first-tap autoplay gesture.
+                // hls.js MSE path is async but iOS uses native HLS anyway, so
+                // the gesture is preserved on iOS.
+                const { src, isHls } = resolveVideoSrc(currentItem);
+                if (src && !hlsDetachRef.current) {
+                  if (isHls) {
+                    const token: AttachToken = { cancelled: false };
+                    hlsTokenRef.current = token;
+                    hlsDetachRef.current = attachHls(el, src, token, {
+                      onEvent: (e, p) => analytics.track(e, p),
+                    });
+                  } else {
+                    try { el.src = src; } catch { /* ignore */ }
+                    hlsDetachRef.current = () => {
+                      try { el.removeAttribute('src'); el.load(); } catch { /* ignore */ }
+                    };
+                  }
+                }
                 // iOS-only synchronous early play, inside the originating tap
                 // gesture. Skip on non-iOS (already works), non-entry items,
                 // paused-handoff, or after the one-shot has run.
@@ -304,8 +364,7 @@ export function LightboxPreview({
                   p.catch(() => { /* iOS blocked; fall back to existing flow */ });
                 }
               }}
-              src={currentItem.url}
-              poster={currentItem.thumbnail_url}
+              poster={muxPosterUrl(currentItem)}
               controls
               playsInline
               className={cn(

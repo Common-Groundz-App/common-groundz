@@ -10,7 +10,8 @@ import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
 import { MediaItem, VideoHandoff } from '@/types/media';
-import { isMuxPreparing } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, maybeEmitBrokenReady } from '@/utils/muxMedia';
+import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 
 interface FeedVideoProps {
@@ -172,9 +173,23 @@ export function FeedVideo({
   source = 'post',
   sourceId,
 }: FeedVideoProps) {
-  // Phase 2A — Mux video still preparing. Never mount <video> for these;
-  // render the poster + Processing badge instead. Hooks below have not run
-  // yet, so an early return here is safe.
+  // ============================================================================
+  // LOCKED RENDER BRANCHING — order matters. See src/utils/renderBranching.ts
+  //   1. errored or broken-ready  → errored poster + one-shot telemetry
+  //   2. preparing                → preparing poster
+  //   3. mux + playable           → HLS <video> (handled below)
+  //   4. legacy                   → <video src={item.url}> (handled below)
+  // ============================================================================
+  if (isMuxErroredOrBroken(item)) {
+    maybeEmitBrokenReady(item, (e, p) => analytics.track(e, p));
+    return (
+      <MuxPreparingPoster
+        item={item}
+        className={cn('rounded-md', className)}
+        objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
+      />
+    );
+  }
   if (isMuxPreparing(item)) {
     return (
       <MuxPreparingPoster
@@ -184,6 +199,7 @@ export function FeedVideo({
       />
     );
   }
+
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -222,6 +238,34 @@ export function FeedVideo({
     if (!v) return;
     v.muted = muted;
   }, [muted]);
+
+  // Phase 4 — source attachment. Mux-playable items go through attachHls
+  // (native HLS on Safari/iOS, lazy hls.js elsewhere). Legacy items get
+  // a plain src= assignment. Cancellation token guards against stale
+  // attach after unmount or item swap.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const { src, isHls } = resolveVideoSrc(item);
+    if (!src) return;
+    const token: AttachToken = { cancelled: false };
+    let detach: () => void;
+    if (isHls) {
+      detach = attachHls(v, src, token, {
+        onEvent: (e, p) => analytics.track(e, p),
+      });
+    } else {
+      try { v.src = src; } catch { /* ignore */ }
+      detach = () => {
+        try { v.removeAttribute('src'); v.load(); } catch { /* ignore */ }
+      };
+    }
+    return () => {
+      token.cancelled = true;
+      detach();
+    };
+  }, [item.url, item.mux_playback_id, item.mux_status, item.provider]);
+
 
   // Reset userPaused when video leaves viewport, so re-entry can autoplay again.
   useEffect(() => {
@@ -423,8 +467,7 @@ export function FeedVideo({
     >
       <video
         ref={videoRef}
-        src={item.url}
-        poster={item.thumbnail_url}
+        poster={isMuxPlayable(item) ? (item.mux_playback_id ? `https://image.mux.com/${item.mux_playback_id}/thumbnail.jpg` : item.thumbnail_url) : item.thumbnail_url}
         muted={muted}
         playsInline
         loop

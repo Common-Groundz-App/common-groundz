@@ -1,66 +1,241 @@
-# Phase 3B — Wire composer + webhook into Mux reconciliation
+# Phase 4 — Mux HLS Playback (FINAL LOCKED — ready to implement)
 
-Scope: two files change. No migrations, no RPC changes, no playback/UI changes, no edit-path reconciliation.
+Step 0 (doc) + Phase 4 (frontend). Stop for verification before Phase 5. Phase order: **4 → 5 → 3C → 6**. 3C and 6 remain deferred.
 
-## 1. Update `.lovable/plan.md`
+---
 
-Replace Phase 3A "DONE" doc with a Phase 3A summary + Phase 3B (in progress) section folding in all refinements from chatgpt/codex review:
-- RPC signature confirmed: `patch_content_media_from_mux(p_mapping_id uuid) → text`
-- Composer retries: transport/network errors and HTTP 5xx only; never 4xx
-- Webhook log enrichment: every error/skip log includes `{ event_id, event_type, upload_id, asset_id, mapping_id }`
-- DB idempotency relied upon (Phase 3A `ON CONFLICT` + per-item handling)
-- Webhook calls `reconcilePendingMappings` only after `mux_uploads` UPDATE returns ≥1 row
-- 0-row UPDATE → skipped reconciliation logged with full context (codex addition)
-- `.limit(10)` cap on pending mapping fan-out per webhook call
-- Concurrent-requeue verification scenario added
+## Step 0 — `.lovable/plan.md` Phase 3A doc correction (doc-only)
 
-## 2. Composer wiring — `src/components/feed/EnhancedCreatePostForm.tsx`
+Align the doc with the deployed migration:
+- `content_type CHECK IN ('post')` — post-only.
+- `status` enum: `('pending','patched','orphaned','errored')`. `noop_*` are RPC return strings, never column values.
+- Unique constraints: `mux_upload_id UNIQUE` + `UNIQUE(content_type, content_id, media_index)`.
+- FK: `mux_upload_id REFERENCES mux_uploads(upload_id) ON DELETE CASCADE`.
+- RPC: `patch_content_media_from_mux(p_mapping_id uuid) RETURNS text`, `SECURITY DEFINER`, EXECUTE granted to `service_role` only.
+- RPC sets transaction-local `app.mux_system_patch='on'`; `enforce_post_edit_window` bypasses on that flag.
+- Integrity: ready without `asset_id`/`playback_id` → mapping → `orphaned` with `last_error`, never `patched`.
 
-Create path only. After successful `INSERT` into `posts`:
-- Build `muxItems` by scanning `mediaToSave` (post-save shape) for items with `provider === 'mux'` and a usable upload id, mapping to `{ mux_upload_id, media_index }` (index = position in `mediaToSave`).
-- If `muxItems.length === 0` → skip.
-- Otherwise call `supabase.functions.invoke('mux-register-mappings', { body: { content_type: 'post', content_id: newPost.id, items: muxItems } })`.
-- Retry once only when the failure is transport-class: `FunctionsFetchError` / `TypeError` / network error, or `error.context?.status >= 500`. Never retry on 4xx body errors or per-item `{results}` failures.
-- On final failure: `console.error` with `{ post_id, mux_upload_ids }`, `analytics.track('mux_register_mappings_failed', …)`, and a soft non-blocking toast: `"Video processing pending — refresh in a minute to update."`. Post creation success is never blocked.
-- Edit branch: add only the comment `// TODO(phase 3C): reconcile mux mappings on media edits` above the existing edit update — no behavior change.
+---
 
-## 3. Webhook extension — `supabase/functions/mux-webhook/index.ts`
+## Phase 4 — locked scope
 
-Add `reconcilePendingMappings(admin, { uploadId, assetId, eventId, eventType })` helper:
-- Resolve `uploadId` from `mux_uploads` by `asset_id` if missing.
-- If still no `uploadId` → log `{ event_id, event_type, asset_id, reason: 'no_upload_id' }` and return.
-- Query `mux_upload_mappings` where `mux_upload_id = uploadId` and `status = 'pending'`, `.limit(10)`.
-- For each: call `admin.rpc('patch_content_media_from_mux', { p_mapping_id: m.id })`.
-- Any RPC error → `console.error('reconcile_rpc_failed', { event_id, event_type, upload_id, asset_id, mapping_id, err })`. Never throw out of handler.
+1. Mux ready + `mux_playback_id` → play via HLS.
+2. Native HLS on Safari/iOS via `video.canPlayType('application/vnd.apple.mpegurl')`.
+3. Lazy `hls.js` (dynamic import) on browsers without native HLS.
+4. Preserve `FeedVideo` autoplay, mute, scrubber, milestones, view tracking, analytics, handoff snapshot.
+5. **Preserve `LightboxPreview` first-tap iOS autoplay + `VideoHandoff` byte-for-byte** — change *only* source attachment.
+6. Legacy Supabase `.mp4` / `.webm` unchanged; `hls.js` never loaded for them.
+7. **No new components, no new visual states, no new props.** Reuse the existing `isMuxErrored` branch already in `MuxPreparingPoster` by widening the predicate it consumes.
+8. **Out of scope:** Mux Player, captions, storyboards, Mux Data, signed URLs, redesign, edit reconciliation (3C), composer/webhook/DB changes.
 
-Call sites — **only after** the existing `mux_uploads` UPDATE call returns a non-empty `updated` array:
-- `video.asset.ready` branch
-- `video.asset.errored` / `video.upload.errored` branch
+---
 
-If 0 rows updated (race / stale state):
-- `console.warn('mux_uploads_update_zero_rows', { event_id, event_type, upload_id, asset_id })` and skip reconciliation that cycle. Still return 200.
+## Centralized Mux state predicates (single source of truth)
 
-All errors inside the reconcile path are swallowed (logged) so the webhook always returns 200 on otherwise-valid events.
+In `src/utils/muxMedia.ts`, add and export:
 
-Webhook keeps `verify_jwt = false` (signature is the auth). Composer call remains JWT-authenticated.
+```ts
+export const isMuxPlayable = (m) =>
+  isMuxItem(m) && m.mux_status === 'ready' && !!m.mux_playback_id;
 
-## 4. Verification (curl + DB only — no UI assertions)
+export const isMuxReadyButBroken = (m) =>
+  isMuxItem(m) && m.mux_status === 'ready' && !m.mux_playback_id;
 
-| # | Scenario | Expected |
+// THE ONE predicate every renderer checks for the "errored poster" branch:
+export const isMuxErroredOrBroken = (m) =>
+  isMuxErrored(m) || isMuxReadyButBroken(m);
+```
+
+`FeedVideo`, `LightboxPreview`, and `MuxPreparingPoster` all consume `isMuxErroredOrBroken` — zero drift possible.
+
+---
+
+## Locked render branching order (codified in BOTH FeedVideo + LightboxPreview)
+
+```ts
+// 1. errored or broken-ready FIRST → errored poster, fire one-shot telemetry
+if (isMuxErroredOrBroken(item)) {
+  maybeEmitBrokenReady(item, (e, p) => analytics.track(e, p));
+  return <MuxPreparingPoster item={item} ... />;
+}
+// 2. preparing → preparing poster
+if (isMuxPreparing(item)) {
+  return <MuxPreparingPoster item={item} ... />;
+}
+// 3. playable Mux → HLS <video>
+// 4. legacy → plain <video src={item.url}>
+```
+
+Order is asserted in `src/utils/renderBranching.test.ts` via a pure `pickRenderBranch(item)` helper that feeds 5 synthetic items through and snapshots the result.
+
+### Pure, dependency-free broken-ready telemetry (chatgpt's correction)
+
+`muxMedia.ts` **must not import `@/services/analytics`**. The dedup `Set` stays inside the module; analytics is injected:
+
+```ts
+// muxMedia.ts — zero project-internal imports
+type EmitFn = (event: string, props: Record<string, unknown>) => void;
+const _brokenReadyEmitted = new Set<string>();
+
+export const maybeEmitBrokenReady = (m: MediaItem, onEvent: EmitFn): void => {
+  const key = m.mux_asset_id ?? m.id ?? m.url;
+  if (!key || _brokenReadyEmitted.has(key)) return;
+  _brokenReadyEmitted.add(key);
+  onEvent('mux_ready_without_playback_id', {
+    asset_id: m.mux_asset_id, playback_id: m.mux_playback_id ?? null,
+  });
+};
+```
+
+Callers inject `analytics.track` from the component. `muxMedia.ts` stays a pure utility — no import cycles.
+
+---
+
+## `attachHls` — async-safe, analytics-decoupled, leak-instrumented
+
+`src/utils/hlsAttach.ts` (new, zero internal imports):
+
+```ts
+export type AttachToken = { cancelled: boolean };
+export type HlsTelemetry = (event: string, props: Record<string, unknown>) => void;
+export interface AttachHlsOptions { onEvent?: HlsTelemetry }
+
+export function attachHls(
+  video: HTMLVideoElement,
+  src: string,
+  token: AttachToken,
+  opts: AttachHlsOptions = {},
+): () => void {
+  const emit = opts.onEvent ?? (() => {});
+  let hls: import('hls.js').default | null = null;
+
+  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    if (token.cancelled) return () => {};
+    video.src = src;
+    return () => { try { video.removeAttribute('src'); video.load(); } catch {} };
+  }
+
+  import('hls.js').then(({ default: Hls }) => {
+    if (token.cancelled) return;
+    if (!Hls.isSupported()) { video.src = src; return; }
+    hls = new Hls({ enableWorker: true, lowLatencyMode: false, backBufferLength: 30 });
+    if (import.meta.env.DEV) (window as any).__muxHlsLive = ((window as any).__muxHlsLive ?? 0) + 1;
+    hls.on(Hls.Events.ERROR, (_e, data) => {
+      if (!data?.fatal) return;
+      emit('mux_hls_fatal', { src, type: data.type });
+      try { hls?.destroy(); } catch {}
+      if (import.meta.env.DEV) (window as any).__muxHlsLive--;
+      hls = null;
+      if (!token.cancelled) video.src = src;
+    });
+    hls.loadSource(src);
+    hls.attachMedia(video);
+  }).catch((err) => {
+    emit('mux_hls_load_failed', { src, err: String(err) });
+    if (!token.cancelled) video.src = src;
+  });
+
+  return () => {
+    try { hls?.destroy(); } catch {}
+    if (hls && import.meta.env.DEV) (window as any).__muxHlsLive--;
+    hls = null;
+    try { video.removeAttribute('src'); video.load(); } catch {}
+  };
+}
+```
+
+---
+
+## `LightboxPreview` handoff invariants (static gate)
+
+Add a comment block at the top of `LightboxPreview.tsx`:
+
+```tsx
+/**
+ * 🚫 HANDOFF INVARIANTS — DO NOT VIOLATE
+ *  1. <video>.currentTime is set from initialVideoState.currentTime BEFORE play().
+ *  2. <video>.muted is initialized from initialVideoState.muted (global mute intent).
+ *  3. If initialVideoState.wasPlaying, play() is invoked once on loadedmetadata.
+ *  4. First user tap on iOS triggers play()+unmute synchronously inside the handler.
+ *  5. Mux source attachment via attachHls() runs AFTER (1)-(2) wiring, not before.
+ * Regression of any of the above breaks iOS lightbox handoff.
+ * Backed by LightboxPreview.handoff.test.tsx — failing test blocks merge.
+ */
+```
+
+Plus `src/components/media/LightboxPreview.handoff.test.tsx` — minimal RTL test asserting `muted`, `currentTime`, and exactly one `play()` call after `loadedmetadata` with mocked `initialVideoState={ currentTime: 12.3, wasPlaying: true, muted: false }`.
+
+---
+
+## Files touched (9 total)
+
+| # | File | Change |
 |---|---|---|
-| 1 | Real `.MOV` post, normal timing | mapping row created; `posts.media[0].mux_status='ready'`, `mux_playback_id` set |
-| 2 | Fast composer (submit before `asset.ready`) | mapping inserted `pending` → webhook flips to `patched` |
-| 3 | Slow composer (submit after `asset.ready`) | catch-up branch in `mux-register-mappings` patches synchronously |
-| 4 | Image-only post | no `invoke` call; zero new mapping rows |
-| 5 | Forced Mux error | `posts.media[0].mux_status='errored'`, webhook returns 200, mapping `noop_errored`/`orphaned` per rules |
-| 6 | Registration endpoint offline mid-submit | post still created; toast shown; later `mux-reconcile-upload` patches |
-| 7 | **New:** Submit post, immediately call `mux-reconcile-upload` as admin while webhook in-flight | row-level `SELECT … FOR UPDATE` serializes; final state `patched`, no JSONB clobber |
-| 8 | **New:** `video.asset.ready` arrives but `mux_uploads` update affects 0 rows | warn logged with `{ event_id, event_type, upload_id, asset_id }`; no RPC call; 200 returned |
+| 1 | `src/utils/muxMedia.ts` | Add `muxHlsUrl`, `muxThumbnailUrl`, `isMuxPlayable`, `isMuxReadyButBroken`, `isMuxErroredOrBroken`, `maybeEmitBrokenReady(item, onEvent)`. Patch `muxPosterUrl` to prefer `muxThumbnailUrl(playback_id)` over `m.url` when playback_id present. **Zero new imports from project code.** |
+| 2 | `src/utils/hlsAttach.ts` | **New.** Pure utility, no analytics import. |
+| 3 | `src/utils/renderBranching.ts` | **New.** `pickRenderBranch(item)` pure helper. |
+| 4 | `src/utils/renderBranching.test.ts` | **New.** Snapshot the 5-state matrix. |
+| 5 | `src/components/media/MuxPreparingPoster.tsx` | Swap `isMuxErrored(item)` for `isMuxErroredOrBroken(item)` in the errored-branch predicate. One-line change. |
+| 6 | `src/components/media/FeedVideo.tsx` | Replace top-of-component early return with locked branching order; replace `<video src={item.url}>` with attach effect that calls `attachHls` for Mux-playable items and sets `video.src` for legacy. |
+| 7 | `src/components/media/LightboxPreview.tsx` | Add handoff-invariants comment block; swap source attachment for `attachHls`; iOS sequencing untouched. |
+| 8 | `src/components/media/LightboxPreview.handoff.test.tsx` | **New.** Handoff invariants merge gate. |
+| 9 | `package.json` | Add `hls.js` (lazy import only). |
 
-Feed/lightbox still shows the "Processing" poster until Phase 4 (HLS/Mux Player) — expected.
+---
 
-## Out of scope (unchanged)
-Edit-path reconciliation (3C) · review `content_type` · HLS playback (4) · errored-state UI (5) · orphaned-upload cleanup (6).
+## Effect pattern (both video components)
+
+```ts
+useEffect(() => {
+  const v = videoRef.current;
+  if (!v) return;
+  const { src, isHls } = resolveVideoSrc(item);
+  if (!src) return;
+  const token: AttachToken = { cancelled: false };
+  const detach = isHls
+    ? attachHls(v, src, token, { onEvent: (e, p) => analytics.track(e, p) })
+    : (() => { v.src = src; return () => { try { v.removeAttribute('src'); v.load(); } catch {} }; })();
+  return () => { token.cancelled = true; detach(); };
+}, [item.url, item.mux_playback_id, item.mux_status]);
+```
+
+---
+
+## Verification (sequenced)
+
+1. **Chrome desktop** on Phase 3B test post → hls.js loads on demand, plays, scrubber/mute/autoplay intact.
+2. **iOS Safari** → native HLS, autoplay-muted-inline, **no** `hls.js` network request.
+3. **Desktop Safari** → native HLS.
+4. **🚧 BLOCKING — iOS handoff regression gate.** Feed → tap → lightbox resumes at same `currentTime`, same play/pause, respects global mute. First-tap autoplay on iPhone still works. `LightboxPreview.handoff.test.tsx` must pass.
+5. **Legacy `.mp4`** → unchanged, hls.js never requested.
+6. **Preparing item** → preparing poster, poster falls back to `muxThumbnailUrl`, `<video>` never mounts.
+7. **Errored item** (`mux_status='errored'`) → errored poster, `<video>` never mounts.
+8. **Broken-ready** (synthetic `mux_status='ready'`, `mux_playback_id=null`) → errored poster, `mux_ready_without_playback_id` fires **exactly once** even after scrolling past it 10 times.
+9. **hls.js import blocked** (DevTools request-block) → `mux_hls_load_failed` fires, fallback `video.src = src`, no crash.
+10. **🚧 BLOCKING — Deterministic unmount-race check:**
+    - `window.__muxHlsLive === 0` on fresh feed load.
+    - Scroll past 30 Mux posts rapidly, wait 2s → `window.__muxHlsLive === 0` again.
+    - Console has **zero** `mux_hls_fatal` events post-unmount.
+    - `performance.getEntriesByType('resource').filter(r => r.name.includes('hls.js')).length === 1`.
+11. **Branching test** — `renderBranching.test.ts` passes; all 5 states map to the locked order.
+12. **Bundle check** — `hls.js` chunk only fetched in scenarios 1, 9, 10. Never iOS/Safari, never legacy.
+
+---
 
 ## Rollback
-Remove the composer post-insert block and the two webhook helper call-sites. Already-patched rows stay patched; new uploads fall back to pre-3A behavior.
+
+Revert the two `useEffect` source-attach blocks. Revert the one-line predicate widening in `MuxPreparingPoster`. Remove `hls.js` from `package.json`. New helpers + test files can stay as dead code.
+
+---
+
+## Final deltas vs prior revision
+
+| Change | Source | Why |
+|---|---|---|
+| `maybeEmitBrokenReady(item, onEvent)` — callback-injected | chatgpt | Keeps `muxMedia.ts` pure, no analytics import cycle |
+| File count locked at **9** | codex | Matches the actual touched files list |
+| Render branching order: errored/broken → preparing → playable → legacy | chatgpt (reaffirmed) | Prevents `mux_status='errored'` matching a "not ready" check |
+
+---
+
+Approve to proceed. Step 0 + Phase 4 implement in the next turn. Stop for verification before Phase 5. **No further plan iterations.**

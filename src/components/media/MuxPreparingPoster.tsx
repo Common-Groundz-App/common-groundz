@@ -2,7 +2,7 @@ import React from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MediaItem } from '@/types/media';
-import { isMuxErrored, muxPosterUrl } from '@/utils/muxMedia';
+import { isMuxErroredOrBroken, muxPosterUrl } from '@/utils/muxMedia';
 
 interface MuxPreparingPosterProps {
   item: MediaItem;
@@ -31,7 +31,7 @@ export const MuxPreparingPoster: React.FC<MuxPreparingPosterProps> = ({
   alt,
 }) => {
   const poster = muxPosterUrl(item);
-  const errored = isMuxErrored(item);
+  const errored = isMuxErroredOrBroken(item);
 
   return (
     <div
