@@ -10,6 +10,17 @@ import type { MuxUiStatus } from '@/hooks/useMuxStatus';
  * etc.). Cleared only on hard page reload — desired.
  */
 const dismissedReadyChips = new Set<string>();
+const MAX_DISMISSED = 64;
+
+function rememberDismissed(uploadId: string) {
+  if (dismissedReadyChips.has(uploadId)) return;
+  if (dismissedReadyChips.size >= MAX_DISMISSED) {
+    // Set preserves insertion order — drop the oldest entry.
+    const oldest = dismissedReadyChips.values().next().value;
+    if (oldest !== undefined) dismissedReadyChips.delete(oldest);
+  }
+  dismissedReadyChips.add(uploadId);
+}
 
 interface Props {
   uploadId: string;
