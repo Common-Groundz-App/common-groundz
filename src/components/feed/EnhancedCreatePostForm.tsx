@@ -29,6 +29,8 @@ import { cn } from '@/lib/utils';
 import { getDisplayName } from '@/services/profileService';
 import { getInitialsFromName } from '@/utils/profileUtils';
 import { ComposerMediaPreview } from './composer/ComposerMediaPreview';
+import { MuxUploadChip } from './composer/MuxUploadChip';
+import { useMuxStatus } from '@/hooks/useMuxStatus';
 import { supabase } from '@/integrations/supabase/client';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import data from '@emoji-mart/data';
