@@ -1,64 +1,46 @@
-## Decision
+## Goal
+Make invalid/deleted Mux assets in the feed show `Video failed to load` instead of `This video format isn't supported on your device`, while keeping true legacy codec failures classified as `unsupported`.
 
-Agreed with ChatGPT's read. Two parallel actions:
+## Plan
+1. Inspect the feed video error-state race in the actual player path.
+   - Re-check `FeedVideo.tsx`, `hlsAttach.ts`, `muxMedia.ts`, and the feed media renderer path to confirm the stale `phase 3B test` card uses `FeedVideo` + `attachHls`.
+   - Verify there is no remaining non-native `.m3u8 -> video.src` fallback outside the Safari/iOS native HLS branch.
 
-1. **Old "phase 3B test" post** — stale test data. Its `mux_playback_id` returns `404 Invalid Playback ID` directly from Mux (confirmed via curl). Delete it (your call — DB row in `posts`, id `23b4943b-53b6-416c-b43e-2df216636c9b`) or just leave it; not a code bug.
-2. **Ship the small frontend hotfix** so any future invalid / deleted / expired Mux asset fails gracefully with "Video failed to load." + Retry, instead of the misleading "format isn't supported" overlay.
+2. Add temporary runtime logging to isolate the sequence of events.
+   - Log when `attachHls` is called for a Mux item.
+   - Log when fatal HLS errors fire and when `onUnrecoverable` is invoked.
+   - Log when `FeedVideo` transitions to `error` or `unsupported`.
+   - Log the native `<video onError>` payload, including `video.currentSrc` and `video.error?.code`.
+   - Use those logs in preview to confirm whether native `onError` is firing after the HLS fatal path and overwriting the earlier `error` state.
 
-This is exactly the Phase 5.2 hardening pass ChatGPT described. Narrow, defensive, no contract changes.
+3. Fix the classification race in `FeedVideo.tsx`.
+   - Preserve the current `onUnrecoverable => setStatus('error')` behavior for invalid/deleted Mux HLS assets.
+   - Prevent a later native `onError(code === 4)` from downgrading an already-known HLS load failure from `error` to `unsupported`.
+   - Keep true legacy/non-HLS codec failures mapped to `unsupported`.
+   - Keep all existing UI/copy unchanged.
 
-## Root cause recap
+4. Audit the related preview paths without expanding scope.
+   - Confirm the feed is not using an alternate video component for this post.
+   - Confirm `LightboxPreview` still avoids raw `.m3u8` fallback and does not need broader UI changes.
+   - Do not touch DB, webhook, hook contracts, playback flow, or Mux config.
 
-`src/utils/hlsAttach.ts` has three fallbacks in the MSE path that do `video.src = src` when hls.js fails. On Chromium that assigns a raw `.m3u8` to `<video>`, which Chrome can't play natively → `HTMLMediaElement.error.code === 4` → `FeedVideo` maps to `'unsupported'` → wrong copy.
+5. Validate in preview.
+   - Reproduce the stale `phase 3B test` case and verify it now lands on `Video failed to load`.
+   - Confirm a normal working Mux post still reaches `ready` and plays.
+   - Confirm legacy/non-HLS unsupported behavior still shows the existing unsupported message only for real native media failures.
+   - Remove the temporary logs once the behavior is verified.
 
-## Changes (frontend only)
+## Technical details
+- Most likely root cause: a race where `attachHls(... onUnrecoverable)` sets `status = 'error'`, but a later native `<video onError>` event still fires with `MediaError.code === 4` and overwrites the state to `unsupported`.
+- The surgical fix is to make `FeedVideo` remember that an HLS unrecoverable failure already occurred and treat the subsequent native media error as part of the same load-failure path instead of a codec-unsupported path.
+- Files likely involved:
+  - `src/components/media/FeedVideo.tsx`
+  - `src/utils/hlsAttach.ts`
+  - possibly `src/components/media/LightboxPreview.tsx` only for parity/logging review
 
-### 1. `src/utils/hlsAttach.ts`
-
-- Add to `AttachHlsOptions`:
-  ```ts
-  onUnrecoverable?: (
-    reason: 'hls_unsupported' | 'hls_fatal' | 'hls_load_failed',
-    detail?: unknown
-  ) => void;
-  ```
-- Remove all three `video.src = src` fallbacks inside the MSE branch:
-  - `!Hls.isSupported()` → call `onUnrecoverable('hls_unsupported')` and return.
-  - Fatal `Hls.Events.ERROR` → keep existing `emit('mux_hls_fatal', ...)`, destroy hls, call `onUnrecoverable('hls_fatal', data.type)`. Do **not** mutate `video.src`.
-  - `import('hls.js').catch(err)` → keep existing `emit('mux_hls_load_failed', ...)`, call `onUnrecoverable('hls_load_failed', String(err))`. Do **not** mutate `video.src`.
-- Native HLS path (Safari/iOS): unchanged.
-- Cleanup / `detachNative` / `__muxHlsLive` counter: unchanged.
-
-### 2. `src/components/media/FeedVideo.tsx`
-
-In the `useEffect` that calls `attachHls`, wire:
-```ts
-detach = attachHls(v, src, token, {
-  onEvent: (e, p) => analytics.track(e, p),
-  onUnrecoverable: () => setStatus('error'),
-});
-```
-`handleError` stays as-is — true codec failures on legacy MP4s still map to `'unsupported'` via `video.error.code === 4`. The existing `'error'` overlay already shows "Video failed to load." + Retry, which is the correct copy for "manifest 404 / MSE missing / hls.js failed to load".
-
-### 3. `src/components/media/LightboxPreview.tsx`
-
-Same wiring at the existing `attachHls` call site (line ~330): add `onUnrecoverable: () => { /* set local error state if one exists, else no-op */ }`. If LightboxPreview has no explicit error UI today, at minimum pass an empty callback so we don't accidentally re-introduce the bogus fallback indirectly later. I'll confirm the exact state hook when implementing; copy stays "Video failed to load." for consistency with `FeedVideo`.
-
-### 4. Nothing else
-
-- No DB / migration / webhook / edge function changes.
-- No Phase 4 playback logic, no Phase 5 / 5.1 code touched (`useMuxStatus`, `MuxOwnerHint`, `MuxUploadChip`, `PostView` refetch timer, `dismissedReadyChips`).
-- No new deps. No type changes outside `AttachHlsOptions`.
-
-## Verification
-
-- `/home` "phase 3B test" card now shows **"Video failed to load." + Retry** instead of the format-unsupported overlay.
-- New posts (working Mux assets) still autoplay normally.
-- Safari/iOS path unchanged (still uses native HLS via `video.src`).
-- Analytics: `mux_hls_fatal` / `mux_hls_load_failed` still emit once per failure (already wired).
-- `tsc --noEmit` clean.
-- Optional: delete the broken test post from DB once confirmed.
-
-## Rollback
-
-Per-file revert. All three changes are local and self-contained.
+## Out of scope
+- No DB changes
+- No webhook/edge changes
+- No hook contract changes
+- No UI/copy changes
+- No Phase 4/5 playback redesign
