@@ -329,7 +329,13 @@ export function LightboxPreview({
                     hlsTokenRef.current = token;
                     hlsDetachRef.current = attachHls(el, src, token, {
                       onEvent: (e, p) => analytics.track(e, p),
+                      onUnrecoverable: () => {
+                        // Stop here instead of falling back to raw .m3u8
+                        // on non-native-HLS browsers (would surface as a
+                        // misleading "format unsupported" media error).
+                      },
                     });
+
                   } else {
                     try { el.src = src; } catch { /* ignore */ }
                     hlsDetachRef.current = () => {
