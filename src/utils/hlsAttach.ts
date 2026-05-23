@@ -20,9 +20,12 @@
 
 export type AttachToken = { cancelled: boolean };
 export type HlsTelemetry = (event: string, props: Record<string, unknown>) => void;
+export type HlsUnrecoverableReason = 'hls_unsupported' | 'hls_fatal' | 'hls_load_failed';
 export interface AttachHlsOptions {
   onEvent?: HlsTelemetry;
+  onUnrecoverable?: (reason: HlsUnrecoverableReason, detail?: unknown) => void;
 }
+
 
 const detachNative = (video: HTMLVideoElement) => {
   try {
