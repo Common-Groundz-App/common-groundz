@@ -260,7 +260,9 @@ function FeedVideoPlayer({
     if (isHls) {
       detach = attachHls(v, src, token, {
         onEvent: (e, p) => analytics.track(e, p),
+        onUnrecoverable: () => setStatus('error'),
       });
+
     } else {
       try { v.src = src; } catch { /* ignore */ }
       detach = () => {
