@@ -645,7 +645,6 @@ export function EnhancedCreatePostForm({
         // Note: last_edited_at is stamped server-side by the
         // enforce_post_edit_window trigger — only on meaningful changes.
         // Same trigger enforces the 1h window + admin bypass.
-        // TODO(phase 3C): reconcile mux mappings on media edits
         const { data: updatedPost, error } = await supabase
           .from('posts')
           .update(basePostData as any)
@@ -655,6 +654,47 @@ export function EnhancedCreatePostForm({
           .single();
 
         if (error) throw error;
+
+        // ===== Phase 3C.1: reconcile Mux mappings after a successful edit =====
+        // HARD GUARDRAIL: only invoke when this post has Mux media now OR had it
+        // before. Pure-image and legacy-Supabase-video edits never call the
+        // function — those code paths stay completely untouched.
+        try {
+          const muxItemsAfter = mediaToSave
+            .map((m, idx) => ({ m, idx }))
+            .filter(({ m }) => m.provider === 'mux' && typeof m.mux_upload_id === 'string' && (m.mux_upload_id as string).length > 0)
+            .map(({ m, idx }) => ({ mux_upload_id: m.mux_upload_id as string, media_index: idx }));
+
+          const hadMuxBefore = (postToEdit.media ?? []).some(
+            (m: any) => m?.provider === 'mux' && typeof m?.mux_upload_id === 'string' && m.mux_upload_id.length > 0
+          );
+
+          if (muxItemsAfter.length > 0 || hadMuxBefore) {
+            const { data: syncData, error: syncErr } = await supabase.functions.invoke('mux-sync-post-mappings', {
+              body: { content_type: 'post', content_id: postToEdit.id, items: muxItemsAfter },
+            });
+            if (syncErr) {
+              console.error('mux_sync_post_mappings_failed', {
+                post_id: postToEdit.id,
+                error: syncErr?.message || String(syncErr),
+              });
+              analytics.track('mux_sync_post_mappings_failed', {
+                post_id: postToEdit.id,
+                item_count: muxItemsAfter.length,
+                error_code: (syncErr as any)?.context?.status || (syncErr as any)?.name || 'unknown',
+              });
+              toast({
+                title: 'Video sync pending',
+                description: "Your edit was saved. Video updates may take a moment to reflect.",
+              });
+            } else {
+              console.log(JSON.stringify({ fn: 'EnhancedCreatePostForm.edit', mux_sync: syncData }));
+            }
+          }
+        } catch (e) {
+          // Non-blocking — edit already succeeded.
+          console.error('mux_sync_post_mappings_threw', e);
+        }
 
         // Replace entity relationships: delete-then-insert
         await supabase

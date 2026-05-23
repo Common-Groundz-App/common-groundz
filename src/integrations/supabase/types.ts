@@ -4683,6 +4683,10 @@ export type Database = {
           slug: string
         }[]
       }
+      sync_mux_post_mappings: {
+        Args: { p_content_id: string; p_items: Json }
+        Returns: Json
+      }
       toggle_comment_like: {
         Args: {
           p_comment_id: string
