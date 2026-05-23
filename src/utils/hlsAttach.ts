@@ -20,9 +20,12 @@
 
 export type AttachToken = { cancelled: boolean };
 export type HlsTelemetry = (event: string, props: Record<string, unknown>) => void;
+export type HlsUnrecoverableReason = 'hls_unsupported' | 'hls_fatal' | 'hls_load_failed';
 export interface AttachHlsOptions {
   onEvent?: HlsTelemetry;
+  onUnrecoverable?: (reason: HlsUnrecoverableReason, detail?: unknown) => void;
 }
+
 
 const detachNative = (video: HTMLVideoElement) => {
   try {
@@ -40,6 +43,7 @@ export function attachHls(
   opts: AttachHlsOptions = {},
 ): () => void {
   const emit = opts.onEvent ?? (() => {});
+  const onUnrecoverable = opts.onUnrecoverable ?? (() => {});
 
   // Native HLS path (Safari, iOS) — no hls.js download.
   if (video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -59,8 +63,10 @@ export function attachHls(
     .then(({ default: Hls }) => {
       if (token.cancelled) return;
       if (!Hls.isSupported()) {
-        // Last-ditch fallback: try native attach anyway.
-        try { video.src = src; } catch { /* ignore */ }
+        // No MSE and no native HLS — surface as unrecoverable. Do NOT assign
+        // raw .m3u8 to <video>; Chromium can't play it and would report a
+        // misleading "format unsupported" error.
+        if (!token.cancelled) onUnrecoverable('hls_unsupported');
         return;
       }
       hls = new Hls({
@@ -81,19 +87,16 @@ export function attachHls(
           if (typeof w.__muxHlsLive === 'number') w.__muxHlsLive--;
         }
         hls = null;
-        if (!token.cancelled) {
-          try { video.src = src; } catch { /* ignore */ }
-        }
+        if (!token.cancelled) onUnrecoverable('hls_fatal', data.type);
       });
       hls.loadSource(src);
       hls.attachMedia(video);
     })
     .catch((err) => {
       emit('mux_hls_load_failed', { src, err: String(err) });
-      if (!token.cancelled) {
-        try { video.src = src; } catch { /* ignore */ }
-      }
+      if (!token.cancelled) onUnrecoverable('hls_load_failed', String(err));
     });
+
 
   return () => {
     try { hls?.destroy(); } catch { /* ignore */ }
