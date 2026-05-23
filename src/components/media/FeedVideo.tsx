@@ -215,6 +215,12 @@ function FeedVideoPlayer({
   const autoplayRef = useRef<boolean>(true);
   const userPausedRef = useRef(false);
   const hideTimerRef = useRef<number | null>(null);
+  // Tracks whether the current source is HLS-attached (Mux) and whether
+  // attachHls already reported an unrecoverable failure. Used so a later
+  // native <video onError> (code === 4) cannot downgrade an HLS load
+  // failure to a misleading "format unsupported" state.
+  const isHlsSourceRef = useRef(false);
+  const hlsUnrecoverableRef = useRef(false);
 
   const [status, setStatus] = useState<Status>('loading');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -255,12 +261,17 @@ function FeedVideoPlayer({
     if (!v) return;
     const { src, isHls } = resolveVideoSrc(item);
     if (!src) return;
+    isHlsSourceRef.current = isHls;
+    hlsUnrecoverableRef.current = false;
     const token: AttachToken = { cancelled: false };
     let detach: () => void;
     if (isHls) {
       detach = attachHls(v, src, token, {
         onEvent: (e, p) => analytics.track(e, p),
-        onUnrecoverable: () => setStatus('error'),
+        onUnrecoverable: () => {
+          hlsUnrecoverableRef.current = true;
+          setStatus('error');
+        },
       });
 
     } else {
@@ -360,6 +371,15 @@ function FeedVideoPlayer({
   };
 
   const handleError = () => {
+    // For HLS-attached (Mux) sources, a native MediaError almost always
+    // reflects a load/manifest failure (e.g. invalid playback id) rather
+    // than a real codec issue. Never classify HLS sources as
+    // 'unsupported' — and if attachHls already surfaced an unrecoverable
+    // failure, keep the 'error' state we already set.
+    if (isHlsSourceRef.current || hlsUnrecoverableRef.current) {
+      setStatus('error');
+      return;
+    }
     const code = videoRef.current?.error?.code;
     setStatus(code === 4 ? 'unsupported' : 'error');
   };
