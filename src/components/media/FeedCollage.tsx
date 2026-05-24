@@ -299,7 +299,7 @@ function computeShape(
   };
 }
 
-function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTileProps) {
+function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick }: SingleMediaTileProps) {
   const { item, originalIndex } = entry;
   const isVideo = item.type === 'video';
 
