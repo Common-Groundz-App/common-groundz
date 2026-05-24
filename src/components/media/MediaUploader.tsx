@@ -192,8 +192,19 @@ export function UploadRow({
             ✓
           </div>
         ) : upload.status === 'error' ? (
-          <div className="text-destructive text-sm" aria-label="Upload failed">
-            ✗
+          <div className="flex items-center gap-1">
+            <span className="text-destructive text-sm" aria-label="Upload failed">
+              ✗
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => onCancel(upload)}
+              aria-label="Remove failed upload"
+            >
+              <X size={14} />
+            </Button>
           </div>
         ) : (
           <Button

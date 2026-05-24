@@ -175,9 +175,19 @@ export const uploadMedia = async (
         try {
           return await uploadVideoViaMux(file, userId, sessionId, onProgress);
         } catch (err: any) {
-          // Accept BOTH error/code shapes from the edge function (Codex's point)
-          const code =
-            err?.code ?? err?.error ?? err?.body?.error ?? err?.body?.code ?? err?.context?.code;
+          // Parse FunctionsHttpError: body lives on err.context as an unread Response.
+          // Scoped to mux-create-upload call only — fallback strictly on MUX_DISABLED,
+          // never on bare HTTP status (so real Mux outages still surface as errors).
+          let code: string | undefined =
+            err?.code ?? err?.error ?? err?.body?.error ?? err?.body?.code;
+          if (!code && err?.context && typeof err.context.clone === 'function') {
+            try {
+              const parsed = await err.context.clone().json();
+              code = parsed?.code ?? parsed?.error;
+            } catch {
+              // body not JSON — leave code undefined, do NOT fallback
+            }
+          }
           if (code === 'MUX_DISABLED') {
             __resetMuxConfigCache();
             analytics.track('mux_fallback_to_supabase', { reason: 'server_disabled' });
