@@ -62,6 +62,63 @@ export type Database = {
         }
         Relationships: []
       }
+      app_config: {
+        Row: {
+          description: string | null
+          key: string
+          updated_at: string
+          updated_by: string | null
+          updated_reason: string | null
+          value: Json
+        }
+        Insert: {
+          description?: string | null
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          updated_reason?: string | null
+          value: Json
+        }
+        Update: {
+          description?: string | null
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          updated_reason?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
+      app_config_audit: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          key: string
+          new_value: Json | null
+          old_value: Json | null
+          reason: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          key: string
+          new_value?: Json | null
+          old_value?: Json | null
+          reason?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          key?: string
+          new_value?: Json | null
+          old_value?: Json | null
+          reason?: string | null
+        }
+        Relationships: []
+      }
       auth_rate_limits: {
         Row: {
           action: string
@@ -4398,6 +4455,7 @@ export type Database = {
           username: string
         }[]
       }
+      get_public_flags: { Args: never; Returns: Json }
       get_recommendation_count: {
         Args: { p_entity_id: string }
         Returns: number
@@ -4682,6 +4740,10 @@ export type Database = {
           parent_name: string
           slug: string
         }[]
+      }
+      set_app_flag: {
+        Args: { _key: string; _reason?: string; _value: Json }
+        Returns: Json
       }
       sync_mux_post_mappings: {
         Args: { p_content_id: string; p_items: Json }
