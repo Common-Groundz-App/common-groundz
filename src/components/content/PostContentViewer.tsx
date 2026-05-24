@@ -27,7 +27,7 @@ interface PostContentViewerProps {
    * Optional; backwards compatible.
    */
   refreshTick?: number;
-  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string; authorId?: string; taggedEntities?: any[]; media?: any[] } | null) => void;
+  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string; authorId?: string; taggedEntities?: any[]; media?: any[]; post_type?: string | null; structured_fields?: Record<string, any> | null; created_at?: string | null; last_edited_at?: string | null } | null) => void;
 }
 
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDetailView = false, refreshTick, onPostLoaded }: PostContentViewerProps) => {
