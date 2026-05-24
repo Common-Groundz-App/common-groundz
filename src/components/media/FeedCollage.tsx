@@ -46,6 +46,8 @@ export function FeedCollage({
   source = 'post',
   sourceId,
   className,
+  renderTileOverlay,
+  disableItemClick,
 }: FeedCollageProps) {
   if (!media || media.length === 0) return null;
 
@@ -72,8 +74,11 @@ export function FeedCollage({
     return (
       <div
         key={item.id || `${item.url}-${originalIndex}`}
-        className="relative w-full h-full overflow-hidden bg-black cursor-pointer"
-        onClick={() => onItemClick(originalIndex)}
+        className={cn(
+          'relative w-full h-full overflow-hidden bg-black',
+          !disableItemClick && 'cursor-pointer'
+        )}
+        onClick={disableItemClick ? undefined : () => onItemClick(originalIndex)}
       >
         {item.type === 'image' ? (
           <img
@@ -88,7 +93,7 @@ export function FeedCollage({
             source={source}
             sourceId={sourceId}
             objectFit={fit}
-            onTap={(handoff) => onItemClick(originalIndex, handoff)}
+            onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
           />
         )}
         {options?.overlayCount && options.overlayCount > 0 ? (
@@ -96,6 +101,7 @@ export function FeedCollage({
             +{options.overlayCount}
           </div>
         ) : null}
+        {renderTileOverlay?.(item, originalIndex)}
       </div>
     );
   };
@@ -111,6 +117,8 @@ export function FeedCollage({
           source={source}
           sourceId={sourceId}
           onItemClick={onItemClick}
+          renderTileOverlay={renderTileOverlay}
+          disableItemClick={disableItemClick}
         />
       </div>
     );
