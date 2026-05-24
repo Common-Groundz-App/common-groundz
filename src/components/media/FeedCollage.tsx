@@ -9,6 +9,17 @@ interface FeedCollageProps {
   source?: 'post' | 'review' | 'entity';
   sourceId?: string;
   className?: string;
+  /**
+   * Optional per-tile overlay rendered absolutely inside each tile wrapper.
+   * Receives the ORIGINAL media index (pre-internal-reorder). Opt-in only —
+   * existing feed callers do not pass this and behavior is unchanged.
+   */
+  renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
+  /**
+   * When true, tiles are not clickable (no onItemClick, no cursor-pointer,
+   * and video onTap is not wired). Opt-in only.
+   */
+  disableItemClick?: boolean;
 }
 
 type Orientation = 'portrait' | 'landscape' | 'square';
