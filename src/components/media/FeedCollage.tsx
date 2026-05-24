@@ -395,8 +395,11 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
       }}
     >
       <div
-        className="relative w-full h-full overflow-hidden bg-black cursor-pointer"
-        onClick={() => onItemClick(originalIndex)}
+        className={cn(
+          'relative w-full h-full overflow-hidden bg-black',
+          !disableItemClick && 'cursor-pointer'
+        )}
+        onClick={disableItemClick ? undefined : () => onItemClick(originalIndex)}
       >
 
         {item.type === 'image' ? (
@@ -411,8 +414,15 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
             loading="lazy"
           />
         ) : (
-          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit={fit} onTap={(handoff) => onItemClick(originalIndex, handoff)} />
+          <FeedVideo
+            item={item}
+            source={source}
+            sourceId={sourceId}
+            objectFit={fit}
+            onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
+          />
         )}
+        {renderTileOverlay?.(item, originalIndex)}
       </div>
     </div>
   );
