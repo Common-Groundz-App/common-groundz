@@ -25,6 +25,10 @@ interface PostMeta {
   authorId?: string;
   taggedEntities?: any[];
   media?: any[];
+  post_type?: string | null;
+  structured_fields?: Record<string, any> | null;
+  created_at?: string | null;
+  last_edited_at?: string | null;
 }
 
 const PostView = () => {
