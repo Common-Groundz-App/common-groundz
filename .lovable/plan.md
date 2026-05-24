@@ -1,226 +1,75 @@
-## Phase 3C.1 — Mux mapping sync after post edit (final, ready to implement)
+# Phase 3C.2-lite — "Edit post" CTA for failed Mux videos (final, approved)
 
-Backend correctness only. Phase 3C.2 (failed-video Replace CTA) deferred until 3C.1 is verified in preview.
+## Goal
 
-Two changes vs the previous approved plan, both from the latest review:
-- **(NEW) `patch_content_media_from_mux` gains a `removed` terminal-no-op guard.**
-- **(NEW) Edge function rejects duplicate `mux_upload_id` values in `items` with HTTP 400 before calling the RPC.**
+When an owner sees the failed-Mux banner on `PostView` and is still inside the 1-hour edit window (or is admin), give them a one-click path into the existing edit composer. They remove the failed video using the composer's existing X button and re-upload — Phase 3C.1's sync RPC handles the `removed` → `pending` → `ready` mapping transitions automatically.
 
-Everything else is identical to the previously approved plan.
+**No `replaceMediaIndex`. No slot targeting. No changes to the composer's upload paths. No changes to image or legacy Supabase video flows. No DB / RPC / edge / webhook changes.**
 
----
+## Scope
 
-### Hard guardrail (acceptance criterion)
+### 1. `src/components/media/MuxOwnerHint.tsx`
 
-All new logic is gated on `item.provider === 'mux' && item.mux_upload_id`.
+- Extend `Props.post` shape to include `created_at?: string | null` and `last_edited_at?: string | null` (needed by `canEditPost`).
+- Add imports: `Button` (shadcn), `Dialog`/`DialogContent` (shadcn), `useIsAdmin` from `@/hooks/useIsAdmin`, `canEditPost` from `@/utils/postEditPolicy`, `EnhancedCreatePostForm`.
+- In the `bannerStatus === 'failed'` branch:
+  - Compute `canEdit = canEditPost(post, user?.id, isAdmin)`.
+  - If `canEdit`: render an **"Edit post"** button next to the existing copy. Keep the "Video failed to process." headline; replace fallback subcopy with "Edit your post to remove and re-upload the video."
+  - If `!canEdit` (window expired, non-admin): keep current fallback copy "Please create a new post." unchanged.
+- Local `isEditOpen` state controls a `<Dialog>` mounting `EnhancedCreatePostForm` with `postToEdit={post}`. `onSuccess` → close dialog + call existing `onReady`. `onCancel` → close.
 
-- Supabase image edit path: untouched.
-- Legacy Supabase video edit path: untouched.
-- **Hard test gate:** "If all media items are non-Mux before AND after edit, `mux-sync-post-mappings` is never called." Enforced by an early `return` in the edit branch and an automated test that mocks `supabase.functions.invoke` and verifies zero calls for (a) image-only and (b) legacy-Supabase-video-only edits.
+### 2. Analytics (inline, with dedup + post-id reset)
 
----
+Use `analytics.track()` directly inline (matches the file's existing pattern for `mux_owner_hint_shown` / `mux_owner_hint_failed_shown`). **No new helper methods on `analytics.ts`.**
 
-### Step 1 — Migration
+Three events, all with `{ post_id: post?.id ?? null }`:
+- `mux_failed_edit_cta_shown` — fired once per `post_id` per mount via `shownCtaRef`.
+- `mux_failed_edit_cta_clicked` — on button click; no dedup.
+- `mux_failed_edit_cta_completed` — fired once per `post_id` per mount via `completedCtaRef` latch, inside dialog `onSuccess`.
 
-```sql
--- 1A. Extend status enum to include 'removed'
-ALTER TABLE public.mux_upload_mappings
-  DROP CONSTRAINT IF EXISTS mux_upload_mappings_status_check;
-ALTER TABLE public.mux_upload_mappings
-  ADD CONSTRAINT mux_upload_mappings_status_check
-  CHECK (status IN ('pending','patched','orphaned','errored','removed'));
+**Codex's note (folded in):** Add a small `useEffect` keyed on `post?.id` that resets both `shownCtaRef.current = null` and `completedCtaRef.current = null` when the post id changes — so navigating across failed posts in the same `MuxOwnerHint` mount fires `shown` correctly per post.
 
--- 1B. Active-only slot uniqueness so removed/orphaned rows don't reserve a slot
-ALTER TABLE public.mux_upload_mappings
-  DROP CONSTRAINT IF EXISTS mux_upload_mappings_slot_unique;
+### 3. `src/pages/PostView.tsx`
 
-CREATE UNIQUE INDEX IF NOT EXISTS mux_upload_mappings_active_slot_unique
-  ON public.mux_upload_mappings (content_type, content_id, media_index)
-  WHERE status IN ('pending','patched','errored');
-```
+- Pass `created_at` and `last_edited_at` to `MuxOwnerHint` through the `ownerPost` projection. Currently it passes only `id`, `user_id`, `media` — add the two timestamp fields from `postMeta`.
+- Requires `PostMeta` interface to carry `created_at` and `last_edited_at`, and `PostContentViewer`'s `onPostLoaded` callback to surface them. **Verify first via read**; if not already surfaced, thread them through (minimal additive change).
 
-Semantics:
-- `removed` = user intentionally removed/replaced this Mux item during edit. Webhook ignores (existing filter is `status='pending'`). Now the patch RPC also treats it as a no-op (Step 2A).
-- `orphaned` = system-detected invalid state. Never overwritten by `removed`. Never reactivated by edit sync.
-- `mux_upload_id` remains globally `UNIQUE`.
+### 4. Mandatory test: `src/components/media/MuxOwnerHint.test.tsx`
 
----
+Three cases, mocking `useAuth`, `useIsAdmin`, `useMuxStatus`:
+- Owner + failed + within window → "Edit post" CTA renders.
+- Owner + failed + expired window (non-admin) → CTA hidden, fallback copy "Please create a new post." shown.
+- Non-owner → component returns `null` (regression guard).
 
-### Step 2A — Patch the existing `patch_content_media_from_mux` (NEW)
+## Verification checklist (ChatGPT's note folded in)
 
-Add a `removed` terminal no-op alongside the existing `patched`, `orphaned`, `errored` checks at the top of the function. Same `CREATE OR REPLACE` body as today, only the early-return block changes:
+Before declaring 3C.2 done, manually confirm:
+1. Opening the edit dialog alone does **NOT** trigger `mux-sync-post-mappings`. The sync call lives inside `EnhancedCreatePostForm`'s save handler from Phase 3C.1 — verify by checking network requests on dialog-open vs save.
+2. `mux-sync-post-mappings` fires only after the user actually saves the edit.
+3. Image and legacy Supabase-video edit paths remain untouched (no new code in their flows).
+4. Non-owner sees no banner/CTA.
+5. Owner after edit window (and not admin) sees the failed-video copy but no "Edit post" button.
+6. Admin viewing any failed post sees the "Edit post" button regardless of window.
+7. After successful edit-and-save: dialog closes, `onReady` fires, the post refetches, and the failed Mux item transitions correctly (verified by 3C.1's existing reconcile logic).
 
-```sql
--- after the existing FOR UPDATE SELECT of v_mapping:
-IF v_mapping.status = 'patched'  THEN RETURN 'noop_already_patched'; END IF;
-IF v_mapping.status = 'orphaned' THEN RETURN 'noop_orphaned';        END IF;
-IF v_mapping.status = 'errored'  THEN RETURN 'noop_errored';         END IF;
-IF v_mapping.status = 'removed'  THEN RETURN 'noop_removed';         END IF;  -- NEW
-```
+## Out of scope (explicit)
 
-Rationale: defense-in-depth against any future manual reconcile path, and against a race where the sync RPC marks a row `removed` while a concurrent catch-up call holds a `mapping_id` from a prior read.
+- `replaceMediaIndex` prop or any per-slot targeting.
+- Feed-card banners (`MuxOwnerHint` is not mounted there).
+- Background Mux asset deletion (Phase 5).
+- Any change to `analytics.ts` itself.
 
-The new sync RPC (Step 2B) also treats `noop_removed` as a clean per-item result.
+## Is this the final fix for Phase 3C?
 
----
+**Yes.** After this lands and passes the verification checklist above:
+- 3C.1 backend mapping sync — done.
+- 3C.2-lite owner CTA — done.
 
-### Step 2B — New `sync_mux_post_mappings` RPC (atomic core)
+Failed-Mux recovery becomes one click for owners inside the edit window; the composer's existing remove + re-upload UX handles the rest; the sync RPC reconciles the mapping. Phase 3C closes. Slot-targeted replacement stays parked as a hypothetical 3C.3 only if real usage shows the 2-click remove+add flow is friction.
 
-All mapping mutations happen here in a single transaction.
+## Files touched
 
-```sql
-CREATE OR REPLACE FUNCTION public.sync_mux_post_mappings(
-  p_content_id uuid,
-  p_items      jsonb  -- [{ mux_upload_id: text, media_index: int }, ...]
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_park_offset constant int := 1000000;
-  v_results     jsonb := '[]'::jsonb;
-  -- ...
-BEGIN
-  IF p_items IS NULL OR jsonb_typeof(p_items) <> 'array' THEN
-    RAISE EXCEPTION 'invalid_items';
-  END IF;
-
-  -- Per-post serialization
-  PERFORM pg_advisory_xact_lock(hashtextextended(p_content_id::text, 0));
-
-  -- TEMP table _sync_items(mux_upload_id text PRIMARY KEY, media_index int).
-  -- Edge function pre-validates duplicates; PK here is belt-and-suspenders.
-
-  -- SELECT FOR UPDATE all existing mappings for this post.
-
-  -- (a) GONE + active -> status='removed' (frees the active-slot unique index)
-  -- (b) MOVED active rows: park to media_index = 1000000 + row_number()
-  -- (c) Place parked rows at target media_index (status preserved)
-  -- (d) REACTIVATE: status='removed' rows whose mux_upload_id reappears ->
-  --     UPDATE status='pending', media_index = target, errors cleared.
-  --     orphaned rows are NEVER reactivated.
-  -- (e) NEW: INSERT for mux_upload_ids with no existing row on this content.
-  --     If the mux_upload_id is mapped to a different content_id, the global
-  --     UNIQUE on mux_upload_id raises -> emit per-item 'conflict'.
-  -- (f) Catch-up: for each desired item whose mapping is now 'pending' and
-  --     mux_uploads.status IN ('ready','errored'), call
-  --     patch_content_media_from_mux(mapping_id). Wrap each in
-  --     EXCEPTION WHEN OTHERS -> emit per-item 'errored_patch'; do not abort.
-  --     Per-item result codes include 'patched', 'noop_already_patched',
-  --     'noop_not_ready', 'noop_orphaned', 'noop_errored', 'noop_removed',
-  --     'orphaned', 'noop_synced'.
-
-  RETURN jsonb_build_object('results', v_results);
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.sync_mux_post_mappings(uuid, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.sync_mux_post_mappings(uuid, jsonb) TO service_role;
-```
-
-Guarantees: atomicity (single txn), reactivation of `removed`, never reactivates `orphaned`, collision-proof parking via advisory lock + deterministic `row_number()`, and per-item failures don't poison the whole call.
-
----
-
-### Step 3 — Edge function: `mux-sync-post-mappings`
-
-Auth/CORS posture identical to `mux-register-mappings`. Body:
-
-```ts
-{
-  content_type: 'post',
-  content_id: string,
-  items: Array<{ mux_upload_id: string, media_index: number }>  // 0..50
-}
-```
-
-Server logic:
-1. JWT validation → `userId`.
-2. Body validation matching `mux-register-mappings` (UUID, length caps).
-3. **NEW — duplicate-`mux_upload_id` rejection.** After per-item validation, compute `new Set(items.map(i => i.mux_upload_id)).size !== items.length` → return `400 { error: 'duplicate_mux_upload_id' }`.
-4. Verify caller owns `posts.id = content_id`.
-5. Load `posts.media`. For each request item assert `media[media_index].mux_upload_id === item.mux_upload_id`. Mismatch → `400 media_index_mismatch`.
-6. Call `admin.rpc('sync_mux_post_mappings', { p_content_id, p_items })`.
-7. Return `{ results }` from the RPC.
-
-Per-item codes the edge function and frontend tolerate as non-errors: `registered | already_registered | media_index_updated | removed | reactivated | patched | noop_synced | noop_unchanged | noop_not_ready | noop_already_patched | noop_orphaned | noop_errored | noop_removed | orphaned | conflict | errored_patch`.
-
-The edge function performs zero mapping mutations directly — every write is inside the RPC transaction.
-
----
-
-### Step 4 — Type / code audit
-
-After Supabase types regen:
-- Widen TS unions like `'pending' | 'patched' | 'orphaned' | 'errored'` → add `'removed'`.
-- Grep edge functions for status switches → add no-op `'removed'` arm.
-- Webhook filter (`status='pending'`) unchanged.
-
----
-
-### Step 5 — Frontend wiring (`EnhancedCreatePostForm.tsx`, edit branch only)
-
-Replaces the `TODO(phase 3C)` after a successful `posts.update`:
-
-```ts
-const muxItemsAfter = mediaToSave
-  .map((m, idx) => ({ m, idx }))
-  .filter(({ m }) => m.provider === 'mux' && typeof m.mux_upload_id === 'string' && m.mux_upload_id.length > 0)
-  .map(({ m, idx }) => ({ mux_upload_id: m.mux_upload_id!, media_index: idx }));
-
-const hadMuxBefore = (postToEdit.media ?? []).some(
-  (m: any) => m?.provider === 'mux' && typeof m?.mux_upload_id === 'string' && m.mux_upload_id.length > 0
-);
-
-if (muxItemsAfter.length === 0 && !hadMuxBefore) return; // HARD GUARDRAIL
-
-await invokeMuxSync({ content_type: 'post', content_id: postToEdit.id, items: muxItemsAfter });
-// Soft-toast on failure (same non-blocking posture as create-branch register call).
-```
-
-Create branch keeps using `mux-register-mappings`. Image and legacy-Supabase-video edit paths untouched.
-
----
-
-### Step 6 — Verification
-
-Manual preview tests:
-1. Pure-image edit (no Mux ever) → sync not invoked. **Hard gate.**
-2. Pure-image edit on a post that previously had Mux → sync called, all `noop_synced`/`noop_already_patched`.
-3. Legacy Supabase-only video edit → no Mux network call.
-4. Edit-add a Mux video → new mapping `pending` → webhook or catch-up patches.
-5. Edit-remove a still-preparing Mux video → row → `removed`; later webhook hits no-op.
-6. Edit-replace at same index → old row `removed`, new row `pending` → patched.
-7. Reorder two Mux items (one pending, one patched) → both `media_index` updated; no constraint violation.
-8. Edit window expired → `posts.update` fails at trigger; sync never runs.
-9. Pre-existing `orphaned` row → unaffected; never converted to `removed`; never reactivated.
-10. Reactivation → remove a Mux item, re-add same `mux_upload_id` later in the window → existing row UPDATEd to `pending` at the new index. No INSERT attempt.
-11. **NEW — `noop_removed` guard:** manually call `patch_content_media_from_mux` (via `supabase--read_query`'s read-only sister or a service-role test edge function) on a `removed` mapping → returns `noop_removed`; `posts.media` unchanged; mapping status unchanged.
-12. **NEW — duplicate items rejection:** call `mux-sync-post-mappings` with two items sharing the same `mux_upload_id` → HTTP 400 `{ error: 'duplicate_mux_upload_id' }`; no RPC call.
-
-Automated:
-- Mock `supabase.functions.invoke`; simulate image-only and legacy-video-only edits; assert `invoke('mux-sync-post-mappings', ...)` is not called.
-
----
-
-### Out of scope
-
-3C.2 Replace CTA. Reviews. Backfill, orphan cleanup cron, Mux Player swap, captions, signed URLs, Mux Data, automatic Mux asset deletion. Phase 5 owner hints. Webhook logic.
-
----
-
-### Rollback
-
-- Revert the edit-branch sync call → back to TODO no-op.
-- Migration + RPC + edge function are additive and harmless when unused.
-
----
-
-### Technical details
-
-- `FOR UPDATE` on the post's mapping rows at the top of the RPC + `pg_advisory_xact_lock(content_id_hash)` together make the park-then-place sequence safe across concurrent calls and serialize same-post edits.
-- The `1_000_000+row_number()` parking offset is far above the composer cap (≤ 50) so it never collides with real indices, and it sits outside the partial unique active-slot index window only insofar as the parked rows themselves are still active — the `row_number()` makes each parked index distinct within the txn, satisfying the partial unique index.
-- Per-item catch-up is wrapped in `BEGIN ... EXCEPTION WHEN OTHERS` so one bad mapping doesn't abort the sync; the offending item gets `'errored_patch'`.
-- Frontend duplicate guard is cheap (`Set.size` comparison) and fires before the RPC, so the temp-table `PRIMARY KEY` defense never triggers in practice.
+1. `src/components/media/MuxOwnerHint.tsx` — CTA, dialog, inline analytics with dedup + post-id reset effect.
+2. `src/pages/PostView.tsx` — pass `created_at` / `last_edited_at` into `ownerPost`.
+3. `src/components/content/PostContentViewer.tsx` (+ `PostMeta` shape) — surface the two timestamps if not already; verify first.
+4. `src/components/media/MuxOwnerHint.test.tsx` — new, three cases.
