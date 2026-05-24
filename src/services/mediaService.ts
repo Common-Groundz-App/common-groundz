@@ -113,8 +113,43 @@ export const validateMediaFile = async (file: File): Promise<{ valid: boolean; e
 
 export type UploadStage = 'preparing' | 'uploading' | 'finalizing' | 'done';
 
-export const isMuxEnabled = (): boolean =>
+// ===== Runtime Mux config (admin-controlled via app_config) =====
+export interface MuxFlags {
+  uploadsEnabled: boolean;
+  mode: 'live' | 'test';
+}
+
+const ENV_FALLBACK_ENABLED =
   (import.meta.env.VITE_MUX_UPLOAD_ENABLED ?? 'false').toString().toLowerCase() === 'true';
+
+let _muxCfgCache: { value: MuxFlags; at: number } | null = null;
+const MUX_CFG_TTL_MS = 30_000;
+
+export async function resolveMuxConfig(): Promise<MuxFlags> {
+  if (_muxCfgCache && Date.now() - _muxCfgCache.at < MUX_CFG_TTL_MS) {
+    return _muxCfgCache.value;
+  }
+  try {
+    const { data, error } = await supabase.rpc('get_public_flags');
+    if (error) throw error;
+    const mux = (data as any)?.mux ?? {};
+    const value: MuxFlags = {
+      uploadsEnabled: mux.uploads_enabled ?? ENV_FALLBACK_ENABLED,
+      mode: mux.mode === 'test' ? 'test' : 'live',
+    };
+    _muxCfgCache = { value, at: Date.now() };
+    return value;
+  } catch {
+    return { uploadsEnabled: ENV_FALLBACK_ENABLED, mode: 'live' };
+  }
+}
+
+export function __resetMuxConfigCache(): void {
+  _muxCfgCache = null;
+}
+
+/** @deprecated Use resolveMuxConfig() — kept for any synchronous callers. */
+export const isMuxEnabled = (): boolean => ENV_FALLBACK_ENABLED;
 
 export const uploadMedia = async (
   file: File,
@@ -133,10 +168,28 @@ export const uploadMedia = async (
     const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
     const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
 
-    // ===== Phase 2B: Mux upload branch (videos only, behind flag) =====
-    if (isVideo && isMuxEnabled()) {
-      return await uploadVideoViaMux(file, userId, sessionId, onProgress);
+    // ===== Mux upload branch (videos only, runtime-flag gated) =====
+    if (isVideo) {
+      const cfg = await resolveMuxConfig();
+      if (cfg.uploadsEnabled) {
+        try {
+          return await uploadVideoViaMux(file, userId, sessionId, onProgress);
+        } catch (err: any) {
+          // Accept BOTH error/code shapes from the edge function (Codex's point)
+          const code =
+            err?.code ?? err?.error ?? err?.body?.error ?? err?.body?.code ?? err?.context?.code;
+          if (code === 'MUX_DISABLED') {
+            __resetMuxConfigCache();
+            analytics.track('mux_fallback_to_supabase', { reason: 'server_disabled' });
+            // fall through to Supabase path — silent, user upload still succeeds
+          } else {
+            throw err;
+          }
+        }
+      }
     }
+
+
 
 
     await ensureBucketPolicies('post_media');

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Shield, BarChart3, Database, FileText, MessageSquare, Award, GitBranch, Users, HardDrive } from 'lucide-react';
+import { Shield, BarChart3, Database, FileText, MessageSquare, Award, GitBranch, Users, HardDrive, ToggleRight } from 'lucide-react';
 import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navbar';
 
 interface AdminSidebarProps {
@@ -88,6 +88,15 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         setCurrentActiveTab('Media Cleanup');
         onTabChange('media-cleanup');
       }
+    },
+    {
+      name: 'Feature Flags',
+      url: '#feature-flags',
+      icon: ToggleRight,
+      onClick: () => {
+        setCurrentActiveTab('Feature Flags');
+        onTabChange('feature-flags');
+      }
     }
   ];
 
@@ -110,6 +119,8 @@ const AdminSidebar = ({ activeTab, onTabChange }: AdminSidebarProps) => {
         return 'User Management';
       case 'media-cleanup':
         return 'Media Cleanup';
+      case 'feature-flags':
+        return 'Feature Flags';
       default:
         return 'Overview';
     }
