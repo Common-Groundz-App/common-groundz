@@ -27,7 +27,7 @@ interface PostContentViewerProps {
    * Optional; backwards compatible.
    */
   refreshTick?: number;
-  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string; authorId?: string; taggedEntities?: any[]; media?: any[] } | null) => void;
+  onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string; authorId?: string; taggedEntities?: any[]; media?: any[]; post_type?: string | null; structured_fields?: Record<string, any> | null; created_at?: string | null; last_edited_at?: string | null } | null) => void;
 }
 
 const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDetailView = false, refreshTick, onPostLoaded }: PostContentViewerProps) => {
@@ -145,6 +145,10 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         imageUrl: data.media?.[0]?.url || undefined,
         authorId: data.user_id || undefined,
         media: Array.isArray(data.media) ? (data.media as any[]) : [],
+        post_type: (data as any).post_type ?? null,
+        structured_fields: (data as any).structured_fields ?? null,
+        created_at: (data as any).created_at ?? null,
+        last_edited_at: (data as any).last_edited_at ?? null,
         taggedEntities: taggedEntities.map((e: any) => ({
           id: e.id,
           name: e.name,
