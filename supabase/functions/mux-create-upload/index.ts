@@ -109,13 +109,34 @@ Deno.serve(async (req) => {
     })
   }
 
+  // Runtime feature-flag check (admin-controlled via app_config)
+  let uploadsEnabled = true
+  let muxMode: 'test' | 'live' = 'live'
+  try {
+    const { data: flags, error: flagsErr } = await admin.rpc('get_public_flags')
+    if (flagsErr) throw flagsErr
+    const mux = (flags as any)?.mux ?? {}
+    uploadsEnabled = mux.uploads_enabled ?? true
+    muxMode = mux.mode === 'test' ? 'test' : 'live'
+  } catch (e) {
+    // Fail-safe: refuse new uploads rather than honor a stale env value.
+    // Client treats MUX_DISABLED as a Supabase fallback, so user upload still succeeds.
+    console.log(JSON.stringify({ event: 'get_public_flags_failed', err: String(e) }))
+    return json({ error: 'MUX_DISABLED', code: 'MUX_DISABLED', reason: 'config_unavailable' }, 503, cors)
+  }
+
+  if (!uploadsEnabled) {
+    console.log(JSON.stringify({ event: 'mux_disabled_block', user_id: userId }))
+    return json({ error: 'MUX_DISABLED', code: 'MUX_DISABLED' }, 503, cors)
+  }
+
   // Mux config
   const muxId = Deno.env.get('MUX_TOKEN_ID')
   const muxSecret = Deno.env.get('MUX_TOKEN_SECRET')
   if (!muxId || !muxSecret) {
     return json({ error: 'mux_not_configured' }, 500, cors)
   }
-  const isTest = (Deno.env.get('MUX_TEST_MODE') ?? 'false').toLowerCase() === 'true'
+  const isTest = muxMode === 'test'
 
   // Allowed playback policy — single source of truth
   const TIMEOUT_SECONDS = 3600
