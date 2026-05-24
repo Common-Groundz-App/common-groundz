@@ -65,7 +65,19 @@ const PostView = () => {
   useEffect(() => clearDelayedRefetch, [clearDelayedRefetch]);
 
   const ownerPost = postId
-    ? { id: postId, user_id: postMeta?.authorId ?? null, media: postMeta?.media ?? null }
+    ? {
+        id: postId,
+        user_id: postMeta?.authorId ?? null,
+        media: postMeta?.media ?? null,
+        title: postMeta?.title ?? null,
+        content: postMeta?.content ?? null,
+        visibility: (postMeta?.visibility as 'public' | 'circle_only' | 'private' | undefined) ?? undefined,
+        post_type: postMeta?.post_type ?? null,
+        structured_fields: postMeta?.structured_fields ?? null,
+        tagged_entities: postMeta?.taggedEntities ?? [],
+        created_at: postMeta?.created_at ?? null,
+        last_edited_at: postMeta?.last_edited_at ?? null,
+      }
     : null;
   const isOwner = isPostOwner(ownerPost, user);
 
