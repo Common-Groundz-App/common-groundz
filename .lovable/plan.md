@@ -1,75 +1,207 @@
-# Phase 3C.2-lite — "Edit post" CTA for failed Mux videos (final, approved)
-
 ## Goal
 
-When an owner sees the failed-Mux banner on `PostView` and is still inside the 1-hour edit window (or is admin), give them a one-click path into the existing edit composer. They remove the failed video using the composer's existing X button and re-upload — Phase 3C.1's sync RPC handles the `removed` → `pending` → `ready` mapping transitions automatically.
+Admin-controlled runtime kill switch for Mux: turn the Mux pipeline on/off and switch **test ↔ live** mode without a redeploy. When Mux is OFF, new video uploads transparently fall back to the existing Supabase Storage path. Existing Mux videos keep playing. Images are untouched.
 
-**No `replaceMediaIndex`. No slot targeting. No changes to the composer's upload paths. No changes to image or legacy Supabase video flows. No DB / RPC / edge / webhook changes.**
+## Admin UI placement
 
-## Scope
+New tab in `AdminPortal.tsx` / `AdminSidebar.tsx` called **"Feature Flags"** (icon: `ToggleRight`), added to the existing `navigationItems` array with the same shape as the other entries. Inherits the existing `VerticalTubelightNavbar` glow/active state, `getDisplayTabName` mapping, and mobile pill-button rendering — no styling changes to the sidebar component itself. Mirrored in the mobile horizontal tab row.
 
-### 1. `src/components/media/MuxOwnerHint.tsx`
+Access: already gated by `AdminRoute` (server-side `is_admin_user` RPC). The panel additionally re-checks `useIsAdmin()` defensively before showing mutation controls (per `mem://style/security-frontend-standards`).
 
-- Extend `Props.post` shape to include `created_at?: string | null` and `last_edited_at?: string | null` (needed by `canEditPost`).
-- Add imports: `Button` (shadcn), `Dialog`/`DialogContent` (shadcn), `useIsAdmin` from `@/hooks/useIsAdmin`, `canEditPost` from `@/utils/postEditPolicy`, `EnhancedCreatePostForm`.
-- In the `bannerStatus === 'failed'` branch:
-  - Compute `canEdit = canEditPost(post, user?.id, isAdmin)`.
-  - If `canEdit`: render an **"Edit post"** button next to the existing copy. Keep the "Video failed to process." headline; replace fallback subcopy with "Edit your post to remove and re-upload the video."
-  - If `!canEdit` (window expired, non-admin): keep current fallback copy "Please create a new post." unchanged.
-- Local `isEditOpen` state controls a `<Dialog>` mounting `EnhancedCreatePostForm` with `postToEdit={post}`. `onSuccess` → close dialog + call existing `onReady`. `onCancel` → close.
+### Panel layout (`AdminFeatureFlagsPanel`)
 
-### 2. Analytics (inline, with dedup + post-id reset)
+Single card, three sections:
 
-Use `analytics.track()` directly inline (matches the file's existing pattern for `mux_owner_hint_shown` / `mux_owner_hint_failed_shown`). **No new helper methods on `analytics.ts`.**
+1. **Effective config** (read-only readout at the top) — what the **backend** currently resolves via a fresh `get_public_flags()` call: *Uploads: Enabled/Disabled* and *Mode: Live/Test*. Refreshes on panel mount and after every successful mutation. Prevents confusion when a toggle failed silently or a stale client cache exists.
 
-Three events, all with `{ post_id: post?.id ?? null }`:
-- `mux_failed_edit_cta_shown` — fired once per `post_id` per mount via `shownCtaRef`.
-- `mux_failed_edit_cta_clicked` — on button click; no dedup.
-- `mux_failed_edit_cta_completed` — fired once per `post_id` per mount via `completedCtaRef` latch, inside dialog `onSuccess`.
+2. **Mux video uploads** — `Switch` (Enabled / Disabled). Help: *"When disabled, new video uploads go to Supabase Storage. Existing Mux videos continue playing."*
 
-**Codex's note (folded in):** Add a small `useEffect` keyed on `post?.id` that resets both `shownCtaRef.current = null` and `completedCtaRef.current = null` when the post id changes — so navigating across failed posts in the same `MuxOwnerHint` mount fires `shown` correctly per post.
+3. **Mux mode** — `Switch` (Live / Test), **disabled & dimmed when row 2 is off**. Help: *"Test mode is for development only. Switching affects new uploads only — existing posts are unchanged."*
 
-### 3. `src/pages/PostView.tsx`
+Each toggle: `AlertDialog` confirm with optional free-text *"Reason for change"*; optimistic update with rollback on error; success toast; *"Updated 2h ago by alice@…"* metadata below.
 
-- Pass `created_at` and `last_edited_at` to `MuxOwnerHint` through the `ownerPost` projection. Currently it passes only `id`, `user_id`, `media` — add the two timestamp fields from `postMeta`.
-- Requires `PostMeta` interface to carry `created_at` and `last_edited_at`, and `PostContentViewer`'s `onPostLoaded` callback to surface them. **Verify first via read**; if not already surfaced, thread them through (minimal additive change).
+## Backend
 
-### 4. Mandatory test: `src/components/media/MuxOwnerHint.test.tsx`
+### New table `public.app_config` — admin-only
 
-Three cases, mocking `useAuth`, `useIsAdmin`, `useMuxStatus`:
-- Owner + failed + within window → "Edit post" CTA renders.
-- Owner + failed + expired window (non-admin) → CTA hidden, fallback copy "Please create a new post." shown.
-- Non-owner → component returns `null` (regression guard).
+```text
+key             text PK            -- 'mux.uploads_enabled' | 'mux.mode'
+value           jsonb              -- { "enabled": true } | { "mode": "live" }
+description     text
+updated_at      timestamptz
+updated_by      uuid
+updated_reason  text               -- nullable
+```
 
-## Verification checklist (ChatGPT's note folded in)
+RLS: **no public SELECT.** All direct access requires `has_role(auth.uid(),'admin')`.
 
-Before declaring 3C.2 done, manually confirm:
-1. Opening the edit dialog alone does **NOT** trigger `mux-sync-post-mappings`. The sync call lives inside `EnhancedCreatePostForm`'s save handler from Phase 3C.1 — verify by checking network requests on dialog-open vs save.
-2. `mux-sync-post-mappings` fires only after the user actually saves the edit.
-3. Image and legacy Supabase-video edit paths remain untouched (no new code in their flows).
-4. Non-owner sees no banner/CTA.
-5. Owner after edit window (and not admin) sees the failed-video copy but no "Edit post" button.
-6. Admin viewing any failed post sees the "Edit post" button regardless of window.
-7. After successful edit-and-save: dialog closes, `onReady` fires, the post refetches, and the failed Mux item transitions correctly (verified by 3C.1's existing reconcile logic).
+### `get_public_flags()` RPC — public-safe read path
 
-## Out of scope (explicit)
+`SECURITY DEFINER`, executable by `anon` + `authenticated`. Returns a **hardcoded allowlist** only:
 
-- `replaceMediaIndex` prop or any per-slot targeting.
-- Feed-card banners (`MuxOwnerHint` is not mounted there).
-- Background Mux asset deletion (Phase 5).
-- Any change to `analytics.ts` itself.
+```sql
+returns jsonb -- { "mux": { "uploads_enabled": true, "mode": "live" } }
+```
 
-## Is this the final fix for Phase 3C?
+New safe keys must be added explicitly inside the function body.
 
-**Yes.** After this lands and passes the verification checklist above:
-- 3C.1 backend mapping sync — done.
-- 3C.2-lite owner CTA — done.
+### `set_app_flag(_key text, _value jsonb, _reason text)` RPC — admin writes
 
-Failed-Mux recovery becomes one click for owners inside the edit window; the composer's existing remove + re-upload UX handles the rest; the sync RPC reconciles the mapping. Phase 3C closes. Slot-targeted replacement stays parked as a hypothetical 3C.3 only if real usage shows the 2-click remove+add flow is friction.
+`SECURITY DEFINER`. Behavior:
+- Asserts `has_role(auth.uid(),'admin')` or raises.
+- **Closed key allowlist:** `_key IN ('mux.uploads_enabled','mux.mode')`.
+- **Per-key value validation:**
+  - `mux.uploads_enabled` → must match `{ "enabled": boolean }`, exactly one key.
+  - `mux.mode` → must match `{ "mode": "test"|"live" }`, exactly one key.
+  - Invalid shape → raise `invalid_value_for_key`.
+- **Idempotent:** if new value equals stored value, return `{ changed: false }` without writing or appending an audit row.
+- Otherwise: update row, set `updated_by = auth.uid()`, `updated_at = now()`, `updated_reason = _reason`, return `{ changed: true, previous: <old jsonb> }`.
+
+**No `console.log` here** (ChatGPT's correction): `set_app_flag` is a Postgres function, not an edge function. The audit table (`updated_by`/`updated_reason`/`updated_at` + per-change row) is the sole flag-change audit trail. No `RAISE LOG` unless we later need it.
+
+### Audit log
+
+New table `public.app_config_audit` (id, key, old_value, new_value, changed_by, changed_at, reason). Populated by `AFTER UPDATE` trigger on `app_config` **only when value actually changes** (matches RPC idempotency). Admin-only RLS.
+
+### Migration idempotency (Codex's point)
+
+The migration is safe to re-run:
+- `CREATE TABLE IF NOT EXISTS` for `app_config`, `app_config_audit`.
+- `CREATE OR REPLACE FUNCTION` for `get_public_flags`, `set_app_flag`, audit trigger function.
+- `DROP TRIGGER IF EXISTS … ; CREATE TRIGGER …` pattern for the audit trigger.
+- `DROP POLICY IF EXISTS … ; CREATE POLICY …` for all RLS policies.
+- Seed rows use `INSERT … ON CONFLICT (key) DO NOTHING` so re-running never overwrites a live admin-set value:
+  - `mux.uploads_enabled` → `{ "enabled": true }`
+  - `mux.mode`           → `{ "mode": "live" }`
+
+## Client wiring — no realtime subscription
+
+Public clients do **not** subscribe to `app_config` realtime (the table has no public SELECT). Admin changes only need to apply reliably to new uploads, not propagate instantly to every viewer.
+
+### `useAppConfig` hook (light)
+
+`src/hooks/useAppConfig.ts`. React Query wrapper around `get_public_flags()`, `staleTime: 30s`, `refetchOnWindowFocus: true`. Used by the admin panel's "effective config" readout. No realtime.
+
+### `resolveMuxConfig()` — on-demand, the upload-time source of truth
+
+`src/services/mediaService.ts` module-local resolver, independent of React lifecycle:
+
+```ts
+let _cache: { value: MuxFlags; at: number } | null = null;
+const TTL_MS = 30_000;
+
+export async function resolveMuxConfig(): Promise<MuxFlags> {
+  if (_cache && Date.now() - _cache.at < TTL_MS) return _cache.value;
+  try {
+    const { data, error } = await supabase.rpc('get_public_flags');
+    if (error) throw error;
+    const value = {
+      uploadsEnabled: data?.mux?.uploads_enabled ?? FALLBACK_FROM_ENV,
+      mode: (data?.mux?.mode ?? 'live') as 'live' | 'test',
+    };
+    _cache = { value, at: Date.now() };
+    return value;
+  } catch {
+    return { uploadsEnabled: FALLBACK_FROM_ENV, mode: 'live' };
+  }
+}
+
+export function __resetMuxConfigCache() { _cache = null; }
+```
+
+The admin panel calls `__resetMuxConfigCache()` after a successful mutation **and** schedules a `setTimeout(() => __resetMuxConfigCache(), 1500)` follow-up — covers the edge case where a request was already in-flight at toggle time and re-populated the cache milliseconds later. Other clients pick up changes within ≤30s.
+
+### `uploadMedia` decision flow + fallback
+
+```text
+if (isVideo) {
+  const cfg = await resolveMuxConfig();
+  if (cfg.uploadsEnabled) {
+    try {
+      return await uploadVideoViaMux(...);
+    } catch (err) {
+      // Codex's point: accept BOTH shapes from the edge function
+      const code = err?.code ?? err?.error ?? err?.body?.error ?? err?.body?.code;
+      if (code === 'MUX_DISABLED') {
+        __resetMuxConfigCache();
+        analytics.track('mux_fallback_to_supabase', { reason: 'server_disabled' });
+        // fall through to Supabase path — no error toast
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+// Existing Supabase Storage video upload path — UNCHANGED
+```
+
+**Explicit acceptance criterion:** When Mux is disabled — by client cache OR by server `MUX_DISABLED` response (in either `error` or `code` field) — the user's video upload **must succeed via Supabase**, silently, with no scary toast.
+
+## Edge function: `mux-create-upload`
+
+Insert near top of handler (after auth, before Mux fetch):
+
+```ts
+let uploadsEnabled = true;
+let muxMode: 'test' | 'live' = 'live';
+try {
+  const { data, error } = await admin.rpc('get_public_flags');
+  if (error) throw error;
+  uploadsEnabled = data?.mux?.uploads_enabled ?? true;
+  muxMode = data?.mux?.mode ?? 'live';
+} catch (e) {
+  // Explicit fail-safe: refuse new uploads rather than honor a stale env value.
+  // Client treats MUX_DISABLED as Supabase fallback, so user upload still succeeds.
+  console.log(JSON.stringify({ event: 'get_public_flags_failed', err: String(e) }));
+  return json({ error: 'MUX_DISABLED', code: 'MUX_DISABLED', reason: 'config_unavailable' }, 503, cors);
+}
+
+if (!uploadsEnabled) {
+  console.log(JSON.stringify({ event: 'mux_disabled_block', user_id: userId }));
+  return json({ error: 'MUX_DISABLED', code: 'MUX_DISABLED' }, 503, cors);
+}
+
+const isTest = muxMode === 'test';
+```
+
+The response body includes **both** `error` and `code: 'MUX_DISABLED'` so any client error-parsing shape resolves correctly (Codex's point). This replaces the existing `MUX_TEST_MODE` env read; the env var stays only as a client-side boot fallback inside `resolveMuxConfig`. Other Mux edge functions (`mux-webhook`, `mux-sync-post-mappings`, `mux-reconcile-upload`, `mux-register-mappings`) are **not** gated — they operate on existing assets.
+
+## Behaviour matrix
+
+| `mux.uploads_enabled` | `mux.mode` | New video upload goes to |
+|---|---|---|
+| true  | live | Mux (live)   |
+| true  | test | Mux (test)   |
+| false | any  | Supabase Storage (legacy path) |
+
+- Image uploads: unaffected.
+- In-flight Mux uploads at toggle time: complete via webhook unaffected.
+- Existing Mux videos: keep playing (playback independent of upload flags).
+- Toggling `mux.mode`: does **not** modify any existing row — only new Direct Uploads use the new mode.
+
+## Verification checklist (run after build)
+
+1. Mux enabled + live → new video uploads to Mux live.
+2. Mux enabled + test → new video uploads to Mux test mode.
+3. Mux disabled → new video uploads to Supabase Storage and post succeeds (no error toast).
+4. Image upload remains unchanged.
+5. Existing Mux videos still play after disabling Mux uploads.
+6. Non-admin cannot call `set_app_flag` (RPC raises).
+7. Admin change appears in `app_config_audit`.
+8. `mux-create-upload` returns `{ error: 'MUX_DISABLED', code: 'MUX_DISABLED' }` (503) when disabled; client falls back silently.
+9. Re-running the migration is a no-op (idempotency).
+
+## Out of scope
+
+- Public realtime propagation of config changes.
+- Migrating existing Mux assets when disabled.
+- Per-user / percentage rollout.
+- Generic admin UI for arbitrary keys.
+- Mux billing/usage dashboard.
 
 ## Files touched
 
-1. `src/components/media/MuxOwnerHint.tsx` — CTA, dialog, inline analytics with dedup + post-id reset effect.
-2. `src/pages/PostView.tsx` — pass `created_at` / `last_edited_at` into `ownerPost`.
-3. `src/components/content/PostContentViewer.tsx` (+ `PostMeta` shape) — surface the two timestamps if not already; verify first.
-4. `src/components/media/MuxOwnerHint.test.tsx` — new, three cases.
+- **Migration:** `app_config`, `app_config_audit`, `get_public_flags()`, `set_app_flag()` (validation + idempotency), audit trigger, seed rows, RLS — all with `IF NOT EXISTS` / `CREATE OR REPLACE` / `ON CONFLICT DO NOTHING`.
+- **New:** `src/hooks/useAppConfig.ts`, `src/hooks/admin/useAppFlagsAdmin.ts`, `src/components/admin/AdminFeatureFlagsPanel.tsx`.
+- **Edited:** `src/services/mediaService.ts` (on-demand `resolveMuxConfig` + dual-shape `MUX_DISABLED` fallback + `__resetMuxConfigCache`), `src/components/admin/AdminSidebar.tsx` (new nav item), `src/pages/AdminPortal.tsx` (new tab + mobile button), `supabase/functions/mux-create-upload/index.ts` (DB-driven flag check + explicit fail-safe + dual-shape error body).
+- **Untouched:** all other Mux edge functions, image upload path, legacy Supabase video path, Phase 3C edit/recovery flow, playback components.
