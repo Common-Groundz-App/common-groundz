@@ -19,6 +19,7 @@ import { AdminClaimsPanel } from '@/components/admin/AdminClaimsPanel';
 import { AdminProductRelationshipsPanel } from '@/components/admin/AdminProductRelationshipsPanel';
 import { AdminUserManagementPanel } from '@/components/admin/AdminUserManagementPanel';
 import { AdminMediaCleanupPanel } from '@/components/admin/AdminMediaCleanupPanel';
+import { AdminFeatureFlagsPanel } from '@/components/admin/AdminFeatureFlagsPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 
 const AdminPortal = () => {
@@ -133,6 +134,12 @@ const AdminPortal = () => {
     </div>
   );
 
+  const renderFeatureFlagsContent = () => (
+    <div className="space-y-6">
+      <AdminFeatureFlagsPanel />
+    </div>
+  );
+
   const renderActiveContent = () => {
     switch (activeTab) {
       case 'overview':
@@ -151,6 +158,8 @@ const AdminPortal = () => {
         return renderUserManagementContent();
       case 'media-cleanup':
         return renderMediaCleanupContent();
+      case 'feature-flags':
+        return renderFeatureFlagsContent();
       default:
         return renderOverviewContent();
     }
@@ -261,6 +270,16 @@ const AdminPortal = () => {
                   }`}
                 >
                   Media
+                </button>
+                <button
+                  onClick={() => setActiveTab('feature-flags')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 'feature-flags'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Flags
                 </button>
               </div>
             </div>
