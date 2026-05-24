@@ -1144,7 +1144,8 @@ export function EnhancedCreatePostForm({
     <div
       ref={formRef}
       className={cn(
-        'flex flex-col min-h-[100dvh] bg-background transition-all',
+        'flex flex-col bg-background transition-all',
+        !isEditMode && 'min-h-[100dvh]',
         showLocationInput && 'location-search-active'
       )}
     >
@@ -1159,7 +1160,7 @@ export function EnhancedCreatePostForm({
       />
 
       {/* Scrollable composer surface — no card wrapper */}
-      <div className="flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 pt-3 md:pt-10 pb-2 md:pb-24 space-y-4">
+      <div className={cn('flex-1 w-full max-w-2xl mx-auto px-4 sm:px-6 pt-3 md:pt-10 pb-2 space-y-4', !isEditMode && 'md:pb-24')}>
         {/* Desktop-only page header — gives the centered column a clear anchor */}
         <h1 className="hidden md:block text-2xl font-semibold tracking-tight">
           {isEditMode ? 'Edit your experience' : 'Share an experience'}
