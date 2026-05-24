@@ -1,64 +1,82 @@
-## What's broken
+## Why
 
-### 1. Mux→Supabase fallback never triggers (root cause)
-`mux-create-upload` correctly returns `503 { error: 'MUX_DISABLED', code: 'MUX_DISABLED' }` when the admin kill-switch is off. But `supabase.functions.invoke()` wraps any non-2xx response in a `FunctionsHttpError` whose body lives on `err.context` as an **unread `Response` object** — not as `err.code` / `err.body.code`.
+The composer (`ComposerMediaPreview`) and the feed (`PostMediaDisplay` → `FeedCollage`) use two different layout systems for the same media. That causes three visible problems:
 
-The current check in `mediaService.ts` → `uploadMedia` video branch:
+1. **Single portrait video in composer** (`1_media.png`) — the tile is `aspect-auto max-h-[480px]` with `FeedVideo` at `objectFit="contain"`, with no real intrinsic-ratio frame. The bottom control row (play, scrubber, duration, mute) ends up clipped / off the visible video box. The multi-tile case "works" only because those tiles have a real `aspect-square`.
+2. **Single portrait video looks zoomed-in** — same root cause: no intrinsic-ratio measurement, so the video is sized by `max-h` only and visually crops.
+3. **Multi-item composer collage stretches videos** (`4_media.png`) — `ComposerMediaPreview` forces every tile to `aspect-square` + `object-cover`, while feed `FeedCollage` letterboxes videos on black (`object-contain`). Composer stretches; feed preserves original form. That's the inconsistency you flagged.
+
+Fix: render the composer preview through the same `FeedCollage` used by the feed, so composer and feed are visually identical and the single-video controls problem disappears for free.
+
+## What changes — frontend only
+
+No business logic, no upload pipeline, no Mux, no `mediaService`, no post creation, no feed behavior.
+
+### 1. `src/components/media/FeedCollage.tsx` — backward-compatible extension only
+
+Add two **optional** props. Existing feed callers (`PostMediaDisplay`) pass neither → feed behavior and layout are byte-for-byte unchanged.
+
 ```ts
-const code = err?.code ?? err?.error ?? err?.body?.error ?? err?.body?.code ?? err?.context?.code;
-if (code === 'MUX_DISABLED') { ...fallback... }
+interface FeedCollageProps {
+  // ...existing
+  renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
+  disableItemClick?: boolean;
+}
 ```
-…never matches. The error bubbles up as **"Couldn't start video upload. Try again."** — no Supabase fallback, no progress bar. Matches the screenshot exactly.
 
-### 2. Supabase upload UI (progress / poster / duration)
-Already intact in `MediaUploader.tsx` / `UploadRow`. Once fallback actually runs (fix #1), execution falls through into the existing Supabase Storage branch and the same staged progress UI, local poster, and duration chip light up automatically. **No UI work needed for #2.**
+Implementation rules:
 
-### 3. No way to dismiss a failed upload card
-In `UploadRow` (lines 189–208), the cancel `X` only renders for `status === 'uploading' | 'idle'`. On `status === 'error'` we render a non-interactive `✗` glyph — so the user is stuck with the failed card.
+- **`renderTileOverlay` always receives the ORIGINAL media index** (the `originalIndex` already tracked on `DisplayEntry`), never the post-sort display index. `FeedCollage` reorders entries internally (it promotes the first video to slot 0 for multi-item posts), so this is the critical guardrail — the composer's remove `X` must operate on the original `media[]` order or it will delete the wrong item.
+- Render `{renderTileOverlay?.(item, originalIndex)}` inside both `renderTile` and `SingleMediaTile`, after the media element, inside the same relatively-positioned tile wrapper. This lets the overlay anchor (absolute `top-2 right-2`) against the actual tile box.
+- When `disableItemClick === true`: skip the `onClick={() => onItemClick(...)}` and drop the `cursor-pointer` class on both `renderTile` and `SingleMediaTile`. Also do not pass `onTap` to `FeedVideo` in that mode (so tapping the video toggles play/mute inline instead of trying to open a lightbox).
+- Both flags are strictly opt-in. `PostMediaDisplay` is not touched.
 
----
+### 2. `src/components/feed/composer/ComposerMediaPreview.tsx` — thin wrapper
 
-## The fix
+Replace the bespoke 1/2/3/4 grid with:
 
-### A. Properly parse `FunctionsHttpError` body in `src/services/mediaService.ts`
-Scope: only the existing `try/catch` around `supabase.functions.invoke('mux-create-upload', …)` inside `uploadVideoViaMux`. No global error interception.
+```tsx
+<FeedCollage
+  media={sorted}
+  source="post"
+  onItemClick={() => {}}
+  disableItemClick
+  renderTileOverlay={(item, originalIndex) => (
+    <>
+      {overlayForItem?.(item)}            {/* Mux processing/ready/failed chip */}
+      <RemoveButton
+        onClick={(e) => { e.stopPropagation(); onRemove(item); }}
+        aria-label="Remove media"
+      />
+    </>
+  )}
+/>
+```
 
-Inside that catch, add a small async helper that returns the error code:
-1. If `err.context instanceof Response`, `await err.context.clone().json()` inside try/catch and read `code` / `error` from the parsed body.
-2. Fall back to flat fields (`err.code`, `err.error`, `err.body?.code`, `err.body?.error`) for non-HTTP errors.
-3. **Fallback only when the resolved code is exactly `'MUX_DISABLED'`** — per reviewer feedback, do NOT treat a bare HTTP 503 (or any other status) as a fallback signal. A transient Mux outage should surface as a real upload error, not silently reroute.
+- `onRemove(item)` (existing prop) is called with the **MediaItem reference**, not an index — so even though `originalIndex` is what `FeedCollage` exposes, the caller stays index-agnostic and the wrong-item bug cannot happen.
+- Keep the existing `X` button styling (`absolute top-2 right-2`, destructive ghost, `z-10`).
+- `overlayForItem` (existing prop, used for Mux processing/ready/failed chips) keeps working unchanged through the same overlay slot.
+- The single-item branch (`SingleMediaTile` inside `FeedCollage`) already hugs intrinsic ratio and uses `FeedVideo`, so scrubber + mute + duration render correctly and the portrait video stops looking zoomed — without any composer-side ratio logic.
 
-On `MUX_DISABLED` hit: call `__resetMuxConfigCache()`, fire `analytics.track('mux_fallback_to_supabase', { reason: 'server_disabled' })`, and let execution continue into the existing Supabase Storage path below the Mux branch. User sees normal Supabase progress UI, no error toast.
+### 3. Nothing else touched
 
-Any other error (e.g. `too_many_inflight_uploads`, `mux_create_failed`, generic 5xx) keeps the current behavior: row goes to error state with the existing message.
+`PostMediaDisplay`, `FeedVideo`, `LightboxPreview`, upload pipeline, `mediaService`, Mux paths, post creation — all unchanged.
 
-### B. Add a remove (`X`) button to failed upload rows in `src/components/media/MediaUploader.tsx`
-In `UploadRow`, when `status === 'error'`:
-- Keep the destructive `✗` visual indicator (and the "Upload failed" label below the file name) so the failed state is still obvious.
-- Render the same ghost-icon `X` button that's used during upload, wired to `onCancel(upload)`, with `aria-label="Remove failed upload"`.
+## Guardrails (hard requirements)
 
-Reuses the existing `cancelUpload` flow (revokes the local poster URL and drops the row from state) — no new state plumbing.
+1. **Feed must not change visually or behaviorally.** No feed caller passes the new props, and the new props default to `undefined` / `false`. Existing feed paths execute the exact same code as today.
+2. **Composer remove must target the correct item.** Overlay callback receives the original `MediaItem` + original index; the X handler calls `onRemove(item)` by reference. Verified against `FeedCollage`'s internal video-promotion reorder.
 
-### Explicitly out of scope
-- `mux-create-upload` edge function
-- Admin Feature Flags panel
-- Image upload path
-- Mux-enabled upload path
-- Playback components (`FeedVideo`, lightbox, `MuxUploadChip`)
-- Phase 3C edit flow
-- The pre-existing 403 on `ensure-bucket-policies` (non-fatal; storage upload still works)
+## Out of scope
 
----
-
-## Files touched
-
-- `src/services/mediaService.ts` — parse `FunctionsHttpError.context` body; strict `MUX_DISABLED`-only fallback scoped to the `mux-create-upload` call.
-- `src/components/media/MediaUploader.tsx` — add removable `X` on failed `UploadRow`.
+- Click-to-open lightbox in the composer (composer is preview-only).
+- Any change to upload, Mux, post creation, or feed layout.
+- Any change to `FeedVideo` controls, autoplay, mute, or HLS attach.
 
 ## Verification
 
-1. Admin → Feature Flags → Mux uploads OFF.
-2. Login as Hana, upload a `.mov` → row shows "Preparing → Uploading → Finalizing" via the **Supabase** path, lands as a normal video preview. No error toast. Console shows `mux_fallback_to_supabase`.
-3. Admin → Mux ON → video upload goes through Mux as before.
-4. Force a real failure → failed row now has a working `X` to dismiss.
-5. Image upload remains unchanged in both flag states.
+1. Composer — 1 portrait video: original portrait ratio, no zoom/crop, scrubber + mute + duration visible, X removes it.
+2. Composer — 1 landscape image: ratio looks normal, X works.
+3. Composer — 2/3/4 mixed media including a portrait video: collage matches feed style; portrait video letterboxes on black (contain) instead of stretching; X works on every tile; removing tile 2 removes tile 2 (not the promoted-video slot).
+4. Post it → feed output is visually identical to the composer preview.
+5. Existing feed posts (single + multi, image + video) render with zero visual regression.

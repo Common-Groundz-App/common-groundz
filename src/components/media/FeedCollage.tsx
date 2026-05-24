@@ -9,6 +9,17 @@ interface FeedCollageProps {
   source?: 'post' | 'review' | 'entity';
   sourceId?: string;
   className?: string;
+  /**
+   * Optional per-tile overlay rendered absolutely inside each tile wrapper.
+   * Receives the ORIGINAL media index (pre-internal-reorder). Opt-in only —
+   * existing feed callers do not pass this and behavior is unchanged.
+   */
+  renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
+  /**
+   * When true, tiles are not clickable (no onItemClick, no cursor-pointer,
+   * and video onTap is not wired). Opt-in only.
+   */
+  disableItemClick?: boolean;
 }
 
 type Orientation = 'portrait' | 'landscape' | 'square';
@@ -35,6 +46,8 @@ export function FeedCollage({
   source = 'post',
   sourceId,
   className,
+  renderTileOverlay,
+  disableItemClick,
 }: FeedCollageProps) {
   if (!media || media.length === 0) return null;
 
@@ -61,8 +74,11 @@ export function FeedCollage({
     return (
       <div
         key={item.id || `${item.url}-${originalIndex}`}
-        className="relative w-full h-full overflow-hidden bg-black cursor-pointer"
-        onClick={() => onItemClick(originalIndex)}
+        className={cn(
+          'relative w-full h-full overflow-hidden bg-black',
+          !disableItemClick && 'cursor-pointer'
+        )}
+        onClick={disableItemClick ? undefined : () => onItemClick(originalIndex)}
       >
         {item.type === 'image' ? (
           <img
@@ -77,7 +93,7 @@ export function FeedCollage({
             source={source}
             sourceId={sourceId}
             objectFit={fit}
-            onTap={(handoff) => onItemClick(originalIndex, handoff)}
+            onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
           />
         )}
         {options?.overlayCount && options.overlayCount > 0 ? (
@@ -85,6 +101,7 @@ export function FeedCollage({
             +{options.overlayCount}
           </div>
         ) : null}
+        {renderTileOverlay?.(item, originalIndex)}
       </div>
     );
   };
@@ -100,6 +117,8 @@ export function FeedCollage({
           source={source}
           sourceId={sourceId}
           onItemClick={onItemClick}
+          renderTileOverlay={renderTileOverlay}
+          disableItemClick={disableItemClick}
         />
       </div>
     );
@@ -163,6 +182,8 @@ interface SingleMediaTileProps {
   source: 'post' | 'review' | 'entity';
   sourceId?: string;
   onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;
+  renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
+  disableItemClick?: boolean;
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
@@ -278,7 +299,7 @@ function computeShape(
   };
 }
 
-function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTileProps) {
+function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick }: SingleMediaTileProps) {
   const { item, originalIndex } = entry;
   const isVideo = item.type === 'video';
 
@@ -374,8 +395,11 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
       }}
     >
       <div
-        className="relative w-full h-full overflow-hidden bg-black cursor-pointer"
-        onClick={() => onItemClick(originalIndex)}
+        className={cn(
+          'relative w-full h-full overflow-hidden bg-black',
+          !disableItemClick && 'cursor-pointer'
+        )}
+        onClick={disableItemClick ? undefined : () => onItemClick(originalIndex)}
       >
 
         {item.type === 'image' ? (
@@ -390,8 +414,15 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick }: SingleMediaTi
             loading="lazy"
           />
         ) : (
-          <FeedVideo item={item} source={source} sourceId={sourceId} objectFit={fit} onTap={(handoff) => onItemClick(originalIndex, handoff)} />
+          <FeedVideo
+            item={item}
+            source={source}
+            sourceId={sourceId}
+            objectFit={fit}
+            onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
+          />
         )}
+        {renderTileOverlay?.(item, originalIndex)}
       </div>
     </div>
   );
