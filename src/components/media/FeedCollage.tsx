@@ -182,6 +182,8 @@ interface SingleMediaTileProps {
   source: 'post' | 'review' | 'entity';
   sourceId?: string;
   onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;
+  renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
+  disableItemClick?: boolean;
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
