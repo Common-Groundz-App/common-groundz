@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { FeedVideo } from '@/components/media/FeedVideo';
 import { cn } from '@/lib/utils';
+import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 
 interface FeedCollageProps {
   media: MediaItem[];
-  onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;
+  onItemClick: (originalIndex: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
   source?: 'post' | 'review' | 'entity';
   sourceId?: string;
   className?: string;
@@ -113,7 +114,7 @@ export function FeedCollage({
             sourceId={sourceId}
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
-            onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
+            onTap={disableItemClick ? undefined : (handoff, extras) => onItemClick(originalIndex, handoff, extras)}
             resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
             onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
           />
@@ -206,7 +207,7 @@ interface SingleMediaTileProps {
   entry: DisplayEntry;
   source: 'post' | 'review' | 'entity';
   sourceId?: string;
-  onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;
+  onItemClick: (originalIndex: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
   renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
   disableItemClick?: boolean;
   previewSrcOverride?: (item: MediaItem) => string | undefined;
@@ -448,7 +449,7 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
             sourceId={sourceId}
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
-            onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
+            onTap={disableItemClick ? undefined : (handoff, extras) => onItemClick(originalIndex, handoff, extras)}
             resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
             onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
           />
