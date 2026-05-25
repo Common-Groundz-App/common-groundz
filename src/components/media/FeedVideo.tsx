@@ -222,6 +222,8 @@ function FeedVideoPlayer({
   source = 'post',
   sourceId,
   srcOverride,
+  resumeState,
+  onResumeConsumed,
 }: FeedVideoProps) {
 
 
