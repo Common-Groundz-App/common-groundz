@@ -469,30 +469,12 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
                   objectFit="contain"
                 />
               ) : (
-              <video
+              <LightboxVideo
                 key={imageKey}
-                src={currentPhoto.url}
-                poster={currentPhoto.thumbnail_url}
-                controls
-                preload="metadata"
-                autoPlay={false}
-                className={cn(
-                  "cursor-auto [&::-webkit-media-controls]:cursor-pointer [&::-webkit-media-controls-panel]:cursor-pointer",
-                  isMobile && isLandscape 
-                    ? "h-auto w-full object-contain" 
-                    : "max-h-[90vh] max-w-full object-contain"
-                )}
-                style={{ cursor: 'auto' }}
+                item={currentPhoto}
+                isMobile={isMobile}
+                isLandscape={isLandscape}
                 onLoadedData={() => handleImageLoad(currentPhoto, currentIndex)}
-                onClick={(e) => e.stopPropagation()}
-                onPlay={(e) => e.stopPropagation()}
-                onPause={(e) => e.stopPropagation()}
-                onVolumeChange={(e) => e.stopPropagation()}
-                onTimeUpdate={(e) => e.stopPropagation()}
-                onSeeking={(e) => e.stopPropagation()}
-                onSeeked={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                onMouseDown={(e) => e.stopPropagation()}
               />
               )
             ) : (
