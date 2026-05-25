@@ -10,8 +10,10 @@
  * Known-safe:
  *   - stream.mux.com (Mux HLS)
  *   - the configured Supabase host (from VITE_SUPABASE_URL)
- *   - any *.supabase.co / *.supabase.in subdomain — covers Storage CDN
- *     custom subdomains, transformation CDN, etc.
+ *   - any *.supabase.co / *.supabase.in subdomain — covers Supabase-owned
+ *     subdomains only (Storage, transformation CDN, project hosts).
+ *     Custom/proxied domains pointed at Supabase are NOT matched — add
+ *     them explicitly here if/when introduced.
  */
 const configuredSupabaseHost: string = (() => {
   try {
