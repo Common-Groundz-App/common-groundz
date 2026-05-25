@@ -20,6 +20,13 @@ interface FeedCollageProps {
    * and video onTap is not wired). Opt-in only.
    */
   disableItemClick?: boolean;
+  /**
+   * Opt-in per-item video source override. When this returns a URL for an
+   * item, that video tile renders a plain native <video controls src=...>
+   * and bypasses FeedVideo / renderBranching entirely. Composer-only — feed
+   * callers never pass this so feed behavior is unchanged.
+   */
+  previewSrcOverride?: (item: MediaItem) => string | undefined;
 }
 
 type Orientation = 'portrait' | 'landscape' | 'square';
@@ -48,6 +55,7 @@ export function FeedCollage({
   className,
   renderTileOverlay,
   disableItemClick,
+  previewSrcOverride,
 }: FeedCollageProps) {
   if (!media || media.length === 0) return null;
 
@@ -87,6 +95,15 @@ export function FeedCollage({
             className={cn('w-full h-full', fit === 'cover' ? 'object-cover' : 'object-contain')}
             loading="lazy"
           />
+        ) : previewSrcOverride?.(item) ? (
+          <video
+            src={previewSrcOverride(item)}
+            poster={item.thumbnail_url || undefined}
+            controls
+            playsInline
+            preload="metadata"
+            className={cn('w-full h-full bg-black', fit === 'cover' ? 'object-cover' : 'object-contain')}
+          />
         ) : (
           <FeedVideo
             item={item}
@@ -119,6 +136,7 @@ export function FeedCollage({
           onItemClick={onItemClick}
           renderTileOverlay={renderTileOverlay}
           disableItemClick={disableItemClick}
+          previewSrcOverride={previewSrcOverride}
         />
       </div>
     );
@@ -184,6 +202,7 @@ interface SingleMediaTileProps {
   onItemClick: (originalIndex: number, handoff?: VideoHandoff) => void;
   renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
   disableItemClick?: boolean;
+  previewSrcOverride?: (item: MediaItem) => string | undefined;
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
@@ -299,7 +318,7 @@ function computeShape(
   };
 }
 
-function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick }: SingleMediaTileProps) {
+function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick, previewSrcOverride }: SingleMediaTileProps) {
   const { item, originalIndex } = entry;
   const isVideo = item.type === 'video';
 
@@ -412,6 +431,15 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
               ready ? 'opacity-100' : 'opacity-0'
             )}
             loading="lazy"
+          />
+        ) : previewSrcOverride?.(item) ? (
+          <video
+            src={previewSrcOverride(item)}
+            poster={item.thumbnail_url || undefined}
+            controls
+            playsInline
+            preload="metadata"
+            className={cn('w-full h-full bg-black', fit === 'cover' ? 'object-cover' : 'object-contain')}
           />
         ) : (
           <FeedVideo

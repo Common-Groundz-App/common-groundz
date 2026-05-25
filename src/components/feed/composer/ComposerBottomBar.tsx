@@ -13,7 +13,7 @@ interface ComposerBottomBarProps {
   sessionId: string;
   media: MediaItem[];
   maxMediaCount: number;
-  onMediaUploaded: (item: MediaItem) => void;
+  onMediaUploaded: (item: MediaItem, file?: File) => void;
 
   emojiPickerVisible: boolean;
   onToggleEmojiPicker: (e: React.MouseEvent) => void;

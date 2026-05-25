@@ -19,7 +19,13 @@ import { MediaCompatibilityBadge } from '@/components/media/MediaCompatibilityBa
 
 interface MediaUploaderProps {
   sessionId: string;
-  onMediaUploaded: (media: MediaItem) => void;
+  /**
+   * Called once an upload resolves to a persisted MediaItem. The original
+   * source `File` is passed as a second argument so callers can build a
+   * transient local preview (e.g. URL.createObjectURL) for Mux-backed
+   * videos while Mux is still preparing the HLS asset.
+   */
+  onMediaUploaded: (media: MediaItem, file?: File) => void;
   initialMedia?: MediaItem[];
   className?: string;
   customButton?: React.ReactNode;
@@ -111,11 +117,11 @@ export function UploadRow({
   const stageLabel = isError
     ? 'Upload failed'
     : stage === 'preparing'
-    ? isVideo
-      ? 'Preparing video…'
-      : 'Preparing…'
+    ? 'Preparing…'
     : stage === 'uploading'
-    ? 'Uploading…'
+    ? isVideo
+      ? 'Uploading video…'
+      : 'Uploading…'
     : stage === 'finalizing'
     ? 'Finalizing…'
     : '';
@@ -388,7 +394,7 @@ export function MediaUploader({
         );
       }).then((mediaItem) => {
         if (mediaItem) {
-          onMediaUploaded(mediaItem);
+          onMediaUploaded(mediaItem, file);
           setCurrentMediaCount((prev) => prev + 1);
           if (mediaItem.type === 'video') setCurrentVideoCount((prev) => prev + 1);
 
