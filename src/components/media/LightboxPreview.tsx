@@ -323,7 +323,7 @@ export function LightboxPreview({
                 : 16 / 9;
             const ratio =
               Number.isFinite(rawRatio) && rawRatio > 0 ? rawRatio : 16 / 9;
-            const maxVh = isMobile && isLandscape ? '85vh' : '90vh';
+            const maxVh = isMobile && isLandscape ? 85 : 90;
             const hiResPoster = isMux
               ? muxThumbnailUrl(currentItem.mux_playback_id!, { width: 1280 })
               : muxPosterUrl(currentItem);
@@ -336,9 +336,9 @@ export function LightboxPreview({
               position: 'relative',
               display: 'block',
               aspectRatio: String(ratio),
-              width: `min(100%, calc(${maxVh} * ${ratio}))`,
+              width: `min(100%, calc(${maxVh}vh * ${ratio}))`,
               maxWidth: '100%',
-              maxHeight: maxVh,
+              maxHeight: `${maxVh}vh`,
               minWidth: '1px',
               minHeight: '1px',
             };
@@ -347,12 +347,7 @@ export function LightboxPreview({
             // small/blurry interim frame. Supabase videos reveal immediately
             // (no HLS attach delay) and behave exactly as before.
             const hidden = isMux && !videoReady;
-            const dbg = (msg: string, extra?: Record<string, unknown>) => {
-              if (import.meta.env.DEV) {
-                // eslint-disable-next-line no-console
-                console.log(`[LightboxPreview Mux] ${msg}`, extra ?? '');
-              }
-            };
+
             return (
               <div style={wrapperStyle}>
                 <video
