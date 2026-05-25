@@ -142,6 +142,8 @@ export function FeedCollage({
           renderTileOverlay={renderTileOverlay}
           disableItemClick={disableItemClick}
           previewSrcOverride={previewSrcOverride}
+          videoResume={videoResume}
+          onResumeConsumed={onResumeConsumed}
         />
       </div>
     );
