@@ -30,6 +30,13 @@ interface LightboxPreviewProps {
    * item so the lightbox opens at the same timestamp / play state.
    */
   initialVideoState?: VideoHandoff;
+  /**
+   * Optional reverse handoff fired exactly once when the lightbox closes,
+   * so the originating feed video can resume from the lightbox's playback
+   * state. Mute is always emitted; timestamp/play resume is only honored
+   * by the parent when entryIndex === currentIndex.
+   */
+  onExitHandoff?: (handoff: VideoExitHandoff) => void;
   onClose: () => void;
   className?: string;
 }
@@ -38,6 +45,7 @@ export function LightboxPreview({
   media,
   initialIndex = 0,
   initialVideoState,
+  onExitHandoff,
   onClose,
   className 
 }: LightboxPreviewProps) {
