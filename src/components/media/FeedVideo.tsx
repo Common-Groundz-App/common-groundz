@@ -511,7 +511,7 @@ function FeedVideoPlayer({
     >
       <video
         ref={videoRef}
-        poster={muxPosterUrl(item)}
+        poster={srcOverride ? (item.thumbnail_url || undefined) : muxPosterUrl(item)}
         muted={muted}
         playsInline
         loop
