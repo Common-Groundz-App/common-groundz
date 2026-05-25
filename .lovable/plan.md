@@ -1,94 +1,206 @@
-# Reverse Video Handoff (Lightbox → Feed)
+# Tier 1 — Exact-Frame Handoff Poster (final)
 
-When the lightbox closes, the original feed video should pick up where the lightbox left off: same timestamp, same play/pause state, same mute. Mute is a global preference and syncs even when the user has navigated to a different media item inside the lightbox; timestamp/play resume only applies to the originally-opened item.
+Goal: make Mux lightbox opening feel visually continuous like Supabase. On tap, snapshot the exact current frame from the feed `<video>` and use it as the lightbox cover until the real video is ready.
 
-Scope is strictly the reverse handoff. No changes to Mux/HLS, sizing, scroll-lock, composer, DB, backend, `photo-lightbox.tsx`, or unrelated feed logic.
+Scope is additive and presentational only — no changes to HLS attach, forward handoff, reverse handoff, scroll lock, sizing, DB, backend, upload pipeline, composer, or feed playback architecture.
 
-## Stable entry index (locked down)
+## Changes folded in from review
 
-`LightboxPreview` already captures `entryIndexRef` when it mounts (the index the lightbox was opened on). That ref is the **only** source of truth for "did the user close on the same item they opened?"
+1. **Single callback (no ordering risk).** Extend the existing `onTap` signature to `onTap(handoff?, extras?)`. The snapshot ships with the tap event in the same React batch, so `LightboxPreview` never mounts a render before `entryPosterDataUrl` is available. No new `onExtras` prop.
+2. **UI-local type.** `LightboxEntryExtras` lives in `src/components/media/lightboxTypes.ts` (new), not in shared `src/types/media.ts`.
+3. **Broader CORS-safe host matcher.** Accept the configured Supabase host AND any `*.supabase.co` / `*.supabase.in` subdomain (covers Storage CDN edge cases, transformation CDN, custom storage subdomains) in addition to `stream.mux.com`.
+4. **`crossOrigin` set at first render, never toggled.** Computed in the render body from `resolveVideoSrc(item)` (same call site used by the attach effect). Never added or removed in an effect — that would force a reload and break playback.
+5. **Smaller dataURL.** 640px wide, JPEG quality 0.65 (~80–120KB).
+6. **Explicit cleanup.** Null `entryExtras` in `PostMediaDisplay.handleLightboxClose` alongside `setVideoHandoff(null)`. Never store the dataURL in a ref.
 
-- The exit handoff snapshot includes both `entryIndex` (immutable, from the ref) and `currentIndex` (where the user is now).
-- `PostMediaDisplay` decides resume vs mute-only by comparing those two fields, never by reading any "currently active" state of its own.
-- The feed tile that receives `resumeState` is the one whose `originalIndex === entryIndex` — not the tapped/active index, not the lightbox's current index.
+## Behavior
 
-## Files touched
+1. User taps a Mux feed video that is playing.
+2. `FeedVideo.handleContainerClick` builds the existing `VideoHandoff`, calls `captureVideoFrame(v)` synchronously, and invokes `onTap(handoff, { entryPosterDataUrl })` in a single call.
+3. `PostMediaDisplay` receives both, stores `videoHandoff` and `entryExtras` in the same handler (single React batch).
+4. `LightboxPreview` uses `entryExtras.entryPosterDataUrl` as the cover for the entry item until `videoReady === true`, then fades to the live video exactly like today.
+5. Fallback chain when no snapshot (image tap, capture failed, paused pre-first-frame, unknown host):
+   - Mux entry item with handoff `currentTime > 0` → `muxThumbnailUrl(playbackId, { time: currentTime, width: 1280 })`
+   - Otherwise → existing `muxPosterUrl(item)` / `muxThumbnailUrl(playbackId, { width: 1280 })`. Unchanged.
 
-1. `src/types/media.ts` — add `VideoExitHandoff`.
-2. `src/components/media/LightboxPreview.tsx` — `closeWithHandoff()` + emit.
-3. `src/components/feed/PostMediaDisplay.tsx` — handle exit handoff, set resume state, sync global mute.
-4. `src/components/media/FeedCollage.tsx` — forward `resumeState` + `onResumeConsumed` to the matching `FeedVideo`.
-5. `src/components/media/FeedVideo.tsx` — apply seek + mute + play, then call `onResumeConsumed`.
+## Files
 
-## Types
+| File | Change |
+|---|---|
+| `src/components/media/lightboxTypes.ts` (new) | Export `LightboxEntryExtras { entryPosterDataUrl?: string }`. UI-local. |
+| `src/utils/captureVideoFrame.ts` (new) | Best-effort canvas snapshot, returns dataURL or null, never throws. |
+| `src/utils/corsSafeHosts.ts` (new) | `isCorsSafeVideoHost(url)` — matches `stream.mux.com`, configured Supabase host, and `*.supabase.co` / `*.supabase.in` subdomains. |
+| `src/types/media.ts` | Extend `VideoHandoff` callers' type only if needed — actually no change: extras are a second argument, not a field. **No edit.** |
+| `src/components/media/FeedVideo.tsx` | Render `<video crossOrigin="anonymous">` only when host is CORS-safe (computed in render body). In `handleContainerClick`, capture frame and pass extras as second arg to `onTap`. Update `FeedVideoProps.onTap` signature. |
+| `src/components/media/FeedCollage.tsx` | Update internal `onTap` forwarding to pass through both args; update prop signature on `onItemTap` (or equivalent) to `(originalIndex, handoff?, extras?)`. |
+| `src/components/feed/PostMediaDisplay.tsx` | Store `entryExtras` state; set it in the same handler that sets `videoHandoff`; clear both in `handleLightboxClose`; pass `entryExtras` prop to `LightboxPreview`. |
+| `src/components/media/LightboxPreview.tsx` | New optional prop `entryExtras?: LightboxEntryExtras`. Compute `coverPoster = (isEntryItem && entryExtras?.entryPosterDataUrl) ?? muxFallbackPoster` and use for both `<video poster>` and the overlay `<img src>`. |
+
+No changes to `useVideoMute`, `hlsAttach`, `useVideoAutoplay`, `muxMedia.ts`.
+
+## Key snippets
+
+### `src/utils/captureVideoFrame.ts`
 
 ```ts
-// src/types/media.ts
-export interface VideoExitHandoff {
-  currentTime: number;
-  wasPlaying: boolean;
-  muted: boolean;
-  entryIndex: number;    // index the lightbox was originally opened on
-  currentIndex: number;  // index the user is on when closing
+/**
+ * Best-effort JPEG dataURL snapshot of a <video>'s current visible frame.
+ * Returns null on any failure (tainted canvas, pre-first-frame, zero dims,
+ * SecurityError). Never throws. Tuned for a 1–3s bridge frame, not archival.
+ */
+export function captureVideoFrame(
+  v: HTMLVideoElement,
+  opts?: { maxWidth?: number; quality?: number }
+): string | null {
+  try {
+    if (!v || v.readyState < 2) return null;
+    const vw = v.videoWidth, vh = v.videoHeight;
+    if (!vw || !vh) return null;
+    const maxW = opts?.maxWidth ?? 640;
+    const scale = vw > maxW ? maxW / vw : 1;
+    const w = Math.max(1, Math.round(vw * scale));
+    const h = Math.max(1, Math.round(vh * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(v, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', opts?.quality ?? 0.65);
+  } catch { return null; }
 }
 ```
 
-## LightboxPreview.tsx
+### `src/utils/corsSafeHosts.ts`
 
-- New prop: `onExitHandoff?: (handoff: VideoExitHandoff) => void`.
-- `closedRef = useRef(false)` so emission/close is idempotent across overlapping triggers (e.g. ESC during swipe).
-- Single `closeWithHandoff()` used by **every** close path: close button, ESC, backdrop click, swipe-to-close.
-- Body:
-  1. If `closedRef.current` → return.
-  2. Set `closedRef.current = true`.
-  3. Read `videoElRef.current`. If null (image item, unmounted, etc.) → just `onClose()` and return; never throw.
-  4. Snapshot: `{ currentTime: v.currentTime, wasPlaying: !v.paused && !v.ended, muted: v.muted, entryIndex: entryIndexRef.current, currentIndex }`.
-  5. `onExitHandoff?.(snapshot)`.
-  6. `onClose()`.
+```ts
+/**
+ * Returns true only for hosts known to serve media bytes with
+ * Access-Control-Allow-Origin: *, so <video crossOrigin="anonymous">
+ * loads AND canvas reads stay untainted. Anything else returns false
+ * — caller must omit the crossOrigin attribute entirely.
+ */
+const configuredSupabaseHost = (() => {
+  try { return new URL(import.meta.env.VITE_SUPABASE_URL ?? '').host; }
+  catch { return ''; }
+})();
 
-## PostMediaDisplay.tsx
+export function isCorsSafeVideoHost(src: string | undefined | null): boolean {
+  if (!src) return false;
+  try {
+    const h = new URL(src, window.location.href).host;
+    if (h === 'stream.mux.com') return true;
+    if (configuredSupabaseHost && h === configuredSupabaseHost) return true;
+    // Covers storage CDN / transformation / custom Supabase subdomains.
+    if (h.endsWith('.supabase.co') || h.endsWith('.supabase.in')) return true;
+    return false;
+  } catch { return false; }
+}
+```
 
-- State: `videoResume: { index: number; handoff: VideoExitHandoff } | null`.
-- `handleExitHandoff(h)`:
-  - **Always** sync global mute: if `h.muted !== readGlobalVideoMuted()` → `setGlobalVideoMuted(h.muted)`. (Runs regardless of index, because mute is global.)
-  - If `h.entryIndex === h.currentIndex` → `setVideoResume({ index: h.entryIndex, handoff: h })`. Otherwise leave null (no seek/play resume).
-- Pass `onExitHandoff` to `LightboxPreview`.
-- Pass `videoResume` + `onResumeConsumed={() => setVideoResume(null)}` to `FeedCollage`.
+### `src/components/media/lightboxTypes.ts`
 
-## FeedCollage.tsx
+```ts
+/**
+ * Transient view-only extras carried alongside VideoHandoff from a feed
+ * video to LightboxPreview. NOT part of the shared media domain types.
+ */
+export interface LightboxEntryExtras {
+  entryPosterDataUrl?: string;
+}
+```
 
-- Accept `videoResume` and `onResumeConsumed`.
-- For the tile whose `originalIndex === videoResume?.index` AND is a video, forward `resumeState={videoResume.handoff}` and `onResumeConsumed`. All other tiles get `undefined`.
+### `FeedVideo.tsx` key diffs
 
-## FeedVideo.tsx
+```ts
+// In FeedVideoProps:
+onTap?: (handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
 
-- Accept `resumeState?: VideoExitHandoff` and `onResumeConsumed?: () => void`.
-- `useEffect` keyed on `resumeState`:
-  - If no `resumeState` → return.
-  - Define `apply()`:
-    1. If `resumeState.muted !== readGlobalVideoMuted()` → `setGlobalVideoMuted(resumeState.muted)` first (before play, so autoplay can't re-mute from stale state).
-    2. `v.muted = resumeState.muted`.
-    3. Seek: `v.currentTime = clamp(resumeState.currentTime, 0, v.duration || resumeState.currentTime)`.
-    4. If `resumeState.wasPlaying` → `v.play().catch(() => {})`.
-    5. `onResumeConsumed?.()`.
-  - If `v.readyState >= 1` → `apply()` synchronously.
-  - Else add a one-shot `loadedmetadata` listener that calls `apply()`. Clean up on teardown.
-  - Do NOT call `onResumeConsumed` synchronously before `apply()` runs.
+// In FeedVideoPlayer render body (computed once per render, stable per item):
+const resolvedForCors = srcOverride ?? resolveVideoSrc(item).src;
+const corsSafe = isCorsSafeVideoHost(resolvedForCors);
+
+// In <video> JSX — spread so unsafe hosts get NO attribute at all:
+<video
+  ref={videoRef}
+  {...(corsSafe ? { crossOrigin: 'anonymous' as const } : {})}
+  poster={...}
+  /* ...rest unchanged... */
+/>
+
+// In handleContainerClick, after building handoff and BEFORE v.pause():
+const dataUrl = captureVideoFrame(v);                  // null on any failure
+const extras = dataUrl ? { entryPosterDataUrl: dataUrl } : undefined;
+try { v.pause(); } catch {}
+onTap(handoff, extras);
+```
+
+Snapshot before pause so we get the live frame, not a stale paused one.
+
+### `FeedCollage.tsx`
+
+Mirror the new two-arg shape wherever `onTap` is forwarded (single-tile and grid paths):
+
+```ts
+onTap={disableItemClick
+  ? undefined
+  : (handoff, extras) => onItemTap?.(originalIndex, handoff, extras)}
+```
+
+Update the `onItemTap` prop type to `(index: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void`.
+
+### `PostMediaDisplay.tsx`
+
+```ts
+const [entryExtras, setEntryExtras] = useState<LightboxEntryExtras | null>(null);
+
+const handleVideoTap = (index: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => {
+  setVideoHandoff(handoff ?? null);
+  setEntryExtras(extras ?? null);   // same batch as setVideoHandoff
+  openLightboxAt(index);             // existing logic
+};
+
+const handleLightboxClose = () => {
+  setLightboxOpen(false);
+  setVideoHandoff(null);
+  setEntryExtras(null);              // explicit cleanup, drops dataURL
+};
+
+// Pass entryExtras={entryExtras ?? undefined} to <LightboxPreview>.
+```
+
+### `LightboxPreview.tsx` (Mux branch only)
+
+```ts
+const isEntryItem = currentIndex === entryIndexRef.current;
+const entryPoster = isEntryItem ? entryExtras?.entryPosterDataUrl : undefined;
+const posterTime =
+  isEntryItem && initialVideoState && initialVideoState.currentTime > 0
+    ? initialVideoState.currentTime
+    : undefined;
+const muxFallbackPoster = isMux
+  ? muxThumbnailUrl(currentItem.mux_playback_id!, { width: 1280, time: posterTime })
+  : muxPosterUrl(currentItem);
+const coverPoster = entryPoster ?? muxFallbackPoster;
+```
+
+Use `coverPoster` in both the `<video poster>` attribute and the existing overlay `<img>`. `videoReady` fade logic unchanged.
 
 ## Verification
 
-1. Playing feed video → tap → lightbox plays → close → feed continues at new timestamp, still playing.
-2. Mute/unmute in lightbox → close → feed reflects new mute; other feed videos honor it via global store.
-3. Paused feed video → tap → play in lightbox → close → feed resumes playing at new timestamp.
-4. Close via X / ESC / backdrop / swipe — all behave identically.
-5. Navigate inside lightbox to another item → mute → close → original feed video does **not** seek/play resume, but global mute IS updated.
-6. Image-only items → close → no errors.
-7. Supabase and Mux/HLS videos both work.
-8. Rapid double-close (ESC during swipe) → handoff emits exactly once thanks to `closedRef`.
+1. **Mux playing → tap** → lightbox shows the exact tap-time frame → fades smoothly into live video. No black flash, no thumb pop, no layout flicker.
+2. **Mux paused / pre-first-frame** → snapshot null → time-based Mux thumbnail (or 0s thumb if `currentTime === 0`). Same as today.
+3. **Capture failure** (CORS edge, taint, decoding quirk) → `captureVideoFrame` returns null silently → Mux fallback runs. No console errors leaked.
+4. **Unknown host** (legacy non-Mux non-Supabase CDN) → `crossOrigin` attribute omitted → video plays exactly as today, snapshot returns null, fallback runs.
+5. **Supabase videos** → still play, snapshot now works as a bonus.
+6. **Forward + reverse handoff, mute sync, entry-index logic, ESC/backdrop/swipe close** → untouched. `LightboxPreview.handoff.test.tsx` still passes.
+7. **Image items** → no `FeedVideo` tap path → no snapshot, no behavior change.
+8. **Memory** → `entryExtras` cleared on close, never stored in a ref, dataURL eligible for GC immediately.
+9. **iOS** → tap-gesture chain (early-play ref-callback path) unaffected; capture + `onTap` run synchronously inside the same click handler.
+10. **No reload** from `crossOrigin` — attribute is present on first render and never toggled.
 
 ## Out of scope
 
-- `photo-lightbox.tsx`
-- Mux/HLS attach logic, `useVideoAutoplay`, view tracking
-- Lightbox sizing, scroll-lock
-- Composer, DB, edge functions, feed query logic
+- Tier 2 (HLS manifest + first-segment prewarm)
+- Tier 3 (same-element DOM reparenting)
+- `photo-lightbox.tsx`, composer, DB, edge functions, feed query logic
+- Any change to forward/reverse handoff semantics
