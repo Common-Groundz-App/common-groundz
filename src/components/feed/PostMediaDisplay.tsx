@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
-import { MediaItem, VideoHandoff } from '@/types/media';
+import React, { useState, useCallback } from 'react';
+import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { FeedCollage } from '@/components/media/FeedCollage';
 import { cn } from '@/lib/utils';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
+import { readGlobalVideoMuted, setGlobalVideoMuted } from '@/hooks/useVideoMute';
 
 interface PostMediaDisplayProps {
   media?: MediaItem[];
@@ -37,6 +38,7 @@ export function PostMediaDisplay({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [videoHandoff, setVideoHandoff] = useState<VideoHandoff | null>(null);
+  const [videoResume, setVideoResume] = useState<{ index: number; handoff: VideoExitHandoff } | null>(null);
   
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
     return null;
@@ -106,6 +108,22 @@ export function PostMediaDisplay({
     setVideoHandoff(null);
   };
 
+  // Reverse handoff: mute is a global preference, so always sync it.
+  // Timestamp/play resume only applies when the user closed on the SAME
+  // item they originally opened from the feed (entryIndex === currentIndex).
+  const handleExitHandoff = useCallback((h: VideoExitHandoff) => {
+    if (h.muted !== readGlobalVideoMuted()) {
+      setGlobalVideoMuted(h.muted);
+    }
+    if (h.entryIndex === h.currentIndex) {
+      setVideoResume({ index: h.entryIndex, handoff: h });
+    }
+  }, []);
+
+  const handleResumeConsumed = useCallback(() => {
+    setVideoResume(null);
+  }, []);
+
   return (
     <>
       <FeedCollage
@@ -114,6 +132,8 @@ export function PostMediaDisplay({
         source={source}
         sourceId={sourceId}
         className={cn("mt-3", className)}
+        videoResume={videoResume}
+        onResumeConsumed={handleResumeConsumed}
       />
 
       {/* Replace Dialog with a direct render of LightboxPreview when lightbox is open */}
@@ -122,6 +142,7 @@ export function PostMediaDisplay({
           media={validMedia}
           initialIndex={activeImageIndex}
           initialVideoState={videoHandoff ?? undefined}
+          onExitHandoff={handleExitHandoff}
           onClose={handleLightboxClose}
         />
       )}
