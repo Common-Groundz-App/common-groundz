@@ -34,6 +34,7 @@ export function ComposerMediaPreview({
   onRemove,
   className,
   overlayForItem,
+  previewSrcOverride,
 }: ComposerMediaPreviewProps) {
   if (media.length === 0) return null;
 
