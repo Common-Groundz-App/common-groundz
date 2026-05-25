@@ -136,6 +136,7 @@ export function FeedCollage({
           onItemClick={onItemClick}
           renderTileOverlay={renderTileOverlay}
           disableItemClick={disableItemClick}
+          previewSrcOverride={previewSrcOverride}
         />
       </div>
     );
