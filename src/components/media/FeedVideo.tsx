@@ -22,6 +22,12 @@ interface FeedVideoProps {
   objectFit?: 'contain' | 'cover';
   source?: 'post' | 'review' | 'entity';
   sourceId?: string;
+  /**
+   * Composer-only: when set, bypasses Mux status branching and uses this
+   * URL as a plain (non-HLS) <video> source. Used for local blob previews
+   * before Mux finishes transcoding.
+   */
+  srcOverride?: string;
 }
 
 type Status = 'loading' | 'ready' | 'error' | 'unsupported';
