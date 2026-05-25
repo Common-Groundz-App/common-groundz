@@ -95,6 +95,15 @@ export function FeedCollage({
             className={cn('w-full h-full', fit === 'cover' ? 'object-cover' : 'object-contain')}
             loading="lazy"
           />
+        ) : previewSrcOverride?.(item) ? (
+          <video
+            src={previewSrcOverride(item)}
+            poster={item.thumbnail_url || undefined}
+            controls
+            playsInline
+            preload="metadata"
+            className={cn('w-full h-full bg-black', fit === 'cover' ? 'object-cover' : 'object-contain')}
+          />
         ) : (
           <FeedVideo
             item={item}
