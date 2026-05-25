@@ -295,8 +295,8 @@ function FeedVideoPlayer({
 
       const dur = v.duration;
       const target = Number.isFinite(dur) && dur > 0
-        ? Math.min(Math.max(0, resumeState.currentTime), Math.max(0, dur - 0.1))
-        : Math.max(0, resumeState.currentTime);
+        ? Math.min(Math.max(0, resumeState.currentTime), Math.max(0, dur - 0.05))
+        : resumeState.currentTime;
       try { v.currentTime = target; } catch { /* pre-metadata seeks can throw */ }
 
       if (resumeState.wasPlaying) {
