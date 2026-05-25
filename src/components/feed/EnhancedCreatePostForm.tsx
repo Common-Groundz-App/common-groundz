@@ -1340,11 +1340,17 @@ export function EnhancedCreatePostForm({
           <ComposerMediaPreview
             media={media}
             onRemove={removeMedia}
+            previewSrcOverride={(item) =>
+              item.id ? localPreviewUrlsRef.current.get(item.id) : undefined
+            }
             overlayForItem={(item) => {
               const id = item.mux_upload_id;
               if (!id || item.provider !== 'mux') return null;
               const ui = muxStatuses[id]?.ui_status;
-              if (!ui) return null;
+              // Only surface a chip on actual failure. Processing/ready chips
+              // would be misleading now that the composer plays the local
+              // file directly via previewSrcOverride.
+              if (ui !== 'failed') return null;
               return <MuxUploadChip uploadId={id} status={ui} />;
             }}
           />
