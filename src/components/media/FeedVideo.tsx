@@ -20,7 +20,7 @@ import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 interface FeedVideoProps {
   item: MediaItem;
   className?: string;
-  onTap?: (handoff?: VideoHandoff) => void;
+  onTap?: (handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
   showBadge?: boolean;
   objectFit?: 'contain' | 'cover';
   source?: 'post' | 'review' | 'entity';
@@ -490,6 +490,7 @@ function FeedVideoPlayer({
     if (onTap) {
       const v = videoRef.current;
       let handoff: VideoHandoff | undefined;
+      let extras: LightboxEntryExtras | undefined;
       if (v) {
         // Snapshot BEFORE pausing, otherwise wasPlaying would always be false.
         // Use global mute intent rather than v.muted — browsers force-mute
@@ -499,13 +500,19 @@ function FeedVideoPlayer({
           wasPlaying: !v.paused,
           muted: readGlobalVideoMuted(),
         };
+        // Capture exact-frame bridge poster BEFORE pause so we get the live
+        // frame, not a stale paused one. Best-effort: null on any failure
+        // (CORS taint, pre-first-frame, etc.) → lightbox falls back to the
+        // existing time-based / static Mux poster.
+        const dataUrl = captureVideoFrame(v);
+        if (dataUrl) extras = { entryPosterDataUrl: dataUrl };
         try {
           v.pause();
         } catch {
           /* ignore */
         }
       }
-      onTap(handoff);
+      onTap(handoff, extras);
       return;
     }
     toggleMute();
