@@ -12,7 +12,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { MediaItem, VideoHandoff } from '@/types/media';
+import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,13 @@ interface LightboxPreviewProps {
    * item so the lightbox opens at the same timestamp / play state.
    */
   initialVideoState?: VideoHandoff;
+  /**
+   * Optional reverse handoff fired exactly once when the lightbox closes,
+   * so the originating feed video can resume from the lightbox's playback
+   * state. Mute is always emitted; timestamp/play resume is only honored
+   * by the parent when entryIndex === currentIndex.
+   */
+  onExitHandoff?: (handoff: VideoExitHandoff) => void;
   onClose: () => void;
   className?: string;
 }
@@ -38,6 +45,7 @@ export function LightboxPreview({
   media,
   initialIndex = 0,
   initialVideoState,
+  onExitHandoff,
   onClose,
   className 
 }: LightboxPreviewProps) {
@@ -72,6 +80,35 @@ export function LightboxPreview({
   const currentItemRef = useRef<MediaItem | null>(null);
   const currentIndexRef = useRef<number>(initialIndex);
   const initialVideoStateRef = useRef<VideoHandoff | undefined>(initialVideoState);
+  // Guards closeWithHandoff so emission/close only happens once even when
+  // multiple close paths fire in rapid succession (e.g. ESC during swipe).
+  const closedRef = useRef(false);
+  // Keep latest onExitHandoff/onClose accessible from the stable callback.
+  const onExitHandoffRef = useRef(onExitHandoff);
+  const onCloseRef = useRef(onClose);
+  onExitHandoffRef.current = onExitHandoff;
+  onCloseRef.current = onClose;
+
+  const closeWithHandoff = useCallback(() => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    const v = videoElRef.current;
+    if (v) {
+      try {
+        const snapshot: VideoExitHandoff = {
+          currentTime: v.currentTime,
+          wasPlaying: !v.paused && !v.ended,
+          muted: v.muted,
+          entryIndex: entryIndexRef.current,
+          currentIndex: currentIndexRef.current,
+        };
+        onExitHandoffRef.current?.(snapshot);
+      } catch {
+        /* never throw from close path */
+      }
+    }
+    onCloseRef.current();
+  }, []);
 
   // iOS UA check — Safari/Chrome/etc on iPhone/iPad (including iPadOS desktop UA).
   const isIOS = (): boolean => {
@@ -128,7 +165,7 @@ export function LightboxPreview({
       } else if (e.key === 'ArrowRight') {
         nextImage();
       } else if (e.key === 'Escape') {
-        onClose();
+        closeWithHandoff();
       }
     };
     
@@ -341,7 +378,7 @@ export function LightboxPreview({
         onClick={(e) => {
           // Only close if clicking directly on this container (the background area)
           if (e.target === e.currentTarget) {
-            onClose();
+            closeWithHandoff();
           }
         }}
       >
@@ -355,7 +392,7 @@ export function LightboxPreview({
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            onClose();
+            closeWithHandoff();
           }}
         >
           <X className="h-5 w-5 text-white" />

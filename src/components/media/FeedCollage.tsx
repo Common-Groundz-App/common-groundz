@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MediaItem, VideoHandoff } from '@/types/media';
+import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { FeedVideo } from '@/components/media/FeedVideo';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +27,15 @@ interface FeedCollageProps {
    * callers never pass this so feed behavior is unchanged.
    */
   previewSrcOverride?: (item: MediaItem) => string | undefined;
+  /**
+   * Reverse handoff target: when the lightbox closes on the originally
+   * opened video, this carries the lightbox's playback state so the
+   * matching feed video can resume from it. Only the FeedVideo whose
+   * originalIndex matches `videoResume.index` receives it.
+   */
+  videoResume?: { index: number; handoff: VideoExitHandoff } | null;
+  /** Called by FeedVideo once it has applied the resume state. */
+  onResumeConsumed?: () => void;
 }
 
 type Orientation = 'portrait' | 'landscape' | 'square';
@@ -56,6 +65,8 @@ export function FeedCollage({
   renderTileOverlay,
   disableItemClick,
   previewSrcOverride,
+  videoResume,
+  onResumeConsumed,
 }: FeedCollageProps) {
   if (!media || media.length === 0) return null;
 
@@ -103,6 +114,8 @@ export function FeedCollage({
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
             onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
+            resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
+            onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
           />
         )}
         {options?.overlayCount && options.overlayCount > 0 ? (
@@ -129,6 +142,8 @@ export function FeedCollage({
           renderTileOverlay={renderTileOverlay}
           disableItemClick={disableItemClick}
           previewSrcOverride={previewSrcOverride}
+          videoResume={videoResume}
+          onResumeConsumed={onResumeConsumed}
         />
       </div>
     );
@@ -195,6 +210,8 @@ interface SingleMediaTileProps {
   renderTileOverlay?: (item: MediaItem, originalIndex: number) => React.ReactNode;
   disableItemClick?: boolean;
   previewSrcOverride?: (item: MediaItem) => string | undefined;
+  videoResume?: { index: number; handoff: VideoExitHandoff } | null;
+  onResumeConsumed?: () => void;
 }
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max);
@@ -310,7 +327,7 @@ function computeShape(
   };
 }
 
-function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick, previewSrcOverride }: SingleMediaTileProps) {
+function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick, previewSrcOverride, videoResume, onResumeConsumed }: SingleMediaTileProps) {
   const { item, originalIndex } = entry;
   const isVideo = item.type === 'video';
 
@@ -432,6 +449,8 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
             onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
+            resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
+            onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
           />
         )}
         {renderTileOverlay?.(item, originalIndex)}

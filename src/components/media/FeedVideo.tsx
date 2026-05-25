@@ -2,14 +2,14 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Volume2, VolumeX, Play, Pause, Film, AlertTriangle, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useVideoMute, readGlobalVideoMuted } from '@/hooks/useVideoMute';
+import { useVideoMute, readGlobalVideoMuted, setGlobalVideoMuted } from '@/hooks/useVideoMute';
 import { useVideoAutoplay } from '@/hooks/useVideoAutoplay';
 import { useVideoMilestones } from '@/hooks/useVideoMilestones';
 import { useVideoViewTracker } from '@/hooks/useVideoViewTracker';
 import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
-import { MediaItem, VideoHandoff } from '@/types/media';
+import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { isMuxPreparing, isMuxErroredOrBroken, resolveVideoSrc, maybeEmitBrokenReady, muxPosterUrl } from '@/utils/muxMedia';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
@@ -28,6 +28,13 @@ interface FeedVideoProps {
    * before Mux finishes transcoding.
    */
   srcOverride?: string;
+  /**
+   * Reverse handoff from the lightbox: when present, this video applies
+   * the carried mute/timestamp/play state once and then calls
+   * `onResumeConsumed`. Only the originally-opened tile receives this.
+   */
+  resumeState?: VideoExitHandoff;
+  onResumeConsumed?: () => void;
 }
 
 type Status = 'loading' | 'ready' | 'error' | 'unsupported';
@@ -215,6 +222,8 @@ function FeedVideoPlayer({
   source = 'post',
   sourceId,
   srcOverride,
+  resumeState,
+  onResumeConsumed,
 }: FeedVideoProps) {
 
 
@@ -262,6 +271,60 @@ function FeedVideoPlayer({
     if (!v) return;
     v.muted = muted;
   }, [muted]);
+
+  // Reverse handoff from lightbox — apply mute, seek, then optionally play.
+  // Defer onResumeConsumed until apply() actually runs (after metadata is
+  // ready). Without that, an early consume could drop the resume before
+  // currentTime is even seekable.
+  useEffect(() => {
+    if (!resumeState) return;
+    const v = videoRef.current;
+    if (!v) return;
+
+    let cleanedUp = false;
+    let listenerAttached = false;
+
+    const apply = () => {
+      if (cleanedUp) return;
+      // Sync global mute BEFORE play() so autoplay paths can't re-mute
+      // from a stale global value between seek and play.
+      if (resumeState.muted !== readGlobalVideoMuted()) {
+        setGlobalVideoMuted(resumeState.muted);
+      }
+      try { v.muted = resumeState.muted; } catch { /* ignore */ }
+
+      const dur = v.duration;
+      const target = Number.isFinite(dur) && dur > 0
+        ? Math.min(Math.max(0, resumeState.currentTime), Math.max(0, dur - 0.1))
+        : Math.max(0, resumeState.currentTime);
+      try { v.currentTime = target; } catch { /* pre-metadata seeks can throw */ }
+
+      if (resumeState.wasPlaying) {
+        userPausedRef.current = false;
+        setAutoplayEnabled(true);
+        const p = v.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => { /* autoplay may block; native UI remains */ });
+        }
+      }
+      onResumeConsumed?.();
+    };
+
+    if (v.readyState >= 1) {
+      apply();
+    } else {
+      listenerAttached = true;
+      const onMeta = () => {
+        v.removeEventListener('loadedmetadata', onMeta);
+        apply();
+      };
+      v.addEventListener('loadedmetadata', onMeta);
+      return () => {
+        cleanedUp = true;
+        if (listenerAttached) v.removeEventListener('loadedmetadata', onMeta);
+      };
+    }
+  }, [resumeState, onResumeConsumed]);
 
   // Phase 4 — source attachment. Mux-playable items go through attachHls
   // (native HLS on Safari/iOS, lazy hls.js elsewhere). Legacy items get

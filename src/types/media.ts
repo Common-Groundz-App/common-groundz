@@ -38,6 +38,21 @@ export interface VideoHandoff {
   muted: boolean;
 }
 
+/**
+ * Playback state handed BACK from the lightbox to the originating feed
+ * video when the lightbox closes. `entryIndex` is the immutable index
+ * the lightbox was opened on; `currentIndex` is where the user is when
+ * closing. Timestamp/play resume only applies when they match; mute
+ * always syncs because it is a global preference.
+ */
+export interface VideoExitHandoff {
+  currentTime: number;
+  wasPlaying: boolean;
+  muted: boolean;
+  entryIndex: number;
+  currentIndex: number;
+}
+
 export type MediaUploadStatus = 'idle' | 'uploading' | 'success' | 'error';
 
 export type MediaCompatibility = 'checking' | 'compatible' | 'risky';

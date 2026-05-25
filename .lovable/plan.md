@@ -1,48 +1,94 @@
-## Scope
-`src/components/media/LightboxPreview.tsx` only.
+# Reverse Video Handoff (Lightbox → Feed)
 
-## Root cause
-The `<video ref={(el) => {...}}>` uses an **inline arrow function**, so its identity changes on every render. React's contract: when a ref callback's identity changes, React calls the old one with `null`, then the new one with the element — on **every render**.
+When the lightbox closes, the original feed video should pick up where the lightbox left off: same timestamp, same play/pause state, same mute. Mute is a global preference and syncs even when the user has navigated to a different media item inside the lightbox; timestamp/play resume only applies to the originally-opened item.
 
-That means every re-render runs the cleanup branch (`hlsTokenRef.cancelled = true`, `hlsDetachRef()` which executes `removeAttribute('src'); load()`) and then re-attaches the source. This:
+Scope is strictly the reverse handoff. No changes to Mux/HLS, sizing, scroll-lock, composer, DB, backend, `photo-lightbox.tsx`, or unrelated feed logic.
 
-1. Resets the `<video>` mid-playback, which is why the native loading spinner reappears in a loop (each cycle: src cleared → src re-set → buffering → loadeddata → `setVideoReady(true)` → re-render → cleared again).
-2. Breaks the handoff — `currentTime` is wiped to 0 and any pending `play()` promise is cancelled, so the lightbox opens paused even when `wasPlaying: true`.
-3. Affects both Mux and Supabase paths (both go through the same ref callback).
+## Stable entry index (locked down)
 
-The recent defensive-sizing edits did not introduce the inline ref — but the introduction (or earlier wiring) of `videoReady` state + `setVideoReady` calls turned a latent bug into a visible loop, because now there is a re-render after first load that triggers the destructive cleanup.
+`LightboxPreview` already captures `entryIndexRef` when it mounts (the index the lightbox was opened on). That ref is the **only** source of truth for "did the user close on the same item they opened?"
 
-## Fix
+- The exit handoff snapshot includes both `entryIndex` (immutable, from the ref) and `currentIndex` (where the user is now).
+- `PostMediaDisplay` decides resume vs mute-only by comparing those two fields, never by reading any "currently active" state of its own.
+- The feed tile that receives `resumeState` is the one whose `originalIndex === entryIndex` — not the tapped/active index, not the lightbox's current index.
 
-1. **Stabilize the video ref callback with `useCallback`**
-   - Wrap the existing ref-callback body in `useCallback(..., [])` so its identity is stable across renders. React will then only invoke it on real mount/unmount (and on `key={imageKey}` change, which is exactly when we *do* want to re-attach).
-   - Move values the callback currently closes over (`currentItem`, `currentIndex`, `initialVideoState`, `entryIndexRef.current`) onto refs that are updated each render:
-     - Add `currentItemRef`, `currentIndexRef`, `initialVideoStateRef`, each assigned at the top of the render (`currentItemRef.current = currentItem;` etc.).
-     - Inside the stable callback, read from `*.current` instead of the closed-over values.
-   - `entryIndexRef`, `handoffAppliedRef`, `earlyPlayRanRef`, `videoElRef`, `hlsDetachRef`, `hlsTokenRef` are already refs — keep them as-is.
-   - `isIOS()` and `analytics.track` are pure / module-level — fine to keep referenced directly.
+## Files touched
 
-2. **Belt-and-suspenders guard inside the callback**
-   - At the top of the attach branch: `if (el === videoElRef.current) return;` — no-op if React ever re-invokes with the same element we already attached.
-   - At the top of the detach branch (`!el`): only run teardown if `videoElRef.current` is non-null (i.e., we actually had an attachment). Prevents spurious teardown if React calls with `null` before any attach.
+1. `src/types/media.ts` — add `VideoExitHandoff`.
+2. `src/components/media/LightboxPreview.tsx` — `closeWithHandoff()` + emit.
+3. `src/components/feed/PostMediaDisplay.tsx` — handle exit handoff, set resume state, sync global mute.
+4. `src/components/media/FeedCollage.tsx` — forward `resumeState` + `onResumeConsumed` to the matching `FeedVideo`.
+5. `src/components/media/FeedVideo.tsx` — apply seek + mute + play, then call `onResumeConsumed`.
 
-3. **Leave everything else untouched**
-   - Keep `key={imageKey}` on `<video>` — that's the legitimate remount trigger when navigating between items.
-   - Keep `onLoadedMetadata`, `onLoadedData`, `onSeeked` handlers exactly as-is (they're inline but that's fine — React doesn't re-bind DOM event handlers destructively the way it does refs).
-   - Keep iOS synchronous early-play branch inside the callback (it still runs on real mount, preserving the tap-gesture chain).
-   - Keep the defensive wrapper sizing, `aspectRatio`, `maxVh`, Mux poster overlay, `videoReady` state, and all handoff invariants in the file header comment.
+## Types
 
-4. **Do NOT touch**
-   - `useEffect` for `setVideoReady(false)` on `currentIndex` change (still needed and correct).
-   - `attachHls`, `muxMedia.ts`, `FeedVideo*`, `PostMediaDisplay`, `MuxOwnerHint`, `photo-lightbox.tsx`, DB, edge functions, composer.
-   - The `console.log('LightboxPreview portal target:', ...)` at line 642 — out of scope.
+```ts
+// src/types/media.ts
+export interface VideoExitHandoff {
+  currentTime: number;
+  wasPlaying: boolean;
+  muted: boolean;
+  entryIndex: number;    // index the lightbox was originally opened on
+  currentIndex: number;  // index the user is on when closing
+}
+```
+
+## LightboxPreview.tsx
+
+- New prop: `onExitHandoff?: (handoff: VideoExitHandoff) => void`.
+- `closedRef = useRef(false)` so emission/close is idempotent across overlapping triggers (e.g. ESC during swipe).
+- Single `closeWithHandoff()` used by **every** close path: close button, ESC, backdrop click, swipe-to-close.
+- Body:
+  1. If `closedRef.current` → return.
+  2. Set `closedRef.current = true`.
+  3. Read `videoElRef.current`. If null (image item, unmounted, etc.) → just `onClose()` and return; never throw.
+  4. Snapshot: `{ currentTime: v.currentTime, wasPlaying: !v.paused && !v.ended, muted: v.muted, entryIndex: entryIndexRef.current, currentIndex }`.
+  5. `onExitHandoff?.(snapshot)`.
+  6. `onClose()`.
+
+## PostMediaDisplay.tsx
+
+- State: `videoResume: { index: number; handoff: VideoExitHandoff } | null`.
+- `handleExitHandoff(h)`:
+  - **Always** sync global mute: if `h.muted !== readGlobalVideoMuted()` → `setGlobalVideoMuted(h.muted)`. (Runs regardless of index, because mute is global.)
+  - If `h.entryIndex === h.currentIndex` → `setVideoResume({ index: h.entryIndex, handoff: h })`. Otherwise leave null (no seek/play resume).
+- Pass `onExitHandoff` to `LightboxPreview`.
+- Pass `videoResume` + `onResumeConsumed={() => setVideoResume(null)}` to `FeedCollage`.
+
+## FeedCollage.tsx
+
+- Accept `videoResume` and `onResumeConsumed`.
+- For the tile whose `originalIndex === videoResume?.index` AND is a video, forward `resumeState={videoResume.handoff}` and `onResumeConsumed`. All other tiles get `undefined`.
+
+## FeedVideo.tsx
+
+- Accept `resumeState?: VideoExitHandoff` and `onResumeConsumed?: () => void`.
+- `useEffect` keyed on `resumeState`:
+  - If no `resumeState` → return.
+  - Define `apply()`:
+    1. If `resumeState.muted !== readGlobalVideoMuted()` → `setGlobalVideoMuted(resumeState.muted)` first (before play, so autoplay can't re-mute from stale state).
+    2. `v.muted = resumeState.muted`.
+    3. Seek: `v.currentTime = clamp(resumeState.currentTime, 0, v.duration || resumeState.currentTime)`.
+    4. If `resumeState.wasPlaying` → `v.play().catch(() => {})`.
+    5. `onResumeConsumed?.()`.
+  - If `v.readyState >= 1` → `apply()` synchronously.
+  - Else add a one-shot `loadedmetadata` listener that calls `apply()`. Clean up on teardown.
+  - Do NOT call `onResumeConsumed` synchronously before `apply()` runs.
 
 ## Verification
 
-1. **Supabase upload video**: tap a playing feed video → lightbox opens, resumes at the exact timestamp, keeps playing, no spinner loop, no shrink, mute preference preserved.
-2. **Mux upload video**: tap a playing feed video → poster visible at full lightbox size immediately, no black flash, HLS attaches once (check Network tab — only one `.m3u8` request, not a repeating burst), video crossfades in once `onSeeked` lands, resumes at the tapped timestamp, keeps playing.
-3. **Paused-handoff case**: tap a paused feed video → lightbox opens paused at the same timestamp, no spinner loop while idle.
-4. **Navigation between items**: arrow keys / arrows / dots → `key={imageKey}` change causes real remount → ref callback runs cleanly once per item, HLS detaches the previous attachment, attaches the new one.
-5. **Re-render sanity check**: while the lightbox is open and a video is playing, trigger an unrelated re-render (e.g., `setChromeVisible` toggling on pointer move) — the video must not reset, the spinner must not reappear, and HLS must not re-attach.
+1. Playing feed video → tap → lightbox plays → close → feed continues at new timestamp, still playing.
+2. Mute/unmute in lightbox → close → feed reflects new mute; other feed videos honor it via global store.
+3. Paused feed video → tap → play in lightbox → close → feed resumes playing at new timestamp.
+4. Close via X / ESC / backdrop / swipe — all behave identically.
+5. Navigate inside lightbox to another item → mute → close → original feed video does **not** seek/play resume, but global mute IS updated.
+6. Image-only items → close → no errors.
+7. Supabase and Mux/HLS videos both work.
+8. Rapid double-close (ESC during swipe) → handoff emits exactly once thanks to `closedRef`.
 
-After confirming all five, the handoff/continuity behaviour is restored to pre-regression state.
+## Out of scope
+
+- `photo-lightbox.tsx`
+- Mux/HLS attach logic, `useVideoAutoplay`, view tracking
+- Lightbox sizing, scroll-lock
+- Composer, DB, edge functions, feed query logic
