@@ -214,6 +214,7 @@ function FeedVideoPlayer({
   objectFit = 'contain',
   source = 'post',
   sourceId,
+  srcOverride,
 }: FeedVideoProps) {
 
 
