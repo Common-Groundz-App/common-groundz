@@ -13,11 +13,14 @@ import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { isMuxPreparing, isMuxErroredOrBroken, resolveVideoSrc, maybeEmitBrokenReady, muxPosterUrl } from '@/utils/muxMedia';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
+import { captureVideoFrame } from '@/utils/captureVideoFrame';
+import { isCorsSafeVideoHost } from '@/utils/corsSafeHosts';
+import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 
 interface FeedVideoProps {
   item: MediaItem;
   className?: string;
-  onTap?: (handoff?: VideoHandoff) => void;
+  onTap?: (handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
   showBadge?: boolean;
   objectFit?: 'contain' | 'cover';
   source?: 'post' | 'review' | 'entity';
@@ -487,6 +490,7 @@ function FeedVideoPlayer({
     if (onTap) {
       const v = videoRef.current;
       let handoff: VideoHandoff | undefined;
+      let extras: LightboxEntryExtras | undefined;
       if (v) {
         // Snapshot BEFORE pausing, otherwise wasPlaying would always be false.
         // Use global mute intent rather than v.muted — browsers force-mute
@@ -496,13 +500,19 @@ function FeedVideoPlayer({
           wasPlaying: !v.paused,
           muted: readGlobalVideoMuted(),
         };
+        // Capture exact-frame bridge poster BEFORE pause so we get the live
+        // frame, not a stale paused one. Best-effort: null on any failure
+        // (CORS taint, pre-first-frame, etc.) → lightbox falls back to the
+        // existing time-based / static Mux poster.
+        const dataUrl = captureVideoFrame(v);
+        if (dataUrl) extras = { entryPosterDataUrl: dataUrl };
         try {
           v.pause();
         } catch {
           /* ignore */
         }
       }
-      onTap(handoff);
+      onTap(handoff, extras);
       return;
     }
     toggleMute();
@@ -558,6 +568,13 @@ function FeedVideoPlayer({
   // Suppress unused-var lint for showBadge (kept in API for callers).
   void showBadge;
 
+  // Compute crossOrigin in render body (NOT an effect) so the attribute is
+  // present on first mount and never toggled. Toggling crossOrigin forces a
+  // reload and breaks playback. Unknown hosts get NO attribute at all so
+  // playback is unchanged for legacy CDNs.
+  const resolvedForCors = srcOverride ?? resolveVideoSrc(item).src;
+  const corsSafe = isCorsSafeVideoHost(resolvedForCors);
+
   return (
     <div
       ref={containerRef}
@@ -574,6 +591,7 @@ function FeedVideoPlayer({
     >
       <video
         ref={videoRef}
+        {...(corsSafe ? { crossOrigin: 'anonymous' as const } : {})}
         poster={srcOverride ? (item.thumbnail_url || undefined) : muxPosterUrl(item)}
         muted={muted}
         playsInline
