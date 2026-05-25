@@ -272,6 +272,60 @@ function FeedVideoPlayer({
     v.muted = muted;
   }, [muted]);
 
+  // Reverse handoff from lightbox — apply mute, seek, then optionally play.
+  // Defer onResumeConsumed until apply() actually runs (after metadata is
+  // ready). Without that, an early consume could drop the resume before
+  // currentTime is even seekable.
+  useEffect(() => {
+    if (!resumeState) return;
+    const v = videoRef.current;
+    if (!v) return;
+
+    let cleanedUp = false;
+    let listenerAttached = false;
+
+    const apply = () => {
+      if (cleanedUp) return;
+      // Sync global mute BEFORE play() so autoplay paths can't re-mute
+      // from a stale global value between seek and play.
+      if (resumeState.muted !== readGlobalVideoMuted()) {
+        setGlobalVideoMuted(resumeState.muted);
+      }
+      try { v.muted = resumeState.muted; } catch { /* ignore */ }
+
+      const dur = v.duration;
+      const target = Number.isFinite(dur) && dur > 0
+        ? Math.min(Math.max(0, resumeState.currentTime), Math.max(0, dur - 0.1))
+        : Math.max(0, resumeState.currentTime);
+      try { v.currentTime = target; } catch { /* pre-metadata seeks can throw */ }
+
+      if (resumeState.wasPlaying) {
+        userPausedRef.current = false;
+        setAutoplayEnabled(true);
+        const p = v.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => { /* autoplay may block; native UI remains */ });
+        }
+      }
+      onResumeConsumed?.();
+    };
+
+    if (v.readyState >= 1) {
+      apply();
+    } else {
+      listenerAttached = true;
+      const onMeta = () => {
+        v.removeEventListener('loadedmetadata', onMeta);
+        apply();
+      };
+      v.addEventListener('loadedmetadata', onMeta);
+      return () => {
+        cleanedUp = true;
+        if (listenerAttached) v.removeEventListener('loadedmetadata', onMeta);
+      };
+    }
+  }, [resumeState, onResumeConsumed]);
+
   // Phase 4 — source attachment. Mux-playable items go through attachHls
   // (native HLS on Safari/iOS, lazy hls.js elsewhere). Legacy items get
   // a plain src= assignment. Cancellation token guards against stale
