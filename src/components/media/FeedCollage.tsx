@@ -327,7 +327,7 @@ function computeShape(
   };
 }
 
-function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick, previewSrcOverride }: SingleMediaTileProps) {
+function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverlay, disableItemClick, previewSrcOverride, videoResume, onResumeConsumed }: SingleMediaTileProps) {
   const { item, originalIndex } = entry;
   const isVideo = item.type === 'video';
 
