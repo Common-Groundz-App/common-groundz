@@ -57,27 +57,16 @@ export const MuxPreparingPoster: React.FC<MuxPreparingPosterProps> = ({
         <div className="w-full h-full bg-muted" />
       )}
 
-      {!hideBadge && (
+      {!hideBadge && errored && (
         <div className="absolute inset-x-0 bottom-0 flex justify-center pb-2 pointer-events-none">
           <div
             className={cn(
               'flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium backdrop-blur-sm',
-              errored
-                ? 'bg-destructive/85 text-destructive-foreground'
-                : 'bg-black/65 text-white',
+              'bg-destructive/85 text-destructive-foreground',
             )}
           >
-            {errored ? (
-              <>
-                <AlertTriangle className="h-3 w-3" />
-                <span>Couldn't process video</span>
-              </>
-            ) : (
-              <>
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span>Processing video…</span>
-              </>
-            )}
+            <AlertTriangle className="h-3 w-3" />
+            <span>Couldn't process video</span>
           </div>
         </div>
       )}
