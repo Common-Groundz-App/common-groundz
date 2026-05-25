@@ -17,7 +17,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, maybeEmitBrokenReady } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, muxThumbnailUrl, maybeEmitBrokenReady } from '@/utils/muxMedia';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
