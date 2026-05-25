@@ -23,6 +23,98 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+/**
+ * Lightbox-only video player.
+ *
+ * - For Mux-playable items, attaches the proper HLS stream via the shared
+ *   `attachHls` helper and uses a high-res Mux thumbnail as the poster.
+ * - For legacy (Supabase) items, behaves like a plain `<video src=...>`.
+ * - Reserves the correct aspect-ratio box up-front from `item.width/height`
+ *   (fallback 16/9) so the player does not pop from small-blurry to full size
+ *   when video metadata arrives.
+ */
+interface LightboxVideoProps {
+  item: MediaItem;
+  isMobile: boolean;
+  isLandscape: boolean;
+  onLoadedData: () => void;
+}
+
+const LightboxVideo: React.FC<LightboxVideoProps> = ({
+  item,
+  isMobile,
+  isLandscape,
+  onLoadedData,
+}) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const { src, isHls } = resolveVideoSrc(item);
+    if (!src) return;
+
+    const token: AttachToken = { cancelled: false };
+    let detach: () => void;
+    if (isHls) {
+      detach = attachHls(v, src, token, {
+        onEvent: (e, p) => analytics.track(e, p),
+      });
+    } else {
+      try { v.src = src; } catch { /* ignore */ }
+      detach = () => {
+        try { v.removeAttribute('src'); v.load(); } catch { /* ignore */ }
+      };
+    }
+    return () => {
+      token.cancelled = true;
+      detach();
+    };
+  }, [item.id, item.url, item.mux_playback_id, item.mux_status, item.provider]);
+
+  const poster =
+    isMuxPlayable(item) && item.mux_playback_id
+      ? muxThumbnailUrl(item.mux_playback_id, { width: 1280 })
+      : item.thumbnail_url;
+
+  const aspectRatio =
+    item.width && item.height ? `${item.width} / ${item.height}` : '16 / 9';
+
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-center',
+        isMobile && isLandscape ? 'w-full' : 'max-h-[90vh] max-w-full'
+      )}
+      style={{ aspectRatio }}
+    >
+      <video
+        ref={videoRef}
+        poster={poster}
+        controls
+        preload="metadata"
+        autoPlay={false}
+        className={cn(
+          'h-full w-full object-contain',
+          'cursor-auto [&::-webkit-media-controls]:cursor-pointer [&::-webkit-media-controls-panel]:cursor-pointer'
+        )}
+        style={{ cursor: 'auto' }}
+        onLoadedData={onLoadedData}
+        onClick={(e) => e.stopPropagation()}
+        onPlay={(e) => e.stopPropagation()}
+        onPause={(e) => e.stopPropagation()}
+        onVolumeChange={(e) => e.stopPropagation()}
+        onTimeUpdate={(e) => e.stopPropagation()}
+        onSeeking={(e) => e.stopPropagation()}
+        onSeeked={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
+};
+
+
 interface PhotoLightboxProps {
   photos: (MediaItem & { source?: string; username?: string; createdAt?: string })[];
   currentIndex: number;
