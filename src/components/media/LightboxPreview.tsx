@@ -323,7 +323,7 @@ export function LightboxPreview({
                 : 16 / 9;
             const ratio =
               Number.isFinite(rawRatio) && rawRatio > 0 ? rawRatio : 16 / 9;
-            const maxVh = isMobile && isLandscape ? '85vh' : '90vh';
+            const maxVh = isMobile && isLandscape ? 85 : 90;
             const hiResPoster = isMux
               ? muxThumbnailUrl(currentItem.mux_playback_id!, { width: 1280 })
               : muxPosterUrl(currentItem);
@@ -336,9 +336,9 @@ export function LightboxPreview({
               position: 'relative',
               display: 'block',
               aspectRatio: String(ratio),
-              width: `min(100%, calc(${maxVh} * ${ratio}))`,
+              width: `min(100%, calc(${maxVh}vh * ${ratio}))`,
               maxWidth: '100%',
-              maxHeight: maxVh,
+              maxHeight: `${maxVh}vh`,
               minWidth: '1px',
               minHeight: '1px',
             };
@@ -347,12 +347,7 @@ export function LightboxPreview({
             // small/blurry interim frame. Supabase videos reveal immediately
             // (no HLS attach delay) and behave exactly as before.
             const hidden = isMux && !videoReady;
-            const dbg = (msg: string, extra?: Record<string, unknown>) => {
-              if (import.meta.env.DEV) {
-                // eslint-disable-next-line no-console
-                console.log(`[LightboxPreview Mux] ${msg}`, extra ?? '');
-              }
-            };
+
             return (
               <div style={wrapperStyle}>
                 <video
@@ -389,7 +384,7 @@ export function LightboxPreview({
                             // misleading "format unsupported" media error).
                           },
                         });
-                        dbg('hlsAttached', { src });
+
                       } else {
                         try { el.src = src; } catch { /* ignore */ }
                         hlsDetachRef.current = () => {
@@ -434,7 +429,7 @@ export function LightboxPreview({
                   style={{ cursor: 'auto' }}
                   onLoadedMetadata={(e) => {
                     const v = e.currentTarget;
-                    dbg('loadedmetadata', { duration: v.duration, readyState: v.readyState });
+
                     if (
                       handoffAppliedRef.current ||
                       !initialVideoState ||
@@ -454,7 +449,7 @@ export function LightboxPreview({
                         Math.max(0, initialVideoState.currentTime),
                         Math.max(0, dur - 0.5)
                       );
-                      try { v.currentTime = target; dbg('seekApplied', { target }); } catch { /* ignore */ }
+                      try { v.currentTime = target; } catch { /* ignore */ }
                     }
                   }}
                   onLoadedData={() => {
@@ -465,17 +460,16 @@ export function LightboxPreview({
                     const isEntryHandoff =
                       !!initialVideoState && currentIndex === entryIndexRef.current;
                     if (!isEntryHandoff) {
-                      dbg('videoReady=true', { reason: 'loadeddata-no-handoff' });
                       setVideoReady(true);
                     }
+
                   }}
                   onSeeked={(e) => {
                     e.stopPropagation();
-                    dbg('seeked', { currentTime: e.currentTarget.currentTime });
                     // Always reveal once any seek lands — covers handoff seek
                     // and any subsequent user-initiated seeks.
                     setVideoReady(true);
-                    dbg('videoReady=true', { reason: 'seeked' });
+
                     if (
                       handoffAppliedRef.current ||
                       !initialVideoState ||
@@ -498,7 +492,7 @@ export function LightboxPreview({
 
                     // Non-iOS / no early-play path: attempt play here as before.
                     if (!initialVideoState.wasPlaying) return;
-                    dbg('playRequested', { muted: v.muted });
+                    
                     const tryPlay = v.play();
                     if (tryPlay && typeof tryPlay.catch === 'function') {
                       tryPlay.catch(() => {
