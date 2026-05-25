@@ -466,9 +466,20 @@ export function LightboxPreview({
             const ratio =
               Number.isFinite(rawRatio) && rawRatio > 0 ? rawRatio : 16 / 9;
             const maxVh = isMobile && isLandscape ? 85 : 90;
-            const hiResPoster = isMux
-              ? muxThumbnailUrl(currentItem.mux_playback_id!, { width: 1280 })
+            // Prefer the exact-frame bridge poster captured at tap time on
+            // the entry item. Falls back to a time-based Mux thumbnail
+            // (matching the handoff timestamp) and finally to the static
+            // Mux poster. Non-Mux items keep their existing poster.
+            const isEntryItem = currentIndex === entryIndexRef.current;
+            const entryPoster = isEntryItem ? entryExtras?.entryPosterDataUrl : undefined;
+            const posterTime =
+              isEntryItem && initialVideoState && initialVideoState.currentTime > 0
+                ? initialVideoState.currentTime
+                : undefined;
+            const muxFallbackPoster = isMux
+              ? muxThumbnailUrl(currentItem.mux_playback_id!, { width: 1280, time: posterTime })
               : muxPosterUrl(currentItem);
+            const hiResPoster = entryPoster ?? muxFallbackPoster;
             // Defensive non-zero sizing: give the browser a real intrinsic
             // width (min of parent and ratio-derived width from the vh cap)
             // PLUS max constraints PLUS a 1px floor so the flex parent can
