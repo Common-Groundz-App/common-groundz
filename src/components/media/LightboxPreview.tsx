@@ -65,6 +65,13 @@ export function LightboxPreview({
   const hlsTokenRef = useRef<AttachToken | null>(null);
   // Capture entry index so navigation away from it disables the handoff.
   const entryIndexRef = useRef(initialIndex);
+  // Live-value refs read by the stable video ref-callback below. Updated each
+  // render so the callback can stay identity-stable (empty deps) without
+  // closing over stale values. This is what prevents the per-render
+  // detach/re-attach loop that was killing playback + handoff.
+  const currentItemRef = useRef<MediaItem | null>(null);
+  const currentIndexRef = useRef<number>(initialIndex);
+  const initialVideoStateRef = useRef<VideoHandoff | undefined>(initialVideoState);
 
   // iOS UA check — Safari/Chrome/etc on iPhone/iPad (including iPadOS desktop UA).
   const isIOS = (): boolean => {
