@@ -378,7 +378,7 @@ export function LightboxPreview({
         onClick={(e) => {
           // Only close if clicking directly on this container (the background area)
           if (e.target === e.currentTarget) {
-            onClose();
+            closeWithHandoff();
           }
         }}
       >
