@@ -19,7 +19,13 @@ import { MediaCompatibilityBadge } from '@/components/media/MediaCompatibilityBa
 
 interface MediaUploaderProps {
   sessionId: string;
-  onMediaUploaded: (media: MediaItem) => void;
+  /**
+   * Called once an upload resolves to a persisted MediaItem. The original
+   * source `File` is passed as a second argument so callers can build a
+   * transient local preview (e.g. URL.createObjectURL) for Mux-backed
+   * videos while Mux is still preparing the HLS asset.
+   */
+  onMediaUploaded: (media: MediaItem, file?: File) => void;
   initialMedia?: MediaItem[];
   className?: string;
   customButton?: React.ReactNode;
