@@ -492,7 +492,7 @@ export function LightboxPreview({
 
                     // Non-iOS / no early-play path: attempt play here as before.
                     if (!initialVideoState.wasPlaying) return;
-                    dbg('playRequested', { muted: v.muted });
+                    
                     const tryPlay = v.play();
                     if (tryPlay && typeof tryPlay.catch === 'function') {
                       tryPlay.catch(() => {
