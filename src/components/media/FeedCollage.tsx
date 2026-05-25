@@ -432,6 +432,15 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
             )}
             loading="lazy"
           />
+        ) : previewSrcOverride?.(item) ? (
+          <video
+            src={previewSrcOverride(item)}
+            poster={item.thumbnail_url || undefined}
+            controls
+            playsInline
+            preload="metadata"
+            className={cn('w-full h-full bg-black', fit === 'cover' ? 'object-cover' : 'object-contain')}
+          />
         ) : (
           <FeedVideo
             item={item}
