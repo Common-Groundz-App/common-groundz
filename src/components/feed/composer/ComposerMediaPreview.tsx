@@ -47,6 +47,7 @@ export function ComposerMediaPreview({
         source="post"
         onItemClick={() => {}}
         disableItemClick
+        previewSrcOverride={previewSrcOverride}
         renderTileOverlay={(item) => (
           <>
             {overlayForItem?.(item)}
