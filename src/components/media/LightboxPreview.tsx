@@ -140,6 +140,14 @@ export function LightboxPreview({
     };
   }, []);
 
+  // Reset videoReady whenever the displayed item changes so the high-res
+  // poster overlay covers the next <video> until it's truly ready.
+  useEffect(() => {
+    setVideoReady(false);
+  }, [currentIndex]);
+
+
+
 
   // Preload adjacent images
   const preloadAdjacentImages = () => {
