@@ -449,7 +449,7 @@ export function LightboxPreview({
                         Math.max(0, initialVideoState.currentTime),
                         Math.max(0, dur - 0.5)
                       );
-                      try { v.currentTime = target; dbg('seekApplied', { target }); } catch { /* ignore */ }
+                      try { v.currentTime = target; } catch { /* ignore */ }
                     }
                   }}
                   onLoadedData={() => {
