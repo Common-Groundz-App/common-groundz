@@ -43,7 +43,12 @@ export function LightboxPreview({
 }: LightboxPreviewProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [loaded, setLoaded] = useState<Record<string, boolean>>({});
+  // Tracks when the <video> for the current item is ready to be revealed
+  // (HLS attached + loadeddata fired + handoff seek applied). Used to keep a
+  // high-res Mux poster on top so we never show a small/blurry interim frame.
+  const [videoReady, setVideoReady] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
+
   const chromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaRef = useRef<MediaItem[]>([]);
   const isMobile = useIsMobile();
