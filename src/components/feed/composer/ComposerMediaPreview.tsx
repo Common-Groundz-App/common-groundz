@@ -13,6 +13,13 @@ interface ComposerMediaPreviewProps {
    * Optional per-tile overlay. Used by Phase 5 to render a Mux processing/ready/failed chip.
    */
   overlayForItem?: (item: MediaItem) => React.ReactNode;
+  /**
+   * Optional per-item override that returns a local blob URL to render as a
+   * plain native <video controls> in place of the normal FeedVideo branch.
+   * Composer-only — used to preview Mux uploads with native controls while
+   * Mux is still preparing the HLS asset. Feed callers never pass this.
+   */
+  previewSrcOverride?: (item: MediaItem) => string | undefined;
 }
 
 /**
