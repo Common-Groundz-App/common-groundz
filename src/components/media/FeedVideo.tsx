@@ -179,25 +179,29 @@ export function FeedVideo(props: FeedVideoProps) {
   //   2. preparing                → preparing poster
   //   3. otherwise                → FeedVideoPlayer (Mux HLS or legacy)
   // ============================================================================
-  const { item, className, objectFit = 'contain' } = props;
-  if (isMuxErroredOrBroken(item)) {
-    maybeEmitBrokenReady(item, (e, p) => analytics.track(e, p));
-    return (
-      <MuxPreparingPoster
-        item={item}
-        className={cn('rounded-md', className)}
-        objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
-      />
-    );
-  }
-  if (isMuxPreparing(item)) {
-    return (
-      <MuxPreparingPoster
-        item={item}
-        className={cn('rounded-md', className)}
-        objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
-      />
-    );
+  const { item, className, objectFit = 'contain', srcOverride } = props;
+  // Composer local-preview override short-circuits Mux status branches so
+  // the user sees the same custom controls as the legacy (Mux-off) path.
+  if (!srcOverride) {
+    if (isMuxErroredOrBroken(item)) {
+      maybeEmitBrokenReady(item, (e, p) => analytics.track(e, p));
+      return (
+        <MuxPreparingPoster
+          item={item}
+          className={cn('rounded-md', className)}
+          objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
+        />
+      );
+    }
+    if (isMuxPreparing(item)) {
+      return (
+        <MuxPreparingPoster
+          item={item}
+          className={cn('rounded-md', className)}
+          objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
+        />
+      );
+    }
   }
   return <FeedVideoPlayer {...props} />;
 }
