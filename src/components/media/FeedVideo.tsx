@@ -568,6 +568,13 @@ function FeedVideoPlayer({
   // Suppress unused-var lint for showBadge (kept in API for callers).
   void showBadge;
 
+  // Compute crossOrigin in render body (NOT an effect) so the attribute is
+  // present on first mount and never toggled. Toggling crossOrigin forces a
+  // reload and breaks playback. Unknown hosts get NO attribute at all so
+  // playback is unchanged for legacy CDNs.
+  const resolvedForCors = srcOverride ?? resolveVideoSrc(item).src;
+  const corsSafe = isCorsSafeVideoHost(resolvedForCors);
+
   return (
     <div
       ref={containerRef}
@@ -584,6 +591,7 @@ function FeedVideoPlayer({
     >
       <video
         ref={videoRef}
+        {...(corsSafe ? { crossOrigin: 'anonymous' as const } : {})}
         poster={srcOverride ? (item.thumbnail_url || undefined) : muxPosterUrl(item)}
         muted={muted}
         playsInline
