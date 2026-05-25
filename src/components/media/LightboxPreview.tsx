@@ -460,9 +460,9 @@ export function LightboxPreview({
                     const isEntryHandoff =
                       !!initialVideoState && currentIndex === entryIndexRef.current;
                     if (!isEntryHandoff) {
-                      dbg('videoReady=true', { reason: 'loadeddata-no-handoff' });
                       setVideoReady(true);
                     }
+
                   }}
                   onSeeked={(e) => {
                     e.stopPropagation();
