@@ -22,6 +22,12 @@ interface FeedVideoProps {
   objectFit?: 'contain' | 'cover';
   source?: 'post' | 'review' | 'entity';
   sourceId?: string;
+  /**
+   * Composer-only: when set, bypasses Mux status branching and uses this
+   * URL as a plain (non-HLS) <video> source. Used for local blob previews
+   * before Mux finishes transcoding.
+   */
+  srcOverride?: string;
 }
 
 type Status = 'loading' | 'ready' | 'error' | 'unsupported';
@@ -173,25 +179,29 @@ export function FeedVideo(props: FeedVideoProps) {
   //   2. preparing                → preparing poster
   //   3. otherwise                → FeedVideoPlayer (Mux HLS or legacy)
   // ============================================================================
-  const { item, className, objectFit = 'contain' } = props;
-  if (isMuxErroredOrBroken(item)) {
-    maybeEmitBrokenReady(item, (e, p) => analytics.track(e, p));
-    return (
-      <MuxPreparingPoster
-        item={item}
-        className={cn('rounded-md', className)}
-        objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
-      />
-    );
-  }
-  if (isMuxPreparing(item)) {
-    return (
-      <MuxPreparingPoster
-        item={item}
-        className={cn('rounded-md', className)}
-        objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
-      />
-    );
+  const { item, className, objectFit = 'contain', srcOverride } = props;
+  // Composer local-preview override short-circuits Mux status branches so
+  // the user sees the same custom controls as the legacy (Mux-off) path.
+  if (!srcOverride) {
+    if (isMuxErroredOrBroken(item)) {
+      maybeEmitBrokenReady(item, (e, p) => analytics.track(e, p));
+      return (
+        <MuxPreparingPoster
+          item={item}
+          className={cn('rounded-md', className)}
+          objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
+        />
+      );
+    }
+    if (isMuxPreparing(item)) {
+      return (
+        <MuxPreparingPoster
+          item={item}
+          className={cn('rounded-md', className)}
+          objectFit={objectFit === 'contain' ? 'contain' : 'cover'}
+        />
+      );
+    }
   }
   return <FeedVideoPlayer {...props} />;
 }
@@ -204,6 +214,7 @@ function FeedVideoPlayer({
   objectFit = 'contain',
   source = 'post',
   sourceId,
+  srcOverride,
 }: FeedVideoProps) {
 
 
@@ -259,7 +270,11 @@ function FeedVideoPlayer({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const { src, isHls } = resolveVideoSrc(item);
+    // Composer local-preview override: treat as a plain legacy source.
+    const resolved = srcOverride
+      ? { src: srcOverride, isHls: false }
+      : resolveVideoSrc(item);
+    const { src, isHls } = resolved;
     if (!src) return;
     isHlsSourceRef.current = isHls;
     hlsUnrecoverableRef.current = false;
@@ -284,7 +299,7 @@ function FeedVideoPlayer({
       token.cancelled = true;
       detach();
     };
-  }, [item.url, item.mux_playback_id, item.mux_status, item.provider]);
+  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride]);
 
 
   // Reset userPaused when video leaves viewport, so re-entry can autoplay again.
@@ -496,7 +511,7 @@ function FeedVideoPlayer({
     >
       <video
         ref={videoRef}
-        poster={muxPosterUrl(item)}
+        poster={srcOverride ? (item.thumbnail_url || undefined) : muxPosterUrl(item)}
         muted={muted}
         playsInline
         loop
