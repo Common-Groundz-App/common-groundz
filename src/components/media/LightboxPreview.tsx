@@ -313,156 +313,197 @@ export function LightboxPreview({
               className="max-h-[90vh] max-w-full"
               objectFit="contain"
             />
-          ) : (
-            <video
-              key={imageKey}
-              ref={(el) => {
-                // Tear down previous attachment when the <video> unmounts
-                // (key={imageKey} change). Cancel async hls.js attach mid-flight.
-                if (!el) {
-                  if (hlsTokenRef.current) hlsTokenRef.current.cancelled = true;
-                  if (hlsDetachRef.current) {
-                    try { hlsDetachRef.current(); } catch { /* ignore */ }
-                  }
-                  hlsDetachRef.current = null;
-                  hlsTokenRef.current = null;
-                  videoElRef.current = null;
-                  return;
-                }
-                videoElRef.current = el;
-                // Phase 4 — attach source synchronously inside the ref callback,
-                // BEFORE the iOS early-play call below. Native HLS path is sync
-                // (just sets el.src), satisfying iOS first-tap autoplay gesture.
-                // hls.js MSE path is async but iOS uses native HLS anyway, so
-                // the gesture is preserved on iOS.
-                const { src, isHls } = resolveVideoSrc(currentItem);
-                if (src && !hlsDetachRef.current) {
-                  if (isHls) {
-                    const token: AttachToken = { cancelled: false };
-                    hlsTokenRef.current = token;
-                    hlsDetachRef.current = attachHls(el, src, token, {
-                      onEvent: (e, p) => analytics.track(e, p),
-                      onUnrecoverable: () => {
-                        // Stop here instead of falling back to raw .m3u8
-                        // on non-native-HLS browsers (would surface as a
-                        // misleading "format unsupported" media error).
-                      },
-                    });
-
-                  } else {
-                    try { el.src = src; } catch { /* ignore */ }
-                    hlsDetachRef.current = () => {
-                      try { el.removeAttribute('src'); el.load(); } catch { /* ignore */ }
-                    };
-                  }
-                }
-                // iOS-only synchronous early play, inside the originating tap
-                // gesture. Skip on non-iOS (already works), non-entry items,
-                // paused-handoff, or after the one-shot has run.
-                if (
-                  !isIOS() ||
-                  earlyPlayRanRef.current ||
-                  handoffAppliedRef.current ||
-                  !initialVideoState ||
-                  !initialVideoState.wasPlaying ||
-                  currentIndex !== entryIndexRef.current
-                ) {
-                  return;
-                }
-                earlyPlayRanRef.current = true;
-                try { el.muted = true; } catch { /* ignore */ }
-                // Best-effort sync seek to reduce 0:00 flash; authoritative
-                // clamped seek still runs in onLoadedMetadata.
-                try {
-                  if (initialVideoState.currentTime > 0) {
-                    el.currentTime = initialVideoState.currentTime;
-                  }
-                } catch { /* ignore — pre-metadata seeks may throw */ }
-                const p = el.play();
-                if (p && typeof p.catch === 'function') {
-                  p.catch(() => { /* iOS blocked; fall back to existing flow */ });
-                }
-              }}
-              poster={muxPosterUrl(currentItem)}
-              controls
-              playsInline
-              className={cn(
-                "cursor-auto [&::-webkit-media-controls]:cursor-pointer [&::-webkit-media-controls-panel]:cursor-pointer",
-                isMobile && isLandscape
-                  ? "h-auto w-full object-contain"
-                  : "max-h-[90vh] max-w-full object-contain"
-              )}
-              style={{ cursor: 'auto' }}
-              onLoadedMetadata={(e) => {
-                const v = e.currentTarget;
-                if (
-                  handoffAppliedRef.current ||
-                  !initialVideoState ||
-                  currentIndex !== entryIndexRef.current
-                ) {
-                  return;
-                }
-                // Only set muted here if the iOS early-play path did NOT run.
-                // If it did, we must keep muted=true until onSeeked attempts
-                // the one-shot unmute, otherwise iOS will pause playback.
-                if (!earlyPlayRanRef.current) {
-                  try { v.muted = initialVideoState.muted; } catch { /* ignore */ }
-                }
-                const dur = v.duration;
-                if (isFinite(dur) && dur > 0) {
-                  const target = Math.min(
-                    Math.max(0, initialVideoState.currentTime),
-                    Math.max(0, dur - 0.5)
-                  );
-                  try { v.currentTime = target; } catch { /* ignore */ }
-                }
-              }}
-              onLoadedData={() => handleImageLoad(currentItem, currentIndex)}
-              onSeeked={(e) => {
-                e.stopPropagation();
-                if (
-                  handoffAppliedRef.current ||
-                  !initialVideoState ||
-                  currentIndex !== entryIndexRef.current
-                ) {
-                  return;
-                }
-                handoffAppliedRef.current = true;
-                const v = e.currentTarget;
-
-                if (earlyPlayRanRef.current) {
-                  // iOS early-play already started playback (muted). If the
-                  // user's global pref is unmuted, try once to unmute. If the
-                  // browser re-mutes or throws, leave it muted — no retries.
-                  if (!initialVideoState.muted) {
-                    try { v.muted = false; } catch { /* ignore */ }
-                  }
-                  return;
-                }
-
-                // Non-iOS / no early-play path: attempt play here as before.
-                if (!initialVideoState.wasPlaying) return;
-                const tryPlay = v.play();
-                if (tryPlay && typeof tryPlay.catch === 'function') {
-                  tryPlay.catch(() => {
-                    try { v.muted = true; } catch { /* ignore */ }
-                    const retry = v.play();
-                    if (retry && typeof retry.catch === 'function') {
-                      retry.catch(() => { /* still blocked; native controls visible */ });
+          ) : (() => {
+            const isMux = isMuxPlayable(currentItem) && !!currentItem.mux_playback_id;
+            const aspectRatio = currentItem.width && currentItem.height
+              ? `${currentItem.width} / ${currentItem.height}`
+              : '16 / 9';
+            const hiResPoster = isMux
+              ? muxThumbnailUrl(currentItem.mux_playback_id!, { width: 1280 })
+              : muxPosterUrl(currentItem);
+            const wrapperStyle: React.CSSProperties =
+              isMobile && isLandscape
+                ? { aspectRatio, width: '100%', maxHeight: '85vh' }
+                : { aspectRatio, maxHeight: '90vh', maxWidth: '100%' };
+            // For Mux, keep the high-res poster on top until the video has
+            // attached + loaded + handoff seek completed so we never show a
+            // small/blurry interim frame. Supabase videos reveal immediately
+            // (no HLS attach delay) and behave exactly as before.
+            const hidden = isMux && !videoReady;
+            return (
+              <div className="relative" style={wrapperStyle}>
+                <video
+                  key={imageKey}
+                  ref={(el) => {
+                    // Tear down previous attachment when the <video> unmounts
+                    // (key={imageKey} change). Cancel async hls.js attach mid-flight.
+                    if (!el) {
+                      if (hlsTokenRef.current) hlsTokenRef.current.cancelled = true;
+                      if (hlsDetachRef.current) {
+                        try { hlsDetachRef.current(); } catch { /* ignore */ }
+                      }
+                      hlsDetachRef.current = null;
+                      hlsTokenRef.current = null;
+                      videoElRef.current = null;
+                      return;
                     }
-                  });
-                }
-              }}
-              onClick={(e) => e.stopPropagation()}
-              onPlay={(e) => e.stopPropagation()}
-              onPause={(e) => e.stopPropagation()}
-              onVolumeChange={(e) => e.stopPropagation()}
-              onTimeUpdate={(e) => e.stopPropagation()}
-              onSeeking={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-            />
-          )}
+                    videoElRef.current = el;
+                    // Phase 4 — attach source synchronously inside the ref callback,
+                    // BEFORE the iOS early-play call below. Native HLS path is sync
+                    // (just sets el.src), satisfying iOS first-tap autoplay gesture.
+                    // hls.js MSE path is async but iOS uses native HLS anyway, so
+                    // the gesture is preserved on iOS.
+                    const { src, isHls } = resolveVideoSrc(currentItem);
+                    if (src && !hlsDetachRef.current) {
+                      if (isHls) {
+                        const token: AttachToken = { cancelled: false };
+                        hlsTokenRef.current = token;
+                        hlsDetachRef.current = attachHls(el, src, token, {
+                          onEvent: (e, p) => analytics.track(e, p),
+                          onUnrecoverable: () => {
+                            // Stop here instead of falling back to raw .m3u8
+                            // on non-native-HLS browsers (would surface as a
+                            // misleading "format unsupported" media error).
+                          },
+                        });
+
+                      } else {
+                        try { el.src = src; } catch { /* ignore */ }
+                        hlsDetachRef.current = () => {
+                          try { el.removeAttribute('src'); el.load(); } catch { /* ignore */ }
+                        };
+                      }
+                    }
+                    // iOS-only synchronous early play, inside the originating tap
+                    // gesture. Skip on non-iOS (already works), non-entry items,
+                    // paused-handoff, or after the one-shot has run.
+                    if (
+                      !isIOS() ||
+                      earlyPlayRanRef.current ||
+                      handoffAppliedRef.current ||
+                      !initialVideoState ||
+                      !initialVideoState.wasPlaying ||
+                      currentIndex !== entryIndexRef.current
+                    ) {
+                      return;
+                    }
+                    earlyPlayRanRef.current = true;
+                    try { el.muted = true; } catch { /* ignore */ }
+                    // Best-effort sync seek to reduce 0:00 flash; authoritative
+                    // clamped seek still runs in onLoadedMetadata.
+                    try {
+                      if (initialVideoState.currentTime > 0) {
+                        el.currentTime = initialVideoState.currentTime;
+                      }
+                    } catch { /* ignore — pre-metadata seeks may throw */ }
+                    const p = el.play();
+                    if (p && typeof p.catch === 'function') {
+                      p.catch(() => { /* iOS blocked; fall back to existing flow */ });
+                    }
+                  }}
+                  poster={hiResPoster}
+                  controls
+                  playsInline
+                  className={cn(
+                    "absolute inset-0 h-full w-full object-contain cursor-auto [&::-webkit-media-controls]:cursor-pointer [&::-webkit-media-controls-panel]:cursor-pointer transition-opacity duration-200",
+                    hidden ? "opacity-0" : "opacity-100"
+                  )}
+                  style={{ cursor: 'auto' }}
+                  onLoadedMetadata={(e) => {
+                    const v = e.currentTarget;
+                    if (
+                      handoffAppliedRef.current ||
+                      !initialVideoState ||
+                      currentIndex !== entryIndexRef.current
+                    ) {
+                      return;
+                    }
+                    // Only set muted here if the iOS early-play path did NOT run.
+                    // If it did, we must keep muted=true until onSeeked attempts
+                    // the one-shot unmute, otherwise iOS will pause playback.
+                    if (!earlyPlayRanRef.current) {
+                      try { v.muted = initialVideoState.muted; } catch { /* ignore */ }
+                    }
+                    const dur = v.duration;
+                    if (isFinite(dur) && dur > 0) {
+                      const target = Math.min(
+                        Math.max(0, initialVideoState.currentTime),
+                        Math.max(0, dur - 0.5)
+                      );
+                      try { v.currentTime = target; } catch { /* ignore */ }
+                    }
+                  }}
+                  onLoadedData={() => {
+                    handleImageLoad(currentItem, currentIndex);
+                    // For non-handoff items (or Supabase no-op handoff), reveal
+                    // immediately on first frame. Entry-handoff items wait for
+                    // onSeeked so we never flash the pre-seek frame.
+                    const isEntryHandoff =
+                      !!initialVideoState && currentIndex === entryIndexRef.current;
+                    if (!isEntryHandoff) setVideoReady(true);
+                  }}
+                  onSeeked={(e) => {
+                    e.stopPropagation();
+                    // Always reveal once any seek lands — covers handoff seek
+                    // and any subsequent user-initiated seeks.
+                    setVideoReady(true);
+                    if (
+                      handoffAppliedRef.current ||
+                      !initialVideoState ||
+                      currentIndex !== entryIndexRef.current
+                    ) {
+                      return;
+                    }
+                    handoffAppliedRef.current = true;
+                    const v = e.currentTarget;
+
+                    if (earlyPlayRanRef.current) {
+                      // iOS early-play already started playback (muted). If the
+                      // user's global pref is unmuted, try once to unmute. If the
+                      // browser re-mutes or throws, leave it muted — no retries.
+                      if (!initialVideoState.muted) {
+                        try { v.muted = false; } catch { /* ignore */ }
+                      }
+                      return;
+                    }
+
+                    // Non-iOS / no early-play path: attempt play here as before.
+                    if (!initialVideoState.wasPlaying) return;
+                    const tryPlay = v.play();
+                    if (tryPlay && typeof tryPlay.catch === 'function') {
+                      tryPlay.catch(() => {
+                        try { v.muted = true; } catch { /* ignore */ }
+                        const retry = v.play();
+                        if (retry && typeof retry.catch === 'function') {
+                          retry.catch(() => { /* still blocked; native controls visible */ });
+                        }
+                      });
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  onPlay={(e) => e.stopPropagation()}
+                  onPause={(e) => e.stopPropagation()}
+                  onVolumeChange={(e) => e.stopPropagation()}
+                  onTimeUpdate={(e) => e.stopPropagation()}
+                  onSeeking={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                />
+                {isMux && hiResPoster && (
+                  <img
+                    src={hiResPoster}
+                    alt=""
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute inset-0 h-full w-full object-contain pointer-events-none transition-opacity duration-200",
+                      videoReady ? "opacity-0" : "opacity-100"
+                    )}
+                  />
+                )}
+              </div>
+            );
+          })()}
+
         </div>
         
         {/* Navigation controls - only shown when there are multiple items */}
