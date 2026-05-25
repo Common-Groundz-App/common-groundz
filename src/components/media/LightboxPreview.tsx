@@ -441,73 +441,7 @@ export function LightboxPreview({
               <div style={wrapperStyle}>
                 <video
                   key={imageKey}
-                  ref={(el) => {
-                    // Tear down previous attachment when the <video> unmounts
-                    // (key={imageKey} change). Cancel async hls.js attach mid-flight.
-                    if (!el) {
-                      if (hlsTokenRef.current) hlsTokenRef.current.cancelled = true;
-                      if (hlsDetachRef.current) {
-                        try { hlsDetachRef.current(); } catch { /* ignore */ }
-                      }
-                      hlsDetachRef.current = null;
-                      hlsTokenRef.current = null;
-                      videoElRef.current = null;
-                      return;
-                    }
-                    videoElRef.current = el;
-                    // Phase 4 — attach source synchronously inside the ref callback,
-                    // BEFORE the iOS early-play call below. Native HLS path is sync
-                    // (just sets el.src), satisfying iOS first-tap autoplay gesture.
-                    // hls.js MSE path is async but iOS uses native HLS anyway, so
-                    // the gesture is preserved on iOS.
-                    const { src, isHls } = resolveVideoSrc(currentItem);
-                    if (src && !hlsDetachRef.current) {
-                      if (isHls) {
-                        const token: AttachToken = { cancelled: false };
-                        hlsTokenRef.current = token;
-                        hlsDetachRef.current = attachHls(el, src, token, {
-                          onEvent: (e, p) => analytics.track(e, p),
-                          onUnrecoverable: () => {
-                            // Stop here instead of falling back to raw .m3u8
-                            // on non-native-HLS browsers (would surface as a
-                            // misleading "format unsupported" media error).
-                          },
-                        });
-
-                      } else {
-                        try { el.src = src; } catch { /* ignore */ }
-                        hlsDetachRef.current = () => {
-                          try { el.removeAttribute('src'); el.load(); } catch { /* ignore */ }
-                        };
-                      }
-                    }
-                    // iOS-only synchronous early play, inside the originating tap
-                    // gesture. Skip on non-iOS (already works), non-entry items,
-                    // paused-handoff, or after the one-shot has run.
-                    if (
-                      !isIOS() ||
-                      earlyPlayRanRef.current ||
-                      handoffAppliedRef.current ||
-                      !initialVideoState ||
-                      !initialVideoState.wasPlaying ||
-                      currentIndex !== entryIndexRef.current
-                    ) {
-                      return;
-                    }
-                    earlyPlayRanRef.current = true;
-                    try { el.muted = true; } catch { /* ignore */ }
-                    // Best-effort sync seek to reduce 0:00 flash; authoritative
-                    // clamped seek still runs in onLoadedMetadata.
-                    try {
-                      if (initialVideoState.currentTime > 0) {
-                        el.currentTime = initialVideoState.currentTime;
-                      }
-                    } catch { /* ignore — pre-metadata seeks may throw */ }
-                    const p = el.play();
-                    if (p && typeof p.catch === 'function') {
-                      p.catch(() => { /* iOS blocked; fall back to existing flow */ });
-                    }
-                  }}
+                  ref={videoRefCallback}
                   poster={hiResPoster}
                   controls
                   playsInline
