@@ -1,40 +1,57 @@
-## Goal
+# Plan — Fix Mux feed-lightbox handoff and sizing (LightboxPreview only)
 
-When Mux uploads are enabled, the composer preview currently renders a native `<video controls>` (browser chrome: fullscreen button, 3-dot menu, no hover states, no center play/pause). When Mux is off, the composer renders `FeedVideo` (custom UI: center play/pause, slim scrubber, mute toggle, hover reveal). Make the Mux-on path use the same `FeedVideo`-based player as Mux-off so both look and behave identically.
+The feed opens `src/components/media/LightboxPreview.tsx` (not `photo-lightbox.tsx`). The remaining Mux bugs (pause on open, small/blurry intermediate frame, late resize) live there. Fix is scoped to this single file.
 
-## Scope
+## What will change
 
-Frontend / presentation only. No DB, edge function, `renderBranching.ts`, upload pipeline, or feed behavior changes. Feed callers do not pass `previewSrcOverride`, so feed is untouched.
+1. **Reserve final aspect ratio from the very first render**
+   - Wrap the `<video>` in an aspect-ratio box derived from `currentItem.width / currentItem.height`, falling back to `16 / 9`.
+   - The wrapper keeps the lightbox content box at the final size for the entire poster → attach → metadata sequence, so the player never shrinks or pops.
 
-## Changes
+2. **Keep a high-res Mux poster visible until the video is truly ready**
+   - For Mux items, render a Mux thumbnail (`muxThumbnailUrl(playback_id, { width: 1280 })`) as an absolutely positioned `<img>` on top of the `<video>`.
+   - The `<video>` stays visually hidden (`opacity-0`) until both:
+     - HLS is attached, and
+     - the video has fired `loadeddata` (or `readyState >= 2`) and the handoff seek has completed.
+   - Then fade the poster out and the video in — no blurry intermediate frame.
 
-### 1. `src/components/media/FeedVideo.tsx`
-- Add optional prop `srcOverride?: string` to `FeedVideoProps`.
-- In the `FeedVideo` dispatcher: when `srcOverride` is set, **bypass** the `isMuxErroredOrBroken` and `isMuxPreparing` branches and render `FeedVideoPlayer` directly. This guarantees Mux-status checks don't hide the local preview.
-- In `FeedVideoPlayer`'s source-attach effect: when `srcOverride` is set, treat as a plain legacy source — assign `v.src = srcOverride`, set `isHlsSourceRef.current = false`, skip `attachHls`. Add `srcOverride` to the effect's dep array.
-- For the `<video poster=...>` attribute: when `srcOverride` is set, prefer `item.thumbnail_url` (the local poster) and fall back to `undefined` instead of `muxPosterUrl(item)` (which would point at a not-yet-ready Mux thumbnail).
-- Everything else (mute toggle, scrubber, center play/pause overlay, hover/focus reveal, autoplay) is reused unchanged.
+3. **Gate the handoff (seek + play) on HLS readiness for Mux**
+   - Keep the existing `handoffAppliedRef` one-shot guard exactly as-is.
+   - For Supabase (`isHls === false`): keep current behavior (handoff in `onLoadedMetadata` / `onSeeked`) — unchanged.
+   - For Mux (`isHls === true`): defer the seek+play to a new `hlsReady` signal, fired when:
+     - `attachHls` has run (sync on Safari/iOS native HLS, async on hls.js), AND
+     - the `<video>` has reached `loadedmetadata` (so duration is known and seeking is safe).
+   - Sequence: set `muted` from handoff → clamp+seek to `initialVideoState.currentTime` → on `seeked`, if `wasPlaying`, call `play()` with the existing muted-retry fallback.
+   - This eliminates the “pause on open” because we no longer rely on the browser autoplay timing — we explicitly play after the seek lands.
 
-### 2. `src/components/media/FeedCollage.tsx`
-- Remove the two `previewSrcOverride?.(item) ? <video controls .../> : <FeedVideo .../>` branches (in `renderTile` and `SingleMediaTile`).
-- Replace with a single `<FeedVideo srcOverride={previewSrcOverride?.(item)} ... />` call. `FeedVideo` decides what to do based on `srcOverride`.
-- `previewSrcOverride` prop signature unchanged; feed callers still don't pass it.
+4. **Preserve iOS first-tap invariant**
+   - The iOS synchronous ref-callback `play()` path (invariant #4 in the file header) stays exactly as-is and continues to run before HLS attach. The new HLS-ready gate only affects the non-iOS / non-early-play branches.
 
-### 3. Untouched
-- `ComposerMediaPreview.tsx`, `EnhancedCreatePostForm.tsx`: still build and pass `previewSrcOverride` exactly as today.
-- `renderBranching.ts`, `muxMedia.ts`, `MuxPreparingPoster.tsx`, `MuxUploadChip.tsx`: unchanged.
-- Feed and lightbox: unchanged (no `srcOverride` is ever passed to them).
+5. **Preserve existing cleanup**
+   - Ref-callback unmount path (cancel HLS token + detach) is unchanged.
+   - The new poster-overlay `<img>` and `videoReady` state reset on `key={imageKey}` change automatically.
 
-## Behavior after change
+## Out of scope
 
-- Mux ON, composer: identical UI to Mux OFF — center play/pause, slim scrubber, mute icon, hover reveal, no fullscreen/3-dot chrome.
-- Mux ON, feed: unchanged (HLS player, no badge while preparing, error pill on failure).
-- Mux OFF, composer and feed: unchanged.
-- Object-URL lifecycle (revoke on remove/unmount/submit) unchanged — still managed by `EnhancedCreatePostForm`.
+- `photo-lightbox.tsx` — not used by the feed path
+- `FeedVideo.tsx`, `FeedCollage.tsx`, `PostMediaDisplay.tsx` — feed playback unchanged
+- `renderBranching.ts`, `muxMedia.ts`, `hlsAttach.ts` — shared utilities unchanged
+- DB / edge functions / upload pipeline / composer — untouched
+- Supabase video lightbox behavior — must remain bit-for-bit identical
+
+## Technical details
+
+- New local state in `LightboxPreview`: `videoReady: boolean`, reset whenever `imageKey` changes.
+- `videoReady` flips to true after both the HLS-ready signal and `loadeddata` for the current `<video>`.
+- Poster overlay `<img>` styles: `absolute inset-0 object-contain`, fades out on `videoReady`.
+- `<video>` is mounted from the start (so HLS can attach) but rendered with `opacity-0` until `videoReady`, then `opacity-100` with a short transition.
+- Aspect-ratio wrapper uses inline `style={{ aspectRatio }}` so the layout is stable before any media metadata arrives.
+- The 5 handoff invariants in the file header are preserved. The iOS early-play branch is unchanged. Only the non-iOS Mux branch now waits for HLS-ready before seeking/playing.
 
 ## Verification
 
-- Mux ON + video upload in composer → see center play/pause, slim white scrubber, mute toggle; no browser-native chrome.
-- Mux OFF + video upload → visually indistinguishable from Mux-ON composer.
-- Mux ON + post → feed video plays via HLS, unchanged from today.
-- Remove the video in the composer → no console errors, blob URL revoked.
+After implementing, I will verify in the preview:
+- Mux video: opens at full lightbox size immediately, no shrink/pop, no blurry frame, no unexpected pause; resumes from the tapped feed timestamp; mute state preserved.
+- Supabase video: identical behavior to before — continues from tapped timestamp, no pause, no resize.
+- Switching between items in the lightbox cleans up HLS (no stale instances).
+- No new console errors.
