@@ -828,6 +828,7 @@ export function EnhancedCreatePostForm({
           description: 'Your changes have been saved.',
         });
 
+        revokeAllLocalPreviews();
         onSuccess();
         return;
       }
