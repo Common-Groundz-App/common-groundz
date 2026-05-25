@@ -444,8 +444,48 @@ export function EnhancedCreatePostForm({
     };
   }, []);
 
-  const handleMediaUpload = (mediaItem: MediaItem) => {
+  // Transient local-preview blob URLs for Mux-backed videos. Keyed by
+  // MediaItem.id (uuid). NEVER added to MediaItem or persisted; revoked on
+  // remove / unmount / successful submit. Lets the composer show native
+  // <video controls> for Mux uploads while Mux is still preparing HLS.
+  const localPreviewUrlsRef = useRef<Map<string, string>>(new Map());
+
+  const revokeLocalPreview = useCallback((mediaId?: string) => {
+    if (!mediaId) return;
+    const url = localPreviewUrlsRef.current.get(mediaId);
+    if (url) {
+      try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+      localPreviewUrlsRef.current.delete(mediaId);
+    }
+  }, []);
+
+  const revokeAllLocalPreviews = useCallback(() => {
+    localPreviewUrlsRef.current.forEach((url) => {
+      try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+    });
+    localPreviewUrlsRef.current.clear();
+  }, []);
+
+  useEffect(() => {
+    return () => revokeAllLocalPreviews();
+  }, [revokeAllLocalPreviews]);
+
+  const handleMediaUpload = (mediaItem: MediaItem, sourceFile?: File) => {
     if (media.length < MAX_MEDIA_COUNT) {
+      // For Mux-backed videos, build a transient blob URL from the original
+      // File so the composer can preview with native controls regardless of
+      // whether Mux has finished processing.
+      if (
+        sourceFile &&
+        mediaItem.id &&
+        mediaItem.type === 'video' &&
+        mediaItem.provider === 'mux'
+      ) {
+        try {
+          const url = URL.createObjectURL(sourceFile);
+          localPreviewUrlsRef.current.set(mediaItem.id, url);
+        } catch { /* ignore */ }
+      }
       setMedia((prev) => [...prev, { ...mediaItem, order: prev.length }]);
     } else {
       toast({
@@ -457,7 +497,8 @@ export function EnhancedCreatePostForm({
   };
 
   const removeMedia = (itemToRemove: MediaItem) => {
-    setMedia((prev) => 
+    revokeLocalPreview(itemToRemove.id);
+    setMedia((prev) =>
       prev
         .filter((item) => item.url !== itemToRemove.url)
         .map((item, index) => ({ ...item, order: index }))
