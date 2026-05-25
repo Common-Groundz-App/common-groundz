@@ -9,7 +9,7 @@ import { useVideoViewTracker } from '@/hooks/useVideoViewTracker';
 import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
-import { MediaItem, VideoHandoff } from '@/types/media';
+import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { isMuxPreparing, isMuxErroredOrBroken, resolveVideoSrc, maybeEmitBrokenReady, muxPosterUrl } from '@/utils/muxMedia';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
@@ -28,6 +28,13 @@ interface FeedVideoProps {
    * before Mux finishes transcoding.
    */
   srcOverride?: string;
+  /**
+   * Reverse handoff from the lightbox: when present, this video applies
+   * the carried mute/timestamp/play state once and then calls
+   * `onResumeConsumed`. Only the originally-opened tile receives this.
+   */
+  resumeState?: VideoExitHandoff;
+  onResumeConsumed?: () => void;
 }
 
 type Status = 'loading' | 'ready' | 'error' | 'unsupported';
