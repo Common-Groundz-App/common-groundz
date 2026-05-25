@@ -434,6 +434,7 @@ export function LightboxPreview({
                   style={{ cursor: 'auto' }}
                   onLoadedMetadata={(e) => {
                     const v = e.currentTarget;
+                    dbg('loadedmetadata', { duration: v.duration, readyState: v.readyState });
                     if (
                       handoffAppliedRef.current ||
                       !initialVideoState ||
@@ -453,7 +454,7 @@ export function LightboxPreview({
                         Math.max(0, initialVideoState.currentTime),
                         Math.max(0, dur - 0.5)
                       );
-                      try { v.currentTime = target; } catch { /* ignore */ }
+                      try { v.currentTime = target; dbg('seekApplied', { target }); } catch { /* ignore */ }
                     }
                   }}
                   onLoadedData={() => {
@@ -463,13 +464,18 @@ export function LightboxPreview({
                     // onSeeked so we never flash the pre-seek frame.
                     const isEntryHandoff =
                       !!initialVideoState && currentIndex === entryIndexRef.current;
-                    if (!isEntryHandoff) setVideoReady(true);
+                    if (!isEntryHandoff) {
+                      dbg('videoReady=true', { reason: 'loadeddata-no-handoff' });
+                      setVideoReady(true);
+                    }
                   }}
                   onSeeked={(e) => {
                     e.stopPropagation();
+                    dbg('seeked', { currentTime: e.currentTarget.currentTime });
                     // Always reveal once any seek lands — covers handoff seek
                     // and any subsequent user-initiated seeks.
                     setVideoReady(true);
+                    dbg('videoReady=true', { reason: 'seeked' });
                     if (
                       handoffAppliedRef.current ||
                       !initialVideoState ||
@@ -492,6 +498,7 @@ export function LightboxPreview({
 
                     // Non-iOS / no early-play path: attempt play here as before.
                     if (!initialVideoState.wasPlaying) return;
+                    dbg('playRequested', { muted: v.muted });
                     const tryPlay = v.play();
                     if (tryPlay && typeof tryPlay.catch === 'function') {
                       tryPlay.catch(() => {
