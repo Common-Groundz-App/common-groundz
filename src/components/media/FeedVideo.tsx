@@ -13,6 +13,9 @@ import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { isMuxPreparing, isMuxErroredOrBroken, resolveVideoSrc, maybeEmitBrokenReady, muxPosterUrl } from '@/utils/muxMedia';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
+import { captureVideoFrame } from '@/utils/captureVideoFrame';
+import { isCorsSafeVideoHost } from '@/utils/corsSafeHosts';
+import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 
 interface FeedVideoProps {
   item: MediaItem;
