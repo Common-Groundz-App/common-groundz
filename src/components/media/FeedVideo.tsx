@@ -270,7 +270,11 @@ function FeedVideoPlayer({
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const { src, isHls } = resolveVideoSrc(item);
+    // Composer local-preview override: treat as a plain legacy source.
+    const resolved = srcOverride
+      ? { src: srcOverride, isHls: false }
+      : resolveVideoSrc(item);
+    const { src, isHls } = resolved;
     if (!src) return;
     isHlsSourceRef.current = isHls;
     hlsUnrecoverableRef.current = false;
@@ -295,7 +299,7 @@ function FeedVideoPlayer({
       token.cancelled = true;
       detach();
     };
-  }, [item.url, item.mux_playback_id, item.mux_status, item.provider]);
+  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride]);
 
 
   // Reset userPaused when video leaves viewport, so re-entry can autoplay again.
