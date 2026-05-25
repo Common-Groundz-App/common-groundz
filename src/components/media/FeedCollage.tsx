@@ -55,6 +55,7 @@ export function FeedCollage({
   className,
   renderTileOverlay,
   disableItemClick,
+  previewSrcOverride,
 }: FeedCollageProps) {
   if (!media || media.length === 0) return null;
 
