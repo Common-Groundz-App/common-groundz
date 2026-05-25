@@ -392,7 +392,7 @@ export function LightboxPreview({
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            onClose();
+            closeWithHandoff();
           }}
         >
           <X className="h-5 w-5 text-white" />
