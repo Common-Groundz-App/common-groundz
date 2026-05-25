@@ -20,6 +20,13 @@ interface FeedCollageProps {
    * and video onTap is not wired). Opt-in only.
    */
   disableItemClick?: boolean;
+  /**
+   * Opt-in per-item video source override. When this returns a URL for an
+   * item, that video tile renders a plain native <video controls src=...>
+   * and bypasses FeedVideo / renderBranching entirely. Composer-only — feed
+   * callers never pass this so feed behavior is unchanged.
+   */
+  previewSrcOverride?: (item: MediaItem) => string | undefined;
 }
 
 type Orientation = 'portrait' | 'landscape' | 'square';
