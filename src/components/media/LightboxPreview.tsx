@@ -21,6 +21,7 @@ import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, m
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
+import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 
 interface LightboxPreviewProps {
   media: MediaItem[];
@@ -37,6 +38,12 @@ interface LightboxPreviewProps {
    * by the parent when entryIndex === currentIndex.
    */
   onExitHandoff?: (handoff: VideoExitHandoff) => void;
+  /**
+   * Transient view-only extras carried from the feed (e.g. exact-frame
+   * snapshot dataURL). Used as a bridge cover on the entry item until
+   * the real <video> is ready. Dropped on close.
+   */
+  entryExtras?: LightboxEntryExtras;
   onClose: () => void;
   className?: string;
 }
@@ -46,6 +53,7 @@ export function LightboxPreview({
   initialIndex = 0,
   initialVideoState,
   onExitHandoff,
+  entryExtras,
   onClose,
   className 
 }: LightboxPreviewProps) {
