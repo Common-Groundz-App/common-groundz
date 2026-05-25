@@ -1038,6 +1038,7 @@ export function EnhancedCreatePostForm({
       setStructuredOpen(false);
       setPostType('experience');
       clearDraft();
+      revokeAllLocalPreviews();
       onSuccess();
     } catch (error) {
       console.error('Error creating post:', error);
