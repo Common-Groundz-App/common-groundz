@@ -156,19 +156,31 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
 
   const currentPhoto = photos[currentIndex];
 
-  // Prevent body scrolling when lightbox is open
+  // Prevent body scrolling when lightbox is open (preserve scroll position)
   useEffect(() => {
+    const savedY = window.scrollY || window.pageYOffset || 0;
     const originalOverflow = document.body.style.overflow;
     const originalPosition = document.body.style.position;
-    
+    const originalWidth = document.body.style.width;
+    const originalTop = document.body.style.top;
+    const originalLeft = document.body.style.left;
+    const originalRight = document.body.style.right;
+
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
     document.body.style.width = '100%';
-    
+    document.body.style.top = `-${savedY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+
     return () => {
       document.body.style.overflow = originalOverflow;
       document.body.style.position = originalPosition;
-      document.body.style.width = '';
+      document.body.style.width = originalWidth;
+      document.body.style.top = originalTop;
+      document.body.style.left = originalLeft;
+      document.body.style.right = originalRight;
+      window.scrollTo(0, savedY);
     };
   }, []);
 
