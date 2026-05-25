@@ -27,6 +27,15 @@ interface FeedCollageProps {
    * callers never pass this so feed behavior is unchanged.
    */
   previewSrcOverride?: (item: MediaItem) => string | undefined;
+  /**
+   * Reverse handoff target: when the lightbox closes on the originally
+   * opened video, this carries the lightbox's playback state so the
+   * matching feed video can resume from it. Only the FeedVideo whose
+   * originalIndex matches `videoResume.index` receives it.
+   */
+  videoResume?: { index: number; handoff: VideoExitHandoff } | null;
+  /** Called by FeedVideo once it has applied the resume state. */
+  onResumeConsumed?: () => void;
 }
 
 type Orientation = 'portrait' | 'landscape' | 'square';
