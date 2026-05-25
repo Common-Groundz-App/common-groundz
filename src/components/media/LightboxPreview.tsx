@@ -12,7 +12,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { MediaItem, VideoHandoff } from '@/types/media';
+import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
