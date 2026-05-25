@@ -5,6 +5,7 @@ import { FeedCollage } from '@/components/media/FeedCollage';
 import { cn } from '@/lib/utils';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { readGlobalVideoMuted, setGlobalVideoMuted } from '@/hooks/useVideoMute';
+import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 
 interface PostMediaDisplayProps {
   media?: MediaItem[];
@@ -38,6 +39,7 @@ export function PostMediaDisplay({
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [videoHandoff, setVideoHandoff] = useState<VideoHandoff | null>(null);
+  const [entryExtras, setEntryExtras] = useState<LightboxEntryExtras | null>(null);
   const [videoResume, setVideoResume] = useState<{ index: number; handoff: VideoExitHandoff } | null>(null);
   
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
@@ -96,9 +98,12 @@ export function PostMediaDisplay({
     return 'h-auto max-h-[500px]';
   };
   
-  const handleImageClick = (index: number, handoff?: VideoHandoff) => {
+  const handleImageClick = (index: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => {
     setActiveImageIndex(index);
+    // Both state updates happen in the same handler — React batches them so
+    // LightboxPreview never mounts a render before entryPosterDataUrl is set.
     setVideoHandoff(handoff ?? null);
+    setEntryExtras(extras ?? null);
     setLightboxOpen(true);
   };
 
@@ -106,6 +111,8 @@ export function PostMediaDisplay({
     setLightboxOpen(false);
     // Reset so a later open of a different post can't inherit stale state.
     setVideoHandoff(null);
+    // Drop the dataURL — never retained in a ref. Eligible for GC immediately.
+    setEntryExtras(null);
   };
 
   // Reverse handoff: mute is a global preference, so always sync it.
@@ -142,6 +149,7 @@ export function PostMediaDisplay({
           media={validMedia}
           initialIndex={activeImageIndex}
           initialVideoState={videoHandoff ?? undefined}
+          entryExtras={entryExtras ?? undefined}
           onExitHandoff={handleExitHandoff}
           onClose={handleLightboxClose}
         />
