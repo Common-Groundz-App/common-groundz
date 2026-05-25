@@ -3,7 +3,14 @@ import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Flag, MoreVertical, Edit3, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MediaItem } from '@/types/media';
-import { isMuxPreparing } from '@/utils/muxMedia';
+import {
+  isMuxPreparing,
+  isMuxPlayable,
+  resolveVideoSrc,
+  muxThumbnailUrl,
+} from '@/utils/muxMedia';
+import { attachHls, type AttachToken } from '@/utils/hlsAttach';
+import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
