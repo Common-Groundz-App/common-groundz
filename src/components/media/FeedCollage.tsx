@@ -65,6 +65,8 @@ export function FeedCollage({
   renderTileOverlay,
   disableItemClick,
   previewSrcOverride,
+  videoResume,
+  onResumeConsumed,
 }: FeedCollageProps) {
   if (!media || media.length === 0) return null;
 
