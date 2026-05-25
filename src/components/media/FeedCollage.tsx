@@ -114,6 +114,8 @@ export function FeedCollage({
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
             onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
+            resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
+            onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
           />
         )}
         {options?.overlayCount && options.overlayCount > 0 ? (
