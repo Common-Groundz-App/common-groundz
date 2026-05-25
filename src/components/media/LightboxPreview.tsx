@@ -80,6 +80,35 @@ export function LightboxPreview({
   const currentItemRef = useRef<MediaItem | null>(null);
   const currentIndexRef = useRef<number>(initialIndex);
   const initialVideoStateRef = useRef<VideoHandoff | undefined>(initialVideoState);
+  // Guards closeWithHandoff so emission/close only happens once even when
+  // multiple close paths fire in rapid succession (e.g. ESC during swipe).
+  const closedRef = useRef(false);
+  // Keep latest onExitHandoff/onClose accessible from the stable callback.
+  const onExitHandoffRef = useRef(onExitHandoff);
+  const onCloseRef = useRef(onClose);
+  onExitHandoffRef.current = onExitHandoff;
+  onCloseRef.current = onClose;
+
+  const closeWithHandoff = useCallback(() => {
+    if (closedRef.current) return;
+    closedRef.current = true;
+    const v = videoElRef.current;
+    if (v) {
+      try {
+        const snapshot: VideoExitHandoff = {
+          currentTime: v.currentTime,
+          wasPlaying: !v.paused && !v.ended,
+          muted: v.muted,
+          entryIndex: entryIndexRef.current,
+          currentIndex: currentIndexRef.current,
+        };
+        onExitHandoffRef.current?.(snapshot);
+      } catch {
+        /* never throw from close path */
+      }
+    }
+    onCloseRef.current();
+  }, []);
 
   // iOS UA check — Safari/Chrome/etc on iPhone/iPad (including iPadOS desktop UA).
   const isIOS = (): boolean => {
