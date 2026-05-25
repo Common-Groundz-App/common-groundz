@@ -315,23 +315,46 @@ export function LightboxPreview({
             />
           ) : (() => {
             const isMux = isMuxPlayable(currentItem) && !!currentItem.mux_playback_id;
-            const aspectRatio = currentItem.width && currentItem.height
-              ? `${currentItem.width} / ${currentItem.height}`
-              : '16 / 9';
+            // Defensive numeric ratio — guard against missing / 0 / NaN / Infinity
+            // metadata so the wrapper always has a sane intrinsic shape.
+            const rawRatio =
+              currentItem.width && currentItem.height
+                ? currentItem.width / currentItem.height
+                : 16 / 9;
+            const ratio =
+              Number.isFinite(rawRatio) && rawRatio > 0 ? rawRatio : 16 / 9;
+            const maxVh = isMobile && isLandscape ? '85vh' : '90vh';
             const hiResPoster = isMux
               ? muxThumbnailUrl(currentItem.mux_playback_id!, { width: 1280 })
               : muxPosterUrl(currentItem);
-            const wrapperStyle: React.CSSProperties =
-              isMobile && isLandscape
-                ? { aspectRatio, width: '100%', maxHeight: '85vh' }
-                : { aspectRatio, maxHeight: '90vh', maxWidth: '100%' };
+            // Defensive non-zero sizing: give the browser a real intrinsic
+            // width (min of parent and ratio-derived width from the vh cap)
+            // PLUS max constraints PLUS a 1px floor so the flex parent can
+            // never collapse this wrapper to 0x0 (which would render a black
+            // screen since the video + poster are absolutely positioned).
+            const wrapperStyle: React.CSSProperties = {
+              position: 'relative',
+              display: 'block',
+              aspectRatio: String(ratio),
+              width: `min(100%, calc(${maxVh} * ${ratio}))`,
+              maxWidth: '100%',
+              maxHeight: maxVh,
+              minWidth: '1px',
+              minHeight: '1px',
+            };
             // For Mux, keep the high-res poster on top until the video has
             // attached + loaded + handoff seek completed so we never show a
             // small/blurry interim frame. Supabase videos reveal immediately
             // (no HLS attach delay) and behave exactly as before.
             const hidden = isMux && !videoReady;
+            const dbg = (msg: string, extra?: Record<string, unknown>) => {
+              if (import.meta.env.DEV) {
+                // eslint-disable-next-line no-console
+                console.log(`[LightboxPreview Mux] ${msg}`, extra ?? '');
+              }
+            };
             return (
-              <div className="relative" style={wrapperStyle}>
+              <div style={wrapperStyle}>
                 <video
                   key={imageKey}
                   ref={(el) => {
@@ -366,7 +389,7 @@ export function LightboxPreview({
                             // misleading "format unsupported" media error).
                           },
                         });
-
+                        dbg('hlsAttached', { src });
                       } else {
                         try { el.src = src; } catch { /* ignore */ }
                         hlsDetachRef.current = () => {
