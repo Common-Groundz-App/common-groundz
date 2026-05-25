@@ -466,11 +466,10 @@ export function LightboxPreview({
                   }}
                   onSeeked={(e) => {
                     e.stopPropagation();
-                    dbg('seeked', { currentTime: e.currentTarget.currentTime });
                     // Always reveal once any seek lands — covers handoff seek
                     // and any subsequent user-initiated seeks.
                     setVideoReady(true);
-                    dbg('videoReady=true', { reason: 'seeked' });
+
                     if (
                       handoffAppliedRef.current ||
                       !initialVideoState ||
