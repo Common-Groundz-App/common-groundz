@@ -10,7 +10,7 @@
  * Regression of any of the above breaks iOS lightbox handoff.
  * Backed by LightboxPreview.handoff.test.tsx.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { MediaItem, VideoHandoff } from '@/types/media';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
