@@ -449,6 +449,8 @@ function SingleMediaTile({ entry, source, sourceId, onItemClick, renderTileOverl
             objectFit={fit}
             srcOverride={previewSrcOverride?.(item)}
             onTap={disableItemClick ? undefined : (handoff) => onItemClick(originalIndex, handoff)}
+            resumeState={videoResume?.index === originalIndex ? videoResume.handoff : undefined}
+            onResumeConsumed={videoResume?.index === originalIndex ? onResumeConsumed : undefined}
           />
         )}
         {renderTileOverlay?.(item, originalIndex)}
