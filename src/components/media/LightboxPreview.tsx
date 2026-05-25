@@ -429,7 +429,7 @@ export function LightboxPreview({
                   style={{ cursor: 'auto' }}
                   onLoadedMetadata={(e) => {
                     const v = e.currentTarget;
-                    dbg('loadedmetadata', { duration: v.duration, readyState: v.readyState });
+                    const v = e.currentTarget;
                     if (
                       handoffAppliedRef.current ||
                       !initialVideoState ||
