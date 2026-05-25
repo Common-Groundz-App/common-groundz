@@ -384,7 +384,7 @@ export function LightboxPreview({
                             // misleading "format unsupported" media error).
                           },
                         });
-                        });
+
                       } else {
                         try { el.src = src; } catch { /* ignore */ }
                         hlsDetachRef.current = () => {
