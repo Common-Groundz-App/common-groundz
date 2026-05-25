@@ -117,11 +117,11 @@ export function UploadRow({
   const stageLabel = isError
     ? 'Upload failed'
     : stage === 'preparing'
-    ? isVideo
-      ? 'Preparing video…'
-      : 'Preparing…'
+    ? 'Preparing…'
     : stage === 'uploading'
-    ? 'Uploading…'
+    ? isVideo
+      ? 'Uploading video…'
+      : 'Uploading…'
     : stage === 'finalizing'
     ? 'Finalizing…'
     : '';
