@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MediaItem } from '@/types/media';
 import { isMuxErroredOrBroken, muxPosterUrl } from '@/utils/muxMedia';
