@@ -10,7 +10,8 @@ import { formatDuration } from '@/utils/videoPoster';
 import { extractMediaPath } from '@/utils/mediaPath';
 import { analytics } from '@/services/analytics';
 import { MediaItem, VideoHandoff, VideoExitHandoff } from '@/types/media';
-import { isMuxPreparing, isMuxErroredOrBroken, resolveVideoSrc, maybeEmitBrokenReady, muxPosterUrl } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, resolveVideoSrc, maybeEmitBrokenReady, muxPosterUrl, isMuxPlayable } from '@/utils/muxMedia';
+import { prewarmMuxHls } from '@/utils/prewarmMuxHls';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import { captureVideoFrame } from '@/utils/captureVideoFrame';
@@ -506,6 +507,11 @@ function FeedVideoPlayer({
         // existing time-based / static Mux poster.
         const dataUrl = captureVideoFrame(v);
         if (dataUrl) extras = { entryPosterDataUrl: dataUrl };
+        // Tier 2: kick off HLS prewarm in parallel with the open animation.
+        // Pass v.currentTime so we target the segment the lightbox needs.
+        if (isMuxPlayable(item) && item.mux_playback_id) {
+          prewarmMuxHls(item.mux_playback_id, v.currentTime);
+        }
         try {
           v.pause();
         } catch {

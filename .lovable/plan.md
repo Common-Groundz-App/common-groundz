@@ -1,206 +1,309 @@
-# Tier 1 — Exact-Frame Handoff Poster (final)
+# Micro-edit + Tier 2 (final) — Time-Aware HLS Prewarm
 
-Goal: make Mux lightbox opening feel visually continuous like Supabase. On tap, snapshot the exact current frame from the feed `<video>` and use it as the lightbox cover until the real video is ready.
+Three independent pieces:
+1. One-line comment tightening in `corsSafeHosts.ts`.
+2. Tier 2 — prewarm Mux HLS manifest + media playlist + the segment near the tapped `currentTime`, with **success-gated dedup**, Data Saver respect, and a runtime override hook.
+3. No Settings UI added — we honor the browser/OS Data Saver signal directly.
 
-Scope is additive and presentational only — no changes to HLS attach, forward handoff, reverse handoff, scroll lock, sizing, DB, backend, upload pipeline, composer, or feed playback architecture.
+## Part 1 — `corsSafeHosts.ts` comment micro-edit
 
-## Changes folded in from review
+Replace the misleading JSDoc line on the `*.supabase.co` / `*.supabase.in` matcher with:
 
-1. **Single callback (no ordering risk).** Extend the existing `onTap` signature to `onTap(handoff?, extras?)`. The snapshot ships with the tap event in the same React batch, so `LightboxPreview` never mounts a render before `entryPosterDataUrl` is available. No new `onExtras` prop.
-2. **UI-local type.** `LightboxEntryExtras` lives in `src/components/media/lightboxTypes.ts` (new), not in shared `src/types/media.ts`.
-3. **Broader CORS-safe host matcher.** Accept the configured Supabase host AND any `*.supabase.co` / `*.supabase.in` subdomain (covers Storage CDN edge cases, transformation CDN, custom storage subdomains) in addition to `stream.mux.com`.
-4. **`crossOrigin` set at first render, never toggled.** Computed in the render body from `resolveVideoSrc(item)` (same call site used by the attach effect). Never added or removed in an effect — that would force a reload and break playback.
-5. **Smaller dataURL.** 640px wide, JPEG quality 0.65 (~80–120KB).
-6. **Explicit cleanup.** Null `entryExtras` in `PostMediaDisplay.handleLightboxClose` alongside `setVideoHandoff(null)`. Never store the dataURL in a ref.
+> "Covers Supabase-owned subdomains only (Storage, transformation CDN, project hosts). Custom/proxied domains pointed at Supabase are NOT matched — add explicitly if needed."
 
-## Behavior
+Zero behavior change.
 
-1. User taps a Mux feed video that is playing.
-2. `FeedVideo.handleContainerClick` builds the existing `VideoHandoff`, calls `captureVideoFrame(v)` synchronously, and invokes `onTap(handoff, { entryPosterDataUrl })` in a single call.
-3. `PostMediaDisplay` receives both, stores `videoHandoff` and `entryExtras` in the same handler (single React batch).
-4. `LightboxPreview` uses `entryExtras.entryPosterDataUrl` as the cover for the entry item until `videoReady === true`, then fades to the live video exactly like today.
-5. Fallback chain when no snapshot (image tap, capture failed, paused pre-first-frame, unknown host):
-   - Mux entry item with handoff `currentTime > 0` → `muxThumbnailUrl(playbackId, { time: currentTime, width: 1280 })`
-   - Otherwise → existing `muxPosterUrl(item)` / `muxThumbnailUrl(playbackId, { width: 1280 })`. Unchanged.
+## Part 2 — Tier 2: Time-aware HLS Prewarm
 
-## Files
+### Changes from previous draft
+
+| Issue (reviewer) | Fix in this plan |
+|---|---|
+| Dedup poisons future retries when fetch fails/aborts (ChatGPT — main issue) | Two-set model: `_inFlight` set during fetch, `_warmed` set **only after** a successful response. Failure/abort never marks warmed. |
+| No Data Saver guard (ChatGPT) | First-line check: `navigator.connection?.saveData === true` → return. No Settings UI — OS/browser already exposes this. |
+| Kill-switch comment falsely implied no-redeploy (ChatGPT) | Comment rewritten: "disables prewarm without touching call sites. Still a code constant — to flip without rebuild, see `setPrewarmEnabled()`." |
+| Need runtime kill switch (Codex) | Module exports `setPrewarmEnabled(bool)`. A future 4-line `useEffect` in `App.tsx` can wire it to an `app_config` flag. The mechanism ships now; the DB flag is out of scope for Tier 2. |
+| Bonus: visibility hidden | `document.addEventListener('visibilitychange', ...)` aborts the in-flight controller when the tab goes hidden. |
+
+### Why the success-gated dedup matters
+
+Old behavior (broken):
+```
+tap (weak network) → add to _warmed → fetch fails → key stays in _warmed
+   → next tap → skipped, even though nothing was actually cached
+```
+
+New behavior:
+```
+tap → add to _inFlight (dedups concurrent re-taps on same key)
+    → fetch succeeds → promote to _warmed
+    → fetch fails/aborts → remove from _inFlight, never touch _warmed
+    → next tap → retries cleanly
+```
+
+### Why we skip the Settings UI for Data Saver
+
+`navigator.connection.saveData` is **already controlled by the user** at the OS/browser level (Chrome "Lite mode", Android Data Saver, etc.). Adding a redundant toggle in our Settings tab would:
+- Duplicate a system-level preference the user has already expressed.
+- Couple Tier 2 to settings UI work (out of scope for a perf change).
+- Be ignored by most users who don't know it exists.
+
+If we ever want a per-app override later, it's a one-line addition. Skipping it now keeps Tier 2 surgical.
+
+### Scope (unchanged from previous draft)
+
+- New utility: `src/utils/prewarmMuxHls.ts`.
+- One added call (+1 import) in `FeedVideo.handleContainerClick`.
+- No change to `hlsAttach.ts`, `LightboxPreview.tsx`, `PostMediaDisplay.tsx`, `FeedCollage.tsx`, `muxMedia.ts`, `useVideoMute`, `useVideoAutoplay`, composer, DB, edge functions, feed queries.
+- No new render path, no hidden `<video>`, no early `Hls` instance, no IntersectionObserver/scroll-based prewarm. Tap-only.
+
+### Files
 
 | File | Change |
 |---|---|
-| `src/components/media/lightboxTypes.ts` (new) | Export `LightboxEntryExtras { entryPosterDataUrl?: string }`. UI-local. |
-| `src/utils/captureVideoFrame.ts` (new) | Best-effort canvas snapshot, returns dataURL or null, never throws. |
-| `src/utils/corsSafeHosts.ts` (new) | `isCorsSafeVideoHost(url)` — matches `stream.mux.com`, configured Supabase host, and `*.supabase.co` / `*.supabase.in` subdomains. |
-| `src/types/media.ts` | Extend `VideoHandoff` callers' type only if needed — actually no change: extras are a second argument, not a field. **No edit.** |
-| `src/components/media/FeedVideo.tsx` | Render `<video crossOrigin="anonymous">` only when host is CORS-safe (computed in render body). In `handleContainerClick`, capture frame and pass extras as second arg to `onTap`. Update `FeedVideoProps.onTap` signature. |
-| `src/components/media/FeedCollage.tsx` | Update internal `onTap` forwarding to pass through both args; update prop signature on `onItemTap` (or equivalent) to `(originalIndex, handoff?, extras?)`. |
-| `src/components/feed/PostMediaDisplay.tsx` | Store `entryExtras` state; set it in the same handler that sets `videoHandoff`; clear both in `handleLightboxClose`; pass `entryExtras` prop to `LightboxPreview`. |
-| `src/components/media/LightboxPreview.tsx` | New optional prop `entryExtras?: LightboxEntryExtras`. Compute `coverPoster = (isEntryItem && entryExtras?.entryPosterDataUrl) ?? muxFallbackPoster` and use for both `<video poster>` and the overlay `<img src>`. |
+| `src/utils/corsSafeHosts.ts` | Part 1 comment only. |
+| `src/utils/prewarmMuxHls.ts` (new) | `prewarmMuxHls(playbackId, currentTime?)` + `setPrewarmEnabled(bool)` export. Two-tier success-gated dedup, Data Saver guard, visibility abort. |
+| `src/components/media/FeedVideo.tsx` | One call + two imports in `handleContainerClick`. |
 
-No changes to `useVideoMute`, `hlsAttach`, `useVideoAutoplay`, `muxMedia.ts`.
+### Behavior on tap
 
-## Key snippets
+1. **Kill-switch + Data Saver gate.** If `!prewarmEnabled` OR `navigator.connection?.saveData === true` → return immediately.
+2. **hls.js chunk warmup.** `void import('hls.js')` — fire-and-forget. Harmless on Safari/iOS (module loads but is never instantiated).
+3. **Master playlist** at `https://stream.mux.com/{id}.m3u8`:
+   - If `playbackId` is in `_warmedMaster` OR `_inFlightMaster` → skip step.
+   - Else add to `_inFlightMaster`, fetch with `cache: 'default', mode: 'cors', credentials: 'omit'`, 4s AbortController, also aborted on `visibilitychange → hidden`.
+   - On success: parse first non-comment line → child URL. Remove from `_inFlight`, add to `_warmedMaster`.
+   - On failure/abort: remove from `_inFlight`. Never touch `_warmed`. Abort the whole chain.
+4. **Media playlist** (resolved child URL): same in-flight/warmed pattern keyed by `playbackId` in `_inFlightMedia` / `_warmedMedia`.
+   - Single-rendition edge case: if the child URL doesn't end in `.m3u8`, treat it as a direct segment and fetch under the segment dedup key instead.
+5. **Segment**: bucket key = `${playbackId}@${Math.floor(currentTime / 10)}`. Same in-flight/warmed pattern with `_inFlightSegments` / `_warmedSegments`.
+   - Target segment selected by walking `#EXTINF:<dur>,` lines and the following segment URL until cumulative time >= `currentTime`.
+   - Parse failure → first-segment fallback. Both end of playlist and any malformed structure fall back silently.
 
-### `src/utils/captureVideoFrame.ts`
+All `fetch` calls are wrapped in try/catch and never throw. No console noise except in dev (gated on `import.meta.env.DEV`).
 
-```ts
-/**
- * Best-effort JPEG dataURL snapshot of a <video>'s current visible frame.
- * Returns null on any failure (tainted canvas, pre-first-frame, zero dims,
- * SecurityError). Never throws. Tuned for a 1–3s bridge frame, not archival.
- */
-export function captureVideoFrame(
-  v: HTMLVideoElement,
-  opts?: { maxWidth?: number; quality?: number }
-): string | null {
-  try {
-    if (!v || v.readyState < 2) return null;
-    const vw = v.videoWidth, vh = v.videoHeight;
-    if (!vw || !vh) return null;
-    const maxW = opts?.maxWidth ?? 640;
-    const scale = vw > maxW ? maxW / vw : 1;
-    const w = Math.max(1, Math.round(vw * scale));
-    const h = Math.max(1, Math.round(vh * scale));
-    const canvas = document.createElement('canvas');
-    canvas.width = w; canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(v, 0, 0, w, h);
-    return canvas.toDataURL('image/jpeg', opts?.quality ?? 0.65);
-  } catch { return null; }
-}
-```
+### Key snippets
 
-### `src/utils/corsSafeHosts.ts`
+#### `src/utils/prewarmMuxHls.ts`
 
 ```ts
-/**
- * Returns true only for hosts known to serve media bytes with
- * Access-Control-Allow-Origin: *, so <video crossOrigin="anonymous">
- * loads AND canvas reads stay untainted. Anything else returns false
- * — caller must omit the crossOrigin attribute entirely.
- */
-const configuredSupabaseHost = (() => {
-  try { return new URL(import.meta.env.VITE_SUPABASE_URL ?? '').host; }
-  catch { return ''; }
-})();
+import { muxHlsUrl } from '@/utils/muxMedia';
 
-export function isCorsSafeVideoHost(src: string | undefined | null): boolean {
-  if (!src) return false;
+/**
+ * Default kill switch — disables prewarm without touching call sites.
+ * NOTE: this is a code constant, so flipping it still requires rebuild/redeploy.
+ * For true runtime control, call setPrewarmEnabled(false) from a React effect
+ * that reads an app_config flag (not wired in Tier 2; mechanism only).
+ */
+let _prewarmEnabled = true;
+export const setPrewarmEnabled = (enabled: boolean): void => {
+  _prewarmEnabled = enabled;
+};
+
+const SEGMENT_BUCKET_SECONDS = 10;
+const PREWARM_TIMEOUT_MS = 4000;
+
+// Success-gated dedup. Keys are added to _inFlight* on request start and to
+// _warmed* ONLY after a 2xx response. Failure/abort removes from _inFlight*
+// without touching _warmed*, so retries work after weak-network failures.
+const _inFlightMaster = new Set<string>();
+const _warmedMaster = new Set<string>();
+const _inFlightMedia = new Set<string>();
+const _warmedMedia = new Set<string>();
+const _inFlightSegments = new Set<string>();
+const _warmedSegments = new Set<string>();
+
+const isSaveDataOn = (): boolean => {
   try {
-    const h = new URL(src, window.location.href).host;
-    if (h === 'stream.mux.com') return true;
-    if (configuredSupabaseHost && h === configuredSupabaseHost) return true;
-    // Covers storage CDN / transformation / custom Supabase subdomains.
-    if (h.endsWith('.supabase.co') || h.endsWith('.supabase.in')) return true;
-    return false;
+    return Boolean((navigator as any)?.connection?.saveData);
   } catch { return false; }
+};
+
+const fetchOpts = (signal: AbortSignal): RequestInit => ({
+  method: 'GET',
+  mode: 'cors',
+  credentials: 'omit',
+  cache: 'default',
+  signal,
+});
+
+function firstResourceLine(text: string): string | null {
+  for (const raw of text.split('\n')) {
+    const l = raw.trim();
+    if (l.length > 0 && !l.startsWith('#')) return l;
+  }
+  return null;
+}
+
+function pickSegmentAt(text: string, targetTime: number): string | null {
+  const lines = text.split('\n').map((l) => l.trim());
+  let cumulative = 0;
+  let pendingDur = 0;
+  let lastSegment: string | null = null;
+  for (const l of lines) {
+    if (l.startsWith('#EXTINF:')) {
+      const m = l.match(/^#EXTINF:([\d.]+)/);
+      pendingDur = m ? parseFloat(m[1]) : 0;
+    } else if (l.length > 0 && !l.startsWith('#')) {
+      lastSegment = l;
+      if (cumulative + pendingDur >= targetTime) return lastSegment;
+      cumulative += pendingDur;
+      pendingDur = 0;
+    }
+  }
+  return lastSegment;
+}
+
+export function prewarmMuxHls(
+  playbackId: string | null | undefined,
+  currentTime: number = 0,
+): void {
+  if (!_prewarmEnabled || !playbackId) return;
+  if (isSaveDataOn()) return;
+
+  // Harmless on Safari (hls.js never instantiates there).
+  try { void import('hls.js'); } catch { /* ignore */ }
+
+  const target = Number.isFinite(currentTime) && currentTime > 0 ? currentTime : 0;
+  const segmentKey = `${playbackId}@${Math.floor(target / SEGMENT_BUCKET_SECONDS)}`;
+
+  const needMaster = !_warmedMaster.has(playbackId) && !_inFlightMaster.has(playbackId);
+  const needMedia = !_warmedMedia.has(playbackId) && !_inFlightMedia.has(playbackId);
+  const needSegment = !_warmedSegments.has(segmentKey) && !_inFlightSegments.has(segmentKey);
+  if (!needMaster && !needMedia && !needSegment) return;
+
+  const ac = new AbortController();
+  const timer = window.setTimeout(() => ac.abort(), PREWARM_TIMEOUT_MS);
+  const onHide = () => { if (document.visibilityState === 'hidden') ac.abort(); };
+  document.addEventListener('visibilitychange', onHide);
+  const cleanup = () => {
+    window.clearTimeout(timer);
+    document.removeEventListener('visibilitychange', onHide);
+  };
+
+  if (needMaster) _inFlightMaster.add(playbackId);
+  if (needMedia) _inFlightMedia.add(playbackId);
+  if (needSegment) _inFlightSegments.add(segmentKey);
+
+  const masterUrl = muxHlsUrl(playbackId);
+
+  (async () => {
+    let masterText: string | null = null;
+    let mediaUrl: string | null = null;
+
+    try {
+      // ---- Master ----
+      if (needMaster || needMedia || needSegment) {
+        const r = await fetch(masterUrl, fetchOpts(ac.signal));
+        if (!r.ok) return;
+        masterText = await r.text();
+        if (needMaster) {
+          _inFlightMaster.delete(playbackId);
+          _warmedMaster.add(playbackId);
+        }
+      }
+
+      const childRel = masterText ? firstResourceLine(masterText) : null;
+      if (!childRel) return;
+      const childUrl = new URL(childRel, masterUrl).toString();
+
+      // Single-rendition asset: master IS the playlist, child is a segment.
+      if (!childUrl.endsWith('.m3u8')) {
+        if (needSegment) {
+          const r = await fetch(childUrl, fetchOpts(ac.signal));
+          if (r.ok) {
+            _inFlightSegments.delete(segmentKey);
+            _warmedSegments.add(segmentKey);
+          }
+        }
+        return;
+      }
+
+      mediaUrl = childUrl;
+
+      // ---- Media playlist ----
+      let mediaText: string | null = null;
+      if (needMedia || needSegment) {
+        const r = await fetch(mediaUrl, fetchOpts(ac.signal));
+        if (!r.ok) return;
+        mediaText = await r.text();
+        if (needMedia) {
+          _inFlightMedia.delete(playbackId);
+          _warmedMedia.add(playbackId);
+        }
+      }
+
+      // ---- Segment at currentTime, fallback first ----
+      if (needSegment && mediaText) {
+        const segRel = pickSegmentAt(mediaText, target) ?? firstResourceLine(mediaText);
+        if (!segRel) return;
+        const segUrl = new URL(segRel, mediaUrl).toString();
+        const r = await fetch(segUrl, fetchOpts(ac.signal));
+        if (r.ok) {
+          _inFlightSegments.delete(segmentKey);
+          _warmedSegments.add(segmentKey);
+        }
+      }
+    } catch {
+      /* AbortError / network / CORS — silent by design */
+    } finally {
+      // Drop any still-inflight keys so a later tap can retry.
+      if (_inFlightMaster.has(playbackId) && !_warmedMaster.has(playbackId)) {
+        _inFlightMaster.delete(playbackId);
+      }
+      if (_inFlightMedia.has(playbackId) && !_warmedMedia.has(playbackId)) {
+        _inFlightMedia.delete(playbackId);
+      }
+      if (_inFlightSegments.has(segmentKey) && !_warmedSegments.has(segmentKey)) {
+        _inFlightSegments.delete(segmentKey);
+      }
+      cleanup();
+    }
+  })();
 }
 ```
 
-### `src/components/media/lightboxTypes.ts`
+#### `FeedVideo.tsx` — single call site
+
+Inside `handleContainerClick`, after the snapshot block and before `onTap(handoff, extras)`:
 
 ```ts
-/**
- * Transient view-only extras carried alongside VideoHandoff from a feed
- * video to LightboxPreview. NOT part of the shared media domain types.
- */
-export interface LightboxEntryExtras {
-  entryPosterDataUrl?: string;
+// Tier 2: kick off HLS prewarm in parallel with the open animation.
+// Pass v.currentTime so we target the segment the lightbox will actually need.
+if (isMuxPlayable(item) && item.mux_playback_id && v) {
+  prewarmMuxHls(item.mux_playback_id, v.currentTime);
 }
 ```
 
-### `FeedVideo.tsx` key diffs
-
+Imports:
 ```ts
-// In FeedVideoProps:
-onTap?: (handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void;
-
-// In FeedVideoPlayer render body (computed once per render, stable per item):
-const resolvedForCors = srcOverride ?? resolveVideoSrc(item).src;
-const corsSafe = isCorsSafeVideoHost(resolvedForCors);
-
-// In <video> JSX — spread so unsafe hosts get NO attribute at all:
-<video
-  ref={videoRef}
-  {...(corsSafe ? { crossOrigin: 'anonymous' as const } : {})}
-  poster={...}
-  /* ...rest unchanged... */
-/>
-
-// In handleContainerClick, after building handoff and BEFORE v.pause():
-const dataUrl = captureVideoFrame(v);                  // null on any failure
-const extras = dataUrl ? { entryPosterDataUrl: dataUrl } : undefined;
-try { v.pause(); } catch {}
-onTap(handoff, extras);
+import { isMuxPlayable } from '@/utils/muxMedia';
+import { prewarmMuxHls } from '@/utils/prewarmMuxHls';
 ```
 
-Snapshot before pause so we get the live frame, not a stale paused one.
+### Verification
 
-### `FeedCollage.tsx`
+1. **Cold Mux tap at t=0** → `.m3u8` master, `.m3u8` media, and first segment all fetched. Lightbox `loadeddata` arrives noticeably faster.
+2. **Cold Mux tap at t≈45s** → segment near 45s prefetched, not segment 0.
+3. **Same item tapped twice within 10s bucket** → full dedup hit, zero network.
+4. **Weak network: tap fails mid-fetch** → keys removed from `_inFlight`, NOT added to `_warmed`. Next tap on same item refires prewarm. ✅ ChatGPT's main concern.
+5. **Concurrent re-tap during in-flight fetch** → second tap sees `_inFlight` hit, no duplicate request.
+6. **Data Saver on** (Chrome DevTools → Network → "Data Saver") → `prewarmMuxHls` returns at first line; no fetches.
+7. **Tab hidden mid-fetch** → AbortController fires, fetches stop, no console noise.
+8. **`setPrewarmEnabled(false)` called** → next tap returns at first line. Re-enable works symmetrically.
+9. **Non-Mux video / preparing item** → guard skips prewarm.
+10. **Single-rendition Mux asset** → segment path runs; media path correctly skipped.
+11. **Malformed playlist** → first-segment fallback or silent skip.
+12. **Safari/iOS** → `import('hls.js')` resolves but module is unused; prefetches still warm Safari's HTTP cache.
+13. **Tier 1 unaffected** — capture + `entryPosterDataUrl` flow untouched.
+14. **`LightboxPreview.handoff.test.tsx`** — not touched.
 
-Mirror the new two-arg shape wherever `onTap` is forwarded (single-tile and grid paths):
+### Out of scope
 
-```ts
-onTap={disableItemClick
-  ? undefined
-  : (handoff, extras) => onItemTap?.(originalIndex, handoff, extras)}
-```
-
-Update the `onItemTap` prop type to `(index: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => void`.
-
-### `PostMediaDisplay.tsx`
-
-```ts
-const [entryExtras, setEntryExtras] = useState<LightboxEntryExtras | null>(null);
-
-const handleVideoTap = (index: number, handoff?: VideoHandoff, extras?: LightboxEntryExtras) => {
-  setVideoHandoff(handoff ?? null);
-  setEntryExtras(extras ?? null);   // same batch as setVideoHandoff
-  openLightboxAt(index);             // existing logic
-};
-
-const handleLightboxClose = () => {
-  setLightboxOpen(false);
-  setVideoHandoff(null);
-  setEntryExtras(null);              // explicit cleanup, drops dataURL
-};
-
-// Pass entryExtras={entryExtras ?? undefined} to <LightboxPreview>.
-```
-
-### `LightboxPreview.tsx` (Mux branch only)
-
-```ts
-const isEntryItem = currentIndex === entryIndexRef.current;
-const entryPoster = isEntryItem ? entryExtras?.entryPosterDataUrl : undefined;
-const posterTime =
-  isEntryItem && initialVideoState && initialVideoState.currentTime > 0
-    ? initialVideoState.currentTime
-    : undefined;
-const muxFallbackPoster = isMux
-  ? muxThumbnailUrl(currentItem.mux_playback_id!, { width: 1280, time: posterTime })
-  : muxPosterUrl(currentItem);
-const coverPoster = entryPoster ?? muxFallbackPoster;
-```
-
-Use `coverPoster` in both the `<video poster>` attribute and the existing overlay `<img>`. `videoReady` fade logic unchanged.
-
-## Verification
-
-1. **Mux playing → tap** → lightbox shows the exact tap-time frame → fades smoothly into live video. No black flash, no thumb pop, no layout flicker.
-2. **Mux paused / pre-first-frame** → snapshot null → time-based Mux thumbnail (or 0s thumb if `currentTime === 0`). Same as today.
-3. **Capture failure** (CORS edge, taint, decoding quirk) → `captureVideoFrame` returns null silently → Mux fallback runs. No console errors leaked.
-4. **Unknown host** (legacy non-Mux non-Supabase CDN) → `crossOrigin` attribute omitted → video plays exactly as today, snapshot returns null, fallback runs.
-5. **Supabase videos** → still play, snapshot now works as a bonus.
-6. **Forward + reverse handoff, mute sync, entry-index logic, ESC/backdrop/swipe close** → untouched. `LightboxPreview.handoff.test.tsx` still passes.
-7. **Image items** → no `FeedVideo` tap path → no snapshot, no behavior change.
-8. **Memory** → `entryExtras` cleared on close, never stored in a ref, dataURL eligible for GC immediately.
-9. **iOS** → tap-gesture chain (early-play ref-callback path) unaffected; capture + `onTap` run synchronously inside the same click handler.
-10. **No reload** from `crossOrigin` — attribute is present on first render and never toggled.
-
-## Out of scope
-
-- Tier 2 (HLS manifest + first-segment prewarm)
-- Tier 3 (same-element DOM reparenting)
-- `photo-lightbox.tsx`, composer, DB, edge functions, feed query logic
-- Any change to forward/reverse handoff semantics
+- Tier 3 (same-element DOM reparenting).
+- DB `app_config` flag for runtime prewarm toggle (mechanism shipped via `setPrewarmEnabled`; wiring to a flag row is a future 5-minute follow-up).
+- Settings tab toggle for Data Saver (browser/OS handles this).
+- Variant pre-selection / bandwidth-aware prewarm (hls.js does this at attach time).
+- Scroll-based or IntersectionObserver-driven prewarm.
+- Service worker / Cache API persistence.
+- Changes to `hlsAttach.ts`, `LightboxPreview.tsx`, `PostMediaDisplay.tsx`, `FeedCollage.tsx`, `muxMedia.ts`, composer, edge functions, feed queries.
