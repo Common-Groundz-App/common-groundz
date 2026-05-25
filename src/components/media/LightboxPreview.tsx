@@ -82,20 +82,28 @@ export function LightboxPreview({
     return navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1;
   };
   
-  // Prevent body scrolling when lightbox is open
+  // Prevent body scrolling when lightbox is open (preserve scroll position)
   useEffect(() => {
     // Check if we're already in a modal context (Radix UI Dialog handles body scroll)
     const isInModal = document.querySelector('[data-radix-portal]') !== null;
-    
-    // Only apply our own scroll prevention if we're not already in a modal
-    if (!isInModal) {
-      document.body.classList.add('lightbox-open');
-    }
-    
-    // Cleanup function
+    if (isInModal) return;
+
+    const savedY = window.scrollY || window.pageYOffset || 0;
+    const prevTop = document.body.style.top;
+    const prevLeft = document.body.style.left;
+    const prevRight = document.body.style.right;
+
+    document.body.style.top = `-${savedY}px`;
+    document.body.style.left = '0';
+    document.body.style.right = '0';
+    document.body.classList.add('lightbox-open');
+
     return () => {
-      // Always remove our class, but be defensive about it
       document.body.classList.remove('lightbox-open');
+      document.body.style.top = prevTop;
+      document.body.style.left = prevLeft;
+      document.body.style.right = prevRight;
+      window.scrollTo(0, savedY);
     };
   }, []);
   
