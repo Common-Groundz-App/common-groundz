@@ -394,7 +394,7 @@ export function MediaUploader({
         );
       }).then((mediaItem) => {
         if (mediaItem) {
-          onMediaUploaded(mediaItem);
+          onMediaUploaded(mediaItem, file);
           setCurrentMediaCount((prev) => prev + 1);
           if (mediaItem.type === 'video') setCurrentVideoCount((prev) => prev + 1);
 
