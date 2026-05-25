@@ -165,7 +165,7 @@ export function LightboxPreview({
       } else if (e.key === 'ArrowRight') {
         nextImage();
       } else if (e.key === 'Escape') {
-        onClose();
+        closeWithHandoff();
       }
     };
     
