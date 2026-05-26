@@ -248,7 +248,33 @@ export function AdminFeatureFlagsPanel() {
                 }
               />
               <span className="text-sm text-muted-foreground">Live</span>
+          </div>
+
+          {/* HLS prewarm switch */}
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="mux-prewarm" className="text-base">
+                HLS prewarm on tap
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, tapping a video prefetches its HLS manifest and first segment for faster playback start. Does NOT affect Mux uploads or video playback — only the on-tap prefetch optimization.
+              </p>
+              {prewarmRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(prewarmRow.updated_at), { addSuffix: true })}
+                  {prewarmRow.updated_reason ? ` — “${prewarmRow.updated_reason}”` : ''}
+                </p>
+              )}
             </div>
+            <Switch
+              id="mux-prewarm"
+              checked={prewarmEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({ key: 'mux.prewarm_enabled', nextEnabled: checked })
+              }
+            />
+          </div>
           </div>
         </CardContent>
       </Card>
