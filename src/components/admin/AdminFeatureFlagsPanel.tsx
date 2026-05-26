@@ -185,6 +185,12 @@ export function AdminFeatureFlagsPanel() {
                   Mode:{' '}
                   <span className="font-medium capitalize">{effective.mode}</span>
                 </span>
+                <span>
+                  HLS prewarm:{' '}
+                  <span className={effective.prewarm_enabled ? 'text-green-600 font-medium' : 'text-destructive font-medium'}>
+                    {effective.prewarm_enabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </span>
               </div>
             )}
           </div>
