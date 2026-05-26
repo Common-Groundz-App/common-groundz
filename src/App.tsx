@@ -51,6 +51,7 @@ import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
 import { AuthPromptProvider } from '@/contexts/AuthPromptContext';
 import { networkStatusService } from '@/services/networkStatusService';
+import PrewarmFlagBridge from '@/components/system/PrewarmFlagBridge';
 
 /**
  * Global Error & Network Policy:
@@ -112,6 +113,7 @@ function App() {
           <AuthErrorBoundary>
             <Router>
               <ScrollToTop />
+              <PrewarmFlagBridge />
               <AuthInitializer>
               <AuthPromptProvider>
                 <OfflineBanner />
