@@ -31,6 +31,7 @@ import { useAppFlagRows, useSetAppFlag } from '@/hooks/admin/useAppFlagsAdmin';
 type PendingChange =
   | { key: 'mux.uploads_enabled'; nextEnabled: boolean }
   | { key: 'mux.mode'; nextMode: 'live' | 'test' }
+  | { key: 'mux.prewarm_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -69,9 +70,11 @@ export function AdminFeatureFlagsPanel() {
 
   const uploadsRow = rows.data?.find((r) => r.key === 'mux.uploads_enabled');
   const modeRow = rows.data?.find((r) => r.key === 'mux.mode');
+  const prewarmRow = rows.data?.find((r) => r.key === 'mux.prewarm_enabled');
 
   const uploadsEnabled = uploadsRow?.value?.enabled ?? true;
   const muxMode: 'live' | 'test' = modeRow?.value?.mode === 'test' ? 'test' : 'live';
+  const prewarmEnabled = prewarmRow?.value?.enabled ?? true;
 
   const effective = publicFlags.data?.mux;
 
@@ -84,7 +87,11 @@ export function AdminFeatureFlagsPanel() {
         ? pending.nextMode === 'test'
           ? 'Switch Mux to Test mode?'
           : 'Switch Mux to Live mode?'
-        : '';
+        : pending?.key === 'mux.prewarm_enabled'
+          ? pending.nextEnabled
+            ? 'Enable HLS prewarm on tap?'
+            : 'Disable HLS prewarm on tap?'
+          : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -95,7 +102,11 @@ export function AdminFeatureFlagsPanel() {
         ? pending.nextMode === 'test'
           ? 'New uploads will use Mux test mode (no charges, watermarked).'
           : 'New uploads will use Mux live mode.'
-        : '';
+        : pending?.key === 'mux.prewarm_enabled'
+          ? pending.nextEnabled
+            ? 'Video taps will prefetch the HLS manifest and first segment again. Does NOT affect Mux uploads or video playback — only the on-tap prefetch optimization.'
+            : 'Video taps will stop prefetching HLS manifests/segments. Does NOT affect Mux uploads or video playback — only the on-tap prefetch optimization.'
+          : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -106,10 +117,16 @@ export function AdminFeatureFlagsPanel() {
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'mux.mode') {
         await setFlag.mutateAsync({
           key: 'mux.mode',
           value: { mode: pending.nextMode },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'mux.prewarm_enabled',
+          value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
       }
