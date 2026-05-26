@@ -27,6 +27,19 @@ export interface AttachHlsOptions {
 }
 
 
+const getDefaultEstimate = (): number => {
+  try {
+    const conn = (navigator as unknown as { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (!conn) return 2_500_000;
+    if (conn.saveData) return 500_000;
+    const et = conn.effectiveType;
+    if (et === 'slow-2g' || et === '2g') return 500_000;
+    return 2_500_000;
+  } catch {
+    return 2_500_000;
+  }
+};
+
 const detachNative = (video: HTMLVideoElement) => {
   try {
     video.removeAttribute('src');
@@ -73,6 +86,8 @@ export function attachHls(
         enableWorker: true,
         lowLatencyMode: false,
         backBufferLength: 30,
+        capLevelToPlayerSize: true,
+        abrEwmaDefaultEstimate: getDefaultEstimate(),
       });
       if (import.meta.env.DEV) {
         const w = window as unknown as { __muxHlsLive?: number };
