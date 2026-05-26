@@ -15,7 +15,7 @@ async function fetchRows(): Promise<AppConfigRow[]> {
   const { data, error } = await supabase
     .from('app_config')
     .select('key,value,description,updated_at,updated_by,updated_reason')
-    .in('key', ['mux.uploads_enabled', 'mux.mode']);
+    .in('key', ['mux.uploads_enabled', 'mux.mode', 'mux.prewarm_enabled']);
   if (error) throw error;
   return (data ?? []) as AppConfigRow[];
 }
@@ -29,7 +29,7 @@ export function useAppFlagRows() {
 }
 
 interface SetFlagInput {
-  key: 'mux.uploads_enabled' | 'mux.mode';
+  key: 'mux.uploads_enabled' | 'mux.mode' | 'mux.prewarm_enabled';
   value: Record<string, unknown>;
   reason?: string;
 }

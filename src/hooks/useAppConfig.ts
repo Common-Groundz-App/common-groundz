@@ -4,12 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 export interface PublicFlags {
   mux: {
     uploads_enabled: boolean;
+    prewarm_enabled: boolean;
     mode: 'live' | 'test';
   };
 }
 
 const DEFAULTS: PublicFlags = {
-  mux: { uploads_enabled: true, mode: 'live' },
+  mux: { uploads_enabled: true, prewarm_enabled: true, mode: 'live' },
 };
 
 async function fetchPublicFlags(): Promise<PublicFlags> {
@@ -19,6 +20,7 @@ async function fetchPublicFlags(): Promise<PublicFlags> {
   return {
     mux: {
       uploads_enabled: muxRaw.uploads_enabled ?? true,
+      prewarm_enabled: muxRaw.prewarm_enabled ?? true,
       mode: (muxRaw.mode === 'test' ? 'test' : 'live'),
     },
   };
