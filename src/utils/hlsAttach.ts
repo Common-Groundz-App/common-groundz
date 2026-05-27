@@ -60,6 +60,20 @@ const detachNative = (video: HTMLVideoElement) => {
   }
 };
 
+// iOS WebKit detection — every browser on iOS (Safari, Chrome, Firefox, Edge)
+// is WebKit under the hood. iPadOS reports as MacIntel with >1 touch points.
+// We always prefer native HLS on iOS because MSE-backed <video> hits stricter
+// autoplay rules and silently fails muted autoplay.
+function isIOSLikeWebKit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  return /iPad|iPhone|iPod/.test(ua)
+    || (platform === 'MacIntel' && maxTouchPoints > 1);
+}
+
+
 export function attachHls(
   video: HTMLVideoElement,
   src: string,
