@@ -1,100 +1,94 @@
 ## Diagnosis
 
-The debug gate proved the real issue. Console on `commongroundz.co/home?hlsdebug=1` shows:
+On iOS, every browser (Safari, Chrome, Firefox, Edge) is WebKit / WKWebView under the hood. Since iOS 17.1, WebKit ships a Managed Media Source implementation, so `Hls.isSupported()` now returns `true` on modern iOS. After the branch-priority fix, iOS Chrome therefore takes the **MSE / hls.js** path instead of native HLS.
 
-- `HLS_DEBUG: true` ✅
-- `canPlayNativeHls: true`
-- `path=native`
+That is what broke autoplay on iOS Chrome:
 
-So `attachHls()` runs, but the current top-of-function branch hands the `.m3u8` to the browser via `video.src = src` and returns. None of the hls.js instrumentation or ABR config (`abrEwmaDefaultEstimate`, `capLevelToPlayerSize`, `MANIFEST_PARSED`, `LEVEL_SWITCHING`, `FRAG_LOADED`, fatal-error handler) ever runs in this Chrome session. That is why earlier ABR tuning produced no visible change and why no `[hls][manifest_parsed]` / `[hls][level_*]` / `[hls][frag_loaded]` logs ever appeared.
-
-Chrome normally returns `""` for `application/vnd.apple.mpegurl`, but in this environment (extension, flag, or Chromium variant) it returns a truthy value, so the current `if (video.canPlayType(...))` check wins on desktop Chrome and locks us out of hls.js.
-
-Fix direction (matches both reviewers and the Stack Overflow pattern for this exact symptom): prefer `hls.js` when `Hls.isSupported()` is true, and fall back to native HLS only when MSE is unavailable (real Safari / iOS).
+- iOS WebKit applies stricter autoplay rules to MSE-backed `<video>` than to native HLS. Even `muted` + `playsInline` frequently needs a user gesture when the source is a `MediaSource` blob. Native HLS (direct `.m3u8` as `video.src`) is treated as "inline media" and autoplay-muted works reliably.
+- That's why the same iPhone works in Safari (Safari historically lands on `native_fallback_no_mse` or its iOS-managed-MSE equivalent without breaking autoplay), Android Chrome and desktop Chrome are fine (no iOS autoplay rule), and `IMG_2428` shows a frozen first frame — hls.js attached and decoded one frag, but `video.play()` was silently rejected. Tapping (`IMG_2429`) works because it's a user gesture.
 
 ## Plan
 
-Scope: **only `src/utils/hlsAttach.ts`**. No other files.
+Scope: **only `src/utils/hlsAttach.ts`**.
 
-1. **Invert branch priority.** Remove the early `if (video.canPlayType('application/vnd.apple.mpegurl')) { video.src = src; return; }` block at the top of `attachHls()`. Replace it with a deferred decision taken after the dynamic `import('hls.js')` resolves:
-   - `Hls.isSupported()` true → use hls.js (MSE path). This covers desktop Chrome, Edge, Firefox, Android Chrome.
-   - Else if `video.canPlayType('application/vnd.apple.mpegurl')` is truthy → native HLS fallback (Safari, iOS — they lack MSE so they naturally land here).
-   - Else → `onUnrecoverable('hls_unsupported')` (unchanged).
+1. **Add a named helper** at module top (per ChatGPT's note — not inline):
 
-2. **Native fallback on dynamic-import failure.** If `import('hls.js')` itself rejects (network block, chunk 404), and the browser supports native HLS, set `video.src = src` instead of calling `onUnrecoverable`. This preserves Safari's "it just plays" behavior when the hls.js chunk fails to load.
+   ```ts
+   function isIOSLikeWebKit(): boolean {
+     if (typeof navigator === 'undefined') return false;
+     const ua = navigator.userAgent || '';
+     const platform = navigator.platform || '';
+     const maxTouchPoints = navigator.maxTouchPoints || 0;
+     return /iPad|iPhone|iPod/.test(ua)
+       || (platform === 'MacIntel' && maxTouchPoints > 1); // iPadOS reports as Mac
+   }
+   ```
 
-3. **Add explicit decision-reason log** (Codex's suggestion). Right after the branch is chosen, emit exactly one of:
-   - `[hls][debug_gate] decision=mse_supported`
-   - `[hls][debug_gate] decision=native_fallback_no_mse`
-   - `[hls][debug_gate] decision=native_fallback_import_failed`
-   - `[hls][debug_gate] decision=unsupported`
-   
-   This makes triage trivial without parsing multiple log lines.
+2. **Add an iOS-prefers-native short-circuit** at the top of `attachHls`, *before* `import('hls.js')`:
+   - Compute `isIOS = isIOSLikeWebKit()` and `canPlayNativeHls = !!video.canPlayType('application/vnd.apple.mpegurl')`.
+   - If `isIOS && canPlayNativeHls`:
+     - Honor `token.cancelled` first.
+     - Log `[hls][debug_gate] decision=native_ios_preferred`.
+     - **Idempotent src assign** (Codex's tweak): only `video.src = src` when `video.src !== src`. Avoids restart flicker if `attachHls` is invoked again for the same element with the same source (StrictMode double-invoke, re-mount).
+     - Do **not** call `video.load()` here — the previous native path did not, and a fresh `.load()` would defeat the idempotency guard.
+     - Wrap in try/catch.
+     - Return a cleanup closure that calls `detachNative(video)` only (no hls instance exists). Parity with existing native cleanup.
+   - Skip the dynamic import entirely on this branch (saves the hls.js chunk on iOS).
 
-4. **Keep cancellation and cleanup intact.** `token.cancelled` checks before assigning `video.src` and before constructing/attaching `Hls`. Cleanup function still calls `hls?.destroy()` and `detachNative(video)`.
+3. **Keep the post-import branching intact** for desktop/Android: `decision=mse_supported`, `decision=native_fallback_no_mse`, `decision=native_fallback_import_failed`, `decision=unsupported`. Desktop quality win the user just confirmed is preserved.
 
-5. **Keep existing `[hls][debug_gate]` proof logs**:
-   - Entry log: `attachHls called` with `href`, `search`, `HLS_DEBUG`, `src`, `canPlayNativeHls`.
-   - Pre-import log: `importing hls.js`.
-   - Post-import: `hls.js loaded` with `isSupported`.
-   - Plus the new `decision=…` line above.
-   
-   These stay until we confirm `decision=mse_supported` on the deployed domain; removal is a follow-up.
+4. **Update the entry debug-gate log** to include `isIOS` alongside `canPlayNativeHls`, `HLS_DEBUG`, `href`, `search`, `src`.
 
-6. **Do NOT change** the `Hls` constructor config, event handlers (`MANIFEST_PARSED`, `LEVEL_SWITCHING`, `LEVEL_SWITCHED`, `FRAG_LOADED`, `ERROR`), `__muxHlsLive` counter, `onUnrecoverable` signature/reasons, or the public `attachHls()` signature/return type.
-
-7. **Out of scope.** No edits to `prewarmMuxHls.ts`, `FeedVideo.tsx`, lightbox/handoff, composer, upload pipeline, Tier 1/2 prewarm, flag bridge, admin, DB, RPCs. No ABR tuning (`abrEwmaDefaultEstimate`, `capLevelToPlayerSize`, `testBandwidth`) in this step.
+5. **Out of scope** (do NOT touch):
+   - `Hls` constructor config (`enableWorker`, `lowLatencyMode`, `backBufferLength`, `capLevelToPlayerSize`, `abrEwmaDefaultEstimate`, `testBandwidth`).
+   - `useVideoAutoplay`, `useVideoMute`.
+   - Lightbox, `LightboxPreview`, handoff.
+   - `prewarmMuxHls`, Tier 1/2 prewarm, flag bridge.
+   - `FeedVideo.tsx`, composer, upload pipeline, admin, DB, RPCs.
+   - Removing temporary `[hls][debug_gate]` proof logs — separate cleanup pass after iOS verification.
 
 ## Technical details
 
 File: `src/utils/hlsAttach.ts`
 
-Pseudocode after the change:
+Pseudocode for the new shape:
 
 ```text
+function isIOSLikeWebKit(): boolean { ... }
+
 attachHls(video, src, token, opts):
-  log [hls][debug_gate] attachHls called { href, search, HLS_DEBUG, src, canPlayNativeHls }
+  const isIOS = isIOSLikeWebKit()
+  const canPlayNativeHls = !!video.canPlayType('application/vnd.apple.mpegurl')
+
+  log [hls][debug_gate] attachHls called { href, search, HLS_DEBUG, src, canPlayNativeHls, isIOS }
+
+  // iOS always prefers native HLS, regardless of Hls.isSupported()
+  if (isIOS && canPlayNativeHls) {
+    if (token.cancelled) return () => detachNative(video)
+    log [hls][debug_gate] decision=native_ios_preferred
+    try {
+      if (video.src !== src) video.src = src   // idempotent — no flicker on re-attach
+    } catch {}
+    return () => detachNative(video)
+  }
+
   log [hls][debug_gate] importing hls.js
-
-  import('hls.js').then(({ default: Hls }) => {
-    if (token.cancelled) return
-    log [hls][debug_gate] hls.js loaded { isSupported }
-
-    if (Hls.isSupported()) {
-      log [hls][debug_gate] decision=mse_supported
-      construct Hls, attach diagnostics + ERROR handler, loadSource, attachMedia   // unchanged
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      log [hls][debug_gate] decision=native_fallback_no_mse
-      video.src = src
-    } else {
-      log [hls][debug_gate] decision=unsupported
-      onUnrecoverable('hls_unsupported')
-    }
-  }).catch(err => {
-    if (token.cancelled) return
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      log [hls][debug_gate] decision=native_fallback_import_failed
-      try { video.src = src } catch {}
-    } else {
-      log [hls][debug_gate] hls.js import failed { err }
-      emit('mux_hls_load_failed', { src, err: String(err) })
-      onUnrecoverable('hls_load_failed', String(err))
-    }
-  })
-
-  return cleanup:
-    hls?.destroy()
-    detachNative(video)
+  import('hls.js').then(...)   // unchanged: mse_supported | native_fallback_no_mse | unsupported
+    .catch(...)                // unchanged: native_fallback_import_failed | hls_load_failed
+  return cleanup_with_hls_destroy
 ```
 
-## Verification (after deploy)
+## Verification
 
-On `/home?hlsdebug=1` in desktop Chrome:
+iOS Chrome `/home?hlsdebug=1`:
+- `[hls][debug_gate] decision=native_ios_preferred`
+- No `[hls][construct]` / `[hls][manifest_parsed]` (hls.js never imported)
+- Muted feed video autoplays again, no frozen first frame
 
-- Expect `[hls][debug_gate] decision=mse_supported` (replacing today's `path=native`).
-- Expect `[hls][construct]`, `[hls][manifest_parsed]`, `[hls][level_switching]`, `[hls][level_switched]`, and up to 5 `[hls][frag_loaded]` lines as the video plays.
-- Network panel should show the `hls.js` chunk loaded once, then `.m3u8` + `.ts`/`.m4s` segments fetched via XHR/fetch (hls.js), not as native media element requests.
+iOS Safari: same `decision=native_ios_preferred`, behavior unchanged from before.
 
-On Safari (any device): expect `decision=native_fallback_no_mse` and the video to play exactly as before.
+Desktop Chrome / Edge / Firefox / Android Chrome: still `decision=mse_supported`, quality improvement preserved.
 
-Once those logs appear, the existing hls.js ABR config is finally active, and we can evaluate the blur separately and decide on actual ABR tuning in a follow-up.
+Desktop Safari (Mac, not iPad): `isIOS=false` → falls through to `import('hls.js')` → `Hls.isSupported()` ? MSE : `native_fallback_no_mse`. No regression.
+
+If iOS still freezes after this (unlikely), follow-up would be a one-time muted `video.play()` retry inside `useVideoAutoplay` — but we expect this branch fix alone to resolve it, since pre-fix iOS Chrome was on this native path and worked fine.
