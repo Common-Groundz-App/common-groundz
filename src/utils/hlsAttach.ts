@@ -23,6 +23,20 @@ export type HlsTelemetry = (event: string, props: Record<string, unknown>) => vo
 export type HlsUnrecoverableReason = 'hls_unsupported' | 'hls_fatal' | 'hls_load_failed';
 export interface AttachHlsOptions {
   onEvent?: HlsTelemetry;
+  // Diagnostic gate: DEV always on; on prod, opt-in via ?hlsdebug=1.
+}
+
+const HLS_DEBUG: boolean = (() => {
+  try {
+    if (import.meta.env.DEV) return true;
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('hlsdebug') === '1';
+  } catch {
+    return false;
+  }
+})();
+
+interface _AttachHlsOptionsContinued {
   onUnrecoverable?: (reason: HlsUnrecoverableReason, detail?: unknown) => void;
 }
 
