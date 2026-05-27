@@ -69,8 +69,21 @@ export function attachHls(
   const emit = opts.onEvent ?? (() => {});
   const onUnrecoverable = opts.onUnrecoverable ?? (() => {});
 
+  // TEMP proof-of-execution log. Uses console.log (not debug) so it survives
+  // production builds and default DevTools log-level filtering.
+  try {
+    console.log('[hls][debug_gate] attachHls called', {
+      href: typeof window !== 'undefined' ? window.location.href : '(no window)',
+      search: typeof window !== 'undefined' ? window.location.search : '(no window)',
+      HLS_DEBUG,
+      src,
+      canPlayNativeHls: !!video.canPlayType('application/vnd.apple.mpegurl'),
+    });
+  } catch { /* ignore */ }
+
   // Native HLS path (Safari, iOS) — no hls.js download.
   if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    try { console.log('[hls][debug_gate] path=native'); } catch { /* ignore */ }
     if (token.cancelled) return () => {};
     try {
       video.src = src;
@@ -80,12 +93,18 @@ export function attachHls(
     return () => detachNative(video);
   }
 
+  try { console.log('[hls][debug_gate] path=mse, importing hls.js'); } catch { /* ignore */ }
+
   // MSE path — lazy load hls.js.
   let hls: import('hls.js').default | null = null;
 
   import('hls.js')
     .then(({ default: Hls }) => {
-      if (token.cancelled) return;
+      try { console.log('[hls][debug_gate] hls.js loaded', { isSupported: Hls.isSupported() }); } catch { /* ignore */ }
+      if (token.cancelled) {
+        try { console.log('[hls][debug_gate] cancelled before attach'); } catch { /* ignore */ }
+        return;
+      }
       if (!Hls.isSupported()) {
         // No MSE and no native HLS — surface as unrecoverable. Do NOT assign
         // raw .m3u8 to <video>; Chromium can't play it and would report a
@@ -185,6 +204,7 @@ export function attachHls(
       hls.attachMedia(video);
     })
     .catch((err) => {
+      try { console.log('[hls][debug_gate] hls.js import failed', String(err)); } catch { /* ignore */ }
       emit('mux_hls_load_failed', { src, err: String(err) });
       if (!token.cancelled) onUnrecoverable('hls_load_failed', String(err));
     });
