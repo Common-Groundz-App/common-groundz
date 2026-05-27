@@ -81,37 +81,34 @@ export function attachHls(
     });
   } catch { /* ignore */ }
 
-  // Native HLS path (Safari, iOS) — no hls.js download.
-  if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    try { console.log('[hls][debug_gate] path=native'); } catch { /* ignore */ }
-    if (token.cancelled) return () => {};
-    try {
-      video.src = src;
-    } catch {
-      /* ignore */
-    }
-    return () => detachNative(video);
-  }
+  const canPlayNativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
 
-  try { console.log('[hls][debug_gate] path=mse, importing hls.js'); } catch { /* ignore */ }
+  try { console.log('[hls][debug_gate] importing hls.js'); } catch { /* ignore */ }
 
-  // MSE path — lazy load hls.js.
+  // MSE path — lazy load hls.js. Branch decision is deferred until after
+  // import resolves so we can prefer hls.js when Hls.isSupported() is true.
   let hls: import('hls.js').default | null = null;
 
   import('hls.js')
     .then(({ default: Hls }) => {
-      try { console.log('[hls][debug_gate] hls.js loaded', { isSupported: Hls.isSupported() }); } catch { /* ignore */ }
+      const isSupported = Hls.isSupported();
+      try { console.log('[hls][debug_gate] hls.js loaded', { isSupported }); } catch { /* ignore */ }
       if (token.cancelled) {
         try { console.log('[hls][debug_gate] cancelled before attach'); } catch { /* ignore */ }
         return;
       }
-      if (!Hls.isSupported()) {
-        // No MSE and no native HLS — surface as unrecoverable. Do NOT assign
-        // raw .m3u8 to <video>; Chromium can't play it and would report a
-        // misleading "format unsupported" error.
+      if (!isSupported) {
+        if (canPlayNativeHls) {
+          try { console.log('[hls][debug_gate] decision=native_fallback_no_mse'); } catch { /* ignore */ }
+          try { video.src = src; } catch { /* ignore */ }
+          return;
+        }
+        try { console.log('[hls][debug_gate] decision=unsupported'); } catch { /* ignore */ }
         if (!token.cancelled) onUnrecoverable('hls_unsupported');
         return;
       }
+      try { console.log('[hls][debug_gate] decision=mse_supported'); } catch { /* ignore */ }
+
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -204,7 +201,14 @@ export function attachHls(
       hls.attachMedia(video);
     })
     .catch((err) => {
+      if (token.cancelled) return;
+      if (canPlayNativeHls) {
+        try { console.log('[hls][debug_gate] decision=native_fallback_import_failed', String(err)); } catch { /* ignore */ }
+        try { video.src = src; } catch { /* ignore */ }
+        return;
+      }
       try { console.log('[hls][debug_gate] hls.js import failed', String(err)); } catch { /* ignore */ }
+
       emit('mux_hls_load_failed', { src, err: String(err) });
       if (!token.cancelled) onUnrecoverable('hls_load_failed', String(err));
     });
