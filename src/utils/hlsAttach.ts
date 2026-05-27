@@ -201,7 +201,14 @@ export function attachHls(
       hls.attachMedia(video);
     })
     .catch((err) => {
+      if (token.cancelled) return;
+      if (canPlayNativeHls) {
+        try { console.log('[hls][debug_gate] decision=native_fallback_import_failed', String(err)); } catch { /* ignore */ }
+        try { video.src = src; } catch { /* ignore */ }
+        return;
+      }
       try { console.log('[hls][debug_gate] hls.js import failed', String(err)); } catch { /* ignore */ }
+
       emit('mux_hls_load_failed', { src, err: String(err) });
       if (!token.cancelled) onUnrecoverable('hls_load_failed', String(err));
     });
