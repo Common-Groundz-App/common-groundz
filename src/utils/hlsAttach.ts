@@ -60,6 +60,20 @@ const detachNative = (video: HTMLVideoElement) => {
   }
 };
 
+// iOS WebKit detection — every browser on iOS (Safari, Chrome, Firefox, Edge)
+// is WebKit under the hood. iPadOS reports as MacIntel with >1 touch points.
+// We always prefer native HLS on iOS because MSE-backed <video> hits stricter
+// autoplay rules and silently fails muted autoplay.
+function isIOSLikeWebKit(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const maxTouchPoints = navigator.maxTouchPoints || 0;
+  return /iPad|iPhone|iPod/.test(ua)
+    || (platform === 'MacIntel' && maxTouchPoints > 1);
+}
+
+
 export function attachHls(
   video: HTMLVideoElement,
   src: string,
@@ -69,6 +83,9 @@ export function attachHls(
   const emit = opts.onEvent ?? (() => {});
   const onUnrecoverable = opts.onUnrecoverable ?? (() => {});
 
+  const isIOS = isIOSLikeWebKit();
+  const canPlayNativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
+
   // TEMP proof-of-execution log. Uses console.log (not debug) so it survives
   // production builds and default DevTools log-level filtering.
   try {
@@ -77,11 +94,24 @@ export function attachHls(
       search: typeof window !== 'undefined' ? window.location.search : '(no window)',
       HLS_DEBUG,
       src,
-      canPlayNativeHls: !!video.canPlayType('application/vnd.apple.mpegurl'),
+      canPlayNativeHls,
+      isIOS,
     });
   } catch { /* ignore */ }
 
-  const canPlayNativeHls = !!video.canPlayType('application/vnd.apple.mpegurl');
+  // iOS always prefers native HLS regardless of Hls.isSupported().
+  // Modern iOS (17.1+) exposes Managed Media Source so hls.js would otherwise
+  // win the branch, but MSE-backed playback breaks muted autoplay on iOS.
+  if (isIOS && canPlayNativeHls) {
+    if (token.cancelled) return () => detachNative(video);
+    try { console.log('[hls][debug_gate] decision=native_ios_preferred'); } catch { /* ignore */ }
+    try {
+      // Idempotent: avoid restart flicker if attachHls is re-invoked for the
+      // same <video>+src (StrictMode double-invoke, re-mount).
+      if (video.src !== src) video.src = src;
+    } catch { /* ignore */ }
+    return () => detachNative(video);
+  }
 
   try { console.log('[hls][debug_gate] importing hls.js'); } catch { /* ignore */ }
 
@@ -97,6 +127,7 @@ export function attachHls(
         try { console.log('[hls][debug_gate] cancelled before attach'); } catch { /* ignore */ }
         return;
       }
+
       if (!isSupported) {
         if (canPlayNativeHls) {
           try { console.log('[hls][debug_gate] decision=native_fallback_no_mse'); } catch { /* ignore */ }
