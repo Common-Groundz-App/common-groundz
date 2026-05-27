@@ -100,7 +100,11 @@ export function attachHls(
 
   import('hls.js')
     .then(({ default: Hls }) => {
-      if (token.cancelled) return;
+      try { console.log('[hls][debug_gate] hls.js loaded', { isSupported: Hls.isSupported() }); } catch { /* ignore */ }
+      if (token.cancelled) {
+        try { console.log('[hls][debug_gate] cancelled before attach'); } catch { /* ignore */ }
+        return;
+      }
       if (!Hls.isSupported()) {
         // No MSE and no native HLS — surface as unrecoverable. Do NOT assign
         // raw .m3u8 to <video>; Chromium can't play it and would report a
