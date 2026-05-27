@@ -92,6 +92,72 @@ export function attachHls(
       if (import.meta.env.DEV) {
         const w = window as unknown as { __muxHlsLive?: number };
         w.__muxHlsLive = (w.__muxHlsLive ?? 0) + 1;
+
+        // Diagnostic-only logging (DEV). No behavior change.
+        try {
+          const cfg = (hls as unknown as { config?: Record<string, unknown> }).config ?? {};
+          console.debug('[hls][construct]', {
+            src,
+            abrEwmaDefaultEstimate: cfg.abrEwmaDefaultEstimate,
+            capLevelToPlayerSize: cfg.capLevelToPlayerSize,
+            testBandwidth: cfg.testBandwidth,
+            clientWidth: video.clientWidth,
+            clientHeight: video.clientHeight,
+            devicePixelRatio: window.devicePixelRatio,
+          });
+        } catch { /* ignore */ }
+
+        let fragCount = 0;
+        hls.on(Hls.Events.MANIFEST_PARSED, (_e, data) => {
+          try {
+            const levels = (data?.levels ?? []).map((lv: { width?: number; height?: number; bitrate?: number }, i: number) => ({
+              index: i,
+              resolution: `${lv.width ?? '?'}x${lv.height ?? '?'}`,
+              bitrate: lv.bitrate,
+            }));
+            console.debug('[hls][manifest_parsed]', { src, levels });
+          } catch { /* ignore */ }
+        });
+        hls.on(Hls.Events.LEVEL_SWITCHING, (_e, data) => {
+          try {
+            const lv = hls?.levels?.[data.level];
+            console.debug('[hls][level_switching]', {
+              level: data.level,
+              resolution: lv ? `${lv.width}x${lv.height}` : undefined,
+              bitrate: lv?.bitrate,
+            });
+          } catch { /* ignore */ }
+        });
+        hls.on(Hls.Events.LEVEL_SWITCHED, (_e, data) => {
+          try {
+            const lv = hls?.levels?.[data.level];
+            console.debug('[hls][level_switched]', {
+              level: data.level,
+              resolution: lv ? `${lv.width}x${lv.height}` : undefined,
+              bitrate: lv?.bitrate,
+            });
+          } catch { /* ignore */ }
+        });
+        hls.on(Hls.Events.FRAG_LOADED, (_e, data) => {
+          if (fragCount >= 5) return;
+          fragCount++;
+          try {
+            const frag = data?.frag as { sn?: number | string; level?: number } | undefined;
+            const lv = frag && typeof frag.level === 'number' ? hls?.levels?.[frag.level] : undefined;
+            const stats = (data as unknown as { stats?: { loading?: { start?: number; end?: number } } })?.stats;
+            const loadMs = stats?.loading?.start != null && stats?.loading?.end != null
+              ? stats.loading.end - stats.loading.start
+              : undefined;
+            console.debug('[hls][frag_loaded]', {
+              n: fragCount,
+              sn: frag?.sn,
+              level: frag?.level,
+              resolution: lv ? `${lv.width}x${lv.height}` : undefined,
+              bitrate: lv?.bitrate,
+              loadMs,
+            });
+          } catch { /* ignore */ }
+        });
       }
       hls.on(Hls.Events.ERROR, (_e, data) => {
         if (!data?.fatal) return;
