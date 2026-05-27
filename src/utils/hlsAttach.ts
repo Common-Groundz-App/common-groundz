@@ -100,7 +100,7 @@ export function attachHls(
         capLevelToPlayerSize: true,
         abrEwmaDefaultEstimate: getDefaultEstimate(),
       });
-      if (import.meta.env.DEV) {
+      if (HLS_DEBUG) {
         const w = window as unknown as { __muxHlsLive?: number };
         w.__muxHlsLive = (w.__muxHlsLive ?? 0) + 1;
 
@@ -174,7 +174,7 @@ export function attachHls(
         if (!data?.fatal) return;
         emit('mux_hls_fatal', { src, type: data.type });
         try { hls?.destroy(); } catch { /* ignore */ }
-        if (import.meta.env.DEV) {
+        if (HLS_DEBUG) {
           const w = window as unknown as { __muxHlsLive?: number };
           if (typeof w.__muxHlsLive === 'number') w.__muxHlsLive--;
         }
@@ -192,7 +192,7 @@ export function attachHls(
 
   return () => {
     try { hls?.destroy(); } catch { /* ignore */ }
-    if (hls && import.meta.env.DEV) {
+    if (hls && HLS_DEBUG) {
       const w = window as unknown as { __muxHlsLive?: number };
       if (typeof w.__muxHlsLive === 'number') w.__muxHlsLive--;
     }
