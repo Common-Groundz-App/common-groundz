@@ -204,6 +204,7 @@ export function attachHls(
       hls.attachMedia(video);
     })
     .catch((err) => {
+      try { console.log('[hls][debug_gate] hls.js import failed', String(err)); } catch { /* ignore */ }
       emit('mux_hls_load_failed', { src, err: String(err) });
       if (!token.cancelled) onUnrecoverable('hls_load_failed', String(err));
     });
