@@ -51,8 +51,20 @@ export const isMuxPlayable = (
 // URL helpers
 // ============================================================================
 
-export const muxHlsUrl = (playbackId: string): string =>
-  `https://stream.mux.com/${playbackId}.m3u8`;
+export type MuxPlaybackOptions = {
+  renditionOrder?: 'asc' | 'desc';
+  minResolution?: '480p' | '720p' | '1080p';
+};
+
+export const muxHlsUrl = (playbackId: string, opts?: MuxPlaybackOptions): string => {
+  const base = `https://stream.mux.com/${playbackId}.m3u8`;
+  if (!opts) return base;
+  const params = new URLSearchParams();
+  if (opts.renditionOrder) params.set('rendition_order', opts.renditionOrder);
+  if (opts.minResolution) params.set('min_resolution', opts.minResolution);
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
+};
 
 export const muxThumbnailUrl = (playbackId: string, opts?: { time?: number; width?: number }): string => {
   const params = new URLSearchParams();
@@ -72,17 +84,19 @@ export const muxPosterUrl = (m: MediaItem): string | undefined => {
 
 /**
  * Resolve which src + transport to use for a video MediaItem.
- * - Mux + playable → HLS .m3u8 from playback_id
+ * - Mux + playable → HLS .m3u8 from playback_id (optional playback opts)
  * - Legacy → item.url, no HLS
  */
 export const resolveVideoSrc = (
   m: MediaItem,
+  opts?: MuxPlaybackOptions,
 ): { src: string | undefined; isHls: boolean } => {
   if (isMuxPlayable(m) && m.mux_playback_id) {
-    return { src: muxHlsUrl(m.mux_playback_id), isHls: true };
+    return { src: muxHlsUrl(m.mux_playback_id, opts), isHls: true };
   }
   return { src: m.url, isHls: false };
 };
+
 
 // ============================================================================
 // One-shot telemetry for ready-but-broken state (dependency-free)
