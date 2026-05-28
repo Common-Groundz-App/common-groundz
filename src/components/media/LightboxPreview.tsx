@@ -297,7 +297,10 @@ export function LightboxPreview({
     // Phase 4 — attach source synchronously inside the ref callback, BEFORE
     // the iOS early-play call below. Native HLS (Safari/iOS) is sync (sets
     // el.src), preserving the first-tap gesture chain.
-    const { src, isHls } = resolveVideoSrc(item);
+    // Lightbox displays Mux video at large size — bias native HLS ABR to start
+    // at the highest available rendition to avoid the cold-start blur.
+    // Lower renditions remain available as fallback if network can't sustain.
+    const { src, isHls } = resolveVideoSrc(item, { renditionOrder: 'desc' });
     if (src && !hlsDetachRef.current) {
       if (isHls) {
         const token: AttachToken = { cancelled: false };
