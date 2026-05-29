@@ -721,8 +721,24 @@ sample 5s  : ${debugSamples[5] ? `${debugSamples[5].w} x ${debugSamples[5].h} (r
 sample 10s : ${debugSamples[10] ? `${debugSamples[10].w} x ${debugSamples[10].h} (rs=${debugSamples[10].rs})` : '…'}`}
                   </div>
                 )}
+                {isMux && hiResPoster && (
+                  <img
+                    src={hiResPoster}
+                    alt=""
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute inset-0 h-full w-full object-contain pointer-events-none transition-opacity duration-200",
+                      videoReady ? "opacity-0" : "opacity-100"
+                    )}
+                  />
+                )}
+              </div>
+            );
+          })()}
 
-        
+        </div>
+
+
         {/* Navigation controls - only shown when there are multiple items */}
         {media.length > 1 && (
           <div
