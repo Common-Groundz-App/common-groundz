@@ -65,9 +65,22 @@ export function LightboxPreview({
   const [videoReady, setVideoReady] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
 
+  // ---- TEMP DIAGNOSTIC: ?hlsdebug=1 on-screen overlay ----
+  // Lets us inspect on iPhone what Mux rendition iOS native HLS actually
+  // picks for the lightbox video over time. Strictly read-only.
+  const hlsDebug =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('hlsdebug') === '1';
+  type DebugSample = { w: number; h: number; rs: number; ct: number };
+  const [debugSamples, setDebugSamples] = useState<Record<number, DebugSample>>({});
+  const [debugLive, setDebugLive] = useState<DebugSample | null>(null);
+  const debugTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const debugSampledRef = useRef(false);
+
   const chromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaRef = useRef<MediaItem[]>([]);
   const isMobile = useIsMobile();
+
   // Apply the feed handoff at most once, on the entry video only.
   const handoffAppliedRef = useRef(false);
   // Tracks whether the iOS synchronous ref-callback play() ran for this open.
@@ -204,7 +217,23 @@ export function LightboxPreview({
   // poster overlay covers the next <video> until it's truly ready.
   useEffect(() => {
     setVideoReady(false);
-  }, [currentIndex]);
+    // Reset diagnostic samples for the new item.
+    if (hlsDebug) {
+      debugTimersRef.current.forEach((t) => clearTimeout(t));
+      debugTimersRef.current = [];
+      debugSampledRef.current = false;
+      setDebugSamples({});
+      setDebugLive(null);
+    }
+  }, [currentIndex, hlsDebug]);
+
+  // Clear any pending diagnostic timers on unmount.
+  useEffect(() => {
+    return () => {
+      debugTimersRef.current.forEach((t) => clearTimeout(t));
+      debugTimersRef.current = [];
+    };
+  }, []);
 
 
 
@@ -504,6 +533,63 @@ export function LightboxPreview({
             // (no HLS attach delay) and behave exactly as before.
             const hidden = isMux && !videoReady;
 
+            // ---- TEMP DIAGNOSTIC overlay data (only when ?hlsdebug=1) ----
+            // Re-derive the exact src used by videoRefCallback so the overlay
+            // reflects what was actually attached.
+            let debugSrc: string | undefined;
+            let debugRenditionOrder: string | null = null;
+            let debugMinResolution: string | null = null;
+            let debugPath: 'native-hls' | 'hls.js' | 'progressive' = 'progressive';
+            if (hlsDebug) {
+              const resolved = resolveVideoSrc(currentItem, { renditionOrder: 'desc' });
+              debugSrc = resolved.src;
+              if (debugSrc && debugSrc.includes('?')) {
+                try {
+                  const q = new URLSearchParams(debugSrc.split('?')[1]);
+                  debugRenditionOrder = q.get('rendition_order');
+                  debugMinResolution = q.get('min_resolution');
+                } catch { /* ignore */ }
+              }
+              if (resolved.isHls) {
+                // Mirror hlsAttach's branch logic: iOS-like WebKit + native HLS
+                // support → native; else hls.js (MSE).
+                let canNative = false;
+                try {
+                  const probe = document.createElement('video');
+                  canNative = !!probe.canPlayType('application/vnd.apple.mpegurl');
+                } catch { /* ignore */ }
+                const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
+                const isIOSLike =
+                  /iPad|iPhone|iPod/.test(ua) ||
+                  (typeof navigator !== 'undefined' &&
+                    navigator.platform === 'MacIntel' &&
+                    (navigator as any).maxTouchPoints > 1);
+                debugPath = isIOSLike && canNative ? 'native-hls' : 'hls.js';
+              } else {
+                debugPath = 'progressive';
+              }
+            }
+
+            const scheduleDebugSamples = (v: HTMLVideoElement) => {
+              if (!hlsDebug || debugSampledRef.current) return;
+              debugSampledRef.current = true;
+              const checkpoints = [1, 3, 5, 10];
+              checkpoints.forEach((sec) => {
+                const t = setTimeout(() => {
+                  setDebugSamples((prev) => ({
+                    ...prev,
+                    [sec]: {
+                      w: v.videoWidth,
+                      h: v.videoHeight,
+                      rs: v.readyState,
+                      ct: v.currentTime,
+                    },
+                  }));
+                }, sec * 1000);
+                debugTimersRef.current.push(t);
+              });
+            };
+
             return (
               <div style={wrapperStyle}>
                 <video
@@ -554,6 +640,9 @@ export function LightboxPreview({
                     }
 
                   }}
+                  onPlaying={(e) => {
+                    if (hlsDebug) scheduleDebugSamples(e.currentTarget);
+                  }}
                   onSeeked={(e) => {
                     e.stopPropagation();
                     // Always reveal once any seek lands — covers handoff seek
@@ -598,11 +687,40 @@ export function LightboxPreview({
                   onPlay={(e) => e.stopPropagation()}
                   onPause={(e) => e.stopPropagation()}
                   onVolumeChange={(e) => e.stopPropagation()}
-                  onTimeUpdate={(e) => e.stopPropagation()}
+                  onTimeUpdate={(e) => {
+                    e.stopPropagation();
+                    if (hlsDebug) {
+                      const v = e.currentTarget;
+                      setDebugLive({
+                        w: v.videoWidth,
+                        h: v.videoHeight,
+                        rs: v.readyState,
+                        ct: v.currentTime,
+                      });
+                    }
+                  }}
                   onSeeking={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 />
+                {hlsDebug && (
+                  <div
+                    className="absolute top-1 left-1 z-50 max-w-[90%] rounded bg-black/80 p-2 font-mono text-[10px] leading-tight text-green-300 pointer-events-none"
+                    style={{ whiteSpace: 'pre' }}
+                  >
+                    {`path       : ${debugPath}
+rendOrder  : ${debugRenditionOrder ?? '(absent)'}
+minRes     : ${debugMinResolution ?? '(absent)'}
+src        : ...${debugSrc ? debugSrc.slice(-80) : '(none)'}
+videoW x H : ${debugLive ? `${debugLive.w} x ${debugLive.h}` : '—'}
+readyState : ${debugLive ? debugLive.rs : '—'}
+currentT   : ${debugLive ? debugLive.ct.toFixed(2) + 's' : '—'}
+sample 1s  : ${debugSamples[1] ? `${debugSamples[1].w} x ${debugSamples[1].h} (rs=${debugSamples[1].rs})` : '…'}
+sample 3s  : ${debugSamples[3] ? `${debugSamples[3].w} x ${debugSamples[3].h} (rs=${debugSamples[3].rs})` : '…'}
+sample 5s  : ${debugSamples[5] ? `${debugSamples[5].w} x ${debugSamples[5].h} (rs=${debugSamples[5].rs})` : '…'}
+sample 10s : ${debugSamples[10] ? `${debugSamples[10].w} x ${debugSamples[10].h} (rs=${debugSamples[10].rs})` : '…'}`}
+                  </div>
+                )}
                 {isMux && hiResPoster && (
                   <img
                     src={hiResPoster}
@@ -619,7 +737,8 @@ export function LightboxPreview({
           })()}
 
         </div>
-        
+
+
         {/* Navigation controls - only shown when there are multiple items */}
         {media.length > 1 && (
           <div
