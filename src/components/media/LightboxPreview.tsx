@@ -571,7 +571,7 @@ export function LightboxPreview({
             let debugMinResolution: string | null = null;
             let debugPath: 'native-hls' | 'hls.js' | 'progressive' = 'progressive';
             if (hlsDebug) {
-              const resolved = resolveVideoSrc(currentItem, { renditionOrder: 'desc' });
+              const resolved = resolveVideoSrc(currentItem, getLightboxPlaybackOpts());
               debugSrc = resolved.src;
               if (debugSrc && debugSrc.includes('?')) {
                 try {
