@@ -17,11 +17,41 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, muxThumbnailUrl, maybeEmitBrokenReady } from '@/utils/muxMedia';
+import { isMuxPreparing, isMuxErroredOrBroken, isMuxPlayable, resolveVideoSrc, muxPosterUrl, muxThumbnailUrl, maybeEmitBrokenReady, type MuxPlaybackOptions } from '@/utils/muxMedia';
 import { attachHls, type AttachToken } from '@/utils/hlsAttach';
 import { analytics } from '@/services/analytics';
 import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
+
+/**
+ * Phase 2 — lightbox-only Mux playback options.
+ *
+ * Always biases native HLS ABR to start at the highest rendition. On
+ * unconstrained networks we ALSO strip renditions below 720p from the
+ * manifest, because iOS native HLS otherwise locks onto a 270p rung for
+ * 4K-source assets (heavy bitrate ladder → conservative cold start) and
+ * never upshifts, producing a visibly blurry full-screen lightbox.
+ *
+ * Skipped when the user has Save-Data enabled or is on 2g/slow-2g, so
+ * we don't force a 720p floor on someone explicitly minimizing data.
+ */
+const getLightboxPlaybackOpts = (): MuxPlaybackOptions => {
+  const opts: MuxPlaybackOptions = { renditionOrder: 'desc' };
+  try {
+    const conn = (navigator as any)?.connection;
+    const saveData = conn?.saveData === true;
+    const eff = conn?.effectiveType;
+    const slow = eff === '2g' || eff === 'slow-2g';
+    if (!saveData && !slow) {
+      opts.minResolution = '720p';
+    }
+  } catch {
+    // navigator.connection unsupported (Safari) — default to 720p floor.
+    opts.minResolution = '720p';
+  }
+  return opts;
+};
+
 
 interface LightboxPreviewProps {
   media: MediaItem[];
@@ -329,7 +359,7 @@ export function LightboxPreview({
     // Lightbox displays Mux video at large size — bias native HLS ABR to start
     // at the highest available rendition to avoid the cold-start blur.
     // Lower renditions remain available as fallback if network can't sustain.
-    const { src, isHls } = resolveVideoSrc(item, { renditionOrder: 'desc' });
+    const { src, isHls } = resolveVideoSrc(item, getLightboxPlaybackOpts());
     if (src && !hlsDetachRef.current) {
       if (isHls) {
         const token: AttachToken = { cancelled: false };
@@ -541,7 +571,7 @@ export function LightboxPreview({
             let debugMinResolution: string | null = null;
             let debugPath: 'native-hls' | 'hls.js' | 'progressive' = 'progressive';
             if (hlsDebug) {
-              const resolved = resolveVideoSrc(currentItem, { renditionOrder: 'desc' });
+              const resolved = resolveVideoSrc(currentItem, getLightboxPlaybackOpts());
               debugSrc = resolved.src;
               if (debugSrc && debugSrc.includes('?')) {
                 try {
