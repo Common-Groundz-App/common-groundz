@@ -65,9 +65,22 @@ export function LightboxPreview({
   const [videoReady, setVideoReady] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
 
+  // ---- TEMP DIAGNOSTIC: ?hlsdebug=1 on-screen overlay ----
+  // Lets us inspect on iPhone what Mux rendition iOS native HLS actually
+  // picks for the lightbox video over time. Strictly read-only.
+  const hlsDebug =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('hlsdebug') === '1';
+  type DebugSample = { w: number; h: number; rs: number; ct: number };
+  const [debugSamples, setDebugSamples] = useState<Record<number, DebugSample>>({});
+  const [debugLive, setDebugLive] = useState<DebugSample | null>(null);
+  const debugTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const debugSampledRef = useRef(false);
+
   const chromeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mediaRef = useRef<MediaItem[]>([]);
   const isMobile = useIsMobile();
+
   // Apply the feed handoff at most once, on the entry video only.
   const handoffAppliedRef = useRef(false);
   // Tracks whether the iOS synchronous ref-callback play() ran for this open.
