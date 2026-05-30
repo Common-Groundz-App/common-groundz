@@ -236,15 +236,7 @@ export function LightboxPreview({
   // poster overlay covers the next <video> until it's truly ready.
   useEffect(() => {
     setVideoReady(false);
-    // Reset diagnostic samples for the new item.
-    if (hlsDebug) {
-      debugTimersRef.current.forEach((t) => clearTimeout(t));
-      debugTimersRef.current = [];
-      debugSampledRef.current = false;
-      setDebugSamples({});
-      setDebugLive(null);
-    }
-  }, [currentIndex, hlsDebug]);
+  }, [currentIndex]);
 
   // Clear any pending diagnostic timers on unmount.
   useEffect(() => {
