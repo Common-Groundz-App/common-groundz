@@ -42,6 +42,7 @@ export function PostMediaDisplay({
   const [videoHandoff, setVideoHandoff] = useState<VideoHandoff | null>(null);
   const [entryExtras, setEntryExtras] = useState<LightboxEntryExtras | null>(null);
   const [videoResume, setVideoResume] = useState<{ index: number; handoff: VideoExitHandoff } | null>(null);
+  const { setLightboxOpen: setManagerLightboxOpen } = useFeedVideoManagerControls();
   
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
     return null;
