@@ -6,6 +6,7 @@ import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import GuestNavBar from '@/components/profile/GuestNavBar';
 import Footer from '@/components/Footer';
 import PostContentViewer from '@/components/content/PostContentViewer';
+import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
 import PostDetailSidebar from '@/components/content/PostDetailSidebar';
 import PublicContentNotFound from '@/components/content/PublicContentNotFound';
 import SEOHead from '@/components/seo/SEOHead';
