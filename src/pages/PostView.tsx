@@ -233,13 +233,15 @@ const PostView = () => {
               {isOwner && (
                 <MuxOwnerHint post={ownerPost} onReady={handleMuxReady} />
               )}
-              <PostContentViewer
-                postId={postId}
-                highlightCommentId={commentId}
-                onPostLoaded={handlePostLoaded}
-                refreshTick={refreshTick}
-                isDetailView
-              />
+              <FeedVideoManagerProvider>
+                <PostContentViewer
+                  postId={postId}
+                  highlightCommentId={commentId}
+                  onPostLoaded={handlePostLoaded}
+                  refreshTick={refreshTick}
+                  isDetailView
+                />
+              </FeedVideoManagerProvider>
             </div>
 
             {/* Right sidebar — desktop only */}
