@@ -726,9 +726,13 @@ const Feed = React.memo(() => {
                 
                 {/* Feed Content - No overflow or height constraints */}
                 {activeTab === "for-you" ? (
-                  <EnhancedFeedForYou refreshing={refreshing} />
+                  <FeedVideoManagerProvider>
+                    <EnhancedFeedForYou refreshing={refreshing} />
+                  </FeedVideoManagerProvider>
                 ) : (
-                  <FeedFollowing refreshing={refreshing} />
+                  <FeedVideoManagerProvider>
+                    <FeedFollowing refreshing={refreshing} />
+                  </FeedVideoManagerProvider>
                 )}
               </div>
             </div>
