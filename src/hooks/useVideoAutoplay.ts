@@ -39,6 +39,43 @@ export const shouldSuppressAutoplay = (): boolean => {
   return false;
 };
 
+/**
+ * Reactive version of `shouldSuppressAutoplay()`. Subscribes to
+ * `prefers-reduced-motion` and `navigator.connection` changes so consumers
+ * (e.g. the single-active feed video manager) re-evaluate suppression
+ * without needing a remount. Does NOT subscribe to `visibilitychange` —
+ * the manager handles tab visibility separately.
+ */
+export const useAutoplaySuppressed = (): boolean => {
+  const [suppressed, setSuppressed] = useState<boolean>(() => shouldSuppressAutoplay());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const update = () => setSuppressed(shouldSuppressAutoplay());
+
+    let mql: MediaQueryList | null = null;
+    try {
+      mql = window.matchMedia?.('(prefers-reduced-motion: reduce)') ?? null;
+    } catch {
+      mql = null;
+    }
+    mql?.addEventListener?.('change', update);
+
+    const conn = (navigator as any).connection;
+    conn?.addEventListener?.('change', update);
+
+    // Sync once on mount in case state changed before subscription attached.
+    update();
+
+    return () => {
+      mql?.removeEventListener?.('change', update);
+      conn?.removeEventListener?.('change', update);
+    };
+  }, []);
+
+  return suppressed;
+};
+
 export function useVideoAutoplay(
   videoRef: RefObject<HTMLVideoElement>,
   { threshold = 0.5, enabled = true }: Options = {}
