@@ -3,7 +3,8 @@ import { Volume2, VolumeX, Play, Pause, Film, AlertTriangle, RotateCw } from 'lu
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useVideoMute, readGlobalVideoMuted, setGlobalVideoMuted } from '@/hooks/useVideoMute';
-import { useVideoAutoplay } from '@/hooks/useVideoAutoplay';
+import { useVideoAutoplay, shouldSuppressAutoplay } from '@/hooks/useVideoAutoplay';
+import { useFeedVideoSlot } from '@/hooks/useFeedVideoManager';
 import { useVideoMilestones } from '@/hooks/useVideoMilestones';
 import { useVideoViewTracker } from '@/hooks/useVideoViewTracker';
 import { formatDuration } from '@/utils/videoPoster';
