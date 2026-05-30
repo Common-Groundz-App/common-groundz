@@ -49,7 +49,9 @@ const Profile = () => {
       <SEOHead noindex={true} canonical={canonical} />
       <NavBarComponent />
       <div className="flex-1">
-        <ProfileContent profileUserId={profileUserId} defaultActiveTab={activeTab} />
+        <FeedVideoManagerProvider>
+          <ProfileContent profileUserId={profileUserId} defaultActiveTab={activeTab} />
+        </FeedVideoManagerProvider>
       </div>
       
 
