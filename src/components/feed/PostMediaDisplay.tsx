@@ -5,6 +5,7 @@ import { FeedCollage } from '@/components/media/FeedCollage';
 import { cn } from '@/lib/utils';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { readGlobalVideoMuted, setGlobalVideoMuted } from '@/hooks/useVideoMute';
+import { useFeedVideoManagerControls } from '@/hooks/useFeedVideoManager';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 
 interface PostMediaDisplayProps {
