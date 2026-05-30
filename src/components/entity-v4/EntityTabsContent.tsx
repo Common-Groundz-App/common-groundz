@@ -16,6 +16,7 @@ import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entit
 import { getEntityStats } from '@/services/entityService';
 import PostFeedItem from '@/components/feed/PostFeedItem';
 import { useEntityPosts } from '@/hooks/use-entity-posts';
+import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
 
 interface EntityTabsContentProps {
   entity?: Entity;
