@@ -107,6 +107,9 @@ export function PostMediaDisplay({
     setVideoHandoff(handoff ?? null);
     setEntryExtras(extras ?? null);
     setLightboxOpen(true);
+    // Phase 1: synchronously pause all feed videos via the manager so
+    // there's no debounce gap before the lightbox takes over playback.
+    setManagerLightboxOpen(true);
   };
 
   const handleLightboxClose = () => {
@@ -115,6 +118,7 @@ export function PostMediaDisplay({
     setVideoHandoff(null);
     // Drop the dataURL — never retained in a ref. Eligible for GC immediately.
     setEntryExtras(null);
+    setManagerLightboxOpen(false);
   };
 
   // Reverse handoff: mute is a global preference, so always sync it.
