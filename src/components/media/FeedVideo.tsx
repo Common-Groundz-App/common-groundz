@@ -288,6 +288,15 @@ function FeedVideoPlayer({
     return () => registerSlotEl(null);
   }, [managed, registerSlotEl]);
 
+  // Reactive autoplay suppression — re-evaluates when the user toggles
+  // reduced-motion / save-data while the feed is open.
+  const autoplaySuppressed = useAutoplaySuppressed();
+
+  // Keep an always-fresh ref of slotIsActive so the inactive-play listener
+  // below can read the current value without detach/reattach churn.
+  const slotIsActiveRef = useRef(slotIsActive);
+  useEffect(() => { slotIsActiveRef.current = slotIsActive; }, [slotIsActive]);
+
   // Manager-driven play/pause — the SOLE owner of feed-card transitions
   // when a provider is present. Honors the same suppression rules as
   // useVideoAutoplay and respects manual pause + scrubbing.
@@ -295,22 +304,23 @@ function FeedVideoPlayer({
     if (!managed) return;
     const el = videoRef.current;
     if (!el) return;
-    const suppressed = shouldSuppressAutoplay();
     const tabHidden = typeof document !== 'undefined' && document.hidden;
     const canAutoplay =
-      slotIsActive && autoplayEnabled && !isScrubbing && !suppressed && !tabHidden;
+      slotIsActive && autoplayEnabled && !isScrubbing && !autoplaySuppressed && !tabHidden;
     if (canAutoplay) {
-      // Browsers force-mute autoplay; keep DOM muted=true here. Do NOT
-      // mutate the global mute preference — the existing `[muted]` effect
-      // syncs el.muted with the user's persisted choice on next render.
-      el.muted = true;
-      const p = el.play();
-      if (p && typeof p.catch === 'function') {
-        p.catch((err: any) => {
-          const name = err?.name;
-          if (name === 'AbortError' || name === 'NotAllowedError') return;
-          // Other errors fall through silently — surfaced via onError handler.
-        });
+      // Idempotent: only call play() if currently paused. Respect the
+      // user's persisted global mute preference — do NOT force mute on
+      // the active video.
+      if (el.paused) {
+        try { el.muted = readGlobalVideoMuted(); } catch { /* ignore */ }
+        const p = el.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch((err: any) => {
+            const name = err?.name;
+            if (name === 'AbortError' || name === 'NotAllowedError') return;
+            // Other errors fall through silently — surfaced via onError handler.
+          });
+        }
       }
     } else {
       if (!el.paused) {
@@ -322,7 +332,25 @@ function FeedVideoPlayer({
         try { el.muted = true; } catch { /* ignore */ }
       }
     }
-  }, [managed, slotIsActive, autoplayEnabled, isScrubbing]);
+  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed]);
+
+  // Single-active invariant guard: if a non-active managed video ever
+  // starts playing (manual tap, browser quirk, late-resolving play()),
+  // pause it immediately. The listener reads `slotIsActiveRef.current`
+  // so it survives active-state flips without detach/reattach.
+  useEffect(() => {
+    if (!managed) return;
+    const el = videoRef.current;
+    if (!el) return;
+    const onPlay = () => {
+      if (!slotIsActiveRef.current) {
+        try { el.pause(); } catch { /* ignore */ }
+      }
+    };
+    el.addEventListener('play', onPlay);
+    return () => el.removeEventListener('play', onPlay);
+  }, [managed]);
+
 
   useEffect(() => {
     const v = videoRef.current;
