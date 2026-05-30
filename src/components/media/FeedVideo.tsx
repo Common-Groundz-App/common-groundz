@@ -261,7 +261,17 @@ function FeedVideoPlayer({
 
   const isActive = isHovered || isFocused || isScrubbing || !isPlaying || forceShow;
 
-  useVideoAutoplay(videoRef, { threshold: 0.5, enabled: autoplayEnabled && !isScrubbing });
+  // Phase 1: single-active-video manager. If a FeedVideoManagerProvider is
+  // present, `managed` is true and the manager owns play/pause via
+  // `slotIsActive`. Otherwise we fall back to the legacy useVideoAutoplay
+  // path so unwrapped surfaces (composer previews, etc.) behave as before.
+  const stableSlotId = item.id ?? `${sourceId ?? 'anon'}:${item.url}`;
+  const { managed, isActive: slotIsActive, registerEl: registerSlotEl } = useFeedVideoSlot(stableSlotId);
+
+  useVideoAutoplay(videoRef, {
+    threshold: 0.5,
+    enabled: !managed && autoplayEnabled && !isScrubbing,
+  });
   useVideoMilestones(videoRef, { src: item.url, autoplayRef });
   useVideoViewTracker({
     videoRef,
@@ -270,6 +280,49 @@ function FeedVideoPlayer({
     mediaPath: extractMediaPath(item.url),
     autoplayRef,
   });
+
+  // Register the <video> element with the manager (and on unmount).
+  useEffect(() => {
+    if (!managed) return;
+    registerSlotEl(videoRef.current);
+    return () => registerSlotEl(null);
+  }, [managed, registerSlotEl]);
+
+  // Manager-driven play/pause — the SOLE owner of feed-card transitions
+  // when a provider is present. Honors the same suppression rules as
+  // useVideoAutoplay and respects manual pause + scrubbing.
+  useEffect(() => {
+    if (!managed) return;
+    const el = videoRef.current;
+    if (!el) return;
+    const suppressed = shouldSuppressAutoplay();
+    const tabHidden = typeof document !== 'undefined' && document.hidden;
+    const canAutoplay =
+      slotIsActive && autoplayEnabled && !isScrubbing && !suppressed && !tabHidden;
+    if (canAutoplay) {
+      // Browsers force-mute autoplay; keep DOM muted=true here. Do NOT
+      // mutate the global mute preference — the existing `[muted]` effect
+      // syncs el.muted with the user's persisted choice on next render.
+      el.muted = true;
+      const p = el.play();
+      if (p && typeof p.catch === 'function') {
+        p.catch((err: any) => {
+          const name = err?.name;
+          if (name === 'AbortError' || name === 'NotAllowedError') return;
+          // Other errors fall through silently — surfaced via onError handler.
+        });
+      }
+    } else {
+      if (!el.paused) {
+        try { el.pause(); } catch { /* ignore */ }
+      }
+      // Safety: non-active videos must never emit audio. DOM-only mute;
+      // global preference untouched.
+      if (!slotIsActive) {
+        try { el.muted = true; } catch { /* ignore */ }
+      }
+    }
+  }, [managed, slotIsActive, autoplayEnabled, isScrubbing]);
 
   useEffect(() => {
     const v = videoRef.current;
