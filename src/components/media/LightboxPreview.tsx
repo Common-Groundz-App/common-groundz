@@ -238,13 +238,6 @@ export function LightboxPreview({
     setVideoReady(false);
   }, [currentIndex]);
 
-  // Clear any pending diagnostic timers on unmount.
-  useEffect(() => {
-    return () => {
-      debugTimersRef.current.forEach((t) => clearTimeout(t));
-      debugTimersRef.current = [];
-    };
-  }, []);
 
 
 
