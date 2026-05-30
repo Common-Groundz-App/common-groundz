@@ -132,7 +132,9 @@ const UserProfile = () => {
         <div className="min-h-screen flex flex-col">
           <NavBarComponent />
           <div className="flex-1">
-            <ProfileContent profileUserId={profile.id} />
+            <FeedVideoManagerProvider>
+              <ProfileContent profileUserId={profile.id} />
+            </FeedVideoManagerProvider>
           </div>
           <div className="xl:hidden">
             <BottomNavigation />
