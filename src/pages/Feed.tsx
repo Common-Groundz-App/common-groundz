@@ -8,6 +8,7 @@ import { VerticalTubelightNavbar } from '@/components/ui/vertical-tubelight-navb
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import FeedFollowing from '@/components/feed/FeedFollowing';
 import EnhancedFeedForYou from '@/components/feed/EnhancedFeedForYou';
+import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
 import { Bell, Search, ChevronDown, ArrowUp } from 'lucide-react';
@@ -725,9 +726,13 @@ const Feed = React.memo(() => {
                 
                 {/* Feed Content - No overflow or height constraints */}
                 {activeTab === "for-you" ? (
-                  <EnhancedFeedForYou refreshing={refreshing} />
+                  <FeedVideoManagerProvider>
+                    <EnhancedFeedForYou refreshing={refreshing} />
+                  </FeedVideoManagerProvider>
                 ) : (
-                  <FeedFollowing refreshing={refreshing} />
+                  <FeedVideoManagerProvider>
+                    <FeedFollowing refreshing={refreshing} />
+                  </FeedVideoManagerProvider>
                 )}
               </div>
             </div>

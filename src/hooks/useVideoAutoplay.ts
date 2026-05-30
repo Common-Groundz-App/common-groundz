@@ -17,7 +17,13 @@ interface Options {
   enabled?: boolean;
 }
 
-const shouldSuppressAutoplay = (): boolean => {
+/**
+ * Returns true when autoplay should be suppressed for the current user/device:
+ * reduced motion, save-data, or 2g/slow-2g connection. Exported so the
+ * single-active-video manager (Phase 1) can apply the same gating without
+ * duplicating play/pause ownership.
+ */
+export const shouldSuppressAutoplay = (): boolean => {
   if (typeof window === 'undefined') return true;
   try {
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true;

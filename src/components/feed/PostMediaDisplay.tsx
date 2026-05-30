@@ -5,6 +5,7 @@ import { FeedCollage } from '@/components/media/FeedCollage';
 import { cn } from '@/lib/utils';
 import { LightboxPreview } from '@/components/media/LightboxPreview';
 import { readGlobalVideoMuted, setGlobalVideoMuted } from '@/hooks/useVideoMute';
+import { useFeedVideoManagerControls } from '@/hooks/useFeedVideoManager';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
 
 interface PostMediaDisplayProps {
@@ -41,6 +42,7 @@ export function PostMediaDisplay({
   const [videoHandoff, setVideoHandoff] = useState<VideoHandoff | null>(null);
   const [entryExtras, setEntryExtras] = useState<LightboxEntryExtras | null>(null);
   const [videoResume, setVideoResume] = useState<{ index: number; handoff: VideoExitHandoff } | null>(null);
+  const { setLightboxOpen: setManagerLightboxOpen } = useFeedVideoManagerControls();
   
   if (!media || media.length === 0 || media.every(m => m.is_deleted)) {
     return null;
@@ -105,6 +107,9 @@ export function PostMediaDisplay({
     setVideoHandoff(handoff ?? null);
     setEntryExtras(extras ?? null);
     setLightboxOpen(true);
+    // Phase 1: synchronously pause all feed videos via the manager so
+    // there's no debounce gap before the lightbox takes over playback.
+    setManagerLightboxOpen(true);
   };
 
   const handleLightboxClose = () => {
@@ -113,6 +118,7 @@ export function PostMediaDisplay({
     setVideoHandoff(null);
     // Drop the dataURL — never retained in a ref. Eligible for GC immediately.
     setEntryExtras(null);
+    setManagerLightboxOpen(false);
   };
 
   // Reverse handoff: mute is a global preference, so always sync it.
