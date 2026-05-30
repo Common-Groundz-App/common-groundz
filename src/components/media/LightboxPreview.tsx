@@ -671,7 +671,7 @@ export function LightboxPreview({
 
                   }}
                   onPlaying={(e) => {
-                    if (hlsDebug) scheduleDebugSamples(e.currentTarget);
+                    e.stopPropagation();
                   }}
                   onSeeked={(e) => {
                     e.stopPropagation();
