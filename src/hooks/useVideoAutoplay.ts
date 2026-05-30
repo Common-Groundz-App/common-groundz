@@ -1,4 +1,4 @@
-import { useEffect, RefObject } from 'react';
+import { useEffect, useState, RefObject } from 'react';
 import { readGlobalVideoMuted, setGlobalVideoMuted } from './useVideoMute';
 
 /**
