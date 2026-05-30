@@ -298,11 +298,13 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {posts.map((p) => (
-                <PostFeedItem key={p.id} post={p} />
-              ))}
-            </div>
+            <FeedVideoManagerProvider>
+              <div className="space-y-4">
+                {posts.map((p) => (
+                  <PostFeedItem key={p.id} post={p} />
+                ))}
+              </div>
+            </FeedVideoManagerProvider>
           )}
           <div className="flex justify-center pt-2">
             {hasMore && (
