@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import ProfileContent from '@/components/profile/ProfileContent';
+import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
 
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import SEOHead from '@/components/seo/SEOHead';
