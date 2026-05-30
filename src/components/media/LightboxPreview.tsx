@@ -563,62 +563,6 @@ export function LightboxPreview({
             // (no HLS attach delay) and behave exactly as before.
             const hidden = isMux && !videoReady;
 
-            // ---- TEMP DIAGNOSTIC overlay data (only when ?hlsdebug=1) ----
-            // Re-derive the exact src used by videoRefCallback so the overlay
-            // reflects what was actually attached.
-            let debugSrc: string | undefined;
-            let debugRenditionOrder: string | null = null;
-            let debugMinResolution: string | null = null;
-            let debugPath: 'native-hls' | 'hls.js' | 'progressive' = 'progressive';
-            if (hlsDebug) {
-              const resolved = resolveVideoSrc(currentItem, getLightboxPlaybackOpts());
-              debugSrc = resolved.src;
-              if (debugSrc && debugSrc.includes('?')) {
-                try {
-                  const q = new URLSearchParams(debugSrc.split('?')[1]);
-                  debugRenditionOrder = q.get('rendition_order');
-                  debugMinResolution = q.get('min_resolution');
-                } catch { /* ignore */ }
-              }
-              if (resolved.isHls) {
-                // Mirror hlsAttach's branch logic: iOS-like WebKit + native HLS
-                // support → native; else hls.js (MSE).
-                let canNative = false;
-                try {
-                  const probe = document.createElement('video');
-                  canNative = !!probe.canPlayType('application/vnd.apple.mpegurl');
-                } catch { /* ignore */ }
-                const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
-                const isIOSLike =
-                  /iPad|iPhone|iPod/.test(ua) ||
-                  (typeof navigator !== 'undefined' &&
-                    navigator.platform === 'MacIntel' &&
-                    (navigator as any).maxTouchPoints > 1);
-                debugPath = isIOSLike && canNative ? 'native-hls' : 'hls.js';
-              } else {
-                debugPath = 'progressive';
-              }
-            }
-
-            const scheduleDebugSamples = (v: HTMLVideoElement) => {
-              if (!hlsDebug || debugSampledRef.current) return;
-              debugSampledRef.current = true;
-              const checkpoints = [1, 3, 5, 10];
-              checkpoints.forEach((sec) => {
-                const t = setTimeout(() => {
-                  setDebugSamples((prev) => ({
-                    ...prev,
-                    [sec]: {
-                      w: v.videoWidth,
-                      h: v.videoHeight,
-                      rs: v.readyState,
-                      ct: v.currentTime,
-                    },
-                  }));
-                }, sec * 1000);
-                debugTimersRef.current.push(t);
-              });
-            };
 
             return (
               <div style={wrapperStyle}>
