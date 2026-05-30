@@ -1,52 +1,174 @@
-# Fix blurry video in lightbox on iPhone Chrome (phased)
+# Single-Active Feed Video — Phase 1 (v4, ready to build)
 
-## Why this happens
+Builds **Phase 1 only**. Phases 2 and 3 deferred. Incorporates v3 plus four refinements from latest review.
 
-Feed and lightbox load the same Mux HLS URL into a freshly-mounted `<video>`. On iOS (Safari + Chrome, both native HLS), the browser picks the starting rendition from a cold bandwidth estimate — it usually starts low and ramps up.
+---
 
-- **Feed:** small element, low rendition looks fine.
-- **Lightbox:** large element, same low rendition looks blurry.
-- **Close + reopen:** a brand-new `<video>` mounts → cold start again → blurry again. The feed video meanwhile kept playing and ramped up, so it looks sharp when you return.
+## Core principle
+**Manager selects `activeId`. FeedVideo executes `play()`/`pause()`.**
+Exactly one place owns playback transitions for feed videos.
 
-This is native-HLS ABR behavior. Mux exposes manifest query params to nudge it.
+---
 
-## Approach (phased, lightbox-only)
+## Refinement A — Resolve duplicate playback ownership (critical)
 
-### Phase 1 — ship now
+`src/hooks/useVideoAutoplay.ts` currently runs its own `IntersectionObserver` and calls `el.play()` / `el.pause()` internally. If left active alongside the new manager-driven effect, the two will fight (interrupted-play warnings, wrong video playing).
 
-- Lightbox Mux URL gets `?rendition_order=desc` only.
-- `rendition_order=desc` makes the manifest list the highest renditions first, so native HLS picks high to start, but lower renditions stay available if the network truly can't keep up.
-- **Do NOT add `min_resolution=720p` yet** — it removes the safety rungs and can cause rebuffering on weak mobile data.
-- Feed path is byte-identical to today.
+Fix:
+- **Extract** the existing suppression rules (`shouldSuppressAutoplay`) into an exported helper from the same file (it already exists locally — just export it, no behavior change).
+- In `FeedVideo`, **stop using `useVideoAutoplay` for feed cards** (or pass `enabled: false`). Replace its role with:
+  ```ts
+  const suppressed = shouldSuppressAutoplay();
+  const { isActive, registerEl } = useFeedVideoSlot(stableId);
+  const canAutoplay = isActive && !suppressed && !document.hidden;
+  ```
+- The new effect in `FeedVideo` is now the **sole owner** of feed-card `play()`/`pause()` transitions.
+- `useVideoAutoplay` itself is **not deleted** — other call sites (if any) keep working unchanged. We only stop relying on it inside `FeedVideo`.
 
-### Phase 2 — only if Phase 1 isn't enough
+---
 
-- Add `min_resolution=480p` (or `720p`) to the lightbox URL, ideally iOS-only or behind a small flag.
-- Decide after real-device testing on iPhone Chrome / Safari.
+## Refinement B — Oversized video handling
 
-## Changes (Phase 1 only)
+Tall portrait videos (or cards) on small viewports may never reach `ratio >= 0.6`.
 
-1. **`src/utils/muxMedia.ts`**
-   - Extend `muxHlsUrl(playbackId, opts?)` to accept `{ renditionOrder?: 'asc' | 'desc'; minResolution?: '480p' | '720p' | '1080p' }`. Append params via `URLSearchParams` when present. No opts → identical output to today.
-   - Extend `resolveVideoSrc(m, opts?)` to forward `opts` to `muxHlsUrl` when the item is Mux-playable. Default behavior unchanged → every existing feed call site is untouched.
+Use an **effective visibility score**:
+```text
+maxPossibleRatio = min(1, viewportHeight / elementHeight)
+effectiveRatio   = rawIntersectionRatio / maxPossibleRatio   // clamped [0, 1]
+```
+Eligibility uses `effectiveRatio >= 0.6`; hysteresis uses `effectiveRatio >= 0.35`; switch margin `0.20` also compares effective ratios. Center-distance tiebreak unchanged.
 
-2. **`src/components/media/LightboxPreview.tsx`**
-   - In the existing `resolveVideoSrc(item)` call inside `videoRefCallback`, pass `{ renditionOrder: 'desc' }`. No other changes — attach/detach, handoff, poster overlay, reveal logic all stay exactly as they are.
+This keeps normal cards behaving identically (`maxPossibleRatio ≈ 1`) while making oversized ones eligible when they're the dominant on-screen item.
 
-That's the entire diff. No inline URL building, no new helper file, no feed touch.
+---
 
-## Out of scope
+## Refinement C — Explicit `visibilitychange` in the manager
 
-- `attachHls.ts`, iOS-vs-MSE branching, `FeedVideo`, `useVideoAutoplay`, `useVideoMute`, `prewarmMuxHls`, lightbox layout/posters/handoff, the temporary `[hls][debug_gate]` logs. All untouched.
-- Phase 2 (`min_resolution`) — deferred until Phase 1 is verified on device.
+The manager itself subscribes to `document.visibilitychange`:
+- On `hidden`: set `activeId = null` synchronously.
+- On `visible`: recompute after a short settle (one rAF + 50ms).
 
-## Verification
+Does not depend on a scroll/IO event firing to pause when the tab is backgrounded.
 
-- **iPhone Chrome + Safari:** open a feed video → lightbox opens sharp on first frame. Close + reopen → still sharp.
-- **Slow-network simulation (iOS Safari Web Inspector → 3G):** lightbox should still play without long rebuffer pauses (this is what `desc`-only protects).
-- **Feed videos:** byte-identical URL → identical behavior, identical autoplay reliability.
-- **Desktop Chrome / Android:** lightbox starts at higher rendition too (fine for those surfaces).
+---
 
-## Risk
+## Refinement D — Swallow expected play-promise rejections
 
-Minimal. `rendition_order=desc` only changes manifest ordering; lower renditions remain available as a fallback. Worst-case: lightbox uses slightly more bandwidth on the first segment, which is acceptable for an explicit large-format view.
+In `FeedVideo`'s play call:
+```ts
+el.play()?.catch((err) => {
+  if (err?.name === 'AbortError' || err?.name === 'NotAllowedError') return;
+  // optionally log unexpected errors via existing logger
+});
+```
+Keeps console clean during rapid scroll / lightbox transitions without hiding real errors.
+
+---
+
+## Manager API (unchanged from v3)
+
+`src/hooks/useFeedVideoManager.tsx` exports:
+- `<FeedVideoManagerProvider>` — one per visible page area
+- `useFeedVideoSlot(stableId)` → `{ isActive, registerEl }`
+- `useFeedVideoManagerControls()` → `{ setLightboxOpen }`
+
+Manager state (Phase 1 only):
+```text
+Map<id, { el: HTMLVideoElement; rawRatio: number; effectiveRatio: number; centerDistance: number }>
+activeId: string | null
+lightboxOpen: boolean
+debounceTimer
+```
+
+Selection:
+- Eligible: `effectiveRatio >= 0.6` AND `!lightboxOpen` AND `!document.hidden`.
+- Pick highest `effectiveRatio`; tiebreak by smallest center distance.
+- Hysteresis: active stays while `effectiveRatio >= 0.35`. Challenger must beat by `>= 0.20`.
+- Normal scroll: 200ms debounce. Lightbox open: synchronous (no debounce).
+
+Observation:
+- One `IntersectionObserver` per provider, thresholds `[0, 0.35, 0.6, 1]`.
+- rAF-throttled scroll + resize listeners while ≥1 video registered.
+- Recompute uses fresh `getBoundingClientRect()` (avoids stale IO ratios).
+
+Stable IDs: `media.id` preferred, fallback `${postId}:${mediaIndex}`. Never raw index.
+
+---
+
+## FeedVideo integration
+
+```ts
+const { isActive, registerEl } = useFeedVideoSlot(stableId);
+const suppressed = shouldSuppressAutoplay();
+
+useEffect(() => registerEl(videoRef.current), [registerEl]);
+
+useEffect(() => {
+  const el = videoRef.current;
+  if (!el) return;
+  const canAutoplay = isActive && !suppressed && !document.hidden;
+  if (canAutoplay) {
+    el.muted = readGlobalVideoMuted(); // existing global mute, unchanged
+    el.play()?.catch(safeIgnore);
+  } else {
+    if (!el.paused) el.pause();
+    // DOM-safety mute for non-active only
+    if (!isActive) el.muted = true;
+  }
+}, [isActive, suppressed]);
+```
+
+Rules preserved:
+- Existing tap/play/pause/scrub/handoff code untouched.
+- `setGlobalVideoMuted` is **never called from the manager**.
+- Active video reads global mute via existing `useVideoMute`.
+- DOM-mute on non-active is local only; does not change persisted preference.
+
+---
+
+## Lightbox handling
+
+- `PostMediaDisplay` calls `setLightboxOpen(true)` via `useFeedVideoManagerControls()` synchronously when opening; manager clears `activeId` in the same tick.
+- On close: `setLightboxOpen(false)`, recompute after settle.
+- Existing reverse-handoff in `PostMediaDisplay` / `LightboxPreview` untouched.
+
+---
+
+## Provider wiring (one shared provider per visible page area)
+
+Wrap each feed surface — but **never two simultaneously visible providers on the same page**:
+- `/home` → `src/pages/Feed.tsx`
+- Profile feed → `src/pages/Profile.tsx`
+- EntityPosts feed
+- `PostView` → main post + related list share **one** provider at the page root
+
+---
+
+## Out of scope (Phase 1)
+Saved-time/resume, LRU, ended-video logic, central manual-pause, preload changes, captions/a11y, Mux/HLS/upload/composer/DB/lightbox-quality changes, global cross-page audio arbiter.
+
+---
+
+## Phase 1 success criteria
+1. Two videos visible → only the dominant one plays.
+2. Oversized portrait video centered in small viewport → still becomes active.
+3. No eligible video → all paused.
+4. Slow scroll → smooth active swap with hysteresis.
+5. Fast scroll → no flicker, never two playing simultaneously.
+6. Lightbox open → feed pauses instantly (no 200ms gap).
+7. Lightbox close → existing reverse handoff still works on the originating item.
+8. Tab background → feed pauses immediately (manager-level handler).
+9. Tab foreground → resumes correct active video.
+10. Global mute preference unchanged across all scroll/lightbox activity.
+11. Save-Data / reduced-motion / 2g suppression still respected.
+12. Mux and Supabase videos behave identically.
+13. No new `play()` interruption warnings in the console.
+14. PostView (main + related) → still only one active video across both sections.
+
+---
+
+## Phase 2 (later)
+Bounded LRU (~200) of `{ savedTime, duration, ended, lastSeenAt }` per stable id. Seek before play. Lightbox-exit time wins.
+
+## Phase 3 (later)
+`userPaused` per id (via `isProgrammaticRef` in `FeedVideo`). Excludes video from eligibility until it fully leaves viewport or user resumes.
