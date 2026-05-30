@@ -719,15 +719,6 @@ export function LightboxPreview({
                   onVolumeChange={(e) => e.stopPropagation()}
                   onTimeUpdate={(e) => {
                     e.stopPropagation();
-                    if (hlsDebug) {
-                      const v = e.currentTarget;
-                      setDebugLive({
-                        w: v.videoWidth,
-                        h: v.videoHeight,
-                        rs: v.readyState,
-                        ct: v.currentTime,
-                      });
-                    }
                   }}
                   onSeeking={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
