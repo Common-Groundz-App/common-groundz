@@ -733,24 +733,6 @@ export function LightboxPreview({
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
                 />
-                {hlsDebug && (
-                  <div
-                    className="absolute top-1 left-1 z-50 max-w-[90%] rounded bg-black/80 p-2 font-mono text-[10px] leading-tight text-green-300 pointer-events-none"
-                    style={{ whiteSpace: 'pre' }}
-                  >
-                    {`path       : ${debugPath}
-rendOrder  : ${debugRenditionOrder ?? '(absent)'}
-minRes     : ${debugMinResolution ?? '(absent)'}
-src        : ...${debugSrc ? debugSrc.slice(-80) : '(none)'}
-videoW x H : ${debugLive ? `${debugLive.w} x ${debugLive.h}` : '—'}
-readyState : ${debugLive ? debugLive.rs : '—'}
-currentT   : ${debugLive ? debugLive.ct.toFixed(2) + 's' : '—'}
-sample 1s  : ${debugSamples[1] ? `${debugSamples[1].w} x ${debugSamples[1].h} (rs=${debugSamples[1].rs})` : '…'}
-sample 3s  : ${debugSamples[3] ? `${debugSamples[3].w} x ${debugSamples[3].h} (rs=${debugSamples[3].rs})` : '…'}
-sample 5s  : ${debugSamples[5] ? `${debugSamples[5].w} x ${debugSamples[5].h} (rs=${debugSamples[5].rs})` : '…'}
-sample 10s : ${debugSamples[10] ? `${debugSamples[10].w} x ${debugSamples[10].h} (rs=${debugSamples[10].rs})` : '…'}`}
-                  </div>
-                )}
                 {isMux && hiResPoster && (
                   <img
                     src={hiResPoster}
