@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 import SEOHead from '@/components/seo/SEOHead';
 import NavBarComponent from '@/components/NavBarComponent';
 import ProfileContent from '@/components/profile/ProfileContent';
+import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
 import GuestNavBar from '@/components/profile/GuestNavBar';
 import PublicProfileView from '@/components/profile/PublicProfileView';
 import Footer from '@/components/Footer';
