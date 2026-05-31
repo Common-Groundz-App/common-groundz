@@ -18,6 +18,12 @@ import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import { captureVideoFrame } from '@/utils/captureVideoFrame';
 import { isCorsSafeVideoHost } from '@/utils/corsSafeHosts';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
+import {
+  saveFeedVideoResume,
+  readFeedVideoResume,
+  clearFeedVideoResume,
+  FEED_VIDEO_RESUME_MIN,
+} from '@/hooks/useFeedVideoResumeStore';
 
 interface FeedVideoProps {
   item: MediaItem;
@@ -297,6 +303,173 @@ function FeedVideoPlayer({
   const slotIsActiveRef = useRef(slotIsActive);
   useEffect(() => { slotIsActiveRef.current = slotIsActive; }, [slotIsActive]);
 
+  // ===== Phase 2 — saved-time resume LRU =====
+  // resumePendingRef: true between "resume seek requested" and "seek done /
+  //   timed out". Guards the managed playback effect from calling play()
+  //   before the saved time is applied (no visible flash from 0).
+  // activationTokenRef: bumped on slot deactivation, source swap (id or
+  //   url), and unmount. Captured by every in-flight resume so stale
+  //   async callbacks can detect they're out-of-date and skip.
+  // prevStableSlotIdRef / prevItemUrlRef: drive Safeguard D — clear the
+  //   previous LRU entry whenever EITHER changes (the url-watch is the
+  //   v3 fix; stable item.id can mask a real source swap).
+  // resumeTick: bumped by finalize() to wake the managed playback effect
+  //   once a pending resume completes (or times out).
+  const resumePendingRef = useRef(false);
+  const activationTokenRef = useRef(0);
+  const prevStableSlotIdRef = useRef<string | null>(null);
+  const prevItemUrlRef = useRef<string | null>(null);
+  const [resumeTick, setResumeTick] = useState(0);
+  const stableSlotIdRef = useRef(stableSlotId);
+  useEffect(() => { stableSlotIdRef.current = stableSlotId; }, [stableSlotId]);
+
+  // Safeguard D (v3) — source-swap clears the previous key.
+  // Tracks BOTH stableSlotId and item.url because when item.id is present,
+  // stableSlotId can stay the same across a real url swap (e.g. admin
+  // re-encode under the same media id). Either change invalidates any
+  // in-flight resume and wipes the old LRU entry.
+  useEffect(() => {
+    const prevId = prevStableSlotIdRef.current;
+    const prevUrl = prevItemUrlRef.current;
+    const idChanged = prevId !== null && prevId !== stableSlotId;
+    const urlChanged = prevUrl !== null && prevUrl !== item.url;
+
+    if (idChanged || urlChanged) {
+      if (prevId !== null) clearFeedVideoResume(prevId);
+      activationTokenRef.current++;
+      resumePendingRef.current = false;
+    }
+
+    prevStableSlotIdRef.current = stableSlotId;
+    prevItemUrlRef.current = item.url;
+  }, [stableSlotId, item.url]);
+
+  // ===== Capture helpers =====
+  // Two distinct paths so HLS-induced spurious `pause` at t=0 cannot
+  // destroy a real 12s entry, while *intentional* deactivation with
+  // near-zero progress DOES clear the stale old entry.
+  const captureResumeFromPause = useCallback(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    // Safeguard C — pause-capture sanity. Require metadata + finite + >0.
+    if (el.readyState < 1) return;
+    const t = el.currentTime;
+    if (!Number.isFinite(t) || t <= 0) return;
+    saveFeedVideoResume(stableSlotIdRef.current, t, el.duration);
+  }, []);
+
+  const captureResumeFromIntent = useCallback(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const t = el.currentTime;
+    const id = stableSlotIdRef.current;
+    if (!Number.isFinite(t) || t < FEED_VIDEO_RESUME_MIN) {
+      // Safeguard E — intentional near-zero capture clears stale entry.
+      clearFeedVideoResume(id);
+      return;
+    }
+    saveFeedVideoResume(id, t, el.duration);
+  }, []);
+
+  // Resume-on-activation effect. Declared BEFORE the managed playback
+  // effect so React commits resumePendingRef = true in the same pass that
+  // the managed effect reads it (the managed effect re-runs when
+  // resumeTick changes, ensuring it sees the cleared flag).
+  useEffect(() => {
+    if (!managed || !slotIsActive) return;
+    // Lightbox handoff owns this activation — let it apply the time and
+    // write the LRU itself (see apply() below).
+    if (resumeState) return;
+
+    const el = videoRef.current;
+    if (!el) return;
+
+    const saved = readFeedVideoResume(stableSlotId);
+    if (saved === null || saved < FEED_VIDEO_RESUME_MIN) return;
+
+    const myToken = ++activationTokenRef.current;
+    const capturedEl = el;
+    const capturedUrl = item.url;
+    resumePendingRef.current = true;
+
+    let finalized = false;
+    let metaTimer: number | null = null;
+    let seekTimer: number | null = null;
+    let metaListener: (() => void) | null = null;
+    let seekedListener: (() => void) | null = null;
+
+    const detachListeners = () => {
+      if (metaListener) {
+        try { capturedEl.removeEventListener('loadedmetadata', metaListener); } catch { /* ignore */ }
+        metaListener = null;
+      }
+      if (seekedListener) {
+        try { capturedEl.removeEventListener('seeked', seekedListener); } catch { /* ignore */ }
+        seekedListener = null;
+      }
+    };
+
+    const clearTimers = () => {
+      if (metaTimer !== null) { window.clearTimeout(metaTimer); metaTimer = null; }
+      if (seekTimer !== null) { window.clearTimeout(seekTimer); seekTimer = null; }
+    };
+
+    // Safeguard A — idempotent finalizer. Always called exactly once via
+    // some path: seeked, post-seek timeout, pre-metadata timeout, or
+    // effect cleanup. Bumps resumeTick so the managed effect re-runs and
+    // can now call play() with the saved time already applied.
+    const finalize = () => {
+      if (finalized) return;
+      finalized = true;
+      detachListeners();
+      clearTimers();
+      resumePendingRef.current = false;
+      setResumeTick((t) => t + 1);
+    };
+
+    // Safeguard B — every async callback re-checks token / element / url /
+    // active. Mismatch → skip without applying the seek.
+    const stillCurrent = () =>
+      activationTokenRef.current === myToken &&
+      slotIsActiveRef.current === true &&
+      videoRef.current === capturedEl &&
+      item.url === capturedUrl;
+
+    const applySeek = () => {
+      if (!stillCurrent()) { finalize(); return; }
+      const dur = capturedEl.duration;
+      const target = Number.isFinite(dur) && dur > 0
+        ? Math.min(saved, Math.max(0, dur - 0.05))
+        : saved;
+      seekedListener = () => { finalize(); };
+      capturedEl.addEventListener('seeked', seekedListener);
+      try { capturedEl.currentTime = target; } catch { finalize(); return; }
+      // Post-seek timeout — some browsers don't fire seeked reliably.
+      seekTimer = window.setTimeout(() => { finalize(); }, 800);
+    };
+
+    if (capturedEl.readyState >= 1) {
+      applySeek();
+    } else {
+      metaListener = () => {
+        if (!stillCurrent()) { finalize(); return; }
+        applySeek();
+      };
+      capturedEl.addEventListener('loadedmetadata', metaListener);
+      // Pre-metadata timeout — finalize as skip so video plays from 0
+      // rather than staying paused forever.
+      metaTimer = window.setTimeout(() => { finalize(); }, 1500);
+    }
+
+    return () => {
+      // Effect cleanup → invalidate this attempt and clear pending flag.
+      activationTokenRef.current++;
+      finalize();
+    };
+  }, [managed, slotIsActive, stableSlotId, item.url, resumeState]);
+
+
+
   // Manager-driven play/pause — the SOLE owner of feed-card transitions
   // when a provider is present. Honors the same suppression rules as
   // useVideoAutoplay and respects manual pause + scrubbing.
@@ -304,6 +477,10 @@ function FeedVideoPlayer({
     if (!managed) return;
     const el = videoRef.current;
     if (!el) return;
+    // Phase 2 guard — don't start playback while a saved-time resume is
+    // still pending. finalize() bumps resumeTick so this effect re-runs
+    // once the seek is applied (or has timed out).
+    if (resumePendingRef.current) return;
     const tabHidden = typeof document !== 'undefined' && document.hidden;
     const canAutoplay =
       slotIsActive && autoplayEnabled && !isScrubbing && !autoplaySuppressed && !tabHidden;
@@ -332,7 +509,59 @@ function FeedVideoPlayer({
         try { el.muted = true; } catch { /* ignore */ }
       }
     }
-  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed]);
+  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick]);
+
+  // Phase 2 — capture currentTime on slot deactivation.
+  // Effect cleanup runs when slotIsActive flips true → false (or unmount).
+  // captureResumeFromIntent: deactivation is *intentional*, so near-zero
+  // progress clears any stale older entry (Safeguard E).
+  useEffect(() => {
+    if (!managed || !slotIsActive) return;
+    return () => {
+      captureResumeFromIntent();
+    };
+  }, [managed, slotIsActive, captureResumeFromIntent]);
+
+  // Phase 2 — capture on tab hide. document.visibilitychange while this
+  // slot is active counts as intent (user navigated away from the tab).
+  useEffect(() => {
+    if (!managed || !slotIsActive) return;
+    if (typeof document === 'undefined') return;
+    const onVis = () => {
+      if (document.hidden) captureResumeFromIntent();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [managed, slotIsActive, captureResumeFromIntent]);
+
+  // Phase 2 — capture on element `pause` while active. Pause from
+  // user-tap, scrubber, or anything else lands here. Safeguard C blocks
+  // spurious 0-time saves from HLS re-attach.
+  useEffect(() => {
+    if (!managed) return;
+    const el = videoRef.current;
+    if (!el) return;
+    const onPause = () => {
+      if (!slotIsActiveRef.current) return;
+      captureResumeFromPause();
+    };
+    el.addEventListener('pause', onPause);
+    return () => el.removeEventListener('pause', onPause);
+  }, [managed, captureResumeFromPause]);
+
+  // Phase 2 — clear on `ended` so a watched-through video doesn't keep
+  // a near-end time around to apply on the next visit.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const onEnded = () => {
+      clearFeedVideoResume(stableSlotIdRef.current);
+    };
+    el.addEventListener('ended', onEnded);
+    return () => el.removeEventListener('ended', onEnded);
+  }, []);
+
+
 
   // Single-active invariant guard: if a non-active managed video ever
   // starts playing (manual tap, browser quirk, late-resolving play()),
@@ -384,6 +613,12 @@ function FeedVideoPlayer({
         ? Math.min(Math.max(0, resumeState.currentTime), Math.max(0, dur - 0.05))
         : resumeState.currentTime;
       try { v.currentTime = target; } catch { /* pre-metadata seeks can throw */ }
+
+      // Phase 2 — lightbox handoff writes the applied time into the LRU
+      // so a fresh save can't overwrite the lightbox-progressed time with
+      // a stale older value later. Use the actual target (clamped), not
+      // the raw resumeState.currentTime.
+      saveFeedVideoResume(stableSlotIdRef.current, target, v.duration);
 
       if (resumeState.wasPlaying) {
         userPausedRef.current = false;
@@ -594,6 +829,10 @@ function FeedVideoPlayer({
         if (isMuxPlayable(item) && item.mux_playback_id) {
           prewarmMuxHls(item.mux_playback_id, v.currentTime);
         }
+        // Phase 2 — lightbox-open is an intentional handoff. Capture as
+        // intent so the time persists in LRU even if the lightbox close
+        // path doesn't write back (e.g. user navigates away).
+        captureResumeFromIntent();
         try {
           v.pause();
         } catch {
