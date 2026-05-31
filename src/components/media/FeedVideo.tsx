@@ -428,13 +428,21 @@ function FeedVideoPlayer({
     // some path: seeked, post-seek timeout, pre-metadata timeout, or
     // effect cleanup. Bumps resumeTick so the managed effect re-runs and
     // can now call play() with the saved time already applied.
-    const finalize = () => {
+    //
+    // v3.1 Refinement 1 — accepts { bumpTick }. Cleanup paths pass false
+    // so we never schedule a setState during unmount or dep-change tear-
+    // down (React's cleanup ordering doesn't guarantee a mount-ref guard
+    // would still read `true` here). Listeners/timers/pending flag are
+    // always cleared regardless.
+    const finalize = (options?: { bumpTick?: boolean }) => {
       if (finalized) return;
       finalized = true;
       detachListeners();
       clearTimers();
       resumePendingRef.current = false;
-      setResumeTick((t) => t + 1);
+      if (options?.bumpTick !== false) {
+        setResumeTick((t) => t + 1);
+      }
     };
 
     // Safeguard B — every async callback re-checks token / element / url /
