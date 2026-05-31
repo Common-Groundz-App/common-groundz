@@ -1026,6 +1026,13 @@ function FeedVideoPlayer({
     // pause/play listener will set/clear userPaused redundantly with
     // setManagedUserPaused below (idempotent: same target id + value).
     if (v.paused) {
+      // Phase 3.1 v2.2 — if managed and not the active slot, ask the
+      // manager to promote us first. On rejection (lightbox open, tab
+      // hidden, below visibility threshold), do nothing — don't play
+      // and don't clear userPaused, so the UI state stays consistent.
+      if (managed && !slotIsActiveRef.current) {
+        if (!requestSlotActivate()) return;
+      }
       userPausedRef.current = false;
       setAutoplayEnabled(true);
       if (managed) setManagedUserPaused(false);
@@ -1036,7 +1043,7 @@ function FeedVideoPlayer({
       if (managed) setManagedUserPaused(true);
       v.pause();
     }
-  }, [managed, setManagedUserPaused]);
+  }, [managed, setManagedUserPaused, requestSlotActivate]);
 
   const handleContainerClick = (e: React.MouseEvent) => {
     e.stopPropagation();
