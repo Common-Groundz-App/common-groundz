@@ -1009,16 +1009,21 @@ function FeedVideoPlayer({
   const togglePlayPause = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
+    // Phase 3 — user-triggered toggle. Do NOT mark system; the native
+    // pause/play listener will set/clear userPaused redundantly with
+    // setManagedUserPaused below (idempotent: same target id + value).
     if (v.paused) {
       userPausedRef.current = false;
       setAutoplayEnabled(true);
+      if (managed) setManagedUserPaused(false);
       v.play().catch(() => {});
     } else {
       userPausedRef.current = true;
       setAutoplayEnabled(false);
+      if (managed) setManagedUserPaused(true);
       v.pause();
     }
-  }, []);
+  }, [managed, setManagedUserPaused]);
 
   const handleContainerClick = (e: React.MouseEvent) => {
     e.stopPropagation();
