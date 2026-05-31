@@ -532,16 +532,34 @@ function FeedVideoPlayer({
     }
   }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick]);
 
-  // Phase 2 — capture currentTime on slot deactivation.
-  // Effect cleanup runs when slotIsActive flips true → false (or unmount).
-  // captureResumeFromIntent: deactivation is *intentional*, so near-zero
-  // progress clears any stale older entry (Safeguard E).
+  // Phase 2 — capture currentTime on slot deactivation (v3.1 Patch 1).
+  // Explicit active → inactive transition tracking. Replaces the older
+  // cleanup-based pattern (which depended on dep-array identity stability
+  // to fire only on real deactivation). Also bumps activationTokenRef so
+  // any in-flight resume is invalidated at the same call site that owns
+  // the transition. captureResumeFromIntent is invoked via a ref so this
+  // effect stays correct even if the callback grows real deps later.
   useEffect(() => {
-    if (!managed || !slotIsActive) return;
+    const wasActive = prevSlotIsActiveRef.current;
+    if (managed && wasActive && !slotIsActive) {
+      captureResumeFromIntentRef.current();
+      activationTokenRef.current++;
+    }
+    prevSlotIsActiveRef.current = slotIsActive;
+  }, [managed, slotIsActive]);
+
+  // Phase 2 — unmount-only capture (v3.1 Patch 1, Refinement 2).
+  // If the component unmounts while the slot is still active, capture
+  // intent. Uses the ref form so a stale closure of
+  // captureResumeFromIntent can never be invoked from this `[]`-deps
+  // cleanup.
+  useEffect(() => {
     return () => {
-      captureResumeFromIntent();
+      if (slotIsActiveRef.current) {
+        captureResumeFromIntentRef.current();
+      }
     };
-  }, [managed, slotIsActive, captureResumeFromIntent]);
+  }, []);
 
   // Phase 2 — capture on tab hide. document.visibilitychange while this
   // slot is active counts as intent (user navigated away from the tab).
