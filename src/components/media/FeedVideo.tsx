@@ -287,7 +287,7 @@ function FeedVideoPlayer({
   // `slotIsActive`. Otherwise we fall back to the legacy useVideoAutoplay
   // path so unwrapped surfaces (composer previews, etc.) behave as before.
   const stableSlotId = item.id ?? `${sourceId ?? 'anon'}:${item.url}`;
-  const { managed, isActive: slotIsActive, registerEl: registerSlotEl } = useFeedVideoSlot(stableSlotId);
+  const { managed, isActive: slotIsActive, registerEl: registerSlotEl, requestActivate: requestSlotActivate } = useFeedVideoSlot(stableSlotId);
 
   useVideoAutoplay(videoRef, {
     threshold: 0.5,
