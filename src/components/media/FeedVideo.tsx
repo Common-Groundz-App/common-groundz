@@ -396,6 +396,112 @@ function FeedVideoPlayer({
     captureResumeFromIntentRef.current = captureResumeFromIntent;
   }, [captureResumeFromIntent]);
 
+  // ===== Phase 3 — manual-pause user intent =====
+  // userPaused: was the slot paused by user intent (tap, native control,
+  //   keyboard, lightbox-close-while-paused)? Persists across scroll
+  //   away/back, survives instance reuse via the LRU pause store.
+  // userPausedRefManaged: synchronous mirror for listeners.
+  // pauseHydratedForIdRef: guard preventing the managed playback effect
+  //   from running with stale userPaused after a stableSlotId change.
+  // systemPauseRef / systemPlayRef: consume-on-event guards so
+  //   programmatic pause()/play() calls cannot be misclassified as user
+  //   intent by the native pause/play listeners.
+  const [userPaused, setUserPausedState] = useState<boolean>(() =>
+    readFeedVideoUserPaused(stableSlotId)
+  );
+  const userPausedRefManaged = useRef<boolean>(userPaused);
+  const pauseHydratedForIdRef = useRef<string>(stableSlotId);
+
+  interface SystemEventGuard {
+    pending: boolean;
+    timer: number | null;
+  }
+  const systemPauseRef = useRef<SystemEventGuard>({ pending: false, timer: null });
+  const systemPlayRef = useRef<SystemEventGuard>({ pending: false, timer: null });
+
+  const markSystemEvent = useCallback(
+    (ref: React.MutableRefObject<SystemEventGuard>, timeoutMs: number) => {
+      ref.current.pending = true;
+      if (ref.current.timer !== null) {
+        window.clearTimeout(ref.current.timer);
+      }
+      ref.current.timer = window.setTimeout(() => {
+        ref.current.pending = false;
+        ref.current.timer = null;
+      }, timeoutMs);
+    },
+    []
+  );
+
+  const markSystemPause = useCallback(
+    (timeoutMs: number = SYSTEM_EVENT_TIMEOUT_DEFAULT_MS) => {
+      markSystemEvent(systemPauseRef, timeoutMs);
+    },
+    [markSystemEvent]
+  );
+
+  const markSystemPlay = useCallback(
+    (timeoutMs: number = SYSTEM_EVENT_TIMEOUT_DEFAULT_MS) => {
+      markSystemEvent(systemPlayRef, timeoutMs);
+    },
+    [markSystemEvent]
+  );
+
+  const consumeSystemEvent = useCallback(
+    (ref: React.MutableRefObject<SystemEventGuard>): boolean => {
+      if (!ref.current.pending) return false;
+      ref.current.pending = false;
+      if (ref.current.timer !== null) {
+        window.clearTimeout(ref.current.timer);
+        ref.current.timer = null;
+      }
+      return true;
+    },
+    []
+  );
+
+  // Unified writer — the ONLY path that mutates state, ref, and store.
+  // `id` defaults to the current stableSlotId (via ref); transitional
+  // call sites (source swap, rehydration, lightbox handoff) pass an
+  // explicit id so the write always lands on the intended key.
+  const setManagedUserPaused = useCallback(
+    (next: boolean, id?: string) => {
+      const targetId = id ?? stableSlotIdRef.current;
+      userPausedRefManaged.current = next;
+      setUserPausedState(next);
+      writeFeedVideoUserPaused(targetId, next);
+    },
+    []
+  );
+
+  // Pause-intent rehydration on stableSlotId change. SSR-safe layout
+  // effect so it runs synchronously before the managed playback effect
+  // in the same commit. First mount: pauseHydratedForIdRef already
+  // equals stableSlotId (lazy useState seeded it), so this is a no-op.
+  // Only gates real id transitions (instance reuse for a different
+  // slot). Body stays minimal — read, write, update guard.
+  useIsomorphicLayoutEffect(() => {
+    if (pauseHydratedForIdRef.current === stableSlotId) return;
+    const stored = readFeedVideoUserPaused(stableSlotId);
+    setManagedUserPaused(stored, stableSlotId);
+    pauseHydratedForIdRef.current = stableSlotId;
+  }, [stableSlotId, setManagedUserPaused]);
+
+  // Clear system-event timers on unmount.
+  useEffect(() => {
+    return () => {
+      if (systemPauseRef.current.timer !== null) {
+        window.clearTimeout(systemPauseRef.current.timer);
+        systemPauseRef.current.timer = null;
+      }
+      if (systemPlayRef.current.timer !== null) {
+        window.clearTimeout(systemPlayRef.current.timer);
+        systemPlayRef.current.timer = null;
+      }
+    };
+  }, []);
+
+
   // Resume-on-activation effect. Declared BEFORE the managed playback
   // effect so React commits resumePendingRef = true in the same pass that
   // the managed effect reads it (the managed effect re-runs when
