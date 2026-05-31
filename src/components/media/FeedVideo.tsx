@@ -614,6 +614,12 @@ function FeedVideoPlayer({
         : resumeState.currentTime;
       try { v.currentTime = target; } catch { /* pre-metadata seeks can throw */ }
 
+      // Phase 2 — lightbox handoff writes the applied time into the LRU
+      // so a fresh save can't overwrite the lightbox-progressed time with
+      // a stale older value later. Use the actual target (clamped), not
+      // the raw resumeState.currentTime.
+      saveFeedVideoResume(stableSlotIdRef.current, target, v.duration);
+
       if (resumeState.wasPlaying) {
         userPausedRef.current = false;
         setAutoplayEnabled(true);
