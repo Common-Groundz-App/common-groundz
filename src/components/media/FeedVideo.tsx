@@ -875,6 +875,11 @@ function FeedVideoPlayer({
     hlsUnrecoverableRef.current = false;
     const token: AttachToken = { cancelled: false };
     let detach: () => void;
+    // Phase 3 — source-attach can trigger pause events on slow paths
+    // (HLS init/manifest, detach + load). Mark system pause with the
+    // longer 1000ms timeout so a delayed pause event is not
+    // misattributed as user intent.
+    markSystemPause(1000);
     if (isHls) {
       detach = attachHls(v, src, token, {
         onEvent: (e, p) => analytics.track(e, p),
@@ -892,9 +897,10 @@ function FeedVideoPlayer({
     }
     return () => {
       token.cancelled = true;
+      markSystemPause(1000);
       detach();
     };
-  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride]);
+  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride, markSystemPause]);
 
 
   // Reset userPaused when video leaves viewport, so re-entry can autoplay again.
