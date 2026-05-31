@@ -480,9 +480,12 @@ function FeedVideoPlayer({
     }
 
     return () => {
-      // Effect cleanup → invalidate this attempt and clear pending flag.
+      // Effect cleanup (dep change or unmount) → invalidate this attempt
+      // and clear pending flag. v3.1 Refinement 1 — never bump resumeTick
+      // from cleanup; either the next effect run will fire naturally
+      // (dep change) or the component is unmounting.
       activationTokenRef.current++;
-      finalize();
+      finalize({ bumpTick: false });
     };
   }, [managed, slotIsActive, stableSlotId, item.url, resumeState]);
 
