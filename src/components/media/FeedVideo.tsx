@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { Volume2, VolumeX, Play, Pause, Film, AlertTriangle, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +24,21 @@ import {
   clearFeedVideoResume,
   FEED_VIDEO_RESUME_MIN,
 } from '@/hooks/useFeedVideoResumeStore';
+import {
+  readFeedVideoUserPaused,
+  writeFeedVideoUserPaused,
+  clearFeedVideoUserPaused,
+} from '@/hooks/useFeedVideoPauseStore';
+
+// Phase 3 v5.1 — SSR-safe layout effect. Vite app is client-only today,
+// but this degrades cleanly to useEffect in any Node/test/SSG path.
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+// Phase 3 — system pause/play event guard timeout. Default tolerates
+// Safari/iOS/HLS media-event scheduling. Per-site overrides for slower
+// paths (source attach/detach: 1000ms, lightbox handoff: 750ms).
+const SYSTEM_EVENT_TIMEOUT_DEFAULT_MS = 500;
 
 interface FeedVideoProps {
   item: MediaItem;
