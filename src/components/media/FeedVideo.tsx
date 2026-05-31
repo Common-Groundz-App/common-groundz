@@ -829,6 +829,10 @@ function FeedVideoPlayer({
         if (isMuxPlayable(item) && item.mux_playback_id) {
           prewarmMuxHls(item.mux_playback_id, v.currentTime);
         }
+        // Phase 2 — lightbox-open is an intentional handoff. Capture as
+        // intent so the time persists in LRU even if the lightbox close
+        // path doesn't write back (e.g. user navigates away).
+        captureResumeFromIntent();
         try {
           v.pause();
         } catch {
