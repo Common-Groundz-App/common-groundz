@@ -319,6 +319,7 @@ function FeedVideoPlayer({
   const activationTokenRef = useRef(0);
   const prevStableSlotIdRef = useRef<string | null>(null);
   const prevItemUrlRef = useRef<string | null>(null);
+  const prevSlotIsActiveRef = useRef(slotIsActive);
   const [resumeTick, setResumeTick] = useState(0);
   const stableSlotIdRef = useRef(stableSlotId);
   useEffect(() => { stableSlotIdRef.current = stableSlotId; }, [stableSlotId]);
