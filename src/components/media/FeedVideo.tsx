@@ -1055,6 +1055,9 @@ function FeedVideoPlayer({
         // intent so the time persists in LRU even if the lightbox close
         // path doesn't write back (e.g. user navigates away).
         captureResumeFromIntent();
+        // Phase 3 — lightbox-open pause is system, not user intent.
+        // Slightly longer timeout for DOM-transition timing.
+        markSystemPause(750);
         try {
           v.pause();
         } catch {
