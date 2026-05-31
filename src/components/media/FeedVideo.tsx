@@ -352,6 +352,16 @@ function FeedVideoPlayer({
 
     if (idChanged || urlChanged) {
       if (prevId !== null) clearFeedVideoResume(prevId);
+      // Phase 3 — clear manual-pause intent on source swap.
+      // id change → prev key is gone, wipe it. url-only change (same key)
+      // → content is different, current intent no longer applies.
+      if (idChanged && prevId !== null) {
+        clearFeedVideoUserPaused(prevId);
+      }
+      if (urlChanged && !idChanged) {
+        clearFeedVideoUserPaused(stableSlotId);
+        setManagedUserPaused(false, stableSlotId);
+      }
       activationTokenRef.current++;
       resumePendingRef.current = false;
     }
