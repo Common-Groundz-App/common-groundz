@@ -1,85 +1,116 @@
-# Phase 3 v5.1 — SSR-safe layout effect (final)
+# Phase 3.1 v2.2 — Manual play promotion (final, implementation-ready)
 
-Identical to v5 in behavior. Single additive change: wrap the `useLayoutEffect` used for pause-intent rehydration in an isomorphic helper so it degrades cleanly to `useEffect` if a server/prerender path ever exists. No other changes from v5.
+Same behavior as v2.1. Threshold correction from reviewer feedback: `MANUAL_OVERRIDE_KEEP_RATIO` lowered below `MANUAL_ACTIVATE_MIN_RATIO` to provide stable hysteresis.
 
-## What changed vs v5
+## What changed vs v2.1
 
-### Refinement — Isomorphic layout effect helper
+### Threshold correction — hysteresis fix
 
-**Why:** `useLayoutEffect` emits a React dev warning when executed on the server (no DOM). This project is currently Vite client-only with no SSR, so the warning never fires today. But:
+Reviewer noted that `MANUAL_OVERRIDE_KEEP_RATIO = 0.15` being higher than `MANUAL_ACTIVATE_MIN_RATIO = 0.1` is backwards:
 
-- It's a one-time 3-line addition.
-- Zero runtime cost in the browser (the ternary resolves at module load).
-- Future-proofs against any SSG/prerender setup, static export, or test environment that runs components in Node without `window`.
-- Both Codex and ChatGPT flagged it explicitly.
+- A video at 0.12 visibility activates (>= 0.1).
+- Next recompute sees 0.12 < 0.15 and immediately clears the override.
+- The promoted video loses active status before the user can see it play.
 
-**Implementation:**
+**Fix:**
 
-```ts
-// At top of FeedVideo.tsx (or a small shared util if preferred — v5.1 keeps
-// it inline to avoid touching unrelated files).
-const useIsomorphicLayoutEffect =
-  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+```
+MANUAL_ACTIVATE_MIN_RATIO    = 0.1
+MANUAL_OVERRIDE_KEEP_RATIO   = 0.05
 ```
 
-Then the v5 rehydration effect becomes:
+This means: if the user can visibly click the play button (>= 0.1), we honor it generously, and keep that video active until it drops below 0.05 (nearly off-screen).
+
+## Implementation note — fresh geometry in `requestActivate()`
+
+Both reviewers flagged the same risk: the manager stores `raw`, `effective`, and `centerDist` on each `SlotEntry` and only updates them inside `recompute()`. If `requestActivate(id)` reads those cached values, a freshly tapped video could be rejected because the last IO tick was stale (scroll just settled, layout shifted, video just mounted, etc.).
+
+**Required behavior:** `requestActivate(id)` must run the same per-slot geometry block already used inside `recompute()`:
 
 ```ts
-useIsomorphicLayoutEffect(() => {
-  if (pauseHydratedForIdRef.current === stableSlotId) return;
-  const stored = readFeedVideoUserPaused(stableSlotId);
-  setManagedUserPaused(stored, stableSlotId);
-  pauseHydratedForIdRef.current = stableSlotId;
-}, [stableSlotId]);
+const rect = el.getBoundingClientRect();
+const elH = rect.height;
+if (elH <= 0) return false;
+const vpH = window.innerHeight || document.documentElement.clientHeight || 0;
+if (vpH <= 0) return false;
+const visTop = Math.max(0, rect.top);
+const visBot = Math.min(vpH, rect.bottom);
+const visH = Math.max(0, visBot - visTop);
+const raw = visH / elH;
+const maxPossible = Math.min(1, vpH / elH);
+const effective = maxPossible > 0 ? Math.min(1, raw / maxPossible) : 0;
+if (effective < MANUAL_ACTIVATE_MIN_RATIO) return false;
 ```
 
-**Constraint (per reviewer note):** the layout effect body stays minimal — only reads the pause store, calls the unified writer, and updates the guard ref. No DOM measurement, no playback decisions, no source-attach work. The managed playback effect (which can do heavier work) remains a plain `useEffect` and early-returns until `pauseHydratedForIdRef.current === stableSlotId`.
+This block is extracted into a small internal helper (e.g. `computeSlotVisibility(el)` returning `{ raw, effective, centerDist }`) and called from BOTH `recompute()` (per slot, in the existing forEach) and `requestActivate()`. No behavior change to `recompute()` — it's a pure refactor to share the math and guarantee `requestActivate()` never reads stale state.
 
-## Everything else: unchanged from v5
+The freshly computed values are also written back to `slot.raw / slot.effective / slot.centerDist` inside `requestActivate()` so a subsequent `recompute()` doesn't immediately re-evaluate against pre-tap data.
 
-All v5 design decisions carry over verbatim:
+### Inactive `onPlay` — confirm early return after success
 
-- Lazy `useState(() => readFeedVideoUserPaused(stableSlotId))` for first-mount hydration.
-- `pauseHydratedForIdRef` initialized to `stableSlotId`; guard passes immediately on first mount, only gates `stableSlotId` transitions.
-- Managed playback effect early-returns when `pauseHydratedForIdRef.current !== stableSlotId`.
-- `setManagedUserPaused(next, id?)` is the only writer for state, `userPausedRefManaged`, and the pause store. Default `id` is `stableSlotIdRef.current`; transitional sites (source swap, rehydration, lightbox handoff) pass an explicit id.
-- `systemPauseRef` / `systemPlayRef` consume-on-event pattern. Defaults to 500ms; source-attach/detach passes 1000ms; lightbox open / reverse-handoff `apply()` passes 750ms. All timers cleared on unmount.
-- User-triggered `togglePlayPause` does NOT mark system. Programmatic paths do.
-- Scrubber `pointerdown` calls `markSystemPause()` before `v.pause()` (preserves pre-scrub intent).
-- Native `pause` listener: consumes system flag; if not system, calls `setManagedUserPaused(true)`. Native `play` listener: consumes system flag; if not system and slot is active, calls `setManagedUserPaused(false)`. Inactive-play guard from Phase 1.1 retained.
-- Reverse-handoff `apply()`: `setManagedUserPaused(!wasPlaying, stableSlotId)` covers both branches.
-- Source-swap effect clears pause store on prev key (id change) or current key (url-only change), both with explicit id.
-- `canAutoplay = slotIsActive && ... && !userPaused`. `userPaused` is in managed effect deps.
-- New file `src/hooks/useFeedVideoPauseStore.ts`: LRU `Map<string, true>`, cap 128, promote-on-read and promote-on-write, only stores `true`. Read/write/clear/__resetForTests API parallel to the resume store.
-- No analytics. No new UI badge. No Phase 1 manager changes. No Phase 2 resume store behavior changes. No Mux/HLS/lightbox-quality/DB/composer/admin changes. Legacy non-managed `userPausedRef` untouched.
+Returning after a successful `requestActivate()` in the inactive `onPlay` listener so the old "inactive → immediately pause" guard doesn't fire:
+
+```ts
+// inside onPlay, when !slotIsActiveRef.current and not wasSystem:
+if (requestActivate()) {
+  // Successful promotion. Do NOT pause. The managed playback effect
+  // re-runs after slotIsActive flips true and takes ownership.
+  return;
+}
+// Promotion rejected (hidden tab, below threshold, lightbox open).
+// Preserve single-active invariant.
+markSystemPause();
+v.pause();
+```
+
+## Everything else: unchanged from v2.1
+
+All v2.1 design carries over verbatim:
+
+- `requestActivate(id): boolean` on the manager registry, exposed via `SlotReturn.requestActivate(): boolean` bound to this slot's id.
+- Rejects when: not registered, `el` missing, lightbox open, `document.hidden`, or fresh `effective < MANUAL_ACTIVATE_MIN_RATIO`.
+- Constants: `MANUAL_ACTIVATE_MIN_RATIO = 0.1`, `MANUAL_OVERRIDE_KEEP_RATIO = 0.05`.
+- `manualOverrideIdRef: MutableRefObject<string | null>` on the provider.
+- On successful activation: clear pending `debounceRef` timeout and pending `rafRef` frame, set `manualOverrideIdRef.current = id`, call `updateActive(id)`.
+- `recompute()`: if `manualOverrideIdRef.current` is set AND that slot is still registered AND its fresh effective >= `MANUAL_OVERRIDE_KEEP_RATIO` AND not lightbox/hidden, keep it active and return early. Otherwise clear the override and fall through to normal dominance.
+- `setLightboxOpen(true)` clears `manualOverrideIdRef`.
+- `unregisterSlot(id)` clears `manualOverrideIdRef` if it matches.
+- Tab `visibilitychange` to hidden: existing behavior (clear debounce, `updateActive(null)`); also clear `manualOverrideIdRef` so it doesn't resurrect on return.
+- Manual override **persists across user pause of the chosen slot** (intentional product decision, documented).
+- `FeedVideo.togglePlayPause` play branch: call `requestActivate()`; on `false` return without `v.play()` and without clearing `userPaused`; on `true` proceed with existing `setManagedUserPaused(false)` + `v.play()`.
+- `FeedVideo` inactive `onPlay`: if `wasSystem`, pause as before. Else call `requestActivate()`; on success return, on failure `markSystemPause()` + `v.pause()`.
+- Unmanaged surfaces (no provider): `requestActivate` is `() => false`; legacy `useVideoAutoplay` path unchanged.
 
 ## Files touched
 
+- `src/hooks/useFeedVideoManager.tsx`
+  - Extract `computeSlotVisibility(el)` helper.
+  - `recompute()` uses the helper inside the existing forEach (pure refactor).
+  - Add `manualOverrideIdRef` and two constants.
+  - Add `requestActivate(id)` on `RegistryApi` (uses helper, validates, writes back fresh values, clears pending debounce/RAF, calls `updateActive`).
+  - `recompute()` honors `manualOverrideIdRef` ahead of dominance and clears it when below keep threshold.
+  - `setLightboxOpen` / `unregisterSlot` / hidden `visibilitychange` clear override.
+  - `SlotReturn` gains `requestActivate(): boolean` bound to this slot's id.
 - `src/components/media/FeedVideo.tsx`
-  - All v5 changes.
-  - Add `useIsomorphicLayoutEffect` const at top of file.
-  - Pause-rehydration effect uses `useIsomorphicLayoutEffect` instead of `useLayoutEffect` directly.
-- `src/hooks/useFeedVideoPauseStore.ts` (new) — unchanged from v5.
-
-## Verification
-
-All 20 v5 cases unchanged. No new cases required — the helper is a transparent fallback. The reviewer-listed focus cases remain the acceptance bar:
-
-1. Manual pause at 4s → scroll away → scroll back → stays paused at 4s.
-2. Tap play → resumes from 4s.
-3. System (scroll-away) pause does not set `userPaused`; on return, autoplays from saved time.
-4. Lightbox close while playing → feed resumes playback.
-5. Lightbox close while paused → feed stays paused at lightbox time.
-6. Scrub while playing → resumes playing. Scrub while paused → stays paused.
-7. Native controls pause/play update intent correctly.
-8. Source swap clears pause intent.
-9. Remount/reuse with stored pause intent → no one-frame autoplay flash.
-10. Phase 1 single-active still works. Phase 2 saved-time resume still works.
+  - Destructure `requestActivate` from `useFeedVideoSlot`.
+  - Call in `togglePlayPause` play branch (gate `play()` and `setManagedUserPaused(false)` on success).
+  - Call in inactive `onPlay` for genuine native/keyboard plays (return on success, pause on failure).
 
 ## Out of scope (unchanged)
 
-Analytics, UI badges, Phase 1 manager, Phase 2 LRU behavior, legacy `userPausedRef`, Mux/HLS attach internals, lightbox quality, composer, uploads, DB, RLS, edge functions.
+Mux/HLS, lightbox quality, Phase 2 resume store, Phase 3 pause store (except the existing `setManagedUserPaused(false)` already in the play branch), composer, uploads, DB, RLS, edge functions, UI, analytics.
 
-## Summary
+## Verification cases
 
-v5.1 = v5 + 3 lines for SSR safety. The plan is implementation-ready. No further review cycles expected.
+1. First playing, click Play on second visible → first pauses, second plays. Subsequent recompute does NOT flip back.
+2. First manually paused, click Play on second → first stays paused, second plays.
+3. Click Play on second, then pause second → second stays paused and active; first does NOT resume.
+4. Scroll until second drops below 0.05 → override clears, dominance recompute promotes whatever is dominant.
+5. Tab hidden when a stray focus/keyboard event fires `requestActivate` → returns `false`, no promotion; override also cleared on hide so it doesn't resurrect.
+6. Native control play on inactive video → `requestActivate` runs with fresh geometry; success promotes, failure pauses.
+7. Lightbox opens while override active → override cleared, no feed playback.
+8. Unmanaged surface → `requestActivate` returns `false`; legacy autoplay unchanged.
+9. Phase 2 resume on outgoing video still saves time on deactivation.
+10. Phase 3 pause intent on the promoted slot survives scroll-away + return.
+11. Stale-rect regression: scroll quickly so IO hasn't fired, then tap Play on a 30%-visible second video → `requestActivate` recomputes from fresh `getBoundingClientRect`, passes the 0.1 threshold, promotion succeeds.
+12. Hysteresis stability: tap a video at 0.12 visibility → activates; recompute at 0.12 still >= 0.05 → override stays; only drops below 0.05 and loses override.
