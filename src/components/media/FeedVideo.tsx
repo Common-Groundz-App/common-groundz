@@ -287,7 +287,7 @@ function FeedVideoPlayer({
   // `slotIsActive`. Otherwise we fall back to the legacy useVideoAutoplay
   // path so unwrapped surfaces (composer previews, etc.) behave as before.
   const stableSlotId = item.id ?? `${sourceId ?? 'anon'}:${item.url}`;
-  const { managed, isActive: slotIsActive, registerEl: registerSlotEl } = useFeedVideoSlot(stableSlotId);
+  const { managed, isActive: slotIsActive, registerEl: registerSlotEl, requestActivate: requestSlotActivate } = useFeedVideoSlot(stableSlotId);
 
   useVideoAutoplay(videoRef, {
     threshold: 0.5,
@@ -766,8 +766,21 @@ function FeedVideoPlayer({
     const onPlay = () => {
       const wasSystem = consumeSystemEvent(systemPlayRef);
       if (!slotIsActiveRef.current) {
-        // Inactive slot must not play — system pause to avoid the
-        // subsequent pause event being attributed to user intent.
+        if (wasSystem) {
+          // Programmatic play on an inactive slot — preserve invariant.
+          markSystemPause();
+          try { el.pause(); } catch { /* ignore */ }
+          return;
+        }
+        // Phase 3.1 v2.2 — genuine native/keyboard play on an inactive
+        // slot. Try to promote; on success leave it playing, on failure
+        // pause to preserve single-active invariant.
+        if (requestSlotActivate()) {
+          // Promotion succeeded. Clear manual-pause intent so the managed
+          // playback effect (which now sees isActive=true) doesn't pause us.
+          setManagedUserPaused(false);
+          return;
+        }
         markSystemPause();
         try { el.pause(); } catch { /* ignore */ }
         return;
@@ -780,7 +793,7 @@ function FeedVideoPlayer({
     };
     el.addEventListener('play', onPlay);
     return () => el.removeEventListener('play', onPlay);
-  }, [managed, consumeSystemEvent, markSystemPause, setManagedUserPaused]);
+  }, [managed, consumeSystemEvent, markSystemPause, setManagedUserPaused, requestSlotActivate]);
 
 
   useEffect(() => {
@@ -1013,6 +1026,13 @@ function FeedVideoPlayer({
     // pause/play listener will set/clear userPaused redundantly with
     // setManagedUserPaused below (idempotent: same target id + value).
     if (v.paused) {
+      // Phase 3.1 v2.2 — if managed and not the active slot, ask the
+      // manager to promote us first. On rejection (lightbox open, tab
+      // hidden, below visibility threshold), do nothing — don't play
+      // and don't clear userPaused, so the UI state stays consistent.
+      if (managed && !slotIsActiveRef.current) {
+        if (!requestSlotActivate()) return;
+      }
       userPausedRef.current = false;
       setAutoplayEnabled(true);
       if (managed) setManagedUserPaused(false);
@@ -1023,7 +1043,7 @@ function FeedVideoPlayer({
       if (managed) setManagedUserPaused(true);
       v.pause();
     }
-  }, [managed, setManagedUserPaused]);
+  }, [managed, setManagedUserPaused, requestSlotActivate]);
 
   const handleContainerClick = (e: React.MouseEvent) => {
     e.stopPropagation();

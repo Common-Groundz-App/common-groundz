@@ -21,6 +21,14 @@ import React, {
  * via a per-slot useSyncExternalStore subscription. This eliminates the
  * unregister/re-register loop that caused frame-by-frame oscillation.
  *
+ * Phase 3.1 v2.2 — manual play promotion. `requestActivate(id)` lets a
+ * user-initiated play promote a non-dominant (but visible) slot to
+ * active. Hysteresis: activate at MANUAL_ACTIVATE_MIN_RATIO (0.1), keep
+ * until MANUAL_OVERRIDE_KEEP_RATIO (0.05) so the promoted slot doesn't
+ * get yanked back by the next recompute. Override is cleared on
+ * lightbox open, unregister of the chosen slot, tab hidden, or when the
+ * chosen slot's visibility drops below the keep threshold.
+ *
  * The manager is OPT-IN via <FeedVideoManagerProvider>. Outside a
  * provider, `useFeedVideoSlot` returns `managed: false` and FeedVideo
  * falls back to its legacy `useVideoAutoplay` behavior.
@@ -41,6 +49,7 @@ interface RegistryApi {
   setLightboxOpen: (open: boolean) => void;
   subscribeSlotActive: (id: string, listener: Listener) => () => void;
   getSlotActiveSnapshot: (id: string) => boolean;
+  requestActivate: (id: string) => boolean;
 }
 
 const Ctx = createContext<RegistryApi | null>(null);
@@ -53,12 +62,54 @@ const SWITCH_MARGIN = 0.2;
 const DEBOUNCE_MS = 200;
 const SETTLE_MS = 50;
 
+// Phase 3.1 v2.2 — manual play promotion thresholds. Keep < Activate to
+// guarantee hysteresis: if the user can visibly click play (>= 0.1), we
+// honor it and keep that slot active until it's nearly off-screen (<0.05).
+const MANUAL_ACTIVATE_MIN_RATIO = 0.1;
+const MANUAL_OVERRIDE_KEEP_RATIO = 0.05;
+
+interface VisibilityMeasure {
+  raw: number;
+  effective: number;
+  centerDist: number;
+}
+
+// Shared per-slot geometry. Used by both recompute() (in its forEach) and
+// requestActivate() (which MUST work from fresh getBoundingClientRect, not
+// stale IO ratios). vpH/vpCenter are passed in so callers compute the
+// viewport once. Returns null when geometry is degenerate.
+function computeSlotVisibility(
+  el: HTMLVideoElement,
+  vpH: number,
+  vpCenter: number
+): VisibilityMeasure | null {
+  const rect = el.getBoundingClientRect();
+  const elH = rect.height;
+  if (elH <= 0) return null;
+  const visTop = Math.max(0, rect.top);
+  const visBot = Math.min(vpH, rect.bottom);
+  const visH = Math.max(0, visBot - visTop);
+  const raw = visH / elH;
+  const maxPossible = Math.min(1, vpH / elH);
+  const effective = maxPossible > 0 ? Math.min(1, raw / maxPossible) : 0;
+  const elCenter = rect.top + elH / 2;
+  return {
+    raw,
+    effective,
+    centerDist: Math.abs(elCenter - vpCenter),
+  };
+}
+
 export function FeedVideoManagerProvider({ children }: { children: React.ReactNode }) {
   const slotsRef = useRef<Map<string, SlotEntry>>(new Map());
   const observerRef = useRef<IntersectionObserver | null>(null);
   const debounceRef = useRef<number | null>(null);
   const rafRef = useRef<number | null>(null);
   const lightboxOpenRef = useRef(false);
+  // Phase 3.1 v2.2 — set by requestActivate(), cleared when the chosen
+  // slot drops below MANUAL_OVERRIDE_KEEP_RATIO, unregisters, or when
+  // lightbox/hidden. recompute() honors this ahead of dominance.
+  const manualOverrideIdRef = useRef<string | null>(null);
 
   // Per-slot subscription: map id -> set of listeners.
   const slotListenersRef = useRef<Map<string, Set<Listener>>>(new Map());
@@ -108,29 +159,34 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
         slot.centerDist = Infinity;
         return;
       }
-      const rect = el.getBoundingClientRect();
-      const elH = rect.height;
-      if (elH <= 0) {
+      const m = computeSlotVisibility(el, vpH, vpCenter);
+      if (!m) {
         slot.raw = 0;
         slot.effective = 0;
         slot.centerDist = Infinity;
         return;
       }
-      const visTop = Math.max(0, rect.top);
-      const visBot = Math.min(vpH, rect.bottom);
-      const visH = Math.max(0, visBot - visTop);
-      const raw = visH / elH;
-      const maxPossible = Math.min(1, vpH / elH);
-      const effective = maxPossible > 0 ? Math.min(1, raw / maxPossible) : 0;
-      const elCenter = rect.top + elH / 2;
-      slot.raw = raw;
-      slot.effective = effective;
-      slot.centerDist = Math.abs(elCenter - vpCenter);
+      slot.raw = m.raw;
+      slot.effective = m.effective;
+      slot.centerDist = m.centerDist;
     });
 
     if (lightboxOpenRef.current || (typeof document !== 'undefined' && document.hidden)) {
+      manualOverrideIdRef.current = null;
       updateActive(null);
       return;
+    }
+
+    // Phase 3.1 v2.2 — manual override takes precedence while still visible.
+    const overrideId = manualOverrideIdRef.current;
+    if (overrideId) {
+      const ov = slotsRef.current.get(overrideId);
+      if (ov && ov.el && ov.effective >= MANUAL_OVERRIDE_KEEP_RATIO) {
+        updateActive(overrideId);
+        return;
+      }
+      // Lost visibility / unregistered → drop override and fall through.
+      manualOverrideIdRef.current = null;
     }
 
     let bestId: string | null = null;
@@ -210,6 +266,9 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
           window.clearTimeout(debounceRef.current);
           debounceRef.current = null;
         }
+        // Phase 3.1 v2.2 — clear manual override so it doesn't resurrect
+        // a stale promoted slot when the tab returns.
+        manualOverrideIdRef.current = null;
         updateActive(null);
       } else {
         requestAnimationFrame(() => {
@@ -262,6 +321,7 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
       try { observerRef.current.unobserve(slot.el); } catch { /* ignore */ }
     }
     slotsRef.current.delete(id);
+    if (manualOverrideIdRef.current === id) manualOverrideIdRef.current = null;
     if (activeIdRef.current === id) updateActive(null);
     scheduleRecompute();
   }, [scheduleRecompute, updateActive]);
@@ -273,6 +333,7 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
         window.clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
+      manualOverrideIdRef.current = null;
       updateActive(null);
     } else {
       flushNow();
@@ -298,6 +359,47 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
     return activeIdRef.current === id;
   }, []);
 
+  // Phase 3.1 v2.2 — manual play promotion. Returns true on successful
+  // promotion. MUST measure from fresh getBoundingClientRect — reading
+  // cached slot.effective could be stale (last IO tick was before scroll
+  // settled, before layout shift, before video mounted, etc.).
+  const requestActivate = useCallback((id: string): boolean => {
+    if (typeof window === 'undefined') return false;
+    if (lightboxOpenRef.current) return false;
+    if (typeof document !== 'undefined' && document.hidden) return false;
+
+    const slot = slotsRef.current.get(id);
+    if (!slot || !slot.el) return false;
+
+    const vpH = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (vpH <= 0) return false;
+    const vpCenter = vpH / 2;
+
+    const m = computeSlotVisibility(slot.el, vpH, vpCenter);
+    if (!m) return false;
+    if (m.effective < MANUAL_ACTIVATE_MIN_RATIO) return false;
+
+    // Write fresh values back so a subsequent recompute() doesn't
+    // re-evaluate against pre-tap data.
+    slot.raw = m.raw;
+    slot.effective = m.effective;
+    slot.centerDist = m.centerDist;
+
+    // Cancel any in-flight recompute so it can't immediately override us.
+    if (debounceRef.current !== null) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+
+    manualOverrideIdRef.current = id;
+    updateActive(id);
+    return true;
+  }, [updateActive]);
+
   // Stable api object — never changes identity.
   const api = useMemo<RegistryApi>(
     () => ({
@@ -306,8 +408,9 @@ export function FeedVideoManagerProvider({ children }: { children: React.ReactNo
       setLightboxOpen,
       subscribeSlotActive,
       getSlotActiveSnapshot,
+      requestActivate,
     }),
-    [setSlotEl, unregisterSlot, setLightboxOpen, subscribeSlotActive, getSlotActiveSnapshot]
+    [setSlotEl, unregisterSlot, setLightboxOpen, subscribeSlotActive, getSlotActiveSnapshot, requestActivate]
   );
 
   return (
@@ -324,6 +427,14 @@ interface SlotReturn {
   isActive: boolean;
   /** Stable ref callback — pass to the <video> element. */
   registerEl: (el: HTMLVideoElement | null) => void;
+  /**
+   * Phase 3.1 v2.2 — request manual activation for this slot. Returns
+   * true on success (slot promoted, caller may proceed to play()),
+   * false on rejection (caller should not play; in inactive `onPlay`,
+   * pause to preserve the single-active invariant). Always returns
+   * false on unmanaged surfaces.
+   */
+  requestActivate: () => boolean;
 }
 
 const FALSE_SNAPSHOT = () => false;
@@ -362,10 +473,16 @@ export function useFeedVideoSlot(id: string): SlotReturn {
     [ctx, id]
   );
 
+  const requestActivate = useCallback(
+    () => (ctx ? ctx.requestActivate(id) : false),
+    [ctx, id]
+  );
+
   return {
     managed: !!ctx,
     isActive,
     registerEl,
+    requestActivate,
   };
 }
 
