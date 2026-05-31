@@ -822,9 +822,18 @@ function FeedVideoPlayer({
       // the raw resumeState.currentTime.
       saveFeedVideoResume(stableSlotIdRef.current, target, v.duration);
 
+      // Phase 3 — explicit manual-pause intent in BOTH branches.
+      // wasPlaying=true → clear intent; wasPlaying=false → set intent
+      // so the feed slot stays paused after the lightbox closes. Use
+      // explicit id since stableSlotIdRef.current is the right key here.
+      setManagedUserPaused(!resumeState.wasPlaying, stableSlotIdRef.current);
+
       if (resumeState.wasPlaying) {
         userPausedRef.current = false;
         setAutoplayEnabled(true);
+        // Mark programmatic play with longer timeout — lightbox close
+        // transition + element-ready timing can be slow.
+        markSystemPlay(750);
         const p = v.play();
         if (p && typeof p.catch === 'function') {
           p.catch(() => { /* autoplay may block; native UI remains */ });
