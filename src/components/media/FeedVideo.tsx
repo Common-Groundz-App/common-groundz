@@ -477,6 +477,10 @@ function FeedVideoPlayer({
     if (!managed) return;
     const el = videoRef.current;
     if (!el) return;
+    // Phase 2 guard — don't start playback while a saved-time resume is
+    // still pending. finalize() bumps resumeTick so this effect re-runs
+    // once the seek is applied (or has timed out).
+    if (resumePendingRef.current) return;
     const tabHidden = typeof document !== 'undefined' && document.hidden;
     const canAutoplay =
       slotIsActive && autoplayEnabled && !isScrubbing && !autoplaySuppressed && !tabHidden;
@@ -505,7 +509,59 @@ function FeedVideoPlayer({
         try { el.muted = true; } catch { /* ignore */ }
       }
     }
-  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed]);
+  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick]);
+
+  // Phase 2 — capture currentTime on slot deactivation.
+  // Effect cleanup runs when slotIsActive flips true → false (or unmount).
+  // captureResumeFromIntent: deactivation is *intentional*, so near-zero
+  // progress clears any stale older entry (Safeguard E).
+  useEffect(() => {
+    if (!managed || !slotIsActive) return;
+    return () => {
+      captureResumeFromIntent();
+    };
+  }, [managed, slotIsActive, captureResumeFromIntent]);
+
+  // Phase 2 — capture on tab hide. document.visibilitychange while this
+  // slot is active counts as intent (user navigated away from the tab).
+  useEffect(() => {
+    if (!managed || !slotIsActive) return;
+    if (typeof document === 'undefined') return;
+    const onVis = () => {
+      if (document.hidden) captureResumeFromIntent();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, [managed, slotIsActive, captureResumeFromIntent]);
+
+  // Phase 2 — capture on element `pause` while active. Pause from
+  // user-tap, scrubber, or anything else lands here. Safeguard C blocks
+  // spurious 0-time saves from HLS re-attach.
+  useEffect(() => {
+    if (!managed) return;
+    const el = videoRef.current;
+    if (!el) return;
+    const onPause = () => {
+      if (!slotIsActiveRef.current) return;
+      captureResumeFromPause();
+    };
+    el.addEventListener('pause', onPause);
+    return () => el.removeEventListener('pause', onPause);
+  }, [managed, captureResumeFromPause]);
+
+  // Phase 2 — clear on `ended` so a watched-through video doesn't keep
+  // a near-end time around to apply on the next visit.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    const onEnded = () => {
+      clearFeedVideoResume(stableSlotIdRef.current);
+    };
+    el.addEventListener('ended', onEnded);
+    return () => el.removeEventListener('ended', onEnded);
+  }, []);
+
+
 
   // Single-active invariant guard: if a non-active managed video ever
   // starts playing (manual tap, browser quirk, late-resolving play()),
