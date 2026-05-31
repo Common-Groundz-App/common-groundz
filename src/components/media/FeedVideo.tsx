@@ -1103,7 +1103,11 @@ function FeedVideoPlayer({
     setIsScrubbing(true);
     clearHideTimer();
     setForceShow(true);
-  }, [clearHideTimer]);
+    // Phase 3 — scrubber pointerdown calls v.pause() in VideoProgressBar
+    // BEFORE handing back. Mark system so pre-scrub user intent
+    // (playing vs paused) is preserved instead of being overwritten.
+    markSystemPause();
+  }, [clearHideTimer, markSystemPause]);
 
   const handleScrubEnd = useCallback(() => {
     setIsScrubbing(false);
