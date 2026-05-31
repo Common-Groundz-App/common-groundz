@@ -372,6 +372,15 @@ function FeedVideoPlayer({
     saveFeedVideoResume(id, t, el.duration);
   }, []);
 
+  // v3.1 Refinement 2 — ref-based call site for captureResumeFromIntent.
+  // Future-proofs the transition + unmount effects against this callback
+  // ever growing real deps (right now it's `useCallback([], ...)` reading
+  // from refs, but the safety net is cheap).
+  const captureResumeFromIntentRef = useRef(captureResumeFromIntent);
+  useEffect(() => {
+    captureResumeFromIntentRef.current = captureResumeFromIntent;
+  }, [captureResumeFromIntent]);
+
   // Resume-on-activation effect. Declared BEFORE the managed playback
   // effect so React commits resumePendingRef = true in the same pass that
   // the managed effect reads it (the managed effect re-runs when
