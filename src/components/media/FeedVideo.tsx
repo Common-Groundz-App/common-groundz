@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { Volume2, VolumeX, Play, Pause, Film, AlertTriangle, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +24,21 @@ import {
   clearFeedVideoResume,
   FEED_VIDEO_RESUME_MIN,
 } from '@/hooks/useFeedVideoResumeStore';
+import {
+  readFeedVideoUserPaused,
+  writeFeedVideoUserPaused,
+  clearFeedVideoUserPaused,
+} from '@/hooks/useFeedVideoPauseStore';
+
+// Phase 3 v5.1 — SSR-safe layout effect. Vite app is client-only today,
+// but this degrades cleanly to useEffect in any Node/test/SSG path.
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+// Phase 3 — system pause/play event guard timeout. Default tolerates
+// Safari/iOS/HLS media-event scheduling. Per-site overrides for slower
+// paths (source attach/detach: 1000ms, lightbox handoff: 750ms).
+const SYSTEM_EVENT_TIMEOUT_DEFAULT_MS = 500;
 
 interface FeedVideoProps {
   item: MediaItem;
@@ -337,6 +352,16 @@ function FeedVideoPlayer({
 
     if (idChanged || urlChanged) {
       if (prevId !== null) clearFeedVideoResume(prevId);
+      // Phase 3 — clear manual-pause intent on source swap.
+      // id change → prev key is gone, wipe it. url-only change (same key)
+      // → content is different, current intent no longer applies.
+      if (idChanged && prevId !== null) {
+        clearFeedVideoUserPaused(prevId);
+      }
+      if (urlChanged && !idChanged) {
+        clearFeedVideoUserPaused(stableSlotId);
+        setManagedUserPaused(false, stableSlotId);
+      }
       activationTokenRef.current++;
       resumePendingRef.current = false;
     }
@@ -380,6 +405,112 @@ function FeedVideoPlayer({
   useEffect(() => {
     captureResumeFromIntentRef.current = captureResumeFromIntent;
   }, [captureResumeFromIntent]);
+
+  // ===== Phase 3 — manual-pause user intent =====
+  // userPaused: was the slot paused by user intent (tap, native control,
+  //   keyboard, lightbox-close-while-paused)? Persists across scroll
+  //   away/back, survives instance reuse via the LRU pause store.
+  // userPausedRefManaged: synchronous mirror for listeners.
+  // pauseHydratedForIdRef: guard preventing the managed playback effect
+  //   from running with stale userPaused after a stableSlotId change.
+  // systemPauseRef / systemPlayRef: consume-on-event guards so
+  //   programmatic pause()/play() calls cannot be misclassified as user
+  //   intent by the native pause/play listeners.
+  const [userPaused, setUserPausedState] = useState<boolean>(() =>
+    readFeedVideoUserPaused(stableSlotId)
+  );
+  const userPausedRefManaged = useRef<boolean>(userPaused);
+  const pauseHydratedForIdRef = useRef<string>(stableSlotId);
+
+  interface SystemEventGuard {
+    pending: boolean;
+    timer: number | null;
+  }
+  const systemPauseRef = useRef<SystemEventGuard>({ pending: false, timer: null });
+  const systemPlayRef = useRef<SystemEventGuard>({ pending: false, timer: null });
+
+  const markSystemEvent = useCallback(
+    (ref: React.MutableRefObject<SystemEventGuard>, timeoutMs: number) => {
+      ref.current.pending = true;
+      if (ref.current.timer !== null) {
+        window.clearTimeout(ref.current.timer);
+      }
+      ref.current.timer = window.setTimeout(() => {
+        ref.current.pending = false;
+        ref.current.timer = null;
+      }, timeoutMs);
+    },
+    []
+  );
+
+  const markSystemPause = useCallback(
+    (timeoutMs: number = SYSTEM_EVENT_TIMEOUT_DEFAULT_MS) => {
+      markSystemEvent(systemPauseRef, timeoutMs);
+    },
+    [markSystemEvent]
+  );
+
+  const markSystemPlay = useCallback(
+    (timeoutMs: number = SYSTEM_EVENT_TIMEOUT_DEFAULT_MS) => {
+      markSystemEvent(systemPlayRef, timeoutMs);
+    },
+    [markSystemEvent]
+  );
+
+  const consumeSystemEvent = useCallback(
+    (ref: React.MutableRefObject<SystemEventGuard>): boolean => {
+      if (!ref.current.pending) return false;
+      ref.current.pending = false;
+      if (ref.current.timer !== null) {
+        window.clearTimeout(ref.current.timer);
+        ref.current.timer = null;
+      }
+      return true;
+    },
+    []
+  );
+
+  // Unified writer — the ONLY path that mutates state, ref, and store.
+  // `id` defaults to the current stableSlotId (via ref); transitional
+  // call sites (source swap, rehydration, lightbox handoff) pass an
+  // explicit id so the write always lands on the intended key.
+  const setManagedUserPaused = useCallback(
+    (next: boolean, id?: string) => {
+      const targetId = id ?? stableSlotIdRef.current;
+      userPausedRefManaged.current = next;
+      setUserPausedState(next);
+      writeFeedVideoUserPaused(targetId, next);
+    },
+    []
+  );
+
+  // Pause-intent rehydration on stableSlotId change. SSR-safe layout
+  // effect so it runs synchronously before the managed playback effect
+  // in the same commit. First mount: pauseHydratedForIdRef already
+  // equals stableSlotId (lazy useState seeded it), so this is a no-op.
+  // Only gates real id transitions (instance reuse for a different
+  // slot). Body stays minimal — read, write, update guard.
+  useIsomorphicLayoutEffect(() => {
+    if (pauseHydratedForIdRef.current === stableSlotId) return;
+    const stored = readFeedVideoUserPaused(stableSlotId);
+    setManagedUserPaused(stored, stableSlotId);
+    pauseHydratedForIdRef.current = stableSlotId;
+  }, [stableSlotId, setManagedUserPaused]);
+
+  // Clear system-event timers on unmount.
+  useEffect(() => {
+    return () => {
+      if (systemPauseRef.current.timer !== null) {
+        window.clearTimeout(systemPauseRef.current.timer);
+        systemPauseRef.current.timer = null;
+      }
+      if (systemPlayRef.current.timer !== null) {
+        window.clearTimeout(systemPlayRef.current.timer);
+        systemPlayRef.current.timer = null;
+      }
+    };
+  }, []);
+
 
   // Resume-on-activation effect. Declared BEFORE the managed playback
   // effect so React commits resumePendingRef = true in the same pass that
@@ -498,19 +629,27 @@ function FeedVideoPlayer({
     if (!managed) return;
     const el = videoRef.current;
     if (!el) return;
+    // Phase 3 — hydration guard: never run with stale userPaused after a
+    // stableSlotId change. The layout-effect rehydrator runs before any
+    // useEffect in the same commit, so this only ever returns true mid-
+    // transition before the rehydrator lands.
+    if (pauseHydratedForIdRef.current !== stableSlotId) return;
     // Phase 2 guard — don't start playback while a saved-time resume is
     // still pending. finalize() bumps resumeTick so this effect re-runs
     // once the seek is applied (or has timed out).
     if (resumePendingRef.current) return;
     const tabHidden = typeof document !== 'undefined' && document.hidden;
     const canAutoplay =
-      slotIsActive && autoplayEnabled && !isScrubbing && !autoplaySuppressed && !tabHidden;
+      slotIsActive && autoplayEnabled && !isScrubbing && !autoplaySuppressed && !tabHidden && !userPaused;
     if (canAutoplay) {
       // Idempotent: only call play() if currently paused. Respect the
       // user's persisted global mute preference — do NOT force mute on
       // the active video.
       if (el.paused) {
         try { el.muted = readGlobalVideoMuted(); } catch { /* ignore */ }
+        // Phase 3 — mark programmatic play so the native play listener
+        // does not clear userPaused.
+        markSystemPlay();
         const p = el.play();
         if (p && typeof p.catch === 'function') {
           p.catch((err: any) => {
@@ -522,6 +661,9 @@ function FeedVideoPlayer({
       }
     } else {
       if (!el.paused) {
+        // Phase 3 — mark programmatic pause so the native pause listener
+        // does not set userPaused on system-triggered deactivation.
+        markSystemPause();
         try { el.pause(); } catch { /* ignore */ }
       }
       // Safety: non-active videos must never emit audio. DOM-only mute;
@@ -530,7 +672,7 @@ function FeedVideoPlayer({
         try { el.muted = true; } catch { /* ignore */ }
       }
     }
-  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick]);
+  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick, userPaused, stableSlotId, markSystemPause, markSystemPlay]);
 
   // Phase 2 — capture currentTime on slot deactivation (v3.1 Patch 1).
   // Explicit active → inactive transition tracking. Replaces the older
@@ -581,43 +723,64 @@ function FeedVideoPlayer({
     const el = videoRef.current;
     if (!el) return;
     const onPause = () => {
+      // Phase 3 — consume system flag first. If this pause was
+      // programmatic (managed effect, source-attach, lightbox open,
+      // scrubber), do not attribute it as user intent.
+      const wasSystem = consumeSystemEvent(systemPauseRef);
       if (!slotIsActiveRef.current) return;
       captureResumeFromPause();
+      if (!wasSystem) {
+        // Real user/native-control pause → record manual intent.
+        setManagedUserPaused(true);
+      }
     };
     el.addEventListener('pause', onPause);
     return () => el.removeEventListener('pause', onPause);
-  }, [managed, captureResumeFromPause]);
+  }, [managed, captureResumeFromPause, consumeSystemEvent, setManagedUserPaused]);
 
   // Phase 2 — clear on `ended` so a watched-through video doesn't keep
-  // a near-end time around to apply on the next visit.
+  // a near-end time around to apply on the next visit. Also clears any
+  // manual-pause intent since the user clearly watched through.
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
     const onEnded = () => {
       clearFeedVideoResume(stableSlotIdRef.current);
+      setManagedUserPaused(false);
     };
     el.addEventListener('ended', onEnded);
     return () => el.removeEventListener('ended', onEnded);
-  }, []);
+  }, [setManagedUserPaused]);
 
 
 
-  // Single-active invariant guard: if a non-active managed video ever
-  // starts playing (manual tap, browser quirk, late-resolving play()),
-  // pause it immediately. The listener reads `slotIsActiveRef.current`
-  // so it survives active-state flips without detach/reattach.
+  // Single-active invariant guard + Phase 3 manual-pause clearing.
+  // - If a non-active managed video ever starts playing (manual tap,
+  //   browser quirk, late-resolving play()), pause it immediately.
+  // - If an active video starts playing from a real user/native source
+  //   (not a programmatic markSystemPlay), clear userPaused intent.
   useEffect(() => {
     if (!managed) return;
     const el = videoRef.current;
     if (!el) return;
     const onPlay = () => {
+      const wasSystem = consumeSystemEvent(systemPlayRef);
       if (!slotIsActiveRef.current) {
+        // Inactive slot must not play — system pause to avoid the
+        // subsequent pause event being attributed to user intent.
+        markSystemPause();
         try { el.pause(); } catch { /* ignore */ }
+        return;
+      }
+      if (!wasSystem) {
+        // Real user/native-control play on the active slot → clear
+        // manual-pause intent.
+        setManagedUserPaused(false);
       }
     };
     el.addEventListener('play', onPlay);
     return () => el.removeEventListener('play', onPlay);
-  }, [managed]);
+  }, [managed, consumeSystemEvent, markSystemPause, setManagedUserPaused]);
 
 
   useEffect(() => {
@@ -659,9 +822,18 @@ function FeedVideoPlayer({
       // the raw resumeState.currentTime.
       saveFeedVideoResume(stableSlotIdRef.current, target, v.duration);
 
+      // Phase 3 — explicit manual-pause intent in BOTH branches.
+      // wasPlaying=true → clear intent; wasPlaying=false → set intent
+      // so the feed slot stays paused after the lightbox closes. Use
+      // explicit id since stableSlotIdRef.current is the right key here.
+      setManagedUserPaused(!resumeState.wasPlaying, stableSlotIdRef.current);
+
       if (resumeState.wasPlaying) {
         userPausedRef.current = false;
         setAutoplayEnabled(true);
+        // Mark programmatic play with longer timeout — lightbox close
+        // transition + element-ready timing can be slow.
+        markSystemPlay(750);
         const p = v.play();
         if (p && typeof p.catch === 'function') {
           p.catch(() => { /* autoplay may block; native UI remains */ });
@@ -703,6 +875,11 @@ function FeedVideoPlayer({
     hlsUnrecoverableRef.current = false;
     const token: AttachToken = { cancelled: false };
     let detach: () => void;
+    // Phase 3 — source-attach can trigger pause events on slow paths
+    // (HLS init/manifest, detach + load). Mark system pause with the
+    // longer 1000ms timeout so a delayed pause event is not
+    // misattributed as user intent.
+    markSystemPause(1000);
     if (isHls) {
       detach = attachHls(v, src, token, {
         onEvent: (e, p) => analytics.track(e, p),
@@ -720,9 +897,10 @@ function FeedVideoPlayer({
     }
     return () => {
       token.cancelled = true;
+      markSystemPause(1000);
       detach();
     };
-  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride]);
+  }, [item.url, item.mux_playback_id, item.mux_status, item.provider, srcOverride, markSystemPause]);
 
 
   // Reset userPaused when video leaves viewport, so re-entry can autoplay again.
@@ -831,16 +1009,21 @@ function FeedVideoPlayer({
   const togglePlayPause = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
+    // Phase 3 — user-triggered toggle. Do NOT mark system; the native
+    // pause/play listener will set/clear userPaused redundantly with
+    // setManagedUserPaused below (idempotent: same target id + value).
     if (v.paused) {
       userPausedRef.current = false;
       setAutoplayEnabled(true);
+      if (managed) setManagedUserPaused(false);
       v.play().catch(() => {});
     } else {
       userPausedRef.current = true;
       setAutoplayEnabled(false);
+      if (managed) setManagedUserPaused(true);
       v.pause();
     }
-  }, []);
+  }, [managed, setManagedUserPaused]);
 
   const handleContainerClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -872,6 +1055,9 @@ function FeedVideoPlayer({
         // intent so the time persists in LRU even if the lightbox close
         // path doesn't write back (e.g. user navigates away).
         captureResumeFromIntent();
+        // Phase 3 — lightbox-open pause is system, not user intent.
+        // Slightly longer timeout for DOM-transition timing.
+        markSystemPause(750);
         try {
           v.pause();
         } catch {
@@ -917,7 +1103,11 @@ function FeedVideoPlayer({
     setIsScrubbing(true);
     clearHideTimer();
     setForceShow(true);
-  }, [clearHideTimer]);
+    // Phase 3 — scrubber pointerdown calls v.pause() in VideoProgressBar
+    // BEFORE handing back. Mark system so pre-scrub user intent
+    // (playing vs paused) is preserved instead of being overwritten.
+    markSystemPause();
+  }, [clearHideTimer, markSystemPause]);
 
   const handleScrubEnd = useCallback(() => {
     setIsScrubbing(false);
