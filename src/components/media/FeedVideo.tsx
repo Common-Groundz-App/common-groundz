@@ -319,6 +319,7 @@ function FeedVideoPlayer({
   const activationTokenRef = useRef(0);
   const prevStableSlotIdRef = useRef<string | null>(null);
   const prevItemUrlRef = useRef<string | null>(null);
+  const prevSlotIsActiveRef = useRef(slotIsActive);
   const [resumeTick, setResumeTick] = useState(0);
   const stableSlotIdRef = useRef(stableSlotId);
   useEffect(() => { stableSlotIdRef.current = stableSlotId; }, [stableSlotId]);
@@ -371,6 +372,15 @@ function FeedVideoPlayer({
     saveFeedVideoResume(id, t, el.duration);
   }, []);
 
+  // v3.1 Refinement 2 — ref-based call site for captureResumeFromIntent.
+  // Future-proofs the transition + unmount effects against this callback
+  // ever growing real deps (right now it's `useCallback([], ...)` reading
+  // from refs, but the safety net is cheap).
+  const captureResumeFromIntentRef = useRef(captureResumeFromIntent);
+  useEffect(() => {
+    captureResumeFromIntentRef.current = captureResumeFromIntent;
+  }, [captureResumeFromIntent]);
+
   // Resume-on-activation effect. Declared BEFORE the managed playback
   // effect so React commits resumePendingRef = true in the same pass that
   // the managed effect reads it (the managed effect re-runs when
@@ -418,13 +428,21 @@ function FeedVideoPlayer({
     // some path: seeked, post-seek timeout, pre-metadata timeout, or
     // effect cleanup. Bumps resumeTick so the managed effect re-runs and
     // can now call play() with the saved time already applied.
-    const finalize = () => {
+    //
+    // v3.1 Refinement 1 — accepts { bumpTick }. Cleanup paths pass false
+    // so we never schedule a setState during unmount or dep-change tear-
+    // down (React's cleanup ordering doesn't guarantee a mount-ref guard
+    // would still read `true` here). Listeners/timers/pending flag are
+    // always cleared regardless.
+    const finalize = (options?: { bumpTick?: boolean }) => {
       if (finalized) return;
       finalized = true;
       detachListeners();
       clearTimers();
       resumePendingRef.current = false;
-      setResumeTick((t) => t + 1);
+      if (options?.bumpTick !== false) {
+        setResumeTick((t) => t + 1);
+      }
     };
 
     // Safeguard B — every async callback re-checks token / element / url /
@@ -462,9 +480,12 @@ function FeedVideoPlayer({
     }
 
     return () => {
-      // Effect cleanup → invalidate this attempt and clear pending flag.
+      // Effect cleanup (dep change or unmount) → invalidate this attempt
+      // and clear pending flag. v3.1 Refinement 1 — never bump resumeTick
+      // from cleanup; either the next effect run will fire naturally
+      // (dep change) or the component is unmounting.
       activationTokenRef.current++;
-      finalize();
+      finalize({ bumpTick: false });
     };
   }, [managed, slotIsActive, stableSlotId, item.url, resumeState]);
 
@@ -511,16 +532,34 @@ function FeedVideoPlayer({
     }
   }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick]);
 
-  // Phase 2 — capture currentTime on slot deactivation.
-  // Effect cleanup runs when slotIsActive flips true → false (or unmount).
-  // captureResumeFromIntent: deactivation is *intentional*, so near-zero
-  // progress clears any stale older entry (Safeguard E).
+  // Phase 2 — capture currentTime on slot deactivation (v3.1 Patch 1).
+  // Explicit active → inactive transition tracking. Replaces the older
+  // cleanup-based pattern (which depended on dep-array identity stability
+  // to fire only on real deactivation). Also bumps activationTokenRef so
+  // any in-flight resume is invalidated at the same call site that owns
+  // the transition. captureResumeFromIntent is invoked via a ref so this
+  // effect stays correct even if the callback grows real deps later.
   useEffect(() => {
-    if (!managed || !slotIsActive) return;
+    const wasActive = prevSlotIsActiveRef.current;
+    if (managed && wasActive && !slotIsActive) {
+      captureResumeFromIntentRef.current();
+      activationTokenRef.current++;
+    }
+    prevSlotIsActiveRef.current = slotIsActive;
+  }, [managed, slotIsActive]);
+
+  // Phase 2 — unmount-only capture (v3.1 Patch 1, Refinement 2).
+  // If the component unmounts while the slot is still active, capture
+  // intent. Uses the ref form so a stale closure of
+  // captureResumeFromIntent can never be invoked from this `[]`-deps
+  // cleanup.
+  useEffect(() => {
     return () => {
-      captureResumeFromIntent();
+      if (slotIsActiveRef.current) {
+        captureResumeFromIntentRef.current();
+      }
     };
-  }, [managed, slotIsActive, captureResumeFromIntent]);
+  }, []);
 
   // Phase 2 — capture on tab hide. document.visibilitychange while this
   // slot is active counts as intent (user navigated away from the tab).
