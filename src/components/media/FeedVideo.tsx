@@ -766,8 +766,21 @@ function FeedVideoPlayer({
     const onPlay = () => {
       const wasSystem = consumeSystemEvent(systemPlayRef);
       if (!slotIsActiveRef.current) {
-        // Inactive slot must not play — system pause to avoid the
-        // subsequent pause event being attributed to user intent.
+        if (wasSystem) {
+          // Programmatic play on an inactive slot — preserve invariant.
+          markSystemPause();
+          try { el.pause(); } catch { /* ignore */ }
+          return;
+        }
+        // Phase 3.1 v2.2 — genuine native/keyboard play on an inactive
+        // slot. Try to promote; on success leave it playing, on failure
+        // pause to preserve single-active invariant.
+        if (requestSlotActivate()) {
+          // Promotion succeeded. Clear manual-pause intent so the managed
+          // playback effect (which now sees isActive=true) doesn't pause us.
+          setManagedUserPaused(false);
+          return;
+        }
         markSystemPause();
         try { el.pause(); } catch { /* ignore */ }
         return;
@@ -780,7 +793,7 @@ function FeedVideoPlayer({
     };
     el.addEventListener('play', onPlay);
     return () => el.removeEventListener('play', onPlay);
-  }, [managed, consumeSystemEvent, markSystemPause, setManagedUserPaused]);
+  }, [managed, consumeSystemEvent, markSystemPause, setManagedUserPaused, requestSlotActivate]);
 
 
   useEffect(() => {
