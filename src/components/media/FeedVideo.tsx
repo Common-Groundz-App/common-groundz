@@ -629,19 +629,27 @@ function FeedVideoPlayer({
     if (!managed) return;
     const el = videoRef.current;
     if (!el) return;
+    // Phase 3 — hydration guard: never run with stale userPaused after a
+    // stableSlotId change. The layout-effect rehydrator runs before any
+    // useEffect in the same commit, so this only ever returns true mid-
+    // transition before the rehydrator lands.
+    if (pauseHydratedForIdRef.current !== stableSlotId) return;
     // Phase 2 guard — don't start playback while a saved-time resume is
     // still pending. finalize() bumps resumeTick so this effect re-runs
     // once the seek is applied (or has timed out).
     if (resumePendingRef.current) return;
     const tabHidden = typeof document !== 'undefined' && document.hidden;
     const canAutoplay =
-      slotIsActive && autoplayEnabled && !isScrubbing && !autoplaySuppressed && !tabHidden;
+      slotIsActive && autoplayEnabled && !isScrubbing && !autoplaySuppressed && !tabHidden && !userPaused;
     if (canAutoplay) {
       // Idempotent: only call play() if currently paused. Respect the
       // user's persisted global mute preference — do NOT force mute on
       // the active video.
       if (el.paused) {
         try { el.muted = readGlobalVideoMuted(); } catch { /* ignore */ }
+        // Phase 3 — mark programmatic play so the native play listener
+        // does not clear userPaused.
+        markSystemPlay();
         const p = el.play();
         if (p && typeof p.catch === 'function') {
           p.catch((err: any) => {
@@ -653,6 +661,9 @@ function FeedVideoPlayer({
       }
     } else {
       if (!el.paused) {
+        // Phase 3 — mark programmatic pause so the native pause listener
+        // does not set userPaused on system-triggered deactivation.
+        markSystemPause();
         try { el.pause(); } catch { /* ignore */ }
       }
       // Safety: non-active videos must never emit audio. DOM-only mute;
@@ -661,7 +672,7 @@ function FeedVideoPlayer({
         try { el.muted = true; } catch { /* ignore */ }
       }
     }
-  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick]);
+  }, [managed, slotIsActive, autoplayEnabled, isScrubbing, autoplaySuppressed, resumeTick, userPaused, stableSlotId, markSystemPause, markSystemPlay]);
 
   // Phase 2 — capture currentTime on slot deactivation (v3.1 Patch 1).
   // Explicit active → inactive transition tracking. Replaces the older
