@@ -18,6 +18,12 @@ import { MuxPreparingPoster } from '@/components/media/MuxPreparingPoster';
 import { captureVideoFrame } from '@/utils/captureVideoFrame';
 import { isCorsSafeVideoHost } from '@/utils/corsSafeHosts';
 import type { LightboxEntryExtras } from '@/components/media/lightboxTypes';
+import {
+  saveFeedVideoResume,
+  readFeedVideoResume,
+  clearFeedVideoResume,
+  FEED_VIDEO_RESUME_MIN,
+} from '@/hooks/useFeedVideoResumeStore';
 
 interface FeedVideoProps {
   item: MediaItem;
