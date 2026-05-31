@@ -723,43 +723,64 @@ function FeedVideoPlayer({
     const el = videoRef.current;
     if (!el) return;
     const onPause = () => {
+      // Phase 3 — consume system flag first. If this pause was
+      // programmatic (managed effect, source-attach, lightbox open,
+      // scrubber), do not attribute it as user intent.
+      const wasSystem = consumeSystemEvent(systemPauseRef);
       if (!slotIsActiveRef.current) return;
       captureResumeFromPause();
+      if (!wasSystem) {
+        // Real user/native-control pause → record manual intent.
+        setManagedUserPaused(true);
+      }
     };
     el.addEventListener('pause', onPause);
     return () => el.removeEventListener('pause', onPause);
-  }, [managed, captureResumeFromPause]);
+  }, [managed, captureResumeFromPause, consumeSystemEvent, setManagedUserPaused]);
 
   // Phase 2 — clear on `ended` so a watched-through video doesn't keep
-  // a near-end time around to apply on the next visit.
+  // a near-end time around to apply on the next visit. Also clears any
+  // manual-pause intent since the user clearly watched through.
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
     const onEnded = () => {
       clearFeedVideoResume(stableSlotIdRef.current);
+      setManagedUserPaused(false);
     };
     el.addEventListener('ended', onEnded);
     return () => el.removeEventListener('ended', onEnded);
-  }, []);
+  }, [setManagedUserPaused]);
 
 
 
-  // Single-active invariant guard: if a non-active managed video ever
-  // starts playing (manual tap, browser quirk, late-resolving play()),
-  // pause it immediately. The listener reads `slotIsActiveRef.current`
-  // so it survives active-state flips without detach/reattach.
+  // Single-active invariant guard + Phase 3 manual-pause clearing.
+  // - If a non-active managed video ever starts playing (manual tap,
+  //   browser quirk, late-resolving play()), pause it immediately.
+  // - If an active video starts playing from a real user/native source
+  //   (not a programmatic markSystemPlay), clear userPaused intent.
   useEffect(() => {
     if (!managed) return;
     const el = videoRef.current;
     if (!el) return;
     const onPlay = () => {
+      const wasSystem = consumeSystemEvent(systemPlayRef);
       if (!slotIsActiveRef.current) {
+        // Inactive slot must not play — system pause to avoid the
+        // subsequent pause event being attributed to user intent.
+        markSystemPause();
         try { el.pause(); } catch { /* ignore */ }
+        return;
+      }
+      if (!wasSystem) {
+        // Real user/native-control play on the active slot → clear
+        // manual-pause intent.
+        setManagedUserPaused(false);
       }
     };
     el.addEventListener('play', onPlay);
     return () => el.removeEventListener('play', onPlay);
-  }, [managed]);
+  }, [managed, consumeSystemEvent, markSystemPause, setManagedUserPaused]);
 
 
   useEffect(() => {
