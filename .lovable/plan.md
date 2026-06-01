@@ -1,116 +1,204 @@
-# Phase 3.1 v2.2 — Manual play promotion (final, implementation-ready)
+## Phase 3.1 v2.4 — Final plan
 
-Same behavior as v2.1. Threshold correction from reviewer feedback: `MANUAL_OVERRIDE_KEEP_RATIO` lowered below `MANUAL_ACTIVATE_MIN_RATIO` to provide stable hysteresis.
+This is the final clean scope for the bug you reported.
 
-## What changed vs v2.1
+### Goal
+Restore the intended feed behavior:
+- Fresh app/page open: first active feed video autoplays muted and the icon shows muted.
+- If the user unmutes in the feed, later feed videos in the same session should try to autoplay with sound.
+- If the browser blocks that unmuted autoplay, only that video falls back to muted; the session preference stays intact.
+- Refresh/new session starts muted again.
 
-### Threshold correction — hysteresis fix
+## What will change
 
-Reviewer noted that `MANUAL_OVERRIDE_KEEP_RATIO = 0.15` being higher than `MANUAL_ACTIVATE_MIN_RATIO = 0.1` is backwards:
+### 1) `src/hooks/useVideoMute.ts`
+Add a small in-memory session flag for feed sound unlock.
 
-- A video at 0.12 visibility activates (>= 0.1).
-- Next recompute sees 0.12 < 0.15 and immediately clears the override.
-- The promoted video loses active status before the user can see it play.
+#### New module state/helpers
+- `feedSessionSoundEnabled = false` on page load
+- `isFeedSessionSoundEnabled()`
+- `markFeedSessionSoundEnabled()`
+- `markFeedSessionSoundDisabled()`
+- a small window event so `useVideoMute()` subscribers re-render when the session flag changes
 
-**Fix:**
-
-```
-MANUAL_ACTIVATE_MIN_RATIO    = 0.1
-MANUAL_OVERRIDE_KEEP_RATIO   = 0.05
-```
-
-This means: if the user can visibly click the play button (>= 0.1), we honor it generously, and keep that video active until it drops below 0.05 (nearly off-screen).
-
-## Implementation note — fresh geometry in `requestActivate()`
-
-Both reviewers flagged the same risk: the manager stores `raw`, `effective`, and `centerDist` on each `SlotEntry` and only updates them inside `recompute()`. If `requestActivate(id)` reads those cached values, a freshly tapped video could be rejected because the last IO tick was stale (scroll just settled, layout shifted, video just mounted, etc.).
-
-**Required behavior:** `requestActivate(id)` must run the same per-slot geometry block already used inside `recompute()`:
+#### `useVideoMute()` behavior
+Keep the persisted store exactly as the raw global mute preference, but expose an effective UI value:
 
 ```ts
-const rect = el.getBoundingClientRect();
-const elH = rect.height;
-if (elH <= 0) return false;
-const vpH = window.innerHeight || document.documentElement.clientHeight || 0;
-if (vpH <= 0) return false;
-const visTop = Math.max(0, rect.top);
-const visBot = Math.min(vpH, rect.bottom);
-const visH = Math.max(0, visBot - visTop);
-const raw = visH / elH;
-const maxPossible = Math.min(1, vpH / elH);
-const effective = maxPossible > 0 ? Math.min(1, raw / maxPossible) : 0;
-if (effective < MANUAL_ACTIVATE_MIN_RATIO) return false;
+effectiveMuted = persistedMuted || !feedSessionSoundEnabled
 ```
 
-This block is extracted into a small internal helper (e.g. `computeSlotVisibility(el)` returning `{ raw, effective, centerDist }`) and called from BOTH `recompute()` (per slot, in the existing forEach) and `requestActivate()`. No behavior change to `recompute()` — it's a pure refactor to share the math and guarantee `requestActivate()` never reads stale state.
+That gives us:
+- old `localStorage video.muted = false` + fresh session → UI still shows muted
+- after user unmutes in this session → UI shows unmuted
 
-The freshly computed values are also written back to `slot.raw / slot.effective / slot.centerDist` inside `requestActivate()` so a subsequent `recompute()` doesn't immediately re-evaluate against pre-tap data.
+#### `toggle(next?)` rule
+`toggle()` must operate from the effective value, not just raw localStorage.
 
-### Inactive `onPlay` — confirm early return after success
+Behavior:
+- user unmutes → `markFeedSessionSoundEnabled()` + `setGlobalVideoMuted(false)`
+- user mutes → `markFeedSessionSoundDisabled()` + `setGlobalVideoMuted(true)`
 
-Returning after a successful `requestActivate()` in the inactive `onPlay` listener so the old "inactive → immediately pause" guard doesn't fire:
+This avoids the cold-open bug where persisted `false` could otherwise make the first speaker tap behave incorrectly.
+
+### 2) `src/components/media/FeedVideo.tsx`
+Update only the manager-driven autoplay branch.
+
+Current bug source is here:
+```ts
+el.muted = readGlobalVideoMuted();
+el.play();
+```
+
+That lets stale persisted `false` attempt autoplay with sound on a fresh load, which browsers may block.
+
+#### Replace with session-gated autoplay intent
+Managed autoplay should use:
 
 ```ts
-// inside onPlay, when !slotIsActiveRef.current and not wasSystem:
-if (requestActivate()) {
-  // Successful promotion. Do NOT pause. The managed playback effect
-  // re-runs after slotIsActive flips true and takes ownership.
-  return;
+const shouldTryUnmuted =
+  isFeedSessionSoundEnabled() && !readGlobalVideoMuted();
+const wantMuted = !shouldTryUnmuted;
+el.muted = wantMuted;
+```
+
+#### On `play()` rejection
+If `play()` rejects with `NotAllowedError` while `shouldTryUnmuted` is true:
+- guard against stale async state first
+- retry muted for that video only
+
+Required stale guards:
+```ts
+if (!slotIsActiveRef.current) return;
+if (videoRef.current !== el) return;
+if (typeof document !== 'undefined' && document.hidden) return;
+if (userPausedRefManaged.current) return;
+```
+
+Then:
+```ts
+el.muted = true;
+markSystemPlay();
+el.play();
+```
+
+Do not:
+- call `setGlobalVideoMuted(true)` in this fallback
+- call `markFeedSessionSoundDisabled()` in this fallback
+
+### 3) Keep these paths unchanged
+No changes to:
+- `src/hooks/useFeedVideoManager.tsx` — already has shared `computeSlotVisibility()` and the manual promotion logic is correct
+- lightbox reverse handoff mute behavior
+- `requestActivate` / manual play promotion
+- Mux/HLS logic
+- Phase 2 resume store
+- Phase 3 manual pause intent
+- composer/upload/admin/DB code
+
+## Important scope clarification
+I audited usage of `useVideoMute` / mute helpers.
+
+Relevant consumers found:
+- `FeedVideo.tsx`
+- `PostMediaDisplay.tsx` (raw read/write only for lightbox exit handoff)
+- `useVideoAutoplay.ts` (legacy unmanaged autoplay path)
+
+`useVideoMute()` is not widely used across unrelated surfaces, so changing its returned value to the session-aware effective muted state is safe for this patch.
+
+Also, the actual feed speaker button lives in `FeedVideo` and already uses `useVideoMute()`:
+```ts
+const [muted, toggleMute] = useVideoMute();
+```
+So the session-unlock path stays consistent for the feed controls.
+
+## Technical details
+
+### `useVideoMute.ts`
+Implement roughly this shape:
+
+```ts
+const STORAGE_KEY = 'video.muted';
+const EVENT = 'video-mute-change';
+const SESSION_EVENT = 'video-session-sound-change';
+
+let feedSessionSoundEnabled = false;
+
+export const isFeedSessionSoundEnabled = () => feedSessionSoundEnabled;
+export const markFeedSessionSoundEnabled = () => { ...dispatch SESSION_EVENT... };
+export const markFeedSessionSoundDisabled = () => { ...dispatch SESSION_EVENT... };
+```
+
+`useVideoMute()`:
+- keep a state for raw persisted muted
+- subscribe to both `EVENT` and `SESSION_EVENT`
+- compute `effectiveMuted`
+- return `[effectiveMuted, toggle]`
+
+`toggle(next?)`:
+```ts
+const currentEffective = readInitial() || !isFeedSessionSoundEnabled();
+const value = typeof next === 'boolean' ? next : !currentEffective;
+if (value) {
+  markFeedSessionSoundDisabled();
+  setGlobalVideoMuted(true);
+} else {
+  markFeedSessionSoundEnabled();
+  setGlobalVideoMuted(false);
 }
-// Promotion rejected (hidden tab, below threshold, lightbox open).
-// Preserve single-active invariant.
-markSystemPause();
-v.pause();
 ```
 
-## Everything else: unchanged from v2.1
+### `FeedVideo.tsx`
+Only change the managed autoplay effect around the `canAutoplay` branch.
 
-All v2.1 design carries over verbatim:
+Use:
+```ts
+if (el.paused) {
+  const shouldTryUnmuted =
+    isFeedSessionSoundEnabled() && !readGlobalVideoMuted();
+  const wantMuted = !shouldTryUnmuted;
+  try { el.muted = wantMuted; } catch {}
+  markSystemPlay();
+  const p = el.play();
+  if (p && typeof p.catch === 'function') {
+    p.catch((err: any) => {
+      const name = err?.name;
+      if (name === 'AbortError') return;
+      if (name === 'NotAllowedError' && shouldTryUnmuted) {
+        if (!slotIsActiveRef.current) return;
+        if (videoRef.current !== el) return;
+        if (typeof document !== 'undefined' && document.hidden) return;
+        if (userPausedRefManaged.current) return;
+        try { el.muted = true; } catch {}
+        markSystemPlay();
+        const p2 = el.play();
+        if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
+        return;
+      }
+    });
+  }
+}
+```
 
-- `requestActivate(id): boolean` on the manager registry, exposed via `SlotReturn.requestActivate(): boolean` bound to this slot's id.
-- Rejects when: not registered, `el` missing, lightbox open, `document.hidden`, or fresh `effective < MANUAL_ACTIVATE_MIN_RATIO`.
-- Constants: `MANUAL_ACTIVATE_MIN_RATIO = 0.1`, `MANUAL_OVERRIDE_KEEP_RATIO = 0.05`.
-- `manualOverrideIdRef: MutableRefObject<string | null>` on the provider.
-- On successful activation: clear pending `debounceRef` timeout and pending `rafRef` frame, set `manualOverrideIdRef.current = id`, call `updateActive(id)`.
-- `recompute()`: if `manualOverrideIdRef.current` is set AND that slot is still registered AND its fresh effective >= `MANUAL_OVERRIDE_KEEP_RATIO` AND not lightbox/hidden, keep it active and return early. Otherwise clear the override and fall through to normal dominance.
-- `setLightboxOpen(true)` clears `manualOverrideIdRef`.
-- `unregisterSlot(id)` clears `manualOverrideIdRef` if it matches.
-- Tab `visibilitychange` to hidden: existing behavior (clear debounce, `updateActive(null)`); also clear `manualOverrideIdRef` so it doesn't resurrect on return.
-- Manual override **persists across user pause of the chosen slot** (intentional product decision, documented).
-- `FeedVideo.togglePlayPause` play branch: call `requestActivate()`; on `false` return without `v.play()` and without clearing `userPaused`; on `true` proceed with existing `setManagedUserPaused(false)` + `v.play()`.
-- `FeedVideo` inactive `onPlay`: if `wasSystem`, pause as before. Else call `requestActivate()`; on success return, on failure `markSystemPause()` + `v.pause()`.
-- Unmanaged surfaces (no provider): `requestActivate` is `() => false`; legacy `useVideoAutoplay` path unchanged.
+## Hard rules for this patch
+- No `localStorage` writes at module import.
+- Only the user mute/unmute toggle flips the session flag.
+- Explicit user mute clears the session flag.
+- Autoplay fallback never clears the session flag.
+- Autoplay fallback never rewrites the global mute store.
+- Keep all other playback systems untouched.
 
-## Files touched
+## Known acceptable limitation
+If the browser blocks a later unmuted autoplay, that one video may temporarily be muted while the icon still represents the user’s session preference. That is acceptable for this patch because preserving session intent is more important than resetting the whole feed back to muted.
 
-- `src/hooks/useFeedVideoManager.tsx`
-  - Extract `computeSlotVisibility(el)` helper.
-  - `recompute()` uses the helper inside the existing forEach (pure refactor).
-  - Add `manualOverrideIdRef` and two constants.
-  - Add `requestActivate(id)` on `RegistryApi` (uses helper, validates, writes back fresh values, clears pending debounce/RAF, calls `updateActive`).
-  - `recompute()` honors `manualOverrideIdRef` ahead of dominance and clears it when below keep threshold.
-  - `setLightboxOpen` / `unregisterSlot` / hidden `visibilitychange` clear override.
-  - `SlotReturn` gains `requestActivate(): boolean` bound to this slot's id.
-- `src/components/media/FeedVideo.tsx`
-  - Destructure `requestActivate` from `useFeedVideoSlot`.
-  - Call in `togglePlayPause` play branch (gate `play()` and `setManagedUserPaused(false)` on success).
-  - Call in inactive `onPlay` for genuine native/keyboard plays (return on success, pause on failure).
-
-## Out of scope (unchanged)
-
-Mux/HLS, lightbox quality, Phase 2 resume store, Phase 3 pause store (except the existing `setManagedUserPaused(false)` already in the play branch), composer, uploads, DB, RLS, edge functions, UI, analytics.
-
-## Verification cases
-
-1. First playing, click Play on second visible → first pauses, second plays. Subsequent recompute does NOT flip back.
-2. First manually paused, click Play on second → first stays paused, second plays.
-3. Click Play on second, then pause second → second stays paused and active; first does NOT resume.
-4. Scroll until second drops below 0.05 → override clears, dominance recompute promotes whatever is dominant.
-5. Tab hidden when a stray focus/keyboard event fires `requestActivate` → returns `false`, no promotion; override also cleared on hide so it doesn't resurrect.
-6. Native control play on inactive video → `requestActivate` runs with fresh geometry; success promotes, failure pauses.
-7. Lightbox opens while override active → override cleared, no feed playback.
-8. Unmanaged surface → `requestActivate` returns `false`; legacy autoplay unchanged.
-9. Phase 2 resume on outgoing video still saves time on deactivation.
-10. Phase 3 pause intent on the promoted slot survives scroll-away + return.
-11. Stale-rect regression: scroll quickly so IO hasn't fired, then tap Play on a 30%-visible second video → `requestActivate` recomputes from fresh `getBoundingClientRect`, passes the 0.1 threshold, promotion succeeds.
-12. Hysteresis stability: tap a video at 0.12 visibility → activates; recompute at 0.12 still >= 0.05 → override stays; only drops below 0.05 and loses override.
+## Verification checklist
+1. Clear storage, reload → first dominant feed video autoplays muted, icon muted.
+2. Set `localStorage['video.muted']=false`, reload → still autoplays muted, icon muted.
+3. Tap speaker in feed → current video unmutes.
+4. Scroll to next feed video → it tries unmuted autoplay.
+5. If browser blocks that attempt → that video retries muted only; session/global preference remains unchanged.
+6. Tap speaker again to mute → next videos autoplay muted.
+7. Refresh → cold open muted again.
+8. Manual play promotion still works.
+9. Phase 1 single-active still works.
+10. Phase 2 resume and Phase 3 manual pause still work.
