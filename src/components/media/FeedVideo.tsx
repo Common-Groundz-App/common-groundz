@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from
 import { Volume2, VolumeX, Play, Pause, Film, AlertTriangle, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useVideoMute, readGlobalVideoMuted, setGlobalVideoMuted } from '@/hooks/useVideoMute';
+import { useVideoMute, readGlobalVideoMuted, setGlobalVideoMuted, isFeedSessionSoundEnabled } from '@/hooks/useVideoMute';
 import { useVideoAutoplay, useAutoplaySuppressed } from '@/hooks/useVideoAutoplay';
 import { useFeedVideoSlot } from '@/hooks/useFeedVideoManager';
 import { useVideoMilestones } from '@/hooks/useVideoMilestones';
@@ -642,11 +642,18 @@ function FeedVideoPlayer({
     const canAutoplay =
       slotIsActive && autoplayEnabled && !isScrubbing && !autoplaySuppressed && !tabHidden && !userPaused;
     if (canAutoplay) {
-      // Idempotent: only call play() if currently paused. Respect the
-      // user's persisted global mute preference — do NOT force mute on
-      // the active video.
+      // Idempotent: only call play() if currently paused.
+      // Phase 3.1 v2.4 — session-gated unmuted attempt. Cold open (no
+      // in-memory session unlock) always plays muted, even if persisted
+      // preference is `false`. After the user explicitly unmutes in the
+      // feed, future managed autoplay attempts try unmuted; if the
+      // browser blocks that one video, fall back to muted for that
+      // video only without touching session or global state.
       if (el.paused) {
-        try { el.muted = readGlobalVideoMuted(); } catch { /* ignore */ }
+        const shouldTryUnmuted =
+          isFeedSessionSoundEnabled() && !readGlobalVideoMuted();
+        const wantMuted = !shouldTryUnmuted;
+        try { el.muted = wantMuted; } catch { /* ignore */ }
         // Phase 3 — mark programmatic play so the native play listener
         // does not clear userPaused.
         markSystemPlay();
@@ -654,7 +661,22 @@ function FeedVideoPlayer({
         if (p && typeof p.catch === 'function') {
           p.catch((err: any) => {
             const name = err?.name;
-            if (name === 'AbortError' || name === 'NotAllowedError') return;
+            if (name === 'AbortError') return;
+            if (name === 'NotAllowedError' && shouldTryUnmuted) {
+              // Async stale-video guards — by the time the promise
+              // rejects, this slot/element may no longer be the one
+              // we should be playing.
+              if (!slotIsActiveRef.current) return;
+              if (videoRef.current !== el) return;
+              if (typeof document !== 'undefined' && document.hidden) return;
+              if (userPausedRefManaged.current) return;
+              try { el.muted = true; } catch { /* ignore */ }
+              markSystemPlay();
+              const p2 = el.play();
+              if (p2 && typeof p2.catch === 'function') p2.catch(() => {});
+              return;
+            }
+            if (name === 'NotAllowedError') return;
             // Other errors fall through silently — surfaced via onError handler.
           });
         }
