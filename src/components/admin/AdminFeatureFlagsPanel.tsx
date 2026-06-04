@@ -79,6 +79,10 @@ export function AdminFeatureFlagsPanel() {
 
   const effective = publicFlags.data?.mux;
 
+  const extractionRow = rows.data?.find((r) => r.key === 'entity_extraction.version');
+  const extractionVersion: 'v1' | 'v2' =
+    extractionRow?.value?.version === 'v2' ? 'v2' : 'v1';
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
@@ -92,7 +96,11 @@ export function AdminFeatureFlagsPanel() {
           ? pending.nextEnabled
             ? 'Enable HLS prewarm on tap?'
             : 'Disable HLS prewarm on tap?'
-          : '';
+          : pending?.key === 'entity_extraction.version'
+            ? pending.nextVersion === 'v2'
+              ? 'Switch entity URL extraction to Version 2 (Experimental)?'
+              : 'Switch entity URL extraction to Version 1 (Stable)?'
+            : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -107,7 +115,11 @@ export function AdminFeatureFlagsPanel() {
           ? pending.nextEnabled
             ? 'Video taps will prefetch the HLS manifest and first segment again. Does NOT affect Mux uploads or video playback — only the on-tap prefetch optimization.'
             : 'Video taps will stop prefetching HLS manifests/segments. Does NOT affect Mux uploads or video playback — only the on-tap prefetch optimization.'
-          : '';
+          : pending?.key === 'entity_extraction.version'
+            ? pending.nextVersion === 'v2'
+              ? 'The Analyze URL button in Create Entity will route to the experimental analyze-entity-url-v2 function. This is admin-only and may be unstable. Routing wires up in a later phase — for now this only changes the selected engine.'
+              : 'The Analyze URL button in Create Entity will route to the stable analyze-entity-url function (current default behavior).'
+            : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -124,10 +136,16 @@ export function AdminFeatureFlagsPanel() {
           value: { mode: pending.nextMode },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'mux.prewarm_enabled') {
         await setFlag.mutateAsync({
           key: 'mux.prewarm_enabled',
           value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_extraction.version',
+          value: { version: pending.nextVersion },
           reason: reason.trim() || undefined,
         });
       }
