@@ -298,6 +298,79 @@ export function AdminFeatureFlagsPanel() {
         </CardContent>
       </Card>
 
+      {/* Entity URL extraction engine */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Entity URL extraction engine
+          </CardTitle>
+          <CardDescription>
+            Which engine the Create Entity dialog's “Analyze URL” button calls. Admin-only.
+            Routing wires up in a later phase — Phase 1 only stores the selection.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+            <p className="font-medium mb-1">Currently selected</p>
+            {rows.isLoading ? (
+              <Skeleton className="h-5 w-48" />
+            ) : (
+              <span className="font-medium">
+                {extractionVersion === 'v2'
+                  ? 'Version 2 — Experimental'
+                  : 'Version 1 — Stable'}
+              </span>
+            )}
+            {extractionRow?.updated_at && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Updated {formatDistanceToNow(new Date(extractionRow.updated_at), { addSuffix: true })}
+                {extractionRow.updated_reason ? ` — “${extractionRow.updated_reason}”` : ''}
+              </p>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={rows.isLoading || setFlag.isPending}
+              onClick={() =>
+                extractionVersion !== 'v1' &&
+                setPending({ key: 'entity_extraction.version', nextVersion: 'v1' })
+              }
+              className={`text-left rounded-lg border p-4 transition-colors ${
+                extractionVersion === 'v1'
+                  ? 'border-primary bg-primary/5'
+                  : 'hover:bg-muted/50'
+              }`}
+            >
+              <p className="font-medium">Version 1 — Stable</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Current production engine. Calls <code>analyze-entity-url</code>.
+              </p>
+            </button>
+            <button
+              type="button"
+              disabled={rows.isLoading || setFlag.isPending}
+              onClick={() =>
+                extractionVersion !== 'v2' &&
+                setPending({ key: 'entity_extraction.version', nextVersion: 'v2' })
+              }
+              className={`text-left rounded-lg border p-4 transition-colors ${
+                extractionVersion === 'v2'
+                  ? 'border-primary bg-primary/5'
+                  : 'hover:bg-muted/50'
+              }`}
+            >
+              <p className="font-medium">Version 2 — Experimental</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                New engine. Will call <code>analyze-entity-url-v2</code> once wired up.
+              </p>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
