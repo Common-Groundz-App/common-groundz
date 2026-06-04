@@ -39,6 +39,8 @@ export type V2ErrorCode =
   | "METHOD_NOT_ALLOWED"
   | "INVALID_JSON"
   | "INVALID_URL"
+  | "BLOCKED_HOST"
+  | "DNS_RESOLUTION_FAILED"
   | "INTERNAL_ERROR";
 
 export interface V2SuccessResponse {
@@ -46,6 +48,8 @@ export interface V2SuccessResponse {
   predictions: null | Record<string, unknown>;
   metadata: {
     analyzed_url: string;
+    /** Phase 4A+: normalized form of analyzed_url. Additive. */
+    normalized_url?: string;
     extraction_version: typeof EXTRACTION_VERSION;
     edge_function: typeof EDGE_FUNCTION_NAME;
     method: string;

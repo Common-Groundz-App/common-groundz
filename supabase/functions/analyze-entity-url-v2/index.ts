@@ -14,6 +14,7 @@ import {
   type V2ErrorResponse,
   type V2SuccessResponse,
 } from "./schema.ts";
+import { assertSafeUrl, SsrfError } from "./ssrf.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,12 +103,33 @@ serve(async (req) => {
 
     const { url } = parsed.data;
 
-    // === Locked Phase 2 stub response ===
+    // === Phase 4A: SSRF preflight + URL normalization (no fetch) ===
+    let safe;
+    try {
+      // deno-lint-ignore no-explicit-any
+      const resolveDns = (Deno as any).resolveDns?.bind(Deno);
+      safe = await assertSafeUrl(url, { resolveDns });
+    } catch (e) {
+      if (e instanceof SsrfError) {
+        const msg = e.code === "BLOCKED_HOST"
+          ? "URL is not allowed"
+          : e.code === "DNS_RESOLUTION_FAILED"
+            ? "Could not resolve host"
+            : "Invalid URL";
+        return errorResponse(400, e.code as V2ErrorCode, msg);
+      }
+      throw e;
+    }
+
+    const warnings = ["stub: extraction not yet implemented"];
+    if (!safe.dnsChecked) warnings.push("dns_check_skipped");
+
     const response: V2SuccessResponse = {
       success: true,
       predictions: null,
       metadata: {
-        analyzed_url: url,
+        analyzed_url: safe.url,
+        normalized_url: safe.url,
         extraction_version: EXTRACTION_VERSION,
         edge_function: EDGE_FUNCTION_NAME,
         method: "stub",
@@ -115,10 +137,10 @@ serve(async (req) => {
         used_url_context: false,
         used_google_search: false,
         used_firecrawl: false,
-        phase: 2,
-        stage: "scaffold",
+        phase: 4,
+        stage: "ssrf-guard",
       },
-      warnings: ["stub: extraction not yet implemented"],
+      warnings,
     };
 
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });

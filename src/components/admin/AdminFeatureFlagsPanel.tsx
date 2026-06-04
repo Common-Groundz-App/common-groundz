@@ -364,7 +364,7 @@ export function AdminFeatureFlagsPanel() {
             >
               <p className="font-medium">Version 2 — Experimental</p>
               <p className="text-xs text-muted-foreground mt-1">
-                New engine. Will call <code>analyze-entity-url-v2</code> once wired up.
+                Calls <code>analyze-entity-url-v2</code>. Currently a scaffold and returns no AI prefill yet.
               </p>
             </button>
           </div>

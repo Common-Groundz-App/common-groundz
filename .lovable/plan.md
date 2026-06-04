@@ -1,133 +1,160 @@
-# Phase 3 — Route `Analyze URL` via `useAnalyzeUrlEngine()` (final)
+# Phase 4A — SSRF preflight + URL normalization (FINAL, ready to build)
 
-## Phase 2 completion ✅
-V2 scaffold + locked envelope live, `verify_jwt = false` parity in `config.toml`, V1 untouched, `useAnalyzeUrlEngine` has zero callers. Ready to wire.
+Preflight-only. No fetch, no Gemini, no Firecrawl, no extraction, no category/brand logic, no DB/RPC/config/secrets changes. V1, `CreateEntityDialog.tsx`, and `useAnalyzeUrlEngine.ts` are untouched.
 
-## Decisions on latest review
-| Reviewer ask | Verdict |
+## Files
+
+| File | Action |
 |---|---|
-| Treat `aiResult.data?.success === false` as V2 failure | **Adopt** — V2 returns this envelope by design. |
-| Loading gate must not get stuck | **Adopt** — combine `engineLoading` with a single-render guard so an errored `useIsAdmin` (`isLoading=false, isAdmin=false`) still leaves the button enabled (hook already returns `engine='v1', isLoading=false` in that case — verified). |
-| Update stale admin flag panel copy | **Adopt** — tiny copy-only edit in `AdminFeatureFlagsPanel.tsx`. Scope grows from 1 → 2 files; no behavior change in the panel. |
-| Wording: "non-admins keep using V1" | **Fix** — say *"non-admin behavior is unchanged"*. V1 is still admin-gated server-side; this phase makes no claim about non-admin Analyze succeeding. |
-| Future: open Analyze to non-admins | Deferred to a later phase (SSRF + rate limits + cost controls first). |
+| `supabase/functions/analyze-entity-url-v2/ssrf.ts` | **new** |
+| `supabase/functions/analyze-entity-url-v2/ssrf_test.ts` | **new** |
+| `supabase/functions/analyze-entity-url-v2/schema.ts` | **edit** — add `BLOCKED_HOST`, `DNS_RESOLUTION_FAILED` to `V2ErrorCode`; add optional `metadata.normalized_url: string` |
+| `supabase/functions/analyze-entity-url-v2/index.ts` | **edit** — call `assertSafeUrl()` after Zod; set `analyzed_url` + `normalized_url` to normalized form; `phase: 4`, `stage: 'ssrf-guard'`; append `'dns_check_skipped'` to existing top-level `warnings` when applicable |
+| `supabase/functions/analyze-entity-url-v2/README.md` | **edit** — document Phase 4A boundary, DNS-skip safe only because no fetch, TOCTOU deferred to 4B, brand-roadmap wording corrected |
+| `src/components/admin/AdminFeatureFlagsPanel.tsx` | **edit, copy-only** — change "Will call `analyze-entity-url-v2` once wired up." to "Calls `analyze-entity-url-v2`. Currently a scaffold and returns no AI prefill yet." |
 
-## Goal
-Wire `entity_extraction.version` end-to-end so admins toggling the flag actually route the Analyze URL button to V1 or V2. Routing only. V2 still returns the locked Phase-2 stub.
+## `ssrf.ts` rules
 
-## Non-goals
-No changes to `supabase/functions/analyze-entity-url/**`, `supabase/functions/analyze-entity-url-v2/**`, DB, `supabase/config.toml`, secrets, Gemini, Firecrawl, SSRF, exact-page extraction, category matching, image extraction, brand logic. No silent V2 → V1 fallback.
+### `normalizeUrl(input: string)`
+1. `new URL(input.trim())` — invalid → `SsrfError('INVALID_URL')`.
+2. **If `u.username || u.password` → `SsrfError('BLOCKED_HOST', { reason: 'userinfo' })`** before any mutation. Never sanitized away.
+3. Lowercase `u.hostname`.
+4. Clear fragment (`u.hash = ''`).
+5. Default-port handling: `new URL().toString()` already strips `:80` for http and `:443` for https. Do not manually re-add or re-strip — read `u.port` for allowlist check **after** parsing, treating empty `u.port` as protocol default (80/443).
+6. Do NOT touch pathname slashes, query order, or query casing.
+7. Return `{ url: u.toString(), host: u.host, hostname: u.hostname, port: effectivePort }`.
 
-## Scope (two files)
+### `assertSafeUrl(input, { resolveDns? })`
+1. `normalizeUrl()`.
+2. Hostname suffix block list (case-insensitive, after lowercase): exact `localhost`, suffix-match `.localhost`, `.local`, `.internal`, `.lan`, `.intranet`, `.corp`, `.home`, `.home.arpa`.
+3. Effective port allowlist `[80, 443, 8080, 8443]`. Anything else → `BLOCKED_HOST` reason `port_not_allowed`.
+4. IP-literal detection:
+   - IPv4: WHATWG dotted-quad plus accept decimal/octal/hex integer forms (`2130706433`, `0177.0.0.1`, `0x7f000001`) by re-parsing.
+   - IPv6: strip surrounding `[`/`]` before classification; preserve URL output formatting from `u.toString()`.
+   - Blocked ranges: `0.0.0.0/8`, `10/8`, `100.64/10`, `127/8`, `169.254/16` (incl. `169.254.169.254`), `172.16/12`, `192.0.0/24`, `192.168/16`, `198.18/15`, `224/4`, `240/4`, `255.255.255.255`, `::1`, `fc00::/7`, `fe80::/10`, and IPv4-mapped `::ffff:<v4>` (recurse on the embedded v4).
+   - TEST-NET / 6to4 / Teredo are explicitly OUT of 4A; documented as 4B work.
+5. If hostname is not an IP literal AND a resolver is available:
+   - Resolve A and AAAA in parallel via `Promise.allSettled` (real resolver = `Deno.resolveDns`; injected fake in tests).
+   - Use a helper `isDnsNoRecordsError(err)` that matches `Deno.errors.NotFound` (and equivalent name === 'NotFound' from fakes) — treat as "no records of this type", not an error.
+   - If runtime throws `Deno.errors.NotCapable` / `PermissionDenied` on **both** types → skip DNS, return `dnsChecked: false`. Handler appends `'dns_check_skipped'` to top-level `warnings`.
+   - If **both** types reject with a non-NotCapable, non-NoRecords error → `SsrfError('DNS_RESOLUTION_FAILED')`.
+   - Otherwise: classify every returned IP (strip IPv6 brackets first); any blocked → `SsrfError('BLOCKED_HOST', { reason: 'dns_resolves_private' })`.
+6. Return `{ url, host, hostname, port, dnsChecked: boolean }`.
 
-### 1. `src/components/admin/CreateEntityDialog.tsx` (routing + UX)
+`SsrfError` is a typed class with `code: 'INVALID_URL' | 'BLOCKED_HOST' | 'DNS_RESOLUTION_FAILED'` and an optional `reason` string (for diagnostics; never echoed back unsanitized).
 
-1. **Import the hook:**
-   ```ts
-   import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
-   ```
-2. **Read once in component:**
-   ```ts
-   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
-   ```
-3. **Loading gate:** extend the existing `disabled={...}` on the Analyze button to also include `engineLoading`. The hook already short-circuits to `{ engine: 'v1', isLoading: false }` for non-admins and on `has_role` error (verified in `useIsAdmin.ts` and `useAnalyzeUrlEngine.ts`), so the button cannot stay stuck. No spinner copy change required.
-4. **Route the invoke** (around line 939):
-   ```ts
-   const fnName = analyzeEngine === 'v2' ? 'analyze-entity-url-v2' : 'analyze-entity-url';
-   let urlHost = 'unknown';
-   try { urlHost = new URL(analyzeUrl).host; } catch {}
-   console.log(`🔍 [engine=${analyzeEngine}] invoking ${fnName} (host=${urlHost})`);
-   const aiResult = await supabase.functions.invoke(fnName, { body: { url: analyzeUrl } });
-   ```
-   Never log the full URL or query string.
-5. **Detect V2 failure (both shapes), no V1 retry:**
-   ```ts
-   const v2Failed =
-     analyzeEngine === 'v2' &&
-     (aiResult.error || (aiResult.data && aiResult.data.success === false));
+## `index.ts` integration
 
-   if (v2Failed) {
-     console.error('⚠️ V2 analysis failed:', aiResult.error ?? aiResult.data);
-     toast({
-       title: 'V2 engine failed',
-       description: 'analyze-entity-url-v2 returned an error. Not falling back to V1. Switch the engine flag to v1 to retry with the stable engine.',
-       variant: 'destructive',
-     });
-     // Do NOT invoke V1. Metadata-lite still loads via the existing path.
-   } else if (aiResult.error) {
-     // V1 path: keep today's generic toast verbatim
-     console.error('⚠️ AI analysis error:', aiResult.error);
-     toast({
-       title: 'AI Analysis Unavailable',
-       description: 'Using basic metadata only. You can still create the entity.',
-     });
-   }
-   ```
-6. **V2 scaffold info toast** (success path, stub-only signal):
-   ```ts
-   if (
-     analyzeEngine === 'v2' &&
-     !v2Failed &&
-     aiResult.data?.success === true &&
-     aiResult.data?.predictions == null
-   ) {
-     toast({
-       title: 'V2 engine (scaffold only)',
-       description: 'analyze-entity-url-v2 is still a stub. No AI prefill yet — metadata-only result.',
-     });
-   }
-   ```
-7. **Downstream guards:** existing prefill / brand auto-select already use optional chaining (`aiResult.data?.predictions?.…`) and `if (aiBrandName && aiBrandName.length >= 2)`, so a `null` `predictions` short-circuits cleanly. No extra guards needed.
+After Zod validation:
+```ts
+let safe;
+try {
+  safe = await assertSafeUrl(parsed.data.url, { resolveDns: Deno.resolveDns?.bind(Deno) });
+} catch (e) {
+  if (e instanceof SsrfError) {
+    return errorResponse(400, e.code, e.code === 'BLOCKED_HOST' ? 'URL is not allowed' : e.code === 'DNS_RESOLUTION_FAILED' ? 'Could not resolve host' : 'Invalid URL');
+  }
+  throw e;
+}
+const warnings = ['stub: extraction not yet implemented'];
+if (!safe.dnsChecked) warnings.push('dns_check_skipped');
+const response: V2SuccessResponse = {
+  success: true,
+  predictions: null,
+  metadata: {
+    analyzed_url: safe.url,
+    normalized_url: safe.url,
+    extraction_version: EXTRACTION_VERSION,
+    edge_function: EDGE_FUNCTION_NAME,
+    method: 'stub',
+    timestamp: new Date().toISOString(),
+    used_url_context: false,
+    used_google_search: false,
+    used_firecrawl: false,
+    phase: 4,
+    stage: 'ssrf-guard',
+  },
+  warnings,
+};
+```
 
-No other lines in `CreateEntityDialog.tsx` change.
+## `ssrf_test.ts` (Deno, no real network)
 
-### 2. `src/components/admin/AdminFeatureFlagsPanel.tsx` (copy only)
+Fake resolver only (object passed via opts). Covers:
 
-Two stale strings reference "routing wires up later" — both become inaccurate the moment Phase 3 ships. Update only the copy, no logic:
+**Normalization (allow):**
+- `https://example.com` → `https://example.com/`
+- `https://example.com:443/x` → `https://example.com/x` (default port stripped by URL)
+- `https://example.com:8443/x` → unchanged, allowed
+- `https://EXAMPLE.com/Path?Q=B&A=1#frag` → hostname lowercased, fragment dropped, **path case + query order + query case preserved**
+- `https://example.com/a//b` → slashes preserved
+- `https://example.com/path#secret` → `https://example.com/path` (manual-test parity)
 
-- `CardDescription` for the engine card:
-  - **From:** "…Admin-only. Routing wires up in a later phase — Phase 1 only stores the selection."
-  - **To:** "…Admin-only. Affects only the Create Entity dialog's Analyze URL button for admins."
-- `confirmDesc` for `entity_extraction.version` → `v2`:
-  - **From:** "…This is admin-only and may be unstable. Routing wires up in a later phase — for now this only changes the selected engine."
-  - **To:** "…This is admin-only and may be unstable. V2 is currently a scaffold and returns no AI prefill yet."
-- `confirmDesc` for `entity_extraction.version` → `v1`: unchanged.
+**Block — literals:** `http://localhost`, `http://127.0.0.1`, `http://0.0.0.0`, `http://10.0.0.1`, `http://192.168.1.1`, `http://169.254.169.254`, `http://[::1]/`, `http://[fc00::1]/`, `http://[fe80::1]/`, `http://[::ffff:127.0.0.1]/`, `http://2130706433/`, `http://0177.0.0.1/`, `http://0x7f000001/`.
 
-No other lines in `AdminFeatureFlagsPanel.tsx` change.
+**Block — userinfo:** `https://user:pass@example.com/` → `BLOCKED_HOST` reason `userinfo`. Verify it is **rejected**, never returned as a sanitized URL.
 
-## Behavior matrix
-| Caller | Flag | Function | UX |
-|---|---|---|---|
-| Admin | `v1` | `analyze-entity-url` | Unchanged from today. |
-| Admin | `v2` (stub OK) | `analyze-entity-url-v2` | Info toast "scaffold only", metadata-only prefill, no brand auto-select. |
-| Admin | `v2` (error OR `success:false`) | `analyze-entity-url-v2` | Destructive toast, **no** V1 retry. Metadata-lite still attempted. |
-| Non-admin | (hook returns `v1`) | `analyze-entity-url` | **Unchanged from today.** (V1 is admin-gated server-side — Phase 3 makes no claim about non-admin success.) |
-| Anyone, engine flag loading | — | none | Button disabled until hook resolves; cannot get stuck (verified). |
+**Block — port:** `https://example.com:22/` → `BLOCKED_HOST` reason `port_not_allowed`. Also `http://example.com:8080/` allowed.
 
-## Testing checklist
-- [ ] Admin + `v1` → network shows `POST …/analyze-entity-url`; V1 prefill + brand auto-select unchanged.
-- [ ] Admin + `v2` (stub success) → `POST …/analyze-entity-url-v2`, 200, info toast, no brand auto-select, no console errors.
-- [ ] Admin + `v2` with forced failure (revoke admin temporarily, or POST `{}` via devtools) → destructive toast; network shows zero retries to `analyze-entity-url`.
-- [ ] Admin + `v2` returning `{ success: false, ... }` (simulated) → handled by the same destructive toast (not the generic V1 toast).
-- [ ] Flip back to `v1` → next click hits V1.
-- [ ] Non-admin → behavior unchanged from today.
-- [ ] Loading gate: hard refresh + immediate click → button disabled briefly, then enabled. Errored `useIsAdmin` → button still enabled.
-- [ ] Console logs show `host=…` only; no full URL, no query string.
-- [ ] `git diff` shows changes only in `CreateEntityDialog.tsx` and `AdminFeatureFlagsPanel.tsx` (copy-only).
-- [ ] V1 and V2 function bodies byte-identical to before Phase 3.
+**Block — suffix:** `http://app.internal/`, `http://db.lan/`, `http://x.home.arpa/`.
 
-## Rollback
-Revert the two files. Hook, V2 function, and config block remain inert.
+**DNS behavior (fake resolver):**
+- A-only host (A=`93.184.216.34`, AAAA rejects NotFound) → allowed.
+- AAAA-only host (A NotFound, AAAA=`2606:2800:220:1:248:1893:25c8:1946`) → allowed.
+- A resolves private (`10.0.0.1`) → `BLOCKED_HOST` reason `dns_resolves_private`.
+- AAAA resolves to `::1` → `BLOCKED_HOST`.
+- Both reject with generic Error → `DNS_RESOLUTION_FAILED`.
+- Both reject with `NotCapable` → allowed, `dnsChecked: false`.
+- IPv6 returned without brackets (`fc00::1`) → still classified as private.
 
-## Deliverables when Phase 3 completes
-- Diff of `CreateEntityDialog.tsx` and `AdminFeatureFlagsPanel.tsx`.
-- Network proof: admin+v1, admin+v2 stub success, admin+v2 failure (no V1 retry).
-- Confirmation V1 output unchanged when flag is `v1`.
-- Confirmation V2 function body unchanged from Phase 2.
-- Confirmation console logs contain no full URL / query string.
-- Confirmation non-admin behavior is unchanged.
+## Response shape (additive only)
 
-## Phase boundaries
-Phase 1 ✅ (flag+UI) → Phase 2 ✅ (V2 scaffold) → **Phase 3** (routing + stale-copy fix) → Phase 4+ (SSRF, exact-page, Firecrawl, Gemini URL Context, category matching, brand parity, eventual non-admin access decision).
+```ts
+{
+  success: true,
+  predictions: null,                       // unchanged
+  metadata: {
+    analyzed_url: '<normalized>',          // now normalized URL
+    normalized_url: '<normalized>',        // NEW additive
+    extraction_version: 'v2',
+    edge_function: 'analyze-entity-url-v2',
+    method: 'stub',                        // unchanged
+    timestamp: '...',
+    used_url_context: false,
+    used_google_search: false,
+    used_firecrawl: false,
+    phase: 4,                              // diagnostic-only
+    stage: 'ssrf-guard',                   // diagnostic-only
+  },
+  warnings: [
+    'stub: extraction not yet implemented',
+    // 'dns_check_skipped' appended only when runtime DNS unavailable
+  ]
+}
+```
 
-Awaiting approval to implement.
+Error envelope unchanged; new codes `BLOCKED_HOST` / `DNS_RESOLUTION_FAILED` are already handled by Phase 3's V2 destructive toast.
+
+## README additions
+
+- Phase 4A = preflight only; **no network fetch happens in this phase**.
+- DNS-skip on `NotCapable` is acceptable **only because** there is no fetch. Once Phase 4B introduces real fetching, DNS resolution + per-redirect re-check at connect time become **mandatory**.
+- TOCTOU protection, timeout, max-size, redirect cap, content-type allowlist → Phase 4B.
+- Brand handling: lookup only during Analyze; create-on-Save after admin confirms (Phase 8).
+
+## Phase roadmap (locked)
+
+1 ✅ → 2 ✅ → 3 ✅ → **4A (preflight + normalization)** → **4B `validateAndFetchUrl` (8s timeout, 2MB streaming cap, ≤3 redirects with per-hop re-normalize + DNS/IP re-check (TOCTOU), content-type allowlist `text/html`/`application/xhtml+xml`, safe structured result, optional broader public-reserved enforcement)** → 5 exact-page extractor (must call 4B, never raw `fetch`) → 6 weak-signal detector + Firecrawl fallback → 7 Gemini URL Context + structured output → 8 brand suggestion + Save-time parent brand handling → 9 admin smoke test → 10 logging (deferred) → 11 compare mode (deferred).
+
+## Stop-and-show after implementation
+
+1. Diff of the 6 files.
+2. `supabase--test_edge_functions` output for `analyze-entity-url-v2` (green, no network).
+3. Admin + v2 + `https://example.com` → 200, `metadata.normalized_url === 'https://example.com/'`, `phase: 4`, `predictions: null`.
+4. Admin + v2 + `http://localhost` → 400 `BLOCKED_HOST`.
+5. Admin + v2 + `http://169.254.169.254` → 400 `BLOCKED_HOST`.
+6. Admin + v2 + `https://user:pass@example.com/` → 400 `BLOCKED_HOST` reason `userinfo`.
+7. Admin + v2 + `https://example.com/path#secret` → 200, `metadata.normalized_url === 'https://example.com/path'`.
+8. Confirmation: `predictions: null`, V1 byte-identical, `CreateEntityDialog.tsx` byte-identical to post-Phase-3, `useAnalyzeUrlEngine.ts` untouched, no DB/RPC/config/secrets changes.
+
+Awaiting approval to switch to build mode.
