@@ -36,6 +36,7 @@ import { Database } from '@/integrations/supabase/types';
 import { CategorySelector } from './CategorySelector';
 import { SimpleTagInput } from './SimpleTagInput';
 import { AutoFillPreviewModal } from './AutoFillPreviewModal';
+import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
 
 interface CreateEntityDialogProps {
   open: boolean;
