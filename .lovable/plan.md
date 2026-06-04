@@ -1,153 +1,133 @@
-# Phase 2 — Scaffold `analyze-entity-url-v2` edge function (final)
+# Phase 3 — Route `Analyze URL` via `useAnalyzeUrlEngine()` (final)
 
-Incorporates all ChatGPT + Codex feedback across both review rounds.
+## Phase 2 completion ✅
+V2 scaffold + locked envelope live, `verify_jwt = false` parity in `config.toml`, V1 untouched, `useAnalyzeUrlEngine` has zero callers. Ready to wire.
 
-## V1 parity confirmation
-`supabase/config.toml` already contains:
-```toml
-[functions.analyze-entity-url]
-verify_jwt = false
-```
-So adding the matching block for V2 is parity-only, not a behavior change for V1.
+## Decisions on latest review
+| Reviewer ask | Verdict |
+|---|---|
+| Treat `aiResult.data?.success === false` as V2 failure | **Adopt** — V2 returns this envelope by design. |
+| Loading gate must not get stuck | **Adopt** — combine `engineLoading` with a single-render guard so an errored `useIsAdmin` (`isLoading=false, isAdmin=false`) still leaves the button enabled (hook already returns `engine='v1', isLoading=false` in that case — verified). |
+| Update stale admin flag panel copy | **Adopt** — tiny copy-only edit in `AdminFeatureFlagsPanel.tsx`. Scope grows from 1 → 2 files; no behavior change in the panel. |
+| Wording: "non-admins keep using V1" | **Fix** — say *"non-admin behavior is unchanged"*. V1 is still admin-gated server-side; this phase makes no claim about non-admin Analyze succeeding. |
+| Future: open Analyze to non-admins | Deferred to a later phase (SSRF + rate limits + cost controls first). |
 
 ## Goal
-Stand up a brand-new, **isolated** V2 edge function that admins can invoke directly (curl / Supabase SDK) to validate scaffolding, auth gating, request validation, and the final V2 response contract — **without** touching V1 and **without** wiring the frontend.
+Wire `entity_extraction.version` end-to-end so admins toggling the flag actually route the Analyze URL button to V1 or V2. Routing only. V2 still returns the locked Phase-2 stub.
 
-Phase 2 ships **scaffold only**. No extraction logic. Phase 3 = routing only.
+## Non-goals
+No changes to `supabase/functions/analyze-entity-url/**`, `supabase/functions/analyze-entity-url-v2/**`, DB, `supabase/config.toml`, secrets, Gemini, Firecrawl, SSRF, exact-page extraction, category matching, image extraction, brand logic. No silent V2 → V1 fallback.
 
-## Non-goals (explicit)
-- No changes to `supabase/functions/analyze-entity-url/` (V1 byte-identical).
-- No imports from V1 helpers (`prompt-generator.ts`, etc.).
-- No frontend routing. `CreateEntityDialog` keeps calling V1 unconditionally.
-- No DB migrations.
-- No new secrets.
-- No Gemini / Firecrawl / SSRF fetch / brand creation / category matching / image extraction.
+## Scope (two files)
 
-## Scope of changes
+### 1. `src/components/admin/CreateEntityDialog.tsx` (routing + UX)
 
-### New files
+1. **Import the hook:**
+   ```ts
+   import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
+   ```
+2. **Read once in component:**
+   ```ts
+   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
+   ```
+3. **Loading gate:** extend the existing `disabled={...}` on the Analyze button to also include `engineLoading`. The hook already short-circuits to `{ engine: 'v1', isLoading: false }` for non-admins and on `has_role` error (verified in `useIsAdmin.ts` and `useAnalyzeUrlEngine.ts`), so the button cannot stay stuck. No spinner copy change required.
+4. **Route the invoke** (around line 939):
+   ```ts
+   const fnName = analyzeEngine === 'v2' ? 'analyze-entity-url-v2' : 'analyze-entity-url';
+   let urlHost = 'unknown';
+   try { urlHost = new URL(analyzeUrl).host; } catch {}
+   console.log(`🔍 [engine=${analyzeEngine}] invoking ${fnName} (host=${urlHost})`);
+   const aiResult = await supabase.functions.invoke(fnName, { body: { url: analyzeUrl } });
+   ```
+   Never log the full URL or query string.
+5. **Detect V2 failure (both shapes), no V1 retry:**
+   ```ts
+   const v2Failed =
+     analyzeEngine === 'v2' &&
+     (aiResult.error || (aiResult.data && aiResult.data.success === false));
 
-**1. `supabase/functions/analyze-entity-url-v2/schema.ts`**
-- Pinned Deno-compatible Zod import: `import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";`
-- Zod schema for the request body:
-  - `url`: string, 1–2048 chars, must parse as URL, scheme must be `http:` or `https:`.
-- Exported TypeScript types: `V2SuccessResponse`, `V2ErrorResponse`, `V2ErrorCode`.
-- Exported constants: `EXTRACTION_VERSION = 'v2'`, `EDGE_FUNCTION_NAME = 'analyze-entity-url-v2'`.
-- Doc comment: `phase` and `stage` in metadata are **diagnostic-only**, not part of the stable contract. Phase 3+ MUST NOT branch on them.
+   if (v2Failed) {
+     console.error('⚠️ V2 analysis failed:', aiResult.error ?? aiResult.data);
+     toast({
+       title: 'V2 engine failed',
+       description: 'analyze-entity-url-v2 returned an error. Not falling back to V1. Switch the engine flag to v1 to retry with the stable engine.',
+       variant: 'destructive',
+     });
+     // Do NOT invoke V1. Metadata-lite still loads via the existing path.
+   } else if (aiResult.error) {
+     // V1 path: keep today's generic toast verbatim
+     console.error('⚠️ AI analysis error:', aiResult.error);
+     toast({
+       title: 'AI Analysis Unavailable',
+       description: 'Using basic metadata only. You can still create the entity.',
+     });
+   }
+   ```
+6. **V2 scaffold info toast** (success path, stub-only signal):
+   ```ts
+   if (
+     analyzeEngine === 'v2' &&
+     !v2Failed &&
+     aiResult.data?.success === true &&
+     aiResult.data?.predictions == null
+   ) {
+     toast({
+       title: 'V2 engine (scaffold only)',
+       description: 'analyze-entity-url-v2 is still a stub. No AI prefill yet — metadata-only result.',
+     });
+   }
+   ```
+7. **Downstream guards:** existing prefill / brand auto-select already use optional chaining (`aiResult.data?.predictions?.…`) and `if (aiBrandName && aiBrandName.length >= 2)`, so a `null` `predictions` short-circuits cleanly. No extra guards needed.
 
-**2. `supabase/functions/analyze-entity-url-v2/index.ts`**
-- CORS preflight (`OPTIONS` → 200), header set identical to V1: `authorization, x-client-info, apikey, content-type`.
-- **Method gate**: anything other than `POST` (after `OPTIONS`) → `405 { success: false, error: 'Method not allowed', code: 'METHOD_NOT_ALLOWED' }`.
-- Auth gate (mirrors V1 exactly):
-  - Missing `Authorization: Bearer …` → `401 MISSING_AUTH`.
-  - `auth.getClaims` invalid → `401 INVALID_TOKEN`.
-  - Service-role `has_role(uid, 'admin')` false/error → `403 NOT_ADMIN`.
-- **Body parse**: wrap `req.json()` in try/catch. Failure → `400 { success: false, error: 'Invalid JSON body', code: 'INVALID_JSON' }`.
-- **Zod validation**: failure → `400 { success: false, error: 'Invalid request', code: 'INVALID_URL', details: <z.flatten()> }`.
-- Success → 200 with the **locked Phase 2 stub response** (below).
-- Unknown error → `500 { success: false, error: 'Internal error', code: 'INTERNAL_ERROR' }` (details only via `console.error`, never in response body).
+No other lines in `CreateEntityDialog.tsx` change.
 
-**3. `supabase/functions/analyze-entity-url-v2/README.md`**
-- Admin-only, NOT wired to UI, Phase 2 = scaffold only, V1 untouched.
-- States the response envelope is the **final** V2 contract.
-- States `phase` / `stage` are diagnostic-only.
+### 2. `src/components/admin/AdminFeatureFlagsPanel.tsx` (copy only)
 
-### Files modified
+Two stale strings reference "routing wires up later" — both become inaccurate the moment Phase 3 ships. Update only the copy, no logic:
 
-**`supabase/config.toml`** — append one block (parity with V1):
-```toml
-[functions.analyze-entity-url-v2]
-verify_jwt = false
-```
+- `CardDescription` for the engine card:
+  - **From:** "…Admin-only. Routing wires up in a later phase — Phase 1 only stores the selection."
+  - **To:** "…Admin-only. Affects only the Create Entity dialog's Analyze URL button for admins."
+- `confirmDesc` for `entity_extraction.version` → `v2`:
+  - **From:** "…This is admin-only and may be unstable. Routing wires up in a later phase — for now this only changes the selected engine."
+  - **To:** "…This is admin-only and may be unstable. V2 is currently a scaffold and returns no AI prefill yet."
+- `confirmDesc` for `entity_extraction.version` → `v1`: unchanged.
 
-### Files NOT touched
-- Anything under `supabase/functions/analyze-entity-url/`.
-- All frontend files. `useAnalyzeUrlEngine` continues to have zero callers.
-- Database / RPCs / secrets.
+No other lines in `AdminFeatureFlagsPanel.tsx` change.
 
-## Locked Phase 2 stub response (admin + valid URL → 200)
-```ts
-{
-  success: true,
-  predictions: null,
-  metadata: {
-    analyzed_url: url,
-    extraction_version: 'v2',
-    edge_function: 'analyze-entity-url-v2',
-    method: 'stub',
-    timestamp: new Date().toISOString(),
-    used_url_context: false,
-    used_google_search: false,
-    used_firecrawl: false,
-    phase: 2,        // diagnostic-only
-    stage: 'scaffold' // diagnostic-only
-  },
-  warnings: ['stub: extraction not yet implemented']
-}
-```
+## Behavior matrix
+| Caller | Flag | Function | UX |
+|---|---|---|---|
+| Admin | `v1` | `analyze-entity-url` | Unchanged from today. |
+| Admin | `v2` (stub OK) | `analyze-entity-url-v2` | Info toast "scaffold only", metadata-only prefill, no brand auto-select. |
+| Admin | `v2` (error OR `success:false`) | `analyze-entity-url-v2` | Destructive toast, **no** V1 retry. Metadata-lite still attempted. |
+| Non-admin | (hook returns `v1`) | `analyze-entity-url` | **Unchanged from today.** (V1 is admin-gated server-side — Phase 3 makes no claim about non-admin success.) |
+| Anyone, engine flag loading | — | none | Button disabled until hook resolves; cannot get stuck (verified). |
 
-## Locked error envelope (used everywhere)
-```ts
-{
-  success: false,
-  error: string,           // ALWAYS a string
-  code: V2ErrorCode,
-  details?: unknown        // optional, only for Zod field errors
-}
-```
-Codes used in Phase 2: `MISSING_AUTH`, `INVALID_TOKEN`, `NOT_ADMIN`, `METHOD_NOT_ALLOWED`, `INVALID_JSON`, `INVALID_URL`, `INTERNAL_ERROR`.
+## Testing checklist
+- [ ] Admin + `v1` → network shows `POST …/analyze-entity-url`; V1 prefill + brand auto-select unchanged.
+- [ ] Admin + `v2` (stub success) → `POST …/analyze-entity-url-v2`, 200, info toast, no brand auto-select, no console errors.
+- [ ] Admin + `v2` with forced failure (revoke admin temporarily, or POST `{}` via devtools) → destructive toast; network shows zero retries to `analyze-entity-url`.
+- [ ] Admin + `v2` returning `{ success: false, ... }` (simulated) → handled by the same destructive toast (not the generic V1 toast).
+- [ ] Flip back to `v1` → next click hits V1.
+- [ ] Non-admin → behavior unchanged from today.
+- [ ] Loading gate: hard refresh + immediate click → button disabled briefly, then enabled. Errored `useIsAdmin` → button still enabled.
+- [ ] Console logs show `host=…` only; no full URL, no query string.
+- [ ] `git diff` shows changes only in `CreateEntityDialog.tsx` and `AdminFeatureFlagsPanel.tsx` (copy-only).
+- [ ] V1 and V2 function bodies byte-identical to before Phase 3.
 
-## Expected behavior after Phase 2
-| Scenario | Status | Code |
-|---|---|---|
-| Admin + valid http(s) URL | 200 | success envelope above |
-| Non-admin authenticated user | 403 | `NOT_ADMIN` |
-| No `Authorization` header | 401 | `MISSING_AUTH` |
-| Garbage / expired bearer | 401 | `INVALID_TOKEN` |
-| `GET` / `PUT` / `DELETE` | 405 | `METHOD_NOT_ALLOWED` |
-| Body is not JSON | 400 | `INVALID_JSON` |
-| `{}` (missing `url`) | 400 | `INVALID_URL` |
-| `{ url: "not a url" }` | 400 | `INVALID_URL` |
-| `{ url: "mailto:a@b" }` | 400 | `INVALID_URL` |
-| `{ url: "file:///etc/passwd" }` | 400 | `INVALID_URL` |
-| `{ url: "javascript:alert(1)" }` | 400 | `INVALID_URL` |
-| `url` length > 2048 | 400 | `INVALID_URL` |
+## Rollback
+Revert the two files. Hook, V2 function, and config block remain inert.
 
-V1 behavior **completely unchanged**. Admin flag flip `v1` ↔ `v2` still has zero UI effect (no routing yet).
+## Deliverables when Phase 3 completes
+- Diff of `CreateEntityDialog.tsx` and `AdminFeatureFlagsPanel.tsx`.
+- Network proof: admin+v1, admin+v2 stub success, admin+v2 failure (no V1 retry).
+- Confirmation V1 output unchanged when flag is `v1`.
+- Confirmation V2 function body unchanged from Phase 2.
+- Confirmation console logs contain no full URL / query string.
+- Confirmation non-admin behavior is unchanged.
 
-## Testing checklist (manual, via Supabase dashboard + curl)
-- [ ] Admin invoke `{ "url": "https://example.com" }` → 200, exact locked envelope.
-- [ ] Admin invoke `{}` → 400 `INVALID_URL`, `details` present.
-- [ ] Admin invoke with body `not-json` → 400 `INVALID_JSON`.
-- [ ] Admin `curl -X GET` → 405 `METHOD_NOT_ALLOWED`.
-- [ ] `{ "url": "mailto:a@b.com" }` → 400 `INVALID_URL`.
-- [ ] `{ "url": "file:///etc/passwd" }` → 400 `INVALID_URL`.
-- [ ] curl no `Authorization` → 401 `MISSING_AUTH` (proves `verify_jwt = false` honored).
-- [ ] curl bogus bearer → 401 `INVALID_TOKEN`.
-- [ ] Non-admin logged-in → 403 `NOT_ADMIN`.
-- [ ] V1 still works: Create Entity → Analyze URL → identical output.
-- [ ] Flip admin flag v1↔v2 → no UI change anywhere.
-- [ ] Edge function logs show structured `console.error` only on 500s; no tokens / PII leaked.
-
-## Risks / rollback
-- Minimal. New isolated route, no callers.
-- The `config.toml` edit is additive; does not affect any other function.
-- Rollback: delete `supabase/functions/analyze-entity-url-v2/` + remove the new `config.toml` block.
-
-## Phase boundaries (reaffirmed)
-- **Phase 1 ✅** — `entity_extraction.version` flag + admin selector UI.
-- **Phase 2 (this plan)** — V2 edge function scaffold.
-- **Phase 3** — Centralized routing in `CreateEntityDialog` via `useAnalyzeUrlEngine()`. Still no extraction logic in V2.
-- **Phase 4+** — SSRF protections, exact-page extraction, Firecrawl, Gemini URL Context, category matching, preview UX.
-
-## Deliverables when Phase 2 is complete
-- Files changed list
-- Final stub response shape (paste actual JSON from a real admin call)
-- Auth test results (admin / non-admin / missing token / invalid token)
-- Method + JSON + URL validation results
-- Confirmation V1 is untouched
-- Confirmation `CreateEntityDialog` still calls V1 only
-- Confirmation admin engine flag flip has no UI effect
-- Any issues surfaced before Phase 3
+## Phase boundaries
+Phase 1 ✅ (flag+UI) → Phase 2 ✅ (V2 scaffold) → **Phase 3** (routing + stale-copy fix) → Phase 4+ (SSRF, exact-page, Firecrawl, Gemini URL Context, category matching, brand parity, eventual non-admin access decision).
 
 Awaiting approval to implement.

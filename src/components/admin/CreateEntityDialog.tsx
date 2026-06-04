@@ -36,6 +36,7 @@ import { Database } from '@/integrations/supabase/types';
 import { CategorySelector } from './CategorySelector';
 import { SimpleTagInput } from './SimpleTagInput';
 import { AutoFillPreviewModal } from './AutoFillPreviewModal';
+import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -104,6 +105,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   // URL analysis state
   const [analyzeUrl, setAnalyzeUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
   const [showAnalyzeButton, setShowAnalyzeButton] = useState(false);
   const [aiPredictions, setAiPredictions] = useState<any>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -930,14 +932,23 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setSelectedParent(null);
     
     try {
-      console.log('🔍 Analyzing URL:', analyzeUrl);
-      
+      // Route to V1 or V2 based on admin engine flag. Never log the full URL (may contain tokens/PII).
+      const fnName = analyzeEngine === 'v2' ? 'analyze-entity-url-v2' : 'analyze-entity-url';
+      let urlHost = 'unknown';
+      try { urlHost = new URL(analyzeUrl).host; } catch { /* ignore */ }
+      console.log(`🔍 [engine=${analyzeEngine}] invoking ${fnName} (host=${urlHost})`);
+
       // Check cache first
       const cachedMetadata = getCachedMetadata(analyzeUrl);
-      
+
       // Call AI analysis first to get product name AND brand
-      const aiResult = await supabase.functions.invoke('analyze-entity-url', { body: { url: analyzeUrl } });
-      
+      const aiResult = await supabase.functions.invoke(fnName, { body: { url: analyzeUrl } });
+
+      // V2 failure detection: both transport errors AND { success: false } envelopes.
+      const v2Failed =
+        analyzeEngine === 'v2' &&
+        (!!aiResult.error || (aiResult.data && aiResult.data.success === false));
+
       // Extract product name and brand from AI analysis if available
       const aiProductName = aiResult.data?.predictions?.name;
       // AI returns brand in two possible locations depending on analysis type
@@ -971,9 +982,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       }
       
       // Handle AI predictions
-      if (aiResult.error) {
+      if (v2Failed) {
+        // V2-specific failure. Do NOT silently fall back to V1.
+        console.error('⚠️ V2 analysis failed:', aiResult.error ?? aiResult.data);
+        toast({
+          title: "V2 engine failed",
+          description: "analyze-entity-url-v2 returned an error. Not falling back to V1. Switch the engine flag to v1 to retry with the stable engine.",
+          variant: "destructive"
+        });
+      } else if (aiResult.error) {
+        // V1 path: keep existing generic behavior
         console.error('⚠️ AI analysis error:', aiResult.error);
-        // Don't throw - show warning but continue with metadata
         toast({
           title: "AI Analysis Unavailable",
           description: "Using basic metadata only. You can still create the entity.",
@@ -981,7 +1000,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         });
       }
       
-      if (aiResult.data) {
+      if (aiResult.data && !v2Failed) {
         console.log('🤖 AI Analysis:', aiResult.data);
         setAiPredictions(aiResult.data);
         
@@ -996,8 +1015,19 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           }
         }
         
-        // Show different toast based on success status
-        if (aiResult.data.success === false) {
+        // V2 scaffold-only signal: success but no predictions yet.
+        if (
+          analyzeEngine === 'v2' &&
+          aiResult.data.success === true &&
+          aiResult.data.predictions == null
+        ) {
+          toast({
+            title: "V2 engine (scaffold only)",
+            description: "analyze-entity-url-v2 is still a stub. No AI prefill yet — metadata-only result.",
+            variant: "default"
+          });
+        } else if (aiResult.data.success === false) {
+          // V1 legacy soft-failure envelope
           toast({
             title: "AI Suggestions Unavailable",
             description: aiResult.data.message || "Using basic metadata. Images are still available.",
@@ -1005,6 +1035,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           });
         }
       }
+      
       
       // Show preview modal if we have metadata OR AI predictions
       if (metadataResult.data || aiResult.data) {
@@ -1793,7 +1824,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 </div>
                 <Button
                   onClick={handleAnalyzeUrl}
-                  disabled={!showAnalyzeButton || analyzing || loading}
+                  disabled={!showAnalyzeButton || analyzing || loading || engineLoading}
                   className="gap-2 min-w-[100px]"
                 >
                   {analyzing ? (

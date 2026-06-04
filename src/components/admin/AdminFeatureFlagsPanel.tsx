@@ -117,7 +117,7 @@ export function AdminFeatureFlagsPanel() {
             : 'Video taps will stop prefetching HLS manifests/segments. Does NOT affect Mux uploads or video playback — only the on-tap prefetch optimization.'
           : pending?.key === 'entity_extraction.version'
             ? pending.nextVersion === 'v2'
-              ? 'The Analyze URL button in Create Entity will route to the experimental analyze-entity-url-v2 function. This is admin-only and may be unstable. Routing wires up in a later phase — for now this only changes the selected engine.'
+              ? 'The Analyze URL button in Create Entity will route to the experimental analyze-entity-url-v2 function. This is admin-only and may be unstable. V2 is currently a scaffold and returns no AI prefill yet.'
               : 'The Analyze URL button in Create Entity will route to the stable analyze-entity-url function (current default behavior).'
             : '';
 
@@ -307,7 +307,7 @@ export function AdminFeatureFlagsPanel() {
           </CardTitle>
           <CardDescription>
             Which engine the Create Entity dialog's “Analyze URL” button calls. Admin-only.
-            Routing wires up in a later phase — Phase 1 only stores the selection.
+            Affects only the Create Entity dialog's Analyze URL button for admins.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
