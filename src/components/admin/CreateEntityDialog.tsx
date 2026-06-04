@@ -1824,7 +1824,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 </div>
                 <Button
                   onClick={handleAnalyzeUrl}
-                  disabled={!showAnalyzeButton || analyzing || loading}
+                  disabled={!showAnalyzeButton || analyzing || loading || engineLoading}
                   className="gap-2 min-w-[100px]"
                 >
                   {analyzing ? (
