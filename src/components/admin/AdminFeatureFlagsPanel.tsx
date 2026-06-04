@@ -32,6 +32,7 @@ type PendingChange =
   | { key: 'mux.uploads_enabled'; nextEnabled: boolean }
   | { key: 'mux.mode'; nextMode: 'live' | 'test' }
   | { key: 'mux.prewarm_enabled'; nextEnabled: boolean }
+  | { key: 'entity_extraction.version'; nextVersion: 'v1' | 'v2' }
   | null;
 
 export function AdminFeatureFlagsPanel() {
