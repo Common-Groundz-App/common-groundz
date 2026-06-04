@@ -307,7 +307,7 @@ export function AdminFeatureFlagsPanel() {
           </CardTitle>
           <CardDescription>
             Which engine the Create Entity dialog's “Analyze URL” button calls. Admin-only.
-            Routing wires up in a later phase — Phase 1 only stores the selection.
+            Affects only the Create Entity dialog's Analyze URL button for admins.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
