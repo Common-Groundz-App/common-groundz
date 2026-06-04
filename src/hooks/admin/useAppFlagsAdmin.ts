@@ -11,11 +11,20 @@ export interface AppConfigRow {
   updated_reason: string | null;
 }
 
+const ALLOWED_KEYS = [
+  'mux.uploads_enabled',
+  'mux.mode',
+  'mux.prewarm_enabled',
+  'entity_extraction.version',
+] as const;
+
+type AllowedKey = (typeof ALLOWED_KEYS)[number];
+
 async function fetchRows(): Promise<AppConfigRow[]> {
   const { data, error } = await supabase
     .from('app_config')
     .select('key,value,description,updated_at,updated_by,updated_reason')
-    .in('key', ['mux.uploads_enabled', 'mux.mode', 'mux.prewarm_enabled']);
+    .in('key', ALLOWED_KEYS as unknown as string[]);
   if (error) throw error;
   return (data ?? []) as AppConfigRow[];
 }
@@ -29,7 +38,7 @@ export function useAppFlagRows() {
 }
 
 interface SetFlagInput {
-  key: 'mux.uploads_enabled' | 'mux.mode' | 'mux.prewarm_enabled';
+  key: AllowedKey;
   value: Record<string, unknown>;
   reason?: string;
 }
