@@ -1,0 +1,85 @@
+-- 1. Seed entity_extraction.version flag (idempotent)
+INSERT INTO public.app_config (key, value, description)
+VALUES (
+  'entity_extraction.version',
+  '{"version": "v1"}'::jsonb,
+  'Selects which entity URL extraction engine the Create Entity dialog calls. v1 = stable (analyze-entity-url), v2 = experimental (analyze-entity-url-v2). Admin-only.'
+)
+ON CONFLICT (key) DO NOTHING;
+
+-- 2. Extend admin flag-writer allowlist to include entity_extraction.version.
+--    All three existing Mux keys are preserved verbatim.
+CREATE OR REPLACE FUNCTION public.set_app_flag(_key text, _value jsonb, _reason text DEFAULT NULL::text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  existing jsonb;
+  v_keys text[];
+BEGIN
+  IF NOT public.has_role(auth.uid(), 'admin') THEN
+    RAISE EXCEPTION 'forbidden' USING ERRCODE = '42501';
+  END IF;
+
+  IF _key NOT IN ('mux.uploads_enabled', 'mux.mode', 'mux.prewarm_enabled', 'entity_extraction.version') THEN
+    RAISE EXCEPTION 'unknown_key: %', _key USING ERRCODE = '22023';
+  END IF;
+
+  IF _value IS NULL OR jsonb_typeof(_value) <> 'object' THEN
+    RAISE EXCEPTION 'invalid_value_for_key: value must be a json object'
+      USING ERRCODE = '22023';
+  END IF;
+
+  IF _key = 'mux.uploads_enabled' THEN
+    SELECT array_agg(k) INTO v_keys FROM jsonb_object_keys(_value) k;
+    IF v_keys IS DISTINCT FROM ARRAY['enabled']::text[]
+       OR jsonb_typeof(_value->'enabled') <> 'boolean' THEN
+      RAISE EXCEPTION 'invalid_value_for_key: mux.uploads_enabled expects { "enabled": boolean }'
+        USING ERRCODE = '22023';
+    END IF;
+  ELSIF _key = 'mux.prewarm_enabled' THEN
+    SELECT array_agg(k) INTO v_keys FROM jsonb_object_keys(_value) k;
+    IF v_keys IS DISTINCT FROM ARRAY['enabled']::text[]
+       OR jsonb_typeof(_value->'enabled') <> 'boolean' THEN
+      RAISE EXCEPTION 'invalid_value_for_key: mux.prewarm_enabled expects { "enabled": boolean }'
+        USING ERRCODE = '22023';
+    END IF;
+  ELSIF _key = 'mux.mode' THEN
+    SELECT array_agg(k) INTO v_keys FROM jsonb_object_keys(_value) k;
+    IF v_keys IS DISTINCT FROM ARRAY['mode']::text[]
+       OR (_value->>'mode') NOT IN ('test', 'live') THEN
+      RAISE EXCEPTION 'invalid_value_for_key: mux.mode expects { "mode": "test"|"live" }'
+        USING ERRCODE = '22023';
+    END IF;
+  ELSIF _key = 'entity_extraction.version' THEN
+    SELECT array_agg(k) INTO v_keys FROM jsonb_object_keys(_value) k;
+    IF v_keys IS DISTINCT FROM ARRAY['version']::text[]
+       OR (_value->>'version') NOT IN ('v1', 'v2') THEN
+      RAISE EXCEPTION 'invalid_value_for_key: entity_extraction.version expects { "version": "v1"|"v2" }'
+        USING ERRCODE = '22023';
+    END IF;
+  END IF;
+
+  SELECT value INTO existing FROM public.app_config WHERE key = _key;
+
+  IF existing IS NOT NULL AND existing = _value THEN
+    RETURN jsonb_build_object('changed', false);
+  END IF;
+
+  IF existing IS NULL THEN
+    INSERT INTO public.app_config (key, value, updated_by, updated_reason)
+    VALUES (_key, _value, auth.uid(), _reason);
+  ELSE
+    UPDATE public.app_config
+       SET value = _value,
+           updated_at = now(),
+           updated_by = auth.uid(),
+           updated_reason = _reason
+     WHERE key = _key;
+  END IF;
+
+  RETURN jsonb_build_object('changed', true, 'previous', existing);
+END;
+$function$;
