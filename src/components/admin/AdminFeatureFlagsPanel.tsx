@@ -32,6 +32,7 @@ type PendingChange =
   | { key: 'mux.uploads_enabled'; nextEnabled: boolean }
   | { key: 'mux.mode'; nextMode: 'live' | 'test' }
   | { key: 'mux.prewarm_enabled'; nextEnabled: boolean }
+  | { key: 'entity_extraction.version'; nextVersion: 'v1' | 'v2' }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -78,6 +79,10 @@ export function AdminFeatureFlagsPanel() {
 
   const effective = publicFlags.data?.mux;
 
+  const extractionRow = rows.data?.find((r) => r.key === 'entity_extraction.version');
+  const extractionVersion: 'v1' | 'v2' =
+    extractionRow?.value?.version === 'v2' ? 'v2' : 'v1';
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
@@ -91,7 +96,11 @@ export function AdminFeatureFlagsPanel() {
           ? pending.nextEnabled
             ? 'Enable HLS prewarm on tap?'
             : 'Disable HLS prewarm on tap?'
-          : '';
+          : pending?.key === 'entity_extraction.version'
+            ? pending.nextVersion === 'v2'
+              ? 'Switch entity URL extraction to Version 2 (Experimental)?'
+              : 'Switch entity URL extraction to Version 1 (Stable)?'
+            : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -106,7 +115,11 @@ export function AdminFeatureFlagsPanel() {
           ? pending.nextEnabled
             ? 'Video taps will prefetch the HLS manifest and first segment again. Does NOT affect Mux uploads or video playback — only the on-tap prefetch optimization.'
             : 'Video taps will stop prefetching HLS manifests/segments. Does NOT affect Mux uploads or video playback — only the on-tap prefetch optimization.'
-          : '';
+          : pending?.key === 'entity_extraction.version'
+            ? pending.nextVersion === 'v2'
+              ? 'The Analyze URL button in Create Entity will route to the experimental analyze-entity-url-v2 function. This is admin-only and may be unstable. Routing wires up in a later phase — for now this only changes the selected engine.'
+              : 'The Analyze URL button in Create Entity will route to the stable analyze-entity-url function (current default behavior).'
+            : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -123,10 +136,16 @@ export function AdminFeatureFlagsPanel() {
           value: { mode: pending.nextMode },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'mux.prewarm_enabled') {
         await setFlag.mutateAsync({
           key: 'mux.prewarm_enabled',
           value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_extraction.version',
+          value: { version: pending.nextVersion },
           reason: reason.trim() || undefined,
         });
       }
@@ -275,6 +294,79 @@ export function AdminFeatureFlagsPanel() {
               }
             />
           </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Entity URL extraction engine */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Entity URL extraction engine
+          </CardTitle>
+          <CardDescription>
+            Which engine the Create Entity dialog's “Analyze URL” button calls. Admin-only.
+            Routing wires up in a later phase — Phase 1 only stores the selection.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+            <p className="font-medium mb-1">Currently selected</p>
+            {rows.isLoading ? (
+              <Skeleton className="h-5 w-48" />
+            ) : (
+              <span className="font-medium">
+                {extractionVersion === 'v2'
+                  ? 'Version 2 — Experimental'
+                  : 'Version 1 — Stable'}
+              </span>
+            )}
+            {extractionRow?.updated_at && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Updated {formatDistanceToNow(new Date(extractionRow.updated_at), { addSuffix: true })}
+                {extractionRow.updated_reason ? ` — “${extractionRow.updated_reason}”` : ''}
+              </p>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={rows.isLoading || setFlag.isPending}
+              onClick={() =>
+                extractionVersion !== 'v1' &&
+                setPending({ key: 'entity_extraction.version', nextVersion: 'v1' })
+              }
+              className={`text-left rounded-lg border p-4 transition-colors ${
+                extractionVersion === 'v1'
+                  ? 'border-primary bg-primary/5'
+                  : 'hover:bg-muted/50'
+              }`}
+            >
+              <p className="font-medium">Version 1 — Stable</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Current production engine. Calls <code>analyze-entity-url</code>.
+              </p>
+            </button>
+            <button
+              type="button"
+              disabled={rows.isLoading || setFlag.isPending}
+              onClick={() =>
+                extractionVersion !== 'v2' &&
+                setPending({ key: 'entity_extraction.version', nextVersion: 'v2' })
+              }
+              className={`text-left rounded-lg border p-4 transition-colors ${
+                extractionVersion === 'v2'
+                  ? 'border-primary bg-primary/5'
+                  : 'hover:bg-muted/50'
+              }`}
+            >
+              <p className="font-medium">Version 2 — Experimental</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                New engine. Will call <code>analyze-entity-url-v2</code> once wired up.
+              </p>
+            </button>
           </div>
         </CardContent>
       </Card>
