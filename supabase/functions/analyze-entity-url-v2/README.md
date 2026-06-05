@@ -1,6 +1,6 @@
 # analyze-entity-url-v2
 
-**Status:** Phase 4B — safe-fetch boundary. Still stub (no extraction).
+**Status:** Phase 5 — deterministic exact-page extraction.
 
 ## What this is
 
@@ -166,15 +166,101 @@ Error envelope:
 { success: false, error: string, code: V2ErrorCode, details?: unknown }
 ```
 
+## Phase 5 — exact-page extractor
+
+Pure deterministic parsing of `FetchResult.bodyText` into V1-compatible
+predictions. **No new network, no AI, no Firecrawl, no DB, no category
+resolution, no brand entity creation.**
+
+### Taxonomy split (important)
+
+The app has **15 canonical active entity types**, exported by
+`supabase/functions/_shared/entityTypes.ts` as `CANONICAL_ENTITY_TYPES`:
+`movie, book, tv_show, course, app, game, experience, food, product, place,
+brand, event, service, professional, others`.
+
+`_shared/entityTypes.ts` mirrors `getActiveEntityTypes()` in
+`src/services/entityTypeHelpers.ts`. It is **NOT** the universal source of
+truth — it must stay in sync with the frontend helper until a repo-level
+shared module exists.
+
+Phase 5 only extracts a **deterministic 9-type subset**,
+`EXACT_PAGE_EXTRACTABLE_TYPES`, defined in `extractor.ts` (NOT in
+`_shared/`, because this list is a Phase-5 policy, not part of the universal
+taxonomy):
+`product, book, movie, tv_show, course, app, game, food, place`.
+
+The remaining 6 types — `experience, brand, event, service, professional,
+others` — return `predictions: null` + `warnings: ['weak_signals']`. They
+are deferred to later phases (AI / Firecrawl) where they can be inferred
+safely.
+
+### Type-inference rule (hard)
+
+- `type` is set **only** from a recognized JSON-LD `@type` or recognized
+  `og:type`. No keyword guessing from title, `<h1>`, meta description,
+  Twitter cards, URL patterns, or hostnames.
+- Title/meta may fill `name` / `description` only.
+- No recognized structured type → weak_signals.
+
+### No-mapping rules
+
+- `Organization` → never `brand`. Brand entity extraction is deferred
+  (Phase 8). Raw product brand **text** (`Product.brand.name`) is allowed
+  in `additional_data.brand`.
+- `Person` → never `professional`.
+- `Event` → deferred (event-specific schema fields not yet modeled).
+- No inference of `others`.
+
+### JSON-LD parsing details
+
+- **`@type` arrays** (e.g. `["Thing", "Product"]`): normalize to array,
+  pick the **first recognized** value from the mapping table.
+- **`@graph` flattening**: iterate nodes; first node with a recognized
+  `@type` wins.
+- **One-level wrapper unwrap**: if top-level `@type` is `WebPage, WebSite,
+  Article, NewsArticle, BlogPosting, CollectionPage, ItemPage, ProductPage`
+  and a child object exists at `mainEntity` / `subjectOf` / `about` with
+  its own `@type`, that child is evaluated as the entity node. **One level
+  only — no recursion.** Source recorded as `jsonld:WebPage→Product` etc.
+  in `metadata.extract.sources`.
+- Malformed JSON-LD blocks are skipped silently; remaining blocks and OG
+  fallback continue.
+
+### `suggested_category_path` (Phase 5)
+
+Carries the **raw schema.org/og type verbatim** — `"Product"`, `"Movie"`,
+`"TVSeries"`, `"Restaurant"`, `"video.movie"`. **Never** a fabricated
+taxonomy path (no `"Product>Electronics"`), never lowercased. DB category
+matching that produces a real path is Phase 6's job.
+
+### URL safety
+
+`safeAbsoluteUrl(value, baseUrl)` allows only `http:` and `https:`. It
+drops `javascript:`, `data:`, `blob:`, `file:`, `mailto:`, etc. It is
+applied to `image_url`, every `images[]` entry, `additional_data.canonical_url`,
+and any link/icon href.
+
+### Confidence ladder
+
+- JSON-LD type + name → **0.9**
+- OG type + name → **0.8**
+- No other tier in Phase 5.
+
+### Privacy (still enforced)
+
+Raw HTML, `bodyText`, and parsed JSON-LD blocks are never logged or
+serialized in the response. Server logs include `code` only on errors.
+
 ## Phase roadmap
 
 - **Phase 1 ✅** — `entity_extraction.version` admin flag.
 - **Phase 2 ✅** — scaffold + locked envelope.
 - **Phase 3 ✅** — `CreateEntityDialog` routes via `useAnalyzeUrlEngine()`.
 - **Phase 4A ✅** — SSRF preflight + URL normalization.
-- **Phase 4B ✅ (this)** — safe fetch + live integration.
-- **Phase 5** — exact-page extractor (consumes `FetchResult.bodyText`, no raw fetch).
-- **Phase 6** — weak-signal detector + Firecrawl fallback.
-- **Phase 7** — Gemini URL Context + structured output.
+- **Phase 4B ✅** — safe fetch + live integration.
+- **Phase 5 ✅ (this)** — deterministic exact-page extractor (9-type subset).
+- **Phase 6** — weak-signal detector + Firecrawl fallback + category resolution.
+- **Phase 7** — Gemini URL Context + structured output (covers deferred types).
 - **Phase 8** — brand suggestion + Save-time parent brand handling.
 - **Phase 9+** — admin smoke test, logging, compare mode.
