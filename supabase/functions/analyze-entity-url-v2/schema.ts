@@ -41,7 +41,14 @@ export type V2ErrorCode =
   | "INVALID_URL"
   | "BLOCKED_HOST"
   | "DNS_RESOLUTION_FAILED"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  // Phase 4B safe-fetch error codes
+  | "FETCH_TIMEOUT"
+  | "FETCH_TOO_LARGE"
+  | "FETCH_TOO_MANY_REDIRECTS"
+  | "FETCH_BAD_CONTENT_TYPE"
+  | "FETCH_BAD_STATUS"
+  | "FETCH_NETWORK_ERROR";
 
 export interface V2SuccessResponse {
   success: true;
@@ -61,6 +68,18 @@ export interface V2SuccessResponse {
     phase?: number;
     /** Diagnostic-only. Do not branch on this. */
     stage?: string;
+    /**
+     * Phase 4B+: minimal fetch summary. Additive. INTERNAL fields
+     * (bodyText, redirectChain) are deliberately excluded.
+     */
+    fetch?: {
+      final_url: string;
+      status: number;
+      content_type: string;
+      bytes: number;
+      redirect_count: number;
+      duration_ms: number;
+    };
   };
   warnings?: string[];
 }
