@@ -136,7 +136,13 @@ Deno.test("budget: multiple redirects collectively exceed total budget → FETCH
   assertEquals(e.code, "FETCH_TIMEOUT");
 });
 
-Deno.test("budget: body streaming delayed chunks exceed budget → FETCH_TIMEOUT body_stream_timeout", async () => {
+Deno.test({
+  name: "budget: body streaming delayed chunks exceed budget → FETCH_TIMEOUT body_stream_timeout",
+  // Mock stream's internal setTimeout in pull() intentionally leaks past test end
+  // to simulate an uncooperative source; that's the point of this test.
+  sanitizeOps: false,
+  sanitizeResources: false,
+}, async () => {
   const stream = new ReadableStream<Uint8Array>({
     async pull(c) {
       await new Promise((r) => setTimeout(r, 100));
@@ -158,7 +164,11 @@ Deno.test("budget: body streaming delayed chunks exceed budget → FETCH_TIMEOUT
   assertEquals(e.reason, "body_stream_timeout");
 });
 
-Deno.test("budget: body via never-resolving pull() → FETCH_TIMEOUT (deadline race, not signal)", async () => {
+Deno.test({
+  name: "budget: body via never-resolving pull() → FETCH_TIMEOUT (deadline race, not signal)",
+  sanitizeOps: false,
+  sanitizeResources: false,
+}, async () => {
   const stream = new ReadableStream<Uint8Array>({
     pull() {
       return never<void>();
