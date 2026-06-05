@@ -17,6 +17,7 @@ import {
 } from "./schema.ts";
 import { assertSafeUrl, SsrfError } from "./ssrf.ts";
 import { FetchError, type FetchResult, validateAndFetchUrl } from "./fetcher.ts";
+import { extractFromHtml } from "./extractor.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -176,21 +177,24 @@ serve(async (req) => {
     }
 
     // bodyText and redirectChain are intentionally NOT included in the response.
+    // Phase 5: deterministic exact-page extraction (no AI, no DB).
+    const extract = extractFromHtml(fetchResult.bodyText, fetchResult.finalUrl);
+
     const response: V2SuccessResponse = {
       success: true,
-      predictions: null,
+      predictions: extract.predictions,
       metadata: {
         analyzed_url: safe.url,
         normalized_url: safe.url,
         extraction_version: EXTRACTION_VERSION,
         edge_function: EDGE_FUNCTION_NAME,
-        method: "stub",
+        method: extract.predictions ? "exact-page" : "stub",
         timestamp: new Date().toISOString(),
         used_url_context: false,
         used_google_search: false,
         used_firecrawl: false,
-        phase: 4,
-        stage: "safe-fetch",
+        phase: 5,
+        stage: extract.predictions ? "exact-page" : "weak-signals",
         fetch: {
           final_url: fetchResult.finalUrl,
           status: fetchResult.status,
@@ -199,8 +203,9 @@ serve(async (req) => {
           redirect_count: fetchResult.redirectChain.length - 1,
           duration_ms: fetchResult.durationMs,
         },
+        extract: extract.metadata,
       },
-      warnings: ["stub: extraction not yet implemented"],
+      warnings: extract.warnings.length > 0 ? extract.warnings : undefined,
     };
 
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });

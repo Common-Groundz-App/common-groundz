@@ -8,9 +8,42 @@
 // (routing, UI, future extraction phases) MUST NOT branch on them.
 
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
+import type { CanonicalEntityType } from "../_shared/entityTypes.ts";
 
 export const EXTRACTION_VERSION = "v2" as const;
 export const EDGE_FUNCTION_NAME = "analyze-entity-url-v2" as const;
+
+/** V1-compatible prediction shape. Phase 5 always emits a Phase-5
+ *  ExactPageExtractableType in `type`. `category_id` and
+ *  `matched_category_name` stay null until Phase-6 category resolution. */
+export interface V2Predictions {
+  type: CanonicalEntityType;
+  name: string;
+  description: string | null;
+  category_id: null;
+  /** RAW schema.org @type or og:type verbatim (e.g. "Product", "TVSeries",
+   *  "video.movie"). Never a fabricated taxonomy path. */
+  suggested_category_path: string | null;
+  matched_category_name: null;
+  tags: string[];
+  confidence: number;
+  reasoning: string;
+  image_url: string | null;
+  images: Array<{ url: string }>;
+  additional_data: Record<string, unknown>;
+}
+
+export interface ExtractMetadata {
+  has_jsonld: boolean;
+  jsonld_blocks: number;
+  has_og: boolean;
+  has_twitter: boolean;
+  sources: string[];
+  mapped_type: CanonicalEntityType | null;
+  confidence: number | null;
+  weak_signals: boolean;
+}
+
 
 export const MAX_URL_LENGTH = 2048;
 
@@ -52,7 +85,7 @@ export type V2ErrorCode =
 
 export interface V2SuccessResponse {
   success: true;
-  predictions: null | Record<string, unknown>;
+  predictions: V2Predictions | null;
   metadata: {
     analyzed_url: string;
     /** Phase 4A+: normalized form of analyzed_url. Additive. */
@@ -80,6 +113,8 @@ export interface V2SuccessResponse {
       redirect_count: number;
       duration_ms: number;
     };
+    /** Phase 5+: deterministic exact-page extract metadata. Additive. */
+    extract?: ExtractMetadata;
   };
   warnings?: string[];
 }
