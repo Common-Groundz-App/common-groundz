@@ -117,27 +117,32 @@ export async function withDeadline<T>(
 }
 
 /**
- * Dedicated body-read helper. Races reader.read() against the deadline,
- * invokes reader.cancel() before throwing FETCH_TIMEOUT with internal reason
- * 'body_stream_timeout'. Required so streams that ignore AbortSignal still
- * honor the total budget.
+ * Dedicated body-read helper. Races reader.read() against the deadline.
+ * On timeout, throws FETCH_TIMEOUT (reason 'body_stream_timeout') SYNCHRONOUSLY
+ * from onTimeout and cancels the reader AFTER the throw — awaiting cancel()
+ * here would resolve the pending reader.read() and let it win the race.
+ * Required so streams that ignore AbortSignal still honor the total budget.
  */
 export async function readWithDeadline(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   deadline: number,
 ): Promise<ReadableStreamReadResult<Uint8Array>> {
-  return await withDeadline(
-    reader.read(),
-    deadline,
-    async () => {
-      try {
-        await reader.cancel();
-      } catch {
-        /* best-effort */
-      }
-      throw new FetchError("FETCH_TIMEOUT", { reason: "body_stream_timeout" });
-    },
-  );
+  let timedOut = false;
+  try {
+    return await withDeadline(
+      reader.read(),
+      deadline,
+      () => {
+        timedOut = true;
+        throw new FetchError("FETCH_TIMEOUT", { reason: "body_stream_timeout" });
+      },
+    );
+  } catch (e) {
+    if (timedOut) {
+      reader.cancel().catch(() => {});
+    }
+    throw e;
+  }
 }
 
 function parseContentType(raw: string | null): string {
