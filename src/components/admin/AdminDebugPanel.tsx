@@ -120,8 +120,9 @@ export const AdminDebugPanel = () => {
       // Test Supabase connectivity
       try {
         const { error, count } = await supabase
-          .from('profiles')
+          .from('entities')
           .select('id', { count: 'exact', head: true });
+
         console.log('AdminDebugPanel: Connectivity test result:', { count, error });
 
         info.supabaseHealth.canConnect = true;
