@@ -1,9 +1,16 @@
-// Phase 4B: analyze-entity-url-v2
+// Phase 6: analyze-entity-url-v2
 //
-// Admin-only edge function. Now performs ONE safe fetch operation per call
-// (which may issue up to 1 + maxRedirects HTTP requests internally) via
-// validateAndFetchUrl(). Still returns predictions: null — no extraction.
-// V1 (`analyze-entity-url`) is untouched.
+// Adds a narrow Firecrawl fallback after Phase 5:
+//   - direct safe-fetch failed with an eligible non-SSRF code, OR
+//   - extractor returned predictions === null, OR
+//   - extractor returned metadata.weak_signals === true.
+//
+// Strict fetch-failure contract: a failed direct fetch only becomes 200
+// success when Firecrawl extraction yields predictions !== null. Otherwise
+// the original fetch error is returned unchanged.
+//
+// SSRF rejects (BLOCKED_HOST / INVALID_URL / DNS_RESOLUTION_FAILED) NEVER
+// call Firecrawl. V1 (`analyze-entity-url`) is untouched.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -17,7 +24,10 @@ import {
 } from "./schema.ts";
 import { assertSafeUrl, SsrfError } from "./ssrf.ts";
 import { FetchError, type FetchResult, validateAndFetchUrl } from "./fetcher.ts";
-import { extractFromHtml } from "./extractor.ts";
+import { extractFromHtml, type ExtractResult } from "./extractor.ts";
+import { detectWeakSignals } from "./weak_signals.ts";
+import { isKnownJsHeavyHost } from "./host_hints.ts";
+import { runFirecrawlScrape, safeBaseUrl } from "./firecrawl.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +36,15 @@ const corsHeaders = {
 };
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
+const FETCH_FAILED_ELIGIBLE = new Set([
+  "FETCH_BAD_STATUS",
+  "FETCH_TIMEOUT",
+  "FETCH_NETWORK_ERROR",
+  "FETCH_BAD_CONTENT_TYPE",
+  "FETCH_TOO_LARGE",
+  "FETCH_TOO_MANY_REDIRECTS",
+]);
 
 function errorResponse(
   status: number,
@@ -66,6 +85,18 @@ function humanMessageFor(code: V2ErrorCode): string {
     case "DNS_RESOLUTION_FAILED": return "Could not resolve host";
     default: return "Internal error";
   }
+}
+
+/**
+ * Phase-6 narrow improvement check: only counts as improvement when Firecrawl
+ * turns a null prediction into a real one, or clears the weak_signals flag.
+ */
+function isStrictlyBetter(b: ExtractResult, a: ExtractResult): boolean {
+  if (a.predictions === null && b.predictions !== null) return true;
+  if (a.metadata.weak_signals === true && b.metadata.weak_signals === false) {
+    return true;
+  }
+  return false;
 }
 
 serve(async (req) => {
@@ -159,26 +190,128 @@ serve(async (req) => {
       throw e;
     }
 
+    const firecrawlConfigured = !!Deno.env.get("FIRECRAWL_API_KEY");
+    const priority: "high" | "normal" = isKnownJsHeavyHost(safe.url) ? "high" : "normal";
+
     // === Safe fetch ===
     let fetchResult: FetchResult;
     try {
       fetchResult = await validateAndFetchUrl(safe.url, { resolveDns });
     } catch (e) {
-      if (e instanceof FetchError) {
-        // Log code only — never URL, headers, body, or internal reason.
-        console.warn("[analyze-entity-url-v2] fetch failed", { code: e.code });
-        return errorResponse(
-          httpStatusFor(e.code as V2ErrorCode),
-          e.code as V2ErrorCode,
-          humanMessageFor(e.code as V2ErrorCode),
-        );
+      if (!(e instanceof FetchError)) throw e;
+
+      // Log code only — never URL, headers, body, or internal reason.
+      console.warn("[analyze-entity-url-v2] fetch failed", { code: e.code });
+
+      // Phase 6: eligible fetch failures may be recovered by Firecrawl.
+      if (FETCH_FAILED_ELIGIBLE.has(e.code) && firecrawlConfigured) {
+        const fc = await runFirecrawlScrape(safe.url, { fallbackBaseUrl: safe.url });
+        if (fc.ok) {
+          const base = safeBaseUrl(fc.finalUrl, safe.url);
+          const extract = extractFromHtml(fc.html, base);
+          if (extract.predictions !== null) {
+            const response: V2SuccessResponse = {
+              success: true,
+              predictions: extract.predictions,
+              metadata: {
+                analyzed_url: safe.url,
+                normalized_url: safe.url,
+                extraction_version: EXTRACTION_VERSION,
+                edge_function: EDGE_FUNCTION_NAME,
+                method: "exact-page",
+                timestamp: new Date().toISOString(),
+                used_url_context: false,
+                used_google_search: false,
+                used_firecrawl: true,
+                phase: 6,
+                stage: "firecrawl-recovered",
+                // metadata.fetch OMITTED — no successful direct safe-fetch.
+                extract: extract.metadata,
+                firecrawl: {
+                  used: true,
+                  priority,
+                  duration_ms: fc.durationMs,
+                  improved: true,
+                },
+              },
+              warnings: extract.warnings.length > 0 ? extract.warnings : undefined,
+            };
+            return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
+          }
+          // Firecrawl returned HTML but extraction still null → fall through.
+          console.warn("[analyze-entity-url-v2] firecrawl recovery failed: weak extraction", {
+            code: e.code,
+            durationMs: fc.durationMs,
+          });
+        } else {
+          console.warn("[analyze-entity-url-v2] firecrawl call failed on fetch recovery", {
+            code: fc.code,
+            status: fc.status,
+            durationMs: fc.durationMs,
+          });
+        }
       }
-      throw e;
+
+      // Strict contract: return the ORIGINAL fetch error unchanged.
+      return errorResponse(
+        httpStatusFor(e.code as V2ErrorCode),
+        e.code as V2ErrorCode,
+        humanMessageFor(e.code as V2ErrorCode),
+      );
     }
 
-    // bodyText and redirectChain are intentionally NOT included in the response.
-    // Phase 5: deterministic exact-page extraction (no AI, no DB).
-    const extract = extractFromHtml(fetchResult.bodyText, fetchResult.finalUrl);
+    // === Phase 5 deterministic extraction on the direct-fetched HTML ===
+    let extract = extractFromHtml(fetchResult.bodyText, fetchResult.finalUrl);
+    const warnings: string[] = [...extract.warnings];
+    let usedFirecrawl = false;
+    let firecrawlBlock: V2SuccessResponse["metadata"]["firecrawl"] | undefined;
+
+    const ws = detectWeakSignals(extract);
+    if (ws.weak) {
+      if (firecrawlConfigured) {
+        const fc = await runFirecrawlScrape(safe.url, { fallbackBaseUrl: safe.url });
+        if (fc.ok) {
+          const base = safeBaseUrl(fc.finalUrl, safe.url);
+          const extract2 = extractFromHtml(fc.html, base);
+          if (isStrictlyBetter(extract2, extract)) {
+            extract = extract2;
+            usedFirecrawl = true;
+            firecrawlBlock = {
+              used: true,
+              priority,
+              duration_ms: fc.durationMs,
+              improved: true,
+            };
+            for (const w of extract2.warnings) {
+              if (!warnings.includes(w)) warnings.push(w);
+            }
+          } else {
+            firecrawlBlock = {
+              used: true,
+              priority,
+              duration_ms: fc.durationMs,
+              improved: false,
+            };
+            warnings.push("firecrawl_no_improvement");
+          }
+        } else {
+          firecrawlBlock = {
+            used: false,
+            priority,
+            duration_ms: fc.durationMs,
+            error_code: fc.code,
+          };
+          warnings.push(fc.code);
+          console.warn("[analyze-entity-url-v2] firecrawl call failed on weak recovery", {
+            code: fc.code,
+            status: fc.status,
+            durationMs: fc.durationMs,
+          });
+        }
+      } else {
+        warnings.push("FIRECRAWL_NOT_CONFIGURED");
+      }
+    }
 
     const response: V2SuccessResponse = {
       success: true,
@@ -192,9 +325,13 @@ serve(async (req) => {
         timestamp: new Date().toISOString(),
         used_url_context: false,
         used_google_search: false,
-        used_firecrawl: false,
-        phase: 5,
-        stage: extract.predictions ? "exact-page" : "weak-signals",
+        used_firecrawl: usedFirecrawl,
+        phase: 6,
+        stage: usedFirecrawl
+          ? "firecrawl-improved"
+          : extract.predictions
+            ? "exact-page"
+            : "weak-signals",
         fetch: {
           final_url: fetchResult.finalUrl,
           status: fetchResult.status,
@@ -204,8 +341,9 @@ serve(async (req) => {
           duration_ms: fetchResult.durationMs,
         },
         extract: extract.metadata,
+        ...(firecrawlBlock ? { firecrawl: firecrawlBlock } : {}),
       },
-      warnings: extract.warnings.length > 0 ? extract.warnings : undefined,
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
 
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
