@@ -114,6 +114,36 @@ Deno.serve(async (req) => {
     const mediaPath = normalizeMediaPath(body.mediaPath);
 
     const admin = createClient(supabaseUrl, serviceKey);
+
+    // Pre-check against the correct partial unique index to avoid generating
+    // duplicate-key ERROR log noise on repeat views. PostgREST upsert can't
+    // be used here because both unique indexes are partial:
+    //   media_views_unique_user  ... WHERE (user_id IS NOT NULL)
+    //   media_views_unique_anon  ... WHERE (user_id IS NULL AND anon_session_id IS NOT NULL)
+    let existsQuery = admin
+      .from('media_views')
+      .select('id')
+      .eq('source', body.source)
+      .eq('source_id', body.sourceId)
+      .eq('media_path', mediaPath)
+      .limit(1);
+
+    if (userId) {
+      existsQuery = existsQuery.eq('user_id', userId);
+    } else {
+      existsQuery = existsQuery
+        .is('user_id', null)
+        .eq('anon_session_id', body.anonSessionId ?? '');
+    }
+
+    const { data: existing } = await existsQuery.maybeSingle();
+    if (existing) {
+      return new Response(JSON.stringify({ ok: true, deduped: true }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { error } = await admin.from('media_views').insert({
       source: body.source,
       source_id: body.sourceId,
@@ -127,7 +157,8 @@ Deno.serve(async (req) => {
     });
 
     if (error) {
-      // Unique violation = already counted (dedupe success)
+      // Defensive: concurrent first-view race may still produce a unique
+      // violation between the SELECT above and this INSERT. Treat as dedupe.
       if ((error as any).code === '23505') {
         return new Response(JSON.stringify({ ok: true, deduped: true }), {
           status: 200,
@@ -139,6 +170,7 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
