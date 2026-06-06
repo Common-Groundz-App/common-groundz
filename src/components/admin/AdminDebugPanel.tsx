@@ -119,11 +119,13 @@ export const AdminDebugPanel = () => {
 
       // Test Supabase connectivity
       try {
-        const { data, error } = await supabase.from('profiles').select('count').limit(1);
-        console.log('AdminDebugPanel: Connectivity test result:', { data, error });
-        
+        const { error, count } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true });
+        console.log('AdminDebugPanel: Connectivity test result:', { count, error });
+
         info.supabaseHealth.canConnect = true;
-        
+
         if (!error) {
           info.supabaseHealth.canQuery = true;
         } else {
