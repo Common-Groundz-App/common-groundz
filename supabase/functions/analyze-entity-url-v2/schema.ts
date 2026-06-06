@@ -104,6 +104,10 @@ export interface V2SuccessResponse {
     /**
      * Phase 4B+: minimal fetch summary. Additive. INTERNAL fields
      * (bodyText, redirectChain) are deliberately excluded.
+     *
+     * Presence rule (Phase 6): present only when direct safe-fetch completed
+     * successfully. Omitted when Firecrawl recovered the entity after a
+     * direct-fetch failure — see metadata.firecrawl for that case.
      */
     fetch?: {
       final_url: string;
@@ -113,8 +117,26 @@ export interface V2SuccessResponse {
       redirect_count: number;
       duration_ms: number;
     };
-    /** Phase 5+: deterministic exact-page extract metadata. Additive. */
+    /**
+     * Phase 5+: deterministic exact-page extract metadata. Additive.
+     * Always reflects the FINAL extraction source (may be Firecrawl-based
+     * when metadata.firecrawl.improved === true).
+     */
     extract?: ExtractMetadata;
+    /**
+     * Phase 6+: Firecrawl fallback diagnostics. Additive.
+     * `used` is true iff Firecrawl HTML supplied the final extraction.
+     * `improved` is true iff Firecrawl replaced a weaker direct result or
+     * recovered a failed direct fetch. `error_code` is set only when the
+     * Firecrawl call failed; warning codes also surface in `warnings[]`.
+     */
+    firecrawl?: {
+      used: boolean;
+      priority: "high" | "normal";
+      duration_ms?: number;
+      error_code?: string;
+      improved?: boolean;
+    };
   };
   warnings?: string[];
 }
