@@ -193,6 +193,11 @@ serve(async (req) => {
     const firecrawlConfigured = !!Deno.env.get("FIRECRAWL_API_KEY");
     const priority: "high" | "normal" = isKnownJsHeavyHost(safe.url) ? "high" : "normal";
 
+    console.log("[analyze-entity-url-v2] phase6 firecrawl_configured", {
+      configured: firecrawlConfigured,
+      priority,
+    });
+
     // === Safe fetch ===
     let fetchResult: FetchResult;
     try {
