@@ -83,7 +83,8 @@ export async function runFirecrawlScrape(
     };
   }
 
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const apiTimeoutMs = opts.apiTimeoutMs ?? NORMAL_FIRECRAWL_API_TIMEOUT_MS;
+  const timeoutMs = opts.timeoutMs ?? NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS;
   const fetchImpl = opts.fetchImpl ?? fetch;
   const fallback = opts.fallbackBaseUrl ?? url;
 
@@ -102,6 +103,7 @@ export async function runFirecrawlScrape(
         formats: ["html", "rawHtml"],
         onlyMainContent: false,
         waitFor: 1500,
+        timeout: apiTimeoutMs,
       }),
       signal: controller.signal,
     });
