@@ -1,100 +1,58 @@
-# Phase 6 Diagnostic Patch — Redeploy + Sanitized Logs (revised)
-
 ## Goal
+Fix the V2 URL analysis failure for the Nykaa product URL. Logs confirm Phase 6 is wired correctly and Firecrawl is being invoked; it just times out at the current 12s budget for JS-heavy hosts like Nykaa.
 
-Determine why the Nykaa request returned `FETCH_BAD_STATUS` with **no Firecrawl log at all**, by:
+## Root cause (confirmed by logs)
+- Direct safe-fetch → `FETCH_BAD_STATUS`
+- `firecrawl_configured: true`, `priority: "high"`
+- Firecrawl branch entered (fetch recovery)
+- `FIRECRAWL_TIMEOUT` after ~12009ms
+- V2 correctly returned the original fetch error under the strict Phase 6 contract
 
-1. Forcing the deployed `analyze-entity-url-v2` revision to pick up the newly added `FIRECRAWL_API_KEY`.
-2. Adding minimal, sanitized diagnostic logs that prove (or disprove) whether Firecrawl is configured and whether the Firecrawl branch is entered.
+Not a secret issue, not a deploy-staleness issue, not a Phase 6 wiring bug, not a credits/auth issue.
 
-No behavior changes. No Phase 7 work. No touching V1, frontend, DB, fetcher, ssrf, extractor, firecrawl.ts, schema.ts, weak_signals.ts, or host_hints.ts.
+## Changes
 
-## Scope (in-scope)
+### 1. `supabase/functions/analyze-entity-url-v2/firecrawl.ts`
+- Add explicit constants:
+  - `NORMAL_FIRECRAWL_API_TIMEOUT_MS = 12_000`
+  - `NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS = 12_000` (existing default; unchanged)
+  - `HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS = 30_000`
+  - `HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS = 32_000`
+- Extend `FirecrawlOpts` to accept an `apiTimeoutMs` (sent in the Firecrawl request body as `timeout`) in addition to the existing local `timeoutMs` (AbortController).
+- **ALWAYS send `timeout` in the Firecrawl request body** — no ambiguity. Normal callers get `timeout: 12000`, high-priority callers get `timeout: 30000`.
+- Default (no opts) behavior: normal API timeout 12_000 in body, local abort 12_000.
+- High-priority callers: API `timeout: 30000` in body, local abort 32_000 (local strictly larger than API so Firecrawl can return a structured response before local abort fires).
 
-- `supabase/functions/analyze-entity-url-v2/index.ts` — add exactly 3 sanitized `console.log` lines
-- Redeploy `analyze-entity-url-v2`
-- Re-test the exact Nykaa URL
-- Read edge function logs and report findings
+### 2. `supabase/functions/analyze-entity-url-v2/index.ts`
+- When `priority === "high"` (already derived from `isKnownJsHeavyHost(safe.url)` — Nykaa is already in `host_hints.ts`), pass the high-priority timeout options into `runFirecrawlScrape()` at BOTH call sites:
+  - fetch-failure recovery branch
+  - weak-signals recovery branch
+- Normal hosts keep the existing 12s behavior (now with explicit `timeout: 12000` in the request body).
+- Preserve the strict Phase 6 fallback contract unchanged: only convert to 200 success when Firecrawl returns HTML AND `extractFromHtml()` produces `predictions !== null`. Otherwise return the original fetch error.
+- **Keep the 3 diagnostic logs in place** through the Nykaa validation run. They will be cleaned up in a separate follow-up patch after validation.
 
-## Out of scope (explicitly NOT changing)
+### 3. `supabase/functions/analyze-entity-url-v2/firecrawl_test.ts`
+- Add tests asserting the exact `timeout` field is present in the request body:
+  - Default/normal request body includes `timeout: 12000`.
+  - High-priority request body (via `apiTimeoutMs: 30000`) includes `timeout: 30000`.
+- Add a test that the local AbortController honors a configured local timeout (hanging fetch → `FIRECRAWL_TIMEOUT`).
+- Existing error-code mapping tests (402, 5xx, malformed JSON, oversize HTML, missing key, abort) remain unchanged and must still pass.
 
-- V1 (`analyze-entity-url`)
-- `fetcher.ts`, `ssrf.ts`, `extractor.ts`, `weak_signals.ts`, `host_hints.ts`, `firecrawl.ts`, `schema.ts`
-- Frontend, DB, RPCs, secrets (already added)
-- Firecrawl fallback logic, eligibility set, strict fetch-failure contract
-- Gemini / URL Context / Google Search (Phase 7)
+## Out of scope (not in this patch)
+- Frontend, V1, DB/RPC/secrets, `ssrf.ts`, `fetcher.ts`, `extractor.ts`, `weak_signals.ts`, Firecrawl trigger rules, error envelope shape, Gemini / Phase 7 logic, category resolution, brand creation.
+- Diagnostic log cleanup — deferred to a separate follow-up patch AFTER the Nykaa retest confirms behavior. Do not remove logs in this patch.
 
-## The 3 logs to add (sanitized, corrected)
-
-All inserted in `index.ts` only. Structured objects with **only** the listed fields — no URL, no API key, no HTML, no headers, no body.
-
-1. **Right after `firecrawlConfigured` and `priority` are defined** (just after the SSRF block, before safe fetch — placement guarantees both consts exist so no TS error):
-   ```ts
-   console.log("[analyze-entity-url-v2] phase6 firecrawl_configured", {
-     configured: firecrawlConfigured,
-     priority,
-   });
-   ```
-
-2. **Inside the fetch-failure recovery branch**, right before `runFirecrawlScrape` (only fires when eligible + configured):
-   ```ts
-   console.log("[analyze-entity-url-v2] phase6 firecrawl branch entered (fetch recovery)", {
-     fetch_error_code: e.code,
-     priority,
-   });
-   ```
-
-3. **Inside the weak-signals recovery branch**, right before `runFirecrawlScrape`. Uses the actual return shape `{ weak, reasons: string[] }` from `detectWeakSignals()` — reasons are controlled diagnostic strings (`"predictions_null"`, `"weak_signals_flag"`), safe to log:
-   ```ts
-   console.log("[analyze-entity-url-v2] phase6 firecrawl branch entered (weak recovery)", {
-     priority,
-     weak_reasons: ws.reasons,
-   });
-   ```
-
-Existing `console.warn` lines (firecrawl call failed, firecrawl recovery failed) are already sanitized — leave them as-is.
-
-## Forbidden log content
-
-- Full URL, query string, or final URL
-- `FIRECRAWL_API_KEY` (or any prefix/suffix of it)
-- `fetchResult.bodyText`, `fc.html`, `fc.rawHtml`
-- Request headers, response headers
-- Raw Firecrawl response body
-
-## Steps
-
-1. Edit `supabase/functions/analyze-entity-url-v2/index.ts` to add the 3 logs above at the specified positions.
-2. Deploy only `analyze-entity-url-v2` (forces cold boot → picks up `FIRECRAWL_API_KEY`).
-3. Ask user to re-run the exact Nykaa URL:
-   `https://www.nykaa.com/dior-homme-intense-eau-de-parfum-intense/p/950905?skuId=768775`
-4. Read the edge function logs for that request and report:
-   - direct fetch error code
-   - `firecrawl_configured` value at runtime
-   - whether the Firecrawl branch was entered (and which one)
-   - Firecrawl result: `ok` / error code / status / `durationMs`
-   - if `ok`: did `extractFromHtml()` produce `predictions` or `null`?
-   - final V2 response (200 success vs original fetch error)
+## Validation
+After redeploy, re-test the same Nykaa URL and report all 6 signals:
+1. Firecrawl API timeout used (12_000 vs 30_000)
+2. Firecrawl duration_ms
+3. Firecrawl `ok: true` or error code
+4. Whether HTML was returned
+5. Whether `extractFromHtml()` produced `predictions !== null`
+6. Final response path: 200 success or original `FETCH_BAD_STATUS`
 
 ## Decision matrix after re-test
-
-| Log outcome | Conclusion | Next step |
-|---|---|---|
-| `configured: false` | Secret not injected into runtime even after redeploy | Investigate secret scoping / redeploy mechanism |
-| `configured: true` + branch NOT entered for `FETCH_BAD_STATUS` | Phase 6 wiring bug | Fix `index.ts` branch condition |
-| `configured: true` + branch entered + Firecrawl error (`FIRECRAWL_HTTP_ERROR` / `INSUFFICIENT_CREDITS` / `BAD_RESPONSE` / `TIMEOUT`) | Firecrawl integration / API / credits issue | Address that specific error |
-| `configured: true` + Firecrawl `ok` + extraction `predictions: null` | **Expected Phase 6 behavior** — Nykaa HTML lacks parseable product metadata | Move to Phase 7 (Gemini URL Context / Google Search) |
-| `configured: true` + Firecrawl `ok` + extraction succeeds | Phase 6 works; original V2 error was a deploy-stale issue | Remove diagnostic logs |
-
-## Cleanup (follow-up, NOT in this patch)
-
-After diagnosis is confirmed, remove logs 2 and 3, and keep only a permanent sanitized summary log if useful. That cleanup happens in a separate small patch.
-
-## Acceptance criteria
-
-- Exactly 3 `console.log` lines added, all sanitized per the rules above
-- Log #1 placed after `firecrawlConfigured` and `priority` are defined
-- Log #3 uses `ws.reasons` (array), not `ws.reason`
-- `analyze-entity-url-v2` redeployed
-- Edge function logs for the Nykaa re-test clearly answer all 6 report questions
-- No other files changed
+- Firecrawl returns HTML + extractor produces predictions → V2 success. Then schedule a separate diagnostic-log cleanup patch.
+- Firecrawl returns HTML + extractor `predictions: null` → Phase 6 working as designed; move to Phase 7 (Gemini URL Context / Google Search).
+- Firecrawl still `FIRECRAWL_TIMEOUT` after 30s → Nykaa is beyond an acceptable Firecrawl budget; do not keep raising — move to Phase 7.
+- Firecrawl returns `FIRECRAWL_HTTP_ERROR` / `FIRECRAWL_INSUFFICIENT_CREDITS` / `FIRECRAWL_BAD_RESPONSE` → Firecrawl integration/account issue, separate fix.

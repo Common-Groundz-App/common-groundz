@@ -30,14 +30,21 @@ export interface FirecrawlFailure {
 export type FirecrawlResult = FirecrawlSuccess | FirecrawlFailure;
 
 export interface FirecrawlOpts {
+  /** Local AbortController timeout (ms). Should be >= apiTimeoutMs. */
   timeoutMs?: number;
+  /** Value sent in the Firecrawl request body as `timeout` (ms). */
+  apiTimeoutMs?: number;
   fetchImpl?: typeof fetch;
   apiKey?: string;
   /** Used when Firecrawl returns no usable finalUrl. */
   fallbackBaseUrl?: string;
 }
 
-const DEFAULT_TIMEOUT_MS = 12_000;
+export const NORMAL_FIRECRAWL_API_TIMEOUT_MS = 12_000;
+export const NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS = 12_000;
+export const HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS = 30_000;
+export const HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS = 32_000;
+
 const MAX_HTML_BYTES = 2 * 1024 * 1024; // 2 MB, mirrors fetcher.
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 
