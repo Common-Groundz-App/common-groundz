@@ -27,7 +27,12 @@ import { FetchError, type FetchResult, validateAndFetchUrl } from "./fetcher.ts"
 import { extractFromHtml, type ExtractResult } from "./extractor.ts";
 import { detectWeakSignals } from "./weak_signals.ts";
 import { isKnownJsHeavyHost } from "./host_hints.ts";
-import { runFirecrawlScrape, safeBaseUrl } from "./firecrawl.ts";
+import {
+  runFirecrawlScrape,
+  safeBaseUrl,
+  HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS,
+  HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS,
+} from "./firecrawl.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
