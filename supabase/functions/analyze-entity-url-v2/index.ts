@@ -193,6 +193,11 @@ serve(async (req) => {
     const firecrawlConfigured = !!Deno.env.get("FIRECRAWL_API_KEY");
     const priority: "high" | "normal" = isKnownJsHeavyHost(safe.url) ? "high" : "normal";
 
+    console.log("[analyze-entity-url-v2] phase6 firecrawl_configured", {
+      configured: firecrawlConfigured,
+      priority,
+    });
+
     // === Safe fetch ===
     let fetchResult: FetchResult;
     try {
@@ -205,6 +210,10 @@ serve(async (req) => {
 
       // Phase 6: eligible fetch failures may be recovered by Firecrawl.
       if (FETCH_FAILED_ELIGIBLE.has(e.code) && firecrawlConfigured) {
+        console.log("[analyze-entity-url-v2] phase6 firecrawl branch entered (fetch recovery)", {
+          fetch_error_code: e.code,
+          priority,
+        });
         const fc = await runFirecrawlScrape(safe.url, { fallbackBaseUrl: safe.url });
         if (fc.ok) {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
@@ -269,6 +278,10 @@ serve(async (req) => {
     const ws = detectWeakSignals(extract);
     if (ws.weak) {
       if (firecrawlConfigured) {
+        console.log("[analyze-entity-url-v2] phase6 firecrawl branch entered (weak recovery)", {
+          priority,
+          weak_reasons: ws.reasons,
+        });
         const fc = await runFirecrawlScrape(safe.url, { fallbackBaseUrl: safe.url });
         if (fc.ok) {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
