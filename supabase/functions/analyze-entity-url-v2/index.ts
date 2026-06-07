@@ -210,6 +210,10 @@ serve(async (req) => {
 
       // Phase 6: eligible fetch failures may be recovered by Firecrawl.
       if (FETCH_FAILED_ELIGIBLE.has(e.code) && firecrawlConfigured) {
+        console.log("[analyze-entity-url-v2] phase6 firecrawl branch entered (fetch recovery)", {
+          fetch_error_code: e.code,
+          priority,
+        });
         const fc = await runFirecrawlScrape(safe.url, { fallbackBaseUrl: safe.url });
         if (fc.ok) {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
