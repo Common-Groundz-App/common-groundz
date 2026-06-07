@@ -278,6 +278,10 @@ serve(async (req) => {
     const ws = detectWeakSignals(extract);
     if (ws.weak) {
       if (firecrawlConfigured) {
+        console.log("[analyze-entity-url-v2] phase6 firecrawl branch entered (weak recovery)", {
+          priority,
+          weak_reasons: ws.reasons,
+        });
         const fc = await runFirecrawlScrape(safe.url, { fallbackBaseUrl: safe.url });
         if (fc.ok) {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
