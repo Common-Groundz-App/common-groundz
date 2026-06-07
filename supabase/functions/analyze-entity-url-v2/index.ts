@@ -219,7 +219,15 @@ serve(async (req) => {
           fetch_error_code: e.code,
           priority,
         });
-        const fc = await runFirecrawlScrape(safe.url, { fallbackBaseUrl: safe.url });
+        const fc = await runFirecrawlScrape(safe.url, {
+          fallbackBaseUrl: safe.url,
+          ...(priority === "high"
+            ? {
+                apiTimeoutMs: HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS,
+                timeoutMs: HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS,
+              }
+            : {}),
+        });
         if (fc.ok) {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
           const extract = extractFromHtml(fc.html, base);
