@@ -1,6 +1,42 @@
 import { assertEquals, assert } from "https://deno.land/std@0.168.0/testing/asserts.ts";
 import { runFirecrawlScrape, safeBaseUrl } from "./firecrawl.ts";
 
+Deno.test("default request body includes timeout: 12000", async () => {
+  let captured: unknown = null;
+  const fetchImpl = ((_url: string, init?: RequestInit) => {
+    captured = JSON.parse(String(init?.body ?? "{}"));
+    return Promise.resolve(
+      new Response(JSON.stringify({ data: { html: "<x/>" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  }) as unknown as typeof fetch;
+  await runFirecrawlScrape("https://example.com/x", { apiKey: "k", fetchImpl });
+  assertEquals((captured as { timeout: number }).timeout, 12000);
+});
+
+Deno.test("high-priority apiTimeoutMs sets request body timeout: 30000", async () => {
+  let captured: unknown = null;
+  const fetchImpl = ((_url: string, init?: RequestInit) => {
+    captured = JSON.parse(String(init?.body ?? "{}"));
+    return Promise.resolve(
+      new Response(JSON.stringify({ data: { html: "<x/>" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+  }) as unknown as typeof fetch;
+  await runFirecrawlScrape("https://example.com/x", {
+    apiKey: "k",
+    fetchImpl,
+    apiTimeoutMs: 30000,
+    timeoutMs: 32000,
+  });
+  assertEquals((captured as { timeout: number }).timeout, 30000);
+});
+
+
 const URL_IN = "https://example.com/x";
 
 function jsonRes(body: unknown, status = 200): Response {
