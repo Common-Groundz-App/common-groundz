@@ -49,7 +49,7 @@ Deno.test("missing API key → sentinel, no fetch", async () => {
   assertEquals(res, { ok: false, configured: false });
 });
 
-Deno.test("body never contains responseSchema or top-level timeout; always JSON mode + both tools", async () => {
+Deno.test("body shape: snake_case tools, no responseMimeType/Schema/timeout, systemInstruction split from user prompt", async () => {
   let captured: any = null;
   const res = await runGeminiJsonMode({
     systemPrompt: "s",
@@ -62,12 +62,16 @@ Deno.test("body never contains responseSchema or top-level timeout; always JSON 
     }),
   });
   assert(res.ok);
-  assertEquals(captured.generationConfig.responseMimeType, "application/json");
+  assertEquals(captured.generationConfig.responseMimeType, undefined);
   assertEquals(captured.generationConfig.responseSchema, undefined);
   assertEquals(captured.timeout, undefined);
+  assertEquals(captured.systemInstruction.parts[0].text, "s");
+  assertEquals(captured.contents[0].parts[0].text, "u");
   const tools = captured.tools as Array<Record<string, unknown>>;
-  assert(tools.some((t) => "urlContext" in t));
-  assert(tools.some((t) => "googleSearch" in t));
+  assert(tools.some((t) => "url_context" in t));
+  assert(tools.some((t) => "google_search" in t));
+  assertFalse(tools.some((t) => "urlContext" in t));
+  assertFalse(tools.some((t) => "googleSearch" in t));
 });
 
 Deno.test("429 → GEMINI_RATE_LIMITED; 402 → GEMINI_PAYMENT_REQUIRED; 500 → GEMINI_HTTP_ERROR; 400 → GEMINI_HTTP_ERROR (no schema fallback)", async () => {
@@ -80,6 +84,60 @@ Deno.test("429 → GEMINI_RATE_LIMITED; 402 → GEMINI_PAYMENT_REQUIRED; 500 →
     assertEquals(res.code, code);
     assertEquals(res.status, status);
   }
+});
+
+// --- Sanitized 400 diagnostic logging ---
+
+function captureLogs(fn: () => Promise<void>): Promise<Array<unknown[]>> {
+  const original = console.log;
+  const calls: Array<unknown[]> = [];
+  console.log = (...args: unknown[]) => { calls.push(args); };
+  return fn().then(() => { console.log = original; return calls; }, (e) => { console.log = original; throw e; });
+}
+
+Deno.test("400 with JSON error body → logs sanitized error_status/code/message", async () => {
+  const errBody = JSON.stringify({ error: { status: "INVALID_ARGUMENT", code: 400, message: "Request contains an invalid argument." } });
+  const calls = await captureLogs(async () => {
+    await runGeminiJsonMode({
+      systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+      fetchImpl: makeFetch(() => new Response(errBody, { status: 400 })),
+    });
+  });
+  const payload = calls.find((c) => c[0] === "[analyze-entity-url-v2] gemini")?.[1] as Record<string, unknown> | undefined;
+  assertExists(payload);
+  assertEquals(payload.error_status, "INVALID_ARGUMENT");
+  assertEquals(payload.error_code, 400);
+  assertEquals(payload.error_message_truncated, "Request contains an invalid argument.");
+  assertFalse("prompt" in payload);
+  assertFalse("body" in payload);
+  assertFalse("headers" in payload);
+});
+
+Deno.test("400 with non-JSON text body → error_message_truncated is collapsed text", async () => {
+  const calls = await captureLogs(async () => {
+    await runGeminiJsonMode({
+      systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+      fetchImpl: makeFetch(() => new Response("Bad   Request\n\nfoo", { status: 400 })),
+    });
+  });
+  const payload = calls.find((c) => c[0] === "[analyze-entity-url-v2] gemini")?.[1] as Record<string, unknown> | undefined;
+  assertExists(payload);
+  assertEquals(payload.error_message_truncated, "Bad Request foo");
+});
+
+Deno.test("400 with >400 char body → error_message_truncated <= 400 chars", async () => {
+  const big = "x".repeat(2000);
+  const calls = await captureLogs(async () => {
+    await runGeminiJsonMode({
+      systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+      fetchImpl: makeFetch(() => new Response(big, { status: 400 })),
+    });
+  });
+  const payload = calls.find((c) => c[0] === "[analyze-entity-url-v2] gemini")?.[1] as Record<string, unknown> | undefined;
+  assertExists(payload);
+  const msg = payload.error_message_truncated as string;
+  assert(typeof msg === "string");
+  assert(msg.length <= 400);
 });
 
 Deno.test("AbortController → GEMINI_TIMEOUT", async () => {
