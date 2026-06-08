@@ -9,6 +9,7 @@
 
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 import type { CanonicalEntityType } from "../_shared/entityTypes.ts";
+import type { GeminiErrorCode } from "./gemini.ts";
 
 export const EXTRACTION_VERSION = "v2" as const;
 export const EDGE_FUNCTION_NAME = "analyze-entity-url-v2" as const;
@@ -136,6 +137,24 @@ export interface V2SuccessResponse {
       duration_ms?: number;
       error_code?: string;
       improved?: boolean;
+    };
+    /**
+     * Phase 7+: Gemini URL Context + Google Search diagnostics. Additive.
+     * Present only when Gemini was eligible and called on a success path.
+     * NEVER emitted on V2ErrorResponse. Raw Gemini predictions are NOT
+     * exposed on the wire in Phase 7 (Phase 8 will merge into predictions).
+     */
+    gemini?: {
+      used: boolean;
+      model?: string;
+      duration_ms?: number;
+      used_url_context?: boolean;
+      used_google_search?: boolean;
+      url_context_failed?: boolean;
+      url_retrieval_statuses?: string[];
+      error_code?: GeminiErrorCode;
+      produced_fields?: number;
+      field_confidence_present?: boolean;
     };
   };
   warnings?: string[];
