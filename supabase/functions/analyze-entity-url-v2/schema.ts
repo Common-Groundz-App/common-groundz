@@ -138,6 +138,24 @@ export interface V2SuccessResponse {
       error_code?: string;
       improved?: boolean;
     };
+    /**
+     * Phase 7+: Gemini URL Context + Google Search diagnostics. Additive.
+     * Present only when Gemini was eligible and called on a success path.
+     * NEVER emitted on V2ErrorResponse. Raw Gemini predictions are NOT
+     * exposed on the wire in Phase 7 (Phase 8 will merge into predictions).
+     */
+    gemini?: {
+      used: boolean;
+      model?: string;
+      duration_ms?: number;
+      used_url_context?: boolean;
+      used_google_search?: boolean;
+      url_context_failed?: boolean;
+      url_retrieval_statuses?: string[];
+      error_code?: GeminiErrorCode;
+      produced_fields?: number;
+      field_confidence_present?: boolean;
+    };
   };
   warnings?: string[];
 }
