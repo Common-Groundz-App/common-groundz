@@ -37,7 +37,38 @@ interface RecoveryArgs {
   finalUrl: string;
 }
 
-function weak(sources: string[]): ExtractResult {
+export interface FirecrawlRecoveryDiagnostics {
+  name_source: "markdown_h1" | "metadata_title" | null;
+  markdown_h1_found: boolean;
+  markdown_h1_within_main_region: boolean;
+  markdown_price_found: boolean;
+  metadata_price_found: boolean;
+  price_conflict: boolean;
+  selected_price_source: "metadata" | "markdown" | "omitted" | "none";
+  image_source: "metadata_og_image" | "markdown_image" | null;
+  image_present: boolean;
+}
+
+export interface FirecrawlRecoveryOutput {
+  result: ExtractResult;
+  diagnostics: FirecrawlRecoveryDiagnostics;
+}
+
+function emptyDiagnostics(): FirecrawlRecoveryDiagnostics {
+  return {
+    name_source: null,
+    markdown_h1_found: false,
+    markdown_h1_within_main_region: false,
+    markdown_price_found: false,
+    metadata_price_found: false,
+    price_conflict: false,
+    selected_price_source: "none",
+    image_source: null,
+    image_present: false,
+  };
+}
+
+function weak(sources: string[], diagnostics: FirecrawlRecoveryDiagnostics): FirecrawlRecoveryOutput {
   const metadata: ExtractMetadata = {
     has_jsonld: false,
     jsonld_blocks: 0,
@@ -48,8 +79,9 @@ function weak(sources: string[]): ExtractResult {
     confidence: null,
     weak_signals: true,
   };
-  return { predictions: null, metadata, warnings: [] };
+  return { result: { predictions: null, metadata, warnings: [] }, diagnostics };
 }
+
 
 /** Case-insensitive key lookup. Preserves value casing; trims only. */
 function getMeta(
