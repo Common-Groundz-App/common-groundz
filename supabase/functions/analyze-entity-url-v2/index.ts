@@ -33,6 +33,7 @@ import {
   HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS,
   HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS,
 } from "./firecrawl.ts";
+import { extractFromFirecrawl } from "./firecrawl_recovery.ts";
 import {
   chooseEvidenceBaseUrl,
   runGeminiJsonMode,
