@@ -271,12 +271,8 @@ serve(async (req) => {
     }
 
     const firecrawlConfigured = !!Deno.env.get("FIRECRAWL_API_KEY");
+    const geminiConfigured = !!Deno.env.get("GEMINI_API_KEY");
     const priority: "high" | "normal" = isKnownJsHeavyHost(safe.url) ? "high" : "normal";
-
-    console.log("[analyze-entity-url-v2] phase6 firecrawl_configured", {
-      configured: firecrawlConfigured,
-      priority,
-    });
 
     // === Safe fetch ===
     let fetchResult: FetchResult;
@@ -290,10 +286,6 @@ serve(async (req) => {
 
       // Phase 6: eligible fetch failures may be recovered by Firecrawl.
       if (FETCH_FAILED_ELIGIBLE.has(e.code) && firecrawlConfigured) {
-        console.log("[analyze-entity-url-v2] phase6 firecrawl branch entered (fetch recovery)", {
-          fetch_error_code: e.code,
-          priority,
-        });
         const fc = await runFirecrawlScrape(safe.url, {
           fallbackBaseUrl: safe.url,
           ...(priority === "high"
@@ -307,6 +299,32 @@ serve(async (req) => {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
           const extract = extractFromHtml(fc.html, base);
           if (extract.predictions !== null) {
+            // Phase 7: Gemini eligible (firecrawl was used).
+            const evidenceBaseUrl = chooseEvidenceBaseUrl({
+              firecrawlFinalUrl: base,
+              fetchFinalUrl: null,
+              safeUrl: safe.url,
+            });
+            const warnings: string[] = [...extract.warnings];
+            let geminiBlock: GeminiMetadataBlock | undefined;
+            if (geminiConfigured) {
+              const gem = await invokeGemini({
+                url: safe.url,
+                html: fc.html,
+                evidenceBaseUrl,
+                extractMetadata: extract.metadata,
+              });
+              if (gem.ok) {
+                geminiBlock = geminiSuccessBlock(gem);
+              } else if (gem.configured) {
+                geminiBlock = geminiFailureBlock(gem);
+                (warnings as string[]).push(gem.code satisfies GeminiWarningCode);
+              }
+            } else {
+              (warnings as string[]).push(
+                "GEMINI_NOT_CONFIGURED" satisfies GeminiWarningCode,
+              );
+            }
             const response: V2SuccessResponse = {
               success: true,
               predictions: extract.predictions,
@@ -317,12 +335,11 @@ serve(async (req) => {
                 edge_function: EDGE_FUNCTION_NAME,
                 method: "exact-page",
                 timestamp: new Date().toISOString(),
-                used_url_context: false,
-                used_google_search: false,
+                used_url_context: geminiBlock?.used_url_context ?? false,
+                used_google_search: geminiBlock?.used_google_search ?? false,
                 used_firecrawl: true,
-                phase: 6,
+                phase: 7,
                 stage: "firecrawl-recovered",
-                // metadata.fetch OMITTED — no successful direct safe-fetch.
                 extract: extract.metadata,
                 firecrawl: {
                   used: true,
@@ -330,22 +347,45 @@ serve(async (req) => {
                   duration_ms: fc.durationMs,
                   improved: true,
                 },
+                ...(geminiBlock ? { gemini: geminiBlock } : {}),
               },
-              warnings: extract.warnings.length > 0 ? extract.warnings : undefined,
+              warnings: warnings.length > 0 ? warnings : undefined,
             };
             return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
           }
-          // Firecrawl returned HTML but extraction still null → fall through.
+          // Firecrawl returned HTML but extraction still null → error path.
+          // Phase 7: invoke Gemini for diagnostics ONLY (logs). Do NOT mutate
+          // V2ErrorResponse — no metadata.gemini, no warnings[] in body.
           console.warn("[analyze-entity-url-v2] firecrawl recovery failed: weak extraction", {
             code: e.code,
             durationMs: fc.durationMs,
           });
+          if (geminiConfigured) {
+            const evidenceBaseUrl = chooseEvidenceBaseUrl({
+              firecrawlFinalUrl: base,
+              fetchFinalUrl: null,
+              safeUrl: safe.url,
+            });
+            // Fire-and-await for logs; ignore result.
+            await invokeGemini({
+              url: safe.url,
+              html: fc.html,
+              evidenceBaseUrl,
+              extractMetadata: extract.metadata,
+            });
+          } else {
+            console.log("[analyze-entity-url-v2] gemini", {
+              ok: false,
+              code: "GEMINI_NOT_CONFIGURED",
+            });
+          }
         } else {
           console.warn("[analyze-entity-url-v2] firecrawl call failed on fetch recovery", {
             code: fc.code,
             status: fc.status,
             durationMs: fc.durationMs,
           });
+          // Firecrawl outright failed → per trigger table, skip Gemini.
         }
       }
 
@@ -362,14 +402,12 @@ serve(async (req) => {
     const warnings: string[] = [...extract.warnings];
     let usedFirecrawl = false;
     let firecrawlBlock: V2SuccessResponse["metadata"]["firecrawl"] | undefined;
+    let finalHtmlForGemini: string = fetchResult.bodyText;
+    let finalEvidenceBaseUrl: string = fetchResult.finalUrl;
 
     const ws = detectWeakSignals(extract);
     if (ws.weak) {
       if (firecrawlConfigured) {
-        console.log("[analyze-entity-url-v2] phase6 firecrawl branch entered (weak recovery)", {
-          priority,
-          weak_reasons: ws.reasons,
-        });
         const fc = await runFirecrawlScrape(safe.url, {
           fallbackBaseUrl: safe.url,
           ...(priority === "high"
@@ -385,6 +423,8 @@ serve(async (req) => {
           if (isStrictlyBetter(extract2, extract)) {
             extract = extract2;
             usedFirecrawl = true;
+            finalHtmlForGemini = fc.html;
+            finalEvidenceBaseUrl = base;
             firecrawlBlock = {
               used: true,
               priority,
@@ -422,6 +462,39 @@ serve(async (req) => {
       }
     }
 
+    // === Phase 7: Gemini trigger ===
+    // Eligible when extract is weak/null OR Firecrawl was involved.
+    // Strong direct successes skip Gemini.
+    const wsFinal = detectWeakSignals(extract);
+    const geminiEligible =
+      extract.predictions === null || wsFinal.weak || usedFirecrawl;
+    let geminiBlock: GeminiMetadataBlock | undefined;
+    if (geminiEligible) {
+      if (geminiConfigured) {
+        const evidenceBaseUrl = chooseEvidenceBaseUrl({
+          firecrawlFinalUrl: usedFirecrawl ? finalEvidenceBaseUrl : null,
+          fetchFinalUrl: !usedFirecrawl ? fetchResult.finalUrl : null,
+          safeUrl: safe.url,
+        });
+        const gem = await invokeGemini({
+          url: safe.url,
+          html: finalHtmlForGemini,
+          evidenceBaseUrl,
+          extractMetadata: extract.metadata,
+        });
+        if (gem.ok) {
+          geminiBlock = geminiSuccessBlock(gem);
+        } else if (gem.configured) {
+          geminiBlock = geminiFailureBlock(gem);
+          (warnings as string[]).push(gem.code satisfies GeminiWarningCode);
+        }
+      } else {
+        (warnings as string[]).push(
+          "GEMINI_NOT_CONFIGURED" satisfies GeminiWarningCode,
+        );
+      }
+    }
+
     const response: V2SuccessResponse = {
       success: true,
       predictions: extract.predictions,
@@ -432,10 +505,10 @@ serve(async (req) => {
         edge_function: EDGE_FUNCTION_NAME,
         method: extract.predictions ? "exact-page" : "stub",
         timestamp: new Date().toISOString(),
-        used_url_context: false,
-        used_google_search: false,
+        used_url_context: geminiBlock?.used_url_context ?? false,
+        used_google_search: geminiBlock?.used_google_search ?? false,
         used_firecrawl: usedFirecrawl,
-        phase: 6,
+        phase: 7,
         stage: usedFirecrawl
           ? "firecrawl-improved"
           : extract.predictions
@@ -451,6 +524,7 @@ serve(async (req) => {
         },
         extract: extract.metadata,
         ...(firecrawlBlock ? { firecrawl: firecrawlBlock } : {}),
+        ...(geminiBlock ? { gemini: geminiBlock } : {}),
       },
       warnings: warnings.length > 0 ? warnings : undefined,
     };
