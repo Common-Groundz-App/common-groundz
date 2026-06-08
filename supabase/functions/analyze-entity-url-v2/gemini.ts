@@ -139,6 +139,26 @@ function logLine(payload: Record<string, unknown>): void {
   console.log("[analyze-entity-url-v2] gemini", payload);
 }
 
+function sanitizeErrorBody(raw: string): {
+  error_status?: string;
+  error_code?: number;
+  error_message_truncated?: string;
+} {
+  const MAX = 400;
+  const collapse = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, MAX);
+  try {
+    const j = JSON.parse(raw) as { error?: { status?: unknown; code?: unknown; message?: unknown } };
+    const err = j?.error ?? {};
+    const out: { error_status?: string; error_code?: number; error_message_truncated?: string } = {};
+    if (typeof err.status === "string") out.error_status = err.status.slice(0, 64);
+    if (typeof err.code === "number") out.error_code = err.code;
+    if (typeof err.message === "string") out.error_message_truncated = collapse(err.message);
+    return out;
+  } catch {
+    return raw ? { error_message_truncated: collapse(raw) } : {};
+  }
+}
+
 export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResult> {
   const apiKey = args.apiKey ?? Deno.env.get("GEMINI_API_KEY") ?? "";
   if (!apiKey) {
@@ -149,16 +169,19 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
   const t0 = Date.now();
 
   const body = {
+    systemInstruction: {
+      role: "system",
+      parts: [{ text: args.systemPrompt }],
+    },
     contents: [
       {
         role: "user",
-        parts: [{ text: `${args.systemPrompt}\n\n${args.userPrompt}` }],
+        parts: [{ text: args.userPrompt }],
       },
     ],
-    tools: [{ urlContext: {} }, { googleSearch: {} }],
+    tools: [{ url_context: {} }, { google_search: {} }],
     generationConfig: {
       temperature: GEMINI_TEMPERATURE,
-      responseMimeType: "application/json",
     },
   };
 
@@ -187,9 +210,17 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     let code: GeminiErrorCode = "GEMINI_HTTP_ERROR";
     if (res.status === 429) code = "GEMINI_RATE_LIMITED";
     else if (res.status === 402) code = "GEMINI_PAYMENT_REQUIRED";
-    logLine({ ok: false, code, status: res.status, durationMs, modelUsed: GEMINI_MODEL });
-    // Drain body to free the connection; don't log it.
-    try { await res.text(); } catch { /* ignore */ }
+    let bodyText = "";
+    try { bodyText = await res.text(); } catch { /* ignore */ }
+    const sanitized = sanitizeErrorBody(bodyText);
+    logLine({
+      ok: false,
+      code,
+      status: res.status,
+      ...sanitized,
+      durationMs,
+      modelUsed: GEMINI_MODEL,
+    });
     return { ok: false, configured: true, code, status: res.status, durationMs, model: GEMINI_MODEL };
   }
 
