@@ -111,6 +111,74 @@ function isStrictlyBetter(b: ExtractResult, a: ExtractResult): boolean {
   return false;
 }
 
+/**
+ * Phase 7: run Gemini and produce the metadata.gemini block + any warning
+ * code to push on success responses. On error-path callers, only the result
+ * is needed (for logs) — they discard the metadata block.
+ */
+async function invokeGemini(args: {
+  url: string;
+  html: string;
+  evidenceBaseUrl: string;
+  extractMetadata: ExtractResult["metadata"];
+}): Promise<GeminiResult> {
+  const { systemPrompt, userPrompt } = buildV2Prompts(
+    {
+      url: args.url,
+      evidenceBaseUrl: args.evidenceBaseUrl,
+      rawHtml: args.html ?? null,
+      extractMetadata: args.extractMetadata,
+    },
+    args.evidenceBaseUrl,
+  );
+  return await runGeminiJsonMode({
+    systemPrompt,
+    userPrompt,
+    evidenceBaseUrl: args.evidenceBaseUrl,
+  });
+}
+
+type GeminiMetadataBlock = NonNullable<V2SuccessResponse["metadata"]["gemini"]>;
+
+function geminiSuccessBlock(gem: Extract<GeminiResult, { ok: true }>): GeminiMetadataBlock {
+  const fc = gem.prediction.field_confidence ?? {};
+  const fcKeys = Object.keys(fc);
+  let produced = 0;
+  for (const k of ["name", "description", "image_url"] as const) {
+    if ((gem.prediction as Record<string, unknown>)[k] != null) produced++;
+  }
+  if (gem.prediction.images.length > 0) produced++;
+  if (gem.prediction.additional_data?.brand) produced++;
+  if (gem.prediction.additional_data?.price != null) produced++;
+  return {
+    used: true,
+    model: gem.model,
+    duration_ms: gem.durationMs,
+    used_url_context: gem.grounding.used_url_context,
+    used_google_search: gem.grounding.used_google_search,
+    url_context_failed: gem.grounding.url_context_failed,
+    url_retrieval_statuses: gem.grounding.url_retrieval_statuses,
+    produced_fields: produced,
+    field_confidence_present: fcKeys.length > 0,
+  };
+}
+
+function geminiFailureBlock(
+  gem: Extract<GeminiResult, { ok: false; configured: true }>,
+): GeminiMetadataBlock {
+  return {
+    used: false,
+    model: gem.model,
+    duration_ms: gem.durationMs,
+    error_code: gem.code,
+    used_url_context: gem.grounding?.used_url_context,
+    used_google_search: gem.grounding?.used_google_search,
+    url_context_failed: gem.grounding?.url_context_failed,
+    url_retrieval_statuses: gem.grounding?.url_retrieval_statuses,
+  };
+}
+
+
 serve(async (req) => {
   // CORS preflight
   if (req.method === "OPTIONS") {
