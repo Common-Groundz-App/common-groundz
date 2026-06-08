@@ -1,137 +1,166 @@
+# Firecrawl Deterministic Recovery Patch — `analyze-entity-url-v2`
 
-# Phase 7.1 Hotfix — Fix Gemini `GEMINI_HTTP_ERROR 400` in `analyze-entity-url-v2`
+(Pre-Phase-8 hotfix. Not Gemini merge. Fixes how V2 consumes Firecrawl's own scrape output.)
 
 ## Diagnosis
 
-Edge logs show Phase 7 wiring fires exactly as designed, but Google rejects the Gemini request with HTTP 400 before any URL Context / Search work happens:
+Latest edge logs for the Nykaa URL:
 
 ```
-fetch failed { code: FETCH_BAD_STATUS }
-firecrawl recovery failed: weak extraction
-gemini { ok: false, code: GEMINI_HTTP_ERROR, status: 400, durationMs: 702 }
+fetch failed { code: "FETCH_BAD_STATUS" }
+firecrawl recovery failed: weak extraction { code: "FETCH_BAD_STATUS", durationMs: 3028 }
+gemini { ok: true, used_url_context: true, used_google_search: true }
 ```
 
-The current code drains the 400 body without logging it, so the real reason is hidden. Two suspects, both fixable in one deploy:
-
-1. **`generationConfig.responseMimeType: "application/json"` combined with built-in tools.** Per Google docs, structured outputs + grounding tools is a Gemini 3 capability, not 2.5. Our working V1 (`analyze-entity-url`) does not send `responseMimeType`.
-2. **Tool key casing.** V2 currently uses SDK-style `urlContext` / `googleSearch`. Google's official REST docs for URL Context and Google Search show `url_context` / `google_search`. V1 proves `googleSearch` camelCase works **for Google Search alone**, but does **not** prove `urlContext` camelCase works in a combined REST request. Align V2 with the documented REST shape.
+Firecrawl is **not** failing — it returns rich `metadata` (`og:type=product`, `og:title`/`ogTitle`, `og:image`/`ogImage`, `product:price:amount`, `product:price:currency`) and full product `markdown` (H1, price, description). But V2's Firecrawl client only requests/keeps `html`/`rawHtml`, and `extractFromHtml()` only parses JSON-LD/OG inside HTML — recovery returns `null` and V2 surfaces the original `FETCH_BAD_STATUS`. Gemini works (Phase 7.1) but Phase 7 is diagnostic-only.
 
 ## Scope
 
-Phase 7.1 only. Touches `supabase/functions/analyze-entity-url-v2/gemini.ts` and its test file. Nothing else.
+Touches only:
+- `supabase/functions/analyze-entity-url-v2/firecrawl.ts`
+- `supabase/functions/analyze-entity-url-v2/index.ts`
+- new file `supabase/functions/analyze-entity-url-v2/firecrawl_recovery.ts`
+- `supabase/functions/analyze-entity-url-v2/firecrawl_test.ts` and new `firecrawl_recovery_test.ts`
 
-**Out of scope (do not touch):**
-- **V1 (`analyze-entity-url`) — leave the working version alone.**
-- Frontend, predictions merge, V2 response envelope, `V2ErrorCode` union
-- Firecrawl trigger rules, SSRF, fetcher, deterministic extractor, weak-signal logic, host hints
-- DB, schemas, migrations
-- Phase 8 (predictions merge stays deferred)
+**Out of scope (do not touch):** V1 (`analyze-entity-url`), frontend, DB/schema/migrations, SSRF, fetcher, `extractor.ts`, weak-signal rules, host hints, Gemini client, prompt generator, V2 response envelope/error union, Phase 8.
 
 ## Changes
 
-### 1. Capture and log Google's sanitized 400 message
+### 1) Preserve Firecrawl `markdown` and `metadata`
 
-In `runGeminiJsonMode`, on `!res.ok` stop discarding the body. Read it as text, try `JSON.parse`, and extract only safe fields:
+In `firecrawl.ts`:
+- Change request `formats` from `["html","rawHtml"]` → **`["html","markdown"]`**.
+- Response parsing stays **tolerant of `rawHtml`**: `html = data.html ?? data.rawHtml ?? ""`.
+- Extend `FirecrawlSuccess` with `markdown: string | null` and `metadata: Record<string, unknown> | null`.
+- 2 MB cap continues for `html`. Same cap for `markdown` (oversize → `markdown: null`, scrape does not fail).
+- **Usability rule:** treat scrape as usable if **any one** of `html` (non-empty), `markdown`, or `metadata` is present. Do not fail just because `html` is missing — this patch exists specifically to recover from metadata/markdown.
+- `metadata` and `markdown` are **internal** — never returned in V2 response, never logged in full.
+- All other behavior preserved: `onlyMainContent: false`, `waitFor: 1500`, `timeout`, error codes, `safeBaseUrl`.
 
-- `error.status` (string, e.g. `INVALID_ARGUMENT`)
-- `error.code` (number)
-- `error.message` collapsed whitespace, truncated to **400 chars**
+### 2) New deterministic extractor `firecrawl_recovery.ts`
 
-If body isn't JSON, log first 400 chars of raw text (whitespace collapsed) as `error_message_truncated`.
+Exports `extractFromFirecrawl({ metadata, markdown, finalUrl })` returning the same `ExtractResult` shape as `extractFromHtml`.
 
-Log via existing `logLine` helper as:
+**Type the return against the Phase 5/6 extractable subset only**, not the full canonical list. Allowed emit types:
 
 ```
-{ ok: false, code: "GEMINI_HTTP_ERROR", status, error_status,
-  error_code, error_message_truncated, durationMs, modelUsed }
+product, book, movie, tv_show, course, app, game, food, place
 ```
 
-The returned `GeminiFailure` shape stays unchanged — diagnostics live in logs only.
+This typing prevents future drift even though the initial map only emits a subset.
 
-**Never log:** URL, prompt, evidence HTML, API key, request body, request headers, tool args, full response body, or any candidate text.
+**Product-first conservative map** (matching low-risk OG types already handled by `extractor.ts`):
 
-### 2. Switch REST tool names to documented snake_case
+| signal | emitted type | suggested_category_path |
+|---|---|---|
+| `og:type = product` | `product` | `"product"` |
+| any `product:*` key present (no `og:type`) | `product` | `"Product"` |
+| `og:type = book` / `books.book` | `book` | raw og:type |
+| `og:type = video.movie` | `movie` | `"video.movie"` |
+| `og:type = video.tv_show` / `video.episode` | `tv_show` | raw og:type |
+| **anything else** (`article`, `website`, `profile`, `music.*`, `restaurant.*`, `business.*`, `place`, unknown) | **weak / null** | — |
 
-Change V2's request body from:
+Notes:
+- **Do not** map `restaurant.restaurant` to `food`. In V2 taxonomy, restaurants/venues are `place`, not `food` (only recipes are food). For this hotfix do **not** add restaurant/business/place mappings at all — Nykaa doesn't need them and they introduce edge cases. They can be added later with fixtures.
+- Type comes **only** from structured metadata. Never infer from markdown keywords ("Add to bag", "Price ₹…").
+- `suggested_category_path` is the **raw og:type string** when type came from `og:type`; `"Product"` when type came only from `product:*`; never fabricated.
 
-```ts
-tools: [{ urlContext: {} }, { googleSearch: {} }]
-```
+**Metadata key normalization** (`getMeta(m, keys)`):
+- Key matching is **case-insensitive** (lowercase both sides on key comparison).
+- Values are **trimmed only** — casing preserved. Never lowercase names, brands, descriptions, URLs, or image paths (`"DIOR Homme Intense Eau De Parfum Intense"` must stay as-is).
+- Returns first non-empty string match.
 
-to the documented REST shape:
+Lookups:
+- name: markdown H1 in main region → `["og:title","ogTitle","title"]`
+- description: `["og:description","ogDescription","description","twitter:description"]` → first markdown paragraph
+- image: `["og:image","ogImage","twitter:image"]` → first http(s) markdown image; `safeAbsoluteUrl(..., finalUrl)`; drop `javascript:`/`data:`
+- brand: `["og:brand","product:brand"]` if present
+- currency: `["product:price:currency","og:price:currency"]`
+- price: see (3)
 
-```ts
-tools: [{ url_context: {} }, { google_search: {} }]
-```
+**Markdown safety.** Parse markdown only within the **main product region** = start through the first `## ` heading (or first 4 KB, whichever is smaller). Prevents "Customers also viewed" leaking.
 
-This matches Google's REST docs for both URL Context and Google Search. V1 stays untouched.
+**Prediction shape** (matches V2 exactly): `type`, `name`, `description`, `category_id: null`, `matched_category_name: null`, `tags: []`, `suggested_category_path`, `confidence: 0.75`, `reasoning: "Extracted from Firecrawl metadata/markdown"`, `image_url`, `images: [{ url }]`, `additional_data: { brand?, price?, currency? }`.
 
-### 3. Remove `responseMimeType` and keep JSON enforcement via prompt + parser
+**Source tags** internal only: `firecrawl:metadata:og:type`, `firecrawl:markdown:h1`, etc.
 
-In `generationConfig`:
-- **Remove** `responseMimeType: "application/json"`.
-- **Keep** `temperature: 0.15`.
-- Do **not** add `responseSchema`, `topP`, `topK`, `maxOutputTokens`, or a body-level `timeout`.
+### 3) Conservative price handling
 
-JSON output continues to be enforced through:
-- strict JSON instructions in `systemPrompt` (already in `prompt-generator-v2.ts`)
-- existing `stripCodeFences`
-- `JSON.parse`
-- `buildGeminiRawPredictionSchema` Zod validation
+- Metadata price from `["product:price:amount","og:price:amount"]` (numeric coerce).
+- Markdown price only from the main product region (see §2), matching `(?:₹|\$|€|£|USD|INR|EUR|GBP)\s?([\d,]+(?:\.\d+)?)` near/above first paragraph.
+- If both present and differ by >5% → **omit `price`**, keep `currency`.
+- If only one present → use it.
+- Never inject MRP/List Price when a sale price is also visible.
 
-### 4. Split `systemInstruction` from user prompt
+### 4) Wire into both Firecrawl paths in `index.ts`
 
-Stop concatenating `systemPrompt + "\n\n" + userPrompt` into one user message. Send:
+- **Path A (direct fetch failed → Firecrawl):**
+  1. `extractFromHtml(fc.html, base)`
+  2. If `predictions === null`, call `extractFromFirecrawl({ metadata, markdown, finalUrl: base })`
+  3. If either yields predictions → success with `used_firecrawl: true`, `stage: "firecrawl-recovered"`, `firecrawl.improved: true`
+  4. Only if both fail → return the original fetch error unchanged
 
-```ts
-systemInstruction: { role: "system", parts: [{ text: args.systemPrompt }] },
-contents: [{ role: "user", parts: [{ text: args.userPrompt }] }],
-```
+- **Path B (direct fetch succeeded but weak):**
+  1. Existing `extractFromHtml` + `isStrictlyBetter` check stays
+  2. If still not better, attempt `extractFromFirecrawl(...)`; treat non-null as strictly better than weak/null direct extract
+  3. Otherwise keep current `firecrawl_no_improvement` behavior
 
-Mirrors V1's working shape, slightly improves prompt-injection isolation.
+Gemini eligibility, Phase 7 diagnostic invocation, and strong-direct skip behavior are **unchanged**.
 
-### 5. Tests (`gemini_test.ts`)
+### 5) Privacy / logging
 
-Update existing assertions and add new ones. Keep file fully runnable with no network.
+- `markdown` and `metadata` never serialized into V2 response.
+- **Logs stay minimal** — existing codes and `durationMs` only. **Do not** log raw metadata, raw markdown, product names, descriptions, image URLs, prices, page URLs, source tag names/values, headers, or API keys. No new log lines added for this patch beyond changing the existing `firecrawl recovery failed: weak extraction` outcome.
+- V2 success/error envelope keys unchanged. V1 untouched.
 
-**Update** the body-shape test to assert:
-- `captured.generationConfig.responseMimeType === undefined`
-- `captured.generationConfig.responseSchema === undefined`
-- `captured.timeout === undefined`
-- `captured.systemInstruction.parts[0].text === "s"`
-- `captured.contents[0].parts[0].text === "u"` (no concatenation)
-- `captured.tools` contains an object with key `url_context` and one with key `google_search`
-- `captured.tools` does **not** contain keys `urlContext` or `googleSearch`
+## Tests
 
-**Add** three sanitized-logging tests by capturing `console.log`:
-- 400 with JSON body `{ error: { status: "INVALID_ARGUMENT", code: 400, message: "Request contains an invalid argument." } }` → logged payload contains `error_status: "INVALID_ARGUMENT"`, `error_code: 400`, truncated message; **no** `prompt` / `body` / `headers` keys.
-- 400 with non-JSON text body → `error_message_truncated` is the collapsed text.
-- 400 with a body longer than 400 chars → logged `error_message_truncated.length <= 400`.
+`firecrawl_test.ts` updates:
+- Body sent to Firecrawl contains `formats: ["html","markdown"]`.
+- 200 with `metadata` + `markdown` populated → `FirecrawlSuccess` exposes both.
+- Backward-compat: 200 with only `rawHtml` (no `html`) → succeeds, `html` populated from `rawHtml`.
+- 200 with only `metadata` (no `html`, no `markdown`) → succeeds, `html === ""`, `metadata` populated.
+- 200 with only `html` → `markdown: null`, `metadata: null`, ok.
+- Oversize markdown → `markdown: null`, scrape still succeeds.
+- 200 with all three missing/empty → still fails as malformed.
+- Existing 402, 5xx, timeout, oversize html, malformed JSON, `safeBaseUrl` tests keep passing.
 
-All other existing tests (timeouts, safety blocks, grounding parsing, image normalization, fenced JSON, invalid shape, missing API key) must still pass unchanged.
+New `firecrawl_recovery_test.ts` (no network), Nykaa-shaped fixture from user's playground JSON:
+- Direct HTML returns null; `extractFromFirecrawl` returns a `product` prediction:
+  - `name` from markdown H1, **casing preserved** (`"DIOR Homme Intense Eau De Parfum Intense"`)
+  - `description` from `og:description`
+  - `image_url` from `og:image`
+  - `currency: "INR"`
+  - `additional_data.price` **omitted** (metadata `14900` vs markdown `10600` >5%)
+  - `suggested_category_path === "product"`
+- Variant with `ogTitle` / `ogImage` camel-case only → same extraction; value casing preserved.
+- Variant with no `og:type` but `product:price:amount` → type `product`, `suggested_category_path === "Product"`.
+- Variant with no markdown price → `price: 14900` accepted.
+- Variant `og:type: "article"` → weak (null).
+- Variant `og:type: "website"` / `"profile"` / `"music.song"` / `"restaurant.restaurant"` / `"business.business"` → all weak (null) in this hotfix.
+- Variant `og:type: "video.movie"` → returns `movie`, path `"video.movie"`.
+- Variant `og:image: "javascript:alert(1)"` → `image_url === null`.
+- Variant no H1 but `og:title` → name from `og:title`, casing preserved.
+- "Customers also viewed" section after `## ` → not picked up for name/price.
 
 ## Validation after deploy
 
-1. Run `supabase--test_edge_functions` for `analyze-entity-url-v2`. All tests (existing + new) must pass.
-2. Re-analyze `https://www.nykaa.com/dior-sauvage-eau-forte/p/20232222?root=cav_pd&skuId=20232221` from the UI.
-3. Pull edge logs. Acceptable Phase 7.1 outcomes:
-   - `gemini { ok: true, ... }` with grounding metadata, **or**
-   - `gemini { ok: false, code: "GEMINI_INVALID_JSON" | "GEMINI_INVALID_SHAPE", ... }` (Gemini responded 200, output unusable), **or**
-   - `gemini { ok: false, code: "GEMINI_HTTP_ERROR", status: 400, error_status, error_message_truncated, ... }` — Google's real reason is now visible and we iterate one more time (e.g. flip a single field) based on the message.
-4. Top-level UI response for Nykaa stays `FETCH_BAD_STATUS` (expected — Phase 8 is what surfaces Gemini's data to the UI).
-5. Re-analyze a strong-direct page (e.g. a public Wikipedia article) and confirm Gemini is **skipped** (no `[analyze-entity-url-v2] gemini` log line).
-6. Do not start Phase 8 until Gemini returns 200 at least once on an eligible URL.
-
-## Why this is safe
-
-- V1 stays completely untouched.
-- All changes mirror documented Google REST shapes or V1's known-good shape.
-- Even if Gemini still 400s after this deploy, the sanitized error log makes the next iteration a one-line fix.
-- Zero changes to V2 contract, predictions, or any other subsystem.
+1. `supabase--test_edge_functions` for `analyze-entity-url-v2` — all green.
+2. Re-analyze:
+   - `https://www.nykaa.com/dior-homme-intense-eau-de-parfum-intense/p/950905?skuId=768775`
+   - `https://www.nykaa.com/dior-sauvage-eau-forte/p/20232222?root=cav_pd&skuId=20232221`
+   Expected: 200, `predictions.type === "product"`, casing preserved, `used_firecrawl: true`, `stage: "firecrawl-recovered"`.
+3. Edge logs no longer show `firecrawl recovery failed: weak extraction` for these URLs.
+4. Strong-direct page (e.g. Wikipedia) still skips Firecrawl/Gemini.
+5. Truly bad page (404, or `og:type=article` only) still returns the original fetch error unchanged.
+6. Phase 8 untouched.
 
 ## Files touched
 
-- `supabase/functions/analyze-entity-url-v2/gemini.ts` — sanitized 400 logging; snake_case tool keys; remove `responseMimeType`; split `systemInstruction` from user prompt.
-- `supabase/functions/analyze-entity-url-v2/gemini_test.ts` — update body-shape assertions; add 3 sanitized-error-logging tests.
+- `supabase/functions/analyze-entity-url-v2/firecrawl.ts` — request `["html","markdown"]`; tolerate `rawHtml` in response; expose `metadata` + `markdown`; markdown cap; usability = any of html/markdown/metadata.
+- `supabase/functions/analyze-entity-url-v2/firecrawl_recovery.ts` — **new**; product-first deterministic extractor typed against the 9 extractable types; case-insensitive key lookup with value casing preserved; strict-type rule; main-region markdown parsing; conservative price handling; consistent `suggested_category_path`.
+- `supabase/functions/analyze-entity-url-v2/index.ts` — wire `extractFromFirecrawl` into both Firecrawl paths.
+- `supabase/functions/analyze-entity-url-v2/firecrawl_test.ts` — body-shape assertions; metadata/markdown passthrough; rawHtml fallback; metadata-only usability; oversize markdown.
+- `supabase/functions/analyze-entity-url-v2/firecrawl_recovery_test.ts` — **new**; Nykaa-shaped regression suite incl. type-subset enforcement and value-casing assertions.
 
-No other files change. V1 (`analyze-entity-url`) is not modified.
+V1 and all other files: untouched.
