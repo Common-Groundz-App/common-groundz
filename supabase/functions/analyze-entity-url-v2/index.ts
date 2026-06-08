@@ -428,8 +428,24 @@ serve(async (req) => {
         });
         if (fc.ok) {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
-          const extract2 = extractFromHtml(fc.html, base);
-          if (isStrictlyBetter(extract2, extract)) {
+          let extract2 = extractFromHtml(fc.html, base);
+          let better = isStrictlyBetter(extract2, extract);
+          if (!better) {
+            const recovered = extractFromFirecrawl({
+              metadata: fc.metadata,
+              markdown: fc.markdown,
+              finalUrl: base,
+            });
+            if (
+              recovered.predictions !== null &&
+              (extract.predictions === null ||
+                extract.metadata.weak_signals === true)
+            ) {
+              extract2 = recovered;
+              better = true;
+            }
+          }
+          if (better) {
             extract = extract2;
             usedFirecrawl = true;
             finalHtmlForGemini = fc.html;
