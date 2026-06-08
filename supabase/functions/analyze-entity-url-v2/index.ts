@@ -492,9 +492,8 @@ serve(async (req) => {
                 console.log("[analyze-entity-url-v2] firecrawl recovery diagnostics", recoveryDiagnostics);
               }
             }
-          }
-
           } else {
+
             firecrawlBlock = {
               used: true,
               priority,
