@@ -252,7 +252,7 @@ Deno.test("validator: images[] mixed valid/invalid → invalid dropped", () => {
   const schema = buildGeminiRawPredictionSchema(BASE);
   const v = schema.parse({
     type: "product", name: "x", confidence: 0.5,
-    images: [{ url: "javascript:1" }, { url: "/a.jpg" }, "bad", "https://ok.example.com/b.jpg"],
+    images: [{ url: "javascript:1" }, { url: "/a.jpg" }, { url: "data:foo" }, "https://ok.example.com/b.jpg"],
   });
   assertEquals(v.images.length, 2);
 });
