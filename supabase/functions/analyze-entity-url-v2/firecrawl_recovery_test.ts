@@ -33,8 +33,8 @@ Deno.test("Nykaa-shaped: product, casing preserved, price omitted on conflict", 
     markdown: NYKAA_MD,
     finalUrl: BASE,
   });
-  assert(r.predictions);
-  const p = r.predictions!;
+  assert(r.result.predictions);
+  const p = r.result.predictions!;
   assertEquals(p.type, "product");
   assertEquals(p.name, "DIOR Homme Intense Eau De Parfum Intense");
   assertEquals(p.suggested_category_path, "product");
@@ -53,9 +53,9 @@ Deno.test("camelCase ogTitle/ogImage works; casing preserved", () => {
     markdown: null,
     finalUrl: BASE,
   });
-  assert(r.predictions);
-  assertEquals(r.predictions!.name, "DIOR Sauvage");
-  assertEquals(r.predictions!.image_url, "https://x/y.jpg");
+  assert(r.result.predictions);
+  assertEquals(r.result.predictions!.name, "DIOR Sauvage");
+  assertEquals(r.result.predictions!.image_url, "https://x/y.jpg");
 });
 
 Deno.test("no og:type but product:* present → type=product, path=Product", () => {
@@ -68,10 +68,10 @@ Deno.test("no og:type but product:* present → type=product, path=Product", () 
     markdown: null,
     finalUrl: BASE,
   });
-  assert(r.predictions);
-  assertEquals(r.predictions!.type, "product");
-  assertEquals(r.predictions!.suggested_category_path, "Product");
-  assertEquals(r.predictions!.additional_data.price, 99);
+  assert(r.result.predictions);
+  assertEquals(r.result.predictions!.type, "product");
+  assertEquals(r.result.predictions!.suggested_category_path, "Product");
+  assertEquals(r.result.predictions!.additional_data.price, 99);
 });
 
 Deno.test("metadata price accepted when no markdown price", () => {
@@ -80,8 +80,8 @@ Deno.test("metadata price accepted when no markdown price", () => {
     markdown: "# X\n\nNo price visible here at all in main region body content.",
     finalUrl: BASE,
   });
-  assert(r.predictions);
-  assertEquals(r.predictions!.additional_data.price, 14900);
+  assert(r.result.predictions);
+  assertEquals(r.result.predictions!.additional_data.price, 14900);
 });
 
 Deno.test("og:type article → weak/null", () => {
@@ -90,7 +90,7 @@ Deno.test("og:type article → weak/null", () => {
     markdown: "# x",
     finalUrl: BASE,
   });
-  assertEquals(r.predictions, null);
+  assertEquals(r.result.predictions, null);
 });
 
 for (const t of ["website", "profile", "music.song", "restaurant.restaurant", "business.business", "place"]) {
@@ -100,7 +100,7 @@ for (const t of ["website", "profile", "music.song", "restaurant.restaurant", "b
       markdown: "# x",
       finalUrl: BASE,
     });
-    assertEquals(r.predictions, null);
+    assertEquals(r.result.predictions, null);
   });
 }
 
@@ -110,9 +110,9 @@ Deno.test("og:type video.movie → movie", () => {
     markdown: null,
     finalUrl: BASE,
   });
-  assert(r.predictions);
-  assertEquals(r.predictions!.type, "movie");
-  assertEquals(r.predictions!.suggested_category_path, "video.movie");
+  assert(r.result.predictions);
+  assertEquals(r.result.predictions!.type, "movie");
+  assertEquals(r.result.predictions!.suggested_category_path, "video.movie");
 });
 
 Deno.test("javascript: image → image_url null", () => {
@@ -121,8 +121,8 @@ Deno.test("javascript: image → image_url null", () => {
     markdown: null,
     finalUrl: BASE,
   });
-  assert(r.predictions);
-  assertEquals(r.predictions!.image_url, null);
+  assert(r.result.predictions);
+  assertEquals(r.result.predictions!.image_url, null);
 });
 
 Deno.test("no H1 but og:title → name from og:title, casing preserved", () => {
@@ -131,8 +131,8 @@ Deno.test("no H1 but og:title → name from og:title, casing preserved", () => {
     markdown: "Some body text without any heading at all in this region.",
     finalUrl: BASE,
   });
-  assert(r.predictions);
-  assertEquals(r.predictions!.name, "DIOR Homme");
+  assert(r.result.predictions);
+  assertEquals(r.result.predictions!.name, "DIOR Homme");
 });
 
 Deno.test("'Customers also viewed' after ## not used for name/price", () => {
@@ -151,8 +151,8 @@ Some description body text here that is reasonably long for paragraph match.
     markdown: md,
     finalUrl: BASE,
   });
-  assert(r.predictions);
-  assertEquals(r.predictions!.name, "Real Product Name");
+  assert(r.result.predictions);
+  assertEquals(r.result.predictions!.name, "Real Product Name");
   // markdown price ₹1 is in the "also viewed" section → ignored; metadata 500 kept.
-  assertEquals(r.predictions!.additional_data.price, 500);
+  assertEquals(r.result.predictions!.additional_data.price, 500);
 });

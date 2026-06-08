@@ -37,7 +37,38 @@ interface RecoveryArgs {
   finalUrl: string;
 }
 
-function weak(sources: string[]): ExtractResult {
+export interface FirecrawlRecoveryDiagnostics {
+  name_source: "markdown_h1" | "metadata_title" | null;
+  markdown_h1_found: boolean;
+  markdown_h1_within_main_region: boolean;
+  markdown_price_found: boolean;
+  metadata_price_found: boolean;
+  price_conflict: boolean;
+  selected_price_source: "metadata" | "markdown" | "omitted" | "none";
+  image_source: "metadata_og_image" | "markdown_image" | null;
+  image_present: boolean;
+}
+
+export interface FirecrawlRecoveryOutput {
+  result: ExtractResult;
+  diagnostics: FirecrawlRecoveryDiagnostics;
+}
+
+function emptyDiagnostics(): FirecrawlRecoveryDiagnostics {
+  return {
+    name_source: null,
+    markdown_h1_found: false,
+    markdown_h1_within_main_region: false,
+    markdown_price_found: false,
+    metadata_price_found: false,
+    price_conflict: false,
+    selected_price_source: "none",
+    image_source: null,
+    image_present: false,
+  };
+}
+
+function weak(sources: string[], diagnostics: FirecrawlRecoveryDiagnostics): FirecrawlRecoveryOutput {
   const metadata: ExtractMetadata = {
     has_jsonld: false,
     jsonld_blocks: 0,
@@ -48,8 +79,9 @@ function weak(sources: string[]): ExtractResult {
     confidence: null,
     weak_signals: true,
   };
-  return { predictions: null, metadata, warnings: [] };
+  return { result: { predictions: null, metadata, warnings: [] }, diagnostics };
 }
+
 
 /** Case-insensitive key lookup. Preserves value casing; trims only. */
 function getMeta(
@@ -133,9 +165,10 @@ function firstMarkdownPrice(region: string): number | null {
   return isFinite(n) ? n : null;
 }
 
-export function extractFromFirecrawl(args: RecoveryArgs): ExtractResult {
+export function extractFromFirecrawl(args: RecoveryArgs): FirecrawlRecoveryOutput {
   const { metadata, markdown, finalUrl } = args;
-  if (!metadata && !markdown) return weak([]);
+  const diag = emptyDiagnostics();
+  if (!metadata && !markdown) return weak([], diag);
 
   const sources: string[] = [];
 
@@ -157,23 +190,29 @@ export function extractFromFirecrawl(args: RecoveryArgs): ExtractResult {
     suggestedPath = "Product";
     sources.push("firecrawl:metadata:product:*");
   }
-  if (!mapped) return weak(sources);
+  if (!mapped) return weak(sources, diag);
 
   // ─── Name ─────────────────────────────────────────────────────────────
   const region = mainRegion(markdown);
+  const h1InRegion = firstH1(region);
+  const h1Anywhere = markdown ? firstH1(markdown) : null;
+  diag.markdown_h1_found = h1Anywhere !== null;
+  diag.markdown_h1_within_main_region = h1InRegion !== null;
+
   let name: string | null = null;
-  const h1 = firstH1(region);
-  if (h1) {
-    name = h1;
+  if (h1InRegion) {
+    name = h1InRegion;
+    diag.name_source = "markdown_h1";
     sources.push("firecrawl:markdown:h1");
   } else {
     const og = getMeta(metadata, ["og:title", "ogTitle", "title"]);
     if (og) {
       name = og.value;
+      diag.name_source = "metadata_title";
       sources.push(`firecrawl:metadata:${og.key}`);
     }
   }
-  if (!name) return weak(sources);
+  if (!name) return weak(sources, diag);
 
   // ─── Description ──────────────────────────────────────────────────────
   let description: string | null = null;
@@ -199,15 +238,22 @@ export function extractFromFirecrawl(args: RecoveryArgs): ExtractResult {
   const ogImg = getMeta(metadata, ["og:image", "ogImage", "twitter:image"]);
   if (ogImg) {
     image_url = safeAbsoluteUrl(ogImg.value, finalUrl);
-    if (image_url) sources.push(`firecrawl:metadata:${ogImg.key}`);
+    if (image_url) {
+      sources.push(`firecrawl:metadata:${ogImg.key}`);
+      diag.image_source = "metadata_og_image";
+    }
   }
   if (!image_url) {
     const mdImg = firstMarkdownImage(region);
     if (mdImg) {
       image_url = safeAbsoluteUrl(mdImg, finalUrl);
-      if (image_url) sources.push("firecrawl:markdown:image");
+      if (image_url) {
+        sources.push("firecrawl:markdown:image");
+        diag.image_source = "markdown_image";
+      }
     }
   }
+  diag.image_present = image_url !== null;
 
   // ─── additional_data ──────────────────────────────────────────────────
   const additional_data: Record<string, unknown> = {};
@@ -236,20 +282,28 @@ export function extractFromFirecrawl(args: RecoveryArgs): ExtractResult {
   const mdPrice = firstMarkdownPrice(region);
   const hasMeta = isFinite(metaPrice);
   const hasMd = mdPrice !== null;
+  diag.metadata_price_found = hasMeta;
+  diag.markdown_price_found = hasMd;
   if (hasMeta && hasMd) {
     const diff = Math.abs(metaPrice - (mdPrice as number)) /
       Math.max(metaPrice, mdPrice as number);
     if (diff <= 0.05) {
       additional_data.price = metaPrice;
       sources.push(`firecrawl:metadata:${metaPriceRaw!.key}`);
+      diag.selected_price_source = "metadata";
+    } else {
+      diag.price_conflict = true;
+      diag.selected_price_source = "omitted";
     }
     // else: omit price (keep currency)
   } else if (hasMeta) {
     additional_data.price = metaPrice;
     sources.push(`firecrawl:metadata:${metaPriceRaw!.key}`);
+    diag.selected_price_source = "metadata";
   } else if (hasMd) {
     additional_data.price = mdPrice;
     sources.push("firecrawl:markdown:price");
+    diag.selected_price_source = "markdown";
   }
 
   const predictions: V2Predictions = {
@@ -278,5 +332,6 @@ export function extractFromFirecrawl(args: RecoveryArgs): ExtractResult {
     weak_signals: false,
   };
 
-  return { predictions, metadata: meta, warnings: [] };
+  return { result: { predictions, metadata: meta, warnings: [] }, diagnostics: diag };
 }
+

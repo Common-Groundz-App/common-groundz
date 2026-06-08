@@ -305,8 +305,22 @@ serve(async (req) => {
               markdown: fc.markdown,
               finalUrl: base,
             });
-            if (recovered.predictions !== null) extract = recovered;
+            if (recovered.result.predictions !== null) {
+              extract = recovered.result;
+              console.log("[analyze-entity-url-v2] firecrawl recovery succeeded", {
+                html_present: fc.html.length > 0,
+                markdown_present: fc.markdown !== null,
+                metadata_present: fc.metadata !== null,
+                html_bytes: fc.html.length,
+                markdown_bytes: fc.markdown?.length ?? 0,
+                metadata_key_count: fc.metadata ? Object.keys(fc.metadata).length : 0,
+                durationMs: fc.durationMs,
+                recovered_type: recovered.result.predictions?.type ?? null,
+              });
+              console.log("[analyze-entity-url-v2] firecrawl recovery diagnostics", recovered.diagnostics);
+            }
           }
+
           if (extract.predictions !== null) {
             // Phase 7: Gemini eligible (firecrawl was used).
             const evidenceBaseUrl = chooseEvidenceBaseUrl({
@@ -430,19 +444,23 @@ serve(async (req) => {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
           let extract2 = extractFromHtml(fc.html, base);
           let better = isStrictlyBetter(extract2, extract);
+          let recoveryUsed = false;
+          let recoveryDiagnostics: ReturnType<typeof extractFromFirecrawl>["diagnostics"] | null = null;
           if (!better) {
             const recovered = extractFromFirecrawl({
               metadata: fc.metadata,
               markdown: fc.markdown,
               finalUrl: base,
             });
+            recoveryDiagnostics = recovered.diagnostics;
             if (
-              recovered.predictions !== null &&
+              recovered.result.predictions !== null &&
               (extract.predictions === null ||
                 extract.metadata.weak_signals === true)
             ) {
-              extract2 = recovered;
+              extract2 = recovered.result;
               better = true;
+              recoveryUsed = true;
             }
           }
           if (better) {
@@ -459,7 +477,23 @@ serve(async (req) => {
             for (const w of extract2.warnings) {
               if (!warnings.includes(w)) warnings.push(w);
             }
+            if (recoveryUsed) {
+              console.log("[analyze-entity-url-v2] firecrawl recovery succeeded", {
+                html_present: fc.html.length > 0,
+                markdown_present: fc.markdown !== null,
+                metadata_present: fc.metadata !== null,
+                html_bytes: fc.html.length,
+                markdown_bytes: fc.markdown?.length ?? 0,
+                metadata_key_count: fc.metadata ? Object.keys(fc.metadata).length : 0,
+                durationMs: fc.durationMs,
+                recovered_type: extract2.predictions?.type ?? null,
+              });
+              if (recoveryDiagnostics) {
+                console.log("[analyze-entity-url-v2] firecrawl recovery diagnostics", recoveryDiagnostics);
+              }
+            }
           } else {
+
             firecrawlBlock = {
               used: true,
               priority,
