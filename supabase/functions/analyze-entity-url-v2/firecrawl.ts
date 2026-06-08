@@ -107,7 +107,7 @@ export async function runFirecrawlScrape(
       },
       body: JSON.stringify({
         url,
-        formats: ["html", "rawHtml"],
+        formats: ["html", "markdown"],
         onlyMainContent: false,
         waitFor: 1500,
         timeout: apiTimeoutMs,
@@ -155,18 +155,12 @@ export async function runFirecrawlScrape(
       };
     }
     const d = data as Record<string, unknown>;
-    const html =
+
+    const rawHtml =
       (typeof d.html === "string" && d.html) ||
       (typeof d.rawHtml === "string" && d.rawHtml) ||
       "";
-    if (!html) {
-      return {
-        ok: false,
-        code: "FIRECRAWL_BAD_RESPONSE",
-        durationMs: Date.now() - started,
-      };
-    }
-    if (html.length > MAX_HTML_BYTES) {
+    if (rawHtml.length > MAX_HTML_BYTES) {
       return {
         ok: false,
         code: "FIRECRAWL_RESPONSE_TOO_LARGE",
@@ -174,17 +168,36 @@ export async function runFirecrawlScrape(
       };
     }
 
-    let candidate: unknown = undefined;
+    const rawMd = typeof d.markdown === "string" ? d.markdown : "";
+    const markdown =
+      rawMd && rawMd.length <= MAX_HTML_BYTES ? rawMd : null;
+
     const meta = d.metadata;
-    if (meta && typeof meta === "object") {
-      const m = meta as Record<string, unknown>;
-      candidate = m.sourceURL ?? m.url;
+    const metadata =
+      meta && typeof meta === "object" && !Array.isArray(meta)
+        ? (meta as Record<string, unknown>)
+        : null;
+
+    // Usable if ANY of html / markdown / metadata is present.
+    if (!rawHtml && !markdown && !metadata) {
+      return {
+        ok: false,
+        code: "FIRECRAWL_BAD_RESPONSE",
+        durationMs: Date.now() - started,
+      };
     }
-    candidate = candidate ?? (d as Record<string, unknown>).finalUrl ?? (d as Record<string, unknown>).url;
+
+    let candidate: unknown = undefined;
+    if (metadata) {
+      candidate = metadata.sourceURL ?? metadata.url;
+    }
+    candidate = candidate ?? d.finalUrl ?? d.url;
 
     return {
       ok: true,
-      html,
+      html: rawHtml,
+      markdown,
+      metadata,
       finalUrl: safeBaseUrl(candidate, fallback),
       durationMs: Date.now() - started,
     };
