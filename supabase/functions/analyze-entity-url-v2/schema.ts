@@ -9,6 +9,7 @@
 
 import { z } from "https://deno.land/x/zod@v3.23.8/mod.ts";
 import type { CanonicalEntityType } from "../_shared/entityTypes.ts";
+import type { GeminiErrorCode } from "./gemini.ts";
 
 export const EXTRACTION_VERSION = "v2" as const;
 export const EDGE_FUNCTION_NAME = "analyze-entity-url-v2" as const;
