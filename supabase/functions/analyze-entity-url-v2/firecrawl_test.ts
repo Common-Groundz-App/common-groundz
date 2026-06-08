@@ -203,3 +203,31 @@ Deno.test("safeBaseUrl: https kept, others fall back", () => {
   assertEquals(safeBaseUrl("not a url", "https://fb/"), "https://fb/");
   assertEquals(safeBaseUrl(undefined, "https://fb/"), "https://fb/");
 });
+
+Deno.test("oversize html + metadata: ok, html dropped", async () => {
+  const big = "x".repeat(2 * 1024 * 1024 + 1);
+  const fetchImpl = (() =>
+    Promise.resolve(
+      jsonRes({ data: { html: big, metadata: { "og:type": "product" } } }),
+    )) as unknown as typeof fetch;
+  const r = await runFirecrawlScrape(URL_IN, { apiKey: "k", fetchImpl });
+  assert(r.ok);
+  if (r.ok) {
+    assertEquals(r.html, "");
+    assertEquals(r.metadata?.["og:type"], "product");
+  }
+});
+
+Deno.test("oversize html + markdown: ok, html dropped", async () => {
+  const big = "x".repeat(2 * 1024 * 1024 + 1);
+  const fetchImpl = (() =>
+    Promise.resolve(
+      jsonRes({ data: { html: big, markdown: "# Hello" } }),
+    )) as unknown as typeof fetch;
+  const r = await runFirecrawlScrape(URL_IN, { apiKey: "k", fetchImpl });
+  assert(r.ok);
+  if (r.ok) {
+    assertEquals(r.html, "");
+    assertEquals(r.markdown, "# Hello");
+  }
+});
