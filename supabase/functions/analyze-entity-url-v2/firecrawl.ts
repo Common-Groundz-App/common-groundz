@@ -1,8 +1,10 @@
 // Phase 6: Firecrawl fallback client.
 //
-// Narrow surface: one POST to /v2/scrape with formats=['html','rawHtml'].
-// No markdown, no summary, no JSON extraction. 12s budget, 2 MB HTML cap.
-// All errors and the response shape are sanitized for the V2 envelope.
+// Narrow surface: one POST to /v2/scrape. Requests formats=['html','markdown']
+// and also tolerates rawHtml in responses. 12s budget, 2 MB caps on html and
+// markdown. metadata and markdown are internal — never serialized into the
+// V2 response. A scrape is considered usable if ANY of html / markdown /
+// metadata is present.
 
 export type FirecrawlErrorCode =
   | "FIRECRAWL_NOT_CONFIGURED"
@@ -14,7 +16,12 @@ export type FirecrawlErrorCode =
 
 export interface FirecrawlSuccess {
   ok: true;
+  /** May be empty string when only markdown/metadata was returned. */
   html: string;
+  /** Internal only. Null when missing or oversize. */
+  markdown: string | null;
+  /** Internal only. Null when missing. */
+  metadata: Record<string, unknown> | null;
   /** Sanitized http(s) URL the extractor should use as base. */
   finalUrl: string;
   durationMs: number;
