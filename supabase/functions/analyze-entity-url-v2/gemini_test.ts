@@ -86,9 +86,16 @@ Deno.test("AbortController → GEMINI_TIMEOUT", async () => {
   const res = await runGeminiJsonMode({
     systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
     timeoutMs: 5,
-    fetchImpl: makeFetch((_req) => new Promise<Response>(() => {
-      // never resolves — abort will reject
-    })),
+    fetchImpl: (_input, init) => new Promise<Response>((_resolve, reject) => {
+      const signal = (init as RequestInit | undefined)?.signal;
+      if (signal) {
+        signal.addEventListener("abort", () => {
+          const err = new Error("aborted");
+          (err as { name: string }).name = "AbortError";
+          reject(err);
+        });
+      }
+    }),
   });
   assert(!res.ok && res.configured);
   assertEquals(res.code, "GEMINI_TIMEOUT");
