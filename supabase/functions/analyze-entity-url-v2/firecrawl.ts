@@ -4,7 +4,8 @@
 // and also tolerates rawHtml in responses. 12s budget, 2 MB caps on html and
 // markdown. metadata and markdown are internal — never serialized into the
 // V2 response. A scrape is considered usable if ANY of html / markdown /
-// metadata is present.
+// metadata is present. Oversize HTML alone does NOT fail the scrape — it is
+// dropped and recovery proceeds from metadata/markdown when those are usable.
 
 export type FirecrawlErrorCode =
   | "FIRECRAWL_NOT_CONFIGURED"
@@ -16,7 +17,8 @@ export type FirecrawlErrorCode =
 
 export interface FirecrawlSuccess {
   ok: true;
-  /** May be empty string when only markdown/metadata was returned. */
+  /** May be empty string when only markdown/metadata was returned, or when
+   *  the raw HTML exceeded MAX_HTML_BYTES and was dropped. */
   html: string;
   /** Internal only. Null when missing or oversize. */
   markdown: string | null;
@@ -156,17 +158,14 @@ export async function runFirecrawlScrape(
     }
     const d = data as Record<string, unknown>;
 
-    const rawHtml =
+    const rawHtmlInitial =
       (typeof d.html === "string" && d.html) ||
       (typeof d.rawHtml === "string" && d.rawHtml) ||
       "";
-    if (rawHtml.length > MAX_HTML_BYTES) {
-      return {
-        ok: false,
-        code: "FIRECRAWL_RESPONSE_TOO_LARGE",
-        durationMs: Date.now() - started,
-      };
-    }
+    // Oversize HTML alone no longer fails the scrape — drop the HTML and
+    // continue with metadata/markdown if those are usable.
+    const htmlOversize = rawHtmlInitial.length > MAX_HTML_BYTES;
+    const rawHtml = htmlOversize ? "" : rawHtmlInitial;
 
     const rawMd = typeof d.markdown === "string" ? d.markdown : "";
     const markdown =
@@ -182,7 +181,11 @@ export async function runFirecrawlScrape(
     if (!rawHtml && !markdown && !metadata) {
       return {
         ok: false,
-        code: "FIRECRAWL_BAD_RESPONSE",
+        // Preserve the oversize code when oversize HTML was the cause and
+        // nothing else was usable; otherwise it's a generic bad response.
+        code: htmlOversize
+          ? "FIRECRAWL_RESPONSE_TOO_LARGE"
+          : "FIRECRAWL_BAD_RESPONSE",
         durationMs: Date.now() - started,
       };
     }
