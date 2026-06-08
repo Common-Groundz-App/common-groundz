@@ -79,12 +79,66 @@ Deno.test("200 with only data.rawHtml → ok (fallback)", async () => {
   if (r.ok) assertEquals(r.html, "<raw/>");
 });
 
-Deno.test("200 with no html → FIRECRAWL_BAD_RESPONSE", async () => {
+Deno.test("requests formats=[html,markdown]", async () => {
+  let captured: unknown = null;
+  const fetchImpl = ((_url: string, init?: RequestInit) => {
+    captured = JSON.parse(String(init?.body ?? "{}"));
+    return Promise.resolve(jsonRes({ data: { html: "<x/>" } }));
+  }) as unknown as typeof fetch;
+  await runFirecrawlScrape(URL_IN, { apiKey: "k", fetchImpl });
+  assertEquals((captured as { formats: string[] }).formats, ["html", "markdown"]);
+});
+
+Deno.test("200 with markdown + metadata → exposed on success", async () => {
+  const fetchImpl = (() =>
+    Promise.resolve(
+      jsonRes({
+        data: {
+          html: "<x/>",
+          markdown: "# Hello",
+          metadata: { "og:type": "product", title: "T" },
+        },
+      }),
+    )) as unknown as typeof fetch;
+  const r = await runFirecrawlScrape(URL_IN, { apiKey: "k", fetchImpl });
+  assert(r.ok);
+  if (r.ok) {
+    assertEquals(r.markdown, "# Hello");
+    assertEquals(r.metadata?.["og:type"], "product");
+  }
+});
+
+Deno.test("200 with only metadata (no html, no markdown) → ok, html empty", async () => {
+  const fetchImpl = (() =>
+    Promise.resolve(
+      jsonRes({ data: { metadata: { "og:type": "product" } } }),
+    )) as unknown as typeof fetch;
+  const r = await runFirecrawlScrape(URL_IN, { apiKey: "k", fetchImpl });
+  assert(r.ok);
+  if (r.ok) {
+    assertEquals(r.html, "");
+    assertEquals(r.markdown, null);
+    assertEquals(r.metadata?.["og:type"], "product");
+  }
+});
+
+Deno.test("200 with all of html/markdown/metadata missing → FIRECRAWL_BAD_RESPONSE", async () => {
   const fetchImpl = (() =>
     Promise.resolve(jsonRes({ data: {} }))) as unknown as typeof fetch;
   const r = await runFirecrawlScrape(URL_IN, { apiKey: "k", fetchImpl });
   assertEquals(r.ok, false);
   if (!r.ok) assertEquals(r.code, "FIRECRAWL_BAD_RESPONSE");
+});
+
+Deno.test("oversize markdown → markdown null, scrape ok", async () => {
+  const big = "x".repeat(2 * 1024 * 1024 + 1);
+  const fetchImpl = (() =>
+    Promise.resolve(
+      jsonRes({ data: { html: "<x/>", markdown: big } }),
+    )) as unknown as typeof fetch;
+  const r = await runFirecrawlScrape(URL_IN, { apiKey: "k", fetchImpl });
+  assert(r.ok);
+  if (r.ok) assertEquals(r.markdown, null);
 });
 
 Deno.test("402 → FIRECRAWL_INSUFFICIENT_CREDITS", async () => {

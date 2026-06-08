@@ -1,8 +1,10 @@
 // Phase 6: Firecrawl fallback client.
 //
-// Narrow surface: one POST to /v2/scrape with formats=['html','rawHtml'].
-// No markdown, no summary, no JSON extraction. 12s budget, 2 MB HTML cap.
-// All errors and the response shape are sanitized for the V2 envelope.
+// Narrow surface: one POST to /v2/scrape. Requests formats=['html','markdown']
+// and also tolerates rawHtml in responses. 12s budget, 2 MB caps on html and
+// markdown. metadata and markdown are internal — never serialized into the
+// V2 response. A scrape is considered usable if ANY of html / markdown /
+// metadata is present.
 
 export type FirecrawlErrorCode =
   | "FIRECRAWL_NOT_CONFIGURED"
@@ -14,7 +16,12 @@ export type FirecrawlErrorCode =
 
 export interface FirecrawlSuccess {
   ok: true;
+  /** May be empty string when only markdown/metadata was returned. */
   html: string;
+  /** Internal only. Null when missing or oversize. */
+  markdown: string | null;
+  /** Internal only. Null when missing. */
+  metadata: Record<string, unknown> | null;
   /** Sanitized http(s) URL the extractor should use as base. */
   finalUrl: string;
   durationMs: number;
@@ -100,7 +107,7 @@ export async function runFirecrawlScrape(
       },
       body: JSON.stringify({
         url,
-        formats: ["html", "rawHtml"],
+        formats: ["html", "markdown"],
         onlyMainContent: false,
         waitFor: 1500,
         timeout: apiTimeoutMs,
@@ -148,18 +155,12 @@ export async function runFirecrawlScrape(
       };
     }
     const d = data as Record<string, unknown>;
-    const html =
+
+    const rawHtml =
       (typeof d.html === "string" && d.html) ||
       (typeof d.rawHtml === "string" && d.rawHtml) ||
       "";
-    if (!html) {
-      return {
-        ok: false,
-        code: "FIRECRAWL_BAD_RESPONSE",
-        durationMs: Date.now() - started,
-      };
-    }
-    if (html.length > MAX_HTML_BYTES) {
+    if (rawHtml.length > MAX_HTML_BYTES) {
       return {
         ok: false,
         code: "FIRECRAWL_RESPONSE_TOO_LARGE",
@@ -167,17 +168,36 @@ export async function runFirecrawlScrape(
       };
     }
 
-    let candidate: unknown = undefined;
+    const rawMd = typeof d.markdown === "string" ? d.markdown : "";
+    const markdown =
+      rawMd && rawMd.length <= MAX_HTML_BYTES ? rawMd : null;
+
     const meta = d.metadata;
-    if (meta && typeof meta === "object") {
-      const m = meta as Record<string, unknown>;
-      candidate = m.sourceURL ?? m.url;
+    const metadata =
+      meta && typeof meta === "object" && !Array.isArray(meta)
+        ? (meta as Record<string, unknown>)
+        : null;
+
+    // Usable if ANY of html / markdown / metadata is present.
+    if (!rawHtml && !markdown && !metadata) {
+      return {
+        ok: false,
+        code: "FIRECRAWL_BAD_RESPONSE",
+        durationMs: Date.now() - started,
+      };
     }
-    candidate = candidate ?? (d as Record<string, unknown>).finalUrl ?? (d as Record<string, unknown>).url;
+
+    let candidate: unknown = undefined;
+    if (metadata) {
+      candidate = metadata.sourceURL ?? metadata.url;
+    }
+    candidate = candidate ?? d.finalUrl ?? d.url;
 
     return {
       ok: true,
-      html,
+      html: rawHtml,
+      markdown,
+      metadata,
       finalUrl: safeBaseUrl(candidate, fallback),
       durationMs: Date.now() - started,
     };

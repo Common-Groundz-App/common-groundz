@@ -33,6 +33,7 @@ import {
   HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS,
   HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS,
 } from "./firecrawl.ts";
+import { extractFromFirecrawl } from "./firecrawl_recovery.ts";
 import {
   chooseEvidenceBaseUrl,
   runGeminiJsonMode,
@@ -297,7 +298,15 @@ serve(async (req) => {
         });
         if (fc.ok) {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
-          const extract = extractFromHtml(fc.html, base);
+          let extract = extractFromHtml(fc.html, base);
+          if (extract.predictions === null) {
+            const recovered = extractFromFirecrawl({
+              metadata: fc.metadata,
+              markdown: fc.markdown,
+              finalUrl: base,
+            });
+            if (recovered.predictions !== null) extract = recovered;
+          }
           if (extract.predictions !== null) {
             // Phase 7: Gemini eligible (firecrawl was used).
             const evidenceBaseUrl = chooseEvidenceBaseUrl({
@@ -419,8 +428,24 @@ serve(async (req) => {
         });
         if (fc.ok) {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
-          const extract2 = extractFromHtml(fc.html, base);
-          if (isStrictlyBetter(extract2, extract)) {
+          let extract2 = extractFromHtml(fc.html, base);
+          let better = isStrictlyBetter(extract2, extract);
+          if (!better) {
+            const recovered = extractFromFirecrawl({
+              metadata: fc.metadata,
+              markdown: fc.markdown,
+              finalUrl: base,
+            });
+            if (
+              recovered.predictions !== null &&
+              (extract.predictions === null ||
+                extract.metadata.weak_signals === true)
+            ) {
+              extract2 = recovered;
+              better = true;
+            }
+          }
+          if (better) {
             extract = extract2;
             usedFirecrawl = true;
             finalHtmlForGemini = fc.html;
