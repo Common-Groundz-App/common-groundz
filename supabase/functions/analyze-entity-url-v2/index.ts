@@ -298,7 +298,15 @@ serve(async (req) => {
         });
         if (fc.ok) {
           const base = safeBaseUrl(fc.finalUrl, safe.url);
-          const extract = extractFromHtml(fc.html, base);
+          let extract = extractFromHtml(fc.html, base);
+          if (extract.predictions === null) {
+            const recovered = extractFromFirecrawl({
+              metadata: fc.metadata,
+              markdown: fc.markdown,
+              finalUrl: base,
+            });
+            if (recovered.predictions !== null) extract = recovered;
+          }
           if (extract.predictions !== null) {
             // Phase 7: Gemini eligible (firecrawl was used).
             const evidenceBaseUrl = chooseEvidenceBaseUrl({
