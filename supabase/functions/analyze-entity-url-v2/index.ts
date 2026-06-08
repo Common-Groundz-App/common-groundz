@@ -33,6 +33,13 @@ import {
   HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS,
   HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS,
 } from "./firecrawl.ts";
+import {
+  chooseEvidenceBaseUrl,
+  runGeminiJsonMode,
+  type GeminiResult,
+  type GeminiWarningCode,
+} from "./gemini.ts";
+import { buildV2Prompts } from "./prompt-generator-v2.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
