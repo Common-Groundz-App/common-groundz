@@ -144,9 +144,9 @@ function geminiSuccessBlock(gem: Extract<GeminiResult, { ok: true }>): GeminiMet
   const fc = gem.prediction.field_confidence ?? {};
   const fcKeys = Object.keys(fc);
   let produced = 0;
-  for (const k of ["name", "description", "image_url"] as const) {
-    if ((gem.prediction as Record<string, unknown>)[k] != null) produced++;
-  }
+  if (gem.prediction.name) produced++;
+  if (gem.prediction.description) produced++;
+  if (gem.prediction.image_url) produced++;
   if (gem.prediction.images.length > 0) produced++;
   if (gem.prediction.additional_data?.brand) produced++;
   if (gem.prediction.additional_data?.price != null) produced++;
