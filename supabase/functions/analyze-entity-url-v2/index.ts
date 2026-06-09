@@ -189,6 +189,75 @@ function geminiFailureBlock(
   };
 }
 
+// ─── Phase 8 helpers ──────────────────────────────────────────────────────
+
+const EMPTY_EXTRACT_METADATA: ExtractMetadata = {
+  has_jsonld: false,
+  jsonld_blocks: 0,
+  has_og: false,
+  has_twitter: false,
+  sources: [],
+  mapped_type: null,
+  confidence: null,
+  weak_signals: true,
+};
+
+function pickMetaString(
+  m: Record<string, unknown> | null | undefined,
+  keys: string[],
+): string | null {
+  if (!m) return null;
+  const lower: Record<string, string> = {};
+  for (const k of Object.keys(m)) lower[k.toLowerCase()] = k;
+  for (const want of keys) {
+    const real = lower[want.toLowerCase()];
+    if (!real) continue;
+    const v = m[real];
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (typeof item === "string" && item.trim()) return item.trim();
+      }
+    }
+  }
+  return null;
+}
+
+function deriveFirecrawlSignals(
+  metadata: Record<string, unknown> | null | undefined,
+  baseUrl: string,
+): { firecrawlImageUrl: string | null; firecrawlCurrency: string | null } {
+  const imgRaw = pickMetaString(metadata, ["og:image", "ogImage", "twitter:image"]);
+  const firecrawlImageUrl = imgRaw ? safeAbsoluteUrl(imgRaw, baseUrl) : null;
+  const curRaw = pickMetaString(metadata, ["product:price:currency", "og:price:currency"]);
+  const firecrawlCurrency = curRaw ? curRaw.toUpperCase() : null;
+  return { firecrawlImageUrl, firecrawlCurrency };
+}
+
+/**
+ * Run merge + category resolution. Returns the final predictions (possibly
+ * null on recovery-gate failure) plus the merge diagnostics block.
+ */
+function applyMerge(
+  extract: V2Predictions | null,
+  geminiPred: GeminiRawPrediction | null,
+  flags: MergeFlags,
+): { predictions: V2Predictions | null; mergeDiag: MergeDiagnostics } {
+  const { predictions, diagnostics } = mergePredictions({
+    extract,
+    gemini: geminiPred,
+    flags,
+  });
+  if (predictions) {
+    const resolved = resolveCategory({
+      type: predictions.type,
+      suggested_category_path: predictions.suggested_category_path,
+    });
+    predictions.category_id = resolved.category_id;
+    predictions.matched_category_name = resolved.matched_category_name;
+  }
+  return { predictions, mergeDiag: diagnostics };
+}
 
 serve(async (req) => {
   // CORS preflight
