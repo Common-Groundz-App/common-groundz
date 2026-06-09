@@ -5,6 +5,7 @@ import {
   mergePredictions,
   passesRecoveryGate,
   geminiToV2Predictions,
+  geminiPriceTrusted,
 } from "./merge.ts";
 import type { V2Predictions } from "./schema.ts";
 import type { GeminiRawPrediction } from "./response_schema.ts";
