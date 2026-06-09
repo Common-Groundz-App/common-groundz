@@ -18,7 +18,7 @@ import {
   safeAbsoluteUrl,
 } from "./extractor.ts";
 
-const MAIN_REGION_BYTES = 4 * 1024;
+const MAIN_REGION_BYTES = 16 * 1024;
 
 // Conservative product-first mapping. Only OG types already handled by
 // extractor.ts; extends easily later with fixtures.
@@ -156,13 +156,76 @@ function firstMarkdownImage(region: string): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * Extract a single product price from the markdown main region.
+ *
+ * Guardrails:
+ *  - NEVER matches bare numbers. Each candidate must be anchored by either a
+ *    price label (MRP / Price / Offer Price / Sale Price) or a currency token
+ *    (₹ $ € £ Rs. INR USD EUR GBP).
+ *  - When multiple candidates exist, picks by priority:
+ *      P1: Offer Price / Sale Price / Price label
+ *      P2: currency-prefixed match with no "MRP" within ~40 chars before it
+ *      P3: MRP (last resort, so MRP never beats a visible sale price)
+ *    Within a tier, first occurrence wins.
+ */
 function firstMarkdownPrice(region: string): number | null {
-  const m = region.match(
-    /(?:₹|\$|€|£|USD|INR|EUR|GBP)\s?([\d]{1,3}(?:[,\d]{0,12})(?:\.\d{1,2})?)/i,
+  type Cand = { value: number; index: number; tier: 1 | 2 | 3 };
+  const cands: Cand[] = [];
+
+  const NUM = String.raw`(\d{1,3}(?:[,\d]{0,12})(?:\.\d{1,2})?)`;
+  const CUR = String.raw`(?:₹|\$|€|£|Rs\.|Rs(?=\s)|INR(?=\s)|USD(?=\s)|EUR(?=\s)|GBP(?=\s))`;
+
+  // Branch 1a — REQUIRED label + ":" + optional currency + number
+  const LABEL_COLON = new RegExp(
+    String.raw`\b(MRP|Offer Price|Sale Price|Price)\s*:\s*(?:` + CUR + String.raw`\s?)?` + NUM,
+    "gi",
   );
-  if (!m) return null;
-  const n = parseFloat(m[1].replace(/,/g, ""));
-  return isFinite(n) ? n : null;
+  // Branch 1b — REQUIRED label + REQUIRED currency (no colon) + number
+  const LABEL_CUR = new RegExp(
+    String.raw`\b(MRP|Offer Price|Sale Price|Price)\s+` + CUR + String.raw`\s?` + NUM,
+    "gi",
+  );
+  // Branch 2 — REQUIRED currency + number (no label needed)
+  const CUR_ONLY = new RegExp(CUR + String.raw`\s?` + NUM, "gi");
+
+  const parseNum = (raw: string): number | null => {
+    const n = parseFloat(raw.replace(/,/g, ""));
+    return isFinite(n) ? n : null;
+  };
+
+  const labelTier = (label: string): 1 | 3 => {
+    return label.toLowerCase() === "mrp" ? 3 : 1;
+  };
+
+  for (const re of [LABEL_COLON, LABEL_CUR]) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(region)) !== null) {
+      const n = parseNum(m[2]);
+      if (n === null) continue;
+      cands.push({ value: n, index: m.index, tier: labelTier(m[1]) });
+    }
+  }
+
+  CUR_ONLY.lastIndex = 0;
+  let cm: RegExpExecArray | null;
+  while ((cm = CUR_ONLY.exec(region)) !== null) {
+    const n = parseNum(cm[1]);
+    if (n === null) continue;
+    // Skip if this currency match is already part of a label-anchored match
+    // (within ~40 chars of an MRP/Price/Offer/Sale label before it). The
+    // label branches already captured those, so we'd double-count.
+    const before = region.slice(Math.max(0, cm.index - 40), cm.index);
+    if (/\b(MRP|Offer Price|Sale Price|Price)\s*:?\s*$/i.test(before)) continue;
+    // Demote currency match to tier 3 if "MRP" appears within ~40 chars before
+    const mrpNearby = /\bMRP\b/i.test(before);
+    cands.push({ value: n, index: cm.index, tier: mrpNearby ? 3 : 2 });
+  }
+
+  if (cands.length === 0) return null;
+  cands.sort((a, b) => (a.tier - b.tier) || (a.index - b.index));
+  return cands[0].value;
 }
 
 export function extractFromFirecrawl(args: RecoveryArgs): FirecrawlRecoveryOutput {
