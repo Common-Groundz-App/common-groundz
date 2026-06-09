@@ -179,7 +179,9 @@ Deno.test("recovery: firecrawl currency preserved when gemini lacks one", () => 
 });
 
 Deno.test("recovery: priceConflict blocks gemini price", () => {
-  const gem = makeGemini();
+  const gem = makeGemini({
+    additional_data: { brand: "Acme", price: 99 },  // no currency from gemini
+  });
   const { predictions, diagnostics } = mergePredictions({
     extract: null,
     gemini: gem,
