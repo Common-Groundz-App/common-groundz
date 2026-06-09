@@ -26,24 +26,17 @@ interface PreviewFieldProps {
   label: string;
   value: string | string[];
   multiline?: boolean;
-  isImage?: boolean;
 }
 
-const PreviewField: React.FC<PreviewFieldProps> = ({ label, value, multiline, isImage }) => {
+const PreviewField: React.FC<PreviewFieldProps> = ({ label, value, multiline }) => {
   if (!value || (Array.isArray(value) && value.length === 0)) return null;
-  
+
   const displayValue = Array.isArray(value) ? value.join(', ') : value;
-  
+
   return (
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      {isImage ? (
-        <img 
-          src={displayValue} 
-          alt={label} 
-          className="mt-2 rounded-md max-h-32 object-cover w-full" 
-        />
-      ) : multiline ? (
+      {multiline ? (
         <p className="text-sm leading-relaxed">{displayValue}</p>
       ) : (
         <p className="text-sm font-medium">{displayValue}</p>
