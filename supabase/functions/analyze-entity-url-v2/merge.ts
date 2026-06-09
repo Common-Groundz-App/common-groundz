@@ -397,7 +397,7 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
     }
   }
 
-  // ── price: conflict blocks; else extractor > gemini (gated)
+  // ── price: extractor wins if present; else apply centralized policy
   if (flags.priceConflict) {
     if (typeof out.additional_data.price === "number") {
       delete out.additional_data.price;
@@ -407,10 +407,8 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
       diag.price_conflict_blocked_gemini = true;
     }
   } else if (typeof out.additional_data.price !== "number") {
-    const gemPrice = gemini.additional_data?.price;
-    const conf = gemini.field_confidence?.price ?? 0;
-    if (typeof gemPrice === "number" && isFinite(gemPrice) && conf >= 0.7) {
-      out.additional_data.price = gemPrice;
+    if (geminiPriceTrusted(gemini, flags)) {
+      out.additional_data.price = gemini.additional_data!.price as number;
       diag.field_winners.price = "gemini";
     }
   }
