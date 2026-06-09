@@ -158,6 +158,28 @@ export interface V2SuccessResponse {
       produced_fields?: number;
       field_confidence_present?: boolean;
     };
+    /**
+     * Phase 8+: merge diagnostics. Present when mergePredictions ran.
+     * Additive; downstream code MUST NOT branch on it.
+     */
+    merge?: {
+      path: "success" | "recovery";
+      gemini_used: boolean;
+      gemini_fields_used: number;
+      field_winners: {
+        type: "extractor" | "gemini" | "none";
+        name: "extractor" | "gemini" | "none";
+        description: "extractor" | "gemini" | "none";
+        image_url: "extractor" | "gemini" | "firecrawl" | "none";
+        brand: "extractor" | "gemini" | "none";
+        price: "extractor" | "gemini" | "none";
+        currency: "extractor" | "gemini" | "firecrawl" | "none";
+        tags: "extractor" | "gemini" | "merged" | "none";
+      };
+      name_junk_override_applied: boolean;
+      price_conflict_blocked_gemini: boolean;
+      recovery_gate_passed?: boolean;
+    };
   };
   warnings?: string[];
 }
