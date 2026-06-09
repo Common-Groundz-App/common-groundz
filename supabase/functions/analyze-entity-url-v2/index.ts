@@ -581,6 +581,10 @@ serve(async (req) => {
               duration_ms: fc.durationMs,
               improved: true,
             };
+            const signals = deriveFirecrawlSignals(fc.metadata, base);
+            mainFirecrawlImageUrl = signals.firecrawlImageUrl;
+            mainFirecrawlCurrency = signals.firecrawlCurrency;
+            if (recoveryDiagnostics?.price_conflict) mainPriceConflict = true;
             for (const w of extract2.warnings) {
               if (!warnings.includes(w)) warnings.push(w);
             }
