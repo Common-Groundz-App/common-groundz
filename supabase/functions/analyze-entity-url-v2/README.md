@@ -264,3 +264,108 @@ serialized in the response. Server logs include `code` only on errors.
 - **Phase 7** — Gemini URL Context + structured output (covers deferred types).
 - **Phase 8** — brand suggestion + Save-time parent brand handling.
 - **Phase 9+** — admin smoke test, logging, compare mode.
+
+---
+
+## Phase 8 — Gemini merge + recovery path
+
+Phase 8 adds a strict provenance-based merge between deterministic extractor
+results and Gemini raw predictions, plus a recovery path that lets V2 return
+200 in the Nykaa-class case (direct fetch fails + Firecrawl extraction weak +
+Gemini succeeds).
+
+### Two paths
+
+- **Success path** — extractor (possibly Firecrawl-improved) produced
+  predictions. Gemini, when present, improves selected fields under per-field
+  rules. Per-field validation only — there is NO recovery validity gate on
+  the success path.
+- **Recovery path** — extractor predictions are null. If Gemini passes the
+  recovery validity gate, V2 returns 200 with predictions built from Gemini
+  (plus any deterministic image/currency surviving from Firecrawl metadata).
+  Otherwise the original error response is returned unchanged.
+
+### Recovery validity gate
+
+A Gemini prediction can convert a fetch failure into 200 only if:
+
+- `type` is one of the canonical V2 subset
+- `name` is non-empty and length ≥ 2 after trim
+- `confidence >= 0.6`
+- at least one of `description`, `image_url`, `brand`, or `tags.length >= 2`
+
+### Field rules (success path)
+
+| Field         | Winner                                                                |
+|---------------|-----------------------------------------------------------------------|
+| `type`        | extractor (Gemini never overrides)                                    |
+| `name`        | extractor unless junk + Gemini `field_confidence.name >= 0.7`         |
+| `description` | Gemini if length 40-600, no junk-HTML, not all-caps; else extractor   |
+| `image_url`   | extractor > Gemini                                                    |
+| `images`      | union, dedupe by URL                                                  |
+| `tags`        | union, case-insensitive dedupe, cap 12                                |
+| `brand`       | Gemini > extractor (only from `additional_data.brand`, not sources)   |
+| `price`       | see Price rule below                                                  |
+| `currency`    | extractor > Firecrawl > Gemini                                        |
+
+### Image rule (recovery path)
+
+`flags.firecrawlImageUrl` (deterministic, directly from page metadata) is
+preferred over Gemini image. Gemini image is used only when no deterministic
+image exists.
+
+### Price rule (unified)
+
+`priceConflict` is derived from deterministic Firecrawl diagnostics
+(`selected_price_source === "omitted"`). Never inferred.
+
+| Condition                                                                          | Result                                |
+|------------------------------------------------------------------------------------|---------------------------------------|
+| `priceConflict === true`                                                           | omit price, keep currency             |
+| extractor has price (success)                                                      | extractor price, ignore Gemini        |
+| no extractor price AND Gemini price defined AND `field_confidence.price >= 0.7`    | use Gemini price                      |
+| otherwise                                                                          | omit price, keep currency if known    |
+
+Price ranges, MRP, `list_price`, `sale_price`, `selected_variant_price`,
+`price_min/max`, and `price_display` are deferred to Phase 8.1.
+
+### Categories snapshot policy
+
+`categories_snapshot.json` is a small hand-curated root-level mapping
+(~9 canonical types). It is **pure JSON** — no comments, no header.
+
+- Entries whose `category_id` is not verified against the live `categories`
+  table store `category_id: null` and carry only `matched_category_name`.
+- We **never** emit an unverified `category_id`.
+- On miss, both `category_id` and `matched_category_name` are null, and
+  `suggested_category_path` is preserved on the response.
+- No live DB dump, no subcategories, no fuzzy matching in this phase.
+
+To add a verified entry: confirm the `category_id` against the production
+`categories` table, add the snapshot entry with a real UUID, and add a test
+fixture in `category_resolver_test.ts`.
+
+### `metadata.merge` diagnostic
+
+Additive; downstream code MUST NOT branch on it. Shape:
+
+```jsonc
+{
+  "path": "success" | "recovery",
+  "gemini_used": true,
+  "gemini_fields_used": 3,
+  "field_winners": {
+    "type": "extractor",
+    "name": "extractor",
+    "description": "gemini",
+    "image_url": "extractor",     // or "firecrawl" on recovery
+    "brand": "gemini",
+    "price": "none",
+    "currency": "firecrawl",
+    "tags": "merged"
+  },
+  "name_junk_override_applied": false,
+  "price_conflict_blocked_gemini": false,
+  "recovery_gate_passed": true     // only on recovery path
+}
+```
