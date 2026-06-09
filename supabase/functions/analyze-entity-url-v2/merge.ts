@@ -273,6 +273,12 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
     }
 
     const predictions = geminiToV2Predictions(gemini, flags);
+
+    // Apply centralized price policy (converter is policy-free).
+    if (geminiPriceTrusted(gemini, flags)) {
+      predictions.additional_data.price = gemini.additional_data!.price as number;
+    }
+
     const diag: MergeDiagnostics = {
       ...baseDiag,
       path: "recovery",
