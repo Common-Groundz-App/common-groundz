@@ -5,6 +5,7 @@ import {
   mergePredictions,
   passesRecoveryGate,
   geminiToV2Predictions,
+  geminiPriceTrusted,
 } from "./merge.ts";
 import type { V2Predictions } from "./schema.ts";
 import type { GeminiRawPrediction } from "./response_schema.ts";
@@ -192,8 +193,59 @@ Deno.test("recovery: priceConflict blocks gemini price", () => {
   assertEquals(diagnostics.price_conflict_blocked_gemini, true);
 });
 
-Deno.test("geminiToV2Predictions price gate honored", () => {
+Deno.test("geminiToV2Predictions is policy-free: never writes price (even high confidence)", () => {
+  // High confidence + no conflict — converter STILL must omit price.
+  const gem = makeGemini({ field_confidence: { price: 0.95 } });
+  const p = geminiToV2Predictions(gem, noFlags);
+  assertEquals(p.additional_data.price, undefined);
+  // Brand and currency still copied through.
+  assertEquals(p.additional_data.brand, "Acme");
+  assertEquals(p.additional_data.currency, "USD");
+});
+
+Deno.test("geminiToV2Predictions omits price under low confidence too", () => {
   const gem = makeGemini({ field_confidence: { price: 0.4 } });
   const p = geminiToV2Predictions(gem, noFlags);
   assertEquals(p.additional_data.price, undefined);
+});
+
+Deno.test("geminiPriceTrusted: true only when no conflict + finite price + conf >= 0.7", () => {
+  const gem = makeGemini();
+  assertEquals(geminiPriceTrusted(gem, noFlags), true);
+  assertEquals(
+    geminiPriceTrusted(gem, { ...noFlags, priceConflict: true }),
+    false,
+  );
+  assertEquals(
+    geminiPriceTrusted(makeGemini({ field_confidence: { price: 0.5 } }), noFlags),
+    false,
+  );
+  assertEquals(
+    geminiPriceTrusted(
+      makeGemini({ additional_data: { brand: "Acme", currency: "USD" } }),
+      noFlags,
+    ),
+    false,
+  );
+  assertEquals(geminiPriceTrusted(null, noFlags), false);
+});
+
+Deno.test("recovery merge writes Gemini price when confidence >= 0.7 and no conflict", () => {
+  const gem = makeGemini(); // price 99, conf 0.9
+  const { predictions } = mergePredictions({
+    extract: null,
+    gemini: gem,
+    flags: noFlags,
+  });
+  assertEquals(predictions!.additional_data.price, 99);
+});
+
+Deno.test("recovery merge blocks Gemini price when confidence < 0.7", () => {
+  const gem = makeGemini({ field_confidence: { price: 0.5 } });
+  const { predictions } = mergePredictions({
+    extract: null,
+    gemini: gem,
+    flags: noFlags,
+  });
+  assertEquals(predictions!.additional_data.price, undefined);
 });

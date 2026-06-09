@@ -157,12 +157,40 @@ function clonePredictions(p: V2Predictions): V2Predictions {
   };
 }
 
+// ─── Price policy (single source of truth) ────────────────────────────────
+
+/**
+ * Centralized policy: should the Gemini-provided price be trusted at all?
+ * Used by both success and recovery merge paths. The only place that decides
+ * whether a Gemini price may be written into final predictions.
+ *
+ * Rules:
+ *  - priceConflict true  → never
+ *  - price not a finite number → never
+ *  - field_confidence.price < 0.7 → never
+ *  - otherwise allowed (caller still respects extractor-wins precedence)
+ */
+export function geminiPriceTrusted(
+  gemini: GeminiRawPrediction | null,
+  flags: MergeFlags,
+): boolean {
+  if (!gemini) return false;
+  if (flags.priceConflict) return false;
+  const p = gemini.additional_data?.price;
+  if (typeof p !== "number" || !isFinite(p)) return false;
+  const conf = gemini.field_confidence?.price ?? 0;
+  return conf >= 0.7;
+}
+
 // ─── GeminiRawPrediction → V2Predictions ──────────────────────────────────
 
 /**
  * Recovery path base: turn a Gemini raw prediction into a V2Predictions.
  * Category fields are left null; caller runs `resolveCategory`.
- * Price gating applies here too (see plan §6).
+ *
+ * POLICY-FREE: never writes `additional_data.price`. All price decisions are
+ * centralized in `mergePredictions` via `geminiPriceTrusted`. This keeps the
+ * converter safe for direct use without leaking ungated prices.
  */
 export function geminiToV2Predictions(
   raw: GeminiRawPrediction,
@@ -181,17 +209,7 @@ export function geminiToV2Predictions(
     ad.currency = flags.firecrawlCurrency.trim().toUpperCase();
   }
 
-  // Price: subject to conflict + confidence gate
-  const gemPrice = raw.additional_data?.price;
-  const priceConf = raw.field_confidence?.price ?? 0;
-  if (
-    !flags.priceConflict &&
-    typeof gemPrice === "number" &&
-    isFinite(gemPrice) &&
-    priceConf >= 0.7
-  ) {
-    ad.price = gemPrice;
-  }
+  // NOTE: price intentionally omitted here — mergePredictions owns price policy.
 
   // Recovery image: firecrawl > gemini
   const image_url = flags.firecrawlImageUrl ?? raw.image_url ?? null;
@@ -255,6 +273,12 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
     }
 
     const predictions = geminiToV2Predictions(gemini, flags);
+
+    // Apply centralized price policy (converter is policy-free).
+    if (geminiPriceTrusted(gemini, flags)) {
+      predictions.additional_data.price = gemini.additional_data!.price as number;
+    }
+
     const diag: MergeDiagnostics = {
       ...baseDiag,
       path: "recovery",
@@ -373,7 +397,7 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
     }
   }
 
-  // ── price: conflict blocks; else extractor > gemini (gated)
+  // ── price: extractor wins if present; else apply centralized policy
   if (flags.priceConflict) {
     if (typeof out.additional_data.price === "number") {
       delete out.additional_data.price;
@@ -383,10 +407,8 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
       diag.price_conflict_blocked_gemini = true;
     }
   } else if (typeof out.additional_data.price !== "number") {
-    const gemPrice = gemini.additional_data?.price;
-    const conf = gemini.field_confidence?.price ?? 0;
-    if (typeof gemPrice === "number" && isFinite(gemPrice) && conf >= 0.7) {
-      out.additional_data.price = gemPrice;
+    if (geminiPriceTrusted(gemini, flags)) {
+      out.additional_data.price = gemini.additional_data!.price as number;
       diag.field_winners.price = "gemini";
     }
   }
