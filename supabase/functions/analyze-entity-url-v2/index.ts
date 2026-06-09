@@ -639,6 +639,7 @@ serve(async (req) => {
     const geminiEligible =
       extract.predictions === null || wsFinal.weak || usedFirecrawl;
     let geminiBlock: GeminiMetadataBlock | undefined;
+    let mainGeminiPred: GeminiRawPrediction | null = null;
     if (geminiEligible) {
       if (geminiConfigured) {
         const evidenceBaseUrl = chooseEvidenceBaseUrl({
@@ -654,6 +655,7 @@ serve(async (req) => {
         });
         if (gem.ok) {
           geminiBlock = geminiSuccessBlock(gem);
+          mainGeminiPred = gem.prediction;
         } else if (gem.configured) {
           geminiBlock = geminiFailureBlock(gem);
           (warnings as string[]).push(gem.code satisfies GeminiWarningCode);
@@ -665,23 +667,35 @@ serve(async (req) => {
       }
     }
 
+    // === Phase 8: merge + category resolution ===
+    const mainFlags: MergeFlags = {
+      priceConflict: mainPriceConflict,
+      firecrawlCurrency: mainFirecrawlCurrency,
+      firecrawlImageUrl: mainFirecrawlImageUrl,
+    };
+    const { predictions: mainMerged, mergeDiag: mainMergeDiag } = applyMerge(
+      extract.predictions,
+      mainGeminiPred,
+      mainFlags,
+    );
+
     const response: V2SuccessResponse = {
       success: true,
-      predictions: extract.predictions,
+      predictions: mainMerged,
       metadata: {
         analyzed_url: safe.url,
         normalized_url: safe.url,
         extraction_version: EXTRACTION_VERSION,
         edge_function: EDGE_FUNCTION_NAME,
-        method: extract.predictions ? "exact-page" : "stub",
+        method: mainMerged ? "exact-page" : "stub",
         timestamp: new Date().toISOString(),
         used_url_context: geminiBlock?.used_url_context ?? false,
         used_google_search: geminiBlock?.used_google_search ?? false,
         used_firecrawl: usedFirecrawl,
-        phase: 7,
+        phase: 8,
         stage: usedFirecrawl
           ? "firecrawl-improved"
-          : extract.predictions
+          : mainMerged
             ? "exact-page"
             : "weak-signals",
         fetch: {
@@ -695,6 +709,7 @@ serve(async (req) => {
         extract: extract.metadata,
         ...(firecrawlBlock ? { firecrawl: firecrawlBlock } : {}),
         ...(geminiBlock ? { gemini: geminiBlock } : {}),
+        merge: mainMergeDiag,
       },
       warnings: warnings.length > 0 ? warnings : undefined,
     };
