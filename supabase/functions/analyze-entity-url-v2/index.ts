@@ -530,6 +530,10 @@ serve(async (req) => {
     let firecrawlBlock: V2SuccessResponse["metadata"]["firecrawl"] | undefined;
     let finalHtmlForGemini: string = fetchResult.bodyText;
     let finalEvidenceBaseUrl: string = fetchResult.finalUrl;
+    // Phase 8: deterministic signals plumbed into merge.
+    let mainPriceConflict = false;
+    let mainFirecrawlImageUrl: string | null = null;
+    let mainFirecrawlCurrency: string | null = null;
 
     const ws = detectWeakSignals(extract);
     if (ws.weak) {
