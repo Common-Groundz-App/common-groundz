@@ -41,6 +41,16 @@ import {
   type GeminiWarningCode,
 } from "./gemini.ts";
 import { buildV2Prompts } from "./prompt-generator-v2.ts";
+import {
+  mergePredictions,
+  passesRecoveryGate,
+  type MergeDiagnostics,
+  type MergeFlags,
+} from "./merge.ts";
+import { resolveCategory } from "./category_resolver.ts";
+import { safeAbsoluteUrl } from "./extractor.ts";
+import type { GeminiRawPrediction } from "./response_schema.ts";
+import type { ExtractMetadata, V2Predictions } from "./schema.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
