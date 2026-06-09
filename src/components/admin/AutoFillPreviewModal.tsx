@@ -129,13 +129,17 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
               multiline 
             />
             
-            {/* Show first image if available */}
-            {pred.images && pred.images.length > 0 && (
-              <PreviewField 
-                label="Primary Image" 
-                value={pred.images[0]} 
-                isImage 
-              />
+            {/* Show primary image if available */}
+            {pred.image_url && (
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Primary Image</Label>
+                <ImageWithFallback
+                  src={pred.image_url}
+                  alt={pred.name || 'Primary image'}
+                  entityType={pred.type || 'product'}
+                  className="mt-2 rounded-md max-h-32 object-cover w-full"
+                />
+              </div>
             )}
             
             {/* Additional Data */}
