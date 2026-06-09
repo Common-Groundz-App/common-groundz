@@ -364,7 +364,18 @@ serve(async (req) => {
       // Log code only — never URL, headers, body, or internal reason.
       console.warn("[analyze-entity-url-v2] fetch failed", { code: e.code });
 
-      // Phase 6: eligible fetch failures may be recovered by Firecrawl.
+      // Phase 8: fetch-failure recovery (Firecrawl + Gemini).
+      let recExtract: ExtractResult | null = null;
+      let recHtml = "";
+      let recEvidenceBaseUrl = safe.url;
+      let recPriceConflict = false;
+      let recFirecrawlImageUrl: string | null = null;
+      let recFirecrawlCurrency: string | null = null;
+      let recFirecrawlBlock: V2SuccessResponse["metadata"]["firecrawl"] | undefined;
+      let recWarnings: string[] = [];
+      let recFirecrawlOk = false;
+      let recFcDurationMs: number | undefined;
+
       if (FETCH_FAILED_ELIGIBLE.has(e.code) && firecrawlConfigured) {
         const fc = await runFirecrawlScrape(safe.url, {
           fallbackBaseUrl: safe.url,
@@ -375,17 +386,22 @@ serve(async (req) => {
               }
             : {}),
         });
+        recFcDurationMs = fc.durationMs;
         if (fc.ok) {
+          recFirecrawlOk = true;
           const base = safeBaseUrl(fc.finalUrl, safe.url);
-          let extract = extractFromHtml(fc.html, base);
-          if (extract.predictions === null) {
+          recEvidenceBaseUrl = base;
+          recHtml = fc.html;
+          let candidate = extractFromHtml(fc.html, base);
+          if (candidate.predictions === null) {
             const recovered = extractFromFirecrawl({
               metadata: fc.metadata,
               markdown: fc.markdown,
               finalUrl: base,
             });
+            recPriceConflict = recovered.diagnostics.price_conflict;
             if (recovered.result.predictions !== null) {
-              extract = recovered.result;
+              candidate = recovered.result;
               console.log("[analyze-entity-url-v2] firecrawl recovery succeeded", {
                 html_present: fc.html.length > 0,
                 markdown_present: fc.markdown !== null,
@@ -399,96 +415,104 @@ serve(async (req) => {
               console.log("[analyze-entity-url-v2] firecrawl recovery diagnostics", recovered.diagnostics);
             }
           }
-
-          if (extract.predictions !== null) {
-            // Phase 7: Gemini eligible (firecrawl was used).
-            const evidenceBaseUrl = chooseEvidenceBaseUrl({
-              firecrawlFinalUrl: base,
-              fetchFinalUrl: null,
-              safeUrl: safe.url,
-            });
-            const warnings: string[] = [...extract.warnings];
-            let geminiBlock: GeminiMetadataBlock | undefined;
-            if (geminiConfigured) {
-              const gem = await invokeGemini({
-                url: safe.url,
-                html: fc.html,
-                evidenceBaseUrl,
-                extractMetadata: extract.metadata,
-              });
-              if (gem.ok) {
-                geminiBlock = geminiSuccessBlock(gem);
-              } else if (gem.configured) {
-                geminiBlock = geminiFailureBlock(gem);
-                (warnings as string[]).push(gem.code satisfies GeminiWarningCode);
-              }
-            } else {
-              (warnings as string[]).push(
-                "GEMINI_NOT_CONFIGURED" satisfies GeminiWarningCode,
-              );
+          if (candidate.predictions !== null) {
+            recExtract = candidate;
+            for (const w of candidate.warnings) {
+              if (!recWarnings.includes(w)) recWarnings.push(w);
             }
-            const response: V2SuccessResponse = {
-              success: true,
-              predictions: extract.predictions,
-              metadata: {
-                analyzed_url: safe.url,
-                normalized_url: safe.url,
-                extraction_version: EXTRACTION_VERSION,
-                edge_function: EDGE_FUNCTION_NAME,
-                method: "exact-page",
-                timestamp: new Date().toISOString(),
-                used_url_context: geminiBlock?.used_url_context ?? false,
-                used_google_search: geminiBlock?.used_google_search ?? false,
-                used_firecrawl: true,
-                phase: 7,
-                stage: "firecrawl-recovered",
-                extract: extract.metadata,
-                firecrawl: {
-                  used: true,
-                  priority,
-                  duration_ms: fc.durationMs,
-                  improved: true,
-                },
-                ...(geminiBlock ? { gemini: geminiBlock } : {}),
-              },
-              warnings: warnings.length > 0 ? warnings : undefined,
-            };
-            return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
-          }
-          // Firecrawl returned HTML but extraction still null → error path.
-          // Phase 7: invoke Gemini for diagnostics ONLY (logs). Do NOT mutate
-          // V2ErrorResponse — no metadata.gemini, no warnings[] in body.
-          console.warn("[analyze-entity-url-v2] firecrawl recovery failed: weak extraction", {
-            code: e.code,
-            durationMs: fc.durationMs,
-          });
-          if (geminiConfigured) {
-            const evidenceBaseUrl = chooseEvidenceBaseUrl({
-              firecrawlFinalUrl: base,
-              fetchFinalUrl: null,
-              safeUrl: safe.url,
-            });
-            // Fire-and-await for logs; ignore result.
-            await invokeGemini({
-              url: safe.url,
-              html: fc.html,
-              evidenceBaseUrl,
-              extractMetadata: extract.metadata,
-            });
           } else {
-            console.log("[analyze-entity-url-v2] gemini", {
-              ok: false,
-              code: "GEMINI_NOT_CONFIGURED",
+            console.warn("[analyze-entity-url-v2] firecrawl recovery failed: weak extraction", {
+              code: e.code,
+              durationMs: fc.durationMs,
             });
           }
+          const signals = deriveFirecrawlSignals(fc.metadata, base);
+          recFirecrawlImageUrl = signals.firecrawlImageUrl;
+          recFirecrawlCurrency = signals.firecrawlCurrency;
+          recFirecrawlBlock = {
+            used: recExtract !== null,
+            priority,
+            duration_ms: fc.durationMs,
+            improved: recExtract !== null,
+          };
         } else {
           console.warn("[analyze-entity-url-v2] firecrawl call failed on fetch recovery", {
             code: fc.code,
             status: fc.status,
             durationMs: fc.durationMs,
           });
-          // Firecrawl outright failed → per trigger table, skip Gemini.
+          recFirecrawlBlock = {
+            used: false,
+            priority,
+            duration_ms: fc.durationMs,
+            error_code: fc.code,
+          };
+          recWarnings.push(fc.code);
         }
+      }
+
+      // Phase 8: invoke Gemini on the recovery path (not just diagnostics).
+      let recGeminiBlock: GeminiMetadataBlock | undefined;
+      let recGeminiPred: GeminiRawPrediction | null = null;
+      if (geminiConfigured) {
+        const evidenceBaseUrl = chooseEvidenceBaseUrl({
+          firecrawlFinalUrl: recFirecrawlOk ? recEvidenceBaseUrl : null,
+          fetchFinalUrl: null,
+          safeUrl: safe.url,
+        });
+        const gem = await invokeGemini({
+          url: safe.url,
+          html: recHtml,
+          evidenceBaseUrl,
+          extractMetadata: recExtract?.metadata ?? EMPTY_EXTRACT_METADATA,
+        });
+        if (gem.ok) {
+          recGeminiBlock = geminiSuccessBlock(gem);
+          recGeminiPred = gem.prediction;
+        } else if (gem.configured) {
+          recGeminiBlock = geminiFailureBlock(gem);
+          recWarnings.push(gem.code satisfies GeminiWarningCode);
+        }
+      } else {
+        recWarnings.push("GEMINI_NOT_CONFIGURED" satisfies GeminiWarningCode);
+      }
+
+      // Phase 8: merge.
+      const recFlags: MergeFlags = {
+        priceConflict: recPriceConflict,
+        firecrawlCurrency: recFirecrawlCurrency,
+        firecrawlImageUrl: recFirecrawlImageUrl,
+      };
+      const { predictions: recMerged, mergeDiag: recMergeDiag } = applyMerge(
+        recExtract?.predictions ?? null,
+        recGeminiPred,
+        recFlags,
+      );
+
+      if (recMerged) {
+        const response: V2SuccessResponse = {
+          success: true,
+          predictions: recMerged,
+          metadata: {
+            analyzed_url: safe.url,
+            normalized_url: safe.url,
+            extraction_version: EXTRACTION_VERSION,
+            edge_function: EDGE_FUNCTION_NAME,
+            method: "exact-page",
+            timestamp: new Date().toISOString(),
+            used_url_context: recGeminiBlock?.used_url_context ?? false,
+            used_google_search: recGeminiBlock?.used_google_search ?? false,
+            used_firecrawl: recFirecrawlOk,
+            phase: 8,
+            stage: recExtract ? "firecrawl-recovered" : "gemini-recovered",
+            ...(recExtract ? { extract: recExtract.metadata } : {}),
+            ...(recFirecrawlBlock ? { firecrawl: recFirecrawlBlock } : {}),
+            ...(recGeminiBlock ? { gemini: recGeminiBlock } : {}),
+            merge: recMergeDiag,
+          },
+          warnings: recWarnings.length > 0 ? recWarnings : undefined,
+        };
+        return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
 
       // Strict contract: return the ORIGINAL fetch error unchanged.
