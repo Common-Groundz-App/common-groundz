@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Lightbulb, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface AutoFillPreviewModalProps {
   open: boolean;
