@@ -1,157 +1,238 @@
-## What the diagnostics proved
 
-Latest Nykaa run:
+# Phase 8 — Gemini Merge + Conservative Cleanups (final)
 
-```
-name_source: "metadata_title"          ← junk og:title won
-markdown_h1_found: true                 ← clean H1 exists
-markdown_h1_within_main_region: false   ← but outside the 4 KB region
-markdown_price_found: false             ← regex didn't match Nykaa's Indian price format
-metadata_price_found: true              ← og price = 14900 (one SKU variant)
-selected_price_source: "metadata"
-image_source: "metadata_og_image"
-image_present: true                     ← backend has a syntactically valid URL
-```
+Goal: surface Gemini at the wire level inside `predictions` under strict provenance rules, AND let Gemini recover the Nykaa-class error path (direct fetch fails + Firecrawl weak/null + Gemini succeeds → V2 returns 200 instead of `FETCH_BAD_STATUS`). Three deterministic cleanups (name junk override, description priority, conservative root-level category map + brand). No V1 changes, no DB writes, no frontend redesign, no Gemini prompt/model/tool changes, no response-envelope break beyond optional `metadata.merge`.
 
-UI: junk name, junk description, broken image icon, single price (14900) — PDP actually has ₹10,600 (50 ml) and ₹14,900 (100 ml).
+Price ranges / MRP / `list_price` / `sale_price` / `selected_variant_price` are explicitly deferred to **Phase 8.1** — NOT in this phase.
 
-Three small fixes + a confirmation run. No Phase 8 yet.
+## Two paths this phase must handle
 
-## Scope
+1. **Success path** — extractor (or Firecrawl-improved extractor) produced `predictions`. Gemini, if present, improves selected fields under field-level rules. The recovery validity gate does NOT apply here; field-level validity does.
+2. **Recovery path** — `extractorHasPredictions === false`. If Gemini passes the recovery validity gate, V2 returns 200 with predictions sourced from Gemini (plus any deterministic image/currency that survived). Otherwise the existing error response is returned unchanged.
 
-**Out of scope:** Phase 8, Gemini merge, V1, `extractor.ts`, `fetcher.ts`, `prompt-generator-v2.ts`, response envelope, description priority, SSRF / Gemini client, `proxy-external-image` edits, `ImageWithFallback` edits, DB changes, loosening the 5% rule, skuId→variant mapping, name normalization (size suffix stripping, "Buy … Online" stripping, title-casing).
+## In scope
 
----
+### 1. `GeminiRawPrediction` → `V2Predictions` converter
+- New `geminiToV2Predictions(raw: GeminiRawPrediction): V2Predictions` in `merge.ts`.
+- Fills `category_id = null`, `matched_category_name = null`, `suggested_category_path = null`. Category resolution runs after merge, using both `type` and `suggested_category_path`.
+- Maps `additional_data.brand/price/currency` from raw, subject to price gating (see §6).
+- `tags`, `images`, `image_url` taken from already-normalized raw values.
 
-### Fix A — Widen markdown main region (fixes `name` only, not `description`)
+### 2. Recovery validity gate (recovery path ONLY)
+Convert a fetch failure into 200 only if ALL hold:
+- `gemini.type` is in the canonical V2 extractable subset
+- `gemini.name` non-empty after trim, length ≥ 2
+- `gemini.confidence >= 0.6`
+- at least ONE of `description`, `image_url`, `brand`, or `tags.length >= 2` populated
 
-In `supabase/functions/analyze-entity-url-v2/firecrawl_recovery.ts`:
+If the gate fails, V2 returns the original error response unchanged. The gate is NEVER applied on the success path — there, individual Gemini fields are validated per-field and discarded individually if weak.
 
-- Raise `MAIN_REGION_BYTES` from `4 * 1024` to `16 * 1024`.
-- Keep the "stop at first `## ` heading" cutoff unchanged.
-- 16 KB is a hard ceiling for this pass.
+### 3. `mergePredictions({ extract, gemini, flags })` — clean API
 
-**What changes / what does NOT:**
-- ✅ `firstH1` finds the clean product H1 → `name_source` flips to `"markdown_h1"`.
-- ❌ Description does **not** improve. Priority stays `og:description → metadata.description → markdown paragraph`. Nykaa's junk og:description still wins. Description = Phase 8.
-
-**Guardrail — Minimal H1 cleanup:** No size-suffix stripping (`(50ml)`), no marketing-phrase stripping, no title-casing. Accept H1 verbatim. `firstH1` regex unchanged.
-
-Regression test: fixture with clean H1 between 4 KB and 16 KB of leading nav noise, followed by `## Product Description` cutoff and junk H1 after. Assert `name` = clean H1 verbatim; post-`##` junk H1 ignored.
-
----
-
-### Fix B — Extend markdown price regex; prefer sale over MRP; omit on multi-SKU conflict
-
-Replace `firstMarkdownPrice` with a function that:
-
-**1. Collects ALL anchored matches in the main region** (no bare-number matching ever).
-
-Two regex branches, both strictly anchored:
-
-```
-Branch 1 — REQUIRED label, optional currency, number
-  label   := (MRP | Price | Offer Price | Sale Price)
-  example matches:
-    "MRP: ₹14,900"  → label=MRP,         price=14900
-    "Price: 2499"   → label=Price,       price=2499
-    "Offer Price ₹10,600" → label=Offer Price, price=10600
-    "Sale Price: Rs. 7,499" → label=Sale Price, price=7499
-
-Branch 2 — REQUIRED currency token, number (no label needed)
-  currency := (₹ | $ | € | £ | Rs. | Rs<space> | INR<space> | USD<space> | EUR<space> | GBP<space>)
-  example matches:
-    "₹10,600"       → label=null, price=10600
-    "Rs. 14,900"    → label=null, price=14900
-    "INR 1200"      → label=null, price=1200
-    "$49.99"        → label=null, price=49.99
+```ts
+mergePredictions({
+  extract: V2Predictions | null,
+  gemini: GeminiRawPrediction | null,
+  flags: {
+    priceConflict: boolean,
+    firecrawlCurrency: string | null,
+    firecrawlImageUrl: string | null   // deterministic image even if predictions are null
+  }
+}): { predictions: V2Predictions | null, diagnostics: MergeDiagnostics }
 ```
 
-Neither branch ever allows both label AND currency to be optional. Bare digits never match — ratings (`4.3`), review counts (`12,450 reviews`), pack sizes (`50 ml`), pincodes, dates (`12 June`), SKU IDs (`950905`) are all unreachable by either branch.
+Internal branching:
+- `extract != null` → **success path**: extractor is base, Gemini improves fields under per-field rules.
+- `extract == null && gemini != null && passesRecoveryGate(gemini)` → **recovery path**: call `geminiToV2Predictions(gemini)` as base, then overlay deterministic survivors:
+  - `image_url`: if `flags.firecrawlImageUrl` is a valid http(s) URL, prefer it over Gemini's image. Gemini image fills only when no deterministic image exists.
+  - `additional_data.currency`: if Gemini lacks one, fill from `flags.firecrawlCurrency`.
+  - `additional_data.price`: subject to §6 (blocked on conflict, otherwise requires `field_confidence.price >= 0.7`).
+- both null OR recovery gate failed → `predictions: null` (caller returns existing error response).
 
-**2. Picks one winner from collected matches by priority:**
+**`mergePredictions` MUST return a fresh `predictions` object** (shallow clone of `extract` then field-by-field overlays; arrays/objects copied, never mutated in place). The caller is then free to mutate the returned object for category resolution without touching `finalExtract.predictions`.
+
+Field rules (success path):
+
+| Field | Winner |
+|---|---|
+| `type` | extractor (Gemini never overrides) |
+| `name` | extractor UNLESS normalized extractor name still matches junk regex (`/^(Buy\|Shop\|Order\|Get)\b/i`, `/\bOnline$/i`, or length > 120 with trailing `For Him\|For Her\|Online\|India`) AND `gemini.field_confidence.name >= 0.7` → then Gemini |
+| `description` | Gemini if non-empty, length 40–600, not junk-HTML (no `<`, no `{`, not all-caps). Else `extract.description`. No markdown paragraph fallback. |
+| `image_url` | **Success:** extractor > Gemini. **Recovery:** `flags.firecrawlImageUrl` > Gemini. |
+| `images` | extractor ∪ Gemini, dedupe by URL |
+| `tags` | union, case-insensitive dedupe, cap 12 |
+| `additional_data.brand` | Gemini (non-empty string) > `extract.additional_data.brand` only. NEVER read from `metadata.sources` (those are provenance strings, not values). |
+| `additional_data.price` | See §6 below |
+| `additional_data.currency` | extractor > `flags.firecrawlCurrency` > Gemini |
+| `confidence` | success: `min(extract.confidence, gemini.confidence)`. recovery: `gemini.confidence` |
+| `reasoning` | concat `"[extractor] ..."` + `"[gemini] ..."` |
+
+### 4. `MergeDiagnostics` → `metadata.merge` (additive)
+
+```ts
+{
+  path: "success" | "recovery",
+  gemini_used: boolean,
+  gemini_fields_used: number,       // count of fields whose winner === "gemini" (or "merged" for tags)
+  field_winners: {
+    type:        "extractor" | "gemini" | "none",
+    name:        "extractor" | "gemini" | "none",
+    description: "extractor" | "gemini" | "none",
+    image_url:   "extractor" | "gemini" | "firecrawl" | "none",
+    brand:       "extractor" | "gemini" | "none",
+    price:       "extractor" | "gemini" | "none",
+    currency:    "extractor" | "gemini" | "firecrawl" | "none",
+    tags:        "extractor" | "gemini" | "merged" | "none"
+  },
+  name_junk_override_applied: boolean,
+  price_conflict_blocked_gemini: boolean,
+  recovery_gate_passed?: boolean    // present only when extract was null
+}
+```
+
+- `field_winners.tags === "merged"` when BOTH extractor and Gemini contributed at least one surviving tag after dedupe.
+- `field_winners.image_url === "firecrawl"` on recovery path when `flags.firecrawlImageUrl` won.
+- On recovery path: `path: "recovery"`, `gemini_used: true`, `gemini_fields_used` reflects Gemini-sourced fields (NOT 0).
+- Add `merge?: MergeDiagnostics` to `V2SuccessResponse.metadata` in `schema.ts`. Additive only.
+
+### 5. Conservative root-level category resolver
+- New `category_resolver.ts` + `categories_snapshot.json` (~15 root entries) checked into the function directory.
+- **`categories_snapshot.json` contains pure JSON only — NO comments, NO header.** Snapshot staleness, last-verified date, and rules for adding entries are documented in `README.md` and in a top-of-file comment in `category_resolver.ts`.
+- Signature: `resolveCategory({ type, suggested_category_path }) → { category_id, matched_category_name }`.
+- Attempts:
+  1. Match `suggested_category_path` (case-insensitive) to a root entry.
+  2. Fallback: match canonical `type` (e.g. `product`, `book`, `movie`, `tv_show`) to its root entry. Recovery path (where `suggested_category_path` is null) still resolves.
+- **Snapshot safety:** entries where the `category_id` cannot be verified as current store `category_id: null` and only `matched_category_name`. We never emit an unverified ID. Miss → both null, `suggested_category_path` preserved on `predictions`.
+- No live DB dump script. No subcategories. No fuzzy matching.
+
+### 6. Price handling — unified rule (success AND recovery)
+
+`priceConflict` MUST be derived from deterministic diagnostics (`selected_price_source === "omitted"`). Never inferred.
+
+| Condition | Result |
+|---|---|
+| `flags.priceConflict === true` | `additional_data.price` is OMITTED. Currency kept. Gemini price IGNORED on both paths. `price_conflict_blocked_gemini = true`. |
+| `flags.priceConflict === false` AND extractor has a price (success path) | Use extractor price. Gemini price ignored. |
+| `flags.priceConflict === false` AND extractor has no price AND `gemini.additional_data.price != null` AND `gemini.field_confidence.price >= 0.7` | Use Gemini price. |
+| Otherwise | OMIT price, keep currency if known. |
+
+This rule applies in BOTH `mergePredictions` (success path) AND `geminiToV2Predictions` (recovery path). `geminiToV2Predictions` does NOT copy `gemini.additional_data.price` blindly — it applies the same confidence gate.
+
+### 7. Wiring in `index.ts`
 
 ```
-Priority 1: any match with label ∈ {Offer Price, Sale Price, Price}
-Priority 2: any currency-prefixed match (Branch 2) that does NOT have "MRP"
-            within ~40 chars before it
-Priority 3: any match with label = MRP  (last resort)
+const fetchOutcome = await safeFetch(...);
+const extract = fetchOutcome.ok ? runExtractor(...) : null;
+const firecrawl = maybeRunFirecrawl(...);
+const finalExtract = pickFinalExtract(extract, firecrawl);
+
+const priceConflict      = deriveConflictFromDiagnostics(finalExtract, firecrawl);
+const firecrawlCurrency  = deriveCurrencyFromDiagnostics(finalExtract, firecrawl);
+const firecrawlImageUrl  = deriveImageFromDiagnostics(finalExtract, firecrawl);
+
+const geminiResult = await maybeRunGemini(...);
+// NOTE: Use the ACTUAL GeminiSuccess field from current code
+// (likely geminiResult.prediction). Verify in build mode; do NOT
+// invent geminiResult.raw.
+const geminiPred = geminiResult?.prediction ?? null;
+
+const extractorHasPredictions = !!finalExtract?.predictions;
+
+if (!extractorHasPredictions && (!geminiPred || !passesRecoveryGate(geminiPred))) {
+  return existingErrorResponse;   // unchanged
+}
+
+const { predictions, diagnostics } = mergePredictions({
+  extract: finalExtract?.predictions ?? null,
+  gemini: geminiPred,
+  flags: { priceConflict, firecrawlCurrency, firecrawlImageUrl }
+});
+
+// predictions is a FRESH object; safe to mutate.
+const resolved = resolveCategory({
+  type: predictions.type,
+  suggested_category_path: predictions.suggested_category_path
+});
+predictions.category_id = resolved.category_id;
+predictions.matched_category_name = resolved.matched_category_name;
+
+return success({ predictions, metadata: { ..., merge: diagnostics } });
 ```
 
-Within a tier, first occurrence wins. Returns a single number or null.
+## Out of scope (explicit)
+- **Price ranges, MRP, `list_price`, `sale_price`, `selected_variant_price`, `price_min/max`, `price_display`** — deferred to **Phase 8.1**. Single-`price` contract preserved.
+- No DB writes, no brand entity auto-create, no schema migrations.
+- No V1 changes.
+- No Gemini prompt / model / tool changes.
+- No response envelope break — only additive `metadata.merge`.
+- No `proxy-external-image`, `ImageWithFallback`, `AutoFillPreviewModal` changes.
+- No live DB category dump script.
+- No name normalization beyond the junk-override switch.
+- No description markdown paragraph fallback.
+- No `categories_snapshot.json` comments/headers.
 
-**Why:** On Nykaa-style PDPs the markdown often shows `MRP: ₹14,900` **before** `Offer Price ₹10,600`. Naive first-match returns MRP, which violates the existing "don't inject list price when sale price is visible" rule. The priority order ensures the sale/offer price wins.
+## Verification
 
-**3. 5% metadata-vs-markdown conflict rule unchanged.** For Nykaa: markdown picks 10600 (Offer Price), metadata has 14900 (MRP) → diff > 5% → `selected_price_source: "omitted"`, currency kept.
+**Nykaa URL (currently `FETCH_BAD_STATUS`):**
+- 200 `success: true`.
+- `predictions.name`, `description`, `additional_data.brand` populated from Gemini.
+- `predictions.image_url` = Firecrawl/extractor image if available, else Gemini image.
+- `additional_data.price` absent (priceConflict); `additional_data.currency === "INR"`.
+- `metadata.merge.path === "recovery"`, `gemini_used: true`, `recovery_gate_passed: true`, `gemini_fields_used >= 2`, `price_conflict_blocked_gemini: true`, `field_winners.image_url` is `"firecrawl"` or `"gemini"` depending on what survived.
+- `predictions.category_id` verified product-root ID or null.
 
-Regression tests in `firecrawl_recovery_test.ts`:
+**Clean Amazon book URL (success path):**
+- `predictions.type === "book"` from extractor.
+- `metadata.merge.path === "success"`. Phase 7 diagnostics unchanged in shape.
 
-**Positive (label-anchored):**
-- `MRP: ₹14,900` alone → 14900.
-- `Price: 2499` → 2499.
-- `Offer Price ₹10,600` → 10600.
-- `Sale Price: Rs. 7,499` → 7499.
+**Gemini disabled or failing on a clean URL:**
+- Output identical to Phase 7; `merge.gemini_used: false`, `gemini_fields_used: 0`.
 
-**Positive (currency-anchored):**
-- `Rs. 14,900` → 14900.
-- `INR 1200` → 1200.
-- `$49.99` → 49.99.
+**Recovery gate failure:**
+- Original error response preserved.
 
-**Priority ordering:**
-- Markdown has `MRP: ₹14,900` then later `Offer Price ₹10,600` → picks 10600.
-- Markdown has only `MRP: ₹14,900` → picks 14900 (last resort).
-- Markdown has `₹14,900` (no MRP label nearby) then `₹10,600` → picks first currency-anchored = 14900 (tie within Priority 2 by first occurrence).
+**Success path with weak Gemini description:**
+- Extractor description retained; other Gemini fields (e.g. brand) can still win individually. Confirms recovery gate does NOT apply on success path.
 
-**Conflict rule integration:**
-- metadata=14900, markdown picks 10600 → `selected_price_source: "omitted"`, currency INR kept.
+**Mutation safety:**
+- After merge + category resolution, `finalExtract.predictions` is unchanged. Asserted in a unit test by snapshotting `finalExtract.predictions` before and after.
 
-**Negative (must NOT match):**
-- `4.3 out of 5` → no match.
-- `12,450 reviews` → no match.
-- `50 ml` / `100 ml` → no match.
-- `Delivery by 12 June` → no match.
-- Bare `950905` → no match.
-- `markdown_price_found: false` for all of the above.
+**Offline unit tests:**
+- `merge_test.ts`:
+  - success + recovery winners
+  - junk-name override on/off
+  - `priceConflict` blocks Gemini price on BOTH paths
+  - Gemini price requires `field_confidence.price >= 0.7` on BOTH paths
+  - `firecrawlCurrency` preserved on recovery
+  - `firecrawlImageUrl` wins over Gemini image on recovery
+  - brand never sourced from `metadata.sources`
+  - junk-HTML description rejected
+  - recovery gate accept/reject
+  - `field_winners.tags === "merged"` when both contribute
+  - returned predictions is a fresh object (mutation does not affect input)
+- `category_resolver_test.ts`: root match via path, fallback via type, miss → both null + `suggested_category_path` preserved, unverified entries return name only.
+- `geminiToV2Predictions`: required fields filled, category fields null, price gating honored.
 
-Existing fixture tests still pass.
+## Files
 
----
+New:
+- `supabase/functions/analyze-entity-url-v2/merge.ts`
+- `supabase/functions/analyze-entity-url-v2/merge_test.ts`
+- `supabase/functions/analyze-entity-url-v2/category_resolver.ts` (snapshot-staleness docs in top comment)
+- `supabase/functions/analyze-entity-url-v2/category_resolver_test.ts`
+- `supabase/functions/analyze-entity-url-v2/categories_snapshot.json` (pure JSON, no comments)
 
-### Fix C — AI Analysis modal image (verify URL via response body, NOT logs)
+Modified:
+- `supabase/functions/analyze-entity-url-v2/index.ts` — wire merge + recovery branch + diagnostics plumbing (`firecrawlImageUrl` added).
+- `supabase/functions/analyze-entity-url-v2/schema.ts` — add optional `metadata.merge` with `"firecrawl"` and `"merged"` winners.
+- `supabase/functions/analyze-entity-url-v2/README.md` — document merge rules, recovery gate, image precedence, category snapshot staleness policy.
 
-**Verification step:** On the next Nykaa re-run, open browser devtools → Network tab → find the `analyze-entity-url-v2` POST → read `predictions.image_url` from the JSON response body. We do **not** read image URLs from Edge logs.
+Untouched: all V1 files, `prompt-generator-v2.ts`, `gemini.ts`, `extractor.ts`, `fetcher.ts`, `firecrawl_recovery.ts`, `response_schema.ts`, `AutoFillPreviewModal.tsx`, `ImageWithFallback`, `proxy-external-image`, DB schema.
 
-Branch on what the response body shows:
+## Build-mode preflight (verify before writing code)
+1. Confirm the actual `GeminiSuccess` property name (likely `geminiResult.prediction`) — do NOT invent `.raw`.
+2. Confirm where `selected_price_source`, currency, and og:image / Firecrawl image diagnostics live so `priceConflict`, `firecrawlCurrency`, and `firecrawlImageUrl` are read from the correct fields even when deterministic `predictions` is null.
+3. Confirm each `categories_snapshot.json` `category_id` is currently valid; if not, store name-only.
 
-- **If `image_url` is a valid `images-static.nykaa.com` URL** that opens directly in a browser: bug is frontend rendering. Swap the AI Analysis Results modal's Primary Image `<img>` for the existing `ImageWithFallback` component (`src/components/common/ImageWithFallback.tsx`) with `entityType="product"`. That component already routes through `proxy-external-image` via `getProxyUrlForImage`, retries direct on proxy failure, and falls back to the product placeholder. **No changes to `ImageWithFallback` itself or `proxy-external-image`.**
-- **If `image_url` is malformed / relative / 404s:** bug is backend image selection in `firecrawl_recovery.ts`. Fix image fallback there. Do not also do the frontend swap in the same pass.
-- **If `image_url` is valid AND `ImageWithFallback` still renders broken:** open a separate `proxy-external-image` ticket. Out of scope here.
-
-Exact modal file located in build mode via `rg "image_url|Primary Image" src/components`.
-
----
-
-### Diagnostics retention
-
-Keep the `firecrawl recovery diagnostics` log through this confirmation run. After post-deploy Nykaa run shows expected values, decide whether to keep permanently or trim. Follow-up, not part of this pass.
-
----
-
-## Verification (mandatory)
-
-Re-run the same Nykaa URL from the AI Analysis modal. Required:
-- `name_source: "markdown_h1"` ✅
-- `markdown_h1_within_main_region: true` ✅
-- `markdown_price_found: true` ✅
-- `selected_price_source: "omitted"` ✅ (10600 vs 14900 conflict)
-- Modal renders the product image, or cleanly falls back to product placeholder (no broken icon) ✅
-- Description may still look like Nykaa's og:description — **expected**, Phase 8.
-- Name may include `(50ml)` — **expected**, Phase 8.
-
-All `firecrawl_recovery_test.ts` tests green including new positive, priority-ordering, conflict, and negative tests.
-
-## Files touched
-
-- `supabase/functions/analyze-entity-url-v2/firecrawl_recovery.ts` — `MAIN_REGION_BYTES` constant; replace `firstMarkdownPrice` with collect-all + priority-pick. Possibly image fallback (only if Fix C branches that way).
-- `supabase/functions/analyze-entity-url-v2/firecrawl_recovery_test.ts` — H1-after-4KB fixture, label-anchored tests, currency-anchored tests, MRP-vs-Offer-Price priority tests, multi-SKU conflict test, negative tests (ratings / reviews / pack sizes / dates / bare numbers).
-- AI Analysis Results modal component — swap Primary Image `<img>` for `ImageWithFallback` (only if Fix C branches that way; file located during build).
+## Future (Phase 8.1, NOT this phase)
+Dedicated pricing model: `price_range { min, max }`, `list_price`, `sale_price`, `selected_variant_price`, `price_source`, `price_confidence`, multi-SKU handling. Separate plan; UI + contract decision.

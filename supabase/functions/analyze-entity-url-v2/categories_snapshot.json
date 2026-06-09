@@ -1,0 +1,11 @@
+{
+  "product": { "category_id": null, "matched_category_name": "Products" },
+  "book": { "category_id": null, "matched_category_name": "Books" },
+  "movie": { "category_id": null, "matched_category_name": "Movies" },
+  "tv_show": { "category_id": null, "matched_category_name": "TV Shows" },
+  "course": { "category_id": null, "matched_category_name": "Courses" },
+  "app": { "category_id": null, "matched_category_name": "Apps" },
+  "game": { "category_id": null, "matched_category_name": "Games" },
+  "food": { "category_id": null, "matched_category_name": "Food" },
+  "place": { "category_id": null, "matched_category_name": "Places" }
+}

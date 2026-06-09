@@ -101,10 +101,12 @@ export interface V2Predictions {
   type: CanonicalEntityType;
   name: string;
   description: string | null;
-  category_id: null;
+  /** Phase 8+: resolved root-level category UUID, or null when unresolved. */
+  category_id: string | null;
   /** RAW schema.org @type or og:type verbatim. Never a fabricated path. */
   suggested_category_path: string | null;
-  matched_category_name: null;
+  /** Phase 8+: human-readable root category name, or null when unresolved. */
+  matched_category_name: string | null;
   tags: string[];
   confidence: number;
   reasoning: string;
