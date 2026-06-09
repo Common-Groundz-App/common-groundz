@@ -18,7 +18,7 @@ import {
   safeAbsoluteUrl,
 } from "./extractor.ts";
 
-const MAIN_REGION_BYTES = 4 * 1024;
+const MAIN_REGION_BYTES = 16 * 1024;
 
 // Conservative product-first mapping. Only OG types already handled by
 // extractor.ts; extends easily later with fixtures.
