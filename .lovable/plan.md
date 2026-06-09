@@ -1,133 +1,157 @@
-## Firecrawl Recovery QA Pass (pre-Phase 8)
+## What the diagnostics proved
 
-Goal: verify the deterministic Firecrawl recovery is actually following its own contract on the Nykaa-class URL before layering Phase 8 (Gemini merge) on top. Driven entirely by **sanitized parser diagnostics** — never raw scraped content.
+Latest Nykaa run:
 
-Scope: `supabase/functions/analyze-entity-url-v2/` only. No V1, DB, fetcher, extractor, Gemini, response-envelope, or frontend changes (except a possibly-separate image-fallback ticket — see Step 4).
-
----
-
-### Logging discipline (applies everywhere)
-
-**Never log in production:** markdown previews, metadata values, metadata keys, product names, descriptions, image URLs, price values, page URLs, headers, API keys, Gemini prompts/outputs.
-
-**Safe to log:** booleans, integer byte sizes, key *counts*, durations, deterministic enum-like source labels (`"markdown_h1"`, `"metadata_title"`, …), and our own internal type enum (`"product"`, `"book"`, …).
-
-Raw inspection, if ever needed, happens in the Firecrawl playground or a local Deno run — never in production Edge logs.
-
----
-
-### Step 1 — Add sanitized observability (one deploy, combined)
-
-**Files:** `supabase/functions/analyze-entity-url-v2/index.ts`, `firecrawl_recovery.ts`.
-
-#### 1a. Success log
-On both Firecrawl recovery-success branches in `index.ts`:
-```ts
-console.log("[analyze-entity-url-v2] firecrawl recovery succeeded", {
-  html_present: fc.html.length > 0,
-  markdown_present: fc.markdown !== null,
-  metadata_present: fc.metadata !== null,
-  html_bytes: fc.html.length,
-  markdown_bytes: fc.markdown?.length ?? 0,
-  metadata_key_count: fc.metadata ? Object.keys(fc.metadata).length : 0,
-  durationMs: fc.durationMs,
-  recovered_type: predictions?.type ?? null,
-});
+```
+name_source: "metadata_title"          ← junk og:title won
+markdown_h1_found: true                 ← clean H1 exists
+markdown_h1_within_main_region: false   ← but outside the 4 KB region
+markdown_price_found: false             ← regex didn't match Nykaa's Indian price format
+metadata_price_found: true              ← og price = 14900 (one SKU variant)
+selected_price_source: "metadata"
+image_source: "metadata_og_image"
+image_present: true                     ← backend has a syntactically valid URL
 ```
 
-#### 1b. Parser-source diagnostics
-Inside `extractFromFirecrawl`, compute:
-```ts
-interface FirecrawlRecoveryDiagnostics {
-  name_source: "markdown_h1" | "metadata_title" | null;
-  markdown_h1_found: boolean;
-  markdown_h1_within_main_region: boolean;
-  markdown_price_found: boolean;
-  metadata_price_found: boolean;
-  price_conflict: boolean;            // both present, >5% delta
-  selected_price_source: "metadata" | "markdown" | "omitted" | "none";
-  image_source: "metadata_og_image" | "markdown_image" | null;
-  image_present: boolean;
-}
+UI: junk name, junk description, broken image icon, single price (14900) — PDP actually has ₹10,600 (50 ml) and ₹14,900 (100 ml).
+
+Three small fixes + a confirmation run. No Phase 8 yet.
+
+## Scope
+
+**Out of scope:** Phase 8, Gemini merge, V1, `extractor.ts`, `fetcher.ts`, `prompt-generator-v2.ts`, response envelope, description priority, SSRF / Gemini client, `proxy-external-image` edits, `ImageWithFallback` edits, DB changes, loosening the 5% rule, skuId→variant mapping, name normalization (size suffix stripping, "Buy … Online" stripping, title-casing).
+
+---
+
+### Fix A — Widen markdown main region (fixes `name` only, not `description`)
+
+In `supabase/functions/analyze-entity-url-v2/firecrawl_recovery.ts`:
+
+- Raise `MAIN_REGION_BYTES` from `4 * 1024` to `16 * 1024`.
+- Keep the "stop at first `## ` heading" cutoff unchanged.
+- 16 KB is a hard ceiling for this pass.
+
+**What changes / what does NOT:**
+- ✅ `firstH1` finds the clean product H1 → `name_source` flips to `"markdown_h1"`.
+- ❌ Description does **not** improve. Priority stays `og:description → metadata.description → markdown paragraph`. Nykaa's junk og:description still wins. Description = Phase 8.
+
+**Guardrail — Minimal H1 cleanup:** No size-suffix stripping (`(50ml)`), no marketing-phrase stripping, no title-casing. Accept H1 verbatim. `firstH1` regex unchanged.
+
+Regression test: fixture with clean H1 between 4 KB and 16 KB of leading nav noise, followed by `## Product Description` cutoff and junk H1 after. Assert `name` = clean H1 verbatim; post-`##` junk H1 ignored.
+
+---
+
+### Fix B — Extend markdown price regex; prefer sale over MRP; omit on multi-SKU conflict
+
+Replace `firstMarkdownPrice` with a function that:
+
+**1. Collects ALL anchored matches in the main region** (no bare-number matching ever).
+
+Two regex branches, both strictly anchored:
+
+```
+Branch 1 — REQUIRED label, optional currency, number
+  label   := (MRP | Price | Offer Price | Sale Price)
+  example matches:
+    "MRP: ₹14,900"  → label=MRP,         price=14900
+    "Price: 2499"   → label=Price,       price=2499
+    "Offer Price ₹10,600" → label=Offer Price, price=10600
+    "Sale Price: Rs. 7,499" → label=Sale Price, price=7499
+
+Branch 2 — REQUIRED currency token, number (no label needed)
+  currency := (₹ | $ | € | £ | Rs. | Rs<space> | INR<space> | USD<space> | EUR<space> | GBP<space>)
+  example matches:
+    "₹10,600"       → label=null, price=10600
+    "Rs. 14,900"    → label=null, price=14900
+    "INR 1200"      → label=null, price=1200
+    "$49.99"        → label=null, price=49.99
 ```
 
-`index.ts` logs them on the same recovery-success branches:
-```ts
-console.log("[analyze-entity-url-v2] firecrawl recovery diagnostics", diag);
+Neither branch ever allows both label AND currency to be optional. Bare digits never match — ratings (`4.3`), review counts (`12,450 reviews`), pack sizes (`50 ml`), pincodes, dates (`12 June`), SKU IDs (`950905`) are all unreachable by either branch.
+
+**2. Picks one winner from collected matches by priority:**
+
+```
+Priority 1: any match with label ∈ {Offer Price, Sale Price, Price}
+Priority 2: any currency-prefixed match (Branch 2) that does NOT have "MRP"
+            within ~40 chars before it
+Priority 3: any match with label = MRP  (last resort)
 ```
 
-#### 1c. Critical: diagnostics must NOT leak into the V2 response envelope
+Within a tier, first occurrence wins. Returns a single number or null.
 
-The current `ExtractMetadata` shape is serialized to clients via `metadata.extract`. Diagnostics must therefore live on a **separate sibling object**, never on `ExtractMetadata`.
+**Why:** On Nykaa-style PDPs the markdown often shows `MRP: ₹14,900` **before** `Offer Price ₹10,600`. Naive first-match returns MRP, which violates the existing "don't inject list price when sale price is visible" rule. The priority order ensures the sale/offer price wins.
 
-Change `extractFromFirecrawl`'s return type from `ExtractResult` to:
-```ts
-{ result: ExtractResult, diagnostics: FirecrawlRecoveryDiagnostics }
-```
+**3. 5% metadata-vs-markdown conflict rule unchanged.** For Nykaa: markdown picks 10600 (Offer Price), metadata has 14900 (MRP) → diff > 5% → `selected_price_source: "omitted"`, currency kept.
 
-Update the two call sites in `index.ts` to destructure and log `diagnostics` while passing `result` onward unchanged. No new field on `ExtractMetadata`. No diagnostics in the JSON response.
+Regression tests in `firecrawl_recovery_test.ts`:
 
-Ship 1a + 1b + 1c in **one deploy**.
+**Positive (label-anchored):**
+- `MRP: ₹14,900` alone → 14900.
+- `Price: 2499` → 2499.
+- `Offer Price ₹10,600` → 10600.
+- `Sale Price: Rs. 7,499` → 7499.
 
----
+**Positive (currency-anchored):**
+- `Rs. 14,900` → 14900.
+- `INR 1200` → 1200.
+- `$49.99` → 49.99.
 
-### Step 2 — Re-run Nykaa, read logs
+**Priority ordering:**
+- Markdown has `MRP: ₹14,900` then later `Offer Price ₹10,600` → picks 10600.
+- Markdown has only `MRP: ₹14,900` → picks 14900 (last resort).
+- Markdown has `₹14,900` (no MRP label nearby) then `₹10,600` → picks first currency-anchored = 14900 (tie within Priority 2 by first occurrence).
 
-Re-run `https://www.nykaa.com/dior-homme-intense-eau-de-parfum-intense/p/950905?skuId=768775` via the AI Analysis modal. Read Edge logs. The two log lines together answer:
+**Conflict rule integration:**
+- metadata=14900, markdown picks 10600 → `selected_price_source: "omitted"`, currency INR kept.
 
-- Was markdown preserved end-to-end? → `markdown_present`, `markdown_bytes`
-- Why did og:title beat the H1? → `markdown_h1_found`, `markdown_h1_within_main_region`, `name_source`
-- Why did price 14900 win? → `markdown_price_found`, `metadata_price_found`, `price_conflict`, `selected_price_source`
-- Where did the image come from? → `image_source`, `image_present`
+**Negative (must NOT match):**
+- `4.3 out of 5` → no match.
+- `12,450 reviews` → no match.
+- `50 ml` / `100 ml` → no match.
+- `Delivery by 12 June` → no match.
+- Bare `950905` → no match.
+- `markdown_price_found: false` for all of the above.
 
----
-
-### Step 3 — Data-driven fixes (only what diagnostics prove)
-
-Decided after Step 2. Mutually exclusive paths:
-
-- **A. `markdown_present: false`** → markdown wiring broken. Verify `firecrawl.ts` still requests `formats: ["html","markdown"]` and that `index.ts` passes `fc.markdown` into `extractFromFirecrawl`. No regex changes.
-- **B. `markdown_present: true` but `markdown_h1_found: false` or `markdown_h1_within_main_region: false`** → widen `MAIN_REGION_BYTES` (4 KB → 8 KB) and/or relax `firstH1` to skip leading non-H1 noise lines. Synthesized fixture in `firecrawl_recovery_test.ts`.
-- **C. `markdown_price_found: false`** while real markdown contained the price → extend `firstMarkdownPrice` to accept `Rs\.?\s?` and `Price[:\s]+(?:₹|Rs\.?)?\s?` lead-ins. Keep the ≤5% conflict rule intact. Synthesized fixture.
-- **D. Everything matches the contract** → screenshot was stale, no logic change.
-
-Fixtures are synthesized to model the diagnostic signal — no raw captured markdown pasted into the repo.
-
----
-
-### Step 4 — Image investigation (kept split per Codex)
-
-Do **not** mix with Step 3 deploy.
-
-- **Backend half** (already answered by Step 2): if `image_present: false` or `image_source: null` while metadata was present, og:image was malformed / rejected by `safeAbsoluteUrl`. Fix in `firecrawl_recovery.ts` (optionally prefer `firstMarkdownImage` when og:image fails). Ship as its own small backend deploy.
-- **Frontend half**: only if the backend-returned URL opens standalone in a browser but the AI Analysis modal still renders broken. Then a separate frontend ticket: add `onError` placeholder fallback, prevent 0×0 collapse. Located via `rg "image_url" src/components` in build mode. Not bundled with backend work.
+Existing fixture tests still pass.
 
 ---
 
-### Step 5 — Validate, deploy, then trim
+### Fix C — AI Analysis modal image (verify URL via response body, NOT logs)
 
-1. `supabase--test_edge_functions analyze-entity-url-v2` — all green.
-2. Deploy whichever subset of `index.ts` / `firecrawl_recovery.ts` / `firecrawl.ts` actually changed.
-3. Re-run Nykaa. Confirm via diagnostics that name / price / image now follow the contract.
-4. **Review log verbosity:** keep the Step 1a success log permanent (cheap, always useful). Step 1b parser diagnostics — keep if still cheap and likely to help future debugging, otherwise trim to a minimal permanent summary (e.g. just `name_source`, `selected_price_source`, `image_source`).
-5. Hand off to Phase 8 with a clean deterministic baseline.
+**Verification step:** On the next Nykaa re-run, open browser devtools → Network tab → find the `analyze-entity-url-v2` POST → read `predictions.image_url` from the JSON response body. We do **not** read image URLs from Edge logs.
+
+Branch on what the response body shows:
+
+- **If `image_url` is a valid `images-static.nykaa.com` URL** that opens directly in a browser: bug is frontend rendering. Swap the AI Analysis Results modal's Primary Image `<img>` for the existing `ImageWithFallback` component (`src/components/common/ImageWithFallback.tsx`) with `entityType="product"`. That component already routes through `proxy-external-image` via `getProxyUrlForImage`, retries direct on proxy failure, and falls back to the product placeholder. **No changes to `ImageWithFallback` itself or `proxy-external-image`.**
+- **If `image_url` is malformed / relative / 404s:** bug is backend image selection in `firecrawl_recovery.ts`. Fix image fallback there. Do not also do the frontend swap in the same pass.
+- **If `image_url` is valid AND `ImageWithFallback` still renders broken:** open a separate `proxy-external-image` ticket. Out of scope here.
+
+Exact modal file located in build mode via `rg "image_url|Primary Image" src/components`.
 
 ---
 
-### Out of scope (explicitly)
+### Diagnostics retention
 
-- V1 (Gemini URL grounding).
-- Phase 8 Gemini merge — separate plan after this ships.
-- V2 response envelope shape, `extractor.ts`, `fetcher.ts`, SSRF, Gemini client.
-- Any DB migration.
-- Loosening the 5% price-conflict rule.
-- Logging any raw scraped content, ever.
+Keep the `firecrawl recovery diagnostics` log through this confirmation run. After post-deploy Nykaa run shows expected values, decide whether to keep permanently or trim. Follow-up, not part of this pass.
 
-### Technical summary
+---
 
-- `firecrawl_recovery.ts`: new `FirecrawlRecoveryDiagnostics` interface; change return type of `extractFromFirecrawl` to `{ result: ExtractResult, diagnostics: FirecrawlRecoveryDiagnostics }`; compute the diagnostic fields inline as the existing logic already chooses each source. No change to `ExtractMetadata`. Possible Step 3 region/regex tweak conditional on data. Possible Step 4 image fallback conditional on data.
-- `index.ts`: update the two `extractFromFirecrawl` call sites to destructure `{ result, diagnostics }`; add two `console.log` lines per recovery-success branch (success log + diagnostics). No response-shape change.
-- `firecrawl.ts`: likely no change. Only touched if Step 3 path A applies.
-- `firecrawl_recovery_test.ts`: existing tests updated for new return shape (`r.predictions` becomes `r.result.predictions`, etc.); +1–3 synthesized fixture tests covering whichever Step 3 path activated.
-- Frontend: zero changes unless Step 4 backend confirms a frontend-only issue, in which case a separate small ticket.
-- `.lovable/plan.md`: replaced with this plan's summary on completion.
+## Verification (mandatory)
+
+Re-run the same Nykaa URL from the AI Analysis modal. Required:
+- `name_source: "markdown_h1"` ✅
+- `markdown_h1_within_main_region: true` ✅
+- `markdown_price_found: true` ✅
+- `selected_price_source: "omitted"` ✅ (10600 vs 14900 conflict)
+- Modal renders the product image, or cleanly falls back to product placeholder (no broken icon) ✅
+- Description may still look like Nykaa's og:description — **expected**, Phase 8.
+- Name may include `(50ml)` — **expected**, Phase 8.
+
+All `firecrawl_recovery_test.ts` tests green including new positive, priority-ordering, conflict, and negative tests.
+
+## Files touched
+
+- `supabase/functions/analyze-entity-url-v2/firecrawl_recovery.ts` — `MAIN_REGION_BYTES` constant; replace `firstMarkdownPrice` with collect-all + priority-pick. Possibly image fallback (only if Fix C branches that way).
+- `supabase/functions/analyze-entity-url-v2/firecrawl_recovery_test.ts` — H1-after-4KB fixture, label-anchored tests, currency-anchored tests, MRP-vs-Offer-Price priority tests, multi-SKU conflict test, negative tests (ratings / reviews / pack sizes / dates / bare numbers).
+- AI Analysis Results modal component — swap Primary Image `<img>` for `ImageWithFallback` (only if Fix C branches that way; file located during build).
