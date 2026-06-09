@@ -156,3 +156,99 @@ Some description body text here that is reasonably long for paragraph match.
   // markdown price ₹1 is in the "also viewed" section → ignored; metadata 500 kept.
   assertEquals(r.result.predictions!.additional_data.price, 500);
 });
+
+// ───── Fix A: H1 between 4 KB and 16 KB of nav noise ─────
+Deno.test("H1 within 16KB main region wins; junk H1 after ## ignored", () => {
+  const navNoise = ("- Nav link\n").repeat(800); // ~9 KB of nav junk
+  const md = `${navNoise}\n# Clean Product Name\n\nSome description body text long enough to qualify as a paragraph.\n\n## Product Description\n\n# Junk H1 After Cutoff\n`;
+  const r = extractFromFirecrawl({
+    metadata: { "og:type": "product", "og:title": "Junk OG Title" },
+    markdown: md,
+    finalUrl: BASE,
+  });
+  assert(r.result.predictions);
+  assertEquals(r.result.predictions!.name, "Clean Product Name");
+  assertEquals(r.diagnostics.name_source, "markdown_h1");
+  assertEquals(r.diagnostics.markdown_h1_within_main_region, true);
+});
+
+// ───── Fix B: label-anchored price matches ─────
+const baseProductMeta = { "og:type": "product", "og:title": "X" };
+
+function priceCase(md: string): number | null | undefined {
+  const r = extractFromFirecrawl({
+    metadata: baseProductMeta,
+    markdown: `# X\n\n${md}\n`,
+    finalUrl: BASE,
+  });
+  return r.result.predictions?.additional_data.price as number | null | undefined;
+}
+
+Deno.test("price: 'MRP: ₹14,900' → 14900", () => {
+  assertEquals(priceCase("MRP: ₹14,900"), 14900);
+});
+Deno.test("price: 'Price: 2499' → 2499", () => {
+  assertEquals(priceCase("Price: 2499"), 2499);
+});
+Deno.test("price: 'Offer Price ₹10,600' → 10600", () => {
+  assertEquals(priceCase("Offer Price ₹10,600"), 10600);
+});
+Deno.test("price: 'Sale Price: Rs. 7,499' → 7499", () => {
+  assertEquals(priceCase("Sale Price: Rs. 7,499"), 7499);
+});
+
+// ───── Fix B: currency-anchored matches ─────
+Deno.test("price: 'Rs. 14,900' → 14900", () => {
+  assertEquals(priceCase("Rs. 14,900"), 14900);
+});
+Deno.test("price: 'INR 1200' → 1200", () => {
+  assertEquals(priceCase("INR 1200"), 1200);
+});
+Deno.test("price: '$49.99' → 49.99", () => {
+  assertEquals(priceCase("$49.99"), 49.99);
+});
+
+// ───── Fix B: priority ordering (Offer/Sale > currency-only > MRP) ─────
+Deno.test("price: MRP first, Offer Price later → picks Offer Price", () => {
+  assertEquals(
+    priceCase("MRP: ₹14,900\n\nOffer Price ₹10,600"),
+    10600,
+  );
+});
+Deno.test("price: only MRP present → MRP as last resort", () => {
+  assertEquals(priceCase("MRP: ₹14,900"), 14900);
+});
+Deno.test("price: bare currency tokens, no MRP nearby → first wins", () => {
+  assertEquals(priceCase("₹14,900\n\n₹10,600"), 14900);
+});
+
+// ───── Fix B: multi-SKU conflict with metadata ─────
+Deno.test("price: metadata 14900 vs markdown 10600 (Offer Price) → omitted", () => {
+  const r = extractFromFirecrawl({
+    metadata: { ...baseProductMeta, "product:price:amount": "14900", "product:price:currency": "INR" },
+    markdown: `# X\n\nMRP: ₹14,900\n\nOffer Price ₹10,600\n`,
+    finalUrl: BASE,
+  });
+  assert(r.result.predictions);
+  assertEquals(r.result.predictions!.additional_data.price, undefined);
+  assertEquals(r.result.predictions!.additional_data.currency, "INR");
+  assertEquals(r.diagnostics.selected_price_source, "omitted");
+  assertEquals(r.diagnostics.price_conflict, true);
+});
+
+// ───── Fix B: negative cases — bare numbers must NEVER match ─────
+Deno.test("price: '4.3 out of 5' → no match", () => {
+  assertEquals(priceCase("4.3 out of 5"), undefined);
+});
+Deno.test("price: '12,450 reviews' → no match", () => {
+  assertEquals(priceCase("12,450 reviews"), undefined);
+});
+Deno.test("price: '50 ml' / '100 ml' → no match", () => {
+  assertEquals(priceCase("50 ml\n100 ml"), undefined);
+});
+Deno.test("price: 'Delivery by 12 June' → no match", () => {
+  assertEquals(priceCase("Delivery by 12 June"), undefined);
+});
+Deno.test("price: bare '950905' → no match", () => {
+  assertEquals(priceCase("950905"), undefined);
+});
