@@ -157,12 +157,40 @@ function clonePredictions(p: V2Predictions): V2Predictions {
   };
 }
 
+// ─── Price policy (single source of truth) ────────────────────────────────
+
+/**
+ * Centralized policy: should the Gemini-provided price be trusted at all?
+ * Used by both success and recovery merge paths. The only place that decides
+ * whether a Gemini price may be written into final predictions.
+ *
+ * Rules:
+ *  - priceConflict true  → never
+ *  - price not a finite number → never
+ *  - field_confidence.price < 0.7 → never
+ *  - otherwise allowed (caller still respects extractor-wins precedence)
+ */
+export function geminiPriceTrusted(
+  gemini: GeminiRawPrediction | null,
+  flags: MergeFlags,
+): boolean {
+  if (!gemini) return false;
+  if (flags.priceConflict) return false;
+  const p = gemini.additional_data?.price;
+  if (typeof p !== "number" || !isFinite(p)) return false;
+  const conf = gemini.field_confidence?.price ?? 0;
+  return conf >= 0.7;
+}
+
 // ─── GeminiRawPrediction → V2Predictions ──────────────────────────────────
 
 /**
  * Recovery path base: turn a Gemini raw prediction into a V2Predictions.
  * Category fields are left null; caller runs `resolveCategory`.
- * Price gating applies here too (see plan §6).
+ *
+ * POLICY-FREE: never writes `additional_data.price`. All price decisions are
+ * centralized in `mergePredictions` via `geminiPriceTrusted`. This keeps the
+ * converter safe for direct use without leaking ungated prices.
  */
 export function geminiToV2Predictions(
   raw: GeminiRawPrediction,
@@ -181,17 +209,7 @@ export function geminiToV2Predictions(
     ad.currency = flags.firecrawlCurrency.trim().toUpperCase();
   }
 
-  // Price: subject to conflict + confidence gate
-  const gemPrice = raw.additional_data?.price;
-  const priceConf = raw.field_confidence?.price ?? 0;
-  if (
-    !flags.priceConflict &&
-    typeof gemPrice === "number" &&
-    isFinite(gemPrice) &&
-    priceConf >= 0.7
-  ) {
-    ad.price = gemPrice;
-  }
+  // NOTE: price intentionally omitted here — mergePredictions owns price policy.
 
   // Recovery image: firecrawl > gemini
   const image_url = flags.firecrawlImageUrl ?? raw.image_url ?? null;
