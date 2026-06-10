@@ -56,6 +56,13 @@ export interface MergeFlags {
   priceSourceHint?: PriceSourceHint;
   /** Phase 8.1B: deterministic JSON-LD Offer[]/AggregateOffer payload. */
   extractedOffers?: ExtractedOffers | null;
+  /** Phase 8.1C: labeled Firecrawl markdown MRP/Sale pair. */
+  firecrawlListSalePair?: {
+    list_price: number;
+    sale_price: number;
+    currency: string | null;
+    source: "mrp_sale_labels";
+  } | null;
 }
 
 export interface MergeArgs {
