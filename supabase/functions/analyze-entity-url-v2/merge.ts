@@ -346,6 +346,7 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
   };
 
   if (!gemini) {
+    attachPricing(out, diag, null, flags);
     return { predictions: out, diagnostics: diag };
   }
 
