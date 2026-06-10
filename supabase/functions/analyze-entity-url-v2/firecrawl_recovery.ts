@@ -37,6 +37,13 @@ interface RecoveryArgs {
   finalUrl: string;
 }
 
+export interface MarkdownListSalePair {
+  list_price: number;
+  sale_price: number;
+  currency: string | null;
+  source: "mrp_sale_labels";
+}
+
 export interface FirecrawlRecoveryDiagnostics {
   name_source: "markdown_h1" | "metadata_title" | null;
   markdown_h1_found: boolean;
@@ -47,6 +54,8 @@ export interface FirecrawlRecoveryDiagnostics {
   selected_price_source: "metadata" | "markdown" | "omitted" | "none";
   image_source: "metadata_og_image" | "markdown_image" | null;
   image_present: boolean;
+  /** Phase 8.1C: labeled MRP + sale pair from markdown main region. */
+  markdown_list_sale_pair: MarkdownListSalePair | null;
 }
 
 export interface FirecrawlRecoveryOutput {
@@ -65,8 +74,10 @@ function emptyDiagnostics(): FirecrawlRecoveryDiagnostics {
     selected_price_source: "none",
     image_source: null,
     image_present: false,
+    markdown_list_sale_pair: null,
   };
 }
+
 
 function weak(sources: string[], diagnostics: FirecrawlRecoveryDiagnostics): FirecrawlRecoveryOutput {
   const metadata: ExtractMetadata = {
