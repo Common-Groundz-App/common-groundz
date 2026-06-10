@@ -54,6 +54,8 @@ export interface MergeFlags {
   firecrawlImageUrl: string | null;
   /** Phase 8.1A: pre-resolved hint for the pricing.price_source. Optional. */
   priceSourceHint?: PriceSourceHint;
+  /** Phase 8.1B: deterministic JSON-LD Offer[]/AggregateOffer payload. */
+  extractedOffers?: ExtractedOffers | null;
 }
 
 export interface MergeArgs {
