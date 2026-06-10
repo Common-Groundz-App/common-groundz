@@ -43,12 +43,16 @@ export interface MergeDiagnostics {
   name_junk_override_applied: boolean;
   price_conflict_blocked_gemini: boolean;
   recovery_gate_passed?: boolean;
+  /** Phase 8.1A: internal honesty signal for pricing.price_source. */
+  price_source_used?: PriceSourceUsed;
 }
 
 export interface MergeFlags {
   priceConflict: boolean;
   firecrawlCurrency: string | null;
   firecrawlImageUrl: string | null;
+  /** Phase 8.1A: pre-resolved hint for the pricing.price_source. Optional. */
+  priceSourceHint?: PriceSourceHint;
 }
 
 export interface MergeArgs {
