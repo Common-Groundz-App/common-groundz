@@ -686,9 +686,34 @@ Deno.test("8.1C: JSON-LD price_min/price_max range set → pair ignored", () => 
   assertEquals(r.price_min, 1000);
 });
 
-Deno.test("8.1C: hint not firecrawl_markdown → pair ignored", () => {
+Deno.test("8.1C: hint=jsonld → pair ignored", () => {
   const r = applyFirecrawlListSalePair(basePricing({ price_source: "extractor_jsonld_offer" }), PAIR, "jsonld", false);
   assertEquals(r.list_price, null);
+  assertEquals(r.price_source, "extractor_jsonld_offer");
+});
+
+Deno.test("8.1C: hint=og → pair ignored", () => {
+  const r = applyFirecrawlListSalePair(basePricing({ price_source: "extractor_meta_og" }), PAIR, "og", false);
+  assertEquals(r.list_price, null);
+  assertEquals(r.price_source, "extractor_meta_og");
+});
+
+Deno.test("8.1C: hint=firecrawl_metadata → pair ignored", () => {
+  const r = applyFirecrawlListSalePair(basePricing({ price_source: "firecrawl_metadata" }), PAIR, "firecrawl_metadata", false);
+  assertEquals(r.list_price, null);
+  assertEquals(r.price_source, "firecrawl_metadata");
+});
+
+Deno.test("8.1C: hint=gemini → pair ignored", () => {
+  const r = applyFirecrawlListSalePair(basePricing({ price_source: "gemini" }), PAIR, "gemini", false);
+  assertEquals(r.list_price, null);
+  assertEquals(r.price_source, "gemini");
+});
+
+Deno.test("8.1C: hint=null → pair ignored", () => {
+  const r = applyFirecrawlListSalePair(basePricing({ price_source: "unknown" }), PAIR, null, false);
+  assertEquals(r.list_price, null);
+  assertEquals(r.price_source, "unknown");
 });
 
 Deno.test("8.1C: pair null → block untouched", () => {
@@ -697,7 +722,7 @@ Deno.test("8.1C: pair null → block untouched", () => {
   assertEquals(r, b);
 });
 
-Deno.test("8.1C: display falls back when currency unformattable", () => {
+Deno.test("8.1C: unsupported-but-valid ISO code 'XYZ' → both sides format via fallback", () => {
   const b = basePricing({ currency: null, price_display: "1,299" });
   const r = applyFirecrawlListSalePair(
     b,
@@ -706,9 +731,31 @@ Deno.test("8.1C: display falls back when currency unformattable", () => {
     false,
   );
   assertEquals(r.list_price, 1999);
-  // formatPriceDisplay returns "XYZ 1,999" for valid ISO-shape unknown code, so display is set.
-  assert(r.price_display);
+  assertEquals(r.sale_price, 1299);
+  assertEquals(r.price_source, "firecrawl_markdown_list_sale");
+  // formatPriceDisplay falls back to "<CODE> <amount>" for unknown ISO shape.
+  // Use substring matching to tolerate NBSP vs space from Intl.NumberFormat.
+  const d = r.price_display!;
+  assert(d.includes("XYZ") && d.includes("1,299") && d.includes("MRP") && d.includes("1,999"), d);
 });
+
+Deno.test("8.1C: genuine format failure (NaN sale) → falls back to pre-pair display", () => {
+  const b = basePricing({ price_display: "PREEXISTING" });
+  const r = applyFirecrawlListSalePair(
+    b,
+    { list_price: 1999, sale_price: NaN, currency: "INR", source: "mrp_sale_labels" },
+    "firecrawl_markdown",
+    false,
+  );
+  // Pair fields still applied:
+  assertEquals(r.list_price, 1999);
+  assert(Number.isNaN(r.sale_price as number));
+  assertEquals(r.price_source, "firecrawl_markdown_list_sale");
+  assertEquals(r.price_confidence, 0.72);
+  // But display falls back because sale side cannot format.
+  assertEquals(r.price_display, "PREEXISTING");
+});
+
 
 Deno.test("8.1C: summarizePricing handles firecrawl_markdown_list_sale source", () => {
   const b = basePricing();
