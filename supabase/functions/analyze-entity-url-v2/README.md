@@ -369,3 +369,36 @@ Additive; downstream code MUST NOT branch on it. Shape:
   "recovery_gate_passed": true     // only on recovery path
 }
 ```
+
+## Phase 8.1A — Additive pricing block
+
+Phase 8.1A introduces `additional_data.pricing` (mirrored as `metadata.pricing` for diagnostics). It is **purely additive**. The legacy `additional_data.price` field is never changed from what Phase 8 produced.
+
+### Invariants (apply to Phase 8.1A and all future 8.1 sub-phases)
+
+1. `additional_data.price` is never written, recomputed, or deleted by pricing code.
+2. `additional_data.pricing` is attached whenever it carries useful info: `price_source !== "omitted"` OR `price_conflict` OR `currency !== null` OR any of `list_price/sale_price/price_min/price_max/selected_variant_price`.
+3. Gemini never creates or widens a public price range. Disagreement is diagnostic-only via `gemini_observed_price`.
+4. No V1, DB, Gemini prompt/model/tool, or response-envelope changes.
+5. `formatPriceDisplay` never throws; falls back to `"<CODE> <amount>"` if Intl cannot resolve the symbol.
+6. `price_source` is conservative — `"unknown"` (+ `price_source_used: "inferred"`) when diagnostics cannot uniquely identify the source.
+
+### Source resolution (8.1A, conservative)
+
+| Hint from `index.ts` (via `MergeFlags.priceSourceHint`) | `price_source` | confidence |
+|---|---|---|
+| `"jsonld"`               | `extractor_jsonld_offer`     | 0.90 |
+| `"og"`                   | `extractor_meta_og`          | 0.80 |
+| `"firecrawl_metadata"`   | `firecrawl_metadata`         | 0.75 |
+| `"firecrawl_markdown"`   | `firecrawl_markdown_single`  | 0.65 |
+| merge winner = gemini    | `gemini`                     | `min(0.70, gemini.field_confidence.price)` |
+| `null` / `"unknown"`     | `unknown` (+ `price_source_used: "inferred"`) | 0.50 |
+| conflict OR no legacy price | `omitted`                 | 0 |
+
+### Reserved for future sub-phases (NOT in 8.1A)
+
+- **8.1B** — JSON-LD `Product.offers[]` + `AggregateOffer` → fills `price_min`/`price_max`/`selected_variant_price`. Mixed-currency offers do NOT use majority currency. Selected variant requires explicit `selected`/`default` only.
+- **8.1C** — Firecrawl labeled MRP/Sale pair → fills `list_price`/`sale_price`. Pair detection must use explicit labels; variant-size prices do not count.
+- **8.1D** — Admin preview UI renders `price_display`.
+
+All future sub-phases inherit invariants #1–#6.
