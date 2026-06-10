@@ -49,6 +49,7 @@ import {
 } from "./merge.ts";
 import { resolveCategory } from "./category_resolver.ts";
 import { safeAbsoluteUrl } from "./extractor.ts";
+import { resolvePriceSourceHint, summarizePricing, type PricingBlock } from "./pricing.ts";
 import type { GeminiRawPrediction } from "./response_schema.ts";
 import type { ExtractMetadata, V2Predictions } from "./schema.ts";
 
