@@ -297,11 +297,66 @@ export function buildPricing(input: BuildPricingInput): PricingBlock {
   };
 
   // Phase 8.1B: apply deterministic Offer[] / AggregateOffer layer.
-  return applyOffersToPricing(
+  const after8_1B = applyOffersToPricing(
     base8_1A,
     input.offers ?? null,
     isDeterministicHint(input.priceSourceHint),
   );
+
+  // Phase 8.1C: apply labeled Firecrawl markdown MRP/Sale pair, if any.
+  return applyFirecrawlListSalePair(
+    after8_1B,
+    input.firecrawlListSalePair ?? null,
+    input.priceSourceHint,
+    conflict,
+  );
+}
+
+// ─── Phase 8.1C: Firecrawl markdown MRP/Sale overlay ──────────────────────
+//
+// JSON-LD structured offers (selected, list, or range) take precedence;
+// Firecrawl list/sale only fills when JSON-LD did not provide structured
+// pricing. `additional_data.price` is never recomputed here.
+export function applyFirecrawlListSalePair(
+  base: PricingBlock,
+  pair: {
+    list_price: number;
+    sale_price: number;
+    currency: string | null;
+    source: "mrp_sale_labels";
+  } | null | undefined,
+  hint: PriceSourceHint,
+  priceConflict: boolean,
+): PricingBlock {
+  if (!pair) return base;
+  if (hint !== "firecrawl_markdown") return base;
+  if (priceConflict) return base;
+  // JSON-LD precedence: any structured field populated by 8.1B wins.
+  if (
+    base.list_price !== null ||
+    base.selected_variant_price !== null ||
+    base.price_min !== null ||
+    base.price_max !== null
+  ) {
+    return base;
+  }
+
+  const cur = pair.currency ?? base.currency;
+  const saleStr = formatPriceDisplay(pair.sale_price, cur);
+  const listStr = formatPriceDisplay(pair.list_price, cur);
+  const display = saleStr && listStr
+    ? `${saleStr} (MRP ${listStr})`
+    : base.price_display;
+
+  return {
+    ...base,
+    list_price: pair.list_price,
+    sale_price: pair.sale_price,
+    currency: base.currency ?? cur,
+    price_source: "firecrawl_markdown_list_sale",
+    price_confidence: 0.72,
+    price_display: display,
+  };
 }
 
 // ─── Phase 8.1B: deterministic offer overlay ──────────────────────────────
