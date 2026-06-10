@@ -545,6 +545,7 @@ serve(async (req) => {
     let mainPriceConflict = false;
     let mainFirecrawlImageUrl: string | null = null;
     let mainFirecrawlCurrency: string | null = null;
+    let mainSelectedPriceSource: "metadata" | "markdown" | "omitted" | "none" | null = null;
 
     const ws = detectWeakSignals(extract);
     if (ws.weak) {
