@@ -97,7 +97,15 @@ export interface BuildPricingInput {
   geminiPriceConfidence?: number | null;
   /** Phase 8.1B: deterministic JSON-LD offer payload. */
   offers?: ExtractedOffersInput | null;
+  /** Phase 8.1C: labeled MRP/Sale pair detected from Firecrawl markdown. */
+  firecrawlListSalePair?: {
+    list_price: number;
+    sale_price: number;
+    currency: string | null;
+    source: "mrp_sale_labels";
+  } | null;
 }
+
 
 /** Phase 8.1B: hints backed by deterministic page evidence. */
 export function isDeterministicHint(h: PriceSourceHint): boolean {
