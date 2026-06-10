@@ -252,3 +252,99 @@ Deno.test("price: 'Delivery by 12 June' → no match", () => {
 Deno.test("price: bare '950905' → no match", () => {
   assertEquals(priceCase("950905"), undefined);
 });
+
+// ───── Phase 8.1C: labeled MRP/Sale pair detection ─────
+import { detectListSalePair, MIN_SALE_TO_MRP_RATIO } from "./firecrawl_recovery.ts";
+
+Deno.test("8.1C: MRP labeled + sale currency-only → no pair", () => {
+  const p = detectListSalePair("MRP: ₹1999\n\n₹1299", null);
+  assertEquals(p, null);
+});
+
+Deno.test("8.1C: MRP ₹ + Offer Price ₹ → pair with markdown currency INR", () => {
+  const p = detectListSalePair("MRP: ₹1999\nOffer Price: ₹1299", null);
+  assert(p);
+  assertEquals(p!.list_price, 1999);
+  assertEquals(p!.sale_price, 1299);
+  assertEquals(p!.currency, "INR");
+});
+
+Deno.test("8.1C: MRP ₹ + Price (no currency) + metadata INR → pair via fallback", () => {
+  const p = detectListSalePair("MRP: ₹1999\nPrice: 1299", "INR");
+  assert(p);
+  assertEquals(p!.currency, "INR");
+  assertEquals(p!.sale_price, 1299);
+});
+
+Deno.test("8.1C: MRP ₹ + Price $ → currency conflict → reject", () => {
+  const p = detectListSalePair("MRP: ₹1999\nPrice: $1299", "INR");
+  assertEquals(p, null);
+});
+
+Deno.test("8.1C: label priority Offer > Sale > Price", () => {
+  const p = detectListSalePair(
+    "MRP ₹1999\nOffer Price ₹1299\nSale Price ₹1399\nPrice ₹1499",
+    null,
+  );
+  assert(p);
+  assertEquals(p!.sale_price, 1299);
+});
+
+Deno.test("8.1C: ratio gate rejects sale < 0.4 * list", () => {
+  assert(MIN_SALE_TO_MRP_RATIO === 0.4);
+  const p = detectListSalePair("MRP ₹1999\nOffer Price ₹399", null);
+  assertEquals(p, null);
+});
+
+Deno.test("8.1C: nearest MRP wins over far-away unrelated MRP", () => {
+  const filler = "x ".repeat(400);
+  const md = `MRP ₹999\n${filler}\nMRP ₹1999\nOffer Price ₹1299`;
+  const p = detectListSalePair(md, null);
+  assert(p);
+  assertEquals(p!.list_price, 1999);
+});
+
+Deno.test("8.1C: List Price label accepted as list candidate", () => {
+  const p = detectListSalePair("List Price ₹1999\nOffer Price ₹1299", null);
+  assert(p);
+  assertEquals(p!.list_price, 1999);
+});
+
+Deno.test("8.1C: extractor diagnostics carry pair when present", () => {
+  const r = extractFromFirecrawl({
+    metadata: { "og:type": "product", "og:title": "X", "product:price:currency": "INR" },
+    markdown: `# X\n\nMRP ₹1999\nOffer Price ₹1299\n`,
+    finalUrl: BASE,
+  });
+  assert(r.diagnostics.markdown_list_sale_pair);
+  assertEquals(r.diagnostics.markdown_list_sale_pair!.list_price, 1999);
+  assertEquals(r.diagnostics.markdown_list_sale_pair!.sale_price, 1299);
+  assertEquals(r.diagnostics.markdown_list_sale_pair!.currency, "INR");
+});
+
+Deno.test("8.1C: additional_data.price unchanged by pair detection (byte-identical)", () => {
+  // Same fixture as the priority test above: Offer Price 10600 still wins as single price.
+  const r = extractFromFirecrawl({
+    metadata: { "og:type": "product", "og:title": "X" },
+    markdown: `# X\n\nMRP: ₹14,900\n\nOffer Price ₹10,600\n`,
+    finalUrl: BASE,
+  });
+  assertEquals(r.result.predictions!.additional_data.price, 10600);
+  // And pair is now also surfaced separately:
+  assert(r.diagnostics.markdown_list_sale_pair);
+  assertEquals(r.diagnostics.markdown_list_sale_pair!.sale_price, 10600);
+});
+
+Deno.test("8.1C: pair rejected → additional_data.price still set from single selector", () => {
+  // Sale is currency-only ⇒ no pair, but single-price selector still returns it.
+  const r = extractFromFirecrawl({
+    metadata: { "og:type": "product", "og:title": "X" },
+    markdown: `# X\n\nMRP: ₹1999\n\n₹1299\n`,
+    finalUrl: BASE,
+  });
+  assertEquals(r.diagnostics.markdown_list_sale_pair, null);
+  // Pre-8.1C single-selector behavior preserved: MRP nearby demotes ₹1299 to
+  // tier 3, MRP wins on first occurrence — byte-identical to Phase 8.
+  assertEquals(r.result.predictions!.additional_data.price, 1999);
+
+});

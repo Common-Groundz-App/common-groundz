@@ -56,6 +56,13 @@ export interface MergeFlags {
   priceSourceHint?: PriceSourceHint;
   /** Phase 8.1B: deterministic JSON-LD Offer[]/AggregateOffer payload. */
   extractedOffers?: ExtractedOffers | null;
+  /** Phase 8.1C: labeled Firecrawl markdown MRP/Sale pair. */
+  firecrawlListSalePair?: {
+    list_price: number;
+    sale_price: number;
+    currency: string | null;
+    source: "mrp_sale_labels";
+  } | null;
 }
 
 export interface MergeArgs {
@@ -491,6 +498,7 @@ function attachPricing(
     geminiCurrency: gemini?.additional_data?.currency as string | null | undefined,
     geminiPriceConfidence: gemini?.field_confidence?.price,
     offers: flags.extractedOffers ?? null,
+    firecrawlListSalePair: flags.firecrawlListSalePair ?? null,
   });
 
   // Internal honesty signal: record the source resolution mode.

@@ -371,6 +371,7 @@ serve(async (req) => {
       let recEvidenceBaseUrl = safe.url;
       let recPriceConflict = false;
       let recSelectedPriceSource: "metadata" | "markdown" | "omitted" | "none" | null = null;
+      let recListSalePair: import("./firecrawl_recovery.ts").MarkdownListSalePair | null = null;
       let recFirecrawlImageUrl: string | null = null;
       let recFirecrawlCurrency: string | null = null;
       let recFirecrawlBlock: V2SuccessResponse["metadata"]["firecrawl"] | undefined;
@@ -403,6 +404,7 @@ serve(async (req) => {
             });
             recPriceConflict = recovered.diagnostics.price_conflict;
             recSelectedPriceSource = recovered.diagnostics.selected_price_source;
+            recListSalePair = recovered.diagnostics.markdown_list_sale_pair;
             if (recovered.result.predictions !== null) {
               candidate = recovered.result;
               console.log("[analyze-entity-url-v2] firecrawl recovery succeeded", {
@@ -491,6 +493,7 @@ serve(async (req) => {
         firecrawlImageUrl: recFirecrawlImageUrl,
         priceSourceHint: recPriceHint,
         extractedOffers: recExtract?.extractedOffers ?? null,
+        firecrawlListSalePair: recListSalePair,
       };
       const { predictions: recMerged, mergeDiag: recMergeDiag } = applyMerge(
         recExtract?.predictions ?? null,
@@ -547,6 +550,7 @@ serve(async (req) => {
     let mainFirecrawlImageUrl: string | null = null;
     let mainFirecrawlCurrency: string | null = null;
     let mainSelectedPriceSource: "metadata" | "markdown" | "omitted" | "none" | null = null;
+    let mainListSalePair: import("./firecrawl_recovery.ts").MarkdownListSalePair | null = null;
 
     const ws = detectWeakSignals(extract);
     if (ws.weak) {
@@ -599,6 +603,7 @@ serve(async (req) => {
             mainFirecrawlCurrency = signals.firecrawlCurrency;
             if (recoveryDiagnostics?.price_conflict) mainPriceConflict = true;
             if (recoveryDiagnostics) mainSelectedPriceSource = recoveryDiagnostics.selected_price_source;
+            if (recoveryDiagnostics) mainListSalePair = recoveryDiagnostics.markdown_list_sale_pair;
             for (const w of extract2.warnings) {
               if (!warnings.includes(w)) warnings.push(w);
             }
@@ -693,6 +698,7 @@ serve(async (req) => {
       firecrawlImageUrl: mainFirecrawlImageUrl,
       priceSourceHint: mainPriceHint,
       extractedOffers: extract.extractedOffers ?? null,
+      firecrawlListSalePair: mainListSalePair,
     };
     const { predictions: mainMerged, mergeDiag: mainMergeDiag } = applyMerge(
       extract.predictions,
