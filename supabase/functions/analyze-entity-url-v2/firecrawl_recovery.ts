@@ -538,6 +538,15 @@ export function extractFromFirecrawl(args: RecoveryArgs): FirecrawlRecoveryOutpu
     diag.selected_price_source = "markdown";
   }
 
+  // Phase 8.1C: additive labeled MRP/Sale pair detection. NEVER affects
+  // additional_data.price; consumed downstream only via pricing.ts.
+  const pairMetaCur = typeof additional_data.currency === "string"
+    ? (additional_data.currency as string)
+    : null;
+  diag.markdown_list_sale_pair = detectListSalePair(region, pairMetaCur);
+
+
+
   const predictions: V2Predictions = {
     type: mapped,
     name,
