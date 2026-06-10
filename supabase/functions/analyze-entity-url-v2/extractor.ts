@@ -646,6 +646,12 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
     const canonical = safeAbsoluteUrl(meta.canonical, finalUrl);
     if (canonical) additional.canonical_url = canonical;
 
+    // Phase 8.1B: deterministic Offer[] / AggregateOffer payload (product only).
+    const extractedOffers =
+      chosen.mapped === "product"
+        ? extractOffersFromJsonLd(node.offers)
+        : null;
+
     return {
       predictions: {
         type: chosen.mapped,
@@ -672,6 +678,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
         weak_signals: false,
       },
       warnings: [],
+      extractedOffers,
     };
   }
 
