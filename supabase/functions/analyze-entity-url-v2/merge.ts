@@ -436,6 +436,7 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
   out.reasoning = [extReason, gemReason].filter(Boolean).join(" ") || out.reasoning;
 
   diag.gemini_fields_used = countGeminiFields(diag.field_winners);
+  attachPricing(out, diag, gemini, flags);
   return { predictions: out, diagnostics: diag };
 }
 
@@ -450,4 +451,57 @@ function countGeminiFields(w: MergeDiagnostics["field_winners"]): number {
   if (w.currency === "gemini") n++;
   if (w.tags === "gemini" || w.tags === "merged") n++;
   return n;
+}
+
+// ─── Phase 8.1A: pricing block attachment ─────────────────────────────────
+//
+// Pure additive. Reads merge state and writes additional_data.pricing only.
+// Never touches additional_data.price.
+function attachPricing(
+  out: V2Predictions,
+  diag: MergeDiagnostics,
+  gemini: GeminiRawPrediction | null,
+  flags: MergeFlags,
+): void {
+  const legacyPrice = typeof out.additional_data.price === "number"
+    ? (out.additional_data.price as number)
+    : undefined;
+  const currencyRaw = out.additional_data.currency;
+  const currency = typeof currencyRaw === "string" && currencyRaw.trim()
+    ? (currencyRaw as string).trim().toUpperCase()
+    : null;
+  const winner = diag.field_winners.price;
+  const priceWinner: "extractor" | "gemini" | "none" =
+    winner === "extractor" || winner === "gemini" ? winner : "none";
+
+  const hint: PriceSourceHint = flags.priceSourceHint
+    ?? (priceWinner === "gemini" ? "gemini" : null);
+
+  const pricing: PricingBlock = buildPricing({
+    legacyPrice,
+    currency,
+    priceConflict: flags.priceConflict,
+    priceWinner,
+    priceSourceHint: hint,
+    geminiPrice: gemini?.additional_data?.price as number | null | undefined,
+    geminiCurrency: gemini?.additional_data?.currency as string | null | undefined,
+    geminiPriceConfidence: gemini?.field_confidence?.price,
+  });
+
+  // Internal honesty signal: record the source resolution mode.
+  if (legacyPrice !== undefined && !flags.priceConflict) {
+    if (priceWinner === "gemini" || hint === "gemini") {
+      diag.price_source_used = "exact";
+    } else if (hint === null || hint === "unknown") {
+      diag.price_source_used = "inferred";
+    } else {
+      diag.price_source_used = "exact";
+    }
+  } else {
+    diag.price_source_used = "exact";
+  }
+
+  if (pricingBlockHasContent(pricing)) {
+    out.additional_data.pricing = pricing;
+  }
 }
