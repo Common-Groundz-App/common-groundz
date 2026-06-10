@@ -45,6 +45,175 @@ const PreviewField: React.FC<PreviewFieldProps> = ({ label, value, multiline }) 
   );
 };
 
+// ─── Phase 8.1D: Pricing preview ─────────────────────────────────────────
+const SOURCE_LABELS: Record<string, string> = {
+  extractor_jsonld_offer: 'JSON-LD Offer',
+  extractor_jsonld_aggregate: 'JSON-LD AggregateOffer',
+  extractor_jsonld_offers_merged_range: 'JSON-LD Offers (range)',
+  extractor_jsonld_offers_selected: 'JSON-LD Offer (selected variant)',
+  extractor_meta_og: 'OpenGraph',
+  firecrawl_metadata: 'Firecrawl metadata',
+  firecrawl_markdown_single: 'Firecrawl markdown',
+  firecrawl_markdown_list_sale: 'Firecrawl markdown (MRP/Sale)',
+  gemini: 'Gemini',
+  unknown: 'Unknown',
+  omitted: 'Omitted',
+};
+
+const fmt = (amount: unknown, currency: unknown): string | null => {
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return null;
+  if (typeof currency !== 'string' || !currency.trim()) {
+    return amount.toLocaleString();
+  }
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+  } catch {
+    return `${currency} ${amount.toLocaleString()}`;
+  }
+};
+
+const isFiniteNum = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isFinite(v);
+
+const PricingPreview: React.FC<{ pricing: any }> = ({ pricing }) => {
+  if (!pricing || typeof pricing !== 'object') return null;
+
+  const {
+    price_display,
+    list_price,
+    sale_price,
+    selected_variant_price,
+    price_min,
+    price_max,
+    currency,
+    price_source,
+    price_confidence,
+    price_conflict,
+    range_conflict,
+    gemini_observed_price,
+    gemini_observed_currency,
+  } = pricing;
+
+  // Deterministic headline fallback chain
+  let headline: string | null = null;
+  let headlineMuted = false;
+  if (typeof price_display === 'string' && price_display.trim()) {
+    headline = price_display;
+  } else if (isFiniteNum(selected_variant_price)) {
+    headline = fmt(selected_variant_price, currency);
+  } else if (isFiniteNum(price_min) && isFiniteNum(price_max)) {
+    const lo = fmt(price_min, currency);
+    const hi = fmt(price_max, currency);
+    headline = lo && hi ? `${lo} – ${hi}` : null;
+  } else if (isFiniteNum(sale_price)) {
+    headline = fmt(sale_price, currency);
+  }
+  if (!headline) {
+    if (price_conflict === true) {
+      headline = 'Price omitted — conflicting sources';
+      headlineMuted = true;
+    } else {
+      headline = '—';
+      headlineMuted = true;
+    }
+  }
+
+  // Secondary rows
+  const showPair = isFiniteNum(list_price) && isFiniteNum(sale_price);
+  const showRange =
+    isFiniteNum(price_min) && isFiniteNum(price_max) && price_min !== price_max;
+  const showSelected = isFiniteNum(selected_variant_price);
+
+  // Primary numeric for Gemini comparison
+  let primaryNumeric: number | null = null;
+  if (isFiniteNum(selected_variant_price)) primaryNumeric = selected_variant_price;
+  else if (isFiniteNum(sale_price)) primaryNumeric = sale_price;
+  else if (isFiniteNum(price_min) && isFiniteNum(price_max) && price_min === price_max)
+    primaryNumeric = price_min;
+
+  const showGemini =
+    isFiniteNum(gemini_observed_price) &&
+    (primaryNumeric === null || gemini_observed_price !== primaryNumeric);
+
+  const sourceLabel =
+    typeof price_source === 'string'
+      ? SOURCE_LABELS[price_source] ?? price_source
+      : null;
+
+  return (
+    <div className="space-y-2 pt-2 border-t">
+      <Label className="text-xs text-muted-foreground">Pricing</Label>
+
+      <p
+        className={`text-lg font-medium ${headlineMuted ? 'text-muted-foreground' : ''}`}
+      >
+        {headline}
+      </p>
+
+      {showPair && (
+        <p className="text-xs text-muted-foreground">
+          List {fmt(list_price, currency)} • Sale {fmt(sale_price, currency)}
+        </p>
+      )}
+
+      {showRange && (
+        <p className="text-xs text-muted-foreground">
+          {fmt(price_min, currency)} – {fmt(price_max, currency)}
+        </p>
+      )}
+
+      {showSelected && (
+        <p className="text-xs text-muted-foreground">
+          Selected variant: {fmt(selected_variant_price, currency)}
+        </p>
+      )}
+
+      {(sourceLabel || isFiniteNum(price_confidence)) && (
+        <div className="flex items-center gap-2">
+          {sourceLabel && (
+            <Badge variant="secondary" className="text-xs">
+              {sourceLabel}
+            </Badge>
+          )}
+          {isFiniteNum(price_confidence) && (
+            <span className="text-xs text-muted-foreground">
+              {Math.round(price_confidence * 100)}% confidence
+            </span>
+          )}
+        </div>
+      )}
+
+      {price_conflict === true && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Price conflict</AlertTitle>
+          <AlertDescription className="text-xs">
+            <code>additional_data.price</code> omitted.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {range_conflict === true && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Range conflict</AlertTitle>
+          <AlertDescription className="text-xs">
+            Mixed-currency offers — no public range.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {showGemini && (
+        <p className="text-xs text-muted-foreground italic">
+          Gemini observed:{' '}
+          {fmt(gemini_observed_price, gemini_observed_currency ?? currency) ??
+            String(gemini_observed_price)}
+        </p>
+      )}
+    </div>
+  );
+};
+
 export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
   open,
   onOpenChange,
@@ -141,13 +310,21 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
                 />
               </div>
             )}
-            
-            {/* Additional Data */}
-            {pred.additional_data && Object.keys(pred.additional_data).length > 0 && (
+
+            {/* Phase 8.1D: dedicated pricing preview */}
+            {pred.additional_data?.pricing && (
+              <PricingPreview pricing={pred.additional_data.pricing} />
+            )}
+
+            {/* Additional Data (excludes pricing, which renders above) */}
+            {pred.additional_data &&
+              Object.entries(pred.additional_data).filter(([k]) => k !== 'pricing').length > 0 && (
               <div className="space-y-2 pt-2 border-t">
                 <Label className="text-xs text-muted-foreground">Additional Information</Label>
                 <div className="grid gap-2 text-xs">
-                  {Object.entries(pred.additional_data).map(([key, value]) => (
+                  {Object.entries(pred.additional_data)
+                    .filter(([key]) => key !== 'pricing')
+                    .map(([key, value]) => (
                     <div key={key} className="flex flex-col gap-0.5">
                       <span className="text-muted-foreground capitalize font-medium">
                         {key.replace(/_/g, ' ')}:
