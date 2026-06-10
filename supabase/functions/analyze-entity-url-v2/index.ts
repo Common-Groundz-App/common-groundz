@@ -370,6 +370,7 @@ serve(async (req) => {
       let recHtml = "";
       let recEvidenceBaseUrl = safe.url;
       let recPriceConflict = false;
+      let recSelectedPriceSource: "metadata" | "markdown" | "omitted" | "none" | null = null;
       let recFirecrawlImageUrl: string | null = null;
       let recFirecrawlCurrency: string | null = null;
       let recFirecrawlBlock: V2SuccessResponse["metadata"]["firecrawl"] | undefined;
