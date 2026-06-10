@@ -318,6 +318,7 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
       name_junk_override_applied: false,
     };
     diag.gemini_fields_used = countGeminiFields(diag.field_winners);
+    attachPricing(predictions, diag, gemini, flags);
     return { predictions, diagnostics: diag };
   }
 
