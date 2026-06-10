@@ -371,6 +371,7 @@ serve(async (req) => {
       let recEvidenceBaseUrl = safe.url;
       let recPriceConflict = false;
       let recSelectedPriceSource: "metadata" | "markdown" | "omitted" | "none" | null = null;
+      let recListSalePair: import("./firecrawl_recovery.ts").MarkdownListSalePair | null = null;
       let recFirecrawlImageUrl: string | null = null;
       let recFirecrawlCurrency: string | null = null;
       let recFirecrawlBlock: V2SuccessResponse["metadata"]["firecrawl"] | undefined;
