@@ -597,6 +597,7 @@ serve(async (req) => {
             mainFirecrawlImageUrl = signals.firecrawlImageUrl;
             mainFirecrawlCurrency = signals.firecrawlCurrency;
             if (recoveryDiagnostics?.price_conflict) mainPriceConflict = true;
+            if (recoveryDiagnostics) mainSelectedPriceSource = recoveryDiagnostics.selected_price_source;
             for (const w of extract2.warnings) {
               if (!warnings.includes(w)) warnings.push(w);
             }
