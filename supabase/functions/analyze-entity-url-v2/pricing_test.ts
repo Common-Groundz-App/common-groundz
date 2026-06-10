@@ -463,3 +463,149 @@ Deno.test("8.1B applyOffersToPricing is pure (no input mutation)", () => {
   }, true);
   assertEquals(JSON.stringify(base), snapshot);
 });
+
+// ─── 8.1B follow-up: price_display consistency ────────────────────────────
+
+Deno.test("8.1B follow-up: range only → price_display shows en-dash range", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: false, default: false },
+        { price: 1300, currency: "INR", selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  const lo = formatPriceDisplay(1000, "INR");
+  const hi = formatPriceDisplay(1300, "INR");
+  assertEquals(p.price_display, `${lo} \u2013 ${hi}`);
+});
+
+Deno.test("8.1B follow-up: selected only → price_display shows selected price", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1250, currency: "INR", selected: true, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.price_display, formatPriceDisplay(1250, "INR"));
+});
+
+Deno.test("8.1B follow-up: selected + range → price_display reflects selected (not range)", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: true, default: false },
+        { price: 1300, currency: "INR", selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.price_display, formatPriceDisplay(1000, "INR"));
+  // and not the range string
+  assert(!String(p.price_display).includes("\u2013"));
+});
+
+Deno.test("8.1B follow-up: mixed-currency range_conflict leaves 8.1A price_display untouched", () => {
+  const baseline = buildPricing({
+    legacyPrice: 1499,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+  });
+  const p = buildPricing({
+    legacyPrice: 1499,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: false, default: false },
+        { price: 15, currency: "USD", selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.range_conflict, true);
+  assertEquals(p.price_display, baseline.price_display);
+});
+
+Deno.test("8.1B follow-up: unsupported-but-present currency for range falls back to <CODE> amount", () => {
+  // XYZ is ISO-shaped (3 letters) but not a real currency code; Intl falls back.
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "XYZ",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 999, currency: "XYZ", selected: false, default: false },
+        { price: 1499, currency: "XYZ", selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  const lo = formatPriceDisplay(999, "XYZ");
+  const hi = formatPriceDisplay(1499, "XYZ");
+  assert(lo && lo.includes("XYZ"));
+  assertEquals(p.price_display, `${lo} \u2013 ${hi}`);
+});
+
+// ─── 8.1B follow-up: explicit legacy-price (additional_data.price) regression ───
+
+Deno.test("8.1B follow-up: legacyPrice → sale_price echo invariant across all 8.1B branches", () => {
+  const mkInput = (offers: any) => ({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor" as const,
+    priceSourceHint: "jsonld" as const,
+    offers,
+  });
+  // selected only
+  const sel = buildPricing(mkInput({
+    offers: [{ price: 1250, currency: "INR", selected: true, default: false }],
+    aggregate: null,
+  }));
+  assertEquals(sel.sale_price, 1000);
+
+  // range only
+  const rng = buildPricing(mkInput({
+    offers: [
+      { price: 1000, currency: "INR", selected: false, default: false },
+      { price: 1300, currency: "INR", selected: false, default: false },
+    ],
+    aggregate: null,
+  }));
+  assertEquals(rng.sale_price, 1000);
+
+  // mixed-currency conflict
+  const mix = buildPricing(mkInput({
+    offers: [
+      { price: 1000, currency: "INR", selected: false, default: false },
+      { price: 15, currency: "USD", selected: false, default: false },
+    ],
+    aggregate: null,
+  }));
+  assertEquals(mix.sale_price, 1000);
+});
