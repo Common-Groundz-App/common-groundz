@@ -609,3 +609,111 @@ Deno.test("8.1B follow-up: legacyPrice → sale_price echo invariant across all 
   }));
   assertEquals(mix.sale_price, 1000);
 });
+
+// ───── Phase 8.1C: Firecrawl markdown MRP/Sale overlay ─────
+import { applyFirecrawlListSalePair } from "./pricing.ts";
+
+const PAIR = {
+  list_price: 1999,
+  sale_price: 1299,
+  currency: "INR" as string | null,
+  source: "mrp_sale_labels" as const,
+};
+
+function basePricing(overrides: Partial<PricingBlock> = {}): PricingBlock {
+  return {
+    currency: "INR",
+    list_price: null,
+    sale_price: 1299,
+    selected_variant_price: null,
+    price_min: null,
+    price_max: null,
+    price_display: "₹1,299",
+    price_source: "firecrawl_markdown_single",
+    price_confidence: 0.65,
+    price_conflict: false,
+    range_conflict: false,
+    ...overrides,
+  };
+}
+
+Deno.test("8.1C: buildPricing applies pair when hint=firecrawl_markdown, no conflict", () => {
+  const p = buildPricing({
+    legacyPrice: 1299,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "firecrawl_markdown",
+    firecrawlListSalePair: PAIR,
+  });
+  assertEquals(p.list_price, 1999);
+  assertEquals(p.sale_price, 1299);
+  assertEquals(p.price_source, "firecrawl_markdown_list_sale");
+  assertEquals(p.price_confidence, 0.72);
+  assert(p.price_display && p.price_display.includes("MRP"), p.price_display ?? "");
+  assert(p.price_display!.includes("1,999"));
+  assert(p.price_display!.includes("1,299"));
+});
+
+Deno.test("8.1C: priceConflict suppresses pair entirely", () => {
+  const r = applyFirecrawlListSalePair(basePricing({ price_conflict: true, sale_price: null, price_source: "omitted" }), PAIR, "firecrawl_markdown", true);
+  assertEquals(r.list_price, null);
+  assertEquals(r.price_source, "omitted");
+});
+
+Deno.test("8.1C: JSON-LD list_price already set → pair ignored", () => {
+  const r = applyFirecrawlListSalePair(basePricing({ list_price: 2500 }), PAIR, "firecrawl_markdown", false);
+  assertEquals(r.list_price, 2500);
+  assertEquals(r.price_source, "firecrawl_markdown_single");
+});
+
+Deno.test("8.1C: JSON-LD selected_variant_price set → pair ignored", () => {
+  const r = applyFirecrawlListSalePair(
+    basePricing({ selected_variant_price: 1599, price_source: "extractor_jsonld_offers_selected" }),
+    PAIR, "firecrawl_markdown", false,
+  );
+  assertEquals(r.price_source, "extractor_jsonld_offers_selected");
+  assertEquals(r.list_price, null);
+});
+
+Deno.test("8.1C: JSON-LD price_min/price_max range set → pair ignored", () => {
+  const r = applyFirecrawlListSalePair(
+    basePricing({ price_min: 1000, price_max: 1500, price_source: "extractor_jsonld_offers_merged_range" }),
+    PAIR, "firecrawl_markdown", false,
+  );
+  assertEquals(r.price_source, "extractor_jsonld_offers_merged_range");
+  assertEquals(r.list_price, null);
+  assertEquals(r.price_min, 1000);
+});
+
+Deno.test("8.1C: hint not firecrawl_markdown → pair ignored", () => {
+  const r = applyFirecrawlListSalePair(basePricing({ price_source: "extractor_jsonld_offer" }), PAIR, "jsonld", false);
+  assertEquals(r.list_price, null);
+});
+
+Deno.test("8.1C: pair null → block untouched", () => {
+  const b = basePricing();
+  const r = applyFirecrawlListSalePair(b, null, "firecrawl_markdown", false);
+  assertEquals(r, b);
+});
+
+Deno.test("8.1C: display falls back when currency unformattable", () => {
+  const b = basePricing({ currency: null, price_display: "1,299" });
+  const r = applyFirecrawlListSalePair(
+    b,
+    { ...PAIR, currency: "XYZ" },
+    "firecrawl_markdown",
+    false,
+  );
+  assertEquals(r.list_price, 1999);
+  // formatPriceDisplay returns "XYZ 1,999" for valid ISO-shape unknown code, so display is set.
+  assert(r.price_display);
+});
+
+Deno.test("8.1C: summarizePricing handles firecrawl_markdown_list_sale source", () => {
+  const b = basePricing();
+  const r = applyFirecrawlListSalePair(b, PAIR, "firecrawl_markdown", false);
+  const s = summarizePricing(r);
+  assertEquals(s.source, "firecrawl_markdown_list_sale");
+  assertEquals(s.has_list_sale, true);
+});
