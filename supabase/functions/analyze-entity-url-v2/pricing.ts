@@ -309,7 +309,7 @@ export function applyOffersToPricing(
 
   // ── Range candidate ────────────────────────────────────────────────────
   let rangeCandidate:
-    | { min: number; max: number; source: PriceSource; confidence: number }
+    | { min: number; max: number; source: PriceSource; confidence: number; currency: string | null }
     | null = null;
   let rangeConflict = false;
 
@@ -323,6 +323,7 @@ export function applyOffersToPricing(
         max: a.high,
         source: "extractor_jsonld_aggregate",
         confidence: 0.95,
+        currency: cur,
       };
     }
   }
@@ -361,6 +362,7 @@ export function applyOffersToPricing(
             max,
             source: "extractor_jsonld_offers_merged_range",
             confidence: 0.90,
+            currency: chosenCur,
           };
         }
       }
@@ -374,6 +376,7 @@ export function applyOffersToPricing(
 
   // ── Selected variant candidate ─────────────────────────────────────────
   let selectedPrice: number | null = null;
+  let selectedCur: string | null = null;
   const flagged = offers.offers.filter(
     (o) => o.selected === true || o.default === true,
   );
@@ -384,13 +387,28 @@ export function applyOffersToPricing(
     // Accept if offer currency matches base, OR exactly one side is null.
     if (offCur && baseCur && offCur === baseCur) {
       selectedPrice = f.price;
+      selectedCur = baseCur;
     } else if (offCur && !baseCur) {
       selectedPrice = f.price;
+      selectedCur = offCur;
     } else if (!offCur && baseCur) {
       selectedPrice = f.price;
+      selectedCur = baseCur;
     }
     // both null or mismatch → null
   }
+
+  // Helper: render range display, falling back to 8.1A on null formatting.
+  const renderRangeDisplay = (
+    min: number,
+    max: number,
+    cur: string | null,
+  ): string | null => {
+    const lo = formatPriceDisplay(min, cur);
+    const hi = formatPriceDisplay(max, cur);
+    if (lo && hi) return `${lo} \u2013 ${hi}`;
+    return base.price_display;
+  };
 
   if (selectedPrice !== null && rangeCandidate) {
     return {
@@ -400,6 +418,8 @@ export function applyOffersToPricing(
       price_max: rangeCandidate.max,
       price_source: "extractor_jsonld_offers_selected",
       price_confidence: 0.92,
+      price_display:
+        formatPriceDisplay(selectedPrice, selectedCur) ?? base.price_display,
     };
   }
   if (selectedPrice !== null) {
@@ -408,6 +428,8 @@ export function applyOffersToPricing(
       selected_variant_price: selectedPrice,
       price_source: "extractor_jsonld_offers_selected",
       price_confidence: 0.92,
+      price_display:
+        formatPriceDisplay(selectedPrice, selectedCur) ?? base.price_display,
     };
   }
   if (rangeCandidate) {
@@ -417,6 +439,11 @@ export function applyOffersToPricing(
       price_max: rangeCandidate.max,
       price_source: rangeCandidate.source,
       price_confidence: rangeCandidate.confidence,
+      price_display: renderRangeDisplay(
+        rangeCandidate.min,
+        rangeCandidate.max,
+        rangeCandidate.currency,
+      ),
     };
   }
   return base;
