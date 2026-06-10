@@ -560,13 +560,13 @@ Deno.test("8.1B follow-up: unsupported-but-present currency for range falls back
     offers: {
       offers: [
         { price: 999, currency: "XYZ", selected: false, default: false },
-        { price: 1499, currency: "XYZ", selected: false, default: false },
+        { price: 1300, currency: "XYZ", selected: false, default: false },
       ],
       aggregate: null,
     },
   });
   const lo = formatPriceDisplay(999, "XYZ");
-  const hi = formatPriceDisplay(1499, "XYZ");
+  const hi = formatPriceDisplay(1300, "XYZ");
   assert(lo && lo.includes("XYZ"));
   assertEquals(p.price_display, `${lo} \u2013 ${hi}`);
 });
