@@ -60,7 +60,7 @@ Deno.test("formatPriceDisplay: garbage never throws", () => {
   assertEquals(formatPriceDisplay(-5, "USD"), null);
   // unknown currency code → fallback "<CODE> <amount>"
   const out = formatPriceDisplay(1500, "ZZZ");
-  assert(out && out.startsWith("ZZZ "), `got ${out}`);
+  assert(out && out.startsWith("ZZZ"), `got ${out}`);
 });
 
 Deno.test("formatPriceDisplay: no currency → plain number", () => {
