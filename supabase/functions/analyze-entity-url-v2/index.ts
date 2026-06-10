@@ -404,6 +404,7 @@ serve(async (req) => {
             });
             recPriceConflict = recovered.diagnostics.price_conflict;
             recSelectedPriceSource = recovered.diagnostics.selected_price_source;
+            recListSalePair = recovered.diagnostics.markdown_list_sale_pair;
             if (recovered.result.predictions !== null) {
               candidate = recovered.result;
               console.log("[analyze-entity-url-v2] firecrawl recovery succeeded", {
