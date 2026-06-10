@@ -734,7 +734,7 @@ Deno.test("8.1C: unsupported-but-valid ISO code 'XYZ' → both sides format via 
   assertEquals(r.sale_price, 1299);
   assertEquals(r.price_source, "firecrawl_markdown_list_sale");
   // formatPriceDisplay falls back to "<CODE> <amount>" for unknown ISO shape.
-  assertEquals(r.price_display, "XYZ 1,299 (MRP XYZ 1,999)");
+  assertEquals(r.price_display, "XYZ 1,299.00 (MRP XYZ 1,999.00)");
 });
 
 Deno.test("8.1C: genuine format failure (NaN sale) → falls back to pre-pair display", () => {
