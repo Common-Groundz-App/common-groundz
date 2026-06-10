@@ -239,12 +239,170 @@ function firstMarkdownPrice(region: string): number | null {
   return cands[0].value;
 }
 
+// ─── Phase 8.1C: labeled MRP/Sale pair detection ─────────────────────────
+//
+// Adds a second, additive pass that collects labeled price candidates with
+// their currency token, then attempts to form a (list_price, sale_price)
+// pair. This NEVER affects `firstMarkdownPrice` or `additional_data.price`.
+//
+// Rules:
+//  - Sale candidates must carry one of {Offer Price, Sale Price, Price}.
+//    Currency-only matches are excluded. Priority: Offer > Sale > Price.
+//    Generic "Price" only pairs when a strictly-higher MRP/List Price exists.
+//  - List candidates must carry one of {MRP, List Price}.
+//  - Sanity: list > sale AND sale >= MIN_SALE_TO_MRP_RATIO * list.
+//  - Currency precedence: both present & equal → use; conflict → reject;
+//    one/both missing → metadata fallback; else reject.
+//  - Nearest-MRP: among list candidates passing all checks, pick the one
+//    with the smallest character distance from the chosen sale candidate.
+
+export const MIN_SALE_TO_MRP_RATIO = 0.4;
+
+type PairLabel = "MRP" | "List Price" | "Offer Price" | "Sale Price" | "Price";
+
+interface PairCandidate {
+  value: number;
+  index: number;
+  label: PairLabel;
+  currency: string | null;
+}
+
+function currencyTokenToIso(tok: string | undefined | null): string | null {
+  if (!tok) return null;
+  const t = tok.trim();
+  if (t === "₹") return "INR";
+  if (t === "$") return "USD";
+  if (t === "€") return "EUR";
+  if (t === "£") return "GBP";
+  const up = t.toUpperCase().replace(/\.$/, "");
+  if (up === "RS" || up === "INR") return "INR";
+  if (up === "USD") return "USD";
+  if (up === "EUR") return "EUR";
+  if (up === "GBP") return "GBP";
+  return null;
+}
+
+function collectLabeledCandidates(region: string): PairCandidate[] {
+  const out: PairCandidate[] = [];
+  const NUM = String.raw`(\d{1,3}(?:[,\d]{0,12})(?:\.\d{1,2})?)`;
+  const CUR = String.raw`(₹|\$|€|£|Rs\.|Rs(?=\s)|INR(?=\s)|USD(?=\s)|EUR(?=\s)|GBP(?=\s))`;
+  const LABEL = String.raw`(MRP|List Price|Offer Price|Sale Price|Price)`;
+
+  // Branch A: LABEL + ":" + optional currency + number
+  const reColon = new RegExp(
+    String.raw`\b` + LABEL + String.raw`\s*:\s*(?:` + CUR + String.raw`\s?)?` + NUM,
+    "gi",
+  );
+  // Branch B: LABEL + required currency + number (no colon)
+  const reCur = new RegExp(
+    String.raw`\b` + LABEL + String.raw`\s+` + CUR + String.raw`\s?` + NUM,
+    "gi",
+  );
+
+  const parseNum = (raw: string): number | null => {
+    const n = parseFloat(raw.replace(/,/g, ""));
+    return isFinite(n) ? n : null;
+  };
+
+  const normLabel = (s: string): PairLabel => {
+    const lo = s.toLowerCase();
+    if (lo === "mrp") return "MRP";
+    if (lo === "list price") return "List Price";
+    if (lo === "offer price") return "Offer Price";
+    if (lo === "sale price") return "Sale Price";
+    return "Price";
+  };
+
+  for (const re of [reColon, reCur]) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(region)) !== null) {
+      const n = parseNum(m[3]);
+      if (n === null) continue;
+      out.push({
+        value: n,
+        index: m.index,
+        label: normLabel(m[1]),
+        currency: currencyTokenToIso(m[2]),
+      });
+    }
+  }
+  // De-duplicate exact (index,value) entries that both regexes captured.
+  const seen = new Set<string>();
+  return out.filter((c) => {
+    const k = `${c.index}:${c.value}:${c.label}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+function resolvePairCurrency(
+  saleCur: string | null,
+  listCur: string | null,
+  metaCur: string | null,
+): string | null {
+  if (saleCur && listCur) {
+    return saleCur === listCur ? saleCur : null;
+  }
+  return metaCur ?? null;
+}
+
+export function detectListSalePair(
+  region: string,
+  metadataCurrency: string | null,
+): MarkdownListSalePair | null {
+  if (!region) return null;
+  const cands = collectLabeledCandidates(region);
+  if (cands.length < 2) return null;
+
+  const lists = cands.filter((c) => c.label === "MRP" || c.label === "List Price");
+  if (lists.length === 0) return null;
+
+  // Sale priority: Offer Price > Sale Price > Price.
+  const priorities: PairLabel[] = ["Offer Price", "Sale Price", "Price"];
+  const metaCur = metadataCurrency ? metadataCurrency.trim().toUpperCase() : null;
+
+  for (const pri of priorities) {
+    const sales = cands.filter((c) => c.label === pri);
+    if (sales.length === 0) continue;
+    // Generic "Price" needs at least one list candidate strictly higher.
+    if (pri === "Price") {
+      const anyHigher = lists.some((l) => l.value > sales[0].value);
+      if (!anyHigher) return null;
+    }
+    // First occurrence of this priority tier.
+    const sale = sales[0];
+    // Find list candidates passing all checks; pick nearest by index.
+    let best: { list: PairCandidate; currency: string; dist: number } | null = null;
+    for (const list of lists) {
+      if (!(list.value > sale.value)) continue;
+      if (!(sale.value >= MIN_SALE_TO_MRP_RATIO * list.value)) continue;
+      const cur = resolvePairCurrency(sale.currency, list.currency, metaCur);
+      if (!cur) continue;
+      const dist = Math.abs(list.index - sale.index);
+      if (best === null || dist < best.dist) {
+        best = { list, currency: cur, dist };
+      }
+    }
+    if (!best) return null;
+    return {
+      list_price: best.list.value,
+      sale_price: sale.value,
+      currency: best.currency,
+      source: "mrp_sale_labels",
+    };
+  }
+  return null;
+}
+
 export function extractFromFirecrawl(args: RecoveryArgs): FirecrawlRecoveryOutput {
   const { metadata, markdown, finalUrl } = args;
   const diag = emptyDiagnostics();
   if (!metadata && !markdown) return weak([], diag);
 
   const sources: string[] = [];
+
 
   // ─── Type — strict OG only ────────────────────────────────────────────
   const ogType = getMeta(metadata, ["og:type", "ogType"]);
