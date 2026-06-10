@@ -2,8 +2,11 @@
 
 import { assert, assertEquals } from "https://deno.land/std@0.168.0/testing/asserts.ts";
 import {
+  applyOffersToPricing,
   buildPricing,
   formatPriceDisplay,
+  isDeterministicHint,
+  type PricingBlock,
   pricingBlockHasContent,
   resolvePriceSourceHint,
   summarizePricing,
