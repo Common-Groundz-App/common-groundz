@@ -197,7 +197,8 @@ export interface V2SuccessResponse {
         | "omitted"
         | "extractor_jsonld_aggregate"
         | "extractor_jsonld_offers_merged_range"
-        | "extractor_jsonld_offers_selected";
+        | "extractor_jsonld_offers_selected"
+        | "firecrawl_markdown_list_sale";
       confidence: number;
       conflict: boolean;
       has_range: boolean;
