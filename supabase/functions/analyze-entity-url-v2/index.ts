@@ -603,6 +603,7 @@ serve(async (req) => {
             mainFirecrawlCurrency = signals.firecrawlCurrency;
             if (recoveryDiagnostics?.price_conflict) mainPriceConflict = true;
             if (recoveryDiagnostics) mainSelectedPriceSource = recoveryDiagnostics.selected_price_source;
+            if (recoveryDiagnostics) mainListSalePair = recoveryDiagnostics.markdown_list_sale_pair;
             for (const w of extract2.warnings) {
               if (!warnings.includes(w)) warnings.push(w);
             }
