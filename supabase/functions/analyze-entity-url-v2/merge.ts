@@ -498,6 +498,7 @@ function attachPricing(
     geminiCurrency: gemini?.additional_data?.currency as string | null | undefined,
     geminiPriceConfidence: gemini?.field_confidence?.price,
     offers: flags.extractedOffers ?? null,
+    firecrawlListSalePair: flags.firecrawlListSalePair ?? null,
   });
 
   // Internal honesty signal: record the source resolution mode.
