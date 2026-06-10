@@ -681,16 +681,23 @@ serve(async (req) => {
     }
 
     // === Phase 8: merge + category resolution ===
+    // Phase 8.1A: pre-resolve price source hint from extractor diagnostics.
+    const mainPriceHint = resolvePriceSourceHint({
+      extractSources: extract.metadata.sources,
+      firecrawlRecoveryPriceSource: mainSelectedPriceSource,
+    });
     const mainFlags: MergeFlags = {
       priceConflict: mainPriceConflict,
       firecrawlCurrency: mainFirecrawlCurrency,
       firecrawlImageUrl: mainFirecrawlImageUrl,
+      priceSourceHint: mainPriceHint,
     };
     const { predictions: mainMerged, mergeDiag: mainMergeDiag } = applyMerge(
       extract.predictions,
       mainGeminiPred,
       mainFlags,
     );
+    const mainPricing = mainMerged?.additional_data.pricing as PricingBlock | undefined;
 
     const response: V2SuccessResponse = {
       success: true,
@@ -723,6 +730,7 @@ serve(async (req) => {
         ...(firecrawlBlock ? { firecrawl: firecrawlBlock } : {}),
         ...(geminiBlock ? { gemini: geminiBlock } : {}),
         merge: mainMergeDiag,
+        ...(mainPricing ? { pricing: summarizePricing(mainPricing, mainMergeDiag.price_source_used) } : {}),
       },
       warnings: warnings.length > 0 ? warnings : undefined,
     };
