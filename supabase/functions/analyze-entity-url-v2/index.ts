@@ -490,6 +490,7 @@ serve(async (req) => {
         firecrawlCurrency: recFirecrawlCurrency,
         firecrawlImageUrl: recFirecrawlImageUrl,
         priceSourceHint: recPriceHint,
+        extractedOffers: recExtract?.extractedOffers ?? null,
       };
       const { predictions: recMerged, mergeDiag: recMergeDiag } = applyMerge(
         recExtract?.predictions ?? null,
@@ -691,6 +692,7 @@ serve(async (req) => {
       firecrawlCurrency: mainFirecrawlCurrency,
       firecrawlImageUrl: mainFirecrawlImageUrl,
       priceSourceHint: mainPriceHint,
+      extractedOffers: extract.extractedOffers ?? null,
     };
     const { predictions: mainMerged, mergeDiag: mainMergeDiag } = applyMerge(
       extract.predictions,

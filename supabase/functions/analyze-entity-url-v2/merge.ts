@@ -11,6 +11,7 @@
 
 import type { V2Predictions } from "./schema.ts";
 import type { GeminiRawPrediction } from "./response_schema.ts";
+import type { ExtractedOffers } from "./extractor.ts";
 import {
   buildPricing,
   pricingBlockHasContent,
@@ -53,6 +54,8 @@ export interface MergeFlags {
   firecrawlImageUrl: string | null;
   /** Phase 8.1A: pre-resolved hint for the pricing.price_source. Optional. */
   priceSourceHint?: PriceSourceHint;
+  /** Phase 8.1B: deterministic JSON-LD Offer[]/AggregateOffer payload. */
+  extractedOffers?: ExtractedOffers | null;
 }
 
 export interface MergeArgs {
@@ -487,6 +490,7 @@ function attachPricing(
     geminiPrice: gemini?.additional_data?.price as number | null | undefined,
     geminiCurrency: gemini?.additional_data?.currency as string | null | undefined,
     geminiPriceConfidence: gemini?.field_confidence?.price,
+    offers: flags.extractedOffers ?? null,
   });
 
   // Internal honesty signal: record the source resolution mode.

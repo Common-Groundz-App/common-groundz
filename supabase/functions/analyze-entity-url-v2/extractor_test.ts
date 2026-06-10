@@ -346,3 +346,130 @@ Deno.test("Prediction shape has all V1-compatible keys and no fabricated path", 
   assert(p.suggested_category_path && !p.suggested_category_path.includes(">"), "no fabricated path");
   assertEquals(p.suggested_category_path, "Product", "raw PascalCase preserved");
 });
+
+// ─── Phase 8.1B: extractedOffers + price parser + @type array ─────────────
+
+import {
+  extractOffersFromJsonLd,
+  jsonLdTypeMatches,
+  parseOfferPriceStrict,
+} from "./extractor.ts";
+
+Deno.test("8.1B parseOfferPriceStrict: accepts narrow numeric strings", () => {
+  assertEquals(parseOfferPriceStrict(1499), 1499);
+  assertEquals(parseOfferPriceStrict(1499.5), 1499.5);
+  assertEquals(parseOfferPriceStrict("1499"), 1499);
+  assertEquals(parseOfferPriceStrict("1499.00"), 1499);
+  assertEquals(parseOfferPriceStrict("1,499"), 1499);
+  assertEquals(parseOfferPriceStrict("12,499.50"), 12499.5);
+  assertEquals(parseOfferPriceStrict("  1,499  "), 1499);
+});
+
+Deno.test("8.1B parseOfferPriceStrict: rejects ambiguous/invalid", () => {
+  assertEquals(parseOfferPriceStrict("1499,00"), null);   // European
+  assertEquals(parseOfferPriceStrict("1.499,00"), null);  // European
+  assertEquals(parseOfferPriceStrict("₹1,499"), null);    // symbol
+  assertEquals(parseOfferPriceStrict("$1,499"), null);
+  assertEquals(parseOfferPriceStrict("INR 1499"), null);
+  assertEquals(parseOfferPriceStrict("1 499"), null);     // space
+  assertEquals(parseOfferPriceStrict("N/A"), null);
+  assertEquals(parseOfferPriceStrict(""), null);
+  assertEquals(parseOfferPriceStrict(null), null);
+  assertEquals(parseOfferPriceStrict(undefined), null);
+  assertEquals(parseOfferPriceStrict(0), null);
+  assertEquals(parseOfferPriceStrict(-5), null);
+  assertEquals(parseOfferPriceStrict(NaN), null);
+  assertEquals(parseOfferPriceStrict(Infinity), null);
+});
+
+Deno.test("8.1B jsonLdTypeMatches: string and array, case-insensitive", () => {
+  assert(jsonLdTypeMatches({ "@type": "Offer" }, "Offer"));
+  assert(jsonLdTypeMatches({ "@type": "offer" }, "Offer"));
+  assert(jsonLdTypeMatches({ "@type": "OFFER" }, "Offer"));
+  assert(jsonLdTypeMatches({ "@type": ["Offer", "Demand"] }, "Offer"));
+  assert(jsonLdTypeMatches({ "@type": ["Demand", "offer"] }, "Offer"));
+  assert(!jsonLdTypeMatches({ "@type": "Product" }, "Offer"));
+  assert(!jsonLdTypeMatches({}, "Offer"));
+  assert(!jsonLdTypeMatches(null, "Offer"));
+});
+
+Deno.test("8.1B extractOffersFromJsonLd: array of Offers", () => {
+  const r = extractOffersFromJsonLd([
+    { "@type": "Offer", price: "1000", priceCurrency: "INR" },
+    { "@type": "Offer", price: 1300, priceCurrency: "INR", selected: true },
+  ]);
+  assertEquals(r!.offers.length, 2);
+  assertEquals(r!.offers[0].price, 1000);
+  assertEquals(r!.offers[0].currency, "INR");
+  assertEquals(r!.offers[1].selected, true);
+  assertEquals(r!.aggregate, null);
+});
+
+Deno.test("8.1B extractOffersFromJsonLd: AggregateOffer with nested offers", () => {
+  const r = extractOffersFromJsonLd({
+    "@type": "AggregateOffer",
+    lowPrice: "1000",
+    highPrice: "1400",
+    priceCurrency: "INR",
+    offers: [
+      { "@type": "Offer", price: 1000, priceCurrency: "INR" },
+      { "@type": "Offer", price: 1400, priceCurrency: "INR" },
+    ],
+  });
+  assertEquals(r!.aggregate, { low: 1000, high: 1400, currency: "INR" });
+  assertEquals(r!.offers.length, 2);
+});
+
+Deno.test("8.1B extractOffersFromJsonLd: @type array detection", () => {
+  const r = extractOffersFromJsonLd({
+    "@type": ["Offer", "Demand"],
+    price: 999,
+    priceCurrency: "USD",
+  });
+  assertEquals(r!.offers.length, 1);
+  assertEquals(r!.offers[0].price, 999);
+});
+
+Deno.test("8.1B extractOffersFromJsonLd: strict boolean selected/default", () => {
+  const r = extractOffersFromJsonLd([
+    { "@type": "Offer", price: 1, selected: "true" },           // rejected
+    { "@type": "Offer", price: 2, selected: 1 },                // rejected
+    { "@type": "Offer", price: 3, default: true },              // accepted
+    { "@type": "Offer", price: 4, eligibleQuantity: { value: 1 } }, // ignored
+  ]);
+  assertEquals(r!.offers.length, 4);
+  assertEquals(r!.offers[0].selected, false);
+  assertEquals(r!.offers[1].selected, false);
+  assertEquals(r!.offers[2].default, true);
+  assertEquals(r!.offers[3].selected, false);
+  assertEquals(r!.offers[3].default, false);
+});
+
+Deno.test("8.1B extractOffersFromJsonLd: invalid prices dropped, never throws", () => {
+  const r = extractOffersFromJsonLd([
+    { "@type": "Offer", price: "1499,00" },     // dropped
+    { "@type": "Offer", price: "₹1499" },       // dropped
+    { "@type": "Offer", price: 1499 },          // kept
+    { "@type": "SomethingElse", price: 99 },    // skipped silently
+    null,
+    "garbage",
+  ]);
+  assertEquals(r!.offers.length, 1);
+  assertEquals(r!.offers[0].price, 1499);
+});
+
+Deno.test("8.1B extractFromHtml: product Offer[] reaches extractedOffers", () => {
+  const html = jsonLdHtml({
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: "Acme",
+    offers: [
+      { "@type": "Offer", price: "1000", priceCurrency: "INR", selected: true },
+      { "@type": "Offer", price: "1300", priceCurrency: "INR" },
+    ],
+  });
+  const r = extractFromHtml(html, BASE);
+  assert(r.extractedOffers);
+  assertEquals(r.extractedOffers!.offers.length, 2);
+  assertEquals(r.extractedOffers!.offers[0].selected, true);
+});

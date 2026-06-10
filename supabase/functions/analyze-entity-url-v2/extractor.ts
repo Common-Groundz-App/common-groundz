@@ -126,10 +126,135 @@ export interface ExtractMetadata {
   weak_signals: boolean;
 }
 
+// Phase 8.1B: deterministic JSON-LD Offer[] / AggregateOffer payload.
+export interface ExtractedOfferItem {
+  price: number;
+  currency: string | null;
+  selected: boolean;
+  default: boolean;
+}
+export interface ExtractedAggregateOffer {
+  low: number;
+  high: number;
+  currency: string | null;
+}
+export interface ExtractedOffers {
+  offers: ExtractedOfferItem[];
+  aggregate: ExtractedAggregateOffer | null;
+}
+
 export interface ExtractResult {
   predictions: V2Predictions | null;
   metadata: ExtractMetadata;
   warnings: string[];
+  /**
+   * Phase 8.1B: deterministic Offer[] / AggregateOffer payload from JSON-LD.
+   * Only populated for Product nodes. Never throws; null when nothing parsed.
+   * Existing single-offer additional_data.price/currency unchanged.
+   */
+  extractedOffers?: ExtractedOffers | null;
+}
+
+// ─── Phase 8.1B: JSON-LD offer parsing (defensive, deterministic) ────────
+
+/**
+ * Narrow, deterministic numeric-string parser. Accepts:
+ *   "1499", "1499.00", "1,499", "12,499.50"
+ * Rejects European formats ("1499,00"), currency-prefixed strings,
+ * space-separated digits, NaN/Infinity/zero/negative. Never throws.
+ */
+const PHASE_8_1B_PRICE_RE =
+  /^(?:\d+(?:\.\d+)?|\d{1,3}(?:,\d{3})+(?:\.\d+)?)$/;
+
+export function parseOfferPriceStrict(v: unknown): number | null {
+  if (typeof v === "number") {
+    if (!isFinite(v) || v <= 0) return null;
+    return v;
+  }
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return null;
+    if (!PHASE_8_1B_PRICE_RE.test(s)) return null;
+    const n = parseFloat(s.replace(/,/g, ""));
+    if (!isFinite(n) || n <= 0) return null;
+    return n;
+  }
+  return null;
+}
+
+function parseOfferCurrency(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  if (!s) return null;
+  return s.toUpperCase();
+}
+
+/** Case-insensitive check that supports both string and array @type. */
+export function jsonLdTypeMatches(node: unknown, typeName: string): boolean {
+  if (!node || typeof node !== "object") return false;
+  const t = (node as Record<string, unknown>)["@type"];
+  const target = typeName.toLowerCase();
+  if (typeof t === "string") return t.toLowerCase() === target;
+  if (Array.isArray(t)) {
+    for (const x of t) {
+      if (typeof x === "string" && x.toLowerCase() === target) return true;
+    }
+  }
+  return false;
+}
+
+function parseSingleOffer(node: Record<string, unknown>): ExtractedOfferItem | null {
+  const price = parseOfferPriceStrict(node.price);
+  if (price === null) return null;
+  return {
+    price,
+    currency: parseOfferCurrency(node.priceCurrency),
+    selected: node.selected === true,
+    default: node.default === true,
+  };
+}
+
+export function extractOffersFromJsonLd(offersField: unknown): ExtractedOffers | null {
+  if (offersField === null || offersField === undefined) return null;
+
+  const items: ExtractedOfferItem[] = [];
+  let aggregate: ExtractedAggregateOffer | null = null;
+  let visitedAny = false;
+
+  const visit = (val: unknown): void => {
+    if (val === null || val === undefined) return;
+    if (Array.isArray(val)) {
+      for (const v of val) visit(v);
+      return;
+    }
+    if (typeof val !== "object") return;
+    visitedAny = true;
+    if (jsonLdTypeMatches(val, "AggregateOffer")) {
+      const o = val as Record<string, unknown>;
+      const low = parseOfferPriceStrict(o.lowPrice);
+      const high = parseOfferPriceStrict(o.highPrice);
+      if (low !== null && high !== null && aggregate === null) {
+        aggregate = { low, high, currency: parseOfferCurrency(o.priceCurrency) };
+      }
+      if (o.offers !== undefined) visit(o.offers);
+      return;
+    }
+    if (jsonLdTypeMatches(val, "Offer")) {
+      const item = parseSingleOffer(val as Record<string, unknown>);
+      if (item) items.push(item);
+    }
+    // unrelated types are silently skipped
+  };
+
+  try {
+    visit(offersField);
+  } catch {
+    // never throw
+  }
+
+  if (!visitedAny) return null;
+  if (items.length === 0 && aggregate === null) return null;
+  return { offers: items, aggregate };
 }
 
 // ─── JSON-LD helpers ──────────────────────────────────────────────────────
@@ -521,6 +646,12 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
     const canonical = safeAbsoluteUrl(meta.canonical, finalUrl);
     if (canonical) additional.canonical_url = canonical;
 
+    // Phase 8.1B: deterministic Offer[] / AggregateOffer payload (product only).
+    const extractedOffers =
+      chosen.mapped === "product"
+        ? extractOffersFromJsonLd(node.offers)
+        : null;
+
     return {
       predictions: {
         type: chosen.mapped,
@@ -547,6 +678,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
         weak_signals: false,
       },
       warnings: [],
+      extractedOffers,
     };
   }
 

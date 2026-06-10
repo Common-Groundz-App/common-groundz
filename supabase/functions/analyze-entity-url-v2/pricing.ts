@@ -18,7 +18,11 @@ export type PriceSource =
   | "firecrawl_markdown_single"
   | "gemini"
   | "unknown"
-  | "omitted";
+  | "omitted"
+  // Phase 8.1B
+  | "extractor_jsonld_aggregate"
+  | "extractor_jsonld_offers_merged_range"
+  | "extractor_jsonld_offers_selected";
 
 export type PriceSourceUsed = "exact" | "inferred" | "unknown";
 
@@ -31,6 +35,17 @@ export type PriceSourceHint =
   | "unknown"
   | null;
 
+// Phase 8.1B: deterministic offer payload accepted by buildPricing.
+export interface ExtractedOffersInput {
+  offers: Array<{
+    price: number;
+    currency: string | null;
+    selected: boolean;
+    default: boolean;
+  }>;
+  aggregate: { low: number; high: number; currency: string | null } | null;
+}
+
 export interface PricingBlock {
   currency: string | null;
   list_price: number | null;
@@ -42,6 +57,8 @@ export interface PricingBlock {
   price_source: PriceSource;
   price_confidence: number;
   price_conflict: boolean;
+  /** Phase 8.1B: mixed-currency Offer[] conflict. Pricing-block-scoped. */
+  range_conflict: boolean;
   gemini_observed_price?: number | null;
   gemini_observed_currency?: string | null;
 }
@@ -53,6 +70,8 @@ export interface MetadataPricingBlock {
   has_range: boolean;
   has_list_sale: boolean;
   gemini_diagnostic_only: boolean;
+  /** Phase 8.1B */
+  range_conflict: boolean;
   price_source_used?: PriceSourceUsed;
 }
 
@@ -73,6 +92,18 @@ export interface BuildPricingInput {
   geminiCurrency?: string | null;
   /** Gemini's field_confidence.price (0..1). */
   geminiPriceConfidence?: number | null;
+  /** Phase 8.1B: deterministic JSON-LD offer payload. */
+  offers?: ExtractedOffersInput | null;
+}
+
+/** Phase 8.1B: hints backed by deterministic page evidence. */
+export function isDeterministicHint(h: PriceSourceHint): boolean {
+  return (
+    h === "jsonld" ||
+    h === "og" ||
+    h === "firecrawl_metadata" ||
+    h === "firecrawl_markdown"
+  );
 }
 
 // ─── Source resolution ────────────────────────────────────────────────────
@@ -195,6 +226,7 @@ const EMPTY: PricingBlock = {
   price_source: "omitted",
   price_confidence: 0,
   price_conflict: false,
+  range_conflict: false,
 };
 
 export function buildPricing(input: BuildPricingInput): PricingBlock {
@@ -240,7 +272,7 @@ export function buildPricing(input: BuildPricingInput): PricingBlock {
   const finalSource: PriceSource = conflict || !legacyPriceDefined ? "omitted" : resolved.price_source;
   const finalConfidence = conflict || !legacyPriceDefined ? 0 : resolved.price_confidence;
 
-  return {
+  const base8_1A: PricingBlock = {
     ...EMPTY,
     currency,
     sale_price: finalSale,
@@ -252,6 +284,142 @@ export function buildPricing(input: BuildPricingInput): PricingBlock {
       ? { gemini_observed_price: geminiObservedPrice, gemini_observed_currency: geminiObservedCurrency ?? null }
       : {}),
   };
+
+  // Phase 8.1B: apply deterministic Offer[] / AggregateOffer layer.
+  return applyOffersToPricing(
+    base8_1A,
+    input.offers ?? null,
+    isDeterministicHint(input.priceSourceHint),
+  );
+}
+
+// ─── Phase 8.1B: deterministic offer overlay ──────────────────────────────
+
+/**
+ * Pure, additive overlay. Never mutates `base`. Implements the precedence
+ * table from .lovable/plan.md Phase 8.1B (mixed-currency → range_conflict
+ * STOP; selected+range; selected only; range only; else untouched).
+ */
+export function applyOffersToPricing(
+  base: PricingBlock,
+  offers: ExtractedOffersInput | null | undefined,
+  hintIsDeterministic: boolean,
+): PricingBlock {
+  if (!offers) return base;
+
+  // ── Range candidate ────────────────────────────────────────────────────
+  let rangeCandidate:
+    | { min: number; max: number; source: PriceSource; confidence: number }
+    | null = null;
+  let rangeConflict = false;
+
+  // AggregateOffer
+  const a = offers.aggregate;
+  if (a && isFinite(a.low) && isFinite(a.high) && a.low > 0 && a.low < a.high) {
+    const cur = a.currency ? a.currency.trim().toUpperCase() : null;
+    if (cur && a.high / a.low <= 1.5 && a.high !== a.low) {
+      rangeCandidate = {
+        min: a.low,
+        max: a.high,
+        source: "extractor_jsonld_aggregate",
+        confidence: 0.95,
+      };
+    }
+  }
+
+  // Offer[] (only if AggregateOffer didn't already produce a range)
+  if (!rangeCandidate && offers.offers.length >= 2) {
+    const nonNullCurs = offers.offers
+      .map((o) => (o.currency ? o.currency.trim().toUpperCase() : null))
+      .filter((c): c is string => !!c);
+    const uniqueNonNull = Array.from(new Set(nonNullCurs));
+    const hasNull = offers.offers.some(
+      (o) => !o.currency || !o.currency.trim(),
+    );
+
+    if (uniqueNonNull.length > 1) {
+      rangeConflict = true;
+    } else {
+      let chosenCur: string | null = null;
+      if (uniqueNonNull.length === 1 && !hasNull) {
+        chosenCur = uniqueNonNull[0];
+      } else if (uniqueNonNull.length === 0 && hasNull) {
+        if (hintIsDeterministic && base.currency) chosenCur = base.currency;
+      } else if (uniqueNonNull.length === 1 && hasNull) {
+        const c = uniqueNonNull[0];
+        if (hintIsDeterministic && base.currency && base.currency === c) {
+          chosenCur = c;
+        }
+      }
+      if (chosenCur) {
+        const prices = offers.offers.map((o) => o.price);
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+        if (min > 0 && min < max && max / min <= 1.5) {
+          rangeCandidate = {
+            min,
+            max,
+            source: "extractor_jsonld_offers_merged_range",
+            confidence: 0.90,
+          };
+        }
+      }
+    }
+  }
+
+  // Mixed-currency conflict → set flag only, do NOT touch 8.1A fields.
+  if (rangeConflict) {
+    return { ...base, range_conflict: true };
+  }
+
+  // ── Selected variant candidate ─────────────────────────────────────────
+  let selectedPrice: number | null = null;
+  const flagged = offers.offers.filter(
+    (o) => o.selected === true || o.default === true,
+  );
+  if (flagged.length === 1) {
+    const f = flagged[0];
+    const baseCur = base.currency;
+    const offCur = f.currency ? f.currency.trim().toUpperCase() : null;
+    // Accept if offer currency matches base, OR exactly one side is null.
+    if (offCur && baseCur && offCur === baseCur) {
+      selectedPrice = f.price;
+    } else if (offCur && !baseCur) {
+      selectedPrice = f.price;
+    } else if (!offCur && baseCur) {
+      selectedPrice = f.price;
+    }
+    // both null or mismatch → null
+  }
+
+  if (selectedPrice !== null && rangeCandidate) {
+    return {
+      ...base,
+      selected_variant_price: selectedPrice,
+      price_min: rangeCandidate.min,
+      price_max: rangeCandidate.max,
+      price_source: "extractor_jsonld_offers_selected",
+      price_confidence: 0.92,
+    };
+  }
+  if (selectedPrice !== null) {
+    return {
+      ...base,
+      selected_variant_price: selectedPrice,
+      price_source: "extractor_jsonld_offers_selected",
+      price_confidence: 0.92,
+    };
+  }
+  if (rangeCandidate) {
+    return {
+      ...base,
+      price_min: rangeCandidate.min,
+      price_max: rangeCandidate.max,
+      price_source: rangeCandidate.source,
+      price_confidence: rangeCandidate.confidence,
+    };
+  }
+  return base;
 }
 
 /**
@@ -261,6 +429,7 @@ export function buildPricing(input: BuildPricingInput): PricingBlock {
 export function pricingBlockHasContent(p: PricingBlock): boolean {
   if (p.price_source !== "omitted") return true;
   if (p.price_conflict) return true;
+  if (p.range_conflict) return true;
   if (p.currency !== null) return true;
   if (p.list_price !== null) return true;
   if (p.sale_price !== null) return true;
@@ -285,10 +454,11 @@ export function summarizePricing(
   const out: MetadataPricingBlock = {
     source: p.price_source,
     confidence: p.price_confidence,
-    conflict: p.price_conflict,
+    conflict: p.price_conflict || p.range_conflict,
     has_range: hasRange,
     has_list_sale: hasListSale,
     gemini_diagnostic_only: geminiDiag,
+    range_conflict: p.range_conflict,
   };
   if (priceSourceUsed) out.price_source_used = priceSourceUsed;
   return out;

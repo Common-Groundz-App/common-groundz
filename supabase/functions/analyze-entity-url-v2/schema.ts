@@ -194,12 +194,17 @@ export interface V2SuccessResponse {
         | "firecrawl_markdown_single"
         | "gemini"
         | "unknown"
-        | "omitted";
+        | "omitted"
+        | "extractor_jsonld_aggregate"
+        | "extractor_jsonld_offers_merged_range"
+        | "extractor_jsonld_offers_selected";
       confidence: number;
       conflict: boolean;
       has_range: boolean;
       has_list_sale: boolean;
       gemini_diagnostic_only: boolean;
+      /** Phase 8.1B: mixed-currency Offer[] diagnostic. */
+      range_conflict: boolean;
       price_source_used?: "exact" | "inferred" | "unknown";
     };
   };
