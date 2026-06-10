@@ -191,7 +191,7 @@ Deno.test("summarizePricing: gemini_diagnostic_only when extractor won and gemin
 
 // ─── Phase 8.1B: Offer[] / AggregateOffer overlay ─────────────────────────
 
-import { applyOffersToPricing, isDeterministicHint } from "./pricing.ts";
+
 
 Deno.test("8.1B isDeterministicHint", () => {
   assertEquals(isDeterministicHint("jsonld"), true);
