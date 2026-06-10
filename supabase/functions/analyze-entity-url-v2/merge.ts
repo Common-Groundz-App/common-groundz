@@ -11,6 +11,7 @@
 
 import type { V2Predictions } from "./schema.ts";
 import type { GeminiRawPrediction } from "./response_schema.ts";
+import type { ExtractedOffers } from "./extractor.ts";
 import {
   buildPricing,
   pricingBlockHasContent,
