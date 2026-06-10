@@ -480,11 +480,16 @@ serve(async (req) => {
         recWarnings.push("GEMINI_NOT_CONFIGURED" satisfies GeminiWarningCode);
       }
 
-      // Phase 8: merge.
+      // Phase 8: merge. Phase 8.1A: pre-resolve price source hint.
+      const recPriceHint = resolvePriceSourceHint({
+        extractSources: recExtract?.metadata.sources,
+        firecrawlRecoveryPriceSource: recSelectedPriceSource,
+      });
       const recFlags: MergeFlags = {
         priceConflict: recPriceConflict,
         firecrawlCurrency: recFirecrawlCurrency,
         firecrawlImageUrl: recFirecrawlImageUrl,
+        priceSourceHint: recPriceHint,
       };
       const { predictions: recMerged, mergeDiag: recMergeDiag } = applyMerge(
         recExtract?.predictions ?? null,
@@ -493,6 +498,7 @@ serve(async (req) => {
       );
 
       if (recMerged) {
+        const recPricing = recMerged.additional_data.pricing as PricingBlock | undefined;
         const response: V2SuccessResponse = {
           success: true,
           predictions: recMerged,
@@ -512,11 +518,13 @@ serve(async (req) => {
             ...(recFirecrawlBlock ? { firecrawl: recFirecrawlBlock } : {}),
             ...(recGeminiBlock ? { gemini: recGeminiBlock } : {}),
             merge: recMergeDiag,
+            ...(recPricing ? { pricing: summarizePricing(recPricing, recMergeDiag.price_source_used) } : {}),
           },
           warnings: recWarnings.length > 0 ? recWarnings : undefined,
         };
         return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
+
 
       // Strict contract: return the ORIGINAL fetch error unchanged.
       return errorResponse(
