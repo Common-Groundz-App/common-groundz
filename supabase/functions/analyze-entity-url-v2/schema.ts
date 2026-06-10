@@ -179,6 +179,28 @@ export interface V2SuccessResponse {
       name_junk_override_applied: boolean;
       price_conflict_blocked_gemini: boolean;
       recovery_gate_passed?: boolean;
+      /** Phase 8.1A: internal honesty signal for pricing.price_source. */
+      price_source_used?: "exact" | "inferred" | "unknown";
+    };
+    /**
+     * Phase 8.1A+: additive pricing summary. Mirrors the
+     * additional_data.pricing block. Diagnostic-only; never branch on it.
+     */
+    pricing?: {
+      source:
+        | "extractor_jsonld_offer"
+        | "extractor_meta_og"
+        | "firecrawl_metadata"
+        | "firecrawl_markdown_single"
+        | "gemini"
+        | "unknown"
+        | "omitted";
+      confidence: number;
+      conflict: boolean;
+      has_range: boolean;
+      has_list_sale: boolean;
+      gemini_diagnostic_only: boolean;
+      price_source_used?: "exact" | "inferred" | "unknown";
     };
   };
   warnings?: string[];

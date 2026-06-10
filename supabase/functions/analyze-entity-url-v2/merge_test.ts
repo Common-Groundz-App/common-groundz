@@ -249,3 +249,98 @@ Deno.test("recovery merge blocks Gemini price when confidence < 0.7", () => {
   });
   assertEquals(predictions!.additional_data.price, undefined);
 });
+
+// ─── Phase 8.1A regression: additional_data.price never altered ───────────
+
+Deno.test("8.1A: success path attaches pricing block without touching legacy price", () => {
+  const ext = makeExtract({ additional_data: { price: 1499, currency: "INR" } });
+  const { predictions, diagnostics } = mergePredictions({
+    extract: ext,
+    gemini: makeGemini({ additional_data: { price: 1799, currency: "INR" }, field_confidence: { price: 0.9 } }),
+    flags: { ...noFlags, priceSourceHint: "jsonld" },
+  });
+  // Invariant #1: legacy price unchanged.
+  assertEquals(predictions!.additional_data.price, 1499);
+  // Pricing block attached.
+  const pricing = predictions!.additional_data.pricing as Record<string, unknown> | undefined;
+  assert(pricing);
+  assertEquals(pricing!.sale_price, 1499);
+  assertEquals(pricing!.price_source, "extractor_jsonld_offer");
+  assertEquals(pricing!.gemini_observed_price, 1799);
+  // Diagnostic honesty signal.
+  assertEquals(diagnostics.price_source_used, "exact");
+});
+
+Deno.test("8.1A: priceConflict → no legacy price, pricing block attached as omitted+conflict", () => {
+  const ext = makeExtract({ additional_data: { price: 1499, currency: "INR" } });
+  const { predictions } = mergePredictions({
+    extract: ext,
+    gemini: makeGemini({ additional_data: { price: 9999, currency: "INR" } }),
+    flags: { ...noFlags, priceConflict: true, priceSourceHint: "jsonld" },
+  });
+  // Phase 8 invariant: conflict drops legacy price.
+  assertEquals(predictions!.additional_data.price, undefined);
+  const pricing = predictions!.additional_data.pricing as Record<string, unknown>;
+  assert(pricing);
+  assertEquals(pricing.price_source, "omitted");
+  assertEquals(pricing.price_conflict, true);
+  assertEquals(pricing.currency, "INR");
+  assertEquals(pricing.sale_price, null);
+});
+
+Deno.test("8.1A: ambiguous hint → unknown source, price_source_used=inferred", () => {
+  const ext = makeExtract({ additional_data: { price: 50, currency: "USD" } });
+  const { predictions, diagnostics } = mergePredictions({
+    extract: ext,
+    gemini: null,
+    flags: noFlags, // no priceSourceHint
+  });
+  assertEquals(predictions!.additional_data.price, 50);
+  const pricing = predictions!.additional_data.pricing as Record<string, unknown>;
+  assertEquals(pricing.price_source, "unknown");
+  assertEquals(diagnostics.price_source_used, "inferred");
+});
+
+Deno.test("8.1A: no price and no currency → pricing block not attached", () => {
+  const ext = makeExtract({ additional_data: {} });
+  const { predictions } = mergePredictions({ extract: ext, gemini: null, flags: noFlags });
+  assertEquals(predictions!.additional_data.pricing, undefined);
+});
+
+Deno.test("8.1A: Nykaa-class recovery (currency+conflict, no price) attaches omitted pricing", () => {
+  // recovery: extract null, gemini fails confidence, conflict true, firecrawl currency known
+  const { predictions } = mergePredictions({
+    extract: null,
+    gemini: makeGemini({
+      additional_data: { brand: "X", price: 9999 },
+      field_confidence: { price: 0.4 }, // gated out
+    }),
+    flags: {
+      priceConflict: true,
+      firecrawlCurrency: "INR",
+      firecrawlImageUrl: null,
+    },
+  });
+  assert(predictions);
+  assertEquals(predictions!.additional_data.price, undefined);
+  const pricing = predictions!.additional_data.pricing as Record<string, unknown>;
+  assert(pricing);
+  assertEquals(pricing.price_source, "omitted");
+  assertEquals(pricing.price_conflict, true);
+  assertEquals(pricing.currency, "INR");
+});
+
+Deno.test("8.1A: recovery with trusted Gemini price → source=gemini, legacy price set by Phase 8", () => {
+  const { predictions } = mergePredictions({
+    extract: null,
+    gemini: makeGemini({
+      additional_data: { brand: "X", price: 99, currency: "USD" },
+      field_confidence: { price: 0.9 },
+    }),
+    flags: noFlags,
+  });
+  assertEquals(predictions!.additional_data.price, 99); // Phase 8 behavior unchanged
+  const pricing = predictions!.additional_data.pricing as Record<string, unknown>;
+  assertEquals(pricing.price_source, "gemini");
+  assertEquals(pricing.sale_price, 99);
+});
