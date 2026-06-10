@@ -343,6 +343,8 @@ Deno.test("8.1C: pair rejected → additional_data.price still set from single s
     finalUrl: BASE,
   });
   assertEquals(r.diagnostics.markdown_list_sale_pair, null);
-  // ₹1299 is currency-only tier-2; MRP is tier-3; tier-2 wins.
-  assertEquals(r.result.predictions!.additional_data.price, 1299);
+  // Pre-8.1C single-selector behavior preserved: MRP nearby demotes ₹1299 to
+  // tier 3, MRP wins on first occurrence — byte-identical to Phase 8.
+  assertEquals(r.result.predictions!.additional_data.price, 1999);
+
 });
