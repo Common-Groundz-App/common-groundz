@@ -698,6 +698,7 @@ serve(async (req) => {
       firecrawlImageUrl: mainFirecrawlImageUrl,
       priceSourceHint: mainPriceHint,
       extractedOffers: extract.extractedOffers ?? null,
+      firecrawlListSalePair: mainListSalePair,
     };
     const { predictions: mainMerged, mergeDiag: mainMergeDiag } = applyMerge(
       extract.predictions,
