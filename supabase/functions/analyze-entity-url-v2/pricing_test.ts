@@ -185,3 +185,278 @@ Deno.test("summarizePricing: gemini_diagnostic_only when extractor won and gemin
   assertEquals(m.has_list_sale, false);
   assertEquals(m.price_source_used, "exact");
 });
+
+// ─── Phase 8.1B: Offer[] / AggregateOffer overlay ─────────────────────────
+
+import { applyOffersToPricing, isDeterministicHint } from "./pricing.ts";
+
+Deno.test("8.1B isDeterministicHint", () => {
+  assertEquals(isDeterministicHint("jsonld"), true);
+  assertEquals(isDeterministicHint("og"), true);
+  assertEquals(isDeterministicHint("firecrawl_metadata"), true);
+  assertEquals(isDeterministicHint("firecrawl_markdown"), true);
+  assertEquals(isDeterministicHint("gemini"), false);
+  assertEquals(isDeterministicHint("unknown"), false);
+  assertEquals(isDeterministicHint(null), false);
+});
+
+Deno.test("8.1B AggregateOffer happy path", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [],
+      aggregate: { low: 1000, high: 1400, currency: "INR" },
+    },
+  });
+  assertEquals(p.price_min, 1000);
+  assertEquals(p.price_max, 1400);
+  assertEquals(p.price_source, "extractor_jsonld_aggregate");
+  assertEquals(p.price_confidence, 0.95);
+  assertEquals(p.sale_price, 1000); // 8.1A preserved
+});
+
+Deno.test("8.1B AggregateOffer ratio > 1.5 → no range, no conflict", () => {
+  const p = buildPricing({
+    legacyPrice: 100,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [],
+      aggregate: { low: 100, high: 500, currency: "INR" },
+    },
+  });
+  assertEquals(p.price_min, null);
+  assertEquals(p.price_max, null);
+  assertEquals(p.range_conflict, false);
+  assertEquals(p.price_source, "extractor_jsonld_offer"); // 8.1A untouched
+});
+
+Deno.test("8.1B Offer[] same currency emits range", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: false, default: false },
+        { price: 1300, currency: "INR", selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.price_min, 1000);
+  assertEquals(p.price_max, 1300);
+  assertEquals(p.price_source, "extractor_jsonld_offers_merged_range");
+  assertEquals(p.price_confidence, 0.90);
+});
+
+Deno.test("8.1B Offer[] mixed currency → range_conflict only, 8.1A untouched", () => {
+  const base = buildPricing({
+    legacyPrice: 1499,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+  });
+  const p = buildPricing({
+    legacyPrice: 1499,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: false, default: false },
+        { price: 15, currency: "USD", selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.range_conflict, true);
+  assertEquals(p.price_min, null);
+  assertEquals(p.price_max, null);
+  // 8.1A fields byte-identical to baseline
+  assertEquals(p.sale_price, base.sale_price);
+  assertEquals(p.price_source, base.price_source);
+  assertEquals(p.price_confidence, base.price_confidence);
+  assertEquals(p.currency, base.currency);
+  assertEquals(p.price_display, base.price_display);
+  assertEquals(p.price_conflict, false); // distinct from range_conflict
+  // metadata mirrors
+  const m = summarizePricing(p);
+  assertEquals(m.range_conflict, true);
+  assertEquals(m.conflict, true);
+});
+
+Deno.test("8.1B Offer[] partial-null currencies adopt deterministic Phase 8 currency", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld", // deterministic
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: false, default: false },
+        { price: 1300, currency: null, selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.price_min, 1000);
+  assertEquals(p.price_max, 1300);
+});
+
+Deno.test("8.1B partial-null + mismatched Phase 8 currency → no range, no conflict", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "USD",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: false, default: false },
+        { price: 1300, currency: null, selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.price_min, null);
+  assertEquals(p.range_conflict, false);
+});
+
+Deno.test("8.1B all-null currencies + gemini hint → no range", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "gemini",
+    priceSourceHint: "gemini",
+    geminiPriceConfidence: 0.9,
+    offers: {
+      offers: [
+        { price: 1000, currency: null, selected: false, default: false },
+        { price: 1300, currency: null, selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.price_min, null);
+  assertEquals(p.range_conflict, false);
+});
+
+Deno.test("8.1B all-null currencies + deterministic Phase 8 → adopts", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "firecrawl_metadata",
+    offers: {
+      offers: [
+        { price: 1000, currency: null, selected: false, default: false },
+        { price: 1300, currency: null, selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.price_min, 1000);
+  assertEquals(p.price_max, 1300);
+});
+
+Deno.test("8.1B selected variant only", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: true, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.selected_variant_price, 1000);
+  assertEquals(p.price_source, "extractor_jsonld_offers_selected");
+  assertEquals(p.price_confidence, 0.92);
+});
+
+Deno.test("8.1B selected variant + range both populated", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: true, default: false },
+        { price: 1300, currency: "INR", selected: false, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.selected_variant_price, 1000);
+  assertEquals(p.price_min, 1000);
+  assertEquals(p.price_max, 1300);
+  assertEquals(p.price_source, "extractor_jsonld_offers_selected");
+  const m = summarizePricing(p);
+  assertEquals(m.has_range, true);
+});
+
+Deno.test("8.1B multiple selected → selected_variant_price null", () => {
+  const p = buildPricing({
+    legacyPrice: 1000,
+    currency: "INR",
+    priceConflict: false,
+    priceWinner: "extractor",
+    priceSourceHint: "jsonld",
+    offers: {
+      offers: [
+        { price: 1000, currency: "INR", selected: true, default: false },
+        { price: 1300, currency: "INR", selected: true, default: false },
+      ],
+      aggregate: null,
+    },
+  });
+  assertEquals(p.selected_variant_price, null);
+  // range still emits
+  assertEquals(p.price_min, 1000);
+  assertEquals(p.price_max, 1300);
+});
+
+Deno.test("8.1B applyOffersToPricing is pure (no input mutation)", () => {
+  const base: PricingBlock = {
+    currency: "INR",
+    list_price: null,
+    sale_price: 1000,
+    selected_variant_price: null,
+    price_min: null,
+    price_max: null,
+    price_display: "₹1,000",
+    price_source: "extractor_jsonld_offer",
+    price_confidence: 0.9,
+    price_conflict: false,
+    range_conflict: false,
+  };
+  const snapshot = JSON.stringify(base);
+  applyOffersToPricing(base, {
+    offers: [
+      { price: 1000, currency: "INR", selected: false, default: false },
+      { price: 1300, currency: "INR", selected: false, default: false },
+    ],
+    aggregate: null,
+  }, true);
+  assertEquals(JSON.stringify(base), snapshot);
+});
