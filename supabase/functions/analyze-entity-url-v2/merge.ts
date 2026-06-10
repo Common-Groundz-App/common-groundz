@@ -11,6 +11,13 @@
 
 import type { V2Predictions } from "./schema.ts";
 import type { GeminiRawPrediction } from "./response_schema.ts";
+import {
+  buildPricing,
+  pricingBlockHasContent,
+  type PricingBlock,
+  type PriceSourceHint,
+  type PriceSourceUsed,
+} from "./pricing.ts";
 
 // ─── Diagnostics ──────────────────────────────────────────────────────────
 
