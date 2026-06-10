@@ -18,7 +18,11 @@ export type PriceSource =
   | "firecrawl_markdown_single"
   | "gemini"
   | "unknown"
-  | "omitted";
+  | "omitted"
+  // Phase 8.1B
+  | "extractor_jsonld_aggregate"
+  | "extractor_jsonld_offers_merged_range"
+  | "extractor_jsonld_offers_selected";
 
 export type PriceSourceUsed = "exact" | "inferred" | "unknown";
 
@@ -31,6 +35,17 @@ export type PriceSourceHint =
   | "unknown"
   | null;
 
+// Phase 8.1B: deterministic offer payload accepted by buildPricing.
+export interface ExtractedOffersInput {
+  offers: Array<{
+    price: number;
+    currency: string | null;
+    selected: boolean;
+    default: boolean;
+  }>;
+  aggregate: { low: number; high: number; currency: string | null } | null;
+}
+
 export interface PricingBlock {
   currency: string | null;
   list_price: number | null;
@@ -42,6 +57,8 @@ export interface PricingBlock {
   price_source: PriceSource;
   price_confidence: number;
   price_conflict: boolean;
+  /** Phase 8.1B: mixed-currency Offer[] conflict. Pricing-block-scoped. */
+  range_conflict: boolean;
   gemini_observed_price?: number | null;
   gemini_observed_currency?: string | null;
 }
@@ -53,6 +70,8 @@ export interface MetadataPricingBlock {
   has_range: boolean;
   has_list_sale: boolean;
   gemini_diagnostic_only: boolean;
+  /** Phase 8.1B */
+  range_conflict: boolean;
   price_source_used?: PriceSourceUsed;
 }
 
@@ -73,6 +92,18 @@ export interface BuildPricingInput {
   geminiCurrency?: string | null;
   /** Gemini's field_confidence.price (0..1). */
   geminiPriceConfidence?: number | null;
+  /** Phase 8.1B: deterministic JSON-LD offer payload. */
+  offers?: ExtractedOffersInput | null;
+}
+
+/** Phase 8.1B: hints backed by deterministic page evidence. */
+export function isDeterministicHint(h: PriceSourceHint): boolean {
+  return (
+    h === "jsonld" ||
+    h === "og" ||
+    h === "firecrawl_metadata" ||
+    h === "firecrawl_markdown"
+  );
 }
 
 // ─── Source resolution ────────────────────────────────────────────────────
