@@ -550,6 +550,7 @@ serve(async (req) => {
     let mainFirecrawlImageUrl: string | null = null;
     let mainFirecrawlCurrency: string | null = null;
     let mainSelectedPriceSource: "metadata" | "markdown" | "omitted" | "none" | null = null;
+    let mainListSalePair: import("./firecrawl_recovery.ts").MarkdownListSalePair | null = null;
 
     const ws = detectWeakSignals(extract);
     if (ws.weak) {
