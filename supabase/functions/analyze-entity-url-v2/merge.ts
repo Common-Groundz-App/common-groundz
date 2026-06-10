@@ -490,6 +490,7 @@ function attachPricing(
     geminiPrice: gemini?.additional_data?.price as number | null | undefined,
     geminiCurrency: gemini?.additional_data?.currency as string | null | undefined,
     geminiPriceConfidence: gemini?.field_confidence?.price,
+    offers: flags.extractedOffers ?? null,
   });
 
   // Internal honesty signal: record the source resolution mode.
