@@ -1,7 +1,7 @@
 import { assertEquals, assert } from "https://deno.land/std@0.168.0/testing/asserts.ts";
 import { runFirecrawlScrape, safeBaseUrl } from "./firecrawl.ts";
 
-Deno.test("default request body includes timeout: 12000", async () => {
+Deno.test("default request body includes timeout: 25000", async () => {
   let captured: unknown = null;
   const fetchImpl = ((_url: string, init?: RequestInit) => {
     captured = JSON.parse(String(init?.body ?? "{}"));
@@ -13,7 +13,7 @@ Deno.test("default request body includes timeout: 12000", async () => {
     );
   }) as unknown as typeof fetch;
   await runFirecrawlScrape("https://example.com/x", { apiKey: "k", fetchImpl });
-  assertEquals((captured as { timeout: number }).timeout, 12000);
+  assertEquals((captured as { timeout: number }).timeout, 25000);
 });
 
 Deno.test("high-priority apiTimeoutMs sets request body timeout: 30000", async () => {
