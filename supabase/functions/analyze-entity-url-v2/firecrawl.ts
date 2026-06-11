@@ -1,7 +1,7 @@
 // Phase 6: Firecrawl fallback client.
 //
 // Narrow surface: one POST to /v2/scrape. Requests formats=['html','markdown']
-// and also tolerates rawHtml in responses. 12s budget, 2 MB caps on html and
+// and also tolerates rawHtml in responses. 25s budget, 2 MB caps on html and
 // markdown. metadata and markdown are internal — never serialized into the
 // V2 response. A scrape is considered usable if ANY of html / markdown /
 // metadata is present. Oversize HTML alone does NOT fail the scrape — it is
@@ -49,8 +49,8 @@ export interface FirecrawlOpts {
   fallbackBaseUrl?: string;
 }
 
-export const NORMAL_FIRECRAWL_API_TIMEOUT_MS = 12_000;
-export const NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS = 12_000;
+export const NORMAL_FIRECRAWL_API_TIMEOUT_MS = 25_000;
+export const NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS = 27_000;
 export const HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS = 30_000;
 export const HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS = 32_000;
 

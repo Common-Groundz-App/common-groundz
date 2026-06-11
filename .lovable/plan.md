@@ -1,20 +1,19 @@
-## Goal
+## Summary
+Bump recovery-path Firecrawl timeout constants only. HIGH_PRIORITY_* values stay unchanged.
 
-Make the `analyze-entity-url-v2` edge function read its Gemini key from a new secret `GEMINI_API_KEY_V2` instead of the shared `GEMINI_API_KEY`. No other functions are affected.
+## Changes
 
-## Steps
+### 1. `supabase/functions/analyze-entity-url-v2/firecrawl.ts`
+- Update file header comment from "12s budget" to "25 s budget".
+- `NORMAL_FIRECRAWL_API_TIMEOUT_MS`: `12_000` → `25_000`
+- `NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS`: `12_000` → `27_000`
+- `HIGH_PRIORITY_*` constants untouched.
 
-1. **Add secret** `GEMINI_API_KEY_V2` via the secrets tool (you'll paste the new key in the secure form).
-2. **Edit `supabase/functions/analyze-entity-url-v2/gemini.ts`** (line 163):
-   - Change `Deno.env.get("GEMINI_API_KEY")` → `Deno.env.get("GEMINI_API_KEY_V2")`.
-3. **Edit `supabase/functions/analyze-entity-url-v2/index.ts`** (line 355):
-   - Change the `geminiConfigured` check to read `GEMINI_API_KEY_V2`.
+### 2. `supabase/functions/analyze-entity-url-v2/firecrawl_test.ts`
+- Update test name and assertion for the default timeout:
+  - Rename test from `"default request body includes timeout: 12000"` to `"default request body includes timeout: 25000"`
+  - Change `assertEquals((captured as { timeout: number }).timeout, 12000)` to `25000`
+- High-priority test asserting `30000` stays unchanged.
 
 ## Out of scope
-
-- All other edge functions continue using `GEMINI_API_KEY` unchanged.
-- No changes to pricing logic, merge, schema, UI, DB, or V1.
-
-## Security note
-
-The key you pasted in chat is exposed — please rotate it in Google AI Studio before entering the new value into the secrets form.
+No changes to Gemini keys, pricing, UI, DB, V1, or response/error codes. No queue or worker architecture.
