@@ -160,7 +160,7 @@ function sanitizeErrorBody(raw: string): {
 }
 
 export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResult> {
-  const apiKey = args.apiKey ?? Deno.env.get("GEMINI_API_KEY") ?? "";
+  const apiKey = args.apiKey ?? Deno.env.get("GEMINI_API_KEY_V2") ?? "";
   if (!apiKey) {
     return { ok: false, configured: false };
   }

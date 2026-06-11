@@ -352,7 +352,7 @@ serve(async (req) => {
     }
 
     const firecrawlConfigured = !!Deno.env.get("FIRECRAWL_API_KEY");
-    const geminiConfigured = !!Deno.env.get("GEMINI_API_KEY");
+    const geminiConfigured = !!Deno.env.get("GEMINI_API_KEY_V2");
     const priority: "high" | "normal" = isKnownJsHeavyHost(safe.url) ? "high" : "normal";
 
     // === Safe fetch ===
