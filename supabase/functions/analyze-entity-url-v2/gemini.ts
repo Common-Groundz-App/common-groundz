@@ -186,6 +186,10 @@ export type TolerantParseOutcome =
  * Returns GEMINI_INVALID_SHAPE when at least one candidate parsed but none
  * passed validation.
  */
+function validateOk(r: { success?: boolean; ok?: boolean }): boolean {
+  return r.success === true || r.ok === true;
+}
+
 export function tolerantParseGeminiJson(
   text: string,
   validate: (v: unknown) => { success?: boolean; ok?: boolean },
