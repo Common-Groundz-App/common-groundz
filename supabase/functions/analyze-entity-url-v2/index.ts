@@ -591,6 +591,7 @@ serve(async (req) => {
           success: true,
           predictions: recMerged,
           metadata: {
+            request_id,
             analyzed_url: safe.url,
             normalized_url: safe.url,
             extraction_version: EXTRACTION_VERSION,
@@ -609,6 +610,13 @@ serve(async (req) => {
             ...(recPricing ? { pricing: summarizePricing(recPricing, recMergeDiag.price_source_used) } : {}),
           },
           warnings: recWarnings.length > 0 ? recWarnings : undefined,
+        };
+        trace.path = "fetch_recovery";
+        trace.merge = { path: recMergeDiag.path, field_winners: recMergeDiag.field_winners as unknown as Record<string, string> };
+        trace.final = {
+          prediction_source: recExtract ? "firecrawl_recovery" : "gemini_recovery",
+          error_code: "OK",
+          total_duration_ms: Date.now() - t0,
         };
         return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
