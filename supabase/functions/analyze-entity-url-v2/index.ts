@@ -335,7 +335,7 @@ serve(async (req) => {
     trace.path = "error";
     trace.final.error_code = code;
     trace.final.total_duration_ms = Date.now() - t0;
-    return respondError(status, code, msg, details, request_id);
+    return errorResponse(status, code, msg, details, request_id);
   };
 
 
