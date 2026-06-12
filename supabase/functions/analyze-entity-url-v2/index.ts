@@ -335,20 +335,20 @@ serve(async (req) => {
     trace.path = "error";
     trace.final.error_code = code;
     trace.final.total_duration_ms = Date.now() - t0;
-    return errorResponse(status, code, msg, details, request_id);
+    return respondError(status, code, msg, details, request_id);
   };
 
 
   try {
     // Method gate
     if (req.method !== "POST") {
-      return errorResponse(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+      return respondError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
     }
 
     // === Auth gate (mirrors V1) ===
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return errorResponse(401, "MISSING_AUTH", "Unauthorized");
+      return respondError(401, "MISSING_AUTH", "Unauthorized");
     }
 
     const supabaseAnon = createClient(
@@ -360,7 +360,7 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabaseAnon.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      return errorResponse(401, "INVALID_TOKEN", "Unauthorized");
+      return respondError(401, "INVALID_TOKEN", "Unauthorized");
     }
 
     const userId = claimsData.claims.sub;
@@ -377,7 +377,7 @@ serve(async (req) => {
     });
 
     if (roleError || !isAdmin) {
-      return errorResponse(403, "NOT_ADMIN", "Forbidden");
+      return respondError(403, "NOT_ADMIN", "Forbidden");
     }
 
     // === Body parse ===
@@ -385,13 +385,13 @@ serve(async (req) => {
     try {
       rawBody = await req.json();
     } catch {
-      return errorResponse(400, "INVALID_JSON", "Invalid JSON body");
+      return respondError(400, "INVALID_JSON", "Invalid JSON body");
     }
 
     // === Zod validation ===
     const parsed = V2RequestSchema.safeParse(rawBody);
     if (!parsed.success) {
-      return errorResponse(
+      return respondError(
         400,
         "INVALID_URL",
         "Invalid request",
@@ -405,7 +405,7 @@ serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     const resolveDns = (Deno as any).resolveDns?.bind(Deno);
     if (typeof resolveDns !== "function") {
-      return errorResponse(503, "DNS_RESOLUTION_FAILED", "Could not resolve host");
+      return respondError(503, "DNS_RESOLUTION_FAILED", "Could not resolve host");
     }
 
     // === SSRF preflight + normalization (early reject) ===
@@ -419,7 +419,7 @@ serve(async (req) => {
           : e.code === "DNS_RESOLUTION_FAILED"
             ? "Could not resolve host"
             : "Invalid URL";
-        return errorResponse(400, e.code as V2ErrorCode, msg);
+        return respondError(400, e.code as V2ErrorCode, msg);
       }
       throw e;
     }
@@ -604,7 +604,7 @@ serve(async (req) => {
 
 
       // Strict contract: return the ORIGINAL fetch error unchanged.
-      return errorResponse(
+      return respondError(
         httpStatusFor(e.code as V2ErrorCode),
         e.code as V2ErrorCode,
         humanMessageFor(e.code as V2ErrorCode),
@@ -819,6 +819,6 @@ serve(async (req) => {
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
   } catch (err) {
     console.error("[analyze-entity-url-v2] unhandled error:", err);
-    return errorResponse(500, "INTERNAL_ERROR", "Internal error");
+    return respondError(500, "INTERNAL_ERROR", "Internal error");
   }
 });
