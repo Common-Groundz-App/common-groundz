@@ -188,7 +188,7 @@ export type TolerantParseOutcome =
  */
 export function tolerantParseGeminiJson(
   text: string,
-  validate: (v: unknown) => { ok: boolean },
+  validate: (v: unknown) => { success?: boolean; ok?: boolean },
 ): TolerantParseOutcome {
   let anyParsed = false;
   const parsedRoots: unknown[] = [];
