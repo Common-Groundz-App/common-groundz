@@ -75,10 +75,67 @@ function errorResponse(
   code: V2ErrorCode,
   error: string,
   details?: unknown,
+  request_id?: string,
 ): Response {
   const body: V2ErrorResponse = { success: false, error, code };
   if (details !== undefined) body.details = details;
+  if (request_id) body.request_id = request_id;
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
+}
+
+// ─── Telemetry: per-invocation analysis_trace ────────────────────────────
+interface AnalysisTrace {
+  request_id: string;
+  path: "happy" | "fetch_recovery" | "weak_recovery" | "error";
+  host: string | null;
+  direct_fetch?: {
+    attempted: boolean;
+    ok: boolean;
+    status?: number;
+    content_type?: string;
+    bytes?: number;
+    duration_ms?: number;
+    error_code?: string;
+  };
+  deterministic_extract?: { ok: boolean; weak_signals: boolean };
+  firecrawl?: {
+    eligible: boolean;
+    attempted: boolean;
+    ok: boolean;
+    duration_ms?: number;
+    error_code?: string;
+    skip_reason?: string;
+  };
+  gemini?: {
+    attempted: boolean;
+    ok: boolean;
+    duration_ms?: number;
+    error_code?: string;
+    used_url_context?: boolean;
+    used_google_search?: boolean;
+    url_context_failed?: boolean;
+    raw_text_length?: number;
+    raw_text_sha8?: string;
+  };
+  merge?: { path: string; field_winners?: Record<string, string> };
+  final: {
+    prediction_source?: string;
+    error_code: string;
+    total_duration_ms: number;
+  };
+}
+
+function makeTrace(request_id: string): AnalysisTrace {
+  return {
+    request_id,
+    path: "error",
+    host: null,
+    final: { error_code: "UNKNOWN", total_duration_ms: 0 },
+  };
+}
+
+function safeHost(url: string): string | null {
+  try { return new URL(url).host; } catch { return null; }
 }
 
 function httpStatusFor(code: V2ErrorCode): number {
