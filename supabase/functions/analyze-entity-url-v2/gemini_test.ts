@@ -393,8 +393,9 @@ Deno.test("tolerantParse: nested object with only confidence/reasoning rejected 
   assertEquals(res.code, "GEMINI_INVALID_SHAPE");
 });
 
-Deno.test("tolerantParse: array-of-objects rejected", async () => {
-  const bad = JSON.stringify([JSON.parse(VALID)]);
+Deno.test("tolerantParse: top-level array with no valid object → INVALID_SHAPE", async () => {
+  // Array whose only element fails Zod (missing required fields).
+  const bad = JSON.stringify([{ type: "product" }]);
   const res = await runGeminiJsonMode({
     systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
     fetchImpl: makeFetch(() => geminiJson(bad)),
@@ -402,6 +403,8 @@ Deno.test("tolerantParse: array-of-objects rejected", async () => {
   assert(!res.ok && res.configured);
   assertEquals(res.code, "GEMINI_INVALID_SHAPE");
 });
+
+
 
 Deno.test("tolerantParse: malformed JSON still fails with INVALID_JSON", async () => {
   const res = await runGeminiJsonMode({
