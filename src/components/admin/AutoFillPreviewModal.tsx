@@ -394,7 +394,13 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
             </Alert>
           )}
         </div>
-        
+
+        {requestId && (
+          <p className="text-xs text-muted-foreground">
+            Request ID: <span className="font-mono">{requestId}</span>
+          </p>
+        )}
+
         <DialogFooter className="gap-2">
           <Button 
             variant="outline" 
