@@ -57,6 +57,8 @@ export interface GeminiSuccess {
   model: string;
   grounding: GeminiGrounding;
   prediction: GeminiRawPrediction;
+  rawTextLength?: number;
+  rawTextSha8?: string;
 }
 
 export interface GeminiFailure {
@@ -67,6 +69,8 @@ export interface GeminiFailure {
   durationMs: number;
   model: string;
   grounding?: GeminiGrounding;
+  rawTextLength?: number;
+  rawTextSha8?: string;
 }
 
 export type GeminiResult = GeminiSuccess | GeminiFailure | GeminiNotConfigured;
