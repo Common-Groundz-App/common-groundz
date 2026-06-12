@@ -803,6 +803,7 @@ serve(async (req) => {
       success: true,
       predictions: mainMerged,
       metadata: {
+        request_id,
         analyzed_url: safe.url,
         normalized_url: safe.url,
         extraction_version: EXTRACTION_VERSION,
@@ -835,9 +836,28 @@ serve(async (req) => {
       warnings: warnings.length > 0 ? warnings : undefined,
     };
 
+    trace.deterministic_extract = {
+      ok: extract.predictions !== null,
+      weak_signals: extract.metadata.weak_signals,
+    };
+    trace.merge = {
+      path: mainMergeDiag.path,
+      field_winners: mainMergeDiag.field_winners as unknown as Record<string, string>,
+    };
+    trace.path = usedFirecrawl ? "weak_recovery" : "happy";
+    trace.final = {
+      prediction_source: mainMerged ? (usedFirecrawl ? "firecrawl_merge" : "extractor_merge") : "none",
+      error_code: mainMerged ? "OK" : "NO_PREDICTIONS",
+      total_duration_ms: Date.now() - t0,
+    };
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
   } catch (err) {
-    console.error("[analyze-entity-url-v2] unhandled error:", err);
+    console.error("[analyze-entity-url-v2] unhandled error:", { request_id, err: String(err) });
     return respondError(500, "INTERNAL_ERROR", "Internal error");
+  } finally {
+    if (trace.final.total_duration_ms === 0) {
+      trace.final.total_duration_ms = Date.now() - t0;
+    }
+    console.info("[analyze-entity-url-v2] trace", trace);
   }
 });
