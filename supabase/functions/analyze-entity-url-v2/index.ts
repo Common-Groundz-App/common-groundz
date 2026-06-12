@@ -612,6 +612,26 @@ serve(async (req) => {
           warnings: recWarnings.length > 0 ? recWarnings : undefined,
         };
         trace.path = "fetch_recovery";
+        trace.firecrawl = recFirecrawlBlock
+          ? {
+              eligible: FETCH_FAILED_ELIGIBLE.has(e.code),
+              attempted: true,
+              ok: recFirecrawlOk,
+              duration_ms: recFirecrawlBlock.duration_ms,
+              error_code: recFirecrawlBlock.error_code,
+            }
+          : { eligible: FETCH_FAILED_ELIGIBLE.has(e.code), attempted: false, ok: false, skip_reason: firecrawlConfigured ? "not_eligible" : "not_configured" };
+        trace.gemini = recGeminiBlock
+          ? {
+              attempted: true,
+              ok: recGeminiBlock.used === true,
+              duration_ms: recGeminiBlock.duration_ms,
+              error_code: recGeminiBlock.error_code,
+              used_url_context: recGeminiBlock.used_url_context,
+              used_google_search: recGeminiBlock.used_google_search,
+              url_context_failed: recGeminiBlock.url_context_failed,
+            }
+          : { attempted: false, ok: false };
         trace.merge = { path: recMergeDiag.path, field_winners: recMergeDiag.field_winners as unknown as Record<string, string> };
         trace.final = {
           prediction_source: recExtract ? "firecrawl_recovery" : "gemini_recovery",
