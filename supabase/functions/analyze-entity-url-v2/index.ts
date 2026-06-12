@@ -323,6 +323,22 @@ serve(async (req) => {
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
+  const request_id = crypto.randomUUID();
+  const t0 = Date.now();
+  const trace = makeTrace(request_id);
+  const respondError = (
+    status: number,
+    code: V2ErrorCode,
+    msg: string,
+    details?: unknown,
+  ): Response => {
+    trace.path = "error";
+    trace.final.error_code = code;
+    trace.final.total_duration_ms = Date.now() - t0;
+    return errorResponse(status, code, msg, details, request_id);
+  };
+
+
   try {
     // Method gate
     if (req.method !== "POST") {
