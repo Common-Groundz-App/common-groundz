@@ -198,7 +198,7 @@ export function tolerantParseGeminiJson(
     const v = JSON.parse(stripCodeFences(text));
     anyParsed = true;
     parsedRoots.push(v);
-    if (validate(v).ok) return { ok: true, value: v };
+    if (validateOk(validate(v))) return { ok: true, value: v };
   } catch { /* fallthrough */ }
 
   // Candidate 2: first balanced top-level {...} block from raw text.
@@ -208,7 +208,7 @@ export function tolerantParseGeminiJson(
       const v = JSON.parse(block);
       anyParsed = true;
       parsedRoots.push(v);
-      if (validate(v).ok) return { ok: true, value: v };
+      if (validateOk(validate(v))) return { ok: true, value: v };
     } catch { /* fallthrough */ }
   }
 
@@ -216,7 +216,7 @@ export function tolerantParseGeminiJson(
   for (const root of parsedRoots) {
     if (!isPlainObject(root)) continue;
     for (const c of nestedWrapperCandidates(root)) {
-      if (validate(c).ok) return { ok: true, value: c };
+      if (validateOk(validate(c))) return { ok: true, value: c };
     }
   }
 
