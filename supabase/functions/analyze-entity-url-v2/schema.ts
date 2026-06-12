@@ -90,6 +90,8 @@ export interface V2SuccessResponse {
   success: true;
   predictions: V2Predictions | null;
   metadata: {
+    /** Per-invocation correlation id; matches server-side analysis_trace log. */
+    request_id: string;
     analyzed_url: string;
     /** Phase 4A+: normalized form of analyzed_url. Additive. */
     normalized_url?: string;
