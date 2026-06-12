@@ -429,40 +429,46 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     };
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripCodeFences(text));
-  } catch {
+  const rawTextLength = text.length;
+  const rawTextSha8 = await sha8(text);
+
+  const validator = buildGeminiRawPredictionSchema(args.evidenceBaseUrl);
+  const outcome = tolerantParseGeminiJson(text, (cand) => validator.safeParse(cand));
+  if (!outcome.ok) {
     logLine({
       ok: false,
-      code: "GEMINI_INVALID_JSON",
+      code: outcome.code,
       durationMs,
       modelUsed: GEMINI_MODEL,
       used_url_context: grounding.used_url_context,
       used_google_search: grounding.used_google_search,
       url_context_failed: grounding.url_context_failed,
+      raw_text_length: rawTextLength,
+      raw_text_sha8: rawTextSha8,
     });
     return {
       ok: false,
       configured: true,
-      code: "GEMINI_INVALID_JSON",
+      code: outcome.code,
       durationMs,
       model: GEMINI_MODEL,
       grounding,
+      rawTextLength,
+      rawTextSha8,
     };
   }
 
-  const validator = buildGeminiRawPredictionSchema(args.evidenceBaseUrl);
-  const v = validator.safeParse(parsed);
+  // outcome.value passed Zod via the same schema; re-parse to get typed data.
+  const v = validator.safeParse(outcome.value);
   if (!v.success) {
+    // Should be unreachable: tolerantParseGeminiJson only returns ok when validate(...).ok.
     logLine({
       ok: false,
       code: "GEMINI_INVALID_SHAPE",
       durationMs,
       modelUsed: GEMINI_MODEL,
-      used_url_context: grounding.used_url_context,
-      used_google_search: grounding.used_google_search,
-      url_context_failed: grounding.url_context_failed,
+      raw_text_length: rawTextLength,
+      raw_text_sha8: rawTextSha8,
     });
     return {
       ok: false,
@@ -471,6 +477,8 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       durationMs,
       model: GEMINI_MODEL,
       grounding,
+      rawTextLength,
+      rawTextSha8,
     };
   }
 
@@ -481,6 +489,8 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     used_url_context: grounding.used_url_context,
     used_google_search: grounding.used_google_search,
     url_context_failed: grounding.url_context_failed,
+    raw_text_length: rawTextLength,
+    raw_text_sha8: rawTextSha8,
   });
 
   return {
@@ -490,6 +500,8 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     model: GEMINI_MODEL,
     grounding,
     prediction: v.data,
+    rawTextLength,
+    rawTextSha8,
   };
 }
 
