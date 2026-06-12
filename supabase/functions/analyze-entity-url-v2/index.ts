@@ -434,11 +434,20 @@ serve(async (req) => {
     let fetchResult: FetchResult;
     try {
       fetchResult = await validateAndFetchUrl(safe.url, { resolveDns });
+      trace.direct_fetch = {
+        attempted: true,
+        ok: true,
+        status: fetchResult.status,
+        content_type: fetchResult.contentType,
+        bytes: fetchResult.bytes,
+        duration_ms: fetchResult.durationMs,
+      };
     } catch (e) {
       if (!(e instanceof FetchError)) throw e;
 
+      trace.direct_fetch = { attempted: true, ok: false, error_code: e.code };
       // Log code only — never URL, headers, body, or internal reason.
-      console.warn("[analyze-entity-url-v2] fetch failed", { code: e.code });
+      console.warn("[analyze-entity-url-v2] fetch failed", { request_id, code: e.code });
 
       // Phase 8: fetch-failure recovery (Firecrawl + Gemini).
       let recExtract: ExtractResult | null = null;
