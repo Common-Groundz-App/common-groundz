@@ -75,10 +75,67 @@ function errorResponse(
   code: V2ErrorCode,
   error: string,
   details?: unknown,
+  request_id?: string,
 ): Response {
   const body: V2ErrorResponse = { success: false, error, code };
   if (details !== undefined) body.details = details;
+  if (request_id) body.request_id = request_id;
   return new Response(JSON.stringify(body), { status, headers: jsonHeaders });
+}
+
+// ─── Telemetry: per-invocation analysis_trace ────────────────────────────
+interface AnalysisTrace {
+  request_id: string;
+  path: "happy" | "fetch_recovery" | "weak_recovery" | "error";
+  host: string | null;
+  direct_fetch?: {
+    attempted: boolean;
+    ok: boolean;
+    status?: number;
+    content_type?: string;
+    bytes?: number;
+    duration_ms?: number;
+    error_code?: string;
+  };
+  deterministic_extract?: { ok: boolean; weak_signals: boolean };
+  firecrawl?: {
+    eligible: boolean;
+    attempted: boolean;
+    ok: boolean;
+    duration_ms?: number;
+    error_code?: string;
+    skip_reason?: string;
+  };
+  gemini?: {
+    attempted: boolean;
+    ok: boolean;
+    duration_ms?: number;
+    error_code?: string;
+    used_url_context?: boolean;
+    used_google_search?: boolean;
+    url_context_failed?: boolean;
+    raw_text_length?: number;
+    raw_text_sha8?: string;
+  };
+  merge?: { path: string; field_winners?: Record<string, string> };
+  final: {
+    prediction_source?: string;
+    error_code: string;
+    total_duration_ms: number;
+  };
+}
+
+function makeTrace(request_id: string): AnalysisTrace {
+  return {
+    request_id,
+    path: "error",
+    host: null,
+    final: { error_code: "UNKNOWN", total_duration_ms: 0 },
+  };
+}
+
+function safeHost(url: string): string | null {
+  try { return new URL(url).host; } catch { return null; }
 }
 
 function httpStatusFor(code: V2ErrorCode): number {
@@ -266,16 +323,32 @@ serve(async (req) => {
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
+  const request_id = crypto.randomUUID();
+  const t0 = Date.now();
+  const trace = makeTrace(request_id);
+  const respondError = (
+    status: number,
+    code: V2ErrorCode,
+    msg: string,
+    details?: unknown,
+  ): Response => {
+    trace.path = "error";
+    trace.final.error_code = code;
+    trace.final.total_duration_ms = Date.now() - t0;
+    return errorResponse(status, code, msg, details, request_id);
+  };
+
+
   try {
     // Method gate
     if (req.method !== "POST") {
-      return errorResponse(405, "METHOD_NOT_ALLOWED", "Method not allowed");
+      return respondError(405, "METHOD_NOT_ALLOWED", "Method not allowed");
     }
 
     // === Auth gate (mirrors V1) ===
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return errorResponse(401, "MISSING_AUTH", "Unauthorized");
+      return respondError(401, "MISSING_AUTH", "Unauthorized");
     }
 
     const supabaseAnon = createClient(
@@ -287,7 +360,7 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabaseAnon.auth.getClaims(token);
     if (claimsError || !claimsData?.claims) {
-      return errorResponse(401, "INVALID_TOKEN", "Unauthorized");
+      return respondError(401, "INVALID_TOKEN", "Unauthorized");
     }
 
     const userId = claimsData.claims.sub;
@@ -304,7 +377,7 @@ serve(async (req) => {
     });
 
     if (roleError || !isAdmin) {
-      return errorResponse(403, "NOT_ADMIN", "Forbidden");
+      return respondError(403, "NOT_ADMIN", "Forbidden");
     }
 
     // === Body parse ===
@@ -312,13 +385,13 @@ serve(async (req) => {
     try {
       rawBody = await req.json();
     } catch {
-      return errorResponse(400, "INVALID_JSON", "Invalid JSON body");
+      return respondError(400, "INVALID_JSON", "Invalid JSON body");
     }
 
     // === Zod validation ===
     const parsed = V2RequestSchema.safeParse(rawBody);
     if (!parsed.success) {
-      return errorResponse(
+      return respondError(
         400,
         "INVALID_URL",
         "Invalid request",
@@ -332,7 +405,7 @@ serve(async (req) => {
     // deno-lint-ignore no-explicit-any
     const resolveDns = (Deno as any).resolveDns?.bind(Deno);
     if (typeof resolveDns !== "function") {
-      return errorResponse(503, "DNS_RESOLUTION_FAILED", "Could not resolve host");
+      return respondError(503, "DNS_RESOLUTION_FAILED", "Could not resolve host");
     }
 
     // === SSRF preflight + normalization (early reject) ===
@@ -346,10 +419,12 @@ serve(async (req) => {
           : e.code === "DNS_RESOLUTION_FAILED"
             ? "Could not resolve host"
             : "Invalid URL";
-        return errorResponse(400, e.code as V2ErrorCode, msg);
+        return respondError(400, e.code as V2ErrorCode, msg);
       }
       throw e;
     }
+
+    trace.host = safeHost(safe.url);
 
     const firecrawlConfigured = !!Deno.env.get("FIRECRAWL_API_KEY");
     const geminiConfigured = !!Deno.env.get("GEMINI_API_KEY_V2");
@@ -359,11 +434,20 @@ serve(async (req) => {
     let fetchResult: FetchResult;
     try {
       fetchResult = await validateAndFetchUrl(safe.url, { resolveDns });
+      trace.direct_fetch = {
+        attempted: true,
+        ok: true,
+        status: fetchResult.status,
+        content_type: fetchResult.contentType,
+        bytes: fetchResult.bytes,
+        duration_ms: fetchResult.durationMs,
+      };
     } catch (e) {
       if (!(e instanceof FetchError)) throw e;
 
+      trace.direct_fetch = { attempted: true, ok: false, error_code: e.code };
       // Log code only — never URL, headers, body, or internal reason.
-      console.warn("[analyze-entity-url-v2] fetch failed", { code: e.code });
+      console.warn("[analyze-entity-url-v2] fetch failed", { request_id, code: e.code });
 
       // Phase 8: fetch-failure recovery (Firecrawl + Gemini).
       let recExtract: ExtractResult | null = null;
@@ -507,6 +591,7 @@ serve(async (req) => {
           success: true,
           predictions: recMerged,
           metadata: {
+            request_id,
             analyzed_url: safe.url,
             normalized_url: safe.url,
             extraction_version: EXTRACTION_VERSION,
@@ -526,12 +611,39 @@ serve(async (req) => {
           },
           warnings: recWarnings.length > 0 ? recWarnings : undefined,
         };
+        trace.path = "fetch_recovery";
+        trace.firecrawl = recFirecrawlBlock
+          ? {
+              eligible: FETCH_FAILED_ELIGIBLE.has(e.code),
+              attempted: true,
+              ok: recFirecrawlOk,
+              duration_ms: recFirecrawlBlock.duration_ms,
+              error_code: recFirecrawlBlock.error_code,
+            }
+          : { eligible: FETCH_FAILED_ELIGIBLE.has(e.code), attempted: false, ok: false, skip_reason: firecrawlConfigured ? "not_eligible" : "not_configured" };
+        trace.gemini = recGeminiBlock
+          ? {
+              attempted: true,
+              ok: recGeminiBlock.used === true,
+              duration_ms: recGeminiBlock.duration_ms,
+              error_code: recGeminiBlock.error_code,
+              used_url_context: recGeminiBlock.used_url_context,
+              used_google_search: recGeminiBlock.used_google_search,
+              url_context_failed: recGeminiBlock.url_context_failed,
+            }
+          : { attempted: false, ok: false };
+        trace.merge = { path: recMergeDiag.path, field_winners: recMergeDiag.field_winners as unknown as Record<string, string> };
+        trace.final = {
+          prediction_source: recExtract ? "firecrawl_recovery" : "gemini_recovery",
+          error_code: "OK",
+          total_duration_ms: Date.now() - t0,
+        };
         return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
 
 
       // Strict contract: return the ORIGINAL fetch error unchanged.
-      return errorResponse(
+      return respondError(
         httpStatusFor(e.code as V2ErrorCode),
         e.code as V2ErrorCode,
         humanMessageFor(e.code as V2ErrorCode),
@@ -711,6 +823,7 @@ serve(async (req) => {
       success: true,
       predictions: mainMerged,
       metadata: {
+        request_id,
         analyzed_url: safe.url,
         normalized_url: safe.url,
         extraction_version: EXTRACTION_VERSION,
@@ -743,9 +856,48 @@ serve(async (req) => {
       warnings: warnings.length > 0 ? warnings : undefined,
     };
 
+    trace.deterministic_extract = {
+      ok: extract.predictions !== null,
+      weak_signals: extract.metadata.weak_signals,
+    };
+    trace.firecrawl = firecrawlBlock
+      ? {
+          eligible: true,
+          attempted: true,
+          ok: firecrawlBlock.used === true,
+          duration_ms: firecrawlBlock.duration_ms,
+          error_code: firecrawlBlock.error_code,
+        }
+      : { eligible: false, attempted: false, ok: false };
+    trace.gemini = geminiBlock
+      ? {
+          attempted: true,
+          ok: geminiBlock.used === true,
+          duration_ms: geminiBlock.duration_ms,
+          error_code: geminiBlock.error_code,
+          used_url_context: geminiBlock.used_url_context,
+          used_google_search: geminiBlock.used_google_search,
+          url_context_failed: geminiBlock.url_context_failed,
+        }
+      : { attempted: false, ok: false };
+    trace.merge = {
+      path: mainMergeDiag.path,
+      field_winners: mainMergeDiag.field_winners as unknown as Record<string, string>,
+    };
+    trace.path = usedFirecrawl ? "weak_recovery" : "happy";
+    trace.final = {
+      prediction_source: mainMerged ? (usedFirecrawl ? "firecrawl_merge" : "extractor_merge") : "none",
+      error_code: mainMerged ? "OK" : "NO_PREDICTIONS",
+      total_duration_ms: Date.now() - t0,
+    };
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
   } catch (err) {
-    console.error("[analyze-entity-url-v2] unhandled error:", err);
-    return errorResponse(500, "INTERNAL_ERROR", "Internal error");
+    console.error("[analyze-entity-url-v2] unhandled error:", { request_id, err: String(err) });
+    return respondError(500, "INTERNAL_ERROR", "Internal error");
+  } finally {
+    if (trace.final.total_duration_ms === 0) {
+      trace.final.total_duration_ms = Date.now() - t0;
+    }
+    console.info("[analyze-entity-url-v2] trace", trace);
   }
 });

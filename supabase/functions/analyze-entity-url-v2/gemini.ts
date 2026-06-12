@@ -57,6 +57,8 @@ export interface GeminiSuccess {
   model: string;
   grounding: GeminiGrounding;
   prediction: GeminiRawPrediction;
+  rawTextLength?: number;
+  rawTextSha8?: string;
 }
 
 export interface GeminiFailure {
@@ -67,6 +69,8 @@ export interface GeminiFailure {
   durationMs: number;
   model: string;
   grounding?: GeminiGrounding;
+  rawTextLength?: number;
+  rawTextSha8?: string;
 }
 
 export type GeminiResult = GeminiSuccess | GeminiFailure | GeminiNotConfigured;
@@ -89,6 +93,138 @@ function stripCodeFences(text: string): string {
     if (s.endsWith("```")) s = s.slice(0, -3);
   }
   return s.trim();
+}
+
+/**
+ * Scan for the first balanced top-level `{...}` block in `text`, respecting
+ * string literals (so braces inside strings don't unbalance the count).
+ * Returns the raw substring (including outer braces), or null if none found.
+ */
+function extractFirstBalancedObject(text: string): string | null {
+  let start = -1;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (esc) { esc = false; continue; }
+      if (ch === "\\") { esc = true; continue; }
+      if (ch === '"') { inStr = false; }
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === "}") {
+      if (depth > 0) {
+        depth--;
+        if (depth === 0 && start !== -1) {
+          return text.slice(start, i + 1);
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Given a parsed object, return conservative nested-wrapper candidates:
+ *  - values of well-known wrapper keys (prediction, result, response, data)
+ *  - any property whose value is a plain object containing BOTH `type` AND `name`
+ * Arrays, primitives, and metadata-shaped objects are rejected.
+ */
+function nestedWrapperCandidates(obj: Record<string, unknown>): unknown[] {
+  const out: unknown[] = [];
+  const seen = new Set<unknown>();
+  const push = (v: unknown) => {
+    if (isPlainObject(v) && !seen.has(v)) { seen.add(v); out.push(v); }
+  };
+  const WELL_KNOWN = ["prediction", "result", "response", "data"];
+  for (const k of WELL_KNOWN) {
+    if (k in obj) push(obj[k]);
+  }
+  for (const [k, v] of Object.entries(obj)) {
+    if (WELL_KNOWN.includes(k)) continue;
+    if (isPlainObject(v) && typeof v.type === "string" && typeof v.name === "string") {
+      push(v);
+    }
+  }
+  return out;
+}
+
+/** Hex SHA-256 of `text`, first 8 chars. Web Crypto, edge-compatible. */
+async function sha8(text: string): Promise<string> {
+  try {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+    const bytes = new Uint8Array(buf);
+    let hex = "";
+    for (let i = 0; i < 4; i++) hex += bytes[i].toString(16).padStart(2, "0");
+    return hex;
+  } catch {
+    return "";
+  }
+}
+
+export type TolerantParseOutcome =
+  | { ok: true; value: unknown }
+  | { ok: false; code: "GEMINI_INVALID_JSON" | "GEMINI_INVALID_SHAPE" };
+
+/**
+ * Tolerant Gemini JSON parser. Tries candidates in order and returns the
+ * first that satisfies `validate(candidate).ok === true`:
+ *   1. JSON.parse(stripCodeFences(text))
+ *   2. JSON.parse(firstBalancedObject(text))
+ *   3. For each parsed object from (1)/(2): conservative nested wrappers.
+ *
+ * Returns GEMINI_INVALID_JSON when no candidate parses as JSON.
+ * Returns GEMINI_INVALID_SHAPE when at least one candidate parsed but none
+ * passed validation.
+ */
+function validateOk(r: { success?: boolean; ok?: boolean }): boolean {
+  return r.success === true || r.ok === true;
+}
+
+export function tolerantParseGeminiJson(
+  text: string,
+  validate: (v: unknown) => { success?: boolean; ok?: boolean },
+): TolerantParseOutcome {
+  let anyParsed = false;
+  const parsedRoots: unknown[] = [];
+
+  // Candidate 1: stripped fences.
+  try {
+    const v = JSON.parse(stripCodeFences(text));
+    anyParsed = true;
+    parsedRoots.push(v);
+    if (validateOk(validate(v))) return { ok: true, value: v };
+  } catch { /* fallthrough */ }
+
+  // Candidate 2: first balanced top-level {...} block from raw text.
+  const block = extractFirstBalancedObject(text);
+  if (block !== null) {
+    try {
+      const v = JSON.parse(block);
+      anyParsed = true;
+      parsedRoots.push(v);
+      if (validateOk(validate(v))) return { ok: true, value: v };
+    } catch { /* fallthrough */ }
+  }
+
+  // Candidate 3: conservative nested wrappers on each parsed root.
+  for (const root of parsedRoots) {
+    if (!isPlainObject(root)) continue;
+    for (const c of nestedWrapperCandidates(root)) {
+      if (validateOk(validate(c))) return { ok: true, value: c };
+    }
+  }
+
+  return { ok: false, code: anyParsed ? "GEMINI_INVALID_SHAPE" : "GEMINI_INVALID_JSON" };
 }
 
 function parseGrounding(cand: Record<string, unknown> | undefined): GeminiGrounding {
@@ -301,40 +437,46 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     };
   }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(stripCodeFences(text));
-  } catch {
+  const rawTextLength = text.length;
+  const rawTextSha8 = await sha8(text);
+
+  const validator = buildGeminiRawPredictionSchema(args.evidenceBaseUrl);
+  const outcome = tolerantParseGeminiJson(text, (cand) => validator.safeParse(cand));
+  if (!outcome.ok) {
     logLine({
       ok: false,
-      code: "GEMINI_INVALID_JSON",
+      code: outcome.code,
       durationMs,
       modelUsed: GEMINI_MODEL,
       used_url_context: grounding.used_url_context,
       used_google_search: grounding.used_google_search,
       url_context_failed: grounding.url_context_failed,
+      raw_text_length: rawTextLength,
+      raw_text_sha8: rawTextSha8,
     });
     return {
       ok: false,
       configured: true,
-      code: "GEMINI_INVALID_JSON",
+      code: outcome.code,
       durationMs,
       model: GEMINI_MODEL,
       grounding,
+      rawTextLength,
+      rawTextSha8,
     };
   }
 
-  const validator = buildGeminiRawPredictionSchema(args.evidenceBaseUrl);
-  const v = validator.safeParse(parsed);
+  // outcome.value passed Zod via the same schema; re-parse to get typed data.
+  const v = validator.safeParse(outcome.value);
   if (!v.success) {
+    // Should be unreachable: tolerantParseGeminiJson only returns ok when validate(...).ok.
     logLine({
       ok: false,
       code: "GEMINI_INVALID_SHAPE",
       durationMs,
       modelUsed: GEMINI_MODEL,
-      used_url_context: grounding.used_url_context,
-      used_google_search: grounding.used_google_search,
-      url_context_failed: grounding.url_context_failed,
+      raw_text_length: rawTextLength,
+      raw_text_sha8: rawTextSha8,
     });
     return {
       ok: false,
@@ -343,6 +485,8 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       durationMs,
       model: GEMINI_MODEL,
       grounding,
+      rawTextLength,
+      rawTextSha8,
     };
   }
 
@@ -353,6 +497,8 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     used_url_context: grounding.used_url_context,
     used_google_search: grounding.used_google_search,
     url_context_failed: grounding.url_context_failed,
+    raw_text_length: rawTextLength,
+    raw_text_sha8: rawTextSha8,
   });
 
   return {
@@ -362,6 +508,8 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     model: GEMINI_MODEL,
     grounding,
     prediction: v.data,
+    rawTextLength,
+    rawTextSha8,
   };
 }
 

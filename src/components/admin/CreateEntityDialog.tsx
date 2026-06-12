@@ -985,6 +985,20 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       if (v2Failed) {
         // V2-specific failure. Do NOT silently fall back to V1.
         console.error('⚠️ V2 analysis failed:', aiResult.error ?? aiResult.data);
+        // Surface a structured failure envelope so the AI preview modal can
+        // render an inline failure state with the server-side request_id.
+        const failureRequestId =
+          (aiResult.data && typeof aiResult.data === 'object' && (aiResult.data as any).request_id) ||
+          (aiResult.data && typeof aiResult.data === 'object' && (aiResult.data as any).metadata?.request_id) ||
+          null;
+        const failureCode =
+          (aiResult.data && typeof aiResult.data === 'object' && (aiResult.data as any).code) || null;
+        setAiPredictions({
+          __v2Failed: true,
+          predictions: null,
+          metadata: { request_id: failureRequestId },
+          error: { code: failureCode },
+        } as any);
         toast({
           title: "V2 engine failed",
           description: "analyze-entity-url-v2 returned an error. Not falling back to V1. Switch the engine flag to v1 to retry with the stable engine.",
@@ -1015,15 +1029,15 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           }
         }
         
-        // V2 scaffold-only signal: success but no predictions yet.
+        // V2 scaffold-only / no-predictions signal: success but null predictions.
         if (
           analyzeEngine === 'v2' &&
           aiResult.data.success === true &&
           aiResult.data.predictions == null
         ) {
           toast({
-            title: "V2 engine (scaffold only)",
-            description: "analyze-entity-url-v2 is still a stub. No AI prefill yet — metadata-only result.",
+            title: "AI extraction returned no details",
+            description: "You can fill the form manually. Request ID is shown in the preview.",
             variant: "default"
           });
         } else if (aiResult.data.success === false) {
@@ -1037,8 +1051,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       }
       
       
-      // Show preview modal if we have metadata OR AI predictions
-      if (metadataResult.data || aiResult.data) {
+      // Show preview modal if we have metadata OR any AI envelope (success or failure).
+      if (metadataResult.data || aiResult.data || v2Failed) {
         setShowPreviewModal(true);
       }
       

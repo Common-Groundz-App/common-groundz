@@ -335,3 +335,111 @@ Deno.test("GEMINI_MODEL is gemini-2.5-flash", () => {
   assertEquals(GEMINI_MODEL, "gemini-2.5-flash");
   assertExists(GEMINI_MODEL);
 });
+
+// --- Tolerant Gemini JSON parsing ---
+
+import { tolerantParseGeminiJson } from "./gemini.ts";
+
+Deno.test("tolerantParse: leading prose + JSON succeeds", async () => {
+  const res = await runGeminiJsonMode({
+    systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+    fetchImpl: makeFetch(() => geminiJson("Here is the result:\n" + VALID)),
+  });
+  assert(res.ok);
+});
+
+Deno.test("tolerantParse: trailing prose after JSON succeeds", async () => {
+  const res = await runGeminiJsonMode({
+    systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+    fetchImpl: makeFetch(() => geminiJson(VALID + "\n\n(That was the result.)")),
+  });
+  assert(res.ok);
+});
+
+Deno.test("tolerantParse: { prediction: {...} } as entire response succeeds", async () => {
+  const wrapped = JSON.stringify({ prediction: JSON.parse(VALID) });
+  const res = await runGeminiJsonMode({
+    systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+    fetchImpl: makeFetch(() => geminiJson(wrapped)),
+  });
+  assert(res.ok);
+});
+
+Deno.test("tolerantParse: { result: {...} } wrapper succeeds", async () => {
+  const wrapped = JSON.stringify({ result: JSON.parse(VALID) });
+  const res = await runGeminiJsonMode({
+    systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+    fetchImpl: makeFetch(() => geminiJson(wrapped)),
+  });
+  assert(res.ok);
+});
+
+Deno.test("tolerantParse: prose + { prediction: {...} } succeeds via balanced-block + nested", async () => {
+  const wrapped = "Sure! " + JSON.stringify({ prediction: JSON.parse(VALID) }) + " done.";
+  const res = await runGeminiJsonMode({
+    systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+    fetchImpl: makeFetch(() => geminiJson(wrapped)),
+  });
+  assert(res.ok);
+});
+
+Deno.test("tolerantParse: nested object with only confidence/reasoning rejected → INVALID_SHAPE", async () => {
+  const bad = JSON.stringify({ meta: { confidence: 0.5, reasoning: "x" } });
+  const res = await runGeminiJsonMode({
+    systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+    fetchImpl: makeFetch(() => geminiJson(bad)),
+  });
+  assert(!res.ok && res.configured);
+  assertEquals(res.code, "GEMINI_INVALID_SHAPE");
+});
+
+Deno.test("tolerantParse: top-level array with no valid object → INVALID_SHAPE", async () => {
+  // Array whose only element fails Zod (missing required fields).
+  const bad = JSON.stringify([{ type: "product" }]);
+  const res = await runGeminiJsonMode({
+    systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+    fetchImpl: makeFetch(() => geminiJson(bad)),
+  });
+  assert(!res.ok && res.configured);
+  assertEquals(res.code, "GEMINI_INVALID_SHAPE");
+});
+
+
+
+Deno.test("tolerantParse: malformed JSON still fails with INVALID_JSON", async () => {
+  const res = await runGeminiJsonMode({
+    systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+    fetchImpl: makeFetch(() => geminiJson("not json at all {{{")),
+  });
+  assert(!res.ok && res.configured);
+  assertEquals(res.code, "GEMINI_INVALID_JSON");
+});
+
+Deno.test("tolerantParse: pure-function — fenced JSON parses; nested wrappers respected", () => {
+  const validator = buildGeminiRawPredictionSchema(BASE);
+  const ok1 = tolerantParseGeminiJson("```json\n" + VALID + "\n```", (v) => validator.safeParse(v));
+  assert(ok1.ok);
+  const ok2 = tolerantParseGeminiJson(JSON.stringify({ data: JSON.parse(VALID) }), (v) => validator.safeParse(v));
+  assert(ok2.ok);
+  const bad = tolerantParseGeminiJson(JSON.stringify({ unrelated: { foo: 1 } }), (v) => validator.safeParse(v));
+  assertFalse(bad.ok);
+});
+
+Deno.test("gemini success log includes raw_text_length and raw_text_sha8", async () => {
+  const original = console.log;
+  const calls: Array<unknown[]> = [];
+  console.log = (...args: unknown[]) => { calls.push(args); };
+  try {
+    await runGeminiJsonMode({
+      systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+      fetchImpl: makeFetch(() => geminiJson(VALID)),
+    });
+  } finally {
+    console.log = original;
+  }
+  const payload = calls.find((c) => c[0] === "[analyze-entity-url-v2] gemini")?.[1] as Record<string, unknown> | undefined;
+  assertExists(payload);
+  assert(typeof payload.raw_text_length === "number");
+  assert(typeof payload.raw_text_sha8 === "string");
+  assert((payload.raw_text_sha8 as string).length === 8 || (payload.raw_text_sha8 as string).length === 0);
+});

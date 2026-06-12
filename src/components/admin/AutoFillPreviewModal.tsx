@@ -220,12 +220,48 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
   predictions,
   onApply
 }) => {
-  if (!predictions?.predictions) return null;
-  
+  // Request ID is surfaced from V2 success metadata or error envelope.
+  const requestId: string | null =
+    predictions?.metadata?.request_id ??
+    predictions?.request_id ??
+    null;
+
+  // No predictions available → render inline failure state with optional
+  // request_id. This appears only after the analyze request has resolved
+  // (loading states never open the modal). "Apply to form" is hidden.
+  if (!predictions?.predictions) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              AI couldn't extract details
+            </DialogTitle>
+            <DialogDescription>
+              AI couldn't extract reliable details from this URL. You can fill
+              the form manually or try again.
+            </DialogDescription>
+          </DialogHeader>
+          {requestId && (
+            <p className="text-xs text-muted-foreground">
+              Request ID: <span className="font-mono">{requestId}</span>
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   const pred = predictions.predictions;
   const confidence = pred.confidence || 0;
   const isHighConfidence = confidence > 0.8;
-  
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -358,7 +394,13 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
             </Alert>
           )}
         </div>
-        
+
+        {requestId && (
+          <p className="text-xs text-muted-foreground">
+            Request ID: <span className="font-mono">{requestId}</span>
+          </p>
+        )}
+
         <DialogFooter className="gap-2">
           <Button 
             variant="outline" 
