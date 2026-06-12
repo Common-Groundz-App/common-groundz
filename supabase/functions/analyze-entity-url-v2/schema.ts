@@ -220,4 +220,6 @@ export interface V2ErrorResponse {
   error: string;
   code: V2ErrorCode;
   details?: unknown;
+  /** Per-invocation correlation id; matches server-side analysis_trace log. */
+  request_id?: string;
 }
