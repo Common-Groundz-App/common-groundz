@@ -860,6 +860,26 @@ serve(async (req) => {
       ok: extract.predictions !== null,
       weak_signals: extract.metadata.weak_signals,
     };
+    trace.firecrawl = firecrawlBlock
+      ? {
+          eligible: true,
+          attempted: true,
+          ok: firecrawlBlock.used === true,
+          duration_ms: firecrawlBlock.duration_ms,
+          error_code: firecrawlBlock.error_code,
+        }
+      : { eligible: false, attempted: false, ok: false };
+    trace.gemini = geminiBlock
+      ? {
+          attempted: true,
+          ok: geminiBlock.used === true,
+          duration_ms: geminiBlock.duration_ms,
+          error_code: geminiBlock.error_code,
+          used_url_context: geminiBlock.used_url_context,
+          used_google_search: geminiBlock.used_google_search,
+          url_context_failed: geminiBlock.url_context_failed,
+        }
+      : { attempted: false, ok: false };
     trace.merge = {
       path: mainMergeDiag.path,
       field_winners: mainMergeDiag.field_winners as unknown as Record<string, string>,
