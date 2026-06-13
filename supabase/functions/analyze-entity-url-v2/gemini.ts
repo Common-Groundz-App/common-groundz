@@ -597,6 +597,7 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       url_context_failed: grounding.url_context_failed,
       raw_text_length: rawTextLength,
       raw_text_sha8: rawTextSha8,
+      gemini_failure_diagnostics: geminiFailureDiagnostics(text, outcome.attempts, outcome.zodIssues),
     });
     return {
       ok: false,
@@ -613,7 +614,15 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
   // outcome.value passed Zod via the same schema; re-parse to get typed data.
   const v = validator.safeParse(outcome.value);
   if (!v.success) {
-    // Should be unreachable: tolerantParseGeminiJson only returns ok when validate(...).ok.
+    // Should be unreachable: tolerantParseGeminiJson only returns ok when validate(...).success.
+    const fallbackAttempts: TolerantParseAttempts = {
+      parse_candidate_count: 1,
+      parsed_json: true,
+      contains_code_fence: text.includes("```"),
+      top_level_keys: [],
+      nested_wrapper_keys: [],
+      best_candidate_keys: [],
+    };
     logLine({
       ok: false,
       code: "GEMINI_INVALID_SHAPE",
@@ -621,6 +630,11 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       modelUsed: GEMINI_MODEL,
       raw_text_length: rawTextLength,
       raw_text_sha8: rawTextSha8,
+      gemini_failure_diagnostics: geminiFailureDiagnostics(
+        text,
+        fallbackAttempts,
+        v.error?.issues as ReadonlyArray<ZodIssueLite> | undefined,
+      ),
     });
     return {
       ok: false,
