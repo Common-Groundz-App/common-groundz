@@ -1,7 +1,7 @@
 // Phase 7: Gemini client tests. No network — fetch is injected.
 
 import { assert, assertEquals, assertExists, assertFalse } from "https://deno.land/std@0.168.0/testing/asserts.ts";
-import { runGeminiJsonMode, chooseEvidenceBaseUrl, GEMINI_MODEL } from "./gemini.ts";
+import { runGeminiJsonMode, chooseEvidenceBaseUrl, GEMINI_MODEL, geminiFailureDiagnostics, type TolerantParseAttempts, type ZodIssueLite } from "./gemini.ts";
 import { buildGeminiRawPredictionSchema, normalizeImageUrl } from "./response_schema.ts";
 
 const BASE = "https://www.nykaa.com/x/p/123";
