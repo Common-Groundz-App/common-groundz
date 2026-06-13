@@ -139,20 +139,25 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
  *  - any property whose value is a plain object containing BOTH `type` AND `name`
  * Arrays, primitives, and metadata-shaped objects are rejected.
  */
-function nestedWrapperCandidates(obj: Record<string, unknown>): unknown[] {
-  const out: unknown[] = [];
+function nestedWrapperCandidates(
+  obj: Record<string, unknown>,
+): Array<{ key: string; value: Record<string, unknown> }> {
+  const out: Array<{ key: string; value: Record<string, unknown> }> = [];
   const seen = new Set<unknown>();
-  const push = (v: unknown) => {
-    if (isPlainObject(v) && !seen.has(v)) { seen.add(v); out.push(v); }
+  const push = (key: string, v: unknown) => {
+    if (isPlainObject(v) && !seen.has(v)) {
+      seen.add(v);
+      out.push({ key, value: v });
+    }
   };
   const WELL_KNOWN = ["prediction", "result", "response", "data"];
   for (const k of WELL_KNOWN) {
-    if (k in obj) push(obj[k]);
+    if (k in obj) push(k, obj[k]);
   }
   for (const [k, v] of Object.entries(obj)) {
     if (WELL_KNOWN.includes(k)) continue;
     if (isPlainObject(v) && typeof v.type === "string" && typeof v.name === "string") {
-      push(v);
+      push(k, v);
     }
   }
   return out;
@@ -171,38 +176,69 @@ async function sha8(text: string): Promise<string> {
   }
 }
 
+export type ZodIssueLite = {
+  code: string;
+  path: ReadonlyArray<string | number>;
+  received?: unknown;
+};
+
+export type TolerantParseAttempts = {
+  parse_candidate_count: number;
+  parsed_json: boolean;
+  contains_code_fence: boolean;
+  top_level_keys: string[];
+  nested_wrapper_keys: string[];
+  best_candidate_keys: string[];
+};
+
 export type TolerantParseOutcome =
   | { ok: true; value: unknown }
-  | { ok: false; code: "GEMINI_INVALID_JSON" | "GEMINI_INVALID_SHAPE" };
+  | {
+      ok: false;
+      code: "GEMINI_INVALID_JSON" | "GEMINI_INVALID_SHAPE";
+      attempts: TolerantParseAttempts;
+      zodIssues?: ZodIssueLite[];
+    };
 
 /**
  * Tolerant Gemini JSON parser. Tries candidates in order and returns the
- * first that satisfies `validate(candidate).ok === true`:
+ * first that satisfies `validate(candidate).success === true`:
  *   1. JSON.parse(stripCodeFences(text))
  *   2. JSON.parse(firstBalancedObject(text))
  *   3. For each parsed object from (1)/(2): conservative nested wrappers.
  *
- * Returns GEMINI_INVALID_JSON when no candidate parses as JSON.
- * Returns GEMINI_INVALID_SHAPE when at least one candidate parsed but none
- * passed validation.
+ * On failure, threads attempts metadata + Zod issues from the best failed
+ * candidate (fewest issues) so diagnostics reflect real parser behavior.
  */
-function validateOk(r: { success?: boolean; ok?: boolean }): boolean {
-  return r.success === true || r.ok === true;
-}
-
 export function tolerantParseGeminiJson(
   text: string,
-  validate: (v: unknown) => { success?: boolean; ok?: boolean },
+  validate: (
+    v: unknown,
+  ) => { success: boolean; error?: { issues?: ReadonlyArray<ZodIssueLite> } | null },
 ): TolerantParseOutcome {
-  let anyParsed = false;
+  const containsCodeFence = text.includes("```");
   const parsedRoots: unknown[] = [];
+  const failedCandidates: Array<{ keys: string[]; issues: ZodIssueLite[] }> = [];
+  let parseCandidateCount = 0;
+  let topLevelKeys: string[] = [];
+  const nestedWrapperKeys: string[] = [];
+
+  const keysOf = (v: unknown): string[] => (isPlainObject(v) ? Object.keys(v) : []);
+  const tryValidate = (cand: unknown): boolean => {
+    parseCandidateCount++;
+    const r = validate(cand);
+    if (r.success === true) return true;
+    const issues = (r.error?.issues ?? []) as ReadonlyArray<ZodIssueLite>;
+    failedCandidates.push({ keys: keysOf(cand), issues: issues.slice() });
+    return false;
+  };
 
   // Candidate 1: stripped fences.
   try {
     const v = JSON.parse(stripCodeFences(text));
-    anyParsed = true;
     parsedRoots.push(v);
-    if (validateOk(validate(v))) return { ok: true, value: v };
+    if (topLevelKeys.length === 0) topLevelKeys = keysOf(v);
+    if (tryValidate(v)) return { ok: true, value: v };
   } catch { /* fallthrough */ }
 
   // Candidate 2: first balanced top-level {...} block from raw text.
@@ -210,21 +246,129 @@ export function tolerantParseGeminiJson(
   if (block !== null) {
     try {
       const v = JSON.parse(block);
-      anyParsed = true;
       parsedRoots.push(v);
-      if (validateOk(validate(v))) return { ok: true, value: v };
+      if (topLevelKeys.length === 0) topLevelKeys = keysOf(v);
+      if (tryValidate(v)) return { ok: true, value: v };
     } catch { /* fallthrough */ }
   }
 
   // Candidate 3: conservative nested wrappers on each parsed root.
   for (const root of parsedRoots) {
     if (!isPlainObject(root)) continue;
-    for (const c of nestedWrapperCandidates(root)) {
-      if (validateOk(validate(c))) return { ok: true, value: c };
+    for (const { key, value } of nestedWrapperCandidates(root)) {
+      nestedWrapperKeys.push(key);
+      if (tryValidate(value)) return { ok: true, value };
     }
   }
 
-  return { ok: false, code: anyParsed ? "GEMINI_INVALID_SHAPE" : "GEMINI_INVALID_JSON" };
+  const anyParsed = parsedRoots.length > 0;
+  let best: { keys: string[]; issues: ZodIssueLite[] } | undefined;
+  for (const c of failedCandidates) {
+    if (!best || c.issues.length < best.issues.length) best = c;
+  }
+  const attempts: TolerantParseAttempts = {
+    parse_candidate_count: parseCandidateCount,
+    parsed_json: anyParsed,
+    contains_code_fence: containsCodeFence,
+    top_level_keys: topLevelKeys,
+    nested_wrapper_keys: Array.from(new Set(nestedWrapperKeys)),
+    best_candidate_keys: best?.keys ?? [],
+  };
+  return {
+    ok: false,
+    code: anyParsed ? "GEMINI_INVALID_SHAPE" : "GEMINI_INVALID_JSON",
+    attempts,
+    zodIssues: best?.issues,
+  };
+}
+
+// ---- Failure diagnostics (failure-log only; never raw text/values) ----
+
+const DIAG_STR_MAX = 64;
+const DIAG_ARR_MAX = 12;
+const DIAG_SAFE_KEY = /^[A-Za-z0-9_.\-\[\]]+$/;
+/** Top-level Zod-required fields in GeminiRawPrediction (kept in sync with schema). */
+const DIAG_KNOWN_REQUIRED = ["type", "name", "confidence"];
+
+function diagSanitizeKeyList(arr: ReadonlyArray<unknown>): string[] {
+  const out: string[] = [];
+  for (const v of arr) {
+    if (typeof v !== "string") continue;
+    const truncated = v.slice(0, DIAG_STR_MAX);
+    if (!DIAG_SAFE_KEY.test(truncated)) continue;
+    out.push(truncated);
+    if (out.length >= DIAG_ARR_MAX) break;
+  }
+  return out;
+}
+
+/**
+ * Build a diagnostic object for the gemini-failure log line.
+ * NEVER includes raw model text, prediction values, URLs, prompts, or secrets.
+ * Only shape keys, Zod issue codes/paths, counts, and booleans.
+ */
+export function geminiFailureDiagnostics(
+  rawText: string,
+  attempts: TolerantParseAttempts,
+  zodIssues?: ReadonlyArray<ZodIssueLite>,
+): Record<string, unknown> {
+  const top_level_keys = diagSanitizeKeyList(attempts.top_level_keys);
+  const nested_wrapper_keys = diagSanitizeKeyList(attempts.nested_wrapper_keys);
+  const best_candidate_keys = diagSanitizeKeyList(attempts.best_candidate_keys);
+
+  const codes = new Set<string>();
+  const paths = new Set<string>();
+  const missing = new Set<string>();
+
+  // Missing required = required fields absent from best candidate's keys.
+  for (const req of DIAG_KNOWN_REQUIRED) {
+    if (!best_candidate_keys.includes(req)) missing.add(req);
+  }
+
+  if (Array.isArray(zodIssues)) {
+    for (const issue of zodIssues) {
+      try {
+        if (issue && typeof issue.code === "string") codes.add(issue.code);
+        if (issue && Array.isArray(issue.path)) {
+          const pathStr = issue.path.map((p) => String(p)).join(".");
+          if (pathStr) paths.add(pathStr);
+          if (issue.code === "invalid_type" && issue.path.length === 1) {
+            const received = (issue as { received?: unknown }).received;
+            if (received === "undefined" || received === undefined) {
+              const key = String(issue.path[0] ?? "");
+              if (key) missing.add(key);
+            }
+          }
+        }
+      } catch { /* skip malformed issue */ }
+    }
+  }
+
+  // Refusal heuristic: not parsable JSON, starts with a sentence-like letter,
+  // and no balanced {…} block exists. Boolean only — no excerpt.
+  let refusal_like = false;
+  try {
+    if (!attempts.parsed_json) {
+      const trimmed = rawText.trim();
+      const firstCh = trimmed.charAt(0).toLowerCase();
+      if (firstCh === "i" || firstCh === "s" || firstCh === "a") {
+        if (extractFirstBalancedObject(rawText) === null) refusal_like = true;
+      }
+    }
+  } catch { /* keep false */ }
+
+  return {
+    parse_candidate_count: attempts.parse_candidate_count,
+    parsed_json: attempts.parsed_json,
+    contains_code_fence: attempts.contains_code_fence,
+    top_level_keys,
+    nested_wrapper_keys,
+    best_candidate_keys,
+    zod_issue_codes: diagSanitizeKeyList(Array.from(codes)),
+    zod_issue_paths: diagSanitizeKeyList(Array.from(paths)),
+    missing_required_fields: diagSanitizeKeyList(Array.from(missing)),
+    refusal_like,
+  };
 }
 
 function parseGrounding(cand: Record<string, unknown> | undefined): GeminiGrounding {
