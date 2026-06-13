@@ -1,7 +1,7 @@
 // Phase 7: Gemini client tests. No network — fetch is injected.
 
 import { assert, assertEquals, assertExists, assertFalse } from "https://deno.land/std@0.168.0/testing/asserts.ts";
-import { runGeminiJsonMode, chooseEvidenceBaseUrl, GEMINI_MODEL } from "./gemini.ts";
+import { runGeminiJsonMode, chooseEvidenceBaseUrl, GEMINI_MODEL, geminiFailureDiagnostics, type TolerantParseAttempts, type ZodIssueLite } from "./gemini.ts";
 import { buildGeminiRawPredictionSchema, normalizeImageUrl } from "./response_schema.ts";
 
 const BASE = "https://www.nykaa.com/x/p/123";
@@ -442,4 +442,173 @@ Deno.test("gemini success log includes raw_text_length and raw_text_sha8", async
   assert(typeof payload.raw_text_length === "number");
   assert(typeof payload.raw_text_sha8 === "string");
   assert((payload.raw_text_sha8 as string).length === 8 || (payload.raw_text_sha8 as string).length === 0);
+});
+
+// ---- Gemini failure diagnostics ----
+
+function findFailureLog(calls: Array<unknown[]>): Record<string, unknown> | undefined {
+  // Last gemini log entry; the failure path logs ok:false.
+  for (let i = calls.length - 1; i >= 0; i--) {
+    if (calls[i][0] === "[analyze-entity-url-v2] gemini") {
+      const p = calls[i][1] as Record<string, unknown>;
+      if (p && p.ok === false) return p;
+    }
+  }
+  return undefined;
+}
+
+Deno.test("diagnostics: refusal-like text → parsed_json:false, refusal_like:true, empty key arrays", () => {
+  const attempts: TolerantParseAttempts = {
+    parse_candidate_count: 0,
+    parsed_json: false,
+    contains_code_fence: false,
+    top_level_keys: [],
+    nested_wrapper_keys: [],
+    best_candidate_keys: [],
+  };
+  const d = geminiFailureDiagnostics("I cannot help with extracting product details from that page.", attempts);
+  assertEquals(d.parsed_json, false);
+  assertEquals(d.refusal_like, true);
+  assertEquals((d.top_level_keys as string[]).length, 0);
+  assertEquals((d.nested_wrapper_keys as string[]).length, 0);
+});
+
+Deno.test("diagnostics: valid JSON wrong shape → populated keys, missing_required_fields, zod codes", async () => {
+  // type missing entirely; only name + confidence present.
+  const bad = JSON.stringify({ name: "X", confidence: 0.5 });
+  const calls = await captureLogs(async () => {
+    await runGeminiJsonMode({
+      systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+      fetchImpl: makeFetch(() => geminiJson(bad)),
+    });
+  });
+  const payload = findFailureLog(calls);
+  assertExists(payload);
+  const d = payload.gemini_failure_diagnostics as Record<string, unknown>;
+  assertExists(d);
+  assertEquals(d.parsed_json, true);
+  assert((d.top_level_keys as string[]).includes("name"));
+  assert((d.top_level_keys as string[]).includes("confidence"));
+  assert((d.best_candidate_keys as string[]).includes("name"));
+  assert((d.missing_required_fields as string[]).includes("type"));
+  assertFalse((d.missing_required_fields as string[]).includes("name"));
+  assert((d.zod_issue_codes as string[]).length > 0);
+});
+
+Deno.test("diagnostics: wrapped {prediction:{...}} → nested_wrapper_keys includes 'prediction', best_candidate_keys are inner; type/name not falsely missing", async () => {
+  // Inner is missing only `confidence` so type+name should NOT appear in missing.
+  const inner = { type: "product", name: "X" };
+  const wrapped = JSON.stringify({ prediction: inner });
+  const calls = await captureLogs(async () => {
+    await runGeminiJsonMode({
+      systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+      fetchImpl: makeFetch(() => geminiJson(wrapped)),
+    });
+  });
+  const payload = findFailureLog(calls);
+  assertExists(payload);
+  const d = payload.gemini_failure_diagnostics as Record<string, unknown>;
+  assertExists(d);
+  assert((d.nested_wrapper_keys as string[]).includes("prediction"));
+  const best = d.best_candidate_keys as string[];
+  assert(best.includes("type") && best.includes("name"));
+  const missing = d.missing_required_fields as string[];
+  assertFalse(missing.includes("type"));
+  assertFalse(missing.includes("name"));
+  assert(missing.includes("confidence"));
+});
+
+Deno.test("diagnostics: code-fenced JSON → contains_code_fence:true", async () => {
+  const bad = "```json\n" + JSON.stringify({ name: "X" }) + "\n```";
+  const calls = await captureLogs(async () => {
+    await runGeminiJsonMode({
+      systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+      fetchImpl: makeFetch(() => geminiJson(bad)),
+    });
+  });
+  const payload = findFailureLog(calls);
+  assertExists(payload);
+  const d = payload.gemini_failure_diagnostics as Record<string, unknown>;
+  assertEquals(d.contains_code_fence, true);
+});
+
+Deno.test("diagnostics: cap enforcement — arrays ≤12, weird/long keys dropped", () => {
+  const longKey = "k".repeat(120);
+  const weirdKey = "weird key with space!"; // contains space + ! → dropped
+  const manyKeys: string[] = [];
+  for (let i = 0; i < 50; i++) manyKeys.push(`key${i}`);
+  manyKeys.push(longKey);
+  manyKeys.push(weirdKey);
+  const attempts: TolerantParseAttempts = {
+    parse_candidate_count: 1,
+    parsed_json: true,
+    contains_code_fence: false,
+    top_level_keys: manyKeys,
+    nested_wrapper_keys: [],
+    best_candidate_keys: manyKeys,
+  };
+  const d = geminiFailureDiagnostics("{}", attempts);
+  assertEquals((d.top_level_keys as string[]).length, 12);
+  assertEquals((d.best_candidate_keys as string[]).length, 12);
+  // No weirdKey or longKey survives
+  for (const k of d.top_level_keys as string[]) {
+    assertFalse(k.includes(" "));
+    assert(k.length <= 64);
+  }
+});
+
+Deno.test("diagnostics: sentinel raw value never appears in diagnostics", async () => {
+  const SENTINEL = "SECRET_PRODUCT_VALUE_xyz123";
+  const bad = JSON.stringify({ name: SENTINEL, description: SENTINEL, confidence: 0.5 });
+  const calls = await captureLogs(async () => {
+    await runGeminiJsonMode({
+      systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+      fetchImpl: makeFetch(() => geminiJson(bad)),
+    });
+  });
+  const payload = findFailureLog(calls);
+  assertExists(payload);
+  const d = payload.gemini_failure_diagnostics as Record<string, unknown>;
+  assertExists(d);
+  const serialized = JSON.stringify(d);
+  assertFalse(serialized.includes(SENTINEL));
+});
+
+Deno.test("diagnostics: malformed Zod issue does not throw", () => {
+  const attempts: TolerantParseAttempts = {
+    parse_candidate_count: 1,
+    parsed_json: true,
+    contains_code_fence: false,
+    top_level_keys: ["a"],
+    nested_wrapper_keys: [],
+    best_candidate_keys: ["a"],
+  };
+  // Intentionally malformed shapes
+  const issues = [
+    { code: "invalid_type", path: ["type"] } as unknown as ZodIssueLite,
+    { code: 123 as unknown as string, path: "not-an-array" as unknown as string[] },
+    null as unknown as ZodIssueLite,
+    undefined as unknown as ZodIssueLite,
+    { /* no code, no path */ } as unknown as ZodIssueLite,
+  ];
+  const d = geminiFailureDiagnostics("x", attempts, issues);
+  assertExists(d);
+  assert(Array.isArray(d.zod_issue_codes));
+  // 'type' inferred missing from invalid_type at root depth 1
+  assert((d.missing_required_fields as string[]).includes("type"));
+});
+
+Deno.test("diagnostics: success log has no gemini_failure_diagnostics", async () => {
+  const calls = await captureLogs(async () => {
+    await runGeminiJsonMode({
+      systemPrompt: "s", userPrompt: "u", evidenceBaseUrl: BASE, apiKey: "k",
+      fetchImpl: makeFetch(() => geminiJson(VALID)),
+    });
+  });
+  const payload = calls.find((c) => {
+    const p = c[1] as Record<string, unknown> | undefined;
+    return c[0] === "[analyze-entity-url-v2] gemini" && p?.ok === true;
+  })?.[1] as Record<string, unknown> | undefined;
+  assertExists(payload);
+  assertFalse("gemini_failure_diagnostics" in payload);
 });
