@@ -330,7 +330,7 @@ export function geminiFailureDiagnostics(
       try {
         if (issue && typeof issue.code === "string") codes.add(issue.code);
         if (issue && Array.isArray(issue.path)) {
-          const pathStr = issue.path.map((p) => String(p)).join(".");
+          const pathStr = issue.path.map((p: string | number) => String(p)).join(".");
           if (pathStr) paths.add(pathStr);
           if (issue.code === "invalid_type" && issue.path.length === 1) {
             const received = (issue as { received?: unknown }).received;
