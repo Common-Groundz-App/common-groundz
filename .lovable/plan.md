@@ -1,109 +1,111 @@
-# V2 Resilience + Observability Plan (final)
+# Structured Gemini Failure Diagnostics — Final Plan (v2)
 
-Incorporates every reviewer clarification from the last two rounds. Scope unchanged.
+Both ChatGPT and Codex approved. Folding in their last clarifications:
 
-**Out of scope (do not touch):** V1, DB, pricing, response envelope shape (except additive `request_id`), Firecrawl recovery logic & timeouts, Gemini model / tools / prompt / `responseMimeType`, save flow, UI redesign, Amazon canonicalization.
+1. "No keys" in the hard scope means **no API keys/secrets** — JSON field names (`prediction`, `type`, `name`, Zod paths) are allowed as diagnostic labels.
+2. `missing_required_fields` must be derived from the **best parsed candidate** (the one whose Zod issues we're reporting), not only root-level keys, so a wrapped `{ "prediction": { type, name } }` doesn't falsely report `type`/`name` missing.
+3. `missing_required_fields` derivation must be **defensive about Zod issue shape** — don't rely solely on `issue.received === "undefined"`; also compare known required field names against the best candidate's keys, and skip (never throw) on unexpected issue shapes.
 
----
+## Goal
 
-## 1. Request-scoped telemetry
+When Gemini fails (e.g. the Amazon shoe-insert URL), the current log shows only `code: GEMINI_INVALID_SHAPE`, `raw_text_length`, `raw_text_sha8`. That's not enough to pick the next fix.
 
-**Files:** `supabase/functions/analyze-entity-url-v2/index.ts`, `schema.ts`
+Add a `gemini_failure_diagnostics` object to the **existing Gemini failure log lines only**, telling us *why* it failed without ever logging raw Gemini text, prediction values, URLs, prompts, or HTML.
 
-- At handler entry: `const request_id = crypto.randomUUID()`; initialize a mutable `trace` object with `request_id`, `path: "error"`, `host: null`, `final: { error_code: "UNKNOWN", total_duration_ms: 0 }`. Defaults guarantee that even validation/SSRF/DNS early-returns emit a usable trace.
-- Every return path (auth fail, JSON parse fail, invalid URL, blocked host, DNS fail, fetch error, Gemini fail, success, unhandled throw) **MUST** set `trace.final = { prediction_source, error_code, total_duration_ms }` and `trace.path` before returning. A single `try { … } finally { console.info("[analyze-entity-url-v2] trace", trace) }` wrapper at the top of the handler emits exactly one structured trace line per invocation. The `finally` block also stamps `total_duration_ms` from a monotonic start time as a safety net.
-- Response shape (additive only):
-  - `V2SuccessResponse.metadata.request_id: string` (new required field).
-  - `V2ErrorResponse.request_id?: string` (new optional field; non-breaking — existing callers ignore unknown fields).
-- `analysis_trace` is **NOT** put on the wire. Server-side log only.
-- Existing per-stage `console.warn` / `console.log` lines stay; each is prefixed with `request_id` so multi-line logs can still be correlated under concurrency.
+## Scope (hard)
 
-**`AnalysisTrace` shape (server-side log only, sanitized):**
+Touch only:
+- `supabase/functions/analyze-entity-url-v2/gemini.ts`
+- `supabase/functions/analyze-entity-url-v2/gemini_test.ts`
 
-```text
-request_id
-path: "happy" | "fetch_recovery" | "weak_recovery" | "error"
-host                              // URL().host only, or null on pre-parse failures
-direct_fetch: { attempted, ok, status, content_type, bytes, duration_ms, error_code }
-deterministic_extract: { ok, weak_signals }
-firecrawl:  { eligible, attempted, ok, duration_ms, error_code, skip_reason }
-gemini: {
-  attempted, ok, duration_ms, error_code,
-  used_url_context, used_google_search, url_context_failed,
-  raw_text_length, raw_text_sha8        // first 8 hex chars of SHA-256
-}
-merge: { path, field_winners }          // labels only — see below
-final: { prediction_source, error_code, total_duration_ms }
+Do **not** touch: `AnalysisTrace`, `V2SuccessResponse`, `V2ErrorResponse`, frontend modal, V1, DB, pricing, Firecrawl, merge, save flow, Gemini model/tools/prompt/`responseMimeType`, parser candidate list, schema, error codes, Amazon canonicalization, success-path logs.
+
+No `raw_text_preview`, no env-gated raw preview, no model text, no prediction values, no URLs, no image URLs, no headers, no API keys/secrets, no prompts — in logs, trace, or response. JSON field names and Zod path/code strings are allowed as diagnostic labels.
+
+## Design
+
+### 1. Thread parser attempt metadata out of `tolerantParseGeminiJson`
+
+Keeps diagnostics aligned with actual parser behavior; avoids recompute drift.
+
+```ts
+type TolerantParseAttempts = {
+  parse_candidate_count: number;   // total candidates tried
+  parsed_json: boolean;             // any candidate parsed as JSON
+  contains_code_fence: boolean;     // raw text had ``` fence
+  top_level_keys: string[];         // keys of first parsed root (if any)
+  nested_wrapper_keys: string[];    // wrapper key names that produced candidates
+  best_candidate_keys: string[];    // keys of the candidate closest to validation
+};
 ```
 
-**Never log:** full URL with query params (host only), headers, HTML, markdown, raw Firecrawl output, raw Gemini text, prompt text, API keys, prediction values, image URLs.
+`best_candidate_keys` = keys of the last parsed candidate that was passed to the Zod validator (i.e. the one whose issues we report). For an unwrapped failure this equals `top_level_keys`; for a wrapped `{ "prediction": {...} }` this is the inner object's keys.
 
-**Hash impl:** `crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))` → hex → first 8 chars. Native to Deno Edge, no dependency.
+`TolerantParseOutcome` failure variant gains `attempts: TolerantParseAttempts` and `zodIssues?: Array<{ code: string; path: (string|number)[]; received?: unknown }>` from the best candidate's Zod result.
 
-**`merge.field_winners` is label-only.** Re-use existing `metadata.merge.field_winners` source labels from `schema.ts` (`"extractor" | "gemini" | "firecrawl" | "merged" | "none"`). Never include predicted values.
+### 2. New helper `geminiFailureDiagnostics`
 
----
+```ts
+function geminiFailureDiagnostics(
+  rawText: string,
+  attempts: TolerantParseAttempts,
+  zodIssues?: Array<{ code: string; path: (string|number)[]; received?: unknown }>,
+): Record<string, unknown>
+```
 
-## 2. Tolerant Gemini JSON parsing
+Returns only:
+- `parse_candidate_count` (number)
+- `parsed_json` (boolean)
+- `contains_code_fence` (boolean)
+- `top_level_keys` (string[])
+- `nested_wrapper_keys` (string[])
+- `best_candidate_keys` (string[])
+- `zod_issue_codes` (string[]) — distinct codes
+- `zod_issue_paths` (string[]) — dot-joined path strings
+- `missing_required_fields` (string[]) — derived defensively (see below)
+- `refusal_like` (boolean) — heuristic: `parsed_json === false` AND trimmed text starts with letter `i`/`s`/`a` AND no balanced `{}` found. Boolean only.
 
-**Files:** `supabase/functions/analyze-entity-url-v2/gemini.ts`, `gemini_test.ts`
+#### `missing_required_fields` derivation (defensive)
 
-Today (line ~306): `parsed = JSON.parse(stripCodeFences(text))` — single attempt, fails on prose-wrapped grounded responses.
+1. Known required fields list (hardcoded from schema): `["type", "name"]` (plus any others the Zod schema marks required at top level).
+2. Start with the set of required fields **absent from `best_candidate_keys`**.
+3. Additionally, walk `zodIssues`: if an issue has `code === "invalid_type"` and either (a) `received === "undefined"`, or (b) `received` is missing/unknown but `path.length === 1`, add `String(path[0])` to the set.
+4. Wrap the whole derivation in try/catch — on any unexpected issue shape, skip that issue rather than throwing.
+5. Apply caps (below) to the final array.
 
-Replace with `tolerantParseGeminiJson(text, schema)` that produces a **list of candidate objects**, then Zod-validates each one in order and returns the first that passes. Candidates, in order:
+### 3. Sanitization caps (defensive, applied to every output field)
 
-1. `JSON.parse(stripCodeFences(text))` — current behavior.
-2. First **balanced top-level `{…}` block** extracted by a brace-counting scanner (string-literal aware) from the raw text.
-3. For **each** of candidates (1) and (2): if it is a plain object, also consider its **conservative nested wrappers**:
-   - well-known wrapper keys: `prediction`, `result`, `response`, `data`
-   - OR any property whose value is a plain object containing **both** `type` AND `name`
-   - Arrays, primitives, and metadata-shaped objects (e.g. only `confidence` / `reasoning`) are rejected.
+- Each string ≤ 64 chars (truncate)
+- Each array ≤ 12 entries (slice)
+- Key/path strings: drop entries whose sanitized form isn't a safe identifier-ish token (`[A-Za-z0-9_.\-\[\]]` only) — protects against weird model-emitted long JSON keys
+- Never include values, snippets, or content strings drawn from raw text — only shape keys, Zod enum codes, counts, booleans
 
-Each candidate is Zod-validated against the existing `GeminiRawPrediction` schema; first pass wins. If none yields a schema-valid object, return the **existing** error codes — `GEMINI_INVALID_JSON` when no candidate parses as JSON, `GEMINI_INVALID_SHAPE` when at least one parsed but none satisfied Zod. **No new error codes.** No raw / unvalidated fallback. No schema loosening. No `responseMimeType` retry.
+### 4. Integration
 
-**Tests added to `gemini_test.ts`:**
-- existing fenced ```json … ``` test stays green
-- leading prose + JSON succeeds
-- trailing prose after JSON succeeds
-- `{ "prediction": { type, name, … } }` as the **entire response** succeeds (nested wrapper on candidate 1, not only candidate 2)
-- `{ "result": { … } }` wrapper succeeds when Zod-valid
-- prose + `{ "prediction": { … } }` succeeds (nested wrapper on candidate 2)
-- nested object with only `confidence` / `reasoning` (no type+name) is rejected → `GEMINI_INVALID_SHAPE`
-- array-of-objects is rejected
-- malformed JSON still fails with `GEMINI_INVALID_JSON`
-- valid JSON shape that fails Zod still fails with `GEMINI_INVALID_SHAPE`
+In `gemini.ts`, the two existing failure log sites (~lines 446–456 and ~473–480) extend their existing `logLine({...})` call with:
 
----
+```ts
+gemini_failure_diagnostics: geminiFailureDiagnostics(text, outcome.attempts, outcome.zodIssues)
+```
 
-## 3. Frontend AI-failure state
+Success log unchanged. `GeminiFailure` return objects unchanged — diagnostics live only in the log line.
 
-**Files:** the URL-analyze modal in the quick-add / create-entity flow (the component that renders the "AI suggests these values / Apply to form" card).
+### 5. Tests (`gemini_test.ts`)
 
-- Inline message rendered **only after** the analyze request resolves with either an error or success-with-no-predictions (never while `isLoading`):
-  > "AI couldn't extract reliable details from this URL. You can fill the form manually or try again."
-- If the response includes `request_id` (success metadata or error body), render it underneath in small muted text:
-  > `Request ID: <request_id>`
-  to make user-reported failures correlate with the server trace.
-- "Apply to form" button is rendered **only** when `predictions` exists and is non-null.
-- No partial-prefill, no modal redesign, no backend behavior change.
+- Refusal-like text ("I cannot help with…") → `parsed_json:false`, `refusal_like:true`, empty key arrays
+- Valid JSON wrong shape (unwrapped, missing `type`) → `parsed_json:true`, populated `top_level_keys`, `best_candidate_keys === top_level_keys`, `missing_required_fields` includes `"type"`
+- Wrapped `{"prediction": { "type": "...", "name": "..." }}` where inner fails on a different field → `nested_wrapper_keys` includes `"prediction"`, `best_candidate_keys` are the inner keys, `missing_required_fields` does **not** spuriously include `type`/`name`
+- Code-fenced JSON → `contains_code_fence:true`
+- Cap enforcement: 50 top-level keys → array length 12; key > 64 chars → dropped/truncated; non-identifier key → dropped
+- **Sentinel leak test**: raw text contains `"SECRET_PRODUCT_VALUE_xyz123"`; assert this sentinel does not appear anywhere in `JSON.stringify(diagnostics)`. Safe key names (`prediction`/`type`/`name`) are allowed.
+- Defensive Zod issue: feed a malformed issue object (missing `received`, weird `path`) — diagnostics should not throw and should return a valid object
+- Success path: existing success test still passes with no `gemini_failure_diagnostics` key on success log
+- Parser attempts wiring: failure outcome carries `attempts` with correct `parse_candidate_count`, `contains_code_fence`, and `best_candidate_keys`
 
----
+## Acceptance
 
-## 4. Deferred (explicitly NOT in this patch)
+Re-running the same Amazon URL still returns `NO_PREDICTIONS` with the same modal and Request ID. The `[analyze-entity-url-v2] gemini` failure log line now also carries `gemini_failure_diagnostics`, letting us classify the failure (parser mapping vs prompt nudge vs Firecrawl extraction vs Amazon canonicalization) without ever seeing Gemini's raw output.
 
-- Amazon / sponsored-URL canonicalization (`th=1`, `sspa`, `ref=…` stripping).
-- Gemini `responseMimeType: application/json` retry.
-- Partial-prediction prefill UI.
-- Exposing `analysis_trace` on the wire.
+After build: I'll show files changed, test results, and a sample failure-log shape, then you re-run the Amazon URL so we can pick the next real fix.
 
----
-
-## Acceptance checks
-
-- **Exactly one** `[analyze-entity-url-v2] trace` log line per V2 invocation, including pre-parse early errors (invalid URL, SSRF block, DNS failure, auth failure).
-- Logged `request_id` matches `response.metadata.request_id` (success) or `response.request_id` (error).
-- Telemetry tests are **invariant-focused** (not full-object equality): assert one trace per invocation, `request_id` present and matching the response, `trace.final` set, no disallowed raw fields (`raw_text`, `html`, `markdown`, `prompt`, `prediction_values`, `image_url`, `headers`, full URL).
-- Re-running the failing Amazon URL produces either a successful prediction (tolerant parser recovered it) **or** a clean error response with populated trace identifying the failure stage; UI shows the failure message + `Request ID:` line instead of an empty modal.
-- All existing V2 tests still pass; new tolerant-parser and trace tests pass.
-- `merge.field_winners` in the trace contains only source labels, never values.
-- No new Gemini error codes introduced; `GEMINI_INVALID_JSON` and `GEMINI_INVALID_SHAPE` semantics preserved.
+Ready to switch to build mode?
