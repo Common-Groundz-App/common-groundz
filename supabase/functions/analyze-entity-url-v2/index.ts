@@ -26,7 +26,7 @@ import { assertSafeUrl, SsrfError } from "./ssrf.ts";
 import { FetchError, type FetchResult, validateAndFetchUrl } from "./fetcher.ts";
 import { extractFromHtml, type ExtractResult } from "./extractor.ts";
 import { detectWeakSignals } from "./weak_signals.ts";
-import { isKnownJsHeavyHost } from "./host_hints.ts";
+import { isKnownJsHeavyHost, canonicalizeAmazonUrl, extractAmazonPathSlug } from "./host_hints.ts";
 import {
   runFirecrawlScrape,
   safeBaseUrl,
@@ -190,20 +190,33 @@ async function invokeGemini(args: {
   html: string;
   evidenceBaseUrl: string;
   extractMetadata: ExtractResult["metadata"];
+  usedFirecrawl: boolean;
 }): Promise<GeminiResult> {
+  // Phase A3: for Amazon URLs, send Gemini URL Context the canonical
+  // /dp/<ASIN>/ URL (strips tracking junk). Preserve the original path slug
+  // as untrusted evidence. Non-Amazon URLs are returned unchanged.
+  const canonicalUrl = canonicalizeAmazonUrl(args.url);
+  const amazonPathSlug = extractAmazonPathSlug(args.url);
+  // Only override evidenceBaseUrl when Firecrawl did NOT run AND we actually
+  // canonicalized the URL. Firecrawl-derived base URL is otherwise untouched.
+  const promptBaseUrl =
+    !args.usedFirecrawl && canonicalUrl !== args.url
+      ? canonicalUrl
+      : args.evidenceBaseUrl;
   const { systemPrompt, userPrompt } = buildV2Prompts(
     {
-      url: args.url,
-      evidenceBaseUrl: args.evidenceBaseUrl,
+      url: canonicalUrl,
+      evidenceBaseUrl: promptBaseUrl,
       rawHtml: args.html ?? null,
       extractMetadata: args.extractMetadata,
+      amazonPathSlug,
     },
-    args.evidenceBaseUrl,
+    promptBaseUrl,
   );
   return await runGeminiJsonMode({
     systemPrompt,
     userPrompt,
-    evidenceBaseUrl: args.evidenceBaseUrl,
+    evidenceBaseUrl: promptBaseUrl,
   });
 }
 
