@@ -567,6 +567,7 @@ serve(async (req) => {
           html: recHtml,
           evidenceBaseUrl,
           extractMetadata: recExtract?.metadata ?? EMPTY_EXTRACT_METADATA,
+          usedFirecrawl: recFirecrawlOk,
         });
         if (gem.ok) {
           recGeminiBlock = geminiSuccessBlock(gem);
@@ -796,6 +797,7 @@ serve(async (req) => {
           html: finalHtmlForGemini,
           evidenceBaseUrl,
           extractMetadata: extract.metadata,
+          usedFirecrawl,
         });
         if (gem.ok) {
           geminiBlock = geminiSuccessBlock(gem);
