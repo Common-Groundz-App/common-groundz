@@ -23,8 +23,13 @@ export function isKnownJsHeavyHost(url: string): boolean {
   }
 }
 
+// Strict Amazon host: optional single subdomain, then `amazon.<tld>` with an
+// optional second-level TLD. Rejects lookalikes like `amazon.in.evil.com`
+// (no labels allowed AFTER the amazon.<tld> suffix).
+const STRICT_AMAZON_HOST_RE = /^(?:[a-z0-9-]+\.)?amazon\.[a-z]{2,}(?:\.[a-z]{2,})?$/i;
+
 function isAmazonHost(hostname: string): boolean {
-  return AMAZON_HOST_RE.test(hostname);
+  return STRICT_AMAZON_HOST_RE.test(hostname);
 }
 
 const ASIN_RE = /^[A-Za-z0-9]{10}$/;
