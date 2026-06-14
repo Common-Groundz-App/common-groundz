@@ -53,3 +53,54 @@ Deno.test("truncation drops rawHtml first; protected JSON-LD Product survives", 
   assertStringIncludes(out.userPrompt, '"@type":"Product"');
   assertStringIncludes(out.userPrompt, "og:title");
 });
+
+// ---------- Phase B: required-fields prompt wording ----------
+
+Deno.test("Phase B: removed 'omit the field rather than guess' wording", () => {
+  const { systemPrompt } = buildV2Prompts({ url: URL, evidenceBaseUrl: BASE }, BASE);
+  assert(!/omit the field rather than guess/i.test(systemPrompt));
+  assert(!/Omit fields you cannot determine/i.test(systemPrompt));
+});
+
+Deno.test("Phase B: systemPrompt asserts type/name REQUIRED + non-null + evidence-only", () => {
+  const { systemPrompt } = buildV2Prompts({ url: URL, evidenceBaseUrl: BASE }, BASE);
+  assertStringIncludes(systemPrompt, "REQUIRED");
+  assertStringIncludes(systemPrompt, "MUST NOT be null");
+  assertStringIncludes(systemPrompt, "Do NOT invent");
+  assertStringIncludes(systemPrompt, "amazon_path_slug");
+  assertStringIncludes(systemPrompt, "untrusted");
+  assertStringIncludes(systemPrompt, "do NOT inflate");
+});
+
+Deno.test("Phase B: no banned wording (confidence<0.4, best-effort, downstream-will-reject)", () => {
+  const { systemPrompt } = buildV2Prompts({ url: URL, evidenceBaseUrl: BASE }, BASE);
+  assert(!/confidence\s*<\s*0\.4/i.test(systemPrompt));
+  assert(!/best[- ]effort/i.test(systemPrompt));
+  assert(!/downstream validation will reject/i.test(systemPrompt));
+});
+
+Deno.test("Phase B: optional-field omission language still present", () => {
+  const { systemPrompt } = buildV2Prompts({ url: URL, evidenceBaseUrl: BASE }, BASE);
+  assertStringIncludes(systemPrompt, "Optional fields");
+  assertStringIncludes(systemPrompt, "MAY be omitted");
+});
+
+Deno.test("Phase A2: amazon_path_slug appears in evidence JSON when provided", () => {
+  const { userPrompt } = buildV2Prompts(
+    {
+      url: "https://www.amazon.in/dp/B0FGJF5QN7/",
+      evidenceBaseUrl: BASE,
+      amazonPathSlug: "Root Hair Serum Dandruff Cleanser",
+    },
+    BASE,
+  );
+  assertStringIncludes(userPrompt, '"amazon_path_slug":"Root Hair Serum Dandruff Cleanser"');
+});
+
+Deno.test("Phase A2: amazon_path_slug key absent when not provided", () => {
+  const { userPrompt } = buildV2Prompts(
+    { url: URL, evidenceBaseUrl: BASE, title: "T" },
+    BASE,
+  );
+  assert(!/amazon_path_slug/.test(userPrompt));
+});

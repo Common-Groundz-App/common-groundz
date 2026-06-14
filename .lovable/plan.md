@@ -1,111 +1,141 @@
-# Structured Gemini Failure Diagnostics — Final Plan (v2)
+## Final Plan — Amazon URL canonicalization + slug evidence + required-fields prompt fix
 
-Both ChatGPT and Codex approved. Folding in their last clarifications:
+Both reviewers approved Phases A and B. Adding their four guardrails (strict host matching, ASIN normalization, slug-as-untrusted, honest-confidence wording) and the recovery-gate clarification. Nothing else changes.
 
-1. "No keys" in the hard scope means **no API keys/secrets** — JSON field names (`prediction`, `type`, `name`, Zod paths) are allowed as diagnostic labels.
-2. `missing_required_fields` must be derived from the **best parsed candidate** (the one whose Zod issues we're reporting), not only root-level keys, so a wrapped `{ "prediction": { type, name } }` doesn't falsely report `type`/`name` missing.
-3. `missing_required_fields` derivation must be **defensive about Zod issue shape** — don't rely solely on `issue.received === "undefined"`; also compare known required field names against the best candidate's keys, and skip (never throw) on unexpected issue shapes.
+## Diagnosis (request `66276a76`)
 
-## Goal
+For `https://www.amazon.in/Root-Hair-Serum-Dandruff-Cleanser/dp/B0FGJF5QN7/?_encoding=UTF8&pd_rd_w=…`:
 
-When Gemini fails (e.g. the Amazon shoe-insert URL), the current log shows only `code: GEMINI_INVALID_SHAPE`, `raw_text_length`, `raw_text_sha8`. That's not enough to pick the next fix.
-
-Add a `gemini_failure_diagnostics` object to the **existing Gemini failure log lines only**, telling us *why* it failed without ever logging raw Gemini text, prediction values, URLs, prompts, or HTML.
-
-## Scope (hard)
-
-Touch only:
-- `supabase/functions/analyze-entity-url-v2/gemini.ts`
-- `supabase/functions/analyze-entity-url-v2/gemini_test.ts`
-
-Do **not** touch: `AnalysisTrace`, `V2SuccessResponse`, `V2ErrorResponse`, frontend modal, V1, DB, pricing, Firecrawl, merge, save flow, Gemini model/tools/prompt/`responseMimeType`, parser candidate list, schema, error codes, Amazon canonicalization, success-path logs.
-
-No `raw_text_preview`, no env-gated raw preview, no model text, no prediction values, no URLs, no image URLs, no headers, no API keys/secrets, no prompts — in logs, trace, or response. JSON field names and Zod path/code strings are allowed as diagnostic labels.
-
-## Design
-
-### 1. Thread parser attempt metadata out of `tolerantParseGeminiJson`
-
-Keeps diagnostics aligned with actual parser behavior; avoids recompute drift.
-
-```ts
-type TolerantParseAttempts = {
-  parse_candidate_count: number;   // total candidates tried
-  parsed_json: boolean;             // any candidate parsed as JSON
-  contains_code_fence: boolean;     // raw text had ``` fence
-  top_level_keys: string[];         // keys of first parsed root (if any)
-  nested_wrapper_keys: string[];    // wrapper key names that produced candidates
-  best_candidate_keys: string[];    // keys of the candidate closest to validation
-};
+```
+direct_fetch: ok=true (Amazon bot-wall HTML, no usable predictions)
+firecrawl:    attempted=true, ok=true, no usable predictions
+gemini:       ok=false, GEMINI_INVALID_SHAPE, url_context_failed=true
+gemini_failure_diagnostics: {
+  parsed_json: true,
+  top_level_keys: [type, name, description, tags, confidence, …],
+  zod_issue_codes: ["invalid_type"],
+  zod_issue_paths: ["type", "name"],
+  refusal_like: false
+}
+→ NO_PREDICTIONS → failure modal
 ```
 
-`best_candidate_keys` = keys of the last parsed candidate that was passed to the Zod validator (i.e. the one whose issues we report). For an unwrapped failure this equals `top_level_keys`; for a wrapped `{ "prediction": {...} }` this is the inner object's keys.
+Two compounding causes:
+1. Gemini URL Context can't read the tracking-laden URL (Amazon serves a bot interstitial for noisy `?ref_=`/`pd_rd_*` URLs).
+2. The current prompt explicitly tells Gemini to *omit* `type` if uncertain — but Zod requires `type` and `name`, so omission/null guarantees `GEMINI_INVALID_SHAPE`.
 
-`TolerantParseOutcome` failure variant gains `attempts: TolerantParseAttempts` and `zodIssues?: Array<{ code: string; path: (string|number)[]; received?: unknown }>` from the best candidate's Zod result.
+## Phase A — Amazon URL handling for Gemini (canonicalize + preserve slug)
 
-### 2. New helper `geminiFailureDiagnostics`
+### A1. `canonicalizeAmazonUrl(url)` in `host_hints.ts`
 
-```ts
-function geminiFailureDiagnostics(
-  rawText: string,
-  attempts: TolerantParseAttempts,
-  zodIssues?: Array<{ code: string; path: (string|number)[]; received?: unknown }>,
-): Record<string, unknown>
-```
+- **Strict Amazon host matching** (Codex guardrail #1): reuse the existing `JS_HEAVY_HOST_PATTERNS` Amazon regex `/(^|\.)amazon\.[a-z.]+$/i` applied to `new URL(url).hostname` — anchored at the end, so `amazon.in.evil.com` is rejected.
+- Recognizes `/dp/<ASIN>/…` and `/gp/product/<ASIN>/…`.
+- **ASIN validation + normalization** (Codex guardrail #2): match `[A-Za-z0-9]{10}` case-insensitively, then `.toUpperCase()` in the canonical output. Reject if not exactly 10 chars.
+- On match: rebuild as `https://<original-host>/dp/<ASIN_UPPER>/` — always `https`, always the validated host from the parsed URL, no query, no fragment.
+- Amazon URL without recognizable ASIN (`/gp/bestsellers`, etc.): unchanged.
+- Non-Amazon host, lookalike host, or malformed input: unchanged.
+- Pure, never throws, no network, no SSRF state.
 
-Returns only:
-- `parse_candidate_count` (number)
-- `parsed_json` (boolean)
-- `contains_code_fence` (boolean)
-- `top_level_keys` (string[])
-- `nested_wrapper_keys` (string[])
-- `best_candidate_keys` (string[])
-- `zod_issue_codes` (string[]) — distinct codes
-- `zod_issue_paths` (string[]) — dot-joined path strings
-- `missing_required_fields` (string[]) — derived defensively (see below)
-- `refusal_like` (boolean) — heuristic: `parsed_json === false` AND trimmed text starts with letter `i`/`s`/`a` AND no balanced `{}` found. Boolean only.
+### A2. `extractAmazonPathSlug(url)` in `host_hints.ts`
 
-#### `missing_required_fields` derivation (defensive)
+Preserves the slug as `name` evidence so canonicalizing doesn't discard the only product-name signal when URL Context fails.
 
-1. Known required fields list (hardcoded from schema): `["type", "name"]` (plus any others the Zod schema marks required at top level).
-2. Start with the set of required fields **absent from `best_candidate_keys`**.
-3. Additionally, walk `zodIssues`: if an issue has `code === "invalid_type"` and either (a) `received === "undefined"`, or (b) `received` is missing/unknown but `path.length === 1`, add `String(path[0])` to the set.
-4. Wrap the whole derivation in try/catch — on any unexpected issue shape, skip that issue rather than throwing.
-5. Apply caps (below) to the final array.
+- Same strict Amazon host gate as A1; non-Amazon → `null`.
+- Returns the path segment immediately **before** `/dp/<ASIN>` or `/gp/product/<ASIN>` (e.g. `Root-Hair-Serum-Dandruff-Cleanser`).
+- Sanitize: percent-decode, replace `-`/`_` with spaces, collapse whitespace, drop chars outside `[A-Za-z0-9 ]`, cap at 120 chars.
+- Reject empty, pure-numeric, or punctuation-only results → `null`.
+- **Never includes query string, fragment, or tracking tokens.**
+- **Never logged** (Codex guardrail #3): not in success log, failure log, `gemini_failure_diagnostics`, response payload, DB, or trace. Surfaced to Gemini only.
+- Pure, never throws.
 
-### 3. Sanitization caps (defensive, applied to every output field)
+### A3. Wire both at the Gemini call site only (`index.ts`)
 
-- Each string ≤ 64 chars (truncate)
-- Each array ≤ 12 entries (slice)
-- Key/path strings: drop entries whose sanitized form isn't a safe identifier-ish token (`[A-Za-z0-9_.\-\[\]]` only) — protects against weird model-emitted long JSON keys
-- Never include values, snippets, or content strings drawn from raw text — only shape keys, Zod enum codes, counts, booleans
+At `invokeGemini` invocation(s):
+- `geminiUrl = canonicalizeAmazonUrl(safe.url)` — used as the prompt's `url` field (what URL Context fetches) and, only when `usedFirecrawl === false` AND `geminiUrl !== safe.url`, as `evidenceBaseUrl`.
+- `amazonPathSlug = extractAmazonPathSlug(safe.url)` — passed via a new optional `V2Evidence.amazonPathSlug?: string | null` and emitted as the protected key `amazon_path_slug` inside the bounded evidence `keep` block (≤120 chars, survives truncation cheaply).
 
-### 4. Integration
+When Firecrawl ran, the Firecrawl-derived `evidenceBaseUrl` is **untouched**.
 
-In `gemini.ts`, the two existing failure log sites (~lines 446–456 and ~473–480) extend their existing `logLine({...})` call with:
+### A4. Explicitly unchanged in Phase A
 
-```ts
-gemini_failure_diagnostics: geminiFailureDiagnostics(text, outcome.attempts, outcome.zodIssues)
-```
+Direct fetch URL, SSRF check, Firecrawl call URL, extractor input, saved URL / DB record, frontend preview URL, response payload, merge, recovery gate, V1, pricing, all non-Amazon hosts, error codes, structured diagnostics.
 
-Success log unchanged. `GeminiFailure` return objects unchanged — diagnostics live only in the log line.
+### A5. Phase A tests (`host_hints_test.ts`)
 
-### 5. Tests (`gemini_test.ts`)
+`canonicalizeAmazonUrl` (9):
+1. `/dp/B0FGJF5QN7/?_encoding=…&pd_rd_w=…&ref_=…` → `https://www.amazon.in/dp/B0FGJF5QN7/`
+2. `/gp/product/B0FGJF5QN7/?…` → `https://www.amazon.in/dp/B0FGJF5QN7/`
+3. Already-clean `https://www.amazon.in/dp/B0FGJF5QN7/` → unchanged
+4. Messy `/Root-Hair-Serum-Dandruff-Cleanser/dp/B0FGJF5QN7/?…` → `https://www.amazon.in/dp/B0FGJF5QN7/`
+5. Amazon URL without ASIN (`/gp/bestsellers`) → unchanged passthrough
+6. Non-Amazon URL → unchanged passthrough
+7. **Lookalike host** `https://amazon.in.evil.com/dp/B0FGJF5QN7/` → unchanged passthrough (guardrail #1)
+8. **Lowercase ASIN** `/dp/b0fgjf5qn7/` → `https://www.amazon.in/dp/B0FGJF5QN7/` (guardrail #2 — normalized to uppercase)
+9. Malformed input → returned as-is, no throw
 
-- Refusal-like text ("I cannot help with…") → `parsed_json:false`, `refusal_like:true`, empty key arrays
-- Valid JSON wrong shape (unwrapped, missing `type`) → `parsed_json:true`, populated `top_level_keys`, `best_candidate_keys === top_level_keys`, `missing_required_fields` includes `"type"`
-- Wrapped `{"prediction": { "type": "...", "name": "..." }}` where inner fails on a different field → `nested_wrapper_keys` includes `"prediction"`, `best_candidate_keys` are the inner keys, `missing_required_fields` does **not** spuriously include `type`/`name`
-- Code-fenced JSON → `contains_code_fence:true`
-- Cap enforcement: 50 top-level keys → array length 12; key > 64 chars → dropped/truncated; non-identifier key → dropped
-- **Sentinel leak test**: raw text contains `"SECRET_PRODUCT_VALUE_xyz123"`; assert this sentinel does not appear anywhere in `JSON.stringify(diagnostics)`. Safe key names (`prediction`/`type`/`name`) are allowed.
-- Defensive Zod issue: feed a malformed issue object (missing `received`, weird `path`) — diagnostics should not throw and should return a valid object
-- Success path: existing success test still passes with no `gemini_failure_diagnostics` key on success log
-- Parser attempts wiring: failure outcome carries `attempts` with correct `parse_candidate_count`, `contains_code_fence`, and `best_candidate_keys`
+`extractAmazonPathSlug` (7):
+10. `/Root-Hair-Serum-Dandruff-Cleanser/dp/B0FGJF5QN7/?_encoding=…` → `"Root Hair Serum Dandruff Cleanser"` (no query bleed)
+11. `/gp/product/B0FGJF5QN7/` (no slug segment) → `null`
+12. Already-clean `/dp/B0FGJF5QN7/` → `null`
+13. Non-Amazon host → `null`
+14. Lookalike host `amazon.in.evil.com` → `null`
+15. Percent-escaped slug → decoded, sanitized
+16. Pure-numeric or punctuation-only slug → `null`
 
-## Acceptance
+## Phase B — Required `type`/`name` prompt fix
 
-Re-running the same Amazon URL still returns `NO_PREDICTIONS` with the same modal and Request ID. The `[analyze-entity-url-v2] gemini` failure log line now also carries `gemini_failure_diagnostics`, letting us classify the failure (parser mapping vs prompt nudge vs Firecrawl extraction vs Amazon canonicalization) without ever seeing Gemini's raw output.
+### Edits in `prompt-generator-v2.ts`
 
-After build: I'll show files changed, test results, and a sample failure-log shape, then you re-run the Amazon URL so we can pick the next real fix.
+**Remove** from `PROMPT_INJECTION_GUARD`:
+> *"If you cannot classify type as one of {…}, omit the field rather than guess."*
 
-Ready to switch to build mode?
+**Replace** blanket `JSON_SHAPE_SPEC` rule "Omit fields you cannot determine rather than inventing values" with fields-scoped wording (sharpened per Codex — no "best-effort JSON" ambiguity, untrusted-slug language per guardrail #3, honest-confidence language per guardrail #4):
+
+> **Required fields — `type` and `name`:**
+> - `type` and `name` are REQUIRED strings. They MUST NOT be `null` and MUST NOT be omitted.
+> - `type` MUST be exactly one of the allowed enum values. Pick the single value best supported by evidence (canonical URL, page title, JSON-LD, OG/Twitter metadata, search-grounding results, or `amazon_path_slug` when present).
+> - `name` MUST be derived from evidence: canonical URL slug, `amazon_path_slug`, page title, JSON-LD `name`, OG/Twitter title, product title, or a search-grounding result. If evidence is insufficient, choose the most evidence-supported minimal string — do NOT invent a brand or product, and do NOT use placeholders like `"Unknown"` or `"Product"`.
+> - `amazon_path_slug` (when present) is **untrusted, URL-derived text**: useful as a hint for `name` and `type`, but NOT authoritative product data. Do not treat it as verified brand/price/spec information.
+> - Set `confidence` and every `field_confidence.*` honestly to reflect evidence strength. **If `amazon_path_slug` is the only `name`/`type` evidence, do NOT inflate `confidence`** — the recovery gate decides whether evidence is sufficient.
+>
+> **Optional fields** (`description`, `image_url`, `images`, `tags`, `reasoning`, `additional_data.brand/price/currency`, `field_confidence.*`) MAY be omitted or set to `null` when unknown.
+
+- No `confidence < 0.4` instruction (would deterministically fail the `>= 0.6` recovery gate).
+- No "best-effort JSON" / "downstream validation will reject it cleanly" wording.
+
+### Phase B tests (`prompt_v2_test.ts`)
+
+- Removed sentence (`"omit the field rather than guess"`) is gone from `systemPrompt`.
+- `systemPrompt` contains: `"REQUIRED"`, `"MUST NOT be null"`, `"Do NOT invent"`, `"amazon_path_slug"`, `"untrusted"`, and `"do NOT inflate"`.
+- `systemPrompt` does NOT contain `"confidence < 0.4"`, `"best-effort"`, or `"downstream validation will reject"`.
+- Optional-field-omission language still present.
+- Existing assertions (9 canonical types, no `"other"`, EVIDENCE_BASE_URL, untrusted-data guard, rawHtml-drop-first truncation) all still pass.
+- New: when `amazonPathSlug` is provided in `V2Evidence`, user prompt evidence JSON contains `"amazon_path_slug":"Root Hair Serum Dandruff Cleanser"`; when absent, the key is absent.
+
+## Hard scope (no-touch)
+
+V1, DB, pricing, Firecrawl, Firecrawl recovery, merge, save flow, `response_schema.ts` / Zod (stays strict — `type`/`name` required, no nulls), `passesRecoveryGate`, error codes, frontend modal / NO_PREDICTIONS UX, Gemini model, tools, `responseMimeType`, parser candidate list, `tolerantParseGeminiJson`, structured diagnostics, generic URL canonicalization for any non-Amazon host. **The slug never forces success — Zod, merge, and recovery gate decide normally.**
+
+## Files touched
+
+| File | Change |
+|---|---|
+| `supabase/functions/analyze-entity-url-v2/host_hints.ts` | + `canonicalizeAmazonUrl()`, `extractAmazonPathSlug()` |
+| `supabase/functions/analyze-entity-url-v2/host_hints_test.ts` | + 16 tests (9 canonicalize, 7 slug) |
+| `supabase/functions/analyze-entity-url-v2/prompt-generator-v2.ts` | Phase B prompt edits + `amazonPathSlug` field on `V2Evidence` + `amazon_path_slug` key in evidence payload |
+| `supabase/functions/analyze-entity-url-v2/prompt_v2_test.ts` | Updated assertions + new slug-in-evidence test |
+| `supabase/functions/analyze-entity-url-v2/index.ts` | At Gemini call site only: compute canonical URL + slug, pass into `buildV2Prompts` |
+| `.lovable/plan.md` | This plan |
+
+## Acceptance — after implementation I will report
+
+1. Files changed, full V2 test suite green (host_hints + prompt_v2 + everything else).
+2. Exact final Phase B prompt text as shipped.
+3. Retest of the same Amazon URL with: new `request_id`, `gemini.url_context_failed`, if still failing the `zod_issue_paths` / `missing_required_fields` / `refusal_like` from `gemini_failure_diagnostics`, final `prediction_source` and `merge.path`, and whether the success-confirmation or failure modal appears.
+4. Retest of one additional Amazon URL.
+
+### Expected outcomes (priority order)
+
+- **Best:** Clean `/dp/<ASIN>/` lets URL Context succeed → valid `type` + `name` → predictions surface.
+- **Acceptable:** URL Context still fails, but Gemini extracts `type` + `name` from `amazon_path_slug` + title evidence at honest confidence. Recovery gate decides — slug presence is not a guaranteed pass.
+- **If still failing:** diagnostics will show a *different* shape (e.g. `refusal_like: true`, different `zod_issue_paths`), pointing the next real fix at Firecrawl extraction strength or ASIN-based metadata lookup — not at more prompt-guessing.
