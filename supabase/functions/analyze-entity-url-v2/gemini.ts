@@ -38,6 +38,16 @@ export const GEMINI_API_TIMEOUT_MS = 20_000;
 export const GEMINI_LOCAL_TIMEOUT_MS = 22_000;
 export const GEMINI_TEMPERATURE = 0.15;
 
+// Search-only fallback constants. Used by analyze-entity-url-v2/index.ts.
+// The fallback runs at most once per request, only on the recovery path,
+// only when every earlier step (direct fetch, Firecrawl recovery, primary
+// Gemini with url_context + google_search) failed to produce a gate-passing
+// prediction, and only if at least SEARCH_FALLBACK_TIMEOUT_MS +
+// SEARCH_FALLBACK_BUDGET_BUFFER_MS remain in the request budget.
+export const SEARCH_FALLBACK_TIMEOUT_MS = 8_000;
+export const SEARCH_FALLBACK_BUDGET_BUFFER_MS = 1_000;
+
+
 export interface GeminiGrounding {
   used_url_context: boolean;
   used_google_search: boolean;
