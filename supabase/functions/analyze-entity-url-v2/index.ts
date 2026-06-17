@@ -643,9 +643,10 @@ serve(async (req) => {
       } else if (recGeminiPred) {
         recFallbackSkipReason = "primary_gemini_succeeded";
       } else if (!geminiConfigured) {
-        // No flag exists, so we don't emit "disabled"; treat as budget skip
-        // would be misleading. Use a precedence-compatible label.
-        recFallbackSkipReason = "primary_gemini_succeeded";
+        // No Gemini API key → fallback cannot run. Not part of the four
+        // documented precedence reasons; use an explicit honest label.
+        recFallbackSkipReason = "gemini_not_configured";
+
       } else {
         const elapsed = Date.now() - t0;
         const remainingMs = REQUEST_TOTAL_BUDGET_MS - elapsed;
