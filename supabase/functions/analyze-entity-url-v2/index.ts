@@ -61,6 +61,10 @@ import { safeAbsoluteUrl } from "./extractor.ts";
 import { resolvePriceSourceHint, summarizePricing, type PricingBlock } from "./pricing.ts";
 import type { GeminiRawPrediction } from "./response_schema.ts";
 import type { ExtractMetadata, V2Predictions } from "./schema.ts";
+import {
+  maybeRunGeminiSearchFallback,
+  type SearchFallbackGeminiInvoker,
+} from "./search_fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
