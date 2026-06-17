@@ -1,153 +1,119 @@
-## Goal
+## What the logs prove
 
-Add a last-resort **Gemini search-only fallback** to V2 that mirrors V1's working behavior on hostile-to-scrape hosts (Amazon and any other URL where the page-reading path fails), while preserving every V2 guarantee: SSRF safety, strict Zod schema, recovery gate, merge rules, pricing, and the no-hallucination contract.
+Request `8a744df6-0825-4bd0-9275-b984b8acf420`:
+- Direct fetch → `FETCH_TOO_LARGE` on Amazon
+- Firecrawl recovery → weak/no usable extraction
+- Primary Gemini → `503 UNAVAILABLE`
+- Search-only fallback → ran (`attempted: true`, `skip_reason: null`), but `GEMINI_TIMEOUT` at ~8s
+- V2 preserved original `FETCH_TOO_LARGE`; UI showed the hard "V2 engine failed" modal
 
-Applies to **all URLs**, not Amazon-only. Trigger conditions are strict enough that the fallback runs only when V2 would otherwise return failure.
+The fallback wiring is correct. Two backend issues remain: the 8s window is too tight for Google-Search-grounded Gemini during model high-demand, and the fallback prompt was carrying noisy page evidence instead of behaving like V1.
 
-## Verified from current code
+## Phase 1 — Backend only (this change)
 
-- `gemini.ts` currently uses `tools: [{ url_context: {} }, { google_search: {} }]` and does **not** set `responseMimeType`. Fallback reuses this exact config and changes only `tools`.
-- `prediction_source` is a free-form `string` in `schema.ts` / `index.ts` (no Zod enum, no DB enum). Adding `"gemini_search_fallback"` is schema-safe.
-- `diagnostics` already exists on V2 responses (`prediction_source`, `used_url_context`, `used_google_search`, `url_context_failed`). New fields are additive to that same object — no new envelope.
-- No existing feature flag for this path → the `"disabled"` skip reason is **removed**.
+### 1A. Raise search-only fallback timeout
 
-## Trigger conditions (ALL must be true — last resort)
+`supabase/functions/analyze-entity-url-v2/gemini.ts`:
+- `SEARCH_FALLBACK_TIMEOUT_MS`: `8_000` → `14_000`
+- `SEARCH_FALLBACK_BUDGET_BUFFER_MS`: keep `1_000`
 
-1. On the recovery path (not happy-path direct extraction success).
-2. Direct fetch / deterministic extraction did not produce a gate-passing prediction.
-3. Firecrawl recovery did not produce a gate-passing prediction.
-4. Primary Gemini call (`url_context` + `google_search`) threw, returned no text, failed parsing, failed Zod, or failed the recovery gate.
-5. No prior step has already produced a valid, gate-passing prediction.
-6. Sufficient time budget remains (see "Budget rule" below).
+`supabase/functions/analyze-entity-url-v2/index.ts`:
+- Keep `REQUEST_TOTAL_BUDGET_MS = 45_000` + budget guard.
+- Skip rule unchanged: `remainingMs < SEARCH_FALLBACK_TIMEOUT_MS + SEARCH_FALLBACK_BUDGET_BUFFER_MS` → `budget_exhausted`.
+- Skip-reason precedence unchanged: `prior_prediction_valid` → `firecrawl_succeeded` → `primary_gemini_succeeded` → `gemini_not_configured` → `budget_exhausted` → `null`.
 
-If any condition fails → fallback is skipped with the first matching `skip_reason` from the precedence list.
+### 1B. New sanitized fallback-evidence URL helper
 
-## Skip-reason precedence (deterministic)
+Add `sanitizeFallbackEvidenceUrl(rawUrl: string): string | null` in `host_hints.ts` (or a small new util colocated with it). Rules, applied for ALL hosts:
 
-Evaluated top-down; the first matching reason wins so logs/tests are stable:
+1. Parse with `new URL(rawUrl)` in a try/catch. On parse failure → return `null`.
+2. **Protocol allowlist (defense in depth):** if `url.protocol !== "http:" && url.protocol !== "https:"` → return `null`. This explicitly rejects `javascript:`, `data:`, `file:`, `blob:`, `ftp:`, and any custom scheme even if a future caller passes unvalidated input.
+3. Strip `username`, `password`, `search` (query string), and `hash` (fragment).
+4. If host matches an Amazon product URL with extractable ASIN (`/dp/<ASIN>` or `/gp/product/<ASIN>`) → return canonical `https://<host>/dp/<ASIN>/`.
+5. Otherwise → return `${url.origin}${url.pathname}` (no trailing-slash normalization beyond what `URL` produces).
+6. Enforce 512-char cap. If over the cap after step 4/5 → return `null` (do not truncate mid-path).
 
-1. `prior_prediction_valid`
-2. `not_recovery_path`
-3. `firecrawl_succeeded`
-4. `primary_gemini_succeeded`
-5. `budget_exhausted`
-6. `null` (fallback ran)
+The search-only fallback prompt's `url` field uses ONLY this helper's output. `canonicalizeAmazonUrl` is no longer used to build the fallback prompt URL. If the helper returns `null`, the `url` field is omitted from the prompt entirely (raw input is never sent).
 
-(`"disabled"` is intentionally not included — no flag exists.)
+### 1C. Clean search-only fallback evidence (whitelist + caps, all untrusted)
 
-## Budget rule (concrete)
+When `searchOnly: true`, build a separate minimal prompt path that ONLY contains this explicit whitelist. Every field is framed as untrusted evidence (same framing already used for slug); Zod, recovery gate, and merge rules remain authoritative and unchanged.
 
-- `SEARCH_FALLBACK_TIMEOUT_MS = 8000` (fixed per-call cap for the fallback).
-- `SEARCH_FALLBACK_BUDGET_BUFFER_MS = 1000`.
-- Compute `remainingMs = requestDeadline - now()`.
-- Skip with `skip_reason: "budget_exhausted"` if `remainingMs < SEARCH_FALLBACK_TIMEOUT_MS + SEARCH_FALLBACK_BUDGET_BUFFER_MS` (i.e. `< 9000ms`).
-- The fallback call itself is aborted at `SEARCH_FALLBACK_TIMEOUT_MS`.
+| Field | Source | Cap |
+|---|---|---|
+| `url` | `sanitizeFallbackEvidenceUrl(safe.url)` | 512 chars (helper enforces) |
+| `host` | `new URL(safe.url).host` | 128 chars |
+| `amazon_path_slug` | `extractAmazonPathSlug(safe.url)` (when non-null) | 120 chars (already sanitized) |
+| `extract_metadata.title` | metadata title if already available in V2 | 200 chars |
+| `extract_metadata.description` | metadata description if already available in V2 | 400 chars |
+| `extract_metadata.site_name` | OG/twitter site_name if already available | 80 chars |
+| `extract_metadata.mapped_type` | `extract.metadata.mapped_type` | enum |
 
-## The search-only call
+EXCLUDED (never sent to the fallback prompt):
+- raw direct-fetch HTML
+- Firecrawl HTML
+- Firecrawl markdown
+- bot-wall content / large text bodies
+- raw model output
+- query strings, fragments, username/password (any host)
+- non-http(s) URL schemes
+- image URLs (any list)
+- arbitrary OG/Twitter/JSON-LD blobs
+- headers, cookies, redirect chains
 
-- **Tools:** `[{ google_search: {} }]` only. No `url_context`. This is the **only** difference from the primary Gemini call.
-- Same model, temperature/topP/topK/maxOutputTokens, headers, retry policy, tolerant parser, Zod schema, recovery gate, merge logic, pricing pass.
-- **No `responseMimeType` introduced.**
-- **Prompt:** reuse V2 Phase B `systemPrompt` and `userPrompt` unchanged — keeps untrusted-data framing, "do NOT inflate", required `type`/`name`, and the sanitized `amazon_path_slug` evidence block when present. Slug remains untrusted plain-text evidence.
+If a whitelisted field is not already available inside the V2 Edge Function, it is simply omitted — no new frontend/backend dependency, no extra fetch.
 
-## Failure handling
+Same fallback contract preserved: same model, `tools: [{ google_search: {} }]` only, no `url_context`, no `responseMimeType`, same tolerant parser, same Zod schema, same recovery gate, same merge rules, same `gemini_search_fallback` source label.
 
-- On fallback **success**: `prediction_source = "gemini_search_fallback"`, `merge.path` appended with `"gemini_search_fallback"`, diagnostics populated.
-- On fallback **failure**: return the **original recovery error unchanged** (do not swallow or replace it). Telemetry still records `gemini_search_fallback_attempted: true`, `gemini_search_fallback_ok: false`, `gemini_search_fallback_error`, `gemini_search_fallback_duration_ms`. Observability is preserved even though the user-facing error is the original one.
+### 1D. Logging / diagnostics
 
-## Source labeling
+Unchanged sanitization rules. Specifically:
+- Do NOT log whitelisted metadata values (no titles, descriptions, image URLs, full URLs, slugs, HTML, markdown, or prompt text in diagnostics).
+- Continue logging only: `request_id`, `attempted`, `ok`, `skip_reason`, `duration_ms`, `final_prediction_source`, `original_error_code`, plus `host` (already allowed in `trace`).
+- If fallback fails, preserve the original recovery error and record fallback telemetry (already implemented).
 
-Public `prediction_source` value when this path wins: `"gemini_search_fallback"`. Schema-safe (string, no enum). `merge.path` appended for trace consistency.
+## Phase 2 — Frontend metadata-only fallback (deferred)
 
-## Telemetry
+Not in this change. When revisited, must be clearly labeled "AI details unavailable; using URL metadata" (not AI analysis), may only prefill safe fields (name/title, website URL, preview image(s), source domain). MUST NOT prefill type/category/brand/price/tags/description. Planned/approved separately.
 
-### Server log (full, sanitized)
-Added to the existing structured log line:
-- `gemini_primary_attempted`, `gemini_primary_ok`, `gemini_primary_error`
-- `gemini_search_fallback_attempted`, `gemini_search_fallback_ok`, `gemini_search_fallback_error`
-- `gemini_search_fallback_duration_ms`
-- `gemini_search_fallback_skip_reason` (one of the precedence values or `null`)
-- `final_prediction_source`
+## Out of scope
 
-Existing `url_context_failed` preserved unchanged.
-
-### Response `diagnostics` (additive, sanitized)
-Added to the **existing** `diagnostics` object only:
-- `gemini_search_fallback_attempted`
-- `gemini_search_fallback_ok`
-- `gemini_search_fallback_skip_reason`
-- `final_prediction_source`
-
-**Never in the response:** raw model text, prompt text, full URL/query params, `amazon_path_slug` contents, image URLs, headers, HTML/markdown, error stacks. Error codes are short tokens only (e.g. `"GEMINI_BAD_RESPONSE"`, `"ZOD_INVALID"`, `"TIMEOUT"`).
-
-## Guardrails (unchanged)
-
-- Required `type`, required `name`, confidence gate, Zod schema, parser candidates, merge rules, recovery gate, slug sanitization.
-- Fallback runs **at most once** per request.
-- Respects overall request deadline (budget rule above).
-- Applies to **all URLs** — gated purely by the strict trigger conditions.
-
-## Out of scope (do not touch)
-
-V1 (`analyze-entity-url`), DB schema, pricing logic, Firecrawl config, direct-fetch logic, safe-fetch byte cap, recovery gate thresholds, Zod schema (`response_schema.ts`, `schema.ts` validation), merge rules, frontend modal, Gemini model name, `responseMimeType` (not adding it), parser candidate ordering, save flow, RLS, auth.
-
-## Technical changes
-
-### `supabase/functions/analyze-entity-url-v2/gemini.ts`
-- New export `callGeminiSearchOnly(args)` reusing the existing request builder; overrides only `tools` → `[{ google_search: {} }]`. Accepts an `abortSignal` for the 8 s timeout.
-- Reuses the same response parser and grounding extractor.
-
-### `supabase/functions/analyze-entity-url-v2/index.ts`
-- After the existing primary-Gemini recovery branch, add one gated `if` block:
-  - Evaluate the six trigger conditions in precedence order; record `skip_reason` accordingly.
-  - If eligible, compute `remainingMs`; skip with `budget_exhausted` if insufficient.
-  - Otherwise invoke `callGeminiSearchOnly` with an 8 s `AbortController`.
-  - On success: set source label, append merge path, populate diagnostics.
-  - On failure: keep original recovery error; populate fallback telemetry fields.
-
-### `supabase/functions/analyze-entity-url-v2/schema.ts`
-- Extend the existing `diagnostics` TypeScript type with new optional fields. No Zod schema changes.
+V1, DB, pricing, Firecrawl config, direct-fetch byte cap, Zod schema, recovery gate, merge rules, frontend modal, Gemini model, `responseMimeType`, parser candidates, save flow, RLS/auth, model retries.
 
 ## Tests
 
-New cases in existing test files (no new harness):
+Add/update in `supabase/functions/analyze-entity-url-v2/gemini_search_fallback_test.ts` (+ small companion for the URL sanitizer and prompt builder):
 
-1. Happy path → fallback NOT called; `skip_reason: "prior_prediction_valid"`.
-2. Firecrawl succeeds → `skip_reason: "firecrawl_succeeded"`.
-3. Primary Gemini succeeds → `skip_reason: "primary_gemini_succeeded"`.
-4. Full recovery failure → fallback runs, returns valid JSON, passes Zod + gate, `prediction_source === "gemini_search_fallback"`, `merge.path` includes it.
-5. Fallback invalid (null `type` / low confidence) → original recovery error returned; telemetry records `attempted: true, ok: false, error: ...`.
-6. Non-Amazon URL hitting fallback conditions → fallback runs (proves not Amazon-gated).
-7. Non-Amazon happy path → fallback not called.
-8. Malicious slug regression → sanitized slug stays untrusted in fallback prompt; never echoed into system prompt.
-9. Budget exhausted (simulated `remainingMs < 9000`) → `skip_reason: "budget_exhausted"`; fallback never invoked.
-10. Skip-reason precedence → when multiple reasons are true (e.g. happy path), the first in the precedence list is recorded.
-11. Config parity → fallback request body equals primary body **except** `tools`; asserts no `responseMimeType` added.
-12. V1 untouched → no file changes under `supabase/functions/analyze-entity-url`.
-13. Diagnostics shape → response `diagnostics` contains only the additive sanitized fields; never contains raw text / prompt / slug / image URLs / full query params / stacks.
+- `SEARCH_FALLBACK_TIMEOUT_MS === 14_000`, buffer `1_000`.
+- Budget exhaustion still triggers `skip_reason: "budget_exhausted"` and does NOT call Gemini.
+- `sanitizeFallbackEvidenceUrl`:
+  - Amazon `/dp/<ASIN>?...&ref=...` → `https://www.amazon.in/dp/<ASIN>/`
+  - Amazon `/gp/product/<ASIN>/...` → `https://<host>/dp/<ASIN>/`
+  - Non-Amazon `https://www.nykaa.com/foo/bar?utm=...#frag` → `https://www.nykaa.com/foo/bar`
+  - URL with `user:pass@` → credentials stripped
+  - `javascript:alert(1)` → `null`
+  - `data:text/html,<x>` → `null`
+  - `file:///etc/passwd` → `null`
+  - `ftp://example.com/x` → `null`
+  - Invalid URL string → `null`
+  - >512 chars after normalization → `null`
+- Search-only fallback prompt EXCLUDES: raw HTML, Firecrawl markdown, Firecrawl HTML, large text bodies, image URLs, raw OG/JSON-LD blobs, query strings, fragments.
+- Search-only fallback prompt INCLUDES (when available): sanitized URL, host, sanitized Amazon slug, whitelisted metadata fields with caps enforced.
+- Length caps actually truncate oversize whitelisted metadata fields (title/description/site_name).
+- Valid fallback passes Zod + recovery gate and merges.
+- Invalid/empty fallback preserves the original recovery error.
+- Non-Amazon success path unchanged (`primary_gemini_succeeded` skip reason).
+- Tool-isolation test stays green: only `google_search`, no `url_context`, no `responseMimeType`.
+- Diagnostics/log line still contains no raw metadata values.
+- Non-Amazon URL with query params produces a fallback prompt whose `url` field has NO `?` or `#`.
 
-All existing V2 tests must continue to pass.
+Run `supabase--test_edge_functions` on `analyze-entity-url-v2`. Deploy.
 
-## Acceptance — retest matrix
+## Acceptance / retest
 
-For each URL, capture: `request_id`, primary Gemini attempted/ok, fallback attempted/ok/skip_reason, `final_prediction_source`, `merge.path`, modal renders, reasonableness of name/brand/description/images.
+For each URL capture: `request_id`, primary Gemini `attempted/ok/error_code`, `search_fallback_attempted/ok/error/duration_ms/skip_reason`, `final_prediction_source`, `merge.path`, whether the AI confirmation modal renders, reasonableness of name/brand/description/images.
 
-| URL | Expected |
-|---|---|
-| Moxie Beauty Amazon URL (current failure) | Fallback runs, valid product, modal shows |
-| Root Hair Serum Amazon URL (earlier failure) | Fallback runs, valid product, modal shows |
-| Clean `https://www.amazon.in/dp/<ASIN>/` | Primary path likely succeeds; if not, fallback succeeds |
-| Non-Amazon URL (Nykaa or Goodreads) | Primary path succeeds, fallback NOT called, behavior identical to today |
-
-## Rollout sequence
-
-This is the single next change. Firecrawl extraction improvements and byte-cap changes remain deferred until after retest.
-
-## Deliverables
-
-- `gemini.ts`: `callGeminiSearchOnly` helper (config parity, only `tools` differs, 8 s abort).
-- `index.ts`: gated fallback step with precedence + budget rule + telemetry plumbing.
-- `schema.ts`: additive diagnostics type fields.
-- New tests covering the 13 cases above.
-- Updated `.lovable/plan.md`.
-- Retest results for the four URLs in the acceptance matrix.
+1. Moxie Beauty Amazon URL (current failure)
+2. Root Hair Serum Amazon URL (earlier failure)
+3. A clean Amazon `/dp/<ASIN>/` URL
+4. A currently-successful non-Amazon URL (Nykaa / Goodreads)

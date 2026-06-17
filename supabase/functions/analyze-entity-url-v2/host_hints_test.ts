@@ -217,3 +217,65 @@ Deno.test("malicious slug: 120-char cap enforced on oversized payload", () => {
     throw new Error("slug exceeded 120-char cap: " + out.length);
   }
 });
+
+// ---------- sanitizeFallbackEvidenceUrl ----------
+
+import { sanitizeFallbackEvidenceUrl } from "./host_hints.ts";
+
+Deno.test("sanitizeFallback: Amazon /dp/<ASIN> with query+ref → canonical /dp/<ASIN>/", () => {
+  assertEquals(
+    sanitizeFallbackEvidenceUrl(
+      "https://www.amazon.in/MOXIE-BEAUTY-Super-Defining-Cream/dp/B0CP23212D/ref=bmx_dp_d?pd_rd_w=DEYaL&th=1",
+    ),
+    "https://www.amazon.in/dp/B0CP23212D/",
+  );
+});
+
+Deno.test("sanitizeFallback: Amazon /gp/product/<ASIN> → canonical /dp/<ASIN>/", () => {
+  assertEquals(
+    sanitizeFallbackEvidenceUrl("https://www.amazon.in/gp/product/B0FGJF5QN7/?ref_=x"),
+    "https://www.amazon.in/dp/B0FGJF5QN7/",
+  );
+});
+
+Deno.test("sanitizeFallback: non-Amazon strips query+fragment → origin+pathname", () => {
+  assertEquals(
+    sanitizeFallbackEvidenceUrl("https://www.nykaa.com/foo/bar?utm_source=x&z=1#section"),
+    "https://www.nykaa.com/foo/bar",
+  );
+});
+
+Deno.test("sanitizeFallback: strips username/password credentials", () => {
+  assertEquals(
+    sanitizeFallbackEvidenceUrl("https://user:pass@example.com/path?x=1"),
+    "https://example.com/path",
+  );
+});
+
+Deno.test("sanitizeFallback: rejects non-http(s) protocols", () => {
+  assertEquals(sanitizeFallbackEvidenceUrl("javascript:alert(1)"), null);
+  assertEquals(sanitizeFallbackEvidenceUrl("data:text/html,<x>"), null);
+  assertEquals(sanitizeFallbackEvidenceUrl("file:///etc/passwd"), null);
+  assertEquals(sanitizeFallbackEvidenceUrl("ftp://example.com/x"), null);
+  assertEquals(sanitizeFallbackEvidenceUrl("blob:https://example.com/abc"), null);
+});
+
+Deno.test("sanitizeFallback: invalid URL → null", () => {
+  assertEquals(sanitizeFallbackEvidenceUrl("not a url"), null);
+  assertEquals(sanitizeFallbackEvidenceUrl(""), null);
+});
+
+Deno.test("sanitizeFallback: >512 chars after normalization → null (no mid-path truncation)", () => {
+  const longPath = "/" + "a".repeat(600);
+  assertEquals(sanitizeFallbackEvidenceUrl("https://example.com" + longPath), null);
+});
+
+Deno.test("sanitizeFallback: result contains no '?' or '#' for non-Amazon URL", () => {
+  const out = sanitizeFallbackEvidenceUrl(
+    "https://www.goodreads.com/book/show/123?utm=y#anchor",
+  );
+  if (!out) throw new Error("expected non-null");
+  if (out.includes("?") || out.includes("#")) {
+    throw new Error("expected no query/fragment, got: " + out);
+  }
+});

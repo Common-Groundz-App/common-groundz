@@ -187,3 +187,90 @@ export function buildV2Prompts(
     evidence_chars: bounded.chars,
   };
 }
+
+// ─── Phase 1: search-only fallback prompt ────────────────────────────────
+// Minimal, whitelisted, capped evidence for the last-resort google_search-only
+// Gemini fallback. Excludes raw HTML, Firecrawl markdown/HTML, image URLs,
+// query strings, fragments, OG/JSON-LD blobs, headers, redirects, model output.
+// Every field below is untrusted evidence — Zod + recovery gate stay authoritative.
+
+const SEARCH_FALLBACK_CAPS = {
+  host: 128,
+  amazon_path_slug: 120,
+  title: 200,
+  description: 400,
+  site_name: 80,
+} as const;
+
+export interface V2SearchOnlyEvidence {
+  /** Sanitized URL from sanitizeFallbackEvidenceUrl(); null → omitted. */
+  url: string | null;
+  /** Hostname of the original URL; null/empty → omitted. */
+  host: string | null;
+  /** Sanitized Amazon slug from extractAmazonPathSlug(); null → omitted. */
+  amazonPathSlug: string | null;
+  /** Optional whitelisted metadata; each field individually optional. */
+  metadata?: {
+    title?: string | null;
+    description?: string | null;
+    site_name?: string | null;
+    mapped_type?: string | null;
+  };
+}
+
+function capStr(s: string | null | undefined, max: number): string | null {
+  if (!s) return null;
+  const t = String(s);
+  if (t.length === 0) return null;
+  return t.length > max ? t.slice(0, max) : t;
+}
+
+/**
+ * Build the search-only fallback prompts. Same system prompt and JSON shape
+ * as the primary path so Zod + recovery gate apply unchanged; the user prompt
+ * carries only the whitelisted evidence above.
+ */
+export function buildSearchOnlyV2Prompts(
+  evidence: V2SearchOnlyEvidence,
+): V2PromptOutput {
+  const payload: Record<string, unknown> = {};
+  const url = capStr(evidence.url, 512);
+  if (url) payload.url = url;
+  const host = capStr(evidence.host, SEARCH_FALLBACK_CAPS.host);
+  if (host) payload.host = host;
+  const slug = capStr(evidence.amazonPathSlug, SEARCH_FALLBACK_CAPS.amazon_path_slug);
+  if (slug) payload.amazon_path_slug = slug;
+
+  const m = evidence.metadata ?? {};
+  const meta: Record<string, unknown> = {};
+  const title = capStr(m.title, SEARCH_FALLBACK_CAPS.title);
+  if (title) meta.title = title;
+  const description = capStr(m.description, SEARCH_FALLBACK_CAPS.description);
+  if (description) meta.description = description;
+  const site_name = capStr(m.site_name, SEARCH_FALLBACK_CAPS.site_name);
+  if (site_name) meta.site_name = site_name;
+  if (m.mapped_type) meta.mapped_type = m.mapped_type;
+  if (Object.keys(meta).length > 0) payload.extract_metadata = meta;
+
+  const systemPrompt = [
+    "You are an entity classifier and extractor. You receive ONLY a sanitized URL and a tiny whitelisted evidence object derived from that URL. The page was not fetched. Use Google Search grounding to identify the entity at the URL.",
+    PROMPT_INJECTION_GUARD,
+    JSON_SHAPE_SPEC,
+  ].join("\n\n");
+
+  const serialized = JSON.stringify(payload);
+  const userPrompt = [
+    url ? `URL: ${url}` : "URL: (unavailable)",
+    "EVIDENCE_TRUNCATED: false",
+    "EXTRACTED_EVIDENCE:",
+    serialized,
+  ].join("\n");
+
+  return {
+    systemPrompt,
+    userPrompt,
+    evidence_truncated: false,
+    evidence_chars: serialized.length,
+  };
+}
+
