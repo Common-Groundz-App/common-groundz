@@ -37,9 +37,13 @@ import { extractFromFirecrawl } from "./firecrawl_recovery.ts";
 import {
   chooseEvidenceBaseUrl,
   runGeminiJsonMode,
+  callGeminiSearchOnly,
+  SEARCH_FALLBACK_TIMEOUT_MS,
+  SEARCH_FALLBACK_BUDGET_BUFFER_MS,
   type GeminiResult,
   type GeminiWarningCode,
 } from "./gemini.ts";
+
 import { buildV2Prompts } from "./prompt-generator-v2.ts";
 import {
   mergePredictions,
@@ -191,6 +195,8 @@ async function invokeGemini(args: {
   evidenceBaseUrl: string;
   extractMetadata: ExtractResult["metadata"];
   usedFirecrawl: boolean;
+  searchOnly?: boolean;
+  timeoutMs?: number;
 }): Promise<GeminiResult> {
   // Phase A3: for Amazon URLs, send Gemini URL Context the canonical
   // /dp/<ASIN>/ URL (strips tracking junk). Preserve the original path slug
@@ -213,12 +219,27 @@ async function invokeGemini(args: {
     },
     promptBaseUrl,
   );
+  if (args.searchOnly) {
+    return await callGeminiSearchOnly({
+      systemPrompt,
+      userPrompt,
+      evidenceBaseUrl: promptBaseUrl,
+      timeoutMs: args.timeoutMs,
+    });
+  }
   return await runGeminiJsonMode({
     systemPrompt,
     userPrompt,
     evidenceBaseUrl: promptBaseUrl,
   });
 }
+
+// ─── Search-only fallback configuration ──────────────────────────────────
+// Total wall-clock budget for one analyze-entity-url-v2 request. Used to
+// gate the last-resort search-only Gemini fallback so it never overruns
+// the edge-function deadline. Conservative; well under Supabase's 50s cap.
+const REQUEST_TOTAL_BUDGET_MS = 45_000;
+
 
 type GeminiMetadataBlock = NonNullable<V2SuccessResponse["metadata"]["gemini"]>;
 
@@ -593,14 +614,132 @@ serve(async (req) => {
         extractedOffers: recExtract?.extractedOffers ?? null,
         firecrawlListSalePair: recListSalePair,
       };
-      const { predictions: recMerged, mergeDiag: recMergeDiag } = applyMerge(
+      let { predictions: recMerged, mergeDiag: recMergeDiag } = applyMerge(
         recExtract?.predictions ?? null,
         recGeminiPred,
         recFlags,
       );
 
+      // ─── Last-resort search-only Gemini fallback ──────────────────────
+      // Strict trigger order (first match wins):
+      //   1) prior_prediction_valid   → recMerged !== null
+      //   2) not_recovery_path        → never (this block is recovery-only)
+      //   3) firecrawl_succeeded      → recExtract has gate-passing preds
+      //   4) primary_gemini_succeeded → recGeminiPred already valid
+      //   5) budget_exhausted         → not enough wall-clock remaining
+      //   6) null                     → fallback actually runs
+      // Failure of the fallback preserves the original recovery error.
+      let recFallbackAttempted = false;
+      let recFallbackOk = false;
+      let recFallbackSkipReason: string | null = null;
+      let recFallbackError: ReturnType<typeof Object> | undefined;
+      let recFallbackDurationMs: number | undefined;
+      let recFallbackUsed = false;
+
+      if (recMerged) {
+        recFallbackSkipReason = "prior_prediction_valid";
+      } else if (recExtract?.predictions) {
+        recFallbackSkipReason = "firecrawl_succeeded";
+      } else if (recGeminiPred) {
+        recFallbackSkipReason = "primary_gemini_succeeded";
+      } else if (!geminiConfigured) {
+        // No Gemini API key → fallback cannot run. Not part of the four
+        // documented precedence reasons; use an explicit honest label.
+        recFallbackSkipReason = "gemini_not_configured";
+
+      } else {
+        const elapsed = Date.now() - t0;
+        const remainingMs = REQUEST_TOTAL_BUDGET_MS - elapsed;
+        if (
+          remainingMs <
+          SEARCH_FALLBACK_TIMEOUT_MS + SEARCH_FALLBACK_BUDGET_BUFFER_MS
+        ) {
+          recFallbackSkipReason = "budget_exhausted";
+        } else {
+          recFallbackAttempted = true;
+          recFallbackSkipReason = null;
+          const fbStart = Date.now();
+          const evidenceBaseUrl = chooseEvidenceBaseUrl({
+            firecrawlFinalUrl: recFirecrawlOk ? recEvidenceBaseUrl : null,
+            fetchFinalUrl: null,
+            safeUrl: safe.url,
+          });
+          const fbGem = await invokeGemini({
+            url: safe.url,
+            html: recHtml,
+            evidenceBaseUrl,
+            extractMetadata: recExtract?.metadata ?? EMPTY_EXTRACT_METADATA,
+            usedFirecrawl: recFirecrawlOk,
+            searchOnly: true,
+          });
+          recFallbackDurationMs = Date.now() - fbStart;
+          if (fbGem.ok) {
+            // Re-merge with the fallback prediction.
+            const reMerge = applyMerge(
+              recExtract?.predictions ?? null,
+              fbGem.prediction,
+              recFlags,
+            );
+            if (reMerge.predictions) {
+              recFallbackOk = true;
+              recFallbackUsed = true;
+              recMerged = reMerge.predictions;
+              recMergeDiag = reMerge.mergeDiag;
+              recGeminiPred = fbGem.prediction;
+              // Refresh gemini block to reflect the winning call's grounding.
+              recGeminiBlock = geminiSuccessBlock(fbGem);
+            } else {
+              recFallbackOk = false;
+              recFallbackError = "RECOVERY_GATE_FAILED" as unknown as object;
+            }
+          } else if (fbGem.configured) {
+            recFallbackOk = false;
+            recFallbackError = fbGem.code as unknown as object;
+            recWarnings.push(fbGem.code satisfies GeminiWarningCode);
+          }
+        }
+      }
+
+      // Attach fallback diagnostics onto the existing gemini block (additive).
+      if (recGeminiBlock) {
+        recGeminiBlock = {
+          ...recGeminiBlock,
+          search_fallback_attempted: recFallbackAttempted,
+          search_fallback_ok: recFallbackOk,
+          search_fallback_skip_reason: recFallbackSkipReason,
+          ...(recFallbackError !== undefined
+            ? { search_fallback_error: recFallbackError as never }
+            : {}),
+          ...(recFallbackDurationMs !== undefined
+            ? { search_fallback_duration_ms: recFallbackDurationMs }
+            : {}),
+        };
+      } else if (recFallbackAttempted) {
+        // No primary block existed (e.g. gemini not configured path won't reach
+        // here because we skip the fallback). Create a minimal block so the
+        // additive diagnostics survive into the response.
+        recGeminiBlock = {
+          used: recFallbackOk,
+          search_fallback_attempted: recFallbackAttempted,
+          search_fallback_ok: recFallbackOk,
+          search_fallback_skip_reason: recFallbackSkipReason,
+          ...(recFallbackError !== undefined
+            ? { search_fallback_error: recFallbackError as never }
+            : {}),
+          ...(recFallbackDurationMs !== undefined
+            ? { search_fallback_duration_ms: recFallbackDurationMs }
+            : {}),
+        };
+      }
+
+
       if (recMerged) {
         const recPricing = recMerged.additional_data.pricing as PricingBlock | undefined;
+        const finalSource = recFallbackUsed
+          ? "gemini_search_fallback"
+          : recExtract
+            ? "firecrawl_recovery"
+            : "gemini_recovery";
         const response: V2SuccessResponse = {
           success: true,
           predictions: recMerged,
@@ -616,12 +755,17 @@ serve(async (req) => {
             used_google_search: recGeminiBlock?.used_google_search ?? false,
             used_firecrawl: recFirecrawlOk,
             phase: 8,
-            stage: recExtract ? "firecrawl-recovered" : "gemini-recovered",
+            stage: recFallbackUsed
+              ? "gemini-search-fallback"
+              : recExtract
+                ? "firecrawl-recovered"
+                : "gemini-recovered",
             ...(recExtract ? { extract: recExtract.metadata } : {}),
             ...(recFirecrawlBlock ? { firecrawl: recFirecrawlBlock } : {}),
             ...(recGeminiBlock ? { gemini: recGeminiBlock } : {}),
             merge: recMergeDiag,
             ...(recPricing ? { pricing: summarizePricing(recPricing, recMergeDiag.price_source_used) } : {}),
+            final_prediction_source: finalSource,
           },
           warnings: recWarnings.length > 0 ? recWarnings : undefined,
         };
@@ -648,12 +792,33 @@ serve(async (req) => {
           : { attempted: false, ok: false };
         trace.merge = { path: recMergeDiag.path, field_winners: recMergeDiag.field_winners as unknown as Record<string, string> };
         trace.final = {
-          prediction_source: recExtract ? "firecrawl_recovery" : "gemini_recovery",
+          prediction_source: finalSource,
           error_code: "OK",
           total_duration_ms: Date.now() - t0,
         };
+        console.info("[analyze-entity-url-v2] gemini_search_fallback", {
+          request_id,
+          attempted: recFallbackAttempted,
+          ok: recFallbackOk,
+          skip_reason: recFallbackSkipReason,
+          duration_ms: recFallbackDurationMs,
+          final_prediction_source: finalSource,
+        });
         return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
+
+      // Fallback did not produce predictions either — preserve original error
+      // but log fallback telemetry for observability.
+      console.info("[analyze-entity-url-v2] gemini_search_fallback", {
+        request_id,
+        attempted: recFallbackAttempted,
+        ok: recFallbackOk,
+        skip_reason: recFallbackSkipReason,
+        duration_ms: recFallbackDurationMs,
+        final_prediction_source: "none",
+        original_error_code: e.code,
+      });
+
 
 
       // Strict contract: return the ORIGINAL fetch error unchanged.

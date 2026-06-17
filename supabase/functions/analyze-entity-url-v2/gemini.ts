@@ -38,6 +38,16 @@ export const GEMINI_API_TIMEOUT_MS = 20_000;
 export const GEMINI_LOCAL_TIMEOUT_MS = 22_000;
 export const GEMINI_TEMPERATURE = 0.15;
 
+// Search-only fallback constants. Used by analyze-entity-url-v2/index.ts.
+// The fallback runs at most once per request, only on the recovery path,
+// only when every earlier step (direct fetch, Firecrawl recovery, primary
+// Gemini with url_context + google_search) failed to produce a gate-passing
+// prediction, and only if at least SEARCH_FALLBACK_TIMEOUT_MS +
+// SEARCH_FALLBACK_BUDGET_BUFFER_MS remain in the request budget.
+export const SEARCH_FALLBACK_TIMEOUT_MS = 8_000;
+export const SEARCH_FALLBACK_BUDGET_BUFFER_MS = 1_000;
+
+
 export interface GeminiGrounding {
   used_url_context: boolean;
   used_google_search: boolean;
@@ -83,7 +93,22 @@ export interface RunGeminiArgs {
   fetchImpl?: typeof fetch;
   /** Local AbortController timeout (ms). */
   timeoutMs?: number;
+  /**
+   * Override the Gemini `tools` array. Defaults to
+   * `[{ url_context: {} }, { google_search: {} }]` (primary path).
+   * The search-only fallback overrides to `[{ google_search: {} }]`.
+   * Nothing else about the request body changes.
+   */
+  tools?: Array<Record<string, unknown>>;
+  /**
+   * Optional external AbortSignal. When provided, the call aborts as soon
+   * as either this signal or the internal timeout fires.
+   */
+  abortSignal?: AbortSignal;
+  /** Diagnostic label used only in the structured log line. */
+  logLabel?: string;
 }
+
 
 function stripCodeFences(text: string): string {
   let s = text.trim();
@@ -448,6 +473,7 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
   const timeoutMs = args.timeoutMs ?? GEMINI_LOCAL_TIMEOUT_MS;
   const t0 = Date.now();
 
+  const tools = args.tools ?? [{ url_context: {} }, { google_search: {} }];
   const body = {
     systemInstruction: {
       role: "system",
@@ -459,7 +485,7 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
         parts: [{ text: args.userPrompt }],
       },
     ],
-    tools: [{ url_context: {} }, { google_search: {} }],
+    tools,
     generationConfig: {
       temperature: GEMINI_TEMPERATURE,
     },
@@ -467,12 +493,18 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onExternalAbort = () => controller.abort();
+  if (args.abortSignal) {
+    if (args.abortSignal.aborted) controller.abort();
+    else args.abortSignal.addEventListener("abort", onExternalAbort, { once: true });
+  }
   let res: Response;
   try {
     res = await fetchImpl(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+
       signal: controller.signal,
     });
   } catch (e) {
@@ -694,3 +726,25 @@ export function chooseEvidenceBaseUrl(opts: {
   }
   return opts.safeUrl;
 }
+
+/**
+ * Last-resort search-only Gemini fallback used by the V2 recovery path
+ * when the primary `url_context + google_search` call produced nothing
+ * usable. Only the tools list changes — same model, temperature,
+ * prompts, parser, schema, and recovery gate apply downstream.
+ *
+ * The caller MUST gate this behind the strict trigger conditions
+ * documented in analyze-entity-url-v2/index.ts (recovery path only,
+ * no prior valid prediction, sufficient budget).
+ */
+export function callGeminiSearchOnly(
+  args: Omit<RunGeminiArgs, "tools" | "timeoutMs"> & { timeoutMs?: number },
+): Promise<GeminiResult> {
+  return runGeminiJsonMode({
+    ...args,
+    tools: [{ google_search: {} }],
+    timeoutMs: args.timeoutMs ?? SEARCH_FALLBACK_TIMEOUT_MS,
+    logLabel: "search_fallback",
+  });
+}
+

@@ -159,7 +159,30 @@ export interface V2SuccessResponse {
       error_code?: GeminiErrorCode;
       produced_fields?: number;
       field_confidence_present?: boolean;
+      /**
+       * Search-only fallback diagnostics. Additive; populated only when
+       * the recovery path evaluated the last-resort fallback (whether or
+       * not it actually ran). `skip_reason` is one of:
+       *   "prior_prediction_valid" | "not_recovery_path" |
+       *   "firecrawl_succeeded" | "primary_gemini_succeeded" |
+       *   "budget_exhausted" | null
+       * Precedence is top-down (first match wins). `null` means the
+       * fallback actually ran. Never branch on these fields.
+       */
+      search_fallback_attempted?: boolean;
+      search_fallback_ok?: boolean;
+      search_fallback_skip_reason?: string | null;
+      search_fallback_error?: GeminiErrorCode;
+      search_fallback_duration_ms?: number;
     };
+    /**
+     * Final source of the returned predictions. Free-form string for
+     * observability only. Examples: "extractor_merge", "firecrawl_merge",
+     * "firecrawl_recovery", "gemini_recovery", "gemini_search_fallback",
+     * "none". Diagnostic-only; do not branch on it.
+     */
+    final_prediction_source?: string;
+
     /**
      * Phase 8+: merge diagnostics. Present when mergePredictions ran.
      * Additive; downstream code MUST NOT branch on it.
