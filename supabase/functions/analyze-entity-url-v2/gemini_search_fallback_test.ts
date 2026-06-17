@@ -148,8 +148,8 @@ Deno.test("search-only fallback honors abortSignal (aborts fetch in flight)", as
   }
 });
 
-Deno.test("search-only fallback timeout default is 8s with 1s buffer constant exposed", () => {
-  assertEquals(SEARCH_FALLBACK_TIMEOUT_MS, 8_000);
+Deno.test("search-only fallback timeout is 14s with 1s buffer constant exposed", () => {
+  assertEquals(SEARCH_FALLBACK_TIMEOUT_MS, 14_000);
   assertEquals(SEARCH_FALLBACK_BUDGET_BUFFER_MS, 1_000);
 });
 
