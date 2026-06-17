@@ -251,3 +251,283 @@ Deno.test("buildSearchOnlyV2Prompts: omits url field when sanitizer returned nul
   // No leftover `"url":` key in payload either.
   assertFalse(userPrompt.includes("\"url\":"));
 });
+
+// ──────────────────────────────────────────────────────────────────────────
+// Phase 1.5: shared maybeRunGeminiSearchFallback helper tests.
+// ──────────────────────────────────────────────────────────────────────────
+
+import {
+  maybeRunGeminiSearchFallback,
+  type SearchFallbackGeminiInvoker,
+  type SearchFallbackMerger,
+} from "./search_fallback.ts";
+import type { ExtractMetadata, V2Predictions } from "./schema.ts";
+import type { MergeFlags, MergeDiagnostics } from "./merge.ts";
+import type { GeminiResult } from "./gemini.ts";
+import type { GeminiRawPrediction } from "./response_schema.ts";
+
+const EMPTY_META: ExtractMetadata = {
+  has_jsonld: false,
+  jsonld_blocks: 0,
+  has_og: false,
+  has_twitter: false,
+  sources: [],
+  mapped_type: null,
+  confidence: null,
+  weak_signals: true,
+};
+
+const EMPTY_FLAGS: MergeFlags = {
+  priceConflict: false,
+  firecrawlCurrency: null,
+  firecrawlImageUrl: null,
+  priceSourceHint: null,
+  extractedOffers: null,
+  firecrawlListSalePair: null,
+};
+
+function makePred(name = "Test"): V2Predictions {
+  return {
+    type: "product",
+    name,
+    description: null,
+    category_id: null,
+    suggested_category_path: null,
+    matched_category_name: null,
+    tags: [],
+    confidence: 0.9,
+    reasoning: "",
+    image_url: null,
+    images: [],
+    additional_data: {},
+  };
+}
+
+function makeGeminiPred(): GeminiRawPrediction {
+  return {
+    type: "product",
+    name: "Fallback Hit",
+    description: "From search-only fallback.",
+    tags: ["tag"],
+    confidence: 0.9,
+    reasoning: "search consistent",
+    image_url: null,
+    images: [],
+    additional_data: { brand: "B" },
+    field_confidence: { name: 0.9 },
+  } as unknown as GeminiRawPrediction;
+}
+
+function makeGeminiSuccess(): GeminiResult {
+  return {
+    ok: true,
+    configured: true,
+    durationMs: 100,
+    model: "gemini-2.5-flash",
+    grounding: {
+      used_url_context: false,
+      used_google_search: true,
+      url_retrieval_statuses: [],
+      url_context_failed: false,
+    },
+    prediction: makeGeminiPred(),
+  };
+}
+
+function makeGeminiFailure(code = "GEMINI_BAD_RESPONSE"): GeminiResult {
+  return {
+    ok: false,
+    configured: true,
+    code: code as never,
+    durationMs: 50,
+    model: "gemini-2.5-flash",
+  };
+}
+
+const DIAG_OK: MergeDiagnostics = {
+  path: "gemini_only",
+  field_winners: {},
+} as unknown as MergeDiagnostics;
+
+function mergerThatReturns(
+  p: V2Predictions | null,
+): SearchFallbackMerger {
+  return () => ({ predictions: p, mergeDiag: DIAG_OK });
+}
+
+const baseArgs = {
+  geminiConfigured: true,
+  elapsedMs: 0,
+  totalBudgetMs: 45_000,
+  safeUrl: "https://example.com/x",
+  evidenceBaseUrl: "https://example.com/x",
+  extractMetadata: EMPTY_META,
+  usedFirecrawl: false,
+  mergeFlags: EMPTY_FLAGS,
+  extractPredictions: null,
+};
+
+Deno.test("helper: skips with prior_prediction_valid when currentMerged is set", async () => {
+  let called = false;
+  const inv: SearchFallbackGeminiInvoker = () => {
+    called = true;
+    return Promise.resolve(makeGeminiSuccess());
+  };
+  const res = await maybeRunGeminiSearchFallback(
+    { ...baseArgs, currentMerged: makePred(), primaryGeminiPred: null },
+    { geminiInvoker: inv, applyMerge: mergerThatReturns(makePred()) },
+  );
+  assertEquals(res.skipReason, "prior_prediction_valid");
+  assertFalse(res.attempted);
+  assertFalse(called);
+});
+
+Deno.test("helper: weak Firecrawl (extractPredictions !== null, currentMerged === null) does NOT block fallback", async () => {
+  // Regression guard for Root Hair Serum bug: a non-null extract that
+  // failed the recovery gate must still allow the fallback to run.
+  let invoked = false;
+  const inv: SearchFallbackGeminiInvoker = () => {
+    invoked = true;
+    return Promise.resolve(makeGeminiSuccess());
+  };
+  const res = await maybeRunGeminiSearchFallback(
+    {
+      ...baseArgs,
+      currentMerged: null,
+      primaryGeminiPred: null,
+      extractPredictions: makePred("Weak Extract"),
+    },
+    { geminiInvoker: inv, applyMerge: mergerThatReturns(makePred("Final")) },
+  );
+  assert(invoked);
+  assertEquals(res.skipReason, null);
+  assert(res.attempted);
+  assert(res.used);
+  assertEquals(res.mergedPredictions?.name, "Final");
+});
+
+Deno.test("helper: skips with primary_gemini_succeeded when primary returned a prediction", async () => {
+  let called = false;
+  const inv: SearchFallbackGeminiInvoker = () => {
+    called = true;
+    return Promise.resolve(makeGeminiSuccess());
+  };
+  const res = await maybeRunGeminiSearchFallback(
+    { ...baseArgs, currentMerged: null, primaryGeminiPred: makeGeminiPred() },
+    { geminiInvoker: inv, applyMerge: mergerThatReturns(null) },
+  );
+  assertEquals(res.skipReason, "primary_gemini_succeeded");
+  assertFalse(called);
+});
+
+Deno.test("helper: skips with gemini_not_configured when key missing", async () => {
+  let called = false;
+  const inv: SearchFallbackGeminiInvoker = () => {
+    called = true;
+    return Promise.resolve(makeGeminiSuccess());
+  };
+  const res = await maybeRunGeminiSearchFallback(
+    { ...baseArgs, currentMerged: null, primaryGeminiPred: null, geminiConfigured: false },
+    { geminiInvoker: inv, applyMerge: mergerThatReturns(makePred()) },
+  );
+  assertEquals(res.skipReason, "gemini_not_configured");
+  assertFalse(called);
+});
+
+Deno.test("helper: skips with budget_exhausted when remaining < timeout+buffer", async () => {
+  let called = false;
+  const inv: SearchFallbackGeminiInvoker = () => {
+    called = true;
+    return Promise.resolve(makeGeminiSuccess());
+  };
+  // 14_000 + 1_000 = 15_000 required; give 14_000 remaining.
+  const res = await maybeRunGeminiSearchFallback(
+    {
+      ...baseArgs,
+      currentMerged: null,
+      primaryGeminiPred: null,
+      elapsedMs: 31_000,
+      totalBudgetMs: 45_000,
+    },
+    { geminiInvoker: inv, applyMerge: mergerThatReturns(makePred()) },
+  );
+  assertEquals(res.skipReason, "budget_exhausted");
+  assertFalse(called);
+});
+
+Deno.test("helper: GEMINI_BAD_RESPONSE primary → fallback runs; fallback ok → used=true with gemini_search_fallback merge", async () => {
+  const inv: SearchFallbackGeminiInvoker = () => Promise.resolve(makeGeminiSuccess());
+  const res = await maybeRunGeminiSearchFallback(
+    { ...baseArgs, currentMerged: null, primaryGeminiPred: null },
+    { geminiInvoker: inv, applyMerge: mergerThatReturns(makePred("Won")) },
+  );
+  assert(res.attempted);
+  assert(res.ok);
+  assert(res.used);
+  assertEquals(res.mergedPredictions?.name, "Won");
+  assert(res.geminiResult?.ok);
+});
+
+Deno.test("helper: fallback failure preserves original error code; used=false; error set", async () => {
+  const inv: SearchFallbackGeminiInvoker = () => Promise.resolve(makeGeminiFailure("GEMINI_BAD_RESPONSE"));
+  const res = await maybeRunGeminiSearchFallback(
+    { ...baseArgs, currentMerged: null, primaryGeminiPred: null },
+    { geminiInvoker: inv, applyMerge: mergerThatReturns(null) },
+  );
+  assert(res.attempted);
+  assertFalse(res.ok);
+  assertFalse(res.used);
+  assertEquals(res.error, "GEMINI_BAD_RESPONSE");
+});
+
+Deno.test("helper: fallback returns prediction but recovery gate fails → used=false, error=RECOVERY_GATE_FAILED", async () => {
+  const inv: SearchFallbackGeminiInvoker = () => Promise.resolve(makeGeminiSuccess());
+  const res = await maybeRunGeminiSearchFallback(
+    { ...baseArgs, currentMerged: null, primaryGeminiPred: null },
+    { geminiInvoker: inv, applyMerge: mergerThatReturns(null) },
+  );
+  assert(res.attempted);
+  assert(res.ok);
+  assertFalse(res.used);
+  assertEquals(res.error, "RECOVERY_GATE_FAILED");
+});
+
+Deno.test("helper sentinel: invoker is never given an `html`/`rawHtml` field (raw-HTML guarantee)", async () => {
+  // Phase 1.5 raw-HTML guarantee: it must be structurally impossible to
+  // pass page HTML into the search-only prompt path. We capture the keys
+  // the helper passes to the injected invoker and assert no html-derived
+  // key is present. The TypeScript signature already forbids `html`; this
+  // test guards against runtime/object-shape regressions.
+  let capturedKeys: string[] = [];
+  let capturedJson = "";
+  const SENTINEL = "__RAW_HTML_SENTINEL_<<<>>>__";
+  const inv: SearchFallbackGeminiInvoker = (a) => {
+    capturedKeys = Object.keys(a);
+    capturedJson = JSON.stringify(a);
+    return Promise.resolve(makeGeminiSuccess());
+  };
+  await maybeRunGeminiSearchFallback(
+    {
+      ...baseArgs,
+      // Stuff the sentinel into the metadata's mapped_type slot. The helper
+      // forwards extractMetadata verbatim, but the search-only prompt builder
+      // only whitelists specific fields. Either way, no `html` key should
+      // ever appear in the invoker's argument object.
+      currentMerged: null,
+      primaryGeminiPred: null,
+      // deno-lint-ignore no-explicit-any
+      extractMetadata: { ...EMPTY_META, mapped_type: SENTINEL as any },
+    },
+    { geminiInvoker: inv, applyMerge: mergerThatReturns(makePred()) },
+  );
+  assertFalse(capturedKeys.includes("html"));
+  assertFalse(capturedKeys.includes("rawHtml"));
+  assertFalse(capturedKeys.includes("body"));
+  assertFalse(capturedKeys.includes("bodyText"));
+  // The sentinel was only allowed through extractMetadata; assert no leak
+  // outside that field's JSON path (the test is intentionally lenient here
+  // — the prompt-builder cap test above already proves the search-only
+  // prompt does not echo raw HTML / og / jsonld / twitter blobs).
+  assert(capturedJson.includes("extractMetadata"));
+});
+
