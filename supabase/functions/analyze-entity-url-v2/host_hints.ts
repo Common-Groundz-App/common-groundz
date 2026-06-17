@@ -100,3 +100,56 @@ export function extractAmazonPathSlug(url: string): string | null {
     return null;
   }
 }
+
+// Hard cap for the sanitized fallback-evidence URL. Search-only fallback
+// prompts must never carry messy URLs into the model.
+const FALLBACK_URL_MAX_CHARS = 512;
+
+/**
+ * Phase 1: produce a sanitized URL safe to embed in the search-only fallback
+ * prompt. Applied for ALL hosts (the fallback can run on non-Amazon URLs too,
+ * where canonicalizeAmazonUrl is a no-op and would leak tracking params).
+ *
+ * Rules:
+ *  - parse failure → null
+ *  - protocol allowlist (defense in depth): only http(s) is permitted;
+ *    javascript:, data:, file:, blob:, ftp:, custom schemes → null
+ *  - strip username, password, search (query string), hash (fragment)
+ *  - Amazon product URL with extractable ASIN → canonical https://<host>/dp/<ASIN>/
+ *  - otherwise → `${url.origin}${url.pathname}`
+ *  - enforce 512-char cap; over the cap → null (never truncate mid-path)
+ *
+ * Pure. Never throws.
+ */
+export function sanitizeFallbackEvidenceUrl(rawUrl: string): string | null {
+  let u: URL;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+  u.username = "";
+  u.password = "";
+  u.search = "";
+  u.hash = "";
+  let out: string;
+  if (isAmazonHost(u.hostname)) {
+    const m = u.pathname.match(AMAZON_ASIN_PATH_RE);
+    if (m) {
+      const asin = m[1].toUpperCase();
+      if (ASIN_RE.test(asin)) {
+        out = `https://${u.hostname}/dp/${asin}/`;
+      } else {
+        out = `${u.origin}${u.pathname}`;
+      }
+    } else {
+      out = `${u.origin}${u.pathname}`;
+    }
+  } else {
+    out = `${u.origin}${u.pathname}`;
+  }
+  if (out.length > FALLBACK_URL_MAX_CHARS) return null;
+  return out;
+}
+
