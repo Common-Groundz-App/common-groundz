@@ -266,6 +266,20 @@ async function invokeGemini(args: {
 }
 
 
+// Search-only Gemini invoker for the shared fallback helper. Intentionally
+// has NO `html` field — guarantees raw HTML can never reach the search-only
+// prompt path (see search_fallback.ts and the sentinel test).
+const searchOnlyGeminiInvoker: SearchFallbackGeminiInvoker = (a) =>
+  invokeGemini({
+    url: a.safeUrl,
+    html: "",
+    evidenceBaseUrl: a.evidenceBaseUrl,
+    extractMetadata: a.extractMetadata,
+    usedFirecrawl: a.usedFirecrawl,
+    searchOnly: true,
+    timeoutMs: a.timeoutMs,
+  });
+
 // ─── Search-only fallback configuration ──────────────────────────────────
 // Total wall-clock budget for one analyze-entity-url-v2 request. Used to
 // gate the last-resort search-only Gemini fallback so it never overruns
