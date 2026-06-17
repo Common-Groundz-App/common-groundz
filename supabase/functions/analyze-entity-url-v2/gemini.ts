@@ -473,6 +473,7 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
   const timeoutMs = args.timeoutMs ?? GEMINI_LOCAL_TIMEOUT_MS;
   const t0 = Date.now();
 
+  const tools = args.tools ?? [{ url_context: {} }, { google_search: {} }];
   const body = {
     systemInstruction: {
       role: "system",
@@ -484,7 +485,7 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
         parts: [{ text: args.userPrompt }],
       },
     ],
-    tools: [{ url_context: {} }, { google_search: {} }],
+    tools,
     generationConfig: {
       temperature: GEMINI_TEMPERATURE,
     },
@@ -492,12 +493,18 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onExternalAbort = () => controller.abort();
+  if (args.abortSignal) {
+    if (args.abortSignal.aborted) controller.abort();
+    else args.abortSignal.addEventListener("abort", onExternalAbort, { once: true });
+  }
   let res: Response;
   try {
     res = await fetchImpl(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+
       signal: controller.signal,
     });
   } catch (e) {
