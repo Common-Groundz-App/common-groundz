@@ -1005,11 +1005,91 @@ serve(async (req) => {
       extractedOffers: extract.extractedOffers ?? null,
       firecrawlListSalePair: mainListSalePair,
     };
-    const { predictions: mainMerged, mergeDiag: mainMergeDiag } = applyMerge(
+    let { predictions: mainMerged, mergeDiag: mainMergeDiag } = applyMerge(
       extract.predictions,
       mainGeminiPred,
       mainFlags,
     );
+
+    // ─── Phase 1.5: search-only Gemini fallback in main branch ──────────
+    // Runs only when the main branch has no usable merged prediction.
+    // Same shared helper as the recovery branch; see search_fallback.ts.
+    let mainFallbackUsed = false;
+    let mainFallbackAttempted = false;
+    let mainFallbackOk = false;
+    let mainFallbackSkipReason: string | null = null;
+    let mainFallbackError: string | undefined;
+    let mainFallbackDurationMs: number | undefined;
+    if (!mainMerged) {
+      const mainEvidenceBaseUrlForFb = chooseEvidenceBaseUrl({
+        firecrawlFinalUrl: usedFirecrawl ? finalEvidenceBaseUrl : null,
+        fetchFinalUrl: !usedFirecrawl ? fetchResult.finalUrl : null,
+        safeUrl: safe.url,
+      });
+      const mainFb = await maybeRunGeminiSearchFallback(
+        {
+          currentMerged: mainMerged,
+          primaryGeminiPred: mainGeminiPred,
+          geminiConfigured,
+          elapsedMs: Date.now() - t0,
+          totalBudgetMs: REQUEST_TOTAL_BUDGET_MS,
+          safeUrl: safe.url,
+          evidenceBaseUrl: mainEvidenceBaseUrlForFb,
+          extractMetadata: extract.metadata,
+          usedFirecrawl,
+          mergeFlags: mainFlags,
+          extractPredictions: extract.predictions,
+        },
+        { geminiInvoker: searchOnlyGeminiInvoker, applyMerge },
+      );
+      mainFallbackAttempted = mainFb.attempted;
+      mainFallbackOk = mainFb.ok;
+      mainFallbackSkipReason = mainFb.skipReason;
+      mainFallbackError = mainFb.error;
+      mainFallbackDurationMs = mainFb.durationMs;
+      if (mainFb.used && mainFb.mergedPredictions && mainFb.mergeDiag && mainFb.geminiPred && mainFb.geminiResult?.ok) {
+        mainMerged = mainFb.mergedPredictions;
+        mainMergeDiag = mainFb.mergeDiag;
+        mainGeminiPred = mainFb.geminiPred;
+        // Refresh the gemini block to reflect the winning call's grounding.
+        geminiBlock = geminiSuccessBlock(mainFb.geminiResult);
+        mainFallbackUsed = true;
+      } else if (mainFb.attempted && !mainFb.ok && mainFb.error && mainFb.error !== "RECOVERY_GATE_FAILED") {
+        // Preserve the original primary-Gemini warning AND add the fallback
+        // failure code so observers see both failures.
+        (warnings as string[]).push(mainFb.error as GeminiWarningCode);
+      }
+
+      // Attach fallback telemetry to the gemini block (additive). If no
+      // primary block existed, create a minimal one so diagnostics survive.
+      if (geminiBlock && mainFallbackAttempted) {
+        geminiBlock = {
+          ...geminiBlock,
+          search_fallback_attempted: mainFallbackAttempted,
+          search_fallback_ok: mainFallbackOk,
+          search_fallback_skip_reason: mainFallbackSkipReason,
+          ...(mainFallbackError !== undefined
+            ? { search_fallback_error: mainFallbackError as never }
+            : {}),
+          ...(mainFallbackDurationMs !== undefined
+            ? { search_fallback_duration_ms: mainFallbackDurationMs }
+            : {}),
+        };
+      } else if (!geminiBlock && mainFallbackAttempted) {
+        geminiBlock = {
+          used: mainFallbackOk,
+          search_fallback_attempted: mainFallbackAttempted,
+          search_fallback_ok: mainFallbackOk,
+          search_fallback_skip_reason: mainFallbackSkipReason,
+          ...(mainFallbackError !== undefined
+            ? { search_fallback_error: mainFallbackError as never }
+            : {}),
+          ...(mainFallbackDurationMs !== undefined
+            ? { search_fallback_duration_ms: mainFallbackDurationMs }
+            : {}),
+        };
+      }
+    }
     const mainPricing = mainMerged?.additional_data.pricing as PricingBlock | undefined;
 
     const response: V2SuccessResponse = {
@@ -1027,11 +1107,13 @@ serve(async (req) => {
         used_google_search: geminiBlock?.used_google_search ?? false,
         used_firecrawl: usedFirecrawl,
         phase: 8,
-        stage: usedFirecrawl
-          ? "firecrawl-improved"
-          : mainMerged
-            ? "exact-page"
-            : "weak-signals",
+        stage: mainFallbackUsed
+          ? "gemini-search-fallback"
+          : usedFirecrawl
+            ? "firecrawl-improved"
+            : mainMerged
+              ? "exact-page"
+              : "weak-signals",
         fetch: {
           final_url: fetchResult.finalUrl,
           status: fetchResult.status,
@@ -1079,10 +1161,27 @@ serve(async (req) => {
     };
     trace.path = usedFirecrawl ? "weak_recovery" : "happy";
     trace.final = {
-      prediction_source: mainMerged ? (usedFirecrawl ? "firecrawl_merge" : "extractor_merge") : "none",
+      prediction_source: mainMerged
+        ? mainFallbackUsed
+          ? "gemini_search_fallback"
+          : usedFirecrawl
+            ? "firecrawl_merge"
+            : "extractor_merge"
+        : "none",
       error_code: mainMerged ? "OK" : "NO_PREDICTIONS",
       total_duration_ms: Date.now() - t0,
     };
+    if (mainFallbackAttempted || mainFallbackSkipReason) {
+      console.info("[analyze-entity-url-v2] gemini_search_fallback main", {
+        request_id,
+        attempted: mainFallbackAttempted,
+        ok: mainFallbackOk,
+        used: mainFallbackUsed,
+        skip_reason: mainFallbackSkipReason,
+        duration_ms: mainFallbackDurationMs,
+        final_prediction_source: trace.final.prediction_source,
+      });
+    }
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
   } catch (err) {
     console.error("[analyze-entity-url-v2] unhandled error:", { request_id, err: String(err) });
