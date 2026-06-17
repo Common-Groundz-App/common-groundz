@@ -37,9 +37,13 @@ import { extractFromFirecrawl } from "./firecrawl_recovery.ts";
 import {
   chooseEvidenceBaseUrl,
   runGeminiJsonMode,
+  callGeminiSearchOnly,
+  SEARCH_FALLBACK_TIMEOUT_MS,
+  SEARCH_FALLBACK_BUDGET_BUFFER_MS,
   type GeminiResult,
   type GeminiWarningCode,
 } from "./gemini.ts";
+
 import { buildV2Prompts } from "./prompt-generator-v2.ts";
 import {
   mergePredictions,
