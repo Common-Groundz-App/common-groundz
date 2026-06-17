@@ -666,85 +666,52 @@ serve(async (req) => {
         recFlags,
       );
 
-      // ─── Last-resort search-only Gemini fallback ──────────────────────
-      // Strict trigger order (first match wins):
-      //   1) prior_prediction_valid   → recMerged !== null
-      //   2) not_recovery_path        → never (this block is recovery-only)
-      //   3) firecrawl_succeeded      → recExtract has gate-passing preds
-      //   4) primary_gemini_succeeded → recGeminiPred already valid
-      //   5) budget_exhausted         → not enough wall-clock remaining
-      //   6) null                     → fallback actually runs
-      // Failure of the fallback preserves the original recovery error.
-      let recFallbackAttempted = false;
-      let recFallbackOk = false;
-      let recFallbackSkipReason: string | null = null;
-      let recFallbackError: ReturnType<typeof Object> | undefined;
-      let recFallbackDurationMs: number | undefined;
-      let recFallbackUsed = false;
-
-      if (recMerged) {
-        recFallbackSkipReason = "prior_prediction_valid";
-      } else if (recExtract?.predictions) {
-        recFallbackSkipReason = "firecrawl_succeeded";
-      } else if (recGeminiPred) {
-        recFallbackSkipReason = "primary_gemini_succeeded";
-      } else if (!geminiConfigured) {
-        // No Gemini API key → fallback cannot run. Not part of the four
-        // documented precedence reasons; use an explicit honest label.
-        recFallbackSkipReason = "gemini_not_configured";
-
-      } else {
-        const elapsed = Date.now() - t0;
-        const remainingMs = REQUEST_TOTAL_BUDGET_MS - elapsed;
-        if (
-          remainingMs <
-          SEARCH_FALLBACK_TIMEOUT_MS + SEARCH_FALLBACK_BUDGET_BUFFER_MS
-        ) {
-          recFallbackSkipReason = "budget_exhausted";
-        } else {
-          recFallbackAttempted = true;
-          recFallbackSkipReason = null;
-          const fbStart = Date.now();
-          const evidenceBaseUrl = chooseEvidenceBaseUrl({
-            firecrawlFinalUrl: recFirecrawlOk ? recEvidenceBaseUrl : null,
-            fetchFinalUrl: null,
-            safeUrl: safe.url,
-          });
-          const fbGem = await invokeGemini({
-            url: safe.url,
-            html: recHtml,
-            evidenceBaseUrl,
-            extractMetadata: recExtract?.metadata ?? EMPTY_EXTRACT_METADATA,
-            usedFirecrawl: recFirecrawlOk,
-            searchOnly: true,
-          });
-          recFallbackDurationMs = Date.now() - fbStart;
-          if (fbGem.ok) {
-            // Re-merge with the fallback prediction.
-            const reMerge = applyMerge(
-              recExtract?.predictions ?? null,
-              fbGem.prediction,
-              recFlags,
-            );
-            if (reMerge.predictions) {
-              recFallbackOk = true;
-              recFallbackUsed = true;
-              recMerged = reMerge.predictions;
-              recMergeDiag = reMerge.mergeDiag;
-              recGeminiPred = fbGem.prediction;
-              // Refresh gemini block to reflect the winning call's grounding.
-              recGeminiBlock = geminiSuccessBlock(fbGem);
-            } else {
-              recFallbackOk = false;
-              recFallbackError = "RECOVERY_GATE_FAILED" as unknown as object;
-            }
-          } else if (fbGem.configured) {
-            recFallbackOk = false;
-            recFallbackError = fbGem.code as unknown as object;
-            recWarnings.push(fbGem.code satisfies GeminiWarningCode);
-          }
-        }
+      // ─── Last-resort search-only Gemini fallback (shared helper) ──────
+      // See search_fallback.ts for skip-reason precedence. Note that the
+      // `firecrawl_succeeded` skip reason was removed in Phase 1.5: a
+      // non-null extract may still fail the recovery gate, so we only
+      // skip when a prior step produced a usable, gate-passing prediction
+      // (covered by `prior_prediction_valid`).
+      const recEvidenceBaseUrlForFb = chooseEvidenceBaseUrl({
+        firecrawlFinalUrl: recFirecrawlOk ? recEvidenceBaseUrl : null,
+        fetchFinalUrl: null,
+        safeUrl: safe.url,
+      });
+      const recFb = await maybeRunGeminiSearchFallback(
+        {
+          currentMerged: recMerged,
+          primaryGeminiPred: recGeminiPred,
+          geminiConfigured,
+          elapsedMs: Date.now() - t0,
+          totalBudgetMs: REQUEST_TOTAL_BUDGET_MS,
+          safeUrl: safe.url,
+          evidenceBaseUrl: recEvidenceBaseUrlForFb,
+          extractMetadata: recExtract?.metadata ?? EMPTY_EXTRACT_METADATA,
+          usedFirecrawl: recFirecrawlOk,
+          mergeFlags: recFlags,
+          extractPredictions: recExtract?.predictions ?? null,
+        },
+        { geminiInvoker: searchOnlyGeminiInvoker, applyMerge },
+      );
+      const recFallbackAttempted = recFb.attempted;
+      const recFallbackOk = recFb.ok;
+      const recFallbackSkipReason = recFb.skipReason;
+      const recFallbackError = recFb.error;
+      const recFallbackDurationMs = recFb.durationMs;
+      const recFallbackUsed = recFb.used;
+      if (recFb.used && recFb.mergedPredictions && recFb.mergeDiag && recFb.geminiPred && recFb.geminiResult?.ok) {
+        recMerged = recFb.mergedPredictions;
+        recMergeDiag = recFb.mergeDiag;
+        recGeminiPred = recFb.geminiPred;
+        // Refresh gemini block to reflect the winning call's grounding.
+        recGeminiBlock = geminiSuccessBlock(recFb.geminiResult);
+      } else if (recFb.attempted && !recFb.ok && recFb.error && recFb.error !== "RECOVERY_GATE_FAILED") {
+        // Preserve original failure context by recording the fallback error
+        // as a warning. The original primary-Gemini warning (if any) is
+        // already in recWarnings.
+        recWarnings.push(recFb.error as GeminiWarningCode);
       }
+
 
       // Attach fallback diagnostics onto the existing gemini block (additive).
       if (recGeminiBlock) {
