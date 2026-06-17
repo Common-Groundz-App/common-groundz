@@ -614,11 +614,123 @@ serve(async (req) => {
         extractedOffers: recExtract?.extractedOffers ?? null,
         firecrawlListSalePair: recListSalePair,
       };
-      const { predictions: recMerged, mergeDiag: recMergeDiag } = applyMerge(
+      let { predictions: recMerged, mergeDiag: recMergeDiag } = applyMerge(
         recExtract?.predictions ?? null,
         recGeminiPred,
         recFlags,
       );
+
+      // ─── Last-resort search-only Gemini fallback ──────────────────────
+      // Strict trigger order (first match wins):
+      //   1) prior_prediction_valid   → recMerged !== null
+      //   2) not_recovery_path        → never (this block is recovery-only)
+      //   3) firecrawl_succeeded      → recExtract has gate-passing preds
+      //   4) primary_gemini_succeeded → recGeminiPred already valid
+      //   5) budget_exhausted         → not enough wall-clock remaining
+      //   6) null                     → fallback actually runs
+      // Failure of the fallback preserves the original recovery error.
+      let recFallbackAttempted = false;
+      let recFallbackOk = false;
+      let recFallbackSkipReason: string | null = null;
+      let recFallbackError: ReturnType<typeof Object> | undefined;
+      let recFallbackDurationMs: number | undefined;
+      let recFallbackUsed = false;
+
+      if (recMerged) {
+        recFallbackSkipReason = "prior_prediction_valid";
+      } else if (recExtract?.predictions) {
+        recFallbackSkipReason = "firecrawl_succeeded";
+      } else if (recGeminiPred) {
+        recFallbackSkipReason = "primary_gemini_succeeded";
+      } else if (!geminiConfigured) {
+        // No flag exists, so we don't emit "disabled"; treat as budget skip
+        // would be misleading. Use a precedence-compatible label.
+        recFallbackSkipReason = "primary_gemini_succeeded";
+      } else {
+        const elapsed = Date.now() - t0;
+        const remainingMs = REQUEST_TOTAL_BUDGET_MS - elapsed;
+        if (
+          remainingMs <
+          SEARCH_FALLBACK_TIMEOUT_MS + SEARCH_FALLBACK_BUDGET_BUFFER_MS
+        ) {
+          recFallbackSkipReason = "budget_exhausted";
+        } else {
+          recFallbackAttempted = true;
+          recFallbackSkipReason = null;
+          const fbStart = Date.now();
+          const evidenceBaseUrl = chooseEvidenceBaseUrl({
+            firecrawlFinalUrl: recFirecrawlOk ? recEvidenceBaseUrl : null,
+            fetchFinalUrl: null,
+            safeUrl: safe.url,
+          });
+          const fbGem = await invokeGemini({
+            url: safe.url,
+            html: recHtml,
+            evidenceBaseUrl,
+            extractMetadata: recExtract?.metadata ?? EMPTY_EXTRACT_METADATA,
+            usedFirecrawl: recFirecrawlOk,
+            searchOnly: true,
+          });
+          recFallbackDurationMs = Date.now() - fbStart;
+          if (fbGem.ok) {
+            // Re-merge with the fallback prediction.
+            const reMerge = applyMerge(
+              recExtract?.predictions ?? null,
+              fbGem.prediction,
+              recFlags,
+            );
+            if (reMerge.predictions) {
+              recFallbackOk = true;
+              recFallbackUsed = true;
+              recMerged = reMerge.predictions;
+              recMergeDiag = reMerge.mergeDiag;
+              recGeminiPred = fbGem.prediction;
+              // Refresh gemini block to reflect the winning call's grounding.
+              recGeminiBlock = geminiSuccessBlock(fbGem);
+            } else {
+              recFallbackOk = false;
+              recFallbackError = "RECOVERY_GATE_FAILED" as unknown as object;
+            }
+          } else if (fbGem.configured) {
+            recFallbackOk = false;
+            recFallbackError = fbGem.code as unknown as object;
+            recWarnings.push(fbGem.code satisfies GeminiWarningCode);
+          }
+        }
+      }
+
+      // Attach fallback diagnostics onto the existing gemini block (additive).
+      if (recGeminiBlock) {
+        recGeminiBlock = {
+          ...recGeminiBlock,
+          search_fallback_attempted: recFallbackAttempted,
+          search_fallback_ok: recFallbackOk,
+          search_fallback_skip_reason: recFallbackSkipReason,
+          ...(recFallbackError !== undefined
+            ? { search_fallback_error: recFallbackError as never }
+            : {}),
+          ...(recFallbackDurationMs !== undefined
+            ? { search_fallback_duration_ms: recFallbackDurationMs }
+            : {}),
+        };
+      } else if (recFallbackAttempted) {
+        // No primary block existed (e.g. gemini not configured path won't reach
+        // here because we skip the fallback). Create a minimal block so the
+        // additive diagnostics survive into the response.
+        recGeminiBlock = {
+          used: recFallbackOk,
+          search_fallback_attempted: recFallbackAttempted,
+          search_fallback_ok: recFallbackOk,
+          search_fallback_skip_reason: recFallbackSkipReason,
+          ...(recFallbackError !== undefined
+            ? { search_fallback_error: recFallbackError as never }
+            : {}),
+          ...(recFallbackDurationMs !== undefined
+            ? { search_fallback_duration_ms: recFallbackDurationMs }
+            : {}),
+        };
+      }
+
 
       if (recMerged) {
         const recPricing = recMerged.additional_data.pricing as PricingBlock | undefined;
