@@ -49,7 +49,7 @@ import {
   type GeminiWarningCode,
 } from "./gemini.ts";
 
-import { buildV2Prompts } from "./prompt-generator-v2.ts";
+import { buildV2Prompts, buildSearchOnlyV2Prompts } from "./prompt-generator-v2.ts";
 import {
   mergePredictions,
   passesRecoveryGate,
