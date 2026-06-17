@@ -195,6 +195,8 @@ async function invokeGemini(args: {
   evidenceBaseUrl: string;
   extractMetadata: ExtractResult["metadata"];
   usedFirecrawl: boolean;
+  searchOnly?: boolean;
+  timeoutMs?: number;
 }): Promise<GeminiResult> {
   // Phase A3: for Amazon URLs, send Gemini URL Context the canonical
   // /dp/<ASIN>/ URL (strips tracking junk). Preserve the original path slug
@@ -217,12 +219,27 @@ async function invokeGemini(args: {
     },
     promptBaseUrl,
   );
+  if (args.searchOnly) {
+    return await callGeminiSearchOnly({
+      systemPrompt,
+      userPrompt,
+      evidenceBaseUrl: promptBaseUrl,
+      timeoutMs: args.timeoutMs,
+    });
+  }
   return await runGeminiJsonMode({
     systemPrompt,
     userPrompt,
     evidenceBaseUrl: promptBaseUrl,
   });
 }
+
+// ─── Search-only fallback configuration ──────────────────────────────────
+// Total wall-clock budget for one analyze-entity-url-v2 request. Used to
+// gate the last-resort search-only Gemini fallback so it never overruns
+// the edge-function deadline. Conservative; well under Supabase's 50s cap.
+const REQUEST_TOTAL_BUDGET_MS = 45_000;
+
 
 type GeminiMetadataBlock = NonNullable<V2SuccessResponse["metadata"]["gemini"]>;
 
