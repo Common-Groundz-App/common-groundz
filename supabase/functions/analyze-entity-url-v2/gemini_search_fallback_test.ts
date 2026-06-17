@@ -196,3 +196,58 @@ Deno.test("sanitized amazon slug stays inside untrusted-evidence block in prompt
     ),
   );
 });
+
+// ---- Phase 1: clean search-only fallback prompt (whitelist + caps) ----
+
+import { buildSearchOnlyV2Prompts } from "./prompt-generator-v2.ts";
+
+Deno.test("buildSearchOnlyV2Prompts: includes only whitelisted fields; excludes noisy evidence", () => {
+  const { userPrompt } = buildSearchOnlyV2Prompts({
+    url: "https://www.amazon.in/dp/B0CP23212D/",
+    host: "www.amazon.in",
+    amazonPathSlug: "Moxie Beauty Super Defining Cream",
+    metadata: { mapped_type: "product" },
+  });
+  // Whitelisted fields present.
+  assert(userPrompt.includes("https://www.amazon.in/dp/B0CP23212D/"));
+  assert(userPrompt.includes("www.amazon.in"));
+  assert(userPrompt.includes("amazon_path_slug"));
+  assert(userPrompt.includes("mapped_type"));
+  // No noisy evidence keys.
+  assertFalse(userPrompt.includes("raw_html"));
+  assertFalse(userPrompt.includes("text_body"));
+  assertFalse(userPrompt.includes("jsonld"));
+  assertFalse(userPrompt.includes("\"og\""));
+  assertFalse(userPrompt.includes("\"twitter\""));
+  assertFalse(userPrompt.includes("images"));
+});
+
+Deno.test("buildSearchOnlyV2Prompts: caps oversized metadata fields", () => {
+  const longTitle = "T".repeat(500);
+  const longDesc = "D".repeat(1000);
+  const longSite = "S".repeat(200);
+  const { userPrompt } = buildSearchOnlyV2Prompts({
+    url: "https://example.com/x",
+    host: "example.com",
+    amazonPathSlug: null,
+    metadata: { title: longTitle, description: longDesc, site_name: longSite },
+  });
+  // title cap=200, description cap=400, site_name cap=80.
+  assertFalse(userPrompt.includes("T".repeat(201)));
+  assertFalse(userPrompt.includes("D".repeat(401)));
+  assertFalse(userPrompt.includes("S".repeat(81)));
+  assert(userPrompt.includes("T".repeat(200)));
+  assert(userPrompt.includes("D".repeat(400)));
+  assert(userPrompt.includes("S".repeat(80)));
+});
+
+Deno.test("buildSearchOnlyV2Prompts: omits url field when sanitizer returned null", () => {
+  const { userPrompt } = buildSearchOnlyV2Prompts({
+    url: null,
+    host: "example.com",
+    amazonPathSlug: null,
+  });
+  assert(userPrompt.includes("URL: (unavailable)"));
+  // No leftover `"url":` key in payload either.
+  assertFalse(userPrompt.includes("\"url\":"));
+});
