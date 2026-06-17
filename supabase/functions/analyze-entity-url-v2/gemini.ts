@@ -726,3 +726,25 @@ export function chooseEvidenceBaseUrl(opts: {
   }
   return opts.safeUrl;
 }
+
+/**
+ * Last-resort search-only Gemini fallback used by the V2 recovery path
+ * when the primary `url_context + google_search` call produced nothing
+ * usable. Only the tools list changes — same model, temperature,
+ * prompts, parser, schema, and recovery gate apply downstream.
+ *
+ * The caller MUST gate this behind the strict trigger conditions
+ * documented in analyze-entity-url-v2/index.ts (recovery path only,
+ * no prior valid prediction, sufficient budget).
+ */
+export function callGeminiSearchOnly(
+  args: Omit<RunGeminiArgs, "tools" | "timeoutMs"> & { timeoutMs?: number },
+): Promise<GeminiResult> {
+  return runGeminiJsonMode({
+    ...args,
+    tools: [{ google_search: {} }],
+    timeoutMs: args.timeoutMs ?? SEARCH_FALLBACK_TIMEOUT_MS,
+    logLabel: "search_fallback",
+  });
+}
+
