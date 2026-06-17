@@ -734,6 +734,11 @@ serve(async (req) => {
 
       if (recMerged) {
         const recPricing = recMerged.additional_data.pricing as PricingBlock | undefined;
+        const finalSource = recFallbackUsed
+          ? "gemini_search_fallback"
+          : recExtract
+            ? "firecrawl_recovery"
+            : "gemini_recovery";
         const response: V2SuccessResponse = {
           success: true,
           predictions: recMerged,
@@ -749,12 +754,17 @@ serve(async (req) => {
             used_google_search: recGeminiBlock?.used_google_search ?? false,
             used_firecrawl: recFirecrawlOk,
             phase: 8,
-            stage: recExtract ? "firecrawl-recovered" : "gemini-recovered",
+            stage: recFallbackUsed
+              ? "gemini-search-fallback"
+              : recExtract
+                ? "firecrawl-recovered"
+                : "gemini-recovered",
             ...(recExtract ? { extract: recExtract.metadata } : {}),
             ...(recFirecrawlBlock ? { firecrawl: recFirecrawlBlock } : {}),
             ...(recGeminiBlock ? { gemini: recGeminiBlock } : {}),
             merge: recMergeDiag,
             ...(recPricing ? { pricing: summarizePricing(recPricing, recMergeDiag.price_source_used) } : {}),
+            final_prediction_source: finalSource,
           },
           warnings: recWarnings.length > 0 ? recWarnings : undefined,
         };
@@ -781,12 +791,33 @@ serve(async (req) => {
           : { attempted: false, ok: false };
         trace.merge = { path: recMergeDiag.path, field_winners: recMergeDiag.field_winners as unknown as Record<string, string> };
         trace.final = {
-          prediction_source: recExtract ? "firecrawl_recovery" : "gemini_recovery",
+          prediction_source: finalSource,
           error_code: "OK",
           total_duration_ms: Date.now() - t0,
         };
+        console.info("[analyze-entity-url-v2] gemini_search_fallback", {
+          request_id,
+          attempted: recFallbackAttempted,
+          ok: recFallbackOk,
+          skip_reason: recFallbackSkipReason,
+          duration_ms: recFallbackDurationMs,
+          final_prediction_source: finalSource,
+        });
         return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
+
+      // Fallback did not produce predictions either — preserve original error
+      // but log fallback telemetry for observability.
+      console.info("[analyze-entity-url-v2] gemini_search_fallback", {
+        request_id,
+        attempted: recFallbackAttempted,
+        ok: recFallbackOk,
+        skip_reason: recFallbackSkipReason,
+        duration_ms: recFallbackDurationMs,
+        final_prediction_source: "none",
+        original_error_code: e.code,
+      });
+
 
 
       // Strict contract: return the ORIGINAL fetch error unchanged.
