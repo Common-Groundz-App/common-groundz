@@ -26,7 +26,12 @@ import { assertSafeUrl, SsrfError } from "./ssrf.ts";
 import { FetchError, type FetchResult, validateAndFetchUrl } from "./fetcher.ts";
 import { extractFromHtml, type ExtractResult } from "./extractor.ts";
 import { detectWeakSignals } from "./weak_signals.ts";
-import { isKnownJsHeavyHost, canonicalizeAmazonUrl, extractAmazonPathSlug } from "./host_hints.ts";
+import {
+  isKnownJsHeavyHost,
+  canonicalizeAmazonUrl,
+  extractAmazonPathSlug,
+  sanitizeFallbackEvidenceUrl,
+} from "./host_hints.ts";
 import {
   runFirecrawlScrape,
   safeBaseUrl,
