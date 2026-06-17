@@ -208,6 +208,36 @@ async function invokeGemini(args: {
   // as untrusted evidence. Non-Amazon URLs are returned unchanged.
   const canonicalUrl = canonicalizeAmazonUrl(args.url);
   const amazonPathSlug = extractAmazonPathSlug(args.url);
+
+  if (args.searchOnly) {
+    // Phase 1: build the minimal, whitelisted, capped fallback prompt.
+    // NEVER carries raw HTML / Firecrawl markdown / image URLs /
+    // query strings / fragments / OG/JSON-LD blobs / headers / model output.
+    const sanitizedUrl = sanitizeFallbackEvidenceUrl(args.url);
+    let host: string | null = null;
+    try {
+      host = new URL(args.url).host || null;
+    } catch {
+      host = null;
+    }
+    const { systemPrompt, userPrompt } = buildSearchOnlyV2Prompts({
+      url: sanitizedUrl,
+      host,
+      amazonPathSlug,
+      metadata: {
+        mapped_type: args.extractMetadata?.mapped_type ?? null,
+      },
+    });
+    return await callGeminiSearchOnly({
+      systemPrompt,
+      userPrompt,
+      // Use the sanitized URL when available; otherwise the safe URL. This
+      // value is only consumed by image normalization, never sent to Gemini.
+      evidenceBaseUrl: sanitizedUrl ?? args.url,
+      timeoutMs: args.timeoutMs,
+    });
+  }
+
   // Only override evidenceBaseUrl when Firecrawl did NOT run AND we actually
   // canonicalized the URL. Firecrawl-derived base URL is otherwise untouched.
   const promptBaseUrl =
@@ -224,20 +254,13 @@ async function invokeGemini(args: {
     },
     promptBaseUrl,
   );
-  if (args.searchOnly) {
-    return await callGeminiSearchOnly({
-      systemPrompt,
-      userPrompt,
-      evidenceBaseUrl: promptBaseUrl,
-      timeoutMs: args.timeoutMs,
-    });
-  }
   return await runGeminiJsonMode({
     systemPrompt,
     userPrompt,
     evidenceBaseUrl: promptBaseUrl,
   });
 }
+
 
 // ─── Search-only fallback configuration ──────────────────────────────────
 // Total wall-clock budget for one analyze-entity-url-v2 request. Used to
