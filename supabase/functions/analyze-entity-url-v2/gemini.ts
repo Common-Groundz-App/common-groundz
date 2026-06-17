@@ -93,7 +93,22 @@ export interface RunGeminiArgs {
   fetchImpl?: typeof fetch;
   /** Local AbortController timeout (ms). */
   timeoutMs?: number;
+  /**
+   * Override the Gemini `tools` array. Defaults to
+   * `[{ url_context: {} }, { google_search: {} }]` (primary path).
+   * The search-only fallback overrides to `[{ google_search: {} }]`.
+   * Nothing else about the request body changes.
+   */
+  tools?: Array<Record<string, unknown>>;
+  /**
+   * Optional external AbortSignal. When provided, the call aborts as soon
+   * as either this signal or the internal timeout fires.
+   */
+  abortSignal?: AbortSignal;
+  /** Diagnostic label used only in the structured log line. */
+  logLabel?: string;
 }
+
 
 function stripCodeFences(text: string): string {
   let s = text.trim();
