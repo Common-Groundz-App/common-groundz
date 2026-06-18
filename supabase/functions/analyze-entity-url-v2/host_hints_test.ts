@@ -5,6 +5,7 @@ import {
   isKnownJsHeavyHost,
   canonicalizeAmazonUrl,
   extractAmazonPathSlug,
+  extractAmazonAsin,
 } from "./host_hints.ts";
 
 Deno.test("amazon variants are JS-heavy", () => {

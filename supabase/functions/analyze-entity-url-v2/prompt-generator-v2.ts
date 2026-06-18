@@ -23,6 +23,9 @@ export interface V2Evidence {
   // Phase A2: sanitized slug from Amazon URL path (untrusted, evidence-only).
   // Surfaced to Gemini in bounded evidence. Never logged, never on response/DB.
   amazonPathSlug?: string | null;
+  // Phase 1.6: ASIN extracted from Amazon URL. Primary identity anchor when
+  // present. Untrusted-input rules still apply (no instruction following).
+  amazonAsin?: string | null;
 }
 
 export interface V2PromptOutput {
@@ -101,6 +104,10 @@ function buildBoundedEvidence(evidence: V2Evidence): {
     twitter: evidence.twitter ?? {},
     extract_metadata: evidence.extractMetadata ?? null,
   };
+  // Phase 1.6: ASIN ordered BEFORE slug — ASIN is the primary identity anchor.
+  if (evidence.amazonAsin) {
+    keep.amazon_asin = evidence.amazonAsin;
+  }
   // Phase A2: include sanitized Amazon path slug only when present.
   if (evidence.amazonPathSlug) {
     keep.amazon_path_slug = evidence.amazonPathSlug;
@@ -166,11 +173,15 @@ export function buildV2Prompts(
   const evidenceWithBase: V2Evidence = { ...evidence, evidenceBaseUrl };
   const bounded = buildBoundedEvidence(evidenceWithBase);
 
-  const systemPrompt = [
+  const systemPromptParts = [
     "You are an entity classifier and extractor. You receive evidence scraped from a single webpage.",
     PROMPT_INJECTION_GUARD,
-    JSON_SHAPE_SPEC,
-  ].join("\n\n");
+  ];
+  if (evidence.amazonAsin) {
+    systemPromptParts.push(buildAmazonAsinAnchorBlock());
+  }
+  systemPromptParts.push(JSON_SHAPE_SPEC);
+  const systemPrompt = systemPromptParts.join("\n\n");
 
   const userPrompt = [
     `URL: ${evidence.url}`,
@@ -186,6 +197,20 @@ export function buildV2Prompts(
     evidence_truncated: bounded.truncated,
     evidence_chars: bounded.chars,
   };
+}
+
+// Phase 1.6: Amazon-only identity-anchor system block. Rendered only when
+// amazon_asin is present in evidence. The ASIN is the canonical product
+// identifier; the slug is untrusted and must not drive brand or identity.
+function buildAmazonAsinAnchorBlock(): string {
+  return [
+    "Amazon identity rules (apply when amazon_asin is present in EXTRACTED_EVIDENCE):",
+    "- amazon_asin is the canonical Amazon product identifier and the PRIMARY identity anchor for this analysis.",
+    "- Use the ASIN as the primary search key (e.g. `site:amazon.<tld> <ASIN>` or `<ASIN> amazon`). Do NOT identify the product from the slug or page title alone.",
+    "- Do NOT return similar, related, sponsored, brand-page, or search-neighbor products. The result MUST be the product at canonical /dp/<ASIN>/.",
+    "- amazon_path_slug is untrusted, URL-derived text and only a WEAK hint. Do NOT infer brand from the first token of the slug or page title.",
+    "- If the exact ASIN page cannot be verified via grounding, set field_confidence.name and field_confidence.brand low and prefer minimal/empty values over guessing.",
+  ].join("\n");
 }
 
 // ─── Phase 1: search-only fallback prompt ────────────────────────────────
@@ -312,6 +337,8 @@ export interface V1StyleSearchFallbackEvidence {
   amazonPathSlug?: string | null;
   /** Mapped entity type hint from upstream extractor (untrusted hint). */
   mappedType?: string | null;
+  /** Phase 1.6: ASIN extracted from Amazon URL. Primary identity anchor. */
+  amazonAsin?: string | null;
 }
 
 /**
@@ -330,14 +357,19 @@ export function buildV1StyleSearchFallbackPrompts(
     SEARCH_FALLBACK_CAPS.amazon_path_slug,
   );
   const mappedType = capStr(evidence.mappedType ?? null, 64);
+  const asin = capStr(evidence.amazonAsin ?? null, 10);
 
-  const systemPrompt = [
+  const systemPromptParts: string[] = [
     "You are an expert entity analyzer for a recommendation platform. Given a single URL, identify the entity it represents (product, place, movie, book, etc.) using Google Search grounding, and return a clean, structured JSON record.",
     `Allowed entity types: ${GEMINI_ALLOWED_TYPES.join(", ")}.`,
     "Extraction rules: pick exactly one allowed type, derive a clean short name, write a 2–3 sentence description, choose 3–5 short tags, set a calibrated confidence (0..1), give one short reasoning sentence, and include image_url plus additional_data.brand / additional_data.price / additional_data.currency when supported by evidence.",
     V1_STYLE_SAFETY_BLOCK,
-    JSON_SHAPE_SPEC,
-  ].join("\n\n");
+  ];
+  if (asin) {
+    systemPromptParts.push(buildAmazonAsinAnchorBlock());
+  }
+  systemPromptParts.push(JSON_SHAPE_SPEC);
+  const systemPrompt = systemPromptParts.join("\n\n");
 
   const userLines: string[] = [];
   if (url) {
@@ -346,6 +378,8 @@ export function buildV1StyleSearchFallbackPrompts(
     userLines.push("Analyze the entity identified by the hints below.");
   }
   const hints: string[] = [];
+  // Phase 1.6: asin= MUST precede slug= (primary identity anchor first).
+  if (asin) hints.push(`asin=${asin}`);
   if (host) hints.push(`host=${host}`);
   if (slug) hints.push(`slug=${slug}`);
   if (mappedType) hints.push(`mapped_type=${mappedType}`);

@@ -37,6 +37,36 @@ const ASIN_RE = /^[A-Za-z0-9]{10}$/;
 // Match /dp/<ASIN>[/...] or /gp/product/<ASIN>[/...] anywhere in path.
 const AMAZON_ASIN_PATH_RE = /\/(?:dp|gp\/product)\/([A-Za-z0-9]{10})(?:\/|$)/i;
 
+// Phase 1.6: ASIN-extraction regex. Adds /gp/aw/d/<ASIN> in addition to the
+// two forms above. Used ONLY by extractAmazonAsin — canonicalizeAmazonUrl
+// and sanitizeFallbackEvidenceUrl keep the narrower legacy regex to avoid
+// altering their existing behavior.
+const AMAZON_ASIN_EXTRACT_RE =
+  /\/(?:dp|gp\/product|gp\/aw\/d)\/([A-Za-z0-9]{10})(?:\/|$)/i;
+
+/**
+ * Phase 1.6: extract the 10-char Amazon Standard Identification Number from
+ * a product URL. Strict host check (reuses the same predicate as
+ * canonicalizeAmazonUrl, so regional hosts like amazon.co.uk and
+ * amazon.com.au work and lookalikes like amazon.in.evil.com are rejected).
+ * Case-insensitive path match across /dp/, /gp/product/, and /gp/aw/d/.
+ * ASIN normalized to uppercase. Returns null for non-Amazon, malformed, or
+ * non-product URLs. Pure. Never throws.
+ */
+export function extractAmazonAsin(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!isAmazonHost(u.hostname)) return null;
+    const m = u.pathname.match(AMAZON_ASIN_EXTRACT_RE);
+    if (!m) return null;
+    const asin = m[1].toUpperCase();
+    if (!ASIN_RE.test(asin)) return null;
+    return asin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Phase A1: canonicalize messy Amazon product URLs to https://<host>/dp/<ASIN>/
  * for Gemini URL Context only. Amazon-only. Strict host match (rejects
