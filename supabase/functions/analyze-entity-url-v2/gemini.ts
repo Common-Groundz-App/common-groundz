@@ -666,6 +666,7 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       url_context_failed: grounding.url_context_failed,
       raw_text_length: rawTextLength,
       raw_text_sha8: rawTextSha8,
+      ...candDiag,
       gemini_failure_diagnostics: geminiFailureDiagnostics(text, outcome.attempts, outcome.zodIssues),
     });
     return {
