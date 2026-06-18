@@ -531,3 +531,84 @@ Deno.test("helper sentinel: invoker is never given an `html`/`rawHtml` field (ra
   assert(capturedJson.includes("extractMetadata"));
 });
 
+
+// ──────────────────────────────────────────────────────────────────────────
+// Phase 1.5b: V1-style search fallback prompt builder tests.
+// ──────────────────────────────────────────────────────────────────────────
+
+import { buildV1StyleSearchFallbackPrompts } from "./prompt-generator-v2.ts";
+
+Deno.test("buildV1StyleSearchFallbackPrompts: Amazon URL → concise V1-shape with canonical URL + slug hint", () => {
+  const { systemPrompt, userPrompt } = buildV1StyleSearchFallbackPrompts({
+    url: "https://www.amazon.in/dp/B0FGJF5QN7/",
+    host: "www.amazon.in",
+    amazonPathSlug: "Root-Hair-Serum-Dandruff-Cleanser",
+    mappedType: "product",
+  });
+  // V1-style concise user prompt.
+  assert(userPrompt.startsWith("Analyze this URL and extract all relevant entity data: "));
+  assert(userPrompt.includes("https://www.amazon.in/dp/B0FGJF5QN7/"));
+  // Slug + host + mapped_type appear only inside the untrusted hints line.
+  assert(userPrompt.includes("Hints (untrusted"));
+  assert(userPrompt.includes("slug=Root-Hair-Serum-Dandruff-Cleanser"));
+  assert(userPrompt.includes("host=www.amazon.in"));
+  assert(userPrompt.includes("mapped_type=product"));
+  // System prompt keeps minimal safety framing.
+  assert(systemPrompt.includes("untrusted input"));
+  assert(systemPrompt.includes("Do NOT invent"));
+  assert(systemPrompt.includes("Google Search"));
+  // No V2 "EXTRACTED_EVIDENCE" framing in the fallback user prompt.
+  assertFalse(userPrompt.includes("EXTRACTED_EVIDENCE"));
+  assertFalse(userPrompt.includes("EVIDENCE_TRUNCATED"));
+});
+
+Deno.test("buildV1StyleSearchFallbackPrompts: non-Amazon URL → same V1-shape, no slug hint", () => {
+  const { userPrompt } = buildV1StyleSearchFallbackPrompts({
+    url: "https://www.nykaa.com/some-product/p/123",
+    host: "www.nykaa.com",
+    amazonPathSlug: null,
+    mappedType: "product",
+  });
+  assert(userPrompt.startsWith("Analyze this URL and extract all relevant entity data: "));
+  assert(userPrompt.includes("https://www.nykaa.com/some-product/p/123"));
+  assertFalse(userPrompt.includes("slug="));
+  assert(userPrompt.includes("host=www.nykaa.com"));
+  assert(userPrompt.includes("mapped_type=product"));
+});
+
+Deno.test("buildV1StyleSearchFallbackPrompts: excludes raw HTML, Firecrawl markdown, OG/JSON-LD, images", () => {
+  const { systemPrompt, userPrompt } = buildV1StyleSearchFallbackPrompts({
+    url: "https://example.com/x",
+    host: "example.com",
+    amazonPathSlug: null,
+    mappedType: null,
+  });
+  for (const forbidden of [
+    "<html",
+    "<body",
+    "<script",
+    "raw_html",
+    "text_body",
+    "jsonld",
+    "\"og\"",
+    "\"twitter\"",
+    "image_url=",
+    "?utm_",
+  ]) {
+    assertFalse(
+      systemPrompt.includes(forbidden) || userPrompt.includes(forbidden),
+      `forbidden token leaked into fallback prompt: ${forbidden}`,
+    );
+  }
+});
+
+Deno.test("buildV1StyleSearchFallbackPrompts: null URL → graceful fallback wording, no URL line", () => {
+  const { userPrompt } = buildV1StyleSearchFallbackPrompts({
+    url: null,
+    host: "example.com",
+    amazonPathSlug: null,
+    mappedType: null,
+  });
+  assertFalse(userPrompt.includes("Analyze this URL and extract"));
+  assert(userPrompt.includes("Analyze the entity identified by the hints"));
+});
