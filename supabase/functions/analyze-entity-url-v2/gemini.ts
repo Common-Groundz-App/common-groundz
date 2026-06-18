@@ -627,6 +627,7 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
   }
 
   const grounding = parseGrounding(cand0);
+  const candDiag = candidateDiagnostics(json);
   const text = extractText(json);
   if (!text) {
     logLine({
@@ -637,6 +638,7 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       used_url_context: grounding.used_url_context,
       used_google_search: grounding.used_google_search,
       url_context_failed: grounding.url_context_failed,
+      ...candDiag,
     });
     return {
       ok: false,
