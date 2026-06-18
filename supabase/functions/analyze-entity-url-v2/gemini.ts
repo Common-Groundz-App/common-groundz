@@ -44,13 +44,7 @@ export const GEMINI_TEMPERATURE = 0.15;
 // Gemini with url_context + google_search) failed to produce a gate-passing
 // prediction, and only if at least SEARCH_FALLBACK_TIMEOUT_MS +
 // SEARCH_FALLBACK_BUDGET_BUFFER_MS remain in the request budget.
-// Bumped from 14_000 → 20_000 (Phase 1.5b). V1's successful Gemini +
-// Google Search call on hostile hosts like Amazon completes right around
-// the previous 14s budget; aborting at 14s killed otherwise-valid
-// fallbacks (see Root Hair Serum). The total request budget
-// (REQUEST_TOTAL_BUDGET_MS in index.ts) plus the buffer below guarantees
-// we never overrun the edge-function deadline.
-export const SEARCH_FALLBACK_TIMEOUT_MS = 20_000;
+export const SEARCH_FALLBACK_TIMEOUT_MS = 14_000;
 export const SEARCH_FALLBACK_BUDGET_BUFFER_MS = 1_000;
 
 
@@ -446,35 +440,6 @@ function extractText(json: Record<string, unknown>): string | null {
   return texts.join("");
 }
 
-/**
- * Phase 1.5b: safe candidate-level diagnostics for Gemini fallback failures.
- * Returns only shape/booleans/strings — never raw text, prompts, URLs, secrets.
- */
-function candidateDiagnostics(json: Record<string, unknown>): Record<string, unknown> {
-  const candidates = (json.candidates as Array<Record<string, unknown>> | undefined) ?? [];
-  const cand0 = candidates[0] ?? {};
-  const content = (cand0.content as Record<string, unknown> | undefined) ?? {};
-  const parts = (content.parts as Array<Record<string, unknown>> | undefined) ?? [];
-  const hasTextParts = parts.some(
-    (p) => typeof p.text === "string" && (p.text as string).length > 0,
-  );
-  const gm = (cand0.groundingMetadata ?? cand0.grounding_metadata) as
-    | Record<string, unknown>
-    | undefined;
-  const finishReason =
-    typeof cand0.finishReason === "string"
-      ? (cand0.finishReason as string).slice(0, 64)
-      : typeof cand0.finish_reason === "string"
-        ? (cand0.finish_reason as string).slice(0, 64)
-        : null;
-  return {
-    candidate_count: candidates.length,
-    finish_reason: finishReason,
-    has_text_parts: hasTextParts,
-    has_grounding_metadata: !!gm && Object.keys(gm).length > 0,
-  };
-}
-
 function logLine(payload: Record<string, unknown>): void {
   console.log("[analyze-entity-url-v2] gemini", payload);
 }
@@ -627,7 +592,6 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
   }
 
   const grounding = parseGrounding(cand0);
-  const candDiag = candidateDiagnostics(json);
   const text = extractText(json);
   if (!text) {
     logLine({
@@ -638,7 +602,6 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       used_url_context: grounding.used_url_context,
       used_google_search: grounding.used_google_search,
       url_context_failed: grounding.url_context_failed,
-      ...candDiag,
     });
     return {
       ok: false,
@@ -666,7 +629,6 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       url_context_failed: grounding.url_context_failed,
       raw_text_length: rawTextLength,
       raw_text_sha8: rawTextSha8,
-      ...candDiag,
       gemini_failure_diagnostics: geminiFailureDiagnostics(text, outcome.attempts, outcome.zodIssues),
     });
     return {

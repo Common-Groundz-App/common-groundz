@@ -49,7 +49,7 @@ import {
   type GeminiWarningCode,
 } from "./gemini.ts";
 
-import { buildV2Prompts, buildV1StyleSearchFallbackPrompts } from "./prompt-generator-v2.ts";
+import { buildV2Prompts, buildSearchOnlyV2Prompts } from "./prompt-generator-v2.ts";
 import {
   mergePredictions,
   passesRecoveryGate,
@@ -214,29 +214,30 @@ async function invokeGemini(args: {
   const amazonPathSlug = extractAmazonPathSlug(args.url);
 
   if (args.searchOnly) {
-    // Phase 1.5b: V1-style concise Google-Search-only fallback prompt for
-    // ALL hosts (no host gating). Mirrors V1's successful brevity but keeps
-    // a minimal V2 safety block. NEVER carries raw HTML / Firecrawl
-    // markdown / image URLs / query strings / fragments / OG/JSON-LD blobs
-    // / headers / model output. See buildV1StyleSearchFallbackPrompts.
-    const sanitizedUrl = sanitizeFallbackEvidenceUrl(canonicalUrl);
+    // Phase 1: build the minimal, whitelisted, capped fallback prompt.
+    // NEVER carries raw HTML / Firecrawl markdown / image URLs /
+    // query strings / fragments / OG/JSON-LD blobs / headers / model output.
+    const sanitizedUrl = sanitizeFallbackEvidenceUrl(args.url);
     let host: string | null = null;
     try {
       host = new URL(args.url).host || null;
     } catch {
       host = null;
     }
-    const { systemPrompt, userPrompt } = buildV1StyleSearchFallbackPrompts({
+    const { systemPrompt, userPrompt } = buildSearchOnlyV2Prompts({
       url: sanitizedUrl,
       host,
       amazonPathSlug,
-      mappedType: args.extractMetadata?.mapped_type ?? null,
+      metadata: {
+        mapped_type: args.extractMetadata?.mapped_type ?? null,
+      },
     });
     return await callGeminiSearchOnly({
       systemPrompt,
       userPrompt,
-      // Used only for image normalization downstream; never sent to Gemini.
-      evidenceBaseUrl: sanitizedUrl ?? canonicalUrl,
+      // Use the sanitized URL when available; otherwise the safe URL. This
+      // value is only consumed by image normalization, never sent to Gemini.
+      evidenceBaseUrl: sanitizedUrl ?? args.url,
       timeoutMs: args.timeoutMs,
     });
   }
