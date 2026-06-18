@@ -446,6 +446,35 @@ function extractText(json: Record<string, unknown>): string | null {
   return texts.join("");
 }
 
+/**
+ * Phase 1.5b: safe candidate-level diagnostics for Gemini fallback failures.
+ * Returns only shape/booleans/strings — never raw text, prompts, URLs, secrets.
+ */
+function candidateDiagnostics(json: Record<string, unknown>): Record<string, unknown> {
+  const candidates = (json.candidates as Array<Record<string, unknown>> | undefined) ?? [];
+  const cand0 = candidates[0] ?? {};
+  const content = (cand0.content as Record<string, unknown> | undefined) ?? {};
+  const parts = (content.parts as Array<Record<string, unknown>> | undefined) ?? [];
+  const hasTextParts = parts.some(
+    (p) => typeof p.text === "string" && (p.text as string).length > 0,
+  );
+  const gm = (cand0.groundingMetadata ?? cand0.grounding_metadata) as
+    | Record<string, unknown>
+    | undefined;
+  const finishReason =
+    typeof cand0.finishReason === "string"
+      ? (cand0.finishReason as string).slice(0, 64)
+      : typeof cand0.finish_reason === "string"
+        ? (cand0.finish_reason as string).slice(0, 64)
+        : null;
+  return {
+    candidate_count: candidates.length,
+    finish_reason: finishReason,
+    has_text_parts: hasTextParts,
+    has_grounding_metadata: !!gm && Object.keys(gm).length > 0,
+  };
+}
+
 function logLine(payload: Record<string, unknown>): void {
   console.log("[analyze-entity-url-v2] gemini", payload);
 }
