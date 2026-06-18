@@ -59,6 +59,12 @@ export interface GeminiGrounding {
   used_google_search: boolean;
   url_retrieval_statuses: string[];
   url_context_failed: boolean;
+  // Phase 1.6: external grounding evidence surfaced ONLY for the Amazon
+  // ASIN guard. Excludes prompt text, webSearchQueries, groundingSupports
+  // segment text, and model answer text. Never logged. Never on the wire.
+  grounding_chunk_uris: string[];
+  grounding_chunk_titles: string[];
+  url_context_retrieved_urls: string[];
 }
 
 export interface GeminiNotConfigured {
@@ -417,9 +423,28 @@ function parseGrounding(cand: Record<string, unknown> | undefined): GeminiGround
   const statuses = urlMeta
     .map((u) => (u.urlRetrievalStatus ?? u.url_retrieval_status) as unknown)
     .filter((v): v is string => typeof v === "string");
+  const retrievedUrls = urlMeta
+    .map((u) => (u.retrievedUrl ?? u.retrieved_url ?? u.url) as unknown)
+    .filter((v): v is string => typeof v === "string");
 
   const groundingChunks = (gm.groundingChunks ?? gm.grounding_chunks ?? []) as unknown[];
   const webSearchQueries = (gm.webSearchQueries ?? gm.web_search_queries ?? []) as unknown[];
+
+  const chunkUris: string[] = [];
+  const chunkTitles: string[] = [];
+  if (Array.isArray(groundingChunks)) {
+    for (const ch of groundingChunks) {
+      if (!ch || typeof ch !== "object") continue;
+      const web = (ch as Record<string, unknown>).web as
+        | Record<string, unknown>
+        | undefined;
+      if (!web || typeof web !== "object") continue;
+      const uri = web.uri;
+      const title = web.title;
+      if (typeof uri === "string" && uri.length > 0) chunkUris.push(uri);
+      if (typeof title === "string" && title.length > 0) chunkTitles.push(title);
+    }
+  }
 
   return {
     used_url_context: urlMeta.length > 0,
@@ -429,6 +454,9 @@ function parseGrounding(cand: Record<string, unknown> | undefined): GeminiGround
     url_retrieval_statuses: statuses,
     url_context_failed:
       urlMeta.length > 0 && !statuses.includes("URL_RETRIEVAL_STATUS_SUCCESS"),
+    grounding_chunk_uris: chunkUris,
+    grounding_chunk_titles: chunkTitles,
+    url_context_retrieved_urls: retrievedUrls,
   };
 }
 

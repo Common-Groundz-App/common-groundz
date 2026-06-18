@@ -5,6 +5,7 @@ import {
   isKnownJsHeavyHost,
   canonicalizeAmazonUrl,
   extractAmazonPathSlug,
+  extractAmazonAsin,
 } from "./host_hints.ts";
 
 Deno.test("amazon variants are JS-heavy", () => {
@@ -278,4 +279,88 @@ Deno.test("sanitizeFallback: result contains no '?' or '#' for non-Amazon URL", 
   if (out.includes("?") || out.includes("#")) {
     throw new Error("expected no query/fragment, got: " + out);
   }
+});
+
+// ---------- extractAmazonAsin (Phase 1.6) ----------
+
+Deno.test("asin: /dp/<ASIN>/ uppercase", () => {
+  assertEquals(
+    extractAmazonAsin("https://www.amazon.in/Root-Hair-Serum/dp/B0FGJF5QN7/"),
+    "B0FGJF5QN7",
+  );
+});
+
+Deno.test("asin: /dp/<ASIN> without trailing slash", () => {
+  assertEquals(
+    extractAmazonAsin("https://www.amazon.com/dp/B0FGJF5QN7"),
+    "B0FGJF5QN7",
+  );
+});
+
+Deno.test("asin: /gp/product/<ASIN> form", () => {
+  assertEquals(
+    extractAmazonAsin("https://www.amazon.in/gp/product/B0FGJF5QN7/?ref_=x"),
+    "B0FGJF5QN7",
+  );
+});
+
+Deno.test("asin: /gp/aw/d/<ASIN> mobile form", () => {
+  assertEquals(
+    extractAmazonAsin("https://www.amazon.com/gp/aw/d/B0FGJF5QN7/"),
+    "B0FGJF5QN7",
+  );
+});
+
+Deno.test("asin: lowercase ASIN normalized to uppercase", () => {
+  assertEquals(
+    extractAmazonAsin("https://www.amazon.in/foo/dp/b0fgjf5qn7/"),
+    "B0FGJF5QN7",
+  );
+});
+
+Deno.test("asin: regional Amazon hosts accepted", () => {
+  for (const u of [
+    "https://amazon.com/dp/B0FGJF5QN7",
+    "https://www.amazon.com/dp/B0FGJF5QN7",
+    "https://amazon.in/dp/B0FGJF5QN7",
+    "https://www.amazon.in/dp/B0FGJF5QN7",
+    "https://amazon.co.uk/dp/B0FGJF5QN7",
+    "https://www.amazon.co.uk/dp/B0FGJF5QN7",
+    "https://amazon.com.au/dp/B0FGJF5QN7",
+    "https://amazon.co.jp/dp/B0FGJF5QN7",
+  ]) {
+    assertEquals(extractAmazonAsin(u), "B0FGJF5QN7", u);
+  }
+});
+
+Deno.test("asin: lookalike hosts rejected", () => {
+  // Reuses the existing strict Amazon host predicate from host_hints.ts —
+  // same one canonicalizeAmazonUrl uses. Lookalikes that prepend / wrap the
+  // Amazon name are rejected. (A bare second-level-domain "amazon.example.com"
+  // would slip through the legacy regex; not regressing that here since
+  // Phase 1.6 explicitly does not modify the host predicate.)
+  for (const u of [
+    "https://amazon.in.evil.com/dp/B0FGJF5QN7/",
+    "https://notamazon.in/dp/B0FGJF5QN7/",
+    "https://amazon-in.com/dp/B0FGJF5QN7/",
+  ]) {
+    assertEquals(extractAmazonAsin(u), null, u);
+  }
+});
+
+Deno.test("asin: non-Amazon / non-product URLs → null", () => {
+  assertEquals(extractAmazonAsin("https://www.flipkart.com/dp/B0FGJF5QN7"), null);
+  assertEquals(extractAmazonAsin("https://www.amazon.in/s?k=hair+serum"), null);
+  assertEquals(extractAmazonAsin("https://www.amazon.in/stores/foo"), null);
+  assertEquals(extractAmazonAsin("not a url"), null);
+  assertEquals(extractAmazonAsin(""), null);
+});
+
+Deno.test("asin: malformed ASIN segment → null", () => {
+  // 9 chars
+  assertEquals(extractAmazonAsin("https://www.amazon.in/dp/B0FGJF5Q"), null);
+  // 11 chars
+  assertEquals(extractAmazonAsin("https://www.amazon.in/dp/B0FGJF5QN7X"), null);
+  // special char
+  assertEquals(extractAmazonAsin("https://www.amazon.in/dp/B0FGJF5QN!"), null);
 });

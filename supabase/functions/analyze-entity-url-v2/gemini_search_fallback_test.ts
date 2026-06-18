@@ -329,6 +329,9 @@ function makeGeminiSuccess(): GeminiResult {
       used_google_search: true,
       url_retrieval_statuses: [],
       url_context_failed: false,
+      grounding_chunk_uris: [],
+      grounding_chunk_titles: [],
+      url_context_retrieved_urls: [],
     },
     prediction: makeGeminiPred(),
   };

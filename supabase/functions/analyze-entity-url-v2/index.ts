@@ -30,8 +30,14 @@ import {
   isKnownJsHeavyHost,
   canonicalizeAmazonUrl,
   extractAmazonPathSlug,
+  extractAmazonAsin,
   sanitizeFallbackEvidenceUrl,
 } from "./host_hints.ts";
+import {
+  verifyAmazonAsinGrounding,
+  groundingContainsCanonicalDpUrl,
+  type AmazonGroundingEvidence,
+} from "./amazon_asin_guard.ts";
 import {
   runFirecrawlScrape,
   safeBaseUrl,
@@ -46,6 +52,7 @@ import {
   SEARCH_FALLBACK_TIMEOUT_MS,
   SEARCH_FALLBACK_BUDGET_BUFFER_MS,
   type GeminiResult,
+  type GeminiGrounding,
   type GeminiWarningCode,
 } from "./gemini.ts";
 
@@ -212,6 +219,7 @@ async function invokeGemini(args: {
   // as untrusted evidence. Non-Amazon URLs are returned unchanged.
   const canonicalUrl = canonicalizeAmazonUrl(args.url);
   const amazonPathSlug = extractAmazonPathSlug(args.url);
+  const amazonAsin = extractAmazonAsin(args.url);
 
   if (args.searchOnly) {
     // Phase 1.5b: V1-style concise Google-Search-only fallback prompt for
@@ -230,6 +238,7 @@ async function invokeGemini(args: {
       url: sanitizedUrl,
       host,
       amazonPathSlug,
+      amazonAsin,
       mappedType: args.extractMetadata?.mapped_type ?? null,
     });
     return await callGeminiSearchOnly({
@@ -254,6 +263,7 @@ async function invokeGemini(args: {
       rawHtml: args.html ?? null,
       extractMetadata: args.extractMetadata,
       amazonPathSlug,
+      amazonAsin,
     },
     promptBaseUrl,
   );
@@ -324,6 +334,78 @@ function geminiFailureBlock(
     url_context_failed: gem.grounding?.url_context_failed,
     url_retrieval_statuses: gem.grounding?.url_retrieval_statuses,
   };
+}
+
+/**
+ * Phase 1.6: Amazon ASIN exact-match guard wrapper.
+ *
+ * Runs AFTER the tolerant parser, Zod validator, recovery gate, and
+ * post-fallback re-merge have accepted a prediction — BEFORE that
+ * prediction is treated as modal-eligible or as a "successful" output.
+ *
+ * Evidence used is EXTERNAL only:
+ *   - groundingChunks[*].web.uri / .web.title
+ *   - urlContextMetadata[*].retrievedUrl
+ *
+ * Excluded (must not leak in): prompt text, our canonical URL hint,
+ * webSearchQueries, groundingSupports[*].segment.text, the model's
+ * answer text, locally constructed strings.
+ *
+ * Returns `null` when the guard PASSES (or is N/A for non-Amazon). Returns
+ * a partial diagnostic block + reason when the guard FAILS — caller must
+ * discard the prediction, record telemetry, and route to NO_PREDICTIONS.
+ */
+function runAmazonAsinGuard(
+  amazonAsin: string | null,
+  grounding: GeminiGrounding | undefined,
+):
+  | { ok: true; diagnostics: AmazonGuardDiagnostics }
+  | { ok: false; reason: string; diagnostics: AmazonGuardDiagnostics } {
+  const diagnostics: AmazonGuardDiagnostics = {
+    amazon_asin_present: !!amazonAsin,
+    grounding_contains_target_asin: false,
+    grounding_contains_canonical_dp_url: false,
+    amazon_exact_match_verified: false,
+    amazon_exact_match_reject_reason: null,
+  };
+  if (!amazonAsin) {
+    diagnostics.amazon_exact_match_verified = true;
+    return { ok: true, diagnostics };
+  }
+  const g = grounding;
+  const evidence: AmazonGroundingEvidence = {
+    chunkUris: g?.grounding_chunk_uris ?? [],
+    chunkTitles: g?.grounding_chunk_titles ?? [],
+    retrievedUrls: g?.url_context_retrieved_urls ?? [],
+  };
+  const verdict = verifyAmazonAsinGrounding({ amazonAsin, groundingEvidence: evidence });
+  diagnostics.grounding_contains_canonical_dp_url = groundingContainsCanonicalDpUrl(
+    amazonAsin,
+    evidence,
+  );
+  if (verdict.ok) {
+    diagnostics.amazon_exact_match_verified = true;
+    diagnostics.grounding_contains_target_asin = true;
+    return { ok: true, diagnostics };
+  }
+  diagnostics.amazon_exact_match_reject_reason = verdict.reason;
+  return { ok: false, reason: verdict.reason, diagnostics };
+}
+
+interface AmazonGuardDiagnostics {
+  amazon_asin_present: boolean;
+  grounding_contains_target_asin: boolean;
+  grounding_contains_canonical_dp_url: boolean;
+  amazon_exact_match_verified: boolean;
+  amazon_exact_match_reject_reason: string | null;
+}
+
+function mergeGuardDiagnostics(
+  block: GeminiMetadataBlock | undefined,
+  diag: AmazonGuardDiagnostics,
+): GeminiMetadataBlock | undefined {
+  if (!block) return block;
+  return { ...block, ...diag };
 }
 
 // ─── Phase 8 helpers ──────────────────────────────────────────────────────
@@ -622,6 +704,8 @@ serve(async (req) => {
       // Phase 8: invoke Gemini on the recovery path (not just diagnostics).
       let recGeminiBlock: GeminiMetadataBlock | undefined;
       let recGeminiPred: GeminiRawPrediction | null = null;
+      // (recPrimaryGrounding intentionally not retained — guard runs inline below.)
+      const recAmazonAsin = extractAmazonAsin(safe.url);
       if (geminiConfigured) {
         const evidenceBaseUrl = chooseEvidenceBaseUrl({
           firecrawlFinalUrl: recFirecrawlOk ? recEvidenceBaseUrl : null,
@@ -638,6 +722,24 @@ serve(async (req) => {
         if (gem.ok) {
           recGeminiBlock = geminiSuccessBlock(gem);
           recGeminiPred = gem.prediction;
+          // (grounding consumed below for primary-path guard, not retained.)
+          // Phase 1.6: Amazon ASIN guard on primary path — only when URL
+          // Context retrieval failed AND we used Google Search grounding.
+          // If URL Context succeeded, trust the retrieved page and skip the
+          // guard. Guard rejection discards the primary prediction so the
+          // search-only fallback (which has its own guard pass) can run.
+          if (
+            recAmazonAsin &&
+            gem.grounding.url_context_failed &&
+            gem.grounding.used_google_search
+          ) {
+            const guard = runAmazonAsinGuard(recAmazonAsin, gem.grounding);
+            recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
+            if (!guard.ok) {
+              recGeminiPred = null;
+              recWarnings.push(guard.reason as GeminiWarningCode);
+            }
+          }
         } else if (gem.configured) {
           recGeminiBlock = geminiFailureBlock(gem);
           recWarnings.push(gem.code satisfies GeminiWarningCode);
@@ -695,15 +797,31 @@ serve(async (req) => {
       const recFallbackAttempted = recFb.attempted;
       const recFallbackOk = recFb.ok;
       const recFallbackSkipReason = recFb.skipReason;
-      const recFallbackError = recFb.error;
+      let recFallbackError = recFb.error;
       const recFallbackDurationMs = recFb.durationMs;
-      const recFallbackUsed = recFb.used;
+      let recFallbackUsed = recFb.used;
       if (recFb.used && recFb.mergedPredictions && recFb.mergeDiag && recFb.geminiPred && recFb.geminiResult?.ok) {
         recMerged = recFb.mergedPredictions;
         recMergeDiag = recFb.mergeDiag;
         recGeminiPred = recFb.geminiPred;
         // Refresh gemini block to reflect the winning call's grounding.
         recGeminiBlock = geminiSuccessBlock(recFb.geminiResult);
+        // Phase 1.6: Amazon ASIN exact-match guard on the fallback path.
+        // Runs AFTER parser/Zod/recovery gate/post-fallback merge accept.
+        // Fail-closed: a guard rejection discards the prediction and routes
+        // the request to the original NO_PREDICTIONS / fetch-error path
+        // (never opens the AI Analysis modal with a wrong product).
+        if (recAmazonAsin) {
+          const guard = runAmazonAsinGuard(recAmazonAsin, recFb.geminiResult.grounding);
+          recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
+          if (!guard.ok) {
+            recMerged = null;
+            recGeminiPred = null;
+            recFallbackUsed = false;
+            recFallbackError = guard.reason;
+            recWarnings.push(guard.reason as GeminiWarningCode);
+          }
+        }
       } else if (recFb.attempted && !recFb.ok && recFb.error && recFb.error !== "RECOVERY_GATE_FAILED") {
         // Preserve original failure context by recording the fallback error
         // as a warning. The original primary-Gemini warning (if any) is
@@ -962,6 +1080,7 @@ serve(async (req) => {
       extract.predictions === null || wsFinal.weak || usedFirecrawl;
     let geminiBlock: GeminiMetadataBlock | undefined;
     let mainGeminiPred: GeminiRawPrediction | null = null;
+    const mainAmazonAsin = extractAmazonAsin(safe.url);
     if (geminiEligible) {
       if (geminiConfigured) {
         const evidenceBaseUrl = chooseEvidenceBaseUrl({
@@ -979,6 +1098,22 @@ serve(async (req) => {
         if (gem.ok) {
           geminiBlock = geminiSuccessBlock(gem);
           mainGeminiPred = gem.prediction;
+          // Phase 1.6: Amazon ASIN guard on primary path — only when URL
+          // Context retrieval failed AND Google Search grounding was used.
+          // Guard rejection discards the primary prediction so the
+          // search-only fallback (which has its own guard pass) can run.
+          if (
+            mainAmazonAsin &&
+            gem.grounding.url_context_failed &&
+            gem.grounding.used_google_search
+          ) {
+            const guard = runAmazonAsinGuard(mainAmazonAsin, gem.grounding);
+            geminiBlock = mergeGuardDiagnostics(geminiBlock, guard.diagnostics);
+            if (!guard.ok) {
+              mainGeminiPred = null;
+              (warnings as string[]).push(guard.reason as GeminiWarningCode);
+            }
+          }
         } else if (gem.configured) {
           geminiBlock = geminiFailureBlock(gem);
           (warnings as string[]).push(gem.code satisfies GeminiWarningCode);
@@ -1053,6 +1188,21 @@ serve(async (req) => {
         // Refresh the gemini block to reflect the winning call's grounding.
         geminiBlock = geminiSuccessBlock(mainFb.geminiResult);
         mainFallbackUsed = true;
+        // Phase 1.6: Amazon ASIN exact-match guard on the fallback path.
+        // Fail-closed: guard rejection discards the prediction and routes
+        // the response to the existing NO_PREDICTIONS path (modal NOT
+        // opened). Trace/telemetry preserves the rejection reason.
+        if (mainAmazonAsin) {
+          const guard = runAmazonAsinGuard(mainAmazonAsin, mainFb.geminiResult.grounding);
+          geminiBlock = mergeGuardDiagnostics(geminiBlock, guard.diagnostics);
+          if (!guard.ok) {
+            mainMerged = null;
+            mainGeminiPred = null;
+            mainFallbackUsed = false;
+            mainFallbackError = guard.reason;
+            (warnings as string[]).push(guard.reason as GeminiWarningCode);
+          }
+        }
       } else if (mainFb.attempted && !mainFb.ok && mainFb.error && mainFb.error !== "RECOVERY_GATE_FAILED") {
         // Preserve the original primary-Gemini warning AND add the fallback
         // failure code so observers see both failures.

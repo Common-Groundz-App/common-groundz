@@ -174,6 +174,17 @@ export interface V2SuccessResponse {
       search_fallback_skip_reason?: string | null;
       search_fallback_error?: GeminiErrorCode;
       search_fallback_duration_ms?: number;
+      /**
+       * Phase 1.6: Amazon ASIN exact-match guard diagnostics. Additive;
+       * present only when the analyzed URL is an Amazon product URL whose
+       * ASIN could be extracted. Booleans + reason string only — never the
+       * raw ASIN, prompt, response, HTML, image URLs, or any secret.
+       */
+      amazon_asin_present?: boolean;
+      grounding_contains_target_asin?: boolean;
+      grounding_contains_canonical_dp_url?: boolean;
+      amazon_exact_match_verified?: boolean;
+      amazon_exact_match_reject_reason?: string | null;
     };
     /**
      * Final source of the returned predictions. Free-form string for

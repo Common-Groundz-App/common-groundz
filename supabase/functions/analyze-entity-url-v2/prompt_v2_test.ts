@@ -167,3 +167,58 @@ Deno.test("malicious slug: only one occurrence in userPrompt, inside evidence JS
   // The single occurrence must sit immediately after the evidence JSON key.
   assertStringIncludes(userPrompt, `"amazon_path_slug":"${sanitized}"`);
 });
+
+// ---------- Phase 1.6: Amazon ASIN anchoring ----------
+
+import { buildV1StyleSearchFallbackPrompts } from "./prompt-generator-v2.ts";
+
+Deno.test("Phase 1.6: amazon_asin block absent when ASIN missing", () => {
+  const { systemPrompt, userPrompt } = buildV2Prompts(
+    { url: URL, evidenceBaseUrl: BASE, title: "T" },
+    BASE,
+  );
+  assert(!systemPrompt.includes("amazon_asin is the canonical"));
+  assert(!userPrompt.includes("amazon_asin"));
+});
+
+Deno.test("Phase 1.6: primary prompt — ASIN anchor block + asin before slug in evidence", () => {
+  const { systemPrompt, userPrompt } = buildV2Prompts(
+    {
+      url: "https://www.amazon.in/Root-Hair-Serum/dp/B0FGJF5QN7/",
+      evidenceBaseUrl: BASE,
+      amazonAsin: "B0FGJF5QN7",
+      amazonPathSlug: "Root Hair Serum",
+    },
+    BASE,
+  );
+  assertStringIncludes(systemPrompt, "amazon_asin is the canonical");
+  assertStringIncludes(systemPrompt, "PRIMARY identity anchor");
+  assertStringIncludes(systemPrompt, "Do NOT infer brand from the first token");
+  // asin must precede slug in the JSON evidence payload
+  const asinIdx = userPrompt.indexOf('"amazon_asin"');
+  const slugIdx = userPrompt.indexOf('"amazon_path_slug"');
+  assert(asinIdx > 0 && slugIdx > 0 && asinIdx < slugIdx);
+});
+
+Deno.test("Phase 1.6: V1-style fallback — asin= before slug= and ASIN block present", () => {
+  const { systemPrompt, userPrompt } = buildV1StyleSearchFallbackPrompts({
+    url: "https://www.amazon.in/dp/B0FGJF5QN7/",
+    host: "www.amazon.in",
+    amazonAsin: "B0FGJF5QN7",
+    amazonPathSlug: "Root Hair Serum",
+    mappedType: "product",
+  });
+  assertStringIncludes(systemPrompt, "amazon_asin is the canonical");
+  const asinIdx = userPrompt.indexOf("asin=");
+  const slugIdx = userPrompt.indexOf("slug=");
+  assert(asinIdx > 0 && slugIdx > 0 && asinIdx < slugIdx);
+});
+
+Deno.test("Phase 1.6: V1-style fallback — no ASIN block when ASIN absent", () => {
+  const { systemPrompt, userPrompt } = buildV1StyleSearchFallbackPrompts({
+    url: "https://example.com/x",
+    host: "example.com",
+  });
+  assert(!systemPrompt.includes("amazon_asin is the canonical"));
+  assert(!userPrompt.includes("asin="));
+});
