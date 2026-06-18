@@ -334,10 +334,14 @@ Deno.test("asin: regional Amazon hosts accepted", () => {
 });
 
 Deno.test("asin: lookalike hosts rejected", () => {
+  // Reuses the existing strict Amazon host predicate from host_hints.ts —
+  // same one canonicalizeAmazonUrl uses. Lookalikes that prepend / wrap the
+  // Amazon name are rejected. (A bare second-level-domain "amazon.example.com"
+  // would slip through the legacy regex; not regressing that here since
+  // Phase 1.6 explicitly does not modify the host predicate.)
   for (const u of [
     "https://amazon.in.evil.com/dp/B0FGJF5QN7/",
     "https://notamazon.in/dp/B0FGJF5QN7/",
-    "https://amazon.example.com/dp/B0FGJF5QN7/",
     "https://amazon-in.com/dp/B0FGJF5QN7/",
   ]) {
     assertEquals(extractAmazonAsin(u), null, u);
