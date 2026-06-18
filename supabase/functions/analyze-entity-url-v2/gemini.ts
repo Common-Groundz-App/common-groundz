@@ -44,7 +44,13 @@ export const GEMINI_TEMPERATURE = 0.15;
 // Gemini with url_context + google_search) failed to produce a gate-passing
 // prediction, and only if at least SEARCH_FALLBACK_TIMEOUT_MS +
 // SEARCH_FALLBACK_BUDGET_BUFFER_MS remain in the request budget.
-export const SEARCH_FALLBACK_TIMEOUT_MS = 14_000;
+// Bumped from 14_000 → 20_000 (Phase 1.5b). V1's successful Gemini +
+// Google Search call on hostile hosts like Amazon completes right around
+// the previous 14s budget; aborting at 14s killed otherwise-valid
+// fallbacks (see Root Hair Serum). The total request budget
+// (REQUEST_TOTAL_BUDGET_MS in index.ts) plus the buffer below guarantees
+// we never overrun the edge-function deadline.
+export const SEARCH_FALLBACK_TIMEOUT_MS = 20_000;
 export const SEARCH_FALLBACK_BUDGET_BUFFER_MS = 1_000;
 
 
