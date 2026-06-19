@@ -802,6 +802,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
     hasOg,
     hasTwitter,
     sources,
+    pageSignals,
   });
 }
 
@@ -811,6 +812,7 @@ function weakSignals(input: {
   hasOg: boolean;
   hasTwitter: boolean;
   sources: string[];
+  pageSignals?: PageSignals;
 }): ExtractResult {
   return {
     predictions: null,
@@ -825,5 +827,6 @@ function weakSignals(input: {
       weak_signals: true,
     },
     warnings: ["weak_signals"],
+    pageSignals: input.pageSignals,
   };
 }
