@@ -36,7 +36,10 @@ import {
 import {
   verifyAmazonAsinGrounding,
   groundingContainsCanonicalDpUrl,
+  runDualPathVerification,
   type AmazonGroundingEvidence,
+  type DualPathDiagnostics,
+  type PageSignalsForGuard,
 } from "./amazon_asin_guard.ts";
 import {
   runFirecrawlScrape,
