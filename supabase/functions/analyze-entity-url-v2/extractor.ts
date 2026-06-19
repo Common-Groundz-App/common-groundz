@@ -789,6 +789,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
         weak_signals: false,
       },
       warnings: [],
+      pageSignals,
     };
   }
 
