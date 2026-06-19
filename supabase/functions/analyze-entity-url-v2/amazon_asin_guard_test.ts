@@ -190,3 +190,203 @@ Deno.test("canonicalDp: returns false when only title contains ASIN", () => {
     false,
   );
 });
+
+// ─── Phase 1.7 — dual-path identity verification ─────────────────────────
+
+import {
+  runDualPathVerification,
+  pickPageTitleAnchor,
+} from "./amazon_asin_guard.ts";
+
+const ASIN = "B0FGJF5QN7";
+const ANCHOR_OK = "Root Botanie FOLLIWISE Men Hair Vital Serum + Anti-Pollution Dandruff Protect Scalp Cleanser";
+const GROUNDING_OK = {
+  chunkUris: ["https://www.amazon.in/dp/B0FGJF5QN7/"],
+  chunkTitles: [],
+  retrievedUrls: [],
+};
+const GROUNDING_NONE = { chunkUris: [], chunkTitles: [], retrievedUrls: [] };
+
+Deno.test("dual: Path A only (grounding ok, no anchor) → external_grounding", () => {
+  const r = runDualPathVerification({
+    amazonAsin: ASIN,
+    groundingEvidence: GROUNDING_OK,
+    pageSignals: null,
+    modelName: "Whatever Product",
+  });
+  assertEquals(r.ok, true);
+  assertEquals(r.diagnostics.amazon_identity_verified_via, "external_grounding");
+  assertEquals(r.diagnostics.amazon_exact_match_verified, true);
+});
+
+Deno.test("dual: Path B only (anchor verifies, grounding empty) → page_title_anchor", () => {
+  const r = runDualPathVerification({
+    amazonAsin: ASIN,
+    groundingEvidence: GROUNDING_NONE,
+    pageSignals: {
+      title: null, og_title: ANCHOR_OK, twitter_title: null, canonical: null,
+      jsonld_product_name: null,
+    },
+    modelName: "FOLLIWISE Men Hair Vital Serum",
+  });
+  assertEquals(r.ok, true);
+  assertEquals(r.diagnostics.amazon_identity_verified_via, "page_title_anchor");
+  assertEquals(r.diagnostics.amazon_exact_match_verified, false);
+  assertEquals(r.diagnostics.page_title_match_verified, true);
+});
+
+Deno.test("dual: both pass → both", () => {
+  const r = runDualPathVerification({
+    amazonAsin: ASIN,
+    groundingEvidence: GROUNDING_OK,
+    pageSignals: {
+      title: null, og_title: ANCHOR_OK, twitter_title: null, canonical: null,
+      jsonld_product_name: null,
+    },
+    modelName: "FOLLIWISE Men Hair Vital Serum",
+  });
+  assertEquals(r.ok, true);
+  assertEquals(r.diagnostics.amazon_identity_verified_via, "both");
+});
+
+Deno.test("dual: anchor mismatch overrides grounding pass → MISMATCH", () => {
+  const r = runDualPathVerification({
+    amazonAsin: ASIN,
+    groundingEvidence: GROUNDING_OK,
+    pageSignals: {
+      title: null, og_title: ANCHOR_OK, twitter_title: null, canonical: null,
+      jsonld_product_name: null,
+    },
+    // Slug-derived neighbor: only "root" overlaps and root is in stop-list
+    modelName: "Root Hair Serum Dandruff Cleanser",
+  });
+  assertEquals(r.ok, false);
+  assertEquals(r.reason, "AMAZON_NAME_PAGE_TITLE_MISMATCH");
+  assertEquals(r.diagnostics.page_title_match_verified, false);
+});
+
+Deno.test("dual: model name with only stop-tokens+digits → reject MISMATCH (no overlap)", () => {
+  const r = runDualPathVerification({
+    amazonAsin: ASIN,
+    groundingEvidence: GROUNDING_NONE,
+    pageSignals: {
+      title: null, og_title: ANCHOR_OK, twitter_title: null, canonical: null,
+      jsonld_product_name: null,
+    },
+    modelName: "Hair Serum 100ml",
+  });
+  assertEquals(r.ok, false);
+  assertEquals(r.reason, "AMAZON_NAME_PAGE_TITLE_MISMATCH");
+});
+
+Deno.test("dual: both fail → preserves Phase 1.6 reason", () => {
+  const r = runDualPathVerification({
+    amazonAsin: ASIN,
+    groundingEvidence: { chunkUris: ["https://plantmade.in/x"], chunkTitles: [], retrievedUrls: [] },
+    pageSignals: null,
+    modelName: "Whatever",
+  });
+  assertEquals(r.ok, false);
+  assertEquals(r.reason, "AMAZON_ASIN_GROUNDING_MISMATCH");
+});
+
+Deno.test("dual: anchor with no distinctive tokens → NO_DISTINCTIVE_TOKENS skip, falls back to Path A", () => {
+  const r = runDualPathVerification({
+    amazonAsin: ASIN,
+    groundingEvidence: GROUNDING_OK,
+    pageSignals: {
+      title: "Hair Serum Cleanser", og_title: null, twitter_title: null, canonical: null,
+      jsonld_product_name: null,
+    },
+    modelName: "Folliwise Hair Vital",
+  });
+  assertEquals(r.ok, true);
+  assertEquals(r.diagnostics.page_title_match_skip_reason, "NO_DISTINCTIVE_TOKENS");
+  assertEquals(r.diagnostics.amazon_identity_verified_via, "external_grounding");
+});
+
+// ─── Phase 1.7 — pickPageTitleAnchor: bot-wall + canonical ASIN ──────────
+
+Deno.test("anchor: jsonld_product_name chosen over og/twitter/title", () => {
+  const r = pickPageTitleAnchor({
+    title: "T", og_title: "O", twitter_title: "W", canonical: null,
+    jsonld_product_name: "J",
+  }, null);
+  assertEquals(r.anchor, "J");
+});
+
+Deno.test("anchor: bot-wall <title> skipped, og_title used", () => {
+  const r = pickPageTitleAnchor({
+    title: "Robot Check", og_title: ANCHOR_OK, twitter_title: null, canonical: null,
+    jsonld_product_name: null,
+  }, null);
+  assertEquals(r.anchor, ANCHOR_OK);
+});
+
+Deno.test("anchor: all bot-wall → BOT_WALL_OR_GENERIC", () => {
+  const r = pickPageTitleAnchor({
+    title: "Robot Check", og_title: "Amazon Sign-In", twitter_title: "Page Not Found",
+    canonical: null, jsonld_product_name: null,
+  }, null);
+  assertEquals(r.anchor, null);
+  assertEquals(r.reject_reason, "BOT_WALL_OR_GENERIC");
+});
+
+Deno.test("anchor: bare site name Amazon.in rejected", () => {
+  const r = pickPageTitleAnchor({
+    title: "Amazon.in", og_title: null, twitter_title: null, canonical: null,
+    jsonld_product_name: null,
+  }, null);
+  assertEquals(r.anchor, null);
+  assertEquals(r.reject_reason, "BOT_WALL_OR_GENERIC");
+});
+
+Deno.test("anchor: canonical ASIN matches → anchor used", () => {
+  const r = pickPageTitleAnchor({
+    title: ANCHOR_OK, og_title: null, twitter_title: null,
+    canonical: "https://www.amazon.in/dp/B0FGJF5QN7/", jsonld_product_name: null,
+  }, ASIN);
+  assertEquals(r.anchor, ANCHOR_OK);
+  assertEquals(r.canonical_asin_mismatch, false);
+});
+
+Deno.test("anchor: canonical ASIN mismatch → null + AMAZON_CANONICAL_ASIN_MISMATCH", () => {
+  const r = pickPageTitleAnchor({
+    title: ANCHOR_OK, og_title: null, twitter_title: null,
+    canonical: "https://www.amazon.in/dp/B0XXXXX111/", jsonld_product_name: null,
+  }, ASIN);
+  assertEquals(r.anchor, null);
+  assertEquals(r.canonical_asin_mismatch, true);
+  assertEquals(r.reject_reason, "AMAZON_CANONICAL_ASIN_MISMATCH");
+});
+
+Deno.test("anchor: canonical without ASIN → anchor used normally", () => {
+  const r = pickPageTitleAnchor({
+    title: ANCHOR_OK, og_title: null, twitter_title: null,
+    canonical: "https://www.amazon.in/some-other-page/", jsonld_product_name: null,
+  }, ASIN);
+  assertEquals(r.anchor, ANCHOR_OK);
+});
+
+Deno.test("dual: canonical ASIN mismatch + Path A pass → external_grounding only", () => {
+  const r = runDualPathVerification({
+    amazonAsin: ASIN,
+    groundingEvidence: GROUNDING_OK,
+    pageSignals: {
+      title: ANCHOR_OK, og_title: null, twitter_title: null,
+      canonical: "https://www.amazon.in/dp/B0XXXXX111/", jsonld_product_name: null,
+    },
+    modelName: "Something Else",
+  });
+  assertEquals(r.ok, true);
+  assertEquals(r.diagnostics.amazon_canonical_asin_mismatch, true);
+  assertEquals(r.diagnostics.amazon_identity_verified_via, "external_grounding");
+});
+
+Deno.test("dual: null ASIN passes regardless", () => {
+  const r = runDualPathVerification({
+    amazonAsin: null, groundingEvidence: null, pageSignals: null, modelName: null,
+  });
+  assertEquals(r.ok, true);
+  assertEquals(r.diagnostics.amazon_exact_match_verified, true);
+});
