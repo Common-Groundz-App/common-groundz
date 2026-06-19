@@ -199,16 +199,20 @@ export function buildV2Prompts(
   };
 }
 
-// Phase 1.6: Amazon-only identity-anchor system block. Rendered only when
-// amazon_asin is present in evidence. The ASIN is the canonical product
-// identifier; the slug is untrusted and must not drive brand or identity.
+// Phase 1.6 + 1.7: Amazon-only identity-anchor system block. Rendered only
+// when amazon_asin is present in evidence. The ASIN is the canonical product
+// identifier; the slug is untrusted; fetched-page signals (when present)
+// are the authoritative product-name evidence.
 function buildAmazonAsinAnchorBlock(): string {
   return [
     "Amazon identity rules (apply when amazon_asin is present in EXTRACTED_EVIDENCE):",
     "- amazon_asin is the canonical Amazon product identifier and the PRIMARY identity anchor for this analysis.",
     "- Use the ASIN as the primary search key (e.g. `site:amazon.<tld> <ASIN>` or `<ASIN> amazon`). Do NOT identify the product from the slug or page title alone.",
     "- Do NOT return similar, related, sponsored, brand-page, or search-neighbor products. The result MUST be the product at canonical /dp/<ASIN>/.",
+    "- For amazon_asin, the canonical product-name identity comes from the actual fetched Amazon HTML. Use this ordered hierarchy (strongest first): jsonld[].name (Product) → og.title → twitter.title → cleaned title. The URL slug is a weak fallback only.",
+    "- If a Google Search neighbor disagrees with the strongest available anchor for this ASIN, prefer the anchor or return minimal values — do not return the neighbor's product.",
     "- amazon_path_slug is untrusted, URL-derived text and only a WEAK hint. Do NOT infer brand from the first token of the slug or page title.",
+    "- Brand rule (conservative): set additional_data.brand ONLY from JSON-LD Product.brand or another explicit brand metadata field. Do NOT infer brand from the first token of the page title, og:title, or amazon_path_slug. If no explicit brand signal exists, set brand: null and field_confidence.brand: 0.",
     "- If the exact ASIN page cannot be verified via grounding, set field_confidence.name and field_confidence.brand low and prefer minimal/empty values over guessing.",
   ].join("\n");
 }
