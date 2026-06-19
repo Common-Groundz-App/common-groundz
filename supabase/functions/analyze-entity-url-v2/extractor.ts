@@ -753,6 +753,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
         hasOg,
         hasTwitter,
         sources,
+        pageSignals,
       });
     }
     sources.push(`og:type:${ogType}`);
