@@ -1205,7 +1205,12 @@ serve(async (req) => {
         // the response to the existing NO_PREDICTIONS path (modal NOT
         // opened). Trace/telemetry preserves the rejection reason.
         if (mainAmazonAsin) {
-          const guard = runAmazonAsinGuard(mainAmazonAsin, mainFb.geminiResult.grounding);
+          const guard = runAmazonAsinGuard(
+            mainAmazonAsin,
+            mainFb.geminiResult.grounding,
+            extract.pageSignals ?? null,
+            mainFb.geminiPred?.name ?? null,
+          );
           geminiBlock = mergeGuardDiagnostics(geminiBlock, guard.diagnostics);
           if (!guard.ok) {
             mainMerged = null;
