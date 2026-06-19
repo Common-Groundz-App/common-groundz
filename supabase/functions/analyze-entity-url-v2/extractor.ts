@@ -143,6 +143,19 @@ export interface ExtractedOffers {
   aggregate: ExtractedAggregateOffer | null;
 }
 
+export interface PageSignals {
+  title: string | null;
+  og_title: string | null;
+  og_description: string | null;
+  og_site_name: string | null;
+  og_image: string | null;
+  twitter_title: string | null;
+  twitter_description: string | null;
+  canonical: string | null;
+  jsonld_product_name: string | null;
+  jsonld_brand: string | null;
+}
+
 export interface ExtractResult {
   predictions: V2Predictions | null;
   metadata: ExtractMetadata;
@@ -153,6 +166,12 @@ export interface ExtractResult {
    * Existing single-offer additional_data.price/currency unchanged.
    */
   extractedOffers?: ExtractedOffers | null;
+  /**
+   * Phase 1.7: real fetched-page identity signals. Reuses HTML already
+   * parsed for the main extraction. Each field nullable. Used by index.ts
+   * to feed Gemini and the Amazon dual-path identity guard. Never logged raw.
+   */
+  pageSignals?: PageSignals;
 }
 
 // ─── Phase 8.1B: JSON-LD offer parsing (defensive, deterministic) ────────
