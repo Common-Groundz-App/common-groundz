@@ -599,12 +599,50 @@ function buildAdditionalData(
 
 // ─── Main entry point ─────────────────────────────────────────────────────
 
+function buildPageSignals(
+  meta: MetaIndex,
+  jsonLdBlocks: unknown[],
+): PageSignals {
+  let jsonld_product_name: string | null = null;
+  let jsonld_brand: string | null = null;
+  for (const root of jsonLdBlocks) {
+    for (const node of flattenGraph(root)) {
+      const { node: inner } = unwrapOnce(node);
+      const types = normalizeTypeArray(inner["@type"]);
+      if (!types.some((t) => t === "Product")) continue;
+      if (!jsonld_product_name) {
+        const n = str((inner as Record<string, unknown>).name);
+        if (n) jsonld_product_name = n;
+      }
+      if (!jsonld_brand) {
+        const b = getName((inner as Record<string, unknown>).brand);
+        if (b) jsonld_brand = b;
+      }
+      if (jsonld_product_name && jsonld_brand) break;
+    }
+    if (jsonld_product_name && jsonld_brand) break;
+  }
+  return {
+    title: meta.title ?? null,
+    og_title: meta.og.title ?? null,
+    og_description: meta.og.description ?? null,
+    og_site_name: meta.og.site_name ?? null,
+    og_image: meta.og.image ?? null,
+    twitter_title: meta.twitter.title ?? null,
+    twitter_description: meta.twitter.description ?? null,
+    canonical: meta.canonical ?? null,
+    jsonld_product_name,
+    jsonld_brand,
+  };
+}
+
 export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
   const sources: string[] = [];
   const jsonLdBlocks = extractJsonLdBlocks(html);
   const meta = extractMeta(stripScriptsAndStyles(html));
   const hasOg = Object.keys(meta.og).length > 0;
   const hasTwitter = Object.keys(meta.twitter).length > 0;
+  const pageSignals = buildPageSignals(meta, jsonLdBlocks);
 
   // ── 1. Try JSON-LD ──────────────────────────────────────────────────────
   let chosen: {
