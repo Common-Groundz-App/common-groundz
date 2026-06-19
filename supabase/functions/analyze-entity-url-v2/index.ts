@@ -367,68 +367,49 @@ function geminiFailureBlock(
 }
 
 /**
- * Phase 1.6: Amazon ASIN exact-match guard wrapper.
+ * Phase 1.6 + 1.7: Amazon ASIN dual-path identity guard wrapper.
  *
- * Runs AFTER the tolerant parser, Zod validator, recovery gate, and
- * post-fallback re-merge have accepted a prediction — BEFORE that
- * prediction is treated as modal-eligible or as a "successful" output.
+ * Accepts a prediction if EITHER:
+ *   - Path A: Gemini external grounding contains the target ASIN, OR
+ *   - Path B: fetched-page title anchor (after bot-wall + canonical-ASIN
+ *     filters) shares ≥ 1 distinctive token with the model's returned name.
  *
- * Evidence used is EXTERNAL only:
- *   - groundingChunks[*].web.uri / .web.title
- *   - urlContextMetadata[*].retrievedUrl
+ * Rejects with AMAZON_NAME_PAGE_TITLE_MISMATCH when a usable anchor exists
+ * with distinctive tokens and the model name does not overlap — fetched
+ * page always wins. Returns Phase-1.6 reasons when both paths fail.
  *
- * Excluded (must not leak in): prompt text, our canonical URL hint,
- * webSearchQueries, groundingSupports[*].segment.text, the model's
- * answer text, locally constructed strings.
- *
- * Returns `null` when the guard PASSES (or is N/A for non-Amazon). Returns
- * a partial diagnostic block + reason when the guard FAILS — caller must
- * discard the prediction, record telemetry, and route to NO_PREDICTIONS.
+ * Does NOT mutate `prediction_source`; identity-verification path is
+ * surfaced only via diagnostics.amazon_identity_verified_via.
  */
 function runAmazonAsinGuard(
   amazonAsin: string | null,
   grounding: GeminiGrounding | undefined,
+  pageSignals: PageSignalsForGuard | null | undefined,
+  modelName: string | null | undefined,
 ):
   | { ok: true; diagnostics: AmazonGuardDiagnostics }
   | { ok: false; reason: string; diagnostics: AmazonGuardDiagnostics } {
-  const diagnostics: AmazonGuardDiagnostics = {
-    amazon_asin_present: !!amazonAsin,
-    grounding_contains_target_asin: false,
-    grounding_contains_canonical_dp_url: false,
-    amazon_exact_match_verified: false,
-    amazon_exact_match_reject_reason: null,
-  };
-  if (!amazonAsin) {
-    diagnostics.amazon_exact_match_verified = true;
-    return { ok: true, diagnostics };
-  }
   const g = grounding;
   const evidence: AmazonGroundingEvidence = {
     chunkUris: g?.grounding_chunk_uris ?? [],
     chunkTitles: g?.grounding_chunk_titles ?? [],
     retrievedUrls: g?.url_context_retrieved_urls ?? [],
   };
-  const verdict = verifyAmazonAsinGrounding({ amazonAsin, groundingEvidence: evidence });
-  diagnostics.grounding_contains_canonical_dp_url = groundingContainsCanonicalDpUrl(
+  const verdict = runDualPathVerification({
     amazonAsin,
-    evidence,
-  );
-  if (verdict.ok) {
-    diagnostics.amazon_exact_match_verified = true;
-    diagnostics.grounding_contains_target_asin = true;
-    return { ok: true, diagnostics };
-  }
-  diagnostics.amazon_exact_match_reject_reason = verdict.reason;
-  return { ok: false, reason: verdict.reason, diagnostics };
+    groundingEvidence: evidence,
+    pageSignals: pageSignals ?? null,
+    modelName: modelName ?? null,
+  });
+  if (verdict.ok) return { ok: true, diagnostics: verdict.diagnostics };
+  return {
+    ok: false,
+    reason: verdict.reason ?? "AMAZON_ASIN_GROUNDING_MISMATCH",
+    diagnostics: verdict.diagnostics,
+  };
 }
 
-interface AmazonGuardDiagnostics {
-  amazon_asin_present: boolean;
-  grounding_contains_target_asin: boolean;
-  grounding_contains_canonical_dp_url: boolean;
-  amazon_exact_match_verified: boolean;
-  amazon_exact_match_reject_reason: string | null;
-}
+type AmazonGuardDiagnostics = DualPathDiagnostics;
 
 function mergeGuardDiagnostics(
   block: GeminiMetadataBlock | undefined,
@@ -437,6 +418,7 @@ function mergeGuardDiagnostics(
   if (!block) return block;
   return { ...block, ...diag };
 }
+
 
 // ─── Phase 8 helpers ──────────────────────────────────────────────────────
 
