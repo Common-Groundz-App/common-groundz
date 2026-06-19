@@ -309,10 +309,10 @@ Deno.test("dual: anchor with no distinctive tokens → NO_DISTINCTIVE_TOKENS ski
 
 Deno.test("anchor: jsonld_product_name chosen over og/twitter/title", () => {
   const r = pickPageTitleAnchor({
-    title: "T", og_title: "O", twitter_title: "W", canonical: null,
-    jsonld_product_name: "J",
+    title: "TitleAlpha Item", og_title: "OgAlpha Item", twitter_title: "TwAlpha Item",
+    canonical: null, jsonld_product_name: "JsonldAlpha Item",
   }, null);
-  assertEquals(r.anchor, "J");
+  assertEquals(r.anchor, "JsonldAlpha Item");
 });
 
 Deno.test("anchor: bot-wall <title> skipped, og_title used", () => {
