@@ -737,6 +737,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
       },
       warnings: [],
       extractedOffers,
+      pageSignals,
     };
   }
 
