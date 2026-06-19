@@ -222,3 +222,23 @@ Deno.test("Phase 1.6: V1-style fallback — no ASIN block when ASIN absent", () 
   assert(!systemPrompt.includes("amazon_asin is the canonical"));
   assert(!userPrompt.includes("asin="));
 });
+
+// ─── Phase 1.7 — Amazon anchor block + brand rule + no og_image leak ─────
+
+Deno.test("Phase 1.7: Amazon anchor block includes hierarchy + brand rule", () => {
+  const { systemPrompt } = buildV2Prompts(
+    { url: "https://www.amazon.in/dp/B0FGJF5QN7/", evidenceBaseUrl: BASE, amazonAsin: "B0FGJF5QN7" },
+    BASE,
+  );
+  assertStringIncludes(systemPrompt, "ordered hierarchy");
+  assertStringIncludes(systemPrompt, "jsonld[].name");
+  assertStringIncludes(systemPrompt, "og.title");
+  assertStringIncludes(systemPrompt, "twitter.title");
+  assertStringIncludes(systemPrompt, "Brand rule (conservative)");
+  assertStringIncludes(systemPrompt, "JSON-LD Product.brand");
+});
+
+Deno.test("Phase 1.7: no anchor block when amazon_asin absent", () => {
+  const { systemPrompt } = buildV2Prompts({ url: URL, evidenceBaseUrl: BASE }, BASE);
+  assert(!/ordered hierarchy/.test(systemPrompt));
+});
