@@ -34,8 +34,6 @@ import {
   sanitizeFallbackEvidenceUrl,
 } from "./host_hints.ts";
 import {
-  verifyAmazonAsinGrounding,
-  groundingContainsCanonicalDpUrl,
   runDualPathVerification,
   type AmazonGroundingEvidence,
   type DualPathDiagnostics,
