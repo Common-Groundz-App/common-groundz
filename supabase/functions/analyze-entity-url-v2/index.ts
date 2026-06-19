@@ -728,22 +728,20 @@ serve(async (req) => {
           evidenceBaseUrl,
           extractMetadata: recExtract?.metadata ?? EMPTY_EXTRACT_METADATA,
           usedFirecrawl: recFirecrawlOk,
+          pageSignals: recExtract?.pageSignals ?? null,
         });
         if (gem.ok) {
           recGeminiBlock = geminiSuccessBlock(gem);
           recGeminiPred = gem.prediction;
-          // (grounding consumed below for primary-path guard, not retained.)
-          // Phase 1.6: Amazon ASIN guard on primary path — only when URL
-          // Context retrieval failed AND we used Google Search grounding.
-          // If URL Context succeeded, trust the retrieved page and skip the
-          // guard. Guard rejection discards the primary prediction so the
-          // search-only fallback (which has its own guard pass) can run.
-          if (
-            recAmazonAsin &&
-            gem.grounding.url_context_failed &&
-            gem.grounding.used_google_search
-          ) {
-            const guard = runAmazonAsinGuard(recAmazonAsin, gem.grounding);
+          // Phase 1.7: dual-path guard always runs on Amazon URLs — page
+          // anchor verifies even when external grounding is weak/empty.
+          if (recAmazonAsin) {
+            const guard = runAmazonAsinGuard(
+              recAmazonAsin,
+              gem.grounding,
+              recExtract?.pageSignals ?? null,
+              gem.prediction?.name ?? null,
+            );
             recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
             if (!guard.ok) {
               recGeminiPred = null;
