@@ -185,6 +185,16 @@ export interface V2SuccessResponse {
       grounding_contains_canonical_dp_url?: boolean;
       amazon_exact_match_verified?: boolean;
       amazon_exact_match_reject_reason?: string | null;
+      /**
+       * Phase 1.7: page-signal identity anchor diagnostics. Booleans and
+       * reason codes only — never raw page text, URLs, or HTML.
+       */
+      page_title_anchor_present?: boolean;
+      page_title_match_verified?: boolean | null;
+      page_title_match_skip_reason?: string | null;
+      page_title_anchor_reject_reason?: string | null;
+      amazon_canonical_asin_mismatch?: boolean;
+      amazon_identity_verified_via?: "external_grounding" | "page_title_anchor" | "both" | null;
     };
     /**
      * Final source of the returned predictions. Free-form string for
