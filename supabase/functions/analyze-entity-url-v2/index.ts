@@ -213,6 +213,8 @@ async function invokeGemini(args: {
   usedFirecrawl: boolean;
   searchOnly?: boolean;
   timeoutMs?: number;
+  // Phase 1.7: forwarded real-page identity signals (Amazon-prioritized).
+  pageSignals?: import("./extractor.ts").PageSignals | null;
 }): Promise<GeminiResult> {
   // Phase A3: for Amazon URLs, send Gemini URL Context the canonical
   // /dp/<ASIN>/ URL (strips tracking junk). Preserve the original path slug
@@ -222,11 +224,6 @@ async function invokeGemini(args: {
   const amazonAsin = extractAmazonAsin(args.url);
 
   if (args.searchOnly) {
-    // Phase 1.5b: V1-style concise Google-Search-only fallback prompt for
-    // ALL hosts (no host gating). Mirrors V1's successful brevity but keeps
-    // a minimal V2 safety block. NEVER carries raw HTML / Firecrawl
-    // markdown / image URLs / query strings / fragments / OG/JSON-LD blobs
-    // / headers / model output. See buildV1StyleSearchFallbackPrompts.
     const sanitizedUrl = sanitizeFallbackEvidenceUrl(canonicalUrl);
     let host: string | null = null;
     try {
@@ -244,22 +241,52 @@ async function invokeGemini(args: {
     return await callGeminiSearchOnly({
       systemPrompt,
       userPrompt,
-      // Used only for image normalization downstream; never sent to Gemini.
       evidenceBaseUrl: sanitizedUrl ?? canonicalUrl,
       timeoutMs: args.timeoutMs,
     });
   }
 
-  // Only override evidenceBaseUrl when Firecrawl did NOT run AND we actually
-  // canonicalized the URL. Firecrawl-derived base URL is otherwise untouched.
   const promptBaseUrl =
     !args.usedFirecrawl && canonicalUrl !== args.url
       ? canonicalUrl
       : args.evidenceBaseUrl;
+
+  // Phase 1.7: assemble pageSignals into V2Evidence. og_image is intentionally
+  // NOT forwarded to the prompt to avoid bloat (kept on pageSignals only).
+  const ps = args.pageSignals ?? null;
+  const ogPayload: Record<string, string> = {};
+  const twPayload: Record<string, string> = {};
+  const jsonldPayload: unknown[] = [];
+  let titleField: string | null = null;
+  let descField: string | null = null;
+  let canonicalField: string | null = null;
+  if (ps) {
+    if (ps.og_title) ogPayload.title = ps.og_title;
+    if (ps.og_description) ogPayload.description = ps.og_description;
+    if (ps.og_site_name) ogPayload.site_name = ps.og_site_name;
+    if (ps.twitter_title) twPayload.title = ps.twitter_title;
+    if (ps.twitter_description) twPayload.description = ps.twitter_description;
+    if (ps.jsonld_product_name || ps.jsonld_brand) {
+      const block: Record<string, unknown> = { "@type": "Product" };
+      if (ps.jsonld_product_name) block.name = ps.jsonld_product_name;
+      if (ps.jsonld_brand) block.brand = ps.jsonld_brand;
+      jsonldPayload.push(block);
+    }
+    titleField = ps.title;
+    descField = ps.og_description ?? ps.twitter_description ?? null;
+    canonicalField = ps.canonical;
+  }
+
   const { systemPrompt, userPrompt } = buildV2Prompts(
     {
       url: canonicalUrl,
       evidenceBaseUrl: promptBaseUrl,
+      title: titleField,
+      description: descField,
+      canonical: canonicalField,
+      og: Object.keys(ogPayload).length ? ogPayload : undefined,
+      twitter: Object.keys(twPayload).length ? twPayload : undefined,
+      jsonld: jsonldPayload.length ? jsonldPayload : undefined,
       rawHtml: args.html ?? null,
       extractMetadata: args.extractMetadata,
       amazonPathSlug,
