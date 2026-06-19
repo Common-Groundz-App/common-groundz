@@ -143,6 +143,19 @@ export interface ExtractedOffers {
   aggregate: ExtractedAggregateOffer | null;
 }
 
+export interface PageSignals {
+  title: string | null;
+  og_title: string | null;
+  og_description: string | null;
+  og_site_name: string | null;
+  og_image: string | null;
+  twitter_title: string | null;
+  twitter_description: string | null;
+  canonical: string | null;
+  jsonld_product_name: string | null;
+  jsonld_brand: string | null;
+}
+
 export interface ExtractResult {
   predictions: V2Predictions | null;
   metadata: ExtractMetadata;
@@ -153,6 +166,12 @@ export interface ExtractResult {
    * Existing single-offer additional_data.price/currency unchanged.
    */
   extractedOffers?: ExtractedOffers | null;
+  /**
+   * Phase 1.7: real fetched-page identity signals. Reuses HTML already
+   * parsed for the main extraction. Each field nullable. Used by index.ts
+   * to feed Gemini and the Amazon dual-path identity guard. Never logged raw.
+   */
+  pageSignals?: PageSignals;
 }
 
 // ─── Phase 8.1B: JSON-LD offer parsing (defensive, deterministic) ────────
@@ -580,12 +599,50 @@ function buildAdditionalData(
 
 // ─── Main entry point ─────────────────────────────────────────────────────
 
+function buildPageSignals(
+  meta: MetaIndex,
+  jsonLdBlocks: unknown[],
+): PageSignals {
+  let jsonld_product_name: string | null = null;
+  let jsonld_brand: string | null = null;
+  for (const root of jsonLdBlocks) {
+    for (const node of flattenGraph(root)) {
+      const { node: inner } = unwrapOnce(node);
+      const types = normalizeTypeArray(inner["@type"]);
+      if (!types.some((t) => t === "Product")) continue;
+      if (!jsonld_product_name) {
+        const n = str((inner as Record<string, unknown>).name);
+        if (n) jsonld_product_name = n;
+      }
+      if (!jsonld_brand) {
+        const b = getName((inner as Record<string, unknown>).brand);
+        if (b) jsonld_brand = b;
+      }
+      if (jsonld_product_name && jsonld_brand) break;
+    }
+    if (jsonld_product_name && jsonld_brand) break;
+  }
+  return {
+    title: meta.title ?? null,
+    og_title: meta.og.title ?? null,
+    og_description: meta.og.description ?? null,
+    og_site_name: meta.og.site_name ?? null,
+    og_image: meta.og.image ?? null,
+    twitter_title: meta.twitter.title ?? null,
+    twitter_description: meta.twitter.description ?? null,
+    canonical: meta.canonical ?? null,
+    jsonld_product_name,
+    jsonld_brand,
+  };
+}
+
 export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
   const sources: string[] = [];
   const jsonLdBlocks = extractJsonLdBlocks(html);
   const meta = extractMeta(stripScriptsAndStyles(html));
   const hasOg = Object.keys(meta.og).length > 0;
   const hasTwitter = Object.keys(meta.twitter).length > 0;
+  const pageSignals = buildPageSignals(meta, jsonLdBlocks);
 
   // ── 1. Try JSON-LD ──────────────────────────────────────────────────────
   let chosen: {
@@ -621,6 +678,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
         hasOg,
         hasTwitter,
         sources,
+        pageSignals,
       });
     }
     sources.push(chosen.source);
@@ -679,6 +737,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
       },
       warnings: [],
       extractedOffers,
+      pageSignals,
     };
   }
 
@@ -694,6 +753,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
         hasOg,
         hasTwitter,
         sources,
+        pageSignals,
       });
     }
     sources.push(`og:type:${ogType}`);
@@ -729,6 +789,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
         weak_signals: false,
       },
       warnings: [],
+      pageSignals,
     };
   }
 
@@ -741,6 +802,7 @@ export function extractFromHtml(html: string, finalUrl: string): ExtractResult {
     hasOg,
     hasTwitter,
     sources,
+    pageSignals,
   });
 }
 
@@ -750,6 +812,7 @@ function weakSignals(input: {
   hasOg: boolean;
   hasTwitter: boolean;
   sources: string[];
+  pageSignals?: PageSignals;
 }): ExtractResult {
   return {
     predictions: null,
@@ -764,5 +827,6 @@ function weakSignals(input: {
       weak_signals: true,
     },
     warnings: ["weak_signals"],
+    pageSignals: input.pageSignals,
   };
 }

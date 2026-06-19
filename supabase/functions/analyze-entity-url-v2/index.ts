@@ -34,9 +34,10 @@ import {
   sanitizeFallbackEvidenceUrl,
 } from "./host_hints.ts";
 import {
-  verifyAmazonAsinGrounding,
-  groundingContainsCanonicalDpUrl,
+  runDualPathVerification,
   type AmazonGroundingEvidence,
+  type DualPathDiagnostics,
+  type PageSignalsForGuard,
 } from "./amazon_asin_guard.ts";
 import {
   runFirecrawlScrape,
@@ -213,6 +214,8 @@ async function invokeGemini(args: {
   usedFirecrawl: boolean;
   searchOnly?: boolean;
   timeoutMs?: number;
+  // Phase 1.7: forwarded real-page identity signals (Amazon-prioritized).
+  pageSignals?: import("./extractor.ts").PageSignals | null;
 }): Promise<GeminiResult> {
   // Phase A3: for Amazon URLs, send Gemini URL Context the canonical
   // /dp/<ASIN>/ URL (strips tracking junk). Preserve the original path slug
@@ -222,11 +225,6 @@ async function invokeGemini(args: {
   const amazonAsin = extractAmazonAsin(args.url);
 
   if (args.searchOnly) {
-    // Phase 1.5b: V1-style concise Google-Search-only fallback prompt for
-    // ALL hosts (no host gating). Mirrors V1's successful brevity but keeps
-    // a minimal V2 safety block. NEVER carries raw HTML / Firecrawl
-    // markdown / image URLs / query strings / fragments / OG/JSON-LD blobs
-    // / headers / model output. See buildV1StyleSearchFallbackPrompts.
     const sanitizedUrl = sanitizeFallbackEvidenceUrl(canonicalUrl);
     let host: string | null = null;
     try {
@@ -244,22 +242,52 @@ async function invokeGemini(args: {
     return await callGeminiSearchOnly({
       systemPrompt,
       userPrompt,
-      // Used only for image normalization downstream; never sent to Gemini.
       evidenceBaseUrl: sanitizedUrl ?? canonicalUrl,
       timeoutMs: args.timeoutMs,
     });
   }
 
-  // Only override evidenceBaseUrl when Firecrawl did NOT run AND we actually
-  // canonicalized the URL. Firecrawl-derived base URL is otherwise untouched.
   const promptBaseUrl =
     !args.usedFirecrawl && canonicalUrl !== args.url
       ? canonicalUrl
       : args.evidenceBaseUrl;
+
+  // Phase 1.7: assemble pageSignals into V2Evidence. og_image is intentionally
+  // NOT forwarded to the prompt to avoid bloat (kept on pageSignals only).
+  const ps = args.pageSignals ?? null;
+  const ogPayload: Record<string, string> = {};
+  const twPayload: Record<string, string> = {};
+  const jsonldPayload: unknown[] = [];
+  let titleField: string | null = null;
+  let descField: string | null = null;
+  let canonicalField: string | null = null;
+  if (ps) {
+    if (ps.og_title) ogPayload.title = ps.og_title;
+    if (ps.og_description) ogPayload.description = ps.og_description;
+    if (ps.og_site_name) ogPayload.site_name = ps.og_site_name;
+    if (ps.twitter_title) twPayload.title = ps.twitter_title;
+    if (ps.twitter_description) twPayload.description = ps.twitter_description;
+    if (ps.jsonld_product_name || ps.jsonld_brand) {
+      const block: Record<string, unknown> = { "@type": "Product" };
+      if (ps.jsonld_product_name) block.name = ps.jsonld_product_name;
+      if (ps.jsonld_brand) block.brand = ps.jsonld_brand;
+      jsonldPayload.push(block);
+    }
+    titleField = ps.title;
+    descField = ps.og_description ?? ps.twitter_description ?? null;
+    canonicalField = ps.canonical;
+  }
+
   const { systemPrompt, userPrompt } = buildV2Prompts(
     {
       url: canonicalUrl,
       evidenceBaseUrl: promptBaseUrl,
+      title: titleField,
+      description: descField,
+      canonical: canonicalField,
+      og: Object.keys(ogPayload).length ? ogPayload : undefined,
+      twitter: Object.keys(twPayload).length ? twPayload : undefined,
+      jsonld: jsonldPayload.length ? jsonldPayload : undefined,
       rawHtml: args.html ?? null,
       extractMetadata: args.extractMetadata,
       amazonPathSlug,
@@ -337,68 +365,49 @@ function geminiFailureBlock(
 }
 
 /**
- * Phase 1.6: Amazon ASIN exact-match guard wrapper.
+ * Phase 1.6 + 1.7: Amazon ASIN dual-path identity guard wrapper.
  *
- * Runs AFTER the tolerant parser, Zod validator, recovery gate, and
- * post-fallback re-merge have accepted a prediction — BEFORE that
- * prediction is treated as modal-eligible or as a "successful" output.
+ * Accepts a prediction if EITHER:
+ *   - Path A: Gemini external grounding contains the target ASIN, OR
+ *   - Path B: fetched-page title anchor (after bot-wall + canonical-ASIN
+ *     filters) shares ≥ 1 distinctive token with the model's returned name.
  *
- * Evidence used is EXTERNAL only:
- *   - groundingChunks[*].web.uri / .web.title
- *   - urlContextMetadata[*].retrievedUrl
+ * Rejects with AMAZON_NAME_PAGE_TITLE_MISMATCH when a usable anchor exists
+ * with distinctive tokens and the model name does not overlap — fetched
+ * page always wins. Returns Phase-1.6 reasons when both paths fail.
  *
- * Excluded (must not leak in): prompt text, our canonical URL hint,
- * webSearchQueries, groundingSupports[*].segment.text, the model's
- * answer text, locally constructed strings.
- *
- * Returns `null` when the guard PASSES (or is N/A for non-Amazon). Returns
- * a partial diagnostic block + reason when the guard FAILS — caller must
- * discard the prediction, record telemetry, and route to NO_PREDICTIONS.
+ * Does NOT mutate `prediction_source`; identity-verification path is
+ * surfaced only via diagnostics.amazon_identity_verified_via.
  */
 function runAmazonAsinGuard(
   amazonAsin: string | null,
   grounding: GeminiGrounding | undefined,
+  pageSignals: PageSignalsForGuard | null | undefined,
+  modelName: string | null | undefined,
 ):
   | { ok: true; diagnostics: AmazonGuardDiagnostics }
   | { ok: false; reason: string; diagnostics: AmazonGuardDiagnostics } {
-  const diagnostics: AmazonGuardDiagnostics = {
-    amazon_asin_present: !!amazonAsin,
-    grounding_contains_target_asin: false,
-    grounding_contains_canonical_dp_url: false,
-    amazon_exact_match_verified: false,
-    amazon_exact_match_reject_reason: null,
-  };
-  if (!amazonAsin) {
-    diagnostics.amazon_exact_match_verified = true;
-    return { ok: true, diagnostics };
-  }
   const g = grounding;
   const evidence: AmazonGroundingEvidence = {
     chunkUris: g?.grounding_chunk_uris ?? [],
     chunkTitles: g?.grounding_chunk_titles ?? [],
     retrievedUrls: g?.url_context_retrieved_urls ?? [],
   };
-  const verdict = verifyAmazonAsinGrounding({ amazonAsin, groundingEvidence: evidence });
-  diagnostics.grounding_contains_canonical_dp_url = groundingContainsCanonicalDpUrl(
+  const verdict = runDualPathVerification({
     amazonAsin,
-    evidence,
-  );
-  if (verdict.ok) {
-    diagnostics.amazon_exact_match_verified = true;
-    diagnostics.grounding_contains_target_asin = true;
-    return { ok: true, diagnostics };
-  }
-  diagnostics.amazon_exact_match_reject_reason = verdict.reason;
-  return { ok: false, reason: verdict.reason, diagnostics };
+    groundingEvidence: evidence,
+    pageSignals: pageSignals ?? null,
+    modelName: modelName ?? null,
+  });
+  if (verdict.ok) return { ok: true, diagnostics: verdict.diagnostics };
+  return {
+    ok: false,
+    reason: verdict.reason ?? "AMAZON_ASIN_GROUNDING_MISMATCH",
+    diagnostics: verdict.diagnostics,
+  };
 }
 
-interface AmazonGuardDiagnostics {
-  amazon_asin_present: boolean;
-  grounding_contains_target_asin: boolean;
-  grounding_contains_canonical_dp_url: boolean;
-  amazon_exact_match_verified: boolean;
-  amazon_exact_match_reject_reason: string | null;
-}
+type AmazonGuardDiagnostics = DualPathDiagnostics;
 
 function mergeGuardDiagnostics(
   block: GeminiMetadataBlock | undefined,
@@ -407,6 +416,7 @@ function mergeGuardDiagnostics(
   if (!block) return block;
   return { ...block, ...diag };
 }
+
 
 // ─── Phase 8 helpers ──────────────────────────────────────────────────────
 
@@ -718,22 +728,20 @@ serve(async (req) => {
           evidenceBaseUrl,
           extractMetadata: recExtract?.metadata ?? EMPTY_EXTRACT_METADATA,
           usedFirecrawl: recFirecrawlOk,
+          pageSignals: recExtract?.pageSignals ?? null,
         });
         if (gem.ok) {
           recGeminiBlock = geminiSuccessBlock(gem);
           recGeminiPred = gem.prediction;
-          // (grounding consumed below for primary-path guard, not retained.)
-          // Phase 1.6: Amazon ASIN guard on primary path — only when URL
-          // Context retrieval failed AND we used Google Search grounding.
-          // If URL Context succeeded, trust the retrieved page and skip the
-          // guard. Guard rejection discards the primary prediction so the
-          // search-only fallback (which has its own guard pass) can run.
-          if (
-            recAmazonAsin &&
-            gem.grounding.url_context_failed &&
-            gem.grounding.used_google_search
-          ) {
-            const guard = runAmazonAsinGuard(recAmazonAsin, gem.grounding);
+          // Phase 1.7: dual-path guard always runs on Amazon URLs — page
+          // anchor verifies even when external grounding is weak/empty.
+          if (recAmazonAsin) {
+            const guard = runAmazonAsinGuard(
+              recAmazonAsin,
+              gem.grounding,
+              recExtract?.pageSignals ?? null,
+              gem.prediction?.name ?? null,
+            );
             recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
             if (!guard.ok) {
               recGeminiPred = null;
@@ -812,7 +820,12 @@ serve(async (req) => {
         // the request to the original NO_PREDICTIONS / fetch-error path
         // (never opens the AI Analysis modal with a wrong product).
         if (recAmazonAsin) {
-          const guard = runAmazonAsinGuard(recAmazonAsin, recFb.geminiResult.grounding);
+          const guard = runAmazonAsinGuard(
+            recAmazonAsin,
+            recFb.geminiResult.grounding,
+            recExtract?.pageSignals ?? null,
+            recFb.geminiPred?.name ?? null,
+          );
           recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
           if (!guard.ok) {
             recMerged = null;
@@ -1094,20 +1107,19 @@ serve(async (req) => {
           evidenceBaseUrl,
           extractMetadata: extract.metadata,
           usedFirecrawl,
+          pageSignals: extract.pageSignals ?? null,
         });
         if (gem.ok) {
           geminiBlock = geminiSuccessBlock(gem);
           mainGeminiPred = gem.prediction;
-          // Phase 1.6: Amazon ASIN guard on primary path — only when URL
-          // Context retrieval failed AND Google Search grounding was used.
-          // Guard rejection discards the primary prediction so the
-          // search-only fallback (which has its own guard pass) can run.
-          if (
-            mainAmazonAsin &&
-            gem.grounding.url_context_failed &&
-            gem.grounding.used_google_search
-          ) {
-            const guard = runAmazonAsinGuard(mainAmazonAsin, gem.grounding);
+          // Phase 1.7: dual-path guard always runs on Amazon URLs.
+          if (mainAmazonAsin) {
+            const guard = runAmazonAsinGuard(
+              mainAmazonAsin,
+              gem.grounding,
+              extract.pageSignals ?? null,
+              gem.prediction?.name ?? null,
+            );
             geminiBlock = mergeGuardDiagnostics(geminiBlock, guard.diagnostics);
             if (!guard.ok) {
               mainGeminiPred = null;
@@ -1193,7 +1205,12 @@ serve(async (req) => {
         // the response to the existing NO_PREDICTIONS path (modal NOT
         // opened). Trace/telemetry preserves the rejection reason.
         if (mainAmazonAsin) {
-          const guard = runAmazonAsinGuard(mainAmazonAsin, mainFb.geminiResult.grounding);
+          const guard = runAmazonAsinGuard(
+            mainAmazonAsin,
+            mainFb.geminiResult.grounding,
+            extract.pageSignals ?? null,
+            mainFb.geminiPred?.name ?? null,
+          );
           geminiBlock = mergeGuardDiagnostics(geminiBlock, guard.diagnostics);
           if (!guard.ok) {
             mainMerged = null;

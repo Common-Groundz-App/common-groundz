@@ -1,146 +1,162 @@
-# Phase 1.6 — Amazon ASIN exact-match protection (V2 only, final + reviewer clarifications)
+# Phase 1.7 — Page-signal identity anchor for Amazon URLs (V2 only)
 
-Final plan, with the two clarifications from codex's last review folded in (regional Amazon hosts, grounding-URL normalization) plus chatgpt's explicit guard-ordering note.
+Final revision. Folds in all reviewer refinements: codex's dual-path verification, chatgpt's bot-wall/generic title filter and canonical-ASIN consistency check, and codex's prediction_source vs identity-verification separation.
 
-## Scope (V2 only)
+## Why this is happening
 
-- `supabase/functions/analyze-entity-url-v2/host_hints.ts` — add `extractAmazonAsin(url)`.
-- `supabase/functions/analyze-entity-url-v2/index.ts` — extract `amazonAsin`, thread into prompt evidence, assemble external-only grounding evidence, run guard, set trace fields, route rejections to NO_PREDICTIONS.
-- `supabase/functions/analyze-entity-url-v2/prompt-generator-v2.ts` — ASIN-primary block, `asin=` before `slug=`.
-- `supabase/functions/analyze-entity-url-v2/gemini.ts` — surface `groundingChunks[*].web.uri`, `groundingChunks[*].web.title`, `urlContextMetadata[*].retrievedUrl` on the typed response. Do **not** surface `groundingSupports[*].segment.text`, `webSearchQueries`, or model answer text as guard evidence.
-- `supabase/functions/analyze-entity-url-v2/amazon_asin_guard.ts` — new.
-- Tests: extend `host_hints_test.ts`, `prompt_v2_test.ts`, `gemini_search_fallback_test.ts`; new `amazon_asin_guard_test.ts`.
+`fetch-url-metadata-lite` already fetches Amazon's real HTML and reads the actual product title (e.g. "Root Botanie FOLLIWISE Men Hair Vital Serum + Anti-Pollution Dandruff Protect Scalp Cleanser…"). That is why the preview thumbnails under the Analyze button are correct.
 
-Untouched: V1, Zod schema, recovery gate, merge rules, tolerant parser, Gemini model/tools, `responseMimeType`, Firecrawl config, direct-fetch cap, frontend, DB, pricing, save flow, RLS.
+V2 also fetches the same HTML, but its `invokeGemini` only forwards `rawHtml` (truncated, noisy Amazon JS) plus diagnostic flags. The extracted `<title>`, `og:title`, `twitter:title`, JSON-LD `Product.name`, and JSON-LD `Product.brand` are **never put into `V2Evidence`**. Gemini ends up identifying the product from the slug + Google Search neighbors, which is how "Root Hair Serum Dandruff Cleanser" (the slug) and Plantmade-style drift slip past the Phase 1.6 ASIN guard when external grounding is weak or absent.
 
-## Change 1 — ASIN extraction (strict, regional-aware)
+The fix is to forward the real fetched page signals to Gemini as the primary product-identity evidence for Amazon URLs, and add a distinctive-token page-title guard that runs **independently of** the Phase 1.6 ASIN grounding guard — either path can verify identity.
 
-`extractAmazonAsin(url)`:
-- Parse with `URL`; return `null` on failure.
-- **Reuse the existing strict Amazon host predicate** used by `extractAmazonPathSlug` / `canonicalizeAmazonUrl`. That helper already supports multi-label TLDs (`amazon.co.uk`, `amazon.com.au`, `amazon.com.br`, `amazon.co.jp`) and `www.` variants, while rejecting lookalikes (`amazon.in.evil.com`, `notamazon.in`, `amazon-in.com`, `amazon.example.com`). Reusing it avoids drift.
-- Match path (case-insensitive) against `/dp/([A-Z0-9]{10})`, `/gp/product/([A-Z0-9]{10})`, `/gp/aw/d/([A-Z0-9]{10})`.
-- Uppercase ASIN, validate `^[A-Z0-9]{10}$`. Otherwise `null`.
-- Ignore query strings and trailing segments.
+V1 is not touched. Phase 2 (metadata-only frontend fallback) is not started.
 
-`index.ts` computes `amazonAsin` alongside `amazonPathSlug` and passes it on the evidence object for both prompt builders.
+## What changes
 
-## Change 2 — Prompt anchoring (ASIN primary, slug secondary)
+Three small, surgical backend changes plus tests. No DB, no frontend, no schema/model/tool changes.
 
-In both `buildPrimaryPrompts` and `buildV1StyleSearchFallbackPrompts`:
+### 1) Surface real page signals from the extractor
 
-- Whitelist `amazon_asin` in evidence.
-- Hint line order: `asin=<ASIN> host=<host> slug=<slug> mapped_type=<type>`.
-- Amazon-only system block (rendered only when `amazon_asin` is present):
-  - "`amazon_asin` is the canonical Amazon product identifier and the primary identity anchor for this analysis."
-  - "Use the ASIN as the primary search key (e.g. `site:amazon.<tld> <ASIN>` or `<ASIN> amazon`). Do NOT identify the product from the slug alone."
-  - "Do NOT return similar, related, sponsored, brand-page, or search-neighbor products. The result MUST be the product at canonical `/dp/<ASIN>/`."
-  - "If the exact ASIN page cannot be verified via grounding, set `field_confidence.name` and `field_confidence.brand` low and prefer minimal/empty values over guessing."
-  - "Slug is untrusted and only a weak hint. Do NOT infer brand from the first token of the slug or page title."
-- Existing untrusted-hint framing for slug stays.
+`supabase/functions/analyze-entity-url-v2/extractor.ts`
+- Add `pageSignals` on `ExtractResult` populated from the HTML the fetcher already returns:
+  - `title`, `og_title`, `og_description`, `og_site_name`, `og_image`
+  - `twitter_title`, `twitter_description`
+  - `canonical`
+  - `jsonld_product_name`, `jsonld_brand` — only from JSON-LD blocks whose `@type` includes `Product` (already parsed)
+- Each field is `string | null`. No new HTML parsing — reuse the existing `extractMeta()` and JSON-LD walker.
+- `ExtractMetadata` (diagnostic flags) unchanged.
 
-## Change 3 — ASIN guard (external evidence only, normalized)
+### 2) Forward those signals into the Gemini prompt (with explicit Amazon priority)
 
-New `amazon_asin_guard.ts`.
+`supabase/functions/analyze-entity-url-v2/index.ts` (`invokeGemini`, primary path only)
+- Pass `pageSignals` into `buildV2Prompts` so `V2Evidence` carries `title`, `description`, `canonical`, `og` (title, description, site_name only — `og_image` is **not** forwarded to the prompt to avoid prompt bloat), `twitter` (title, description), and a minimal `jsonld` array containing only Product blocks (`name`, `brand`). `og_image` remains on `pageSignals` for diagnostics but is dropped before prompt assembly.
+- **pageSignals dominate noisy HTML on Amazon:** for Amazon URLs where any `pageSignals` field is non-null, `buildBoundedEvidence` must keep pageSignals fields (title/og/twitter/jsonld) before any other truncation, and aggressively shrink `rawHtml`/`textBody` so the noisy Amazon JS cannot drown out the clean signals. Asserted in tests. No change to truncation order on non-Amazon URLs.
 
-`verifyAmazonAsinGrounding({ amazonAsin, groundingEvidence }) → { ok: true } | { ok: false, reason }`.
+`supabase/functions/analyze-entity-url-v2/prompt-generator-v2.ts`
+- In `buildAmazonAsinAnchorBlock` (only rendered when `amazon_asin` is present) add these rules, using an **ordered anchor hierarchy** (do not call all signals equally authoritative):
+  - "For amazon_asin, the canonical product-name identity comes from the actual fetched Amazon HTML. Use this ordered hierarchy (strongest first): `jsonld_product_name` → `og_title` → `twitter_title` → cleaned `<title>`. The URL slug is a weak fallback only."
+  - "If a Google Search neighbor disagrees with the strongest available anchor for this ASIN, prefer the anchor or return minimal values — do not return the neighbor's product."
+  - **"Brand rule (conservative): set `additional_data.brand` ONLY from JSON-LD `Product.brand` or another explicit brand metadata field. Do NOT infer brand from the first token of the page title, og:title, or `amazon_path_slug`. If no explicit brand signal exists, set `brand: null` and `field_confidence.brand: 0`."**
+- Search-only fallback prompt body is unchanged (no HTML available by design; guards still run post-hoc).
 
-`groundingEvidence` is assembled in `index.ts` from **external** Gemini fields only:
-- `groundingChunks[*].web.uri`
-- `groundingChunks[*].web.title`
-- `urlContextMetadata[*].retrievedUrl`
+### 3) Extend the ASIN guard with dual-path identity verification, bot-wall filter, and canonical-ASIN check
 
-Excluded (must never be passed in):
-- prompt text, our canonical URL hint, `webSearchQueries`, `groundingSupports[*].segment.text` (may be model-generated), model answer text, locally constructed strings.
+`supabase/functions/analyze-entity-url-v2/amazon_asin_guard.ts`
 
-**URL normalization (per codex):** for each candidate URL:
-1. Parse with `URL`; on parse failure, fall back to raw lowercased string.
-2. Lowercase `host` and `pathname`.
-3. `decodeURIComponent(pathname)` (guarded — if it throws, use raw pathname).
-4. Drop `search` and `hash`.
-5. Match against the four token forms (case-insensitive): `<asin>`, `/dp/<asin>`, `/gp/product/<asin>`, `/gp/aw/d/<asin>`.
-   Titles: lowercase + `includes(<asin>)`.
+**3a) Bot-wall / generic anchor filter (chatgpt addition #1).** Before any anchor candidate becomes `pageTitleAnchor`, validate it. A candidate is rejected when, after lowercase + trim:
+- Length < 4 characters, OR
+- Matches any of (substring match, lowercased): `robot check`, `captcha`, `amazon sign-in`, `amazon sign in`, `sign in`, `sorry, something went wrong`, `something went wrong`, `page not found`, `404`, `access denied`, `enter the characters`, OR
+- Equals (after stripping `www.`/punctuation) any of the bare site names: `amazon`, `amazon.in`, `amazon.com`, `amazon.co.uk`, `amazon.de`, `amazon.ca`, etc., OR
+- After normalization has zero distinctive tokens (post stop-list) — caught later naturally, but we short-circuit here too.
 
-Logic:
-1. `amazonAsin` null → `{ ok: true }`.
-2. Amazon fallback + empty/missing `groundingEvidence` → `{ ok: false, reason: "AMAZON_ASIN_GROUNDING_UNAVAILABLE" }`. Fail closed.
-3. Any token match in any normalized URL / retrievedUrl / title → `{ ok: true }`.
-4. Otherwise → `{ ok: false, reason: "AMAZON_ASIN_GROUNDING_MISMATCH" }`.
+Walk the hierarchy `jsonld_product_name → og_title → twitter_title → cleaned <title>` and pick the first **valid** candidate. If all are invalid → `pageTitleAnchor = null`, `page_title_anchor_reject_reason: "BOT_WALL_OR_GENERIC"`.
 
-Wiring in `index.ts` — **explicit ordering (per chatgpt):**
+**3b) Canonical-ASIN consistency check (chatgpt addition #2).** If `pageSignals.canonical` is present and contains an ASIN (regex `/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i`):
+- If the canonical ASIN does NOT match the requested `amazon_asin` → set `pageTitleAnchor = null`, set `amazon_canonical_asin_mismatch: true`, set `page_title_anchor_reject_reason: "AMAZON_CANONICAL_ASIN_MISMATCH"`. The fetched page is not authoritative for the requested ASIN.
+- If canonical ASIN matches OR canonical has no ASIN → proceed normally.
 
-```
-Gemini response → tolerant parser → Zod → recovery gate
-  → (if accepted) → ASIN guard
-    → ok:    prediction proceeds to merge, prediction_source assigned, modal-eligible
-    → !ok:   discard prediction, NO_PREDICTIONS path, modal NOT opened
-```
+**3c) Dual-path verification (codex refinement).** Acceptance now requires **at least one** of the following independent paths to succeed:
+- **Path A — External grounding (Phase 1.6):** Gemini grounding chunks contain the ASIN. Model-generated `segment.text` and `webSearchQueries` still excluded from evidence.
+- **Path B — Fetched page-title anchor (new):** `pageTitleAnchor` is present (passed 3a+3b), has ≥ 1 distinctive token after stop-word filtering, and the model's returned `name` shares ≥ 1 distinctive token with it.
 
-- Always runs on the **search-only fallback** Amazon path.
-- Also runs on the primary path **only when** `url_context_failed` is true AND the prediction was produced via search grounding (not URL Context retrieval). Otherwise primary path is unchanged.
-- On `{ ok: false }`:
-  - Discard prediction.
-  - Trace: `search_fallback_attempted: true`, `search_fallback_ok: false`, `search_fallback_error: <reason>`, `amazon_exact_match_reject_reason: <reason>`, `skip_reason: null`.
-  - Route to existing NO_PREDICTIONS path. No autofill. No modal.
+**3d) Distinctive-token title match:**
+- Normalize: lowercase; replace non-alphanumeric with space; collapse whitespace.
+- Tokenize; drop tokens with length < 3.
+- Drop generic stop-tokens (guard-internal only — never mutates returned `name`):
+  - Category/marketing/pack-size: `root, roots, hair, serum, cleanser, dandruff, scalp, oil, treatment, shampoo, conditioner, mask, cream, lotion, gel, spray, balm, men, women, kids, baby, natural, organic, herbal, ayurvedic, vegan, anti, pollution, protect, vital, fall, growth, care, new, pack, set, combo, kit, bottle, refill, ml, gm, mg, kg, count, ct, oz, fl, pcs, piece, value`
+  - Platform: `amazon, official, store, india, in, com, www, https, http`
+  - Pure-digit tokens: `^\d+$`
 
-Guard only rejects. Never substitutes.
+**3e) Combined outcomes (evaluated in order):**
+- Path A passes AND `pageTitleAnchor` null/no-distinctive-tokens → `{ ok: true, amazon_exact_match_verified: true, page_title_match_verified: null, amazon_identity_verified_via: "external_grounding" }`.
+- Path A passes AND anchor distinctive AND model overlaps → `{ ok: true, amazon_exact_match_verified: true, page_title_match_verified: true, amazon_identity_verified_via: "both" }`.
+- Path A passes AND anchor distinctive AND model does NOT overlap → **reject** `AMAZON_NAME_PAGE_TITLE_MISMATCH` (fetched page wins over search neighbors).
+- Path A fails AND Path B passes → `{ ok: true, amazon_exact_match_verified: false, page_title_match_verified: true, amazon_identity_verified_via: "page_title_anchor" }`. **(codex-refined path)**
+- Path A fails AND anchor distinctive AND model does NOT overlap → **reject** `AMAZON_NAME_PAGE_TITLE_MISMATCH`.
+- Path A fails AND no usable anchor → **reject** (Phase 1.6 behavior preserved) with existing reject reason.
 
-## Change 4 — Safe diagnostics
+**3f) prediction_source separation (codex addition #3).** The guard return must NOT set `prediction_source`. `prediction_source` remains whatever the caller already assigned (`gemini_primary`, `gemini_recovery`, `gemini_search_fallback`, etc.). Identity verification is reported only via the diagnostic field `amazon_identity_verified_via`.
 
-Trace fields (Amazon paths where guard runs):
+`supabase/functions/analyze-entity-url-v2/index.ts` (guard wiring)
+- Primary path (when `amazon_asin` present): run guard with `pageTitleAnchor` derived from `pageSignals` after 3a+3b validation.
+- **Search-only fallback path:** if `pageSignals` were extracted earlier in the same request, pass `pageTitleAnchor` to the guard (same validation). Fallback prompt body unchanged; only post-response guard gains the anchor input. If no `pageSignals` were ever extracted, behavior identical to Phase 1.6.
+- Fail-closed routing on guard rejection is identical in both paths: discard predictions, return `NO_PREDICTIONS`, modal not eligible. **`prediction_source` is not overwritten by the guard in any outcome.**
 
-- `amazon_asin_present: boolean`
-- `grounding_contains_target_asin: boolean`
-- `grounding_contains_canonical_dp_url: boolean`
-- `amazon_exact_match_verified: boolean`
-- `amazon_exact_match_reject_reason: string | null`
-- existing: `search_fallback_attempted`, `search_fallback_ok`, `search_fallback_error`, `skip_reason`
+### Diagnostics (booleans/reason codes only — no raw text, URLs, or HTML)
 
-Never logged: raw ASIN value, raw prompt, raw response, full URLs with query strings, HTML, Firecrawl markdown, image URLs, secrets.
+New fields on the metadata block:
+- `page_title_anchor_present: boolean`
+- `page_title_match_verified: boolean | null`
+- `page_title_match_skip_reason: string | null` (e.g. `NO_DISTINCTIVE_TOKENS`, `NO_PAGE_TITLE_ANCHOR`)
+- `page_title_anchor_reject_reason: string | null` (`BOT_WALL_OR_GENERIC`, `AMAZON_CANONICAL_ASIN_MISMATCH`)
+- `amazon_canonical_asin_mismatch: boolean`
+- `amazon_identity_verified_via: "external_grounding" | "page_title_anchor" | "both" | null`
+- Reuse existing `amazon_exact_match_reject_reason` for `AMAZON_NAME_PAGE_TITLE_MISMATCH`.
 
-## Tests
+Per-call log line includes only:
+`request_id, amazon_asin_present, amazon_exact_match_verified, amazon_exact_match_reject_reason, page_title_anchor_present, page_title_match_verified, page_title_match_skip_reason, page_title_anchor_reject_reason, amazon_canonical_asin_mismatch, amazon_identity_verified_via, prediction_source, modal_eligible`.
 
-`host_hints_test.ts` (extend):
-- ASIN from `/dp/B0FGJF5QN7/`, `/dp/B0FGJF5QN7`, `/gp/product/B0FGJF5QN7`, `/gp/aw/d/B0FGJF5QN7`.
-- Lowercase ASIN normalized to uppercase.
-- **Regional hosts accepted:** `amazon.com`, `www.amazon.com`, `amazon.in`, `www.amazon.in`, `amazon.co.uk`, `www.amazon.co.uk`, `amazon.com.au`, `amazon.co.jp`.
-- **Lookalikes rejected:** `amazon.in.evil.com`, `notamazon.in`, `amazon.example.com`, `amazon-in.com`.
-- Null for non-Amazon, Amazon search URL, storefront URL, malformed ASIN segment.
+Never log: raw page title, og_image URL, raw HTML, prompt text, raw Gemini output, full URLs with query strings.
 
-`prompt_v2_test.ts` (extend):
-- `amazon_asin` whitelisted only when present.
-- `asin=` precedes `slug=`.
-- ASIN-primary block appears only when ASIN present.
-- "Do not infer brand from first token" line present.
-- Raw HTML / Firecrawl markdown / image-list sentinels still absent.
+### 4) Tests
 
-`amazon_asin_guard_test.ts` (new):
-- `{ ok: true }` when ASIN is null.
-- `{ ok: true }` when grounding URL contains `/dp/<ASIN>`.
-- `{ ok: true }` when retrievedUrl contains `/gp/product/<ASIN>`.
-- `{ ok: true }` when chunk title contains the ASIN token.
-- **Lowercase ASIN in URL** (`/dp/b0fgjf5qn7/`) accepted after normalization.
-- **URL-encoded path** (`/dp/%42%30FGJF5QN7/`) accepted after normalization.
-- **Query/fragment stripped** before matching (`/dp/B0FGJF5QN7/?ref=foo#bar`).
-- Plantmade-style evidence (URLs reference `plantmade.in/...`, no ASIN) → `MISMATCH`.
-- Empty `groundingEvidence` → `UNAVAILABLE`.
-- **Model-echo rejection:** ASIN appears only in fields the guard must ignore (simulated `webSearchQueries`, `groundingSupports.segment.text`, prompt-derived strings) and not in chunk URLs/titles or retrievedUrl → `MISMATCH`. Confirms `index.ts` does not surface these fields to the guard.
+`extractor_test.ts`
+- Fixture HTML with `<title>`, OG fields, Twitter fields, `<link rel="canonical">`, JSON-LD `Product` with `name`+`brand` → all `pageSignals` populated.
+- Fixture with no metadata → all `pageSignals` null.
 
-`gemini_search_fallback_test.ts` (extend):
-- Guard-failed fallback → NO_PREDICTIONS with `search_fallback_attempted: true`, `search_fallback_ok: false`, `search_fallback_error` set, `skip_reason: null`, modal-eligibility flag false.
-- Guard-passed fallback → prediction reaches merge unchanged.
-- Fallback timeout constant remains 20 000 ms.
-- Non-Amazon fallback unchanged.
+`prompt_v2_test.ts`
+- Evidence with `amazon_asin` + populated pageSignals → user prompt contains title/og/twitter/jsonld fields; **does not** contain `og_image`; system prompt contains ordered anchor hierarchy rule **and** conservative brand rule.
+- Amazon evidence with pageSignals + bulky rawHtml → `buildBoundedEvidence` retains pageSignals fields and shrinks rawHtml first.
+- Non-Amazon evidence → bounded evidence ordering unchanged.
+- Evidence without `amazon_asin` → no Amazon anchor block rendered.
 
-## Retest matrix
+`amazon_asin_guard_test.ts`
+- **Path A only** (grounding passes, no anchor): accept, `amazon_identity_verified_via: "external_grounding"`.
+- **Path B only** (grounding fails, anchor present): accept, `amazon_identity_verified_via: "page_title_anchor"`, `amazon_exact_match_verified: false`.
+- **Both paths pass**: `amazon_identity_verified_via: "both"`.
+- **Both fail**: reject with Phase 1.6 reason.
+- **Anchor mismatch overrides grounding pass**: Path A passes, anchor "Root Botanie FOLLIWISE…", model "Root Hair Serum Dandruff Cleanser" → reject `AMAZON_NAME_PAGE_TITLE_MISMATCH`.
+- **Stop-list**: anchor "Root Botanie FOLLIWISE…" vs model "Root Hair Serum Dandruff Cleanser" → only "root" overlaps, in stop-list → reject.
+- Model "Hair Serum 100ml" → digits dropped, only generics → reject.
+- **Anchor selection**: `jsonld_product_name` chosen over OG/Twitter/title.
+- **Bot-wall filter**: `<title>="Robot Check"`, og_title="FOLLIWISE…" → anchor selection skips title, picks og_title. All candidates bot-wall → `pageTitleAnchor=null`, `page_title_anchor_reject_reason: "BOT_WALL_OR_GENERIC"`.
+- **Bare site name**: `<title>="Amazon.in"` → rejected as generic.
+- **Canonical ASIN match**: canonical `/dp/B0FGJF5QN7/` and requested `B0FGJF5QN7` → anchor used.
+- **Canonical ASIN mismatch**: canonical `/dp/B0XXXXX111/`, requested `B0FGJF5QN7` → `pageTitleAnchor=null`, `amazon_canonical_asin_mismatch=true`, `page_title_anchor_reject_reason: "AMAZON_CANONICAL_ASIN_MISMATCH"`. If Path A also fails → reject; if Path A passes → accept via external grounding only.
+- **Canonical without ASIN**: anchor used normally.
+- **Degenerate anchor** "Hair Serum Cleanser" (only generics) → Path B unavailable, `page_title_match_skip_reason: "NO_DISTINCTIVE_TOKENS"`, falls back to Path A.
+- **prediction_source untouched**: caller passes `prediction_source: "gemini_search_fallback"`; guard accept via Path B does NOT mutate it. Assert returned/propagated value still equals input.
+- Stop-list does not mutate returned `name` (guard input read-only).
+- `pageTitleAnchor=null` → behavior identical to Phase 1.6.
 
-For each URL capture: `request_id`, `amazon_asin_present` (boolean), `grounding_contains_target_asin`, `grounding_contains_canonical_dp_url`, `amazon_exact_match_verified`, `amazon_exact_match_reject_reason`, `search_fallback_attempted/ok/error`, `skip_reason`, final `prediction_source`, modal vs NO_PREDICTIONS, whether name/brand match the actual ASIN product.
+`index.ts` wiring tests:
+- HTML fetch succeeds → pageSignals populated → primary Gemini fails → search-only fallback returns "Root Hair Serum Dandruff Cleanser" → guard receives anchor → reject → `NO_PREDICTIONS`, `prediction_source` still reflects fallback source in telemetry.
+- HTML fetch succeeds → pageSignals populated → primary Gemini returns FOLLIWISE → grounding empty → Path B verifies → accept, `prediction_source: "gemini_primary"`, `amazon_identity_verified_via: "page_title_anchor"`.
+- HTML fetch fails → no pageSignals → fallback runs → guard with `pageTitleAnchor=null` → identical to Phase 1.6.
+- Amazon canonical redirects to different ASIN → anchor rejected, Path A determines outcome alone.
 
-1. `amazon.in/Root-Hair-Serum-Dandruff-Cleanser/dp/B0FGJF5QN7/` — ASIN product or NO_PREDICTIONS. Plantmade = failure.
+## Not changed
+
+V1, `fetch-url-metadata-lite`, frontend, Zod, recovery gate, merge, model, tools, `responseMimeType`, Firecrawl, direct-fetch cap, search-only fallback prompt body, DB, pricing, save flow, RLS, **public `prediction_source` semantics**.
+
+## Acceptance
+
+For `https://www.amazon.in/Root-Hair-Serum-Dandruff-Cleanser/dp/B0FGJF5QN7/`:
+- HTML fetch succeeds, valid anchor: modal shows FOLLIWISE when model returns it (verified via Path A, Path B, or both). Returns `NO_PREDICTIONS` only on real mismatch — never the slug-derived "Root Hair Serum Dandruff Cleanser".
+- Amazon serves bot-wall: anchor rejected (`BOT_WALL_OR_GENERIC`), falls back to Path A alone.
+- Canonical URL points to different ASIN: anchor rejected (`AMAZON_CANONICAL_ASIN_MISMATCH`), Path A alone determines outcome.
+- HTML fetch fails: Phase 1.6 ASIN guard behavior unchanged.
+- Brand is either JSON-LD `Product.brand` or `null` — never the first slug/title token.
+- `prediction_source` always reflects actual prediction origin (`gemini_primary` / `gemini_recovery` / `gemini_search_fallback`), never `"page_title_anchor"`.
+
+## Retest after build
+
+For each URL report (booleans + reason codes only):
+`request_id, pageSignals.title_present, jsonld_product_name_present, amazon_asin_present, amazon_exact_match_verified, page_title_anchor_present, page_title_match_verified, page_title_match_skip_reason, page_title_anchor_reject_reason, amazon_canonical_asin_mismatch, amazon_identity_verified_via, amazon_exact_match_reject_reason (if any), prediction_source, modal_opened_or_no_predictions, final_name, final_brand`.
+
+1. Root Hair Serum Amazon URL (B0FGJF5QN7) — FOLLIWISE or `NO_PREDICTIONS`.
 2. Moxie Beauty Amazon URL.
-3. Clean `amazon.com/dp/<ASIN>/`.
-4. One successful non-Amazon URL — unchanged.
-5. One non-Amazon URL reaching fallback — unchanged.
-
-## Acceptance criterion
-
-For ASIN `B0FGJF5QN7`, V2 returns the actual ASIN product or NO_PREDICTIONS. Never Plantmade or any similarly named neighbor. Guard failures never open the AI Analysis modal.
+3. Clean Amazon `/dp/<ASIN>/` URL.
+4. One successful non-Amazon URL.
+5. One non-Amazon search-only fallback URL.
