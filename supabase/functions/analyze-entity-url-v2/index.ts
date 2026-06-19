@@ -820,7 +820,12 @@ serve(async (req) => {
         // the request to the original NO_PREDICTIONS / fetch-error path
         // (never opens the AI Analysis modal with a wrong product).
         if (recAmazonAsin) {
-          const guard = runAmazonAsinGuard(recAmazonAsin, recFb.geminiResult.grounding);
+          const guard = runAmazonAsinGuard(
+            recAmazonAsin,
+            recFb.geminiResult.grounding,
+            recExtract?.pageSignals ?? null,
+            recFb.geminiPred?.name ?? null,
+          );
           recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
           if (!guard.ok) {
             recMerged = null;
