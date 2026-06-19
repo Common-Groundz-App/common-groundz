@@ -473,3 +473,44 @@ Deno.test("8.1B extractFromHtml: product Offer[] reaches extractedOffers", () =>
   assertEquals(r.extractedOffers!.offers.length, 2);
   assertEquals(r.extractedOffers!.offers[0].selected, true);
 });
+
+// ─── Phase 1.7 — pageSignals ─────────────────────────────────────────────
+
+Deno.test("Phase 1.7: pageSignals populated from title/OG/Twitter/canonical/JSON-LD", () => {
+  const html = `
+    <html><head>
+      <title>Real Page Title</title>
+      <link rel="canonical" href="https://x.com/p" />
+      <meta property="og:title" content="OG Title" />
+      <meta property="og:description" content="OG Desc" />
+      <meta property="og:site_name" content="X" />
+      <meta property="og:image" content="https://x.com/i.jpg" />
+      <meta name="twitter:title" content="TW Title" />
+      <meta name="twitter:description" content="TW Desc" />
+      <script type="application/ld+json">${JSON.stringify({
+        "@type": "Product", name: "JsonLD Name", brand: { "@type": "Brand", name: "JBrand" },
+      })}</script>
+    </head><body></body></html>`;
+  const r = extractFromHtml(html, BASE);
+  assert(r.pageSignals);
+  assertEquals(r.pageSignals!.title, "Real Page Title");
+  assertEquals(r.pageSignals!.og_title, "OG Title");
+  assertEquals(r.pageSignals!.og_description, "OG Desc");
+  assertEquals(r.pageSignals!.og_site_name, "X");
+  assertEquals(r.pageSignals!.og_image, "https://x.com/i.jpg");
+  assertEquals(r.pageSignals!.twitter_title, "TW Title");
+  assertEquals(r.pageSignals!.twitter_description, "TW Desc");
+  assertEquals(r.pageSignals!.canonical, "https://x.com/p");
+  assertEquals(r.pageSignals!.jsonld_product_name, "JsonLD Name");
+  assertEquals(r.pageSignals!.jsonld_brand, "JBrand");
+});
+
+Deno.test("Phase 1.7: pageSignals fields null when HTML has no metadata", () => {
+  const r = extractFromHtml("<html><head></head><body>hi</body></html>", BASE);
+  assert(r.pageSignals);
+  assertEquals(r.pageSignals!.title, null);
+  assertEquals(r.pageSignals!.og_title, null);
+  assertEquals(r.pageSignals!.canonical, null);
+  assertEquals(r.pageSignals!.jsonld_product_name, null);
+  assertEquals(r.pageSignals!.jsonld_brand, null);
+});
