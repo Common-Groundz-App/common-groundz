@@ -546,6 +546,142 @@ function mergeGuardDiagnostics(
 }
 
 
+// ─── Phase 1.8c.1 finalization-telemetry helpers ─────────────────────────
+
+function createDefaultFinalization(): Finalization {
+  return {
+    merge_returned_predictions: false,
+    merge_path: "none",
+    merge_field_winners_gemini_count: 0,
+    recovery_gate: {
+      ran_inside_merge: false,
+      ran_again_after_merge: false,
+      second_check_passed: null,
+    },
+    amazon_guard: {
+      evaluated: false,
+      passed: true,
+      rejection_reason: "n/a",
+      raw_reason_code: null,
+      input_source: "none",
+    },
+    response_builder: {
+      predictions_var_truthy: false,
+      predictions_value_source: "none",
+      chosen_source: "none",
+      chosen_source_reason: "all_null",
+    },
+  };
+}
+
+/**
+ * Phase 1.8c.1 — populate trace.finalization at a response-construction site.
+ *
+ * Response builders read `mergedPredictions` (== `mainMerged` in the main
+ * branch, `recMerged` in the recovery branch). This helper proves which
+ * variable was actually serialized via `predictions_value_source`.
+ *
+ * Captures state AFTER any guard-driven discard. A discard sets
+ * `mergedPredictions` to null but leaves `mergeDiag` populated; the combo
+ * (mergeReturnedPredictionsBeforeGuard: true, mergedPredictions: null,
+ * guard.passed: false) identifies post-merge discards. The combo
+ * (mergeReturnedPredictionsBeforeGuard: true, mergedPredictions: null,
+ * guard.passed: true) produces chosen_source_reason: "discarded_unknown" and
+ * means the bug from Phase 1.8c.1 is still unresolved.
+ */
+function finalizeTelemetry(
+  trace: AnalysisTrace,
+  args: {
+    mergedPredictions: V2Predictions | null;
+    mergeDiag: MergeDiagnostics | null;
+    mergeReturnedPredictionsBeforeGuard: boolean;
+    guard: GuardTracker;
+    fallbackUsed: boolean;
+    usedFirecrawl: boolean;
+    extractPresent: boolean;
+  },
+): void {
+  const f = trace.finalization ?? createDefaultFinalization();
+  const {
+    mergedPredictions,
+    mergeDiag,
+    mergeReturnedPredictionsBeforeGuard,
+    guard,
+    fallbackUsed,
+    usedFirecrawl,
+    extractPresent,
+  } = args;
+
+  f.merge_returned_predictions = mergeReturnedPredictionsBeforeGuard;
+  f.merge_path = (mergeDiag?.path as Finalization["merge_path"]) ?? "none";
+
+  let geminiCount = 0;
+  if (mergeDiag?.field_winners) {
+    for (const v of Object.values(mergeDiag.field_winners)) {
+      if (v === "gemini") geminiCount++;
+    }
+  }
+  f.merge_field_winners_gemini_count = geminiCount;
+
+  // The recovery gate currently lives ONLY inside mergePredictions. No
+  // redundant post-merge re-check exists in index.ts. If one is ever added,
+  // set ran_again_after_merge: true at that site.
+  f.recovery_gate.ran_inside_merge = mergeDiag?.path === "recovery";
+  f.recovery_gate.ran_again_after_merge = false;
+  f.recovery_gate.second_check_passed = null;
+
+  f.amazon_guard.evaluated = guard.evaluated;
+  f.amazon_guard.passed = guard.evaluated ? guard.passed : true;
+  f.amazon_guard.raw_reason_code = guard.raw_reason_code;
+  f.amazon_guard.rejection_reason = guard.evaluated && !guard.passed
+    ? simplifyGuardReason(guard.raw_reason_code)
+    : (guard.evaluated ? "n/a" : "guard_not_run");
+  f.amazon_guard.input_source = guard.input_source;
+
+  f.response_builder.predictions_var_truthy = mergedPredictions !== null;
+  f.response_builder.predictions_value_source = mergedPredictions !== null
+    ? "merge_output"
+    : "none";
+
+  let chosen: ChosenSourceEnum = "none";
+  let reason: ChosenSourceReasonEnum = "all_null";
+  if (mergedPredictions !== null) {
+    if (fallbackUsed) {
+      chosen = "gemini_search_fallback";
+      reason = "merge_recovery_with_fallback";
+    } else if (extractPresent && usedFirecrawl) {
+      chosen = "firecrawl_merge";
+      reason = "merge_success";
+    } else if (!extractPresent && usedFirecrawl) {
+      chosen = "firecrawl_recovery";
+      reason = "merge_recovery_with_firecrawl";
+    } else if (!extractPresent) {
+      chosen = "gemini_recovery";
+      reason = "merge_recovery_with_fallback";
+    } else {
+      chosen = "extractor_merge";
+      reason = "extract_present";
+    }
+  } else if (mergeReturnedPredictionsBeforeGuard && guard.evaluated && !guard.passed) {
+    chosen = "none";
+    reason = "discarded_by_amazon_guard";
+  } else if (mergeReturnedPredictionsBeforeGuard) {
+    chosen = "none";
+    reason = "discarded_unknown";
+  } else {
+    chosen = "none";
+    reason = "all_null";
+  }
+  f.response_builder.chosen_source = chosen;
+  f.response_builder.chosen_source_reason = reason;
+
+  trace.finalization = f;
+}
+
+
+
+
+
 // ─── Phase 8 helpers ──────────────────────────────────────────────────────
 
 const EMPTY_EXTRACT_METADATA: ExtractMetadata = {
