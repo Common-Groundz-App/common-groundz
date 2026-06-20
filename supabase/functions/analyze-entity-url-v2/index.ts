@@ -282,7 +282,7 @@ async function invokeGemini(args: {
     canonicalField = ps.canonical;
   }
 
-  const { systemPrompt, userPrompt } = buildV2Prompts(
+  const promptOut = buildV2Prompts(
     {
       url: canonicalUrl,
       evidenceBaseUrl: promptBaseUrl,
@@ -299,9 +299,21 @@ async function invokeGemini(args: {
     },
     promptBaseUrl,
   );
+
+  // Phase 1.8: emit one structured log line summarizing the evidence packet
+  // selection. Booleans / enum labels / numbers only — no prompt text, no
+  // prediction values, no PII.
+  console.log("[analyze-entity-url-v2] gemini.evidence", {
+    amazon_min_packet_used: promptOut.amazon_min_packet_used ?? false,
+    raw_html_dropped_reason: promptOut.raw_html_dropped_reason ?? null,
+    amazon_packet_oversize: promptOut.amazon_packet_oversize ?? false,
+    evidence_truncated: promptOut.evidence_truncated,
+    evidence_chars: promptOut.evidence_chars,
+  });
+
   return await runGeminiJsonMode({
-    systemPrompt,
-    userPrompt,
+    systemPrompt: promptOut.systemPrompt,
+    userPrompt: promptOut.userPrompt,
     evidenceBaseUrl: promptBaseUrl,
   });
 }
