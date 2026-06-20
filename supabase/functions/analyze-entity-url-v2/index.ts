@@ -1017,6 +1017,7 @@ serve(async (req) => {
       if (firecrawlConfigured) {
         const fc = await runFirecrawlScrape(safe.url, {
           fallbackBaseUrl: safe.url,
+          ...(firecrawlMaxHtmlBytes !== undefined ? { maxHtmlBytes: firecrawlMaxHtmlBytes } : {}),
           ...(priority === "high"
             ? {
                 apiTimeoutMs: HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS,
