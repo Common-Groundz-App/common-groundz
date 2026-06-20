@@ -148,6 +148,107 @@ interface AnalysisTrace {
     error_code: string;
     total_duration_ms: number;
   };
+  // Phase 1.8c.1 — post-merge finalization telemetry.
+  // Booleans, counts, and constrained enums only. NEVER raw model output,
+  // page titles, brand names, product names, full URLs, or PII.
+  finalization?: Finalization;
+}
+
+// Phase 1.8c.1 — constrained enums for finalization telemetry.
+export type AmazonGuardRejectionReasonEnum =
+  | "asin_mismatch"
+  | "name_unanchored"
+  | "brand_mismatch"
+  | "page_signals_missing"
+  | "grounding_unavailable"
+  | "guard_not_run"
+  | "n/a";
+
+export type FinalizationSourceEnum =
+  | "merge_output"
+  | "extract_only"
+  | "gemini_only"
+  | "firecrawl_only"
+  | "none";
+
+export type ChosenSourceEnum =
+  | "extractor"
+  | "gemini"
+  | "gemini_recovery"
+  | "gemini_search_fallback"
+  | "firecrawl_recovery"
+  | "firecrawl_merge"
+  | "extractor_merge"
+  | "none";
+
+export type ChosenSourceReasonEnum =
+  | "extract_present"
+  | "merge_success"
+  | "merge_recovery_with_fallback"
+  | "merge_recovery_with_firecrawl"
+  | "all_null"
+  | "discarded_by_amazon_guard"
+  | "discarded_by_second_recovery_gate"
+  | "discarded_unknown";
+
+export interface Finalization {
+  merge_returned_predictions: boolean;
+  merge_path: "success" | "recovery" | "none";
+  merge_field_winners_gemini_count: number;
+  recovery_gate: {
+    ran_inside_merge: boolean;
+    ran_again_after_merge: boolean;
+    second_check_passed: boolean | null;
+  };
+  amazon_guard: {
+    evaluated: boolean;
+    passed: boolean;
+    rejection_reason: AmazonGuardRejectionReasonEnum;
+    raw_reason_code: string | null;
+    input_source: FinalizationSourceEnum;
+  };
+  response_builder: {
+    predictions_var_truthy: boolean;
+    predictions_value_source: FinalizationSourceEnum;
+    chosen_source: ChosenSourceEnum;
+    chosen_source_reason: ChosenSourceReasonEnum;
+  };
+}
+
+// Internal mutable tracker used to record guard state during the request.
+// Aggregated into the Finalization block at the end of the request.
+interface GuardTracker {
+  evaluated: boolean;
+  passed: boolean;
+  raw_reason_code: string | null;
+  // Which gemini call's grounding the LAST guard evaluated.
+  // `gemini_only` is the documented enum value for "gemini grounding + page
+  // signals" (the guard's actual inputs — never the merged predictions).
+  input_source: FinalizationSourceEnum;
+}
+
+function makeGuardTracker(): GuardTracker {
+  return {
+    evaluated: false,
+    passed: true,
+    raw_reason_code: null,
+    input_source: "none",
+  };
+}
+
+function simplifyGuardReason(raw: string | null): AmazonGuardRejectionReasonEnum {
+  if (!raw) return "n/a";
+  switch (raw) {
+    case "AMAZON_ASIN_GROUNDING_UNAVAILABLE":
+      return "grounding_unavailable";
+    case "AMAZON_ASIN_GROUNDING_MISMATCH":
+    case "AMAZON_CANONICAL_ASIN_MISMATCH":
+      return "asin_mismatch";
+    case "AMAZON_NAME_PAGE_TITLE_MISMATCH":
+      return "name_unanchored";
+    default:
+      return "guard_not_run";
+  }
 }
 
 function makeTrace(request_id: string): AnalysisTrace {
@@ -158,6 +259,7 @@ function makeTrace(request_id: string): AnalysisTrace {
     final: { error_code: "UNKNOWN", total_duration_ms: 0 },
   };
 }
+
 
 function safeHost(url: string): string | null {
   try { return new URL(url).host; } catch { return null; }
