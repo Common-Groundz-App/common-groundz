@@ -733,6 +733,9 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       raw_text_length: rawTextLength,
       raw_text_sha8: rawTextSha8,
       ...candDiag,
+      ...tokensDiag,
+      ...promptBytesDiag,
+      json_parse_ok: false,
       gemini_failure_diagnostics: geminiFailureDiagnostics(text, outcome.attempts, outcome.zodIssues),
     });
     return {
