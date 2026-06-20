@@ -1469,6 +1469,10 @@ serve(async (req) => {
       mainGeminiPred,
       mainFlags,
     );
+    // Phase 1.8c.1 — hoisted snapshot used by finalization telemetry. Reset
+    // inside the search-fallback block if/when a successful fallback merge
+    // produces predictions BEFORE the post-fallback guard runs.
+    let mainMergeReturnedPredictionsBeforeGuard = mainMerged !== null;
 
     // ─── Phase 1.5: search-only Gemini fallback in main branch ──────────
     // Runs only when the main branch has no usable merged prediction.
