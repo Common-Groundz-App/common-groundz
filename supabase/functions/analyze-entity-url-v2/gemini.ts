@@ -702,6 +702,9 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       used_google_search: grounding.used_google_search,
       url_context_failed: grounding.url_context_failed,
       ...candDiag,
+      ...tokensDiag,
+      ...promptBytesDiag,
+      json_parse_ok: false,
     });
     return {
       ok: false,
