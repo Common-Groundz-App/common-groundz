@@ -605,10 +605,25 @@ serve(async (req) => {
     const geminiConfigured = !!Deno.env.get("GEMINI_API_KEY_V2");
     const priority: "high" | "normal" = isKnownJsHeavyHost(safe.url) ? "high" : "normal";
 
+    // Phase 1.8: strict Amazon hosts get a 4 MiB direct-fetch + Firecrawl HTML
+    // cap. The enlarged HTML is consumed by the extractor (pageSignals only)
+    // and is NOT forwarded to the Gemini prompt — buildV2Prompts uses the
+    // minimal Amazon evidence packet when pageSignals carry a title signal.
+    // Uses the SAME strict host predicate as extractAmazonAsin /
+    // canonicalizeAmazonUrl (rejects lookalikes like amazon.in.evil.com).
+    let safeHostname = "";
+    try { safeHostname = new URL(safe.url).hostname; } catch { /* ignore */ }
+    const isAmazon = isStrictAmazonHost(safeHostname);
+    const directFetchMaxBytes = isAmazon ? 4 * 1024 * 1024 : 2 * 1024 * 1024;
+    const firecrawlMaxHtmlBytes = isAmazon ? 4 * 1024 * 1024 : undefined;
+
     // === Safe fetch ===
     let fetchResult: FetchResult;
     try {
-      fetchResult = await validateAndFetchUrl(safe.url, { resolveDns });
+      fetchResult = await validateAndFetchUrl(safe.url, {
+        resolveDns,
+        maxBytes: directFetchMaxBytes,
+      });
       trace.direct_fetch = {
         attempted: true,
         ok: true,
@@ -616,11 +631,17 @@ serve(async (req) => {
         content_type: fetchResult.contentType,
         bytes: fetchResult.bytes,
         duration_ms: fetchResult.durationMs,
+        max_bytes_used: directFetchMaxBytes,
       };
     } catch (e) {
       if (!(e instanceof FetchError)) throw e;
 
-      trace.direct_fetch = { attempted: true, ok: false, error_code: e.code };
+      trace.direct_fetch = {
+        attempted: true,
+        ok: false,
+        error_code: e.code,
+        max_bytes_used: directFetchMaxBytes,
+      };
       // Log code only — never URL, headers, body, or internal reason.
       console.warn("[analyze-entity-url-v2] fetch failed", { request_id, code: e.code });
 
