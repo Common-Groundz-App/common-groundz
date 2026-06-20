@@ -544,6 +544,10 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
   const t0 = Date.now();
 
   const tools = args.tools ?? [{ url_context: {} }, { google_search: {} }];
+  // Phase 1.8b: Amazon-only thinkingBudget: 0. Non-Amazon stays at 256
+  // (Phase 1.8 default) so Nykaa et al. are unchanged. Single source of
+  // truth: caller derives `isAmazon` via isStrictAmazonHost() from host_hints.
+  const thinkingBudgetUsed = args.isAmazon ? 0 : 256;
   const body = {
     systemInstruction: {
       role: "system",
@@ -558,12 +562,12 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     tools,
     generationConfig: {
       temperature: GEMINI_TEMPERATURE,
-      // Phase 1.8: cap reasoning tokens + guarantee output budget so the
-      // model returns text parts instead of STOP-with-no-content. Same
-      // config applies to primary, recovery, and search-only fallback
-      // calls (callGeminiSearchOnly delegates here). Start conservative
-      // at 256; reduce to 0 only if empty STOPs persist.
-      thinkingConfig: { thinkingBudget: 256 },
+      // Phase 1.8 / 1.8b: cap reasoning tokens + guarantee output budget so
+      // the model returns text parts instead of STOP-with-no-content. Amazon
+      // uses 0 (Phase 1.8b) after empty STOPs persisted at 256; non-Amazon
+      // keeps 256. Same config flows through primary, recovery, and the
+      // search-only fallback (callGeminiSearchOnly delegates here).
+      thinkingConfig: { thinkingBudget: thinkingBudgetUsed },
       maxOutputTokens: 2048,
     },
   };
