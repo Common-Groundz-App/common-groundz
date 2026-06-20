@@ -174,12 +174,12 @@ export async function runFirecrawlScrape(
       "";
     // Oversize HTML alone no longer fails the scrape — drop the HTML and
     // continue with metadata/markdown if those are usable.
-    const htmlOversize = rawHtmlInitial.length > MAX_HTML_BYTES;
+    const htmlOversize = rawHtmlInitial.length > maxHtmlBytes;
     const rawHtml = htmlOversize ? "" : rawHtmlInitial;
 
     const rawMd = typeof d.markdown === "string" ? d.markdown : "";
     const markdown =
-      rawMd && rawMd.length <= MAX_HTML_BYTES ? rawMd : null;
+      rawMd && rawMd.length <= maxHtmlBytes ? rawMd : null;
 
     const meta = d.metadata;
     const metadata =
