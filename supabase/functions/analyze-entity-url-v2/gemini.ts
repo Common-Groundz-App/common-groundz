@@ -551,8 +551,21 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     tools,
     generationConfig: {
       temperature: GEMINI_TEMPERATURE,
+      // Phase 1.8: cap reasoning tokens + guarantee output budget so the
+      // model returns text parts instead of STOP-with-no-content. Same
+      // config applies to primary, recovery, and search-only fallback
+      // calls (callGeminiSearchOnly delegates here). Start conservative
+      // at 256; reduce to 0 only if empty STOPs persist.
+      thinkingConfig: { thinkingBudget: 256 },
+      maxOutputTokens: 2048,
     },
   };
+
+  // Phase 1.8: prompt-byte telemetry (UTF-8, not UTF-16 .length).
+  const enc = new TextEncoder();
+  const systemPromptBytes = enc.encode(args.systemPrompt).length;
+  const userPromptBytes = enc.encode(args.userPrompt).length;
+  const combinedPromptBytes = systemPromptBytes + userPromptBytes;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
