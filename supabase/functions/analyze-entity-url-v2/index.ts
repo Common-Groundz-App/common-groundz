@@ -1104,7 +1104,13 @@ serve(async (req) => {
       let recFallbackError = recFb.error;
       const recFallbackDurationMs = recFb.durationMs;
       let recFallbackUsed = recFb.used;
+      // Phase 1.8c.1 — snapshot "did merge return a non-null prediction?"
+      // BEFORE any post-fallback guard discards it. This distinguishes
+      // "merge had nothing" from "merge produced a prediction that guard
+      // threw away" in finalization telemetry.
+      let recMergeReturnedPredictionsBeforeGuard = recMerged !== null;
       if (recFb.used && recFb.mergedPredictions && recFb.mergeDiag && recFb.geminiPred && recFb.geminiResult?.ok) {
+        recMergeReturnedPredictionsBeforeGuard = true;
         recMerged = recFb.mergedPredictions;
         recMergeDiag = recFb.mergeDiag;
         recGeminiPred = recFb.geminiPred;
@@ -1500,7 +1506,11 @@ serve(async (req) => {
       mainFallbackSkipReason = mainFb.skipReason;
       mainFallbackError = mainFb.error;
       mainFallbackDurationMs = mainFb.durationMs;
+      // Phase 1.8c.1 — snapshot "did merge return a non-null prediction?"
+      // BEFORE any post-fallback guard discards it.
+      let mainMergeReturnedPredictionsBeforeGuard = mainMerged !== null;
       if (mainFb.used && mainFb.mergedPredictions && mainFb.mergeDiag && mainFb.geminiPred && mainFb.geminiResult?.ok) {
+        mainMergeReturnedPredictionsBeforeGuard = true;
         mainMerged = mainFb.mergedPredictions;
         mainMergeDiag = mainFb.mergeDiag;
         mainGeminiPred = mainFb.geminiPred;
