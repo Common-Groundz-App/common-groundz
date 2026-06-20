@@ -105,6 +105,7 @@ export async function runFirecrawlScrape(
   const timeoutMs = opts.timeoutMs ?? NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS;
   const fetchImpl = opts.fetchImpl ?? fetch;
   const fallback = opts.fallbackBaseUrl ?? url;
+  const maxHtmlBytes = opts.maxHtmlBytes ?? DEFAULT_MAX_HTML_BYTES;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
