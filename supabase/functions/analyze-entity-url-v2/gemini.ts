@@ -551,8 +551,21 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     tools,
     generationConfig: {
       temperature: GEMINI_TEMPERATURE,
+      // Phase 1.8: cap reasoning tokens + guarantee output budget so the
+      // model returns text parts instead of STOP-with-no-content. Same
+      // config applies to primary, recovery, and search-only fallback
+      // calls (callGeminiSearchOnly delegates here). Start conservative
+      // at 256; reduce to 0 only if empty STOPs persist.
+      thinkingConfig: { thinkingBudget: 256 },
+      maxOutputTokens: 2048,
     },
   };
+
+  // Phase 1.8: prompt-byte telemetry (UTF-8, not UTF-16 .length).
+  const enc = new TextEncoder();
+  const systemPromptBytes = enc.encode(args.systemPrompt).length;
+  const userPromptBytes = enc.encode(args.userPrompt).length;
+  const combinedPromptBytes = systemPromptBytes + userPromptBytes;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -613,6 +626,28 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     };
   }
 
+  // Phase 1.8: usage telemetry (numbers only, no prediction values).
+  const usage = (json.usageMetadata ?? json.usage_metadata) as
+    | Record<string, unknown>
+    | undefined;
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === "number" && isFinite(v) ? v : null;
+  const tokensDiag = {
+    prompt_token_count: numOrNull(usage?.promptTokenCount ?? usage?.prompt_token_count),
+    candidates_token_count: numOrNull(
+      usage?.candidatesTokenCount ?? usage?.candidates_token_count,
+    ),
+    thoughts_token_count: numOrNull(
+      usage?.thoughtsTokenCount ?? usage?.thoughts_token_count,
+    ),
+    total_token_count: numOrNull(usage?.totalTokenCount ?? usage?.total_token_count),
+  };
+  const promptBytesDiag = {
+    system_prompt_bytes: systemPromptBytes,
+    user_prompt_bytes: userPromptBytes,
+    combined_prompt_bytes: combinedPromptBytes,
+  };
+
   // Safety / block checks.
   const promptFeedback = json.promptFeedback as Record<string, unknown> | undefined;
   if (promptFeedback?.blockReason) {
@@ -667,6 +702,9 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       used_google_search: grounding.used_google_search,
       url_context_failed: grounding.url_context_failed,
       ...candDiag,
+      ...tokensDiag,
+      ...promptBytesDiag,
+      json_parse_ok: false,
     });
     return {
       ok: false,
@@ -695,6 +733,9 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
       raw_text_length: rawTextLength,
       raw_text_sha8: rawTextSha8,
       ...candDiag,
+      ...tokensDiag,
+      ...promptBytesDiag,
+      json_parse_ok: false,
       gemini_failure_diagnostics: geminiFailureDiagnostics(text, outcome.attempts, outcome.zodIssues),
     });
     return {
@@ -755,6 +796,10 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     url_context_failed: grounding.url_context_failed,
     raw_text_length: rawTextLength,
     raw_text_sha8: rawTextSha8,
+    ...tokensDiag,
+    ...promptBytesDiag,
+    json_parse_ok: true,
+    has_text_parts: true,
   });
 
   return {

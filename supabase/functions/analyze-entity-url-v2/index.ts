@@ -28,6 +28,7 @@ import { extractFromHtml, type ExtractResult } from "./extractor.ts";
 import { detectWeakSignals } from "./weak_signals.ts";
 import {
   isKnownJsHeavyHost,
+  isStrictAmazonHost,
   canonicalizeAmazonUrl,
   extractAmazonPathSlug,
   extractAmazonAsin,
@@ -117,6 +118,9 @@ interface AnalysisTrace {
     bytes?: number;
     duration_ms?: number;
     error_code?: string;
+    // Phase 1.8: maxBytes cap actually applied to this fetch (2 MiB default,
+    // 4 MiB for strict Amazon hosts). Numbers only.
+    max_bytes_used?: number;
   };
   deterministic_extract?: { ok: boolean; weak_signals: boolean };
   firecrawl?: {
@@ -278,7 +282,7 @@ async function invokeGemini(args: {
     canonicalField = ps.canonical;
   }
 
-  const { systemPrompt, userPrompt } = buildV2Prompts(
+  const promptOut = buildV2Prompts(
     {
       url: canonicalUrl,
       evidenceBaseUrl: promptBaseUrl,
@@ -295,9 +299,21 @@ async function invokeGemini(args: {
     },
     promptBaseUrl,
   );
+
+  // Phase 1.8: emit one structured log line summarizing the evidence packet
+  // selection. Booleans / enum labels / numbers only — no prompt text, no
+  // prediction values, no PII.
+  console.log("[analyze-entity-url-v2] gemini.evidence", {
+    amazon_min_packet_used: promptOut.amazon_min_packet_used ?? false,
+    raw_html_dropped_reason: promptOut.raw_html_dropped_reason ?? null,
+    amazon_packet_oversize: promptOut.amazon_packet_oversize ?? false,
+    evidence_truncated: promptOut.evidence_truncated,
+    evidence_chars: promptOut.evidence_chars,
+  });
+
   return await runGeminiJsonMode({
-    systemPrompt,
-    userPrompt,
+    systemPrompt: promptOut.systemPrompt,
+    userPrompt: promptOut.userPrompt,
     evidenceBaseUrl: promptBaseUrl,
   });
 }
@@ -601,10 +617,25 @@ serve(async (req) => {
     const geminiConfigured = !!Deno.env.get("GEMINI_API_KEY_V2");
     const priority: "high" | "normal" = isKnownJsHeavyHost(safe.url) ? "high" : "normal";
 
+    // Phase 1.8: strict Amazon hosts get a 4 MiB direct-fetch + Firecrawl HTML
+    // cap. The enlarged HTML is consumed by the extractor (pageSignals only)
+    // and is NOT forwarded to the Gemini prompt — buildV2Prompts uses the
+    // minimal Amazon evidence packet when pageSignals carry a title signal.
+    // Uses the SAME strict host predicate as extractAmazonAsin /
+    // canonicalizeAmazonUrl (rejects lookalikes like amazon.in.evil.com).
+    let safeHostname = "";
+    try { safeHostname = new URL(safe.url).hostname; } catch { /* ignore */ }
+    const isAmazon = isStrictAmazonHost(safeHostname);
+    const directFetchMaxBytes = isAmazon ? 4 * 1024 * 1024 : 2 * 1024 * 1024;
+    const firecrawlMaxHtmlBytes = isAmazon ? 4 * 1024 * 1024 : undefined;
+
     // === Safe fetch ===
     let fetchResult: FetchResult;
     try {
-      fetchResult = await validateAndFetchUrl(safe.url, { resolveDns });
+      fetchResult = await validateAndFetchUrl(safe.url, {
+        resolveDns,
+        maxBytes: directFetchMaxBytes,
+      });
       trace.direct_fetch = {
         attempted: true,
         ok: true,
@@ -612,11 +643,17 @@ serve(async (req) => {
         content_type: fetchResult.contentType,
         bytes: fetchResult.bytes,
         duration_ms: fetchResult.durationMs,
+        max_bytes_used: directFetchMaxBytes,
       };
     } catch (e) {
       if (!(e instanceof FetchError)) throw e;
 
-      trace.direct_fetch = { attempted: true, ok: false, error_code: e.code };
+      trace.direct_fetch = {
+        attempted: true,
+        ok: false,
+        error_code: e.code,
+        max_bytes_used: directFetchMaxBytes,
+      };
       // Log code only — never URL, headers, body, or internal reason.
       console.warn("[analyze-entity-url-v2] fetch failed", { request_id, code: e.code });
 
@@ -637,6 +674,7 @@ serve(async (req) => {
       if (FETCH_FAILED_ELIGIBLE.has(e.code) && firecrawlConfigured) {
         const fc = await runFirecrawlScrape(safe.url, {
           fallbackBaseUrl: safe.url,
+          ...(firecrawlMaxHtmlBytes !== undefined ? { maxHtmlBytes: firecrawlMaxHtmlBytes } : {}),
           ...(priority === "high"
             ? {
                 apiTimeoutMs: HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS,
@@ -991,6 +1029,7 @@ serve(async (req) => {
       if (firecrawlConfigured) {
         const fc = await runFirecrawlScrape(safe.url, {
           fallbackBaseUrl: safe.url,
+          ...(firecrawlMaxHtmlBytes !== undefined ? { maxHtmlBytes: firecrawlMaxHtmlBytes } : {}),
           ...(priority === "high"
             ? {
                 apiTimeoutMs: HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS,

@@ -28,8 +28,17 @@ export function isKnownJsHeavyHost(url: string): boolean {
 // (no labels allowed AFTER the amazon.<tld> suffix).
 const STRICT_AMAZON_HOST_RE = /^(?:[a-z0-9-]+\.)?amazon\.[a-z]{2,}(?:\.[a-z]{2,})?$/i;
 
-function isAmazonHost(hostname: string): boolean {
+// Phase 1.8: exported as the single source of truth for "is this a real
+// Amazon storefront host?". Used by index.ts (4 MiB direct-fetch cap,
+// 4 MiB Firecrawl HTML cap) and the minimal Amazon evidence packet in
+// prompt-generator-v2.ts. extractAmazonAsin / canonicalizeAmazonUrl /
+// sanitizeFallbackEvidenceUrl / extractAmazonPathSlug all delegate here.
+export function isStrictAmazonHost(hostname: string): boolean {
   return STRICT_AMAZON_HOST_RE.test(hostname);
+}
+
+function isAmazonHost(hostname: string): boolean {
+  return isStrictAmazonHost(hostname);
 }
 
 const ASIN_RE = /^[A-Za-z0-9]{10}$/;

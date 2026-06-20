@@ -47,6 +47,15 @@ export interface FirecrawlOpts {
   apiKey?: string;
   /** Used when Firecrawl returns no usable finalUrl. */
   fallbackBaseUrl?: string;
+  /**
+   * Phase 1.8: override the maximum accepted Firecrawl HTML / markdown
+   * byte size for this single call. Defaults to DEFAULT_MAX_HTML_BYTES
+   * (2 MiB). Callers raise this to 4 MiB for strict Amazon hosts only,
+   * to mirror the direct-fetch cap so large Amazon HTML can still feed
+   * the extractor (pageSignals). The enlarged HTML is NOT forwarded to
+   * the Gemini prompt when pageSignals are present.
+   */
+  maxHtmlBytes?: number;
 }
 
 export const NORMAL_FIRECRAWL_API_TIMEOUT_MS = 25_000;
@@ -54,7 +63,7 @@ export const NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS = 27_000;
 export const HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS = 30_000;
 export const HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS = 32_000;
 
-const MAX_HTML_BYTES = 2 * 1024 * 1024; // 2 MB, mirrors fetcher.
+export const DEFAULT_MAX_HTML_BYTES = 2 * 1024 * 1024; // 2 MB, mirrors fetcher default.
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 
 /**
@@ -96,6 +105,7 @@ export async function runFirecrawlScrape(
   const timeoutMs = opts.timeoutMs ?? NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS;
   const fetchImpl = opts.fetchImpl ?? fetch;
   const fallback = opts.fallbackBaseUrl ?? url;
+  const maxHtmlBytes = opts.maxHtmlBytes ?? DEFAULT_MAX_HTML_BYTES;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -164,12 +174,12 @@ export async function runFirecrawlScrape(
       "";
     // Oversize HTML alone no longer fails the scrape — drop the HTML and
     // continue with metadata/markdown if those are usable.
-    const htmlOversize = rawHtmlInitial.length > MAX_HTML_BYTES;
+    const htmlOversize = rawHtmlInitial.length > maxHtmlBytes;
     const rawHtml = htmlOversize ? "" : rawHtmlInitial;
 
     const rawMd = typeof d.markdown === "string" ? d.markdown : "";
     const markdown =
-      rawMd && rawMd.length <= MAX_HTML_BYTES ? rawMd : null;
+      rawMd && rawMd.length <= maxHtmlBytes ? rawMd : null;
 
     const meta = d.metadata;
     const metadata =
