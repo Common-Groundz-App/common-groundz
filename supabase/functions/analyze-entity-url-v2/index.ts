@@ -1034,6 +1034,11 @@ serve(async (req) => {
               gem.prediction?.name ?? null,
             );
             recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
+            // Phase 1.8c.1 — record guard outcome (primary gemini call).
+            recGuardTracker.evaluated = true;
+            recGuardTracker.passed = guard.ok;
+            recGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
+            recGuardTracker.input_source = "gemini_only";
             if (!guard.ok) {
               recGeminiPred = null;
               recWarnings.push(guard.reason as GeminiWarningCode);
@@ -1118,6 +1123,11 @@ serve(async (req) => {
             recFb.geminiPred?.name ?? null,
           );
           recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
+          // Phase 1.8c.1 — record guard outcome (search-fallback gemini call).
+          recGuardTracker.evaluated = true;
+          recGuardTracker.passed = guard.ok;
+          recGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
+          recGuardTracker.input_source = "gemini_only";
           if (!guard.ok) {
             recMerged = null;
             recGeminiPred = null;
@@ -1413,6 +1423,11 @@ serve(async (req) => {
               gem.prediction?.name ?? null,
             );
             geminiBlock = mergeGuardDiagnostics(geminiBlock, guard.diagnostics);
+            // Phase 1.8c.1 — record guard outcome (primary gemini call).
+            mainGuardTracker.evaluated = true;
+            mainGuardTracker.passed = guard.ok;
+            mainGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
+            mainGuardTracker.input_source = "gemini_only";
             if (!guard.ok) {
               mainGeminiPred = null;
               (warnings as string[]).push(guard.reason as GeminiWarningCode);
@@ -1504,6 +1519,11 @@ serve(async (req) => {
             mainFb.geminiPred?.name ?? null,
           );
           geminiBlock = mergeGuardDiagnostics(geminiBlock, guard.diagnostics);
+          // Phase 1.8c.1 — record guard outcome (search-fallback gemini call).
+          mainGuardTracker.evaluated = true;
+          mainGuardTracker.passed = guard.ok;
+          mainGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
+          mainGuardTracker.input_source = "gemini_only";
           if (!guard.ok) {
             mainMerged = null;
             mainGeminiPred = null;
