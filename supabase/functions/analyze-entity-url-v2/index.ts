@@ -74,6 +74,13 @@ import {
   maybeRunGeminiSearchFallback,
   type SearchFallbackGeminiInvoker,
 } from "./search_fallback.ts";
+import {
+  buildFinalization,
+  createDefaultFinalization,
+  type Finalization,
+  type GuardTracker,
+  makeGuardTracker,
+} from "./finalization_telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
