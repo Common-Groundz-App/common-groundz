@@ -1254,6 +1254,15 @@ serve(async (req) => {
           duration_ms: recFallbackDurationMs,
           final_prediction_source: finalSource,
         });
+        finalizeTelemetry(trace, {
+          mergedPredictions: recMerged,
+          mergeDiag: recMergeDiag,
+          mergeReturnedPredictionsBeforeGuard: recMergeReturnedPredictionsBeforeGuard,
+          guard: recGuardTracker,
+          fallbackUsed: recFallbackUsed,
+          usedFirecrawl: recFirecrawlOk,
+          extractPresent: recExtract !== null,
+        });
         return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
 
@@ -1269,7 +1278,15 @@ serve(async (req) => {
         original_error_code: e.code,
       });
 
-
+      finalizeTelemetry(trace, {
+        mergedPredictions: recMerged,
+        mergeDiag: recMergeDiag,
+        mergeReturnedPredictionsBeforeGuard: recMergeReturnedPredictionsBeforeGuard,
+        guard: recGuardTracker,
+        fallbackUsed: recFallbackUsed,
+        usedFirecrawl: recFirecrawlOk,
+        extractPresent: recExtract !== null,
+      });
 
       // Strict contract: return the ORIGINAL fetch error unchanged.
       return respondError(
