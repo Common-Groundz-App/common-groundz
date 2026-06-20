@@ -5,8 +5,30 @@
 
 import { GEMINI_ALLOWED_TYPES } from "./response_schema.ts";
 import type { ExtractMetadata } from "./schema.ts";
+import { isStrictAmazonHost } from "./host_hints.ts";
 
 export const GEMINI_MAX_EVIDENCE_CHARS = 24_000;
+
+// Phase 1.8: defensive byte cap on the assembled user prompt for the
+// Amazon-minimal evidence packet. Per-field caps below should keep us well
+// under this; the cap acts as a regression detector / safety net only.
+export const AMAZON_MIN_PACKET_USER_PROMPT_BYTE_CAP = 24 * 1024;
+
+// Phase 1.8: deterministic per-field caps for the Amazon minimal evidence
+// packet. Applied BEFORE JSON assembly so the global byte cap is a
+// regression detector, not the normal trimming mechanism.
+const AMAZON_MIN_PACKET_CAPS = {
+  asin: 16,
+  canonical_url: 512,
+  amazon_path_slug: 120,
+  title: 300,
+  og_title: 300,
+  twitter_title: 300,
+  og_description: 280,
+  twitter_description: 280,
+  jsonld_product_name: 300,
+  jsonld_brand: 200,
+} as const;
 
 export interface V2Evidence {
   url: string;
