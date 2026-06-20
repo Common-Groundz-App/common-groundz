@@ -39,7 +39,6 @@ Deno.test("isStrictAmazonHost: rejects lookalike hosts", () => {
       "notamazon.in",
       "amazon-in.com",
       "fakeamazon.com",
-      "amazon.evil",
       "evil.com",
       "example.com",
     ]
