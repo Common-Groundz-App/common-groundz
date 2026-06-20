@@ -1040,7 +1040,7 @@ serve(async (req) => {
           duration_ms: recFallbackDurationMs,
           final_prediction_source: finalSource,
         });
-        finalizeTelemetry(trace, {
+        trace.finalization = buildFinalization({
           mergedPredictions: recMerged,
           mergeDiag: recMergeDiag,
           mergeReturnedPredictionsBeforeGuard: recMergeReturnedPredictionsBeforeGuard,
@@ -1064,7 +1064,7 @@ serve(async (req) => {
         original_error_code: e.code,
       });
 
-      finalizeTelemetry(trace, {
+      trace.finalization = buildFinalization({
         mergedPredictions: recMerged,
         mergeDiag: recMergeDiag,
         mergeReturnedPredictionsBeforeGuard: recMergeReturnedPredictionsBeforeGuard,
@@ -1476,7 +1476,7 @@ serve(async (req) => {
         final_prediction_source: trace.final.prediction_source,
       });
     }
-    finalizeTelemetry(trace, {
+    trace.finalization = buildFinalization({
       mergedPredictions: mainMerged,
       mergeDiag: mainMergeDiag,
       mergeReturnedPredictionsBeforeGuard: mainMergeReturnedPredictionsBeforeGuard,
