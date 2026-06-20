@@ -626,6 +626,28 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     };
   }
 
+  // Phase 1.8: usage telemetry (numbers only, no prediction values).
+  const usage = (json.usageMetadata ?? json.usage_metadata) as
+    | Record<string, unknown>
+    | undefined;
+  const numOrNull = (v: unknown): number | null =>
+    typeof v === "number" && isFinite(v) ? v : null;
+  const tokensDiag = {
+    prompt_token_count: numOrNull(usage?.promptTokenCount ?? usage?.prompt_token_count),
+    candidates_token_count: numOrNull(
+      usage?.candidatesTokenCount ?? usage?.candidates_token_count,
+    ),
+    thoughts_token_count: numOrNull(
+      usage?.thoughtsTokenCount ?? usage?.thoughts_token_count,
+    ),
+    total_token_count: numOrNull(usage?.totalTokenCount ?? usage?.total_token_count),
+  };
+  const promptBytesDiag = {
+    system_prompt_bytes: systemPromptBytes,
+    user_prompt_bytes: userPromptBytes,
+    combined_prompt_bytes: combinedPromptBytes,
+  };
+
   // Safety / block checks.
   const promptFeedback = json.promptFeedback as Record<string, unknown> | undefined;
   if (promptFeedback?.blockReason) {
