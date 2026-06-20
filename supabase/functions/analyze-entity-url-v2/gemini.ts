@@ -119,6 +119,13 @@ export interface RunGeminiArgs {
   abortSignal?: AbortSignal;
   /** Diagnostic label used only in the structured log line. */
   logLabel?: string;
+  /**
+   * Phase 1.8b: when true, the request uses thinkingBudget: 0 instead of the
+   * non-Amazon default of 256. Computed once by the caller from
+   * `isStrictAmazonHost(host)` so primary, recovery, and search-only paths
+   * share an identical Amazon predicate. maxOutputTokens stays 2048 either way.
+   */
+  isAmazon?: boolean;
 }
 
 
@@ -537,6 +544,10 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
   const t0 = Date.now();
 
   const tools = args.tools ?? [{ url_context: {} }, { google_search: {} }];
+  // Phase 1.8b: Amazon-only thinkingBudget: 0. Non-Amazon stays at 256
+  // (Phase 1.8 default) so Nykaa et al. are unchanged. Single source of
+  // truth: caller derives `isAmazon` via isStrictAmazonHost() from host_hints.
+  const thinkingBudgetUsed = args.isAmazon ? 0 : 256;
   const body = {
     systemInstruction: {
       role: "system",
@@ -551,12 +562,12 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     tools,
     generationConfig: {
       temperature: GEMINI_TEMPERATURE,
-      // Phase 1.8: cap reasoning tokens + guarantee output budget so the
-      // model returns text parts instead of STOP-with-no-content. Same
-      // config applies to primary, recovery, and search-only fallback
-      // calls (callGeminiSearchOnly delegates here). Start conservative
-      // at 256; reduce to 0 only if empty STOPs persist.
-      thinkingConfig: { thinkingBudget: 256 },
+      // Phase 1.8 / 1.8b: cap reasoning tokens + guarantee output budget so
+      // the model returns text parts instead of STOP-with-no-content. Amazon
+      // uses 0 (Phase 1.8b) after empty STOPs persisted at 256; non-Amazon
+      // keeps 256. Same config flows through primary, recovery, and the
+      // search-only fallback (callGeminiSearchOnly delegates here).
+      thinkingConfig: { thinkingBudget: thinkingBudgetUsed },
       maxOutputTokens: 2048,
     },
   };
@@ -646,6 +657,10 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     system_prompt_bytes: systemPromptBytes,
     user_prompt_bytes: userPromptBytes,
     combined_prompt_bytes: combinedPromptBytes,
+    // Phase 1.8b: surface the effective thinking budget so retests don't
+    // require source inspection. Number only; no prediction values.
+    thinking_budget_used: thinkingBudgetUsed,
+    is_amazon: !!args.isAmazon,
   };
 
   // Safety / block checks.

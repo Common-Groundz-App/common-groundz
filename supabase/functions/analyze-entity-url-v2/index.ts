@@ -228,6 +228,14 @@ async function invokeGemini(args: {
   const amazonPathSlug = extractAmazonPathSlug(args.url);
   const amazonAsin = extractAmazonAsin(args.url);
 
+  // Phase 1.8b: single-source Amazon predicate (host_hints.isStrictAmazonHost)
+  // shared with the 4 MiB fetch cap and the minimal evidence packet. Drives
+  // thinkingBudget: 0 on Amazon-only Gemini calls (primary + search fallback).
+  let isAmazon = false;
+  try {
+    isAmazon = isStrictAmazonHost(new URL(args.url).hostname);
+  } catch { /* malformed url → non-Amazon default */ }
+
   if (args.searchOnly) {
     const sanitizedUrl = sanitizeFallbackEvidenceUrl(canonicalUrl);
     let host: string | null = null;
@@ -248,6 +256,7 @@ async function invokeGemini(args: {
       userPrompt,
       evidenceBaseUrl: sanitizedUrl ?? canonicalUrl,
       timeoutMs: args.timeoutMs,
+      isAmazon,
     });
   }
 
@@ -315,6 +324,7 @@ async function invokeGemini(args: {
     systemPrompt: promptOut.systemPrompt,
     userPrompt: promptOut.userPrompt,
     evidenceBaseUrl: promptBaseUrl,
+    isAmazon,
   });
 }
 
