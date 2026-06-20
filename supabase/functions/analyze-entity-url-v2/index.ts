@@ -74,6 +74,13 @@ import {
   maybeRunGeminiSearchFallback,
   type SearchFallbackGeminiInvoker,
 } from "./search_fallback.ts";
+import {
+  buildFinalization,
+  createDefaultFinalization,
+  type Finalization,
+  type GuardTracker,
+  makeGuardTracker,
+} from "./finalization_telemetry.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -148,7 +155,15 @@ interface AnalysisTrace {
     error_code: string;
     total_duration_ms: number;
   };
+  // Phase 1.8c.1 — post-merge finalization telemetry.
+  // Booleans, counts, and constrained enums only. NEVER raw model output,
+  // page titles, brand names, product names, full URLs, or PII.
+  finalization?: Finalization;
 }
+
+// Phase 1.8c.1 — finalization telemetry types/helpers live in a sibling
+// module so unit tests can import them without triggering serve().
+
 
 function makeTrace(request_id: string): AnalysisTrace {
   return {
@@ -158,6 +173,7 @@ function makeTrace(request_id: string): AnalysisTrace {
     final: { error_code: "UNKNOWN", total_duration_ms: 0 },
   };
 }
+
 
 function safeHost(url: string): string | null {
   try { return new URL(url).host; } catch { return null; }
@@ -444,6 +460,14 @@ function mergeGuardDiagnostics(
 }
 
 
+// Phase 1.8c.1 — finalization helpers imported from finalization_telemetry.ts.
+
+
+
+
+
+
+
 // ─── Phase 8 helpers ──────────────────────────────────────────────────────
 
 const EMPTY_EXTRACT_METADATA: ExtractMetadata = {
@@ -523,6 +547,11 @@ serve(async (req) => {
   const request_id = crypto.randomUUID();
   const t0 = Date.now();
   const trace = makeTrace(request_id);
+  trace.finalization = createDefaultFinalization();
+  // Phase 1.8c.1 — guard trackers, one per branch. Capture the LAST guard
+  // call's outcome on each branch; suspect site for post-merge discard.
+  const recGuardTracker: GuardTracker = makeGuardTracker();
+  const mainGuardTracker: GuardTracker = makeGuardTracker();
   const respondError = (
     status: number,
     code: V2ErrorCode,
@@ -791,6 +820,11 @@ serve(async (req) => {
               gem.prediction?.name ?? null,
             );
             recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
+            // Phase 1.8c.1 — record guard outcome (primary gemini call).
+            recGuardTracker.evaluated = true;
+            recGuardTracker.passed = guard.ok;
+            recGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
+            recGuardTracker.input_source = "gemini_only";
             if (!guard.ok) {
               recGeminiPred = null;
               recWarnings.push(guard.reason as GeminiWarningCode);
@@ -856,7 +890,13 @@ serve(async (req) => {
       let recFallbackError = recFb.error;
       const recFallbackDurationMs = recFb.durationMs;
       let recFallbackUsed = recFb.used;
+      // Phase 1.8c.1 — snapshot "did merge return a non-null prediction?"
+      // BEFORE any post-fallback guard discards it. This distinguishes
+      // "merge had nothing" from "merge produced a prediction that guard
+      // threw away" in finalization telemetry.
+      let recMergeReturnedPredictionsBeforeGuard = recMerged !== null;
       if (recFb.used && recFb.mergedPredictions && recFb.mergeDiag && recFb.geminiPred && recFb.geminiResult?.ok) {
+        recMergeReturnedPredictionsBeforeGuard = true;
         recMerged = recFb.mergedPredictions;
         recMergeDiag = recFb.mergeDiag;
         recGeminiPred = recFb.geminiPred;
@@ -875,6 +915,11 @@ serve(async (req) => {
             recFb.geminiPred?.name ?? null,
           );
           recGeminiBlock = mergeGuardDiagnostics(recGeminiBlock, guard.diagnostics);
+          // Phase 1.8c.1 — record guard outcome (search-fallback gemini call).
+          recGuardTracker.evaluated = true;
+          recGuardTracker.passed = guard.ok;
+          recGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
+          recGuardTracker.input_source = "gemini_only";
           if (!guard.ok) {
             recMerged = null;
             recGeminiPred = null;
@@ -995,6 +1040,15 @@ serve(async (req) => {
           duration_ms: recFallbackDurationMs,
           final_prediction_source: finalSource,
         });
+        trace.finalization = buildFinalization({
+          mergedPredictions: recMerged,
+          mergeDiag: recMergeDiag,
+          mergeReturnedPredictionsBeforeGuard: recMergeReturnedPredictionsBeforeGuard,
+          guard: recGuardTracker,
+          fallbackUsed: recFallbackUsed,
+          usedFirecrawl: recFirecrawlOk,
+          extractPresent: recExtract !== null,
+        });
         return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
 
@@ -1010,7 +1064,15 @@ serve(async (req) => {
         original_error_code: e.code,
       });
 
-
+      trace.finalization = buildFinalization({
+        mergedPredictions: recMerged,
+        mergeDiag: recMergeDiag,
+        mergeReturnedPredictionsBeforeGuard: recMergeReturnedPredictionsBeforeGuard,
+        guard: recGuardTracker,
+        fallbackUsed: recFallbackUsed,
+        usedFirecrawl: recFirecrawlOk,
+        extractPresent: recExtract !== null,
+      });
 
       // Strict contract: return the ORIGINAL fetch error unchanged.
       return respondError(
@@ -1170,6 +1232,11 @@ serve(async (req) => {
               gem.prediction?.name ?? null,
             );
             geminiBlock = mergeGuardDiagnostics(geminiBlock, guard.diagnostics);
+            // Phase 1.8c.1 — record guard outcome (primary gemini call).
+            mainGuardTracker.evaluated = true;
+            mainGuardTracker.passed = guard.ok;
+            mainGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
+            mainGuardTracker.input_source = "gemini_only";
             if (!guard.ok) {
               mainGeminiPred = null;
               (warnings as string[]).push(guard.reason as GeminiWarningCode);
@@ -1205,6 +1272,10 @@ serve(async (req) => {
       mainGeminiPred,
       mainFlags,
     );
+    // Phase 1.8c.1 — hoisted snapshot used by finalization telemetry. Reset
+    // inside the search-fallback block if/when a successful fallback merge
+    // produces predictions BEFORE the post-fallback guard runs.
+    let mainMergeReturnedPredictionsBeforeGuard = mainMerged !== null;
 
     // ─── Phase 1.5: search-only Gemini fallback in main branch ──────────
     // Runs only when the main branch has no usable merged prediction.
@@ -1242,7 +1313,10 @@ serve(async (req) => {
       mainFallbackSkipReason = mainFb.skipReason;
       mainFallbackError = mainFb.error;
       mainFallbackDurationMs = mainFb.durationMs;
+      // (mainMergeReturnedPredictionsBeforeGuard is hoisted above; only the
+      // successful-fallback branch below overrides it to true.)
       if (mainFb.used && mainFb.mergedPredictions && mainFb.mergeDiag && mainFb.geminiPred && mainFb.geminiResult?.ok) {
+        mainMergeReturnedPredictionsBeforeGuard = true;
         mainMerged = mainFb.mergedPredictions;
         mainMergeDiag = mainFb.mergeDiag;
         mainGeminiPred = mainFb.geminiPred;
@@ -1261,6 +1335,11 @@ serve(async (req) => {
             mainFb.geminiPred?.name ?? null,
           );
           geminiBlock = mergeGuardDiagnostics(geminiBlock, guard.diagnostics);
+          // Phase 1.8c.1 — record guard outcome (search-fallback gemini call).
+          mainGuardTracker.evaluated = true;
+          mainGuardTracker.passed = guard.ok;
+          mainGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
+          mainGuardTracker.input_source = "gemini_only";
           if (!guard.ok) {
             mainMerged = null;
             mainGeminiPred = null;
@@ -1397,6 +1476,15 @@ serve(async (req) => {
         final_prediction_source: trace.final.prediction_source,
       });
     }
+    trace.finalization = buildFinalization({
+      mergedPredictions: mainMerged,
+      mergeDiag: mainMergeDiag,
+      mergeReturnedPredictionsBeforeGuard: mainMergeReturnedPredictionsBeforeGuard,
+      guard: mainGuardTracker,
+      fallbackUsed: mainFallbackUsed,
+      usedFirecrawl,
+      extractPresent: extract.predictions !== null,
+    });
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
   } catch (err) {
     console.error("[analyze-entity-url-v2] unhandled error:", { request_id, err: String(err) });
