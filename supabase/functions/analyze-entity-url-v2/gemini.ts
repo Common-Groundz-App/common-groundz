@@ -796,6 +796,10 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     url_context_failed: grounding.url_context_failed,
     raw_text_length: rawTextLength,
     raw_text_sha8: rawTextSha8,
+    ...tokensDiag,
+    ...promptBytesDiag,
+    json_parse_ok: true,
+    has_text_parts: true,
   });
 
   return {
