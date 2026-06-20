@@ -1510,9 +1510,8 @@ serve(async (req) => {
       mainFallbackSkipReason = mainFb.skipReason;
       mainFallbackError = mainFb.error;
       mainFallbackDurationMs = mainFb.durationMs;
-      // Phase 1.8c.1 — snapshot "did merge return a non-null prediction?"
-      // BEFORE any post-fallback guard discards it.
-      let mainMergeReturnedPredictionsBeforeGuard = mainMerged !== null;
+      // (mainMergeReturnedPredictionsBeforeGuard is hoisted above; only the
+      // successful-fallback branch below overrides it to true.)
       if (mainFb.used && mainFb.mergedPredictions && mainFb.mergeDiag && mainFb.geminiPred && mainFb.geminiResult?.ok) {
         mainMergeReturnedPredictionsBeforeGuard = true;
         mainMerged = mainFb.mergedPredictions;
