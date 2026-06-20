@@ -28,6 +28,7 @@ import { extractFromHtml, type ExtractResult } from "./extractor.ts";
 import { detectWeakSignals } from "./weak_signals.ts";
 import {
   isKnownJsHeavyHost,
+  isStrictAmazonHost,
   canonicalizeAmazonUrl,
   extractAmazonPathSlug,
   extractAmazonAsin,
