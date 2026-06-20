@@ -1690,6 +1690,15 @@ serve(async (req) => {
         final_prediction_source: trace.final.prediction_source,
       });
     }
+    finalizeTelemetry(trace, {
+      mergedPredictions: mainMerged,
+      mergeDiag: mainMergeDiag,
+      mergeReturnedPredictionsBeforeGuard: mainMergeReturnedPredictionsBeforeGuard,
+      guard: mainGuardTracker,
+      fallbackUsed: mainFallbackUsed,
+      usedFirecrawl,
+      extractPresent: extract.predictions !== null,
+    });
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
   } catch (err) {
     console.error("[analyze-entity-url-v2] unhandled error:", { request_id, err: String(err) });
