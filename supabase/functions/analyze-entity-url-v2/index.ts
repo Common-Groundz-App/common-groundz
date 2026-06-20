@@ -118,6 +118,9 @@ interface AnalysisTrace {
     bytes?: number;
     duration_ms?: number;
     error_code?: string;
+    // Phase 1.8: maxBytes cap actually applied to this fetch (2 MiB default,
+    // 4 MiB for strict Amazon hosts). Numbers only.
+    max_bytes_used?: number;
   };
   deterministic_extract?: { ok: boolean; weak_signals: boolean };
   firecrawl?: {
