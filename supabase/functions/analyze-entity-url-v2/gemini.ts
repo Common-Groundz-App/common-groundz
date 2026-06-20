@@ -119,6 +119,13 @@ export interface RunGeminiArgs {
   abortSignal?: AbortSignal;
   /** Diagnostic label used only in the structured log line. */
   logLabel?: string;
+  /**
+   * Phase 1.8b: when true, the request uses thinkingBudget: 0 instead of the
+   * non-Amazon default of 256. Computed once by the caller from
+   * `isStrictAmazonHost(host)` so primary, recovery, and search-only paths
+   * share an identical Amazon predicate. maxOutputTokens stays 2048 either way.
+   */
+  isAmazon?: boolean;
 }
 
 
