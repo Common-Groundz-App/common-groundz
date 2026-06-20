@@ -47,6 +47,15 @@ export interface FirecrawlOpts {
   apiKey?: string;
   /** Used when Firecrawl returns no usable finalUrl. */
   fallbackBaseUrl?: string;
+  /**
+   * Phase 1.8: override the maximum accepted Firecrawl HTML / markdown
+   * byte size for this single call. Defaults to DEFAULT_MAX_HTML_BYTES
+   * (2 MiB). Callers raise this to 4 MiB for strict Amazon hosts only,
+   * to mirror the direct-fetch cap so large Amazon HTML can still feed
+   * the extractor (pageSignals). The enlarged HTML is NOT forwarded to
+   * the Gemini prompt when pageSignals are present.
+   */
+  maxHtmlBytes?: number;
 }
 
 export const NORMAL_FIRECRAWL_API_TIMEOUT_MS = 25_000;
@@ -54,7 +63,7 @@ export const NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS = 27_000;
 export const HIGH_PRIORITY_FIRECRAWL_API_TIMEOUT_MS = 30_000;
 export const HIGH_PRIORITY_FIRECRAWL_LOCAL_TIMEOUT_MS = 32_000;
 
-const MAX_HTML_BYTES = 2 * 1024 * 1024; // 2 MB, mirrors fetcher.
+export const DEFAULT_MAX_HTML_BYTES = 2 * 1024 * 1024; // 2 MB, mirrors fetcher default.
 const FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape";
 
 /**
