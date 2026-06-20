@@ -256,6 +256,7 @@ async function invokeGemini(args: {
       userPrompt,
       evidenceBaseUrl: sanitizedUrl ?? canonicalUrl,
       timeoutMs: args.timeoutMs,
+      isAmazon,
     });
   }
 
