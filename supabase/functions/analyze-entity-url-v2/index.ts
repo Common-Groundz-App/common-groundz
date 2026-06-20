@@ -324,6 +324,7 @@ async function invokeGemini(args: {
     systemPrompt: promptOut.systemPrompt,
     userPrompt: promptOut.userPrompt,
     evidenceBaseUrl: promptBaseUrl,
+    isAmazon,
   });
 }
 
