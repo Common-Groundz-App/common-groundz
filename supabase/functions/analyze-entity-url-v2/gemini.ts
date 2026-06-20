@@ -657,6 +657,10 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     system_prompt_bytes: systemPromptBytes,
     user_prompt_bytes: userPromptBytes,
     combined_prompt_bytes: combinedPromptBytes,
+    // Phase 1.8b: surface the effective thinking budget so retests don't
+    // require source inspection. Number only; no prediction values.
+    thinking_budget_used: thinkingBudgetUsed,
+    is_amazon: !!args.isAmazon,
   };
 
   // Safety / block checks.
