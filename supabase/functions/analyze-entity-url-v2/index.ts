@@ -761,6 +761,11 @@ serve(async (req) => {
   const request_id = crypto.randomUUID();
   const t0 = Date.now();
   const trace = makeTrace(request_id);
+  trace.finalization = createDefaultFinalization();
+  // Phase 1.8c.1 — guard trackers, one per branch. Capture the LAST guard
+  // call's outcome on each branch; suspect site for post-merge discard.
+  const recGuardTracker: GuardTracker = makeGuardTracker();
+  const mainGuardTracker: GuardTracker = makeGuardTracker();
   const respondError = (
     status: number,
     code: V2ErrorCode,
