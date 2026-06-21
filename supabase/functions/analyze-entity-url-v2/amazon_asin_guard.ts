@@ -376,21 +376,42 @@ export function runDualPathVerification(args: DualPathArgs): DualPathResult {
   let pathBOk = false;
   let pathBHasDistinctive = false;
   let pathBOverlaps = false;
+  let anchorTokensArr: string[] = [];
+  let nameTokensArr: string[] = [];
+  let overlapTokensArr: string[] = [];
   if (anchorPick.anchor) {
     const anchorTokens = distinctiveTokens(anchorPick.anchor);
+    anchorTokensArr = Array.from(anchorTokens);
     pathBHasDistinctive = anchorTokens.size > 0;
     if (!pathBHasDistinctive) {
       diag.page_title_match_skip_reason = "NO_DISTINCTIVE_TOKENS";
     } else {
       const nameTokens = distinctiveTokens(args.modelName ?? "");
+      nameTokensArr = Array.from(nameTokens);
       for (const t of nameTokens) {
-        if (anchorTokens.has(t)) { pathBOverlaps = true; break; }
+        if (anchorTokens.has(t)) {
+          overlapTokensArr.push(t);
+          pathBOverlaps = true;
+        }
       }
       pathBOk = pathBOverlaps;
     }
   } else {
     diag.page_title_match_skip_reason = "NO_PAGE_TITLE_ANCHOR";
+    // Still collect model-name tokens for diagnostics so reviewers can see
+    // whether the model produced anything tokenizable.
+    nameTokensArr = Array.from(distinctiveTokens(args.modelName ?? ""));
   }
+
+  // ── Phase 1.8c.2: extended diagnostics (Amazon-only triage) ────────────
+  diag.extended = buildExtendedDiagnostics({
+    anchorPick,
+    anchorTokens: anchorTokensArr,
+    nameTokens: nameTokensArr,
+    overlapTokens: overlapTokensArr,
+    groundingEvidence: ev,
+    pageSignals: args.pageSignals ?? null,
+  });
 
   // ── Combine ─────────────────────────────────────────────────────────────
   // Case: usable anchor with distinctive tokens AND model does NOT overlap →
