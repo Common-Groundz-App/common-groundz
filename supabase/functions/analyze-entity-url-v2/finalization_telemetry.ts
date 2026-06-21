@@ -135,6 +135,12 @@ export interface Finalization {
     rejection_reason: AmazonGuardRejectionReasonEnum;
     raw_reason_code: string | null;
     input_source: FinalizationSourceEnum;
+    /**
+     * Phase 1.8c.2 — Amazon-only diagnostic snapshot. Present iff guard
+     * was evaluated AND the request was on an Amazon host. Omitted for
+     * non-Amazon requests so non-Amazon traces stay byte-identical.
+     */
+    diagnostics?: AmazonGuardExtendedDiagnostics;
   };
   response_builder: {
     predictions_var_truthy: boolean;
@@ -149,6 +155,8 @@ export interface GuardTracker {
   passed: boolean;
   raw_reason_code: string | null;
   input_source: FinalizationSourceEnum;
+  /** Phase 1.8c.2 — populated by index.ts from runDualPathVerification. */
+  diagnostics: AmazonGuardExtendedDiagnostics | null;
 }
 
 export function makeGuardTracker(): GuardTracker {
@@ -157,6 +165,7 @@ export function makeGuardTracker(): GuardTracker {
     passed: true,
     raw_reason_code: null,
     input_source: "none",
+    diagnostics: null,
   };
 }
 
