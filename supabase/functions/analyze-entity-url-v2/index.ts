@@ -1113,6 +1113,7 @@ serve(async (req) => {
       if (firecrawlConfigured) {
         const fc = await runFirecrawlScrape(safe.url, {
           fallbackBaseUrl: safe.url,
+          diagContext: { requestId: request_id, callSite: "main" },
           ...(firecrawlMaxHtmlBytes !== undefined ? { maxHtmlBytes: firecrawlMaxHtmlBytes } : {}),
           ...(priority === "high"
             ? {
