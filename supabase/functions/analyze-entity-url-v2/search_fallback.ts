@@ -41,6 +41,22 @@ export type SearchFallbackSkipReason =
   | "budget_exhausted";
 
 /**
+ * Phase 1.8c.3b — why fallback actually ran. Populated only when
+ * `attempted === true`; null otherwise (pair with `skipReason`).
+ *
+ *   "invalid_shape"    — primary Gemini failed with GEMINI_INVALID_SHAPE
+ *   "transport_error"  — primary Gemini failed with any other error code
+ *                        (HTTP / timeout / safety / bad response / etc.)
+ *   "recovery_gate"    — primary call wasn't made or had no error code
+ *                        (i.e. fallback ran purely because merge produced
+ *                        no usable prediction)
+ */
+export type SearchFallbackTriggerReason =
+  | "invalid_shape"
+  | "transport_error"
+  | "recovery_gate";
+
+/**
  * Signature for the Gemini invoker injected into the helper.
  *
  * Intentionally has NO `html` / `rawHtml` field — search-only fallback
