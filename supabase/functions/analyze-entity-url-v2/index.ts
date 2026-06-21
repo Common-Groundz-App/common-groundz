@@ -1569,15 +1569,26 @@ serve(async (req) => {
     trace.path = usedFirecrawl ? "weak_recovery" : "happy";
     trace.final = {
       prediction_source: mainMerged
-        ? mainFallbackUsed
-          ? "gemini_search_fallback"
-          : usedFirecrawl
-            ? "firecrawl_merge"
-            : "extractor_merge"
+        ? mainPageFallbackUsed
+          ? "page_metadata_fallback"
+          : mainFallbackUsed
+            ? "gemini_search_fallback"
+            : usedFirecrawl
+              ? "firecrawl_merge"
+              : "extractor_merge"
         : "none",
       error_code: mainMerged ? "OK" : "NO_PREDICTIONS",
       total_duration_ms: Date.now() - t0,
     };
+    if (mainPageFallbackDiag) {
+      console.info("[analyze-entity-url-v2] page_metadata_fallback main", {
+        request_id,
+        used: mainPageFallbackDiag.used,
+        skip_reason: mainPageFallbackDiag.skip_reason,
+        field_source: mainPageFallbackDiag.field_source,
+        image_candidate_count: mainPageFallbackDiag.image_candidate_count,
+      });
+    }
     if (mainFallbackAttempted || mainFallbackSkipReason) {
       console.info("[analyze-entity-url-v2] gemini_search_fallback main", {
         request_id,
