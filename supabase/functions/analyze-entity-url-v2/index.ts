@@ -825,6 +825,7 @@ serve(async (req) => {
             recGuardTracker.passed = guard.ok;
             recGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
             recGuardTracker.input_source = "gemini_only";
+            recGuardTracker.diagnostics = guard.diagnostics.extended ?? null;
             if (!guard.ok) {
               recGeminiPred = null;
               recWarnings.push(guard.reason as GeminiWarningCode);
