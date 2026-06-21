@@ -791,6 +791,8 @@ serve(async (req) => {
       // Phase 8: invoke Gemini on the recovery path (not just diagnostics).
       let recGeminiBlock: GeminiMetadataBlock | undefined;
       let recGeminiPred: GeminiRawPrediction | null = null;
+      // Phase 1.8c.3b — primary error code feeds search-fallback trigger_reason.
+      let recPrimaryGeminiErrorCode: string | null = null;
       // (recPrimaryGrounding intentionally not retained — guard runs inline below.)
       const recAmazonAsin = extractAmazonAsin(safe.url);
       if (geminiConfigured) {
@@ -833,6 +835,7 @@ serve(async (req) => {
           }
         } else if (gem.configured) {
           recGeminiBlock = geminiFailureBlock(gem);
+          recPrimaryGeminiErrorCode = gem.code;
           recWarnings.push(gem.code satisfies GeminiWarningCode);
         }
       } else {
