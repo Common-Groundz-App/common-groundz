@@ -81,6 +81,10 @@ import {
   type GuardTracker,
   makeGuardTracker,
 } from "./finalization_telemetry.ts";
+import {
+  buildPageMetadataFallback,
+  type PageMetadataFallbackDiagnostics,
+} from "./page_metadata_fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
