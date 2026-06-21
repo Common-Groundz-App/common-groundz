@@ -296,6 +296,8 @@ export interface DualPathDiagnostics {
   page_title_anchor_reject_reason: string | null;
   amazon_canonical_asin_mismatch: boolean;
   amazon_identity_verified_via: AmazonIdentityVerifiedVia;
+  /** Phase 1.8c.2 — extended Amazon diagnostics for guard-decision triage. */
+  extended?: AmazonGuardExtendedDiagnostics;
 }
 
 export interface DualPathArgs {
