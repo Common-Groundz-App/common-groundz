@@ -81,6 +81,10 @@ import {
   type GuardTracker,
   makeGuardTracker,
 } from "./finalization_telemetry.ts";
+import {
+  buildPageMetadataFallback,
+  type PageMetadataFallbackDiagnostics,
+} from "./page_metadata_fallback.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -979,13 +983,55 @@ serve(async (req) => {
       }
 
 
+      // Phase 1.8c.6-A — page-metadata fallback floor (recovery branch).
+      // Last-resort low-confidence prediction built from page-owned signals
+      // (JSON-LD/OG/Twitter/HTML title) when the full pipeline produced
+      // nothing. Only fires when type was deterministically resolved.
+      let recPageFallbackDiag: PageMetadataFallbackDiagnostics | null = null;
+      let recPageFallbackUsed = false;
+      if (!recMerged && recExtract) {
+        const fb = buildPageMetadataFallback({
+          pageSignals: recExtract.pageSignals ?? null,
+          extractMetadata: recExtract.metadata,
+          baseUrl: recEvidenceBaseUrl,
+        });
+        recPageFallbackDiag = fb.diagnostics;
+        if (fb.predictions) {
+          const resolved = resolveCategory({
+            type: fb.predictions.type,
+            suggested_category_path: fb.predictions.suggested_category_path,
+          });
+          fb.predictions.category_id = resolved.category_id;
+          fb.predictions.matched_category_name = resolved.matched_category_name;
+          recMerged = fb.predictions;
+          recPageFallbackUsed = true;
+        }
+      }
+      if (recGeminiBlock && recPageFallbackDiag) {
+        recGeminiBlock = {
+          ...recGeminiBlock,
+          page_metadata_fallback_used: recPageFallbackDiag.used,
+          page_metadata_fallback_skip_reason: recPageFallbackDiag.skip_reason,
+          page_metadata_field_source: recPageFallbackDiag.field_source,
+        } as typeof recGeminiBlock;
+      } else if (recPageFallbackDiag) {
+        recGeminiBlock = {
+          used: false,
+          page_metadata_fallback_used: recPageFallbackDiag.used,
+          page_metadata_fallback_skip_reason: recPageFallbackDiag.skip_reason,
+          page_metadata_field_source: recPageFallbackDiag.field_source,
+        } as typeof recGeminiBlock;
+      }
+
       if (recMerged) {
         const recPricing = recMerged.additional_data.pricing as PricingBlock | undefined;
-        const finalSource = recFallbackUsed
-          ? "gemini_search_fallback"
-          : recExtract
-            ? "firecrawl_recovery"
-            : "gemini_recovery";
+        const finalSource = recPageFallbackUsed
+          ? "page_metadata_fallback"
+          : recFallbackUsed
+            ? "gemini_search_fallback"
+            : recExtract
+              ? "firecrawl_recovery"
+              : "gemini_recovery";
         const response: V2SuccessResponse = {
           success: true,
           predictions: recMerged,
@@ -1001,11 +1047,13 @@ serve(async (req) => {
             used_google_search: recGeminiBlock?.used_google_search ?? false,
             used_firecrawl: recFirecrawlOk,
             phase: 8,
-            stage: recFallbackUsed
-              ? "gemini-search-fallback"
-              : recExtract
-                ? "firecrawl-recovered"
-                : "gemini-recovered",
+            stage: recPageFallbackUsed
+              ? "page-metadata-fallback"
+              : recFallbackUsed
+                ? "gemini-search-fallback"
+                : recExtract
+                  ? "firecrawl-recovered"
+                  : "gemini-recovered",
             ...(recExtract ? { extract: recExtract.metadata } : {}),
             ...(recFirecrawlBlock ? { firecrawl: recFirecrawlBlock } : {}),
             ...(recGeminiBlock ? { gemini: recGeminiBlock } : {}),
@@ -1407,6 +1455,48 @@ serve(async (req) => {
         };
       }
     }
+
+    // Phase 1.8c.6-A — page-metadata fallback floor (main branch).
+    // Synthesize a LOW-CONFIDENCE prediction from page-owned signals when
+    // the full pipeline (extractor → Firecrawl → Gemini → search-only
+    // fallback) failed to produce one. Type-safe: only fires when
+    // extract.metadata.mapped_type was deterministically resolved.
+    let mainPageFallbackDiag: PageMetadataFallbackDiagnostics | null = null;
+    let mainPageFallbackUsed = false;
+    if (!mainMerged) {
+      const fb = buildPageMetadataFallback({
+        pageSignals: extract.pageSignals ?? null,
+        extractMetadata: extract.metadata,
+        baseUrl: finalEvidenceBaseUrl,
+      });
+      mainPageFallbackDiag = fb.diagnostics;
+      if (fb.predictions) {
+        const resolved = resolveCategory({
+          type: fb.predictions.type,
+          suggested_category_path: fb.predictions.suggested_category_path,
+        });
+        fb.predictions.category_id = resolved.category_id;
+        fb.predictions.matched_category_name = resolved.matched_category_name;
+        mainMerged = fb.predictions;
+        mainPageFallbackUsed = true;
+      }
+    }
+    if (geminiBlock && mainPageFallbackDiag) {
+      geminiBlock = {
+        ...geminiBlock,
+        page_metadata_fallback_used: mainPageFallbackDiag.used,
+        page_metadata_fallback_skip_reason: mainPageFallbackDiag.skip_reason,
+        page_metadata_field_source: mainPageFallbackDiag.field_source,
+      } as typeof geminiBlock;
+    } else if (mainPageFallbackDiag) {
+      geminiBlock = {
+        used: false,
+        page_metadata_fallback_used: mainPageFallbackDiag.used,
+        page_metadata_fallback_skip_reason: mainPageFallbackDiag.skip_reason,
+        page_metadata_field_source: mainPageFallbackDiag.field_source,
+      } as typeof geminiBlock;
+    }
+
     const mainPricing = mainMerged?.additional_data.pricing as PricingBlock | undefined;
 
     const response: V2SuccessResponse = {
@@ -1424,13 +1514,15 @@ serve(async (req) => {
         used_google_search: geminiBlock?.used_google_search ?? false,
         used_firecrawl: usedFirecrawl,
         phase: 8,
-        stage: mainFallbackUsed
-          ? "gemini-search-fallback"
-          : usedFirecrawl
-            ? "firecrawl-improved"
-            : mainMerged
-              ? "exact-page"
-              : "weak-signals",
+        stage: mainPageFallbackUsed
+          ? "page-metadata-fallback"
+          : mainFallbackUsed
+            ? "gemini-search-fallback"
+            : usedFirecrawl
+              ? "firecrawl-improved"
+              : mainMerged
+                ? "exact-page"
+                : "weak-signals",
         fetch: {
           final_url: fetchResult.finalUrl,
           status: fetchResult.status,
@@ -1479,15 +1571,26 @@ serve(async (req) => {
     trace.path = usedFirecrawl ? "weak_recovery" : "happy";
     trace.final = {
       prediction_source: mainMerged
-        ? mainFallbackUsed
-          ? "gemini_search_fallback"
-          : usedFirecrawl
-            ? "firecrawl_merge"
-            : "extractor_merge"
+        ? mainPageFallbackUsed
+          ? "page_metadata_fallback"
+          : mainFallbackUsed
+            ? "gemini_search_fallback"
+            : usedFirecrawl
+              ? "firecrawl_merge"
+              : "extractor_merge"
         : "none",
       error_code: mainMerged ? "OK" : "NO_PREDICTIONS",
       total_duration_ms: Date.now() - t0,
     };
+    if (mainPageFallbackDiag) {
+      console.info("[analyze-entity-url-v2] page_metadata_fallback main", {
+        request_id,
+        used: mainPageFallbackDiag.used,
+        skip_reason: mainPageFallbackDiag.skip_reason,
+        field_source: mainPageFallbackDiag.field_source,
+        image_candidate_count: mainPageFallbackDiag.image_candidate_count,
+      });
+    }
     if (mainFallbackAttempted || mainFallbackSkipReason) {
       console.info("[analyze-entity-url-v2] gemini_search_fallback main", {
         request_id,
