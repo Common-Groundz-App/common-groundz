@@ -1512,13 +1512,15 @@ serve(async (req) => {
         used_google_search: geminiBlock?.used_google_search ?? false,
         used_firecrawl: usedFirecrawl,
         phase: 8,
-        stage: mainFallbackUsed
-          ? "gemini-search-fallback"
-          : usedFirecrawl
-            ? "firecrawl-improved"
-            : mainMerged
-              ? "exact-page"
-              : "weak-signals",
+        stage: mainPageFallbackUsed
+          ? "page-metadata-fallback"
+          : mainFallbackUsed
+            ? "gemini-search-fallback"
+            : usedFirecrawl
+              ? "firecrawl-improved"
+              : mainMerged
+                ? "exact-page"
+                : "weak-signals",
         fetch: {
           final_url: fetchResult.finalUrl,
           status: fetchResult.status,
