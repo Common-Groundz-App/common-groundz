@@ -7,8 +7,82 @@
 // Co-located with index.ts so tests can exercise the helper without
 // importing the edge-function entrypoint (which would trigger serve()).
 
+import { createHash } from "node:crypto";
 import type { MergeDiagnostics } from "./merge.ts";
 import type { V2Predictions } from "./schema.ts";
+
+// ─── Phase 1.8c.2: salted token-hash + overlap bucket helpers ──────────
+//
+// Hashes are computed from raw tokens (anchor / model-name) ONLY when a
+// per-deployment salt of at least 16 chars is configured via the
+// ENTITY_DIAG_HASH_SALT env var. Without the salt, hashToken returns null
+// and the caller MUST omit the *_hash_sample fields from emitted logs.
+//
+// Why salt-required: a bare sha256 of a single brand/product token is
+// trivially reversible via a small precomputed vocabulary. A 16+ char
+// per-deployment salt prevents cross-deployment correlation and rainbow
+// attacks while keeping the same-token-equal-hash invariant that lets us
+// compute cross-side overlap inside one request.
+
+function getDiagHashSalt(): string | null {
+  try {
+    const s = Deno.env.get("ENTITY_DIAG_HASH_SALT") ?? "";
+    return s.length >= 16 ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+export function hashToken(t: string): string | null {
+  if (!t) return null;
+  const salt = getDiagHashSalt();
+  if (!salt) return null;
+  return createHash("sha256").update(salt + ":" + t).digest("hex").slice(0, 12);
+}
+
+export type OverlapRatioBucket = "none" | "low" | "medium" | "high";
+
+export function bucketRatio(overlap: number, denom: number): OverlapRatioBucket {
+  if (denom <= 0 || overlap <= 0) return "none";
+  const r = overlap / denom;
+  if (r < 0.34) return "low";
+  if (r <= 0.66) return "medium";
+  return "high";
+}
+
+export type AnchorSource =
+  | "jsonld_product_name"
+  | "og_title"
+  | "twitter_title"
+  | "html_title"
+  | "none";
+
+/**
+ * Phase 1.8c.2 — Amazon-only diagnostic snapshot of the guard's internal
+ * comparison. Populated by runDualPathVerification, attached to the
+ * GuardTracker by index.ts, then mirrored into Finalization.amazon_guard.
+ * Hash arrays are present iff a salt is configured.
+ */
+export interface AmazonGuardExtendedDiagnostics {
+  anchor_present: boolean;
+  anchor_source: AnchorSource;
+  anchor_token_count: number;
+  model_name_token_count: number;
+  token_overlap_count: number;
+  overlap_ratio_bucket: OverlapRatioBucket;
+  page_title_anchor_reject_reason: string | null;
+  grounding_contains_canonical_dp_url: boolean;
+  grounding_chunk_count: number;
+  grounding_amazon_chunk_count: number;
+  jsonld_brand_present: boolean;
+  jsonld_product_name_present: boolean;
+  anchor_has_og_title: boolean;
+  anchor_has_html_title: boolean;
+  anchor_has_jsonld_product_name: boolean;
+  anchor_token_hash_sample?: string[];
+  model_name_token_hash_sample?: string[];
+  overlap_hash_sample?: string[];
+}
 
 export type AmazonGuardRejectionReasonEnum =
   | "asin_mismatch"
