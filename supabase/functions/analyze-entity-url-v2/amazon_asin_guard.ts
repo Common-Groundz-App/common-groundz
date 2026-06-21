@@ -21,6 +21,14 @@
 // JSON-LD Product.name — and a distinctive-token overlap check against the
 // model's returned `name`. Stop-list is guard-internal; never mutates name.
 
+import { isStrictAmazonHost } from "./host_hints.ts";
+import {
+  hashToken,
+  bucketRatio,
+  type AnchorSource,
+  type AmazonGuardExtendedDiagnostics,
+} from "./finalization_telemetry.ts";
+
 export interface AmazonGroundingEvidence {
   /** groundingChunks[*].web.uri */
   chunkUris: string[];
