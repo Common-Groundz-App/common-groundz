@@ -1239,6 +1239,7 @@ serve(async (req) => {
             mainGuardTracker.passed = guard.ok;
             mainGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
             mainGuardTracker.input_source = "gemini_only";
+            mainGuardTracker.diagnostics = guard.diagnostics.extended ?? null;
             if (!guard.ok) {
               mainGeminiPred = null;
               (warnings as string[]).push(guard.reason as GeminiWarningCode);
