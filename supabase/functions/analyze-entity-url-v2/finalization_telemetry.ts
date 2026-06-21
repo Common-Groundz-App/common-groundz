@@ -270,6 +270,11 @@ export function buildFinalization(args: BuildFinalizationArgs): Finalization {
     ? simplifyGuardReason(guard.raw_reason_code)
     : (guard.evaluated ? "n/a" : "guard_not_run");
   f.amazon_guard.input_source = guard.input_source;
+  // Phase 1.8c.2 — attach Amazon-only diagnostics snapshot when present.
+  // Hash arrays already gated inside the guard (omitted iff no salt set).
+  if (guard.diagnostics) {
+    f.amazon_guard.diagnostics = guard.diagnostics;
+  }
 
   f.response_builder.predictions_var_truthy = mergedPredictions !== null;
   f.response_builder.predictions_value_source = mergedPredictions !== null
