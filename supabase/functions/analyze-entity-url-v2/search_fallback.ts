@@ -99,6 +99,13 @@ export interface SearchFallbackArgs {
   mergeFlags: MergeFlags;
   /** Extractor/Firecrawl predictions used for the re-merge after fallback. */
   extractPredictions: V2Predictions | null;
+  /**
+   * Phase 1.8c.3b — error code from the primary Gemini call, when one was
+   * made and failed. Drives `triggerReason` telemetry. Null when no primary
+   * call was made (e.g. fetch-failed recovery branch) or the call
+   * succeeded. NEVER influences eligibility — only labels the reason.
+   */
+  primaryGeminiErrorCode?: string | null;
 }
 
 export interface SearchFallbackResult {
@@ -107,6 +114,11 @@ export interface SearchFallbackResult {
   /** ok AND the post-fallback re-merge produced a gate-passing prediction. */
   used: boolean;
   skipReason: SearchFallbackSkipReason | null;
+  /**
+   * Phase 1.8c.3b — populated iff `attempted === true`. Distinguishes the
+   * three reasons the fallback fired. Null otherwise (pair with `skipReason`).
+   */
+  triggerReason: SearchFallbackTriggerReason | null;
   /** Set on attempted && !used. Either a Gemini error code or RECOVERY_GATE_FAILED. */
   error?: string;
   durationMs?: number;
@@ -116,6 +128,14 @@ export interface SearchFallbackResult {
   geminiPred?: GeminiRawPrediction;
   /** Raw Gemini result on attempted calls (used for refreshed gemini block). */
   geminiResult?: GeminiResult;
+}
+
+function computeTriggerReason(
+  primaryGeminiErrorCode: string | null | undefined,
+): SearchFallbackTriggerReason {
+  if (primaryGeminiErrorCode === "GEMINI_INVALID_SHAPE") return "invalid_shape";
+  if (primaryGeminiErrorCode && primaryGeminiErrorCode.length > 0) return "transport_error";
+  return "recovery_gate";
 }
 
 export async function maybeRunGeminiSearchFallback(
@@ -128,18 +148,20 @@ export async function maybeRunGeminiSearchFallback(
 
   // ─── Skip-reason precedence ────────────────────────────────────────────
   if (args.currentMerged !== null) {
-    return { attempted: false, ok: false, used: false, skipReason: "prior_prediction_valid" };
+    return { attempted: false, ok: false, used: false, skipReason: "prior_prediction_valid", triggerReason: null };
   }
   if (args.primaryGeminiPred !== null) {
-    return { attempted: false, ok: false, used: false, skipReason: "primary_gemini_succeeded" };
+    return { attempted: false, ok: false, used: false, skipReason: "primary_gemini_succeeded", triggerReason: null };
   }
   if (!args.geminiConfigured) {
-    return { attempted: false, ok: false, used: false, skipReason: "gemini_not_configured" };
+    return { attempted: false, ok: false, used: false, skipReason: "gemini_not_configured", triggerReason: null };
   }
   const remainingMs = args.totalBudgetMs - args.elapsedMs;
   if (remainingMs < timeoutMs + bufferMs) {
-    return { attempted: false, ok: false, used: false, skipReason: "budget_exhausted" };
+    return { attempted: false, ok: false, used: false, skipReason: "budget_exhausted", triggerReason: null };
   }
+
+  const triggerReason = computeTriggerReason(args.primaryGeminiErrorCode);
 
   // ─── Run the fallback ──────────────────────────────────────────────────
   const start = now();
@@ -163,6 +185,7 @@ export async function maybeRunGeminiSearchFallback(
       ok: false,
       used: false,
       skipReason: null,
+      triggerReason,
       error: code,
       durationMs,
       geminiResult: gem,
@@ -182,6 +205,7 @@ export async function maybeRunGeminiSearchFallback(
       ok: true,
       used: false,
       skipReason: null,
+      triggerReason,
       error: "RECOVERY_GATE_FAILED",
       durationMs,
       geminiResult: gem,
@@ -194,6 +218,7 @@ export async function maybeRunGeminiSearchFallback(
     ok: true,
     used: true,
     skipReason: null,
+    triggerReason,
     durationMs,
     mergedPredictions: reMerge.predictions,
     mergeDiag: reMerge.mergeDiag,
