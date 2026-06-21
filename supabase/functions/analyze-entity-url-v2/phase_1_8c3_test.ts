@@ -139,8 +139,12 @@ Deno.test("3a: non-object/non-string child kinds → 'other', no unwrap", () => 
   }
 });
 
-Deno.test("3a: unknown wrapper key → no unwrap attempt, key_present=false", () => {
-  const text = JSON.stringify({ wrapper: VALID_INNER });
+Deno.test("3a: unknown wrapper key (non-envelope) → no unwrap attempt, key_present=false", () => {
+  // `wrapper` is NOT one of the 5 envelope keys. The inner is non-object
+  // junk so the existing nested-wrapper pass also skips it (its filter
+  // requires inner type+name strings). Therefore: hard INVALID_SHAPE
+  // with no envelope unwrap recorded.
+  const text = JSON.stringify({ wrapper: "junk" });
   const res = tolerantParseGeminiJson(text, validator);
   assertFalse(res.ok);
   if (!res.ok) {
