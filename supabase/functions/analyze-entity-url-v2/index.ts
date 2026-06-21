@@ -1046,6 +1046,7 @@ serve(async (req) => {
           attempted: recFallbackAttempted,
           ok: recFallbackOk,
           skip_reason: recFallbackSkipReason,
+          trigger_reason: recFallbackTriggerReason,
           duration_ms: recFallbackDurationMs,
           final_prediction_source: finalSource,
         });
