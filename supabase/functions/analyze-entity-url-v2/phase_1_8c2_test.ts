@@ -242,6 +242,7 @@ Deno.test("Phase 1.8c.2: buildFinalization — diagnostics pass through when pre
     grounding_amazon_chunk_count: 1,
     jsonld_brand_present: true,
     jsonld_product_name_present: false,
+    jsonld_brand_matches_model_name: null,
     anchor_has_og_title: true,
     anchor_has_html_title: true,
     anchor_has_jsonld_product_name: false,
