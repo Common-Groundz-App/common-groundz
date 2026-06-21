@@ -1215,6 +1215,8 @@ serve(async (req) => {
       extract.predictions === null || wsFinal.weak || usedFirecrawl;
     let geminiBlock: GeminiMetadataBlock | undefined;
     let mainGeminiPred: GeminiRawPrediction | null = null;
+    // Phase 1.8c.3b — primary error code feeds search-fallback trigger_reason.
+    let mainPrimaryGeminiErrorCode: string | null = null;
     const mainAmazonAsin = extractAmazonAsin(safe.url);
     if (geminiEligible) {
       if (geminiConfigured) {
@@ -1256,6 +1258,7 @@ serve(async (req) => {
           }
         } else if (gem.configured) {
           geminiBlock = geminiFailureBlock(gem);
+          mainPrimaryGeminiErrorCode = gem.code;
           (warnings as string[]).push(gem.code satisfies GeminiWarningCode);
         }
       } else {
