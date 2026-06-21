@@ -1,112 +1,141 @@
-## Verdict on reviewer feedback
+## Phase 1.8c.5 — Firecrawl request/response shape diagnostic (final)
 
-Both ChatGPT and Codex independently approve **shipping 1.8c.3a + 1.8c.3b together**, and both push back on one thing: the original plan's envelope-unwrap was too loose. I agree with every refinement. Folding them in below, plus one tiny additive I'd add on top.
+**Scope:** Diagnostic-only logging. No behavior changes (no timeout/budget/parser/Gemini/Zod/merge/guard/V1/frontend/DB/non-Amazon/Phase 2 changes, no new wire-response field).
 
-## Phase 1.8c.3 — final scope (ship as one unit)
+This revision folds in **all** ChatGPT + Codex refinements from both rounds:
 
-### 1.8c.3a — Strict envelope unwrap in the Gemini JSON parser
-
-**Trigger conditions (all must hold):**
-- Top-level parsed JSON is an object.
-- It is missing one or more of the required schema fields (`type`, `name`, `confidence`).
-- It has exactly one of these wrapper keys present: `content`, `data`, `result`, `output`, `response`.
-
-**Unwrap rules (intentionally narrow):**
-- Single level only. No recursion.
-- If the child value is an **object** → validate it with the same existing Zod schema.
-- If the child value is a **string** → only `JSON.parse` it when, after `trim()`, it starts with `{` or `[`, OR it is a fenced ```` ```json ... ``` ```` block (reuse the existing code-fence stripper already in the parser). Then validate via Zod.
-- Any other shape (number, boolean, null, prose string not starting with `{`/`[`) → do **not** attempt unwrap; fall through to the existing `GEMINI_INVALID_SHAPE` path.
-- No change to the Zod schema itself.
-- No raw `content` / child string ever written to logs.
-
-**Telemetry (additive only, on the existing `gemini` log line):**
-- `envelope_unwrap_attempted: boolean`
-- `envelope_unwrap_succeeded: boolean`
-- `envelope_unwrap_key: "content" | "data" | "result" | "output" | "response" | null`
-- `envelope_child_kind: "object" | "json_string" | "fenced_json" | "non_json_string" | "other" | null` (purely for diagnosis; no raw values)
-
-### 1.8c.3b — Trigger search-only fallback on `GEMINI_INVALID_SHAPE`
-
-**Scope:** Keep this phase **Amazon-only** (matches Codex's "minimum blast radius" — the fallback's minimal-packet logic and ASIN handling are Amazon-aware today; don't generalize without separate evidence).
-
-**Rule:** When the primary URL-context Gemini call returns `GEMINI_INVALID_SHAPE` AND no valid prediction exists yet AND budget allows AND the request is Amazon → run the existing search-only fallback. All other skip-reason precedence in `search_fallback.ts` stays as-is.
-
-**Telemetry:** Replace today's effective boolean with an explicit `trigger_reason` enum on the `gemini_search_fallback` log line:
-- `transport_error` — primary call failed before producing parseable JSON
-- `invalid_shape` — primary parsed but failed Zod (new branch)
-- `recovery_gate` — merge produced nothing usable (existing branch)
-- `none` — fallback did not run; pair with existing `skip_reason`
-
-### Tiny additive I want on top: retroactive envelope frequency
-
-Even when unwrap is **not** attempted (e.g., on a future success), emit one extra boolean inside the existing `gemini_failure_diagnostics` (and a parallel field on success traces):
-
-- `envelope_wrapper_key_present: boolean` — true if any of the 5 known wrapper keys appears at the top level of the parsed JSON
-
-Why: lets us measure on every Amazon trace how often Gemini is wrapping responses, even on calls that didn't fail. ~3 lines of code, zero behavior impact, no raw values.
-
-### Explicitly **not** changing this phase
-
-Guard rules (Path A / Path B / anchor selection / brand overlap), recovery-gate semantics, merge, Zod schema, model name, tool list, `responseMimeType`, `thinkingBudget`, `maxOutputTokens`, Firecrawl behavior, V1, frontend, DB, non-Amazon paths, Phase 2, readable-token debug flag.
-
-### Tests (new `phase_1_8c3_test.ts`)
-
-Parser unwrap:
-1. Object child unwraps + passes Zod.
-2. JSON-string child starting with `{` unwraps + passes Zod.
-3. Fenced ```` ```json ... ``` ```` child unwraps + passes Zod.
-4. Prose string child (no `{`/`[` prefix) → no unwrap, `GEMINI_INVALID_SHAPE` preserved.
-5. Number/boolean/null child → no unwrap.
-6. Unknown wrapper key (e.g., `wrapper`) → no unwrap.
-7. Two wrapper keys present → no unwrap (avoids ambiguous parse).
-8. Unwrap is single-level (nested envelope does **not** recurse).
-9. Unwrapped child still failing Zod → `GEMINI_INVALID_SHAPE` preserved.
-10. Leak guard: serialized log line never contains the raw child string.
-
-Fallback trigger:
-11. Primary `GEMINI_INVALID_SHAPE` on Amazon → fallback runs with `trigger_reason: "invalid_shape"`.
-12. Primary transport error on Amazon → fallback runs with `trigger_reason: "transport_error"`.
-13. Primary success on Amazon → fallback does **not** run.
-14. Primary `GEMINI_INVALID_SHAPE` on **non-Amazon** → fallback does **not** run (scope guard).
-15. Budget exhausted on Amazon `invalid_shape` → fallback skipped with existing `budget_exhausted` reason.
-
-### Files touched
-
-- `supabase/functions/analyze-entity-url-v2/gemini.ts` (parser unwrap + new diagnostic fields)
-- `supabase/functions/analyze-entity-url-v2/search_fallback.ts` (add `invalid_shape` trigger reason in the type; new precedence branch lives in caller — see next)
-- `supabase/functions/analyze-entity-url-v2/index.ts` (call fallback on Amazon `GEMINI_INVALID_SHAPE`; thread `trigger_reason` into the log line)
-- `supabase/functions/analyze-entity-url-v2/phase_1_8c3_test.ts` (new file, 15 tests)
-- `.lovable/plan.md` (record 1.8c.3 outcome + close 1.8c.2a)
-
-### Acceptance
-
-Retest both Amazon URLs (especially `B0B2WX5QPB`). Expected outcomes:
-
-- If `{ url, content, title }` envelope contains schema-shaped JSON → unwrap succeeds, request proceeds, guard evaluates.
-- If envelope contains prose / no valid JSON → parser still fails `GEMINI_INVALID_SHAPE`, but search-only fallback **runs** (because Amazon + invalid_shape).
-- If fallback returns a prediction → guard evaluates; final outcome is either `OK` or a guard-attributed `NO_PREDICTIONS`.
-- No request should die with `NO_PREDICTIONS` + `guard_not_run` due to primary invalid shape alone.
-
-### Sequencing answer for the previous open question
-
-Ship **3a + 3b together** (matches both reviewers). Splitting them would re-create the exact inconsistency we just observed — 3a alone helps when the envelope contains JSON, but Trace B's envelope might not, and without 3b that request still dies before the guard.
-
-## Ready to implement?
-
-Approve and I'll proceed.
+- `request_id` correlation, `call_site: "main" | "recovery"`
+- UTF-8 byte sizes via `TextEncoder`
+- Safe error-shape fields (`error_kind`, `aborted`, `parse_ok`, `body_parse_failed`)
+- Capped metadata key list (50 keys × 40 chars, names only)
+- Exported pure helper so tests can call it without runtime coupling
+- **New (Codex round 2):** `data_unwrap_path` enum so logs are unambiguous about which object was treated as the Firecrawl data payload
+- **New (Codex round 2):** explicit metadata presence booleans
+- **New (ChatGPT round 2):** `url_host` derived from the already-validated/normalized URL the code uses for the actual Firecrawl request (not from a raw user string)
+- Designed for easy removal: single helper + single `console.log` call site per Firecrawl invocation, gated behind a `FIRECRAWL_SHAPE_DIAG_ENABLED` module constant (default `true`) so the whole feature flips off via one boolean when the investigation is done
 
 ---
 
-## Phase 1.8c.3 — Shipped
+### 1. New exported pure helper
 
-Implemented `1.8c.3a` (strict envelope unwrap) and `1.8c.3b` (search-fallback `trigger_reason` telemetry) together. All 18 new tests in `phase_1_8c3_test.ts` pass; full V2 suite green (no regressions).
+In `supabase/functions/analyze-entity-url-v2/firecrawl.ts`:
 
-**Final behavior:**
-- Parser now attempts a single-level unwrap of `{content|data|result|output|response}` envelopes when the top-level is missing required fields AND exactly one wrapper key is present. Object, JSON-string (`{`/`[` prefix), and ```json``` fenced children all flow through the existing Zod schema. Prose / numbers / multiple wrapper keys → no unwrap; `GEMINI_INVALID_SHAPE` preserved.
-- Search-only fallback now reports `triggerReason` (`invalid_shape` | `transport_error` | `recovery_gate` | null). No change to fallback **eligibility** — only labeling.
-- New diagnostic fields on every Gemini log line (success and failure): `envelope_wrapper_key_present`, `envelope_unwrap_attempted`, `envelope_unwrap_succeeded`, `envelope_unwrap_key`, `envelope_child_kind`.
-- `search_fallback_trigger_reason` added to the `gemini` metadata block on responses and to both `gemini_search_fallback` console.info lines.
+```ts
+export function buildFirecrawlShapeDiagnostic(input: {
+  requestArgs: {
+    urlHost: string;              // host of already-normalized URL, never raw
+    urlHasQueryString: boolean;
+    isAmazon: boolean;
+    formats: string[];
+    onlyMainContent: boolean;
+    waitForMs: number;
+    apiTimeoutMs: number;
+    localTimeoutMs: number;
+    maxHtmlBytes: number;
+    payloadKeys: string[];        // Object.keys(body).sort()
+  };
+  response?: {
+    httpStatus: number;
+    contentType: string | null;
+    body: unknown;                // parsed; helper inspects shape only
+    parseOk: boolean;
+    bodyParseFailed: boolean;
+  };
+  failure?: {
+    errorKind: "http_error" | "timeout" | "parse_error" | "network_error" | "unknown";
+    aborted: boolean;
+  };
+  htmlOversizeDropped: boolean;
+  durationMs: number;
+  context: { requestId: string; callSite: "main" | "recovery" };
+}): Record<string, unknown>
+```
 
-**Notes vs the original plan:**
-- Test 1 had to be reframed: when the envelope child is an object with valid type+name, the **existing** nested-wrapper pass (candidate 3) catches it before the new envelope pass (candidate 4) runs. Added a separate test that exercises the new path explicitly with a child that the nested-wrapper filter skips.
-- Schema typing (`schema.ts`) updated to declare `search_fallback_trigger_reason?: string | null`.
+Pure: no I/O, no `console.log` inside. `runFirecrawlScrape` calls it once per invocation (success + failure + timeout paths) and logs exactly one line with the stable prefix:
+
+```
+[analyze-entity-url-v2] firecrawl.shape_diag { ... }
+```
+
+Gated by a single module-level `FIRECRAWL_SHAPE_DIAG_ENABLED = true` constant for easy disable later.
+
+### 2. Minimal signature addition to `runFirecrawlScrape`
+
+Add optional `diagContext?: { requestId: string; callSite: "main" | "recovery" }` to `FirecrawlOpts`. Defaults to `{ requestId: "unknown", callSite: "main" }` when omitted, so the 20+ existing tests in `firecrawl_test.ts` keep working unchanged. Wire it from the two `runFirecrawlScrape` call sites in `index.ts` (main path → `"main"`, fetch-recovery path → `"recovery"`), passing the existing per-invocation `request_id`.
+
+`url_host` is computed inside `runFirecrawlScrape` from the **already-validated** URL the function is about to send to Firecrawl (the same value used for `fetch`), via `new URL(targetUrl).host`. Never from a raw caller string.
+
+### 3. Final field list
+
+**Correlation / context**
+- `request_id`, `call_site`, `is_amazon`, `url_host`, `url_has_query_string`
+
+**Request shape**
+- `endpoint: "v2/scrape"` (literal, no host string), `method_used: "scrape"`
+- `formats_requested`, `only_main_content`, `wait_for_ms`
+- `api_timeout_ms`, `local_timeout_ms`, `max_html_bytes`
+- `proxy_setting_present`, `location_setting_present`, `cache_setting_present`
+- `request_payload_keys` (keys only, sorted)
+
+**Response shape**
+- `http_status`, `content_type`
+- `firecrawl_success` (`body.success ?? null`)
+- `firecrawl_error_present` (boolean)
+- `firecrawl_error_code` — `body.error.code` / `body.code` only if a short stable string (≤40 chars, matches `/^[A-Za-z0-9_\-.]+$/`), else `null`. **Never** raw error message text.
+- `proxy_used` (`metadata.proxyUsed ?? null`)
+- `cache_state` (`metadata.cacheState ?? null`)
+- `credits_used` (`body.creditsUsed ?? null`)
+- `response_keys` (sorted), `data_keys` (sorted, only when data object found)
+- **`data_unwrap_path`** — `"body.data" | "body.result" | "body" | "none"` — records which object the diagnostic treated as the Firecrawl data payload (so we can tell shape-mismatch bugs apart from genuinely empty responses)
+- `has_metadata`, `has_markdown`, `has_html`, `has_raw_html`, `has_content`, `has_json`, `has_links`, `has_screenshot`, `has_summary`
+- `metadata_key_count` (full count)
+- `metadata_keys` — first **50** sorted keys, each truncated to **40 chars** (names only)
+- **Explicit metadata presence booleans** (key existence only, no values):
+  - `metadata_title_present`
+  - `metadata_description_present`
+  - `metadata_og_title_present` (matches both `ogTitle` and `og:title`)
+  - `metadata_og_description_present` (matches both `ogDescription` and `og:description`)
+- `markdown_bytes`, `html_bytes`, `raw_html_bytes`, `content_bytes` — measured with `new TextEncoder().encode(value).length` (UTF-8, not `.length`)
+- `json_key_count` (count of keys in `data.json` if object, else 0)
+- `html_oversize_dropped` (boolean)
+- `duration_ms`
+
+**Failure-shape fields** (always populated; null on success)
+- `error_kind`, `aborted`, `parse_ok`, `body_parse_failed`
+
+### 4. Privacy guarantees (enforced in helper + asserted in tests)
+
+NEVER logged: raw `title` / `description` / `ogTitle` / `ogDescription` / `ogImage` values; raw `markdown` / `html` / `rawHtml` / `content` / `summary` / `json` values; raw Firecrawl `error.message` text; full URLs with query strings (host only); API key; `Authorization` header; any nested metadata values.
+
+### 5. Files touched
+
+- `supabase/functions/analyze-entity-url-v2/firecrawl.ts` — add helper, add optional `diagContext` to `FirecrawlOpts`, add `FIRECRAWL_SHAPE_DIAG_ENABLED` constant, emit one `console.log` per invocation across success + failure + timeout paths. No changes to request body, formats, timeouts, return shape, or error codes.
+- `supabase/functions/analyze-entity-url-v2/index.ts` — pass `diagContext: { requestId, callSite: "main" | "recovery" }` at the two existing `runFirecrawlScrape` call sites. No other changes.
+- `supabase/functions/analyze-entity-url-v2/firecrawl_test.ts` — add these tests:
+  1. Success path: helper output contains expected booleans/key counts; raw `title`/`description`/`markdown`/`html` values absent from JSON-stringified output
+  2. Non-2xx failure: request shape + `http_status` + `error_kind: "http_error"`
+  3. Timeout: request shape + `aborted: true` + `error_kind: "timeout"`
+  4. Body parse failure: `body_parse_failed: true` + `parse_ok: false` + `error_kind: "parse_error"`
+  5. `metadata_keys` capped to 50 entries, each ≤40 chars, values absent
+  6. `firecrawl_error_code` accepts `"INSUFFICIENT_CREDITS"` but rejects long/raw error message → `null`
+  7. UTF-8 byte sizes correct for multi-byte chars (`"日本語"` → 9 bytes, not 3)
+  8. `call_site` and `request_id` propagated from `diagContext`
+  9. `data_unwrap_path` returns `"body.data"` for `{ data: {...} }`, `"body.result"` for `{ result: {...} }`, `"body"` for flat shape, `"none"` for empty
+  10. Metadata presence booleans correctly detect both `ogTitle` and `og:title` variants; absent when key missing
+  11. `url_host` is derived from a normalized URL (test passes a URL with query string and asserts `url_has_query_string: true` and host-only output)
+- `.lovable/plan.md` — append the Phase 1.8c.5 entry.
+
+### 6. Explicitly NOT changing
+
+- Firecrawl request body, `formats`, `waitFor`, `timeout`, `onlyMainContent`
+- `NORMAL_FIRECRAWL_*` / `HIGH_PRIORITY_FIRECRAWL_*` constants, `DEFAULT_MAX_HTML_BYTES`, Amazon 4 MiB bump
+- `firecrawl_recovery.ts` logic, `index.ts` orchestration / budget / eligibility
+- `schema.ts` (no new wire field)
+- Gemini, parser, Zod, merge, guard, recovery gate
+- V1, frontend, DB, Phase 2
+
+### 7. After it ships
+
+You retest 2–3 Amazon URLs, grep `firecrawl.shape_diag` in edge-function logs, and we use them to decide between (a) proceeding straight to Phase 2, (b) fixing how we consume Firecrawl metadata in our pipeline, (c) adjusting Firecrawl request settings, or (d) emailing Firecrawl with concrete request/response evidence (formats sent, `data_unwrap_path`, metadata presence booleans, bytes, proxy/cache state).
+
+When the investigation is done, flip `FIRECRAWL_SHAPE_DIAG_ENABLED` to `false` (one-line change) to silence the logs without removing the helper.
