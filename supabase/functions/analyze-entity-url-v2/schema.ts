@@ -172,6 +172,12 @@ export interface V2SuccessResponse {
       search_fallback_attempted?: boolean;
       search_fallback_ok?: boolean;
       search_fallback_skip_reason?: string | null;
+      /**
+       * Phase 1.8c.3b — populated iff `search_fallback_attempted === true`.
+       * One of: "invalid_shape" | "transport_error" | "recovery_gate" | null.
+       * Never branch on this field; diagnostic only.
+       */
+      search_fallback_trigger_reason?: string | null;
       search_fallback_error?: GeminiErrorCode;
       search_fallback_duration_ms?: number;
       /**
