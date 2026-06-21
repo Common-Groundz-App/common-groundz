@@ -791,6 +791,8 @@ serve(async (req) => {
       // Phase 8: invoke Gemini on the recovery path (not just diagnostics).
       let recGeminiBlock: GeminiMetadataBlock | undefined;
       let recGeminiPred: GeminiRawPrediction | null = null;
+      // Phase 1.8c.3b — primary error code feeds search-fallback trigger_reason.
+      let recPrimaryGeminiErrorCode: string | null = null;
       // (recPrimaryGrounding intentionally not retained — guard runs inline below.)
       const recAmazonAsin = extractAmazonAsin(safe.url);
       if (geminiConfigured) {
@@ -833,6 +835,7 @@ serve(async (req) => {
           }
         } else if (gem.configured) {
           recGeminiBlock = geminiFailureBlock(gem);
+          recPrimaryGeminiErrorCode = gem.code;
           recWarnings.push(gem.code satisfies GeminiWarningCode);
         }
       } else {
@@ -882,12 +885,14 @@ serve(async (req) => {
           usedFirecrawl: recFirecrawlOk,
           mergeFlags: recFlags,
           extractPredictions: recExtract?.predictions ?? null,
+          primaryGeminiErrorCode: recPrimaryGeminiErrorCode,
         },
         { geminiInvoker: searchOnlyGeminiInvoker, applyMerge },
       );
       const recFallbackAttempted = recFb.attempted;
       const recFallbackOk = recFb.ok;
       const recFallbackSkipReason = recFb.skipReason;
+      const recFallbackTriggerReason = recFb.triggerReason;
       let recFallbackError = recFb.error;
       const recFallbackDurationMs = recFb.durationMs;
       let recFallbackUsed = recFb.used;
@@ -945,6 +950,7 @@ serve(async (req) => {
           search_fallback_attempted: recFallbackAttempted,
           search_fallback_ok: recFallbackOk,
           search_fallback_skip_reason: recFallbackSkipReason,
+          search_fallback_trigger_reason: recFallbackTriggerReason,
           ...(recFallbackError !== undefined
             ? { search_fallback_error: recFallbackError as never }
             : {}),
@@ -961,6 +967,7 @@ serve(async (req) => {
           search_fallback_attempted: recFallbackAttempted,
           search_fallback_ok: recFallbackOk,
           search_fallback_skip_reason: recFallbackSkipReason,
+          search_fallback_trigger_reason: recFallbackTriggerReason,
           ...(recFallbackError !== undefined
             ? { search_fallback_error: recFallbackError as never }
             : {}),
@@ -1039,6 +1046,7 @@ serve(async (req) => {
           attempted: recFallbackAttempted,
           ok: recFallbackOk,
           skip_reason: recFallbackSkipReason,
+          trigger_reason: recFallbackTriggerReason,
           duration_ms: recFallbackDurationMs,
           final_prediction_source: finalSource,
         });
@@ -1061,6 +1069,7 @@ serve(async (req) => {
         attempted: recFallbackAttempted,
         ok: recFallbackOk,
         skip_reason: recFallbackSkipReason,
+        trigger_reason: recFallbackTriggerReason,
         duration_ms: recFallbackDurationMs,
         final_prediction_source: "none",
         original_error_code: e.code,
@@ -1206,6 +1215,8 @@ serve(async (req) => {
       extract.predictions === null || wsFinal.weak || usedFirecrawl;
     let geminiBlock: GeminiMetadataBlock | undefined;
     let mainGeminiPred: GeminiRawPrediction | null = null;
+    // Phase 1.8c.3b — primary error code feeds search-fallback trigger_reason.
+    let mainPrimaryGeminiErrorCode: string | null = null;
     const mainAmazonAsin = extractAmazonAsin(safe.url);
     if (geminiEligible) {
       if (geminiConfigured) {
@@ -1247,6 +1258,7 @@ serve(async (req) => {
           }
         } else if (gem.configured) {
           geminiBlock = geminiFailureBlock(gem);
+          mainPrimaryGeminiErrorCode = gem.code;
           (warnings as string[]).push(gem.code satisfies GeminiWarningCode);
         }
       } else {
@@ -1287,6 +1299,7 @@ serve(async (req) => {
     let mainFallbackAttempted = false;
     let mainFallbackOk = false;
     let mainFallbackSkipReason: string | null = null;
+    let mainFallbackTriggerReason: string | null = null;
     let mainFallbackError: string | undefined;
     let mainFallbackDurationMs: number | undefined;
     if (!mainMerged) {
@@ -1308,12 +1321,14 @@ serve(async (req) => {
           usedFirecrawl,
           mergeFlags: mainFlags,
           extractPredictions: extract.predictions,
+          primaryGeminiErrorCode: mainPrimaryGeminiErrorCode,
         },
         { geminiInvoker: searchOnlyGeminiInvoker, applyMerge },
       );
       mainFallbackAttempted = mainFb.attempted;
       mainFallbackOk = mainFb.ok;
       mainFallbackSkipReason = mainFb.skipReason;
+      mainFallbackTriggerReason = mainFb.triggerReason;
       mainFallbackError = mainFb.error;
       mainFallbackDurationMs = mainFb.durationMs;
       // (mainMergeReturnedPredictionsBeforeGuard is hoisted above; only the
@@ -1366,6 +1381,7 @@ serve(async (req) => {
           search_fallback_attempted: mainFallbackAttempted,
           search_fallback_ok: mainFallbackOk,
           search_fallback_skip_reason: mainFallbackSkipReason,
+          search_fallback_trigger_reason: mainFallbackTriggerReason,
           ...(mainFallbackError !== undefined
             ? { search_fallback_error: mainFallbackError as never }
             : {}),
@@ -1379,6 +1395,7 @@ serve(async (req) => {
           search_fallback_attempted: mainFallbackAttempted,
           search_fallback_ok: mainFallbackOk,
           search_fallback_skip_reason: mainFallbackSkipReason,
+          search_fallback_trigger_reason: mainFallbackTriggerReason,
           ...(mainFallbackError !== undefined
             ? { search_fallback_error: mainFallbackError as never }
             : {}),
@@ -1476,6 +1493,7 @@ serve(async (req) => {
         ok: mainFallbackOk,
         used: mainFallbackUsed,
         skip_reason: mainFallbackSkipReason,
+        trigger_reason: mainFallbackTriggerReason,
         duration_ms: mainFallbackDurationMs,
         final_prediction_source: trace.final.prediction_source,
       });

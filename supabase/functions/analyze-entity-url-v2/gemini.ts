@@ -226,6 +226,29 @@ export type ZodIssueLite = {
   received?: unknown;
 };
 
+/**
+ * Phase 1.8c.3a — envelope wrapper keys recognized by the strict
+ * single-level unwrap pass. Actual unwrap requires that EXACTLY ONE of
+ * these keys be present at the top level (and the top-level object is
+ * missing one or more required schema fields).
+ */
+export const ENVELOPE_WRAPPER_KEYS = [
+  "content",
+  "data",
+  "result",
+  "output",
+  "response",
+] as const;
+export type EnvelopeWrapperKey = (typeof ENVELOPE_WRAPPER_KEYS)[number];
+export type EnvelopeChildKind =
+  | "object"
+  | "json_string"
+  | "fenced_json"
+  | "non_json_string"
+  | "other";
+
+const ENVELOPE_REQUIRED_FIELDS = ["type", "name", "confidence"] as const;
+
 export type TolerantParseAttempts = {
   parse_candidate_count: number;
   parsed_json: boolean;
@@ -233,10 +256,18 @@ export type TolerantParseAttempts = {
   top_level_keys: string[];
   nested_wrapper_keys: string[];
   best_candidate_keys: string[];
+  // Phase 1.8c.3a — strict envelope unwrap telemetry (optional for
+  // backwards compat with tests that construct TolerantParseAttempts
+  // directly).
+  envelope_wrapper_key_present?: boolean;
+  envelope_unwrap_attempted?: boolean;
+  envelope_unwrap_succeeded?: boolean;
+  envelope_unwrap_key?: EnvelopeWrapperKey | null;
+  envelope_child_kind?: EnvelopeChildKind | null;
 };
 
 export type TolerantParseOutcome =
-  | { ok: true; value: unknown }
+  | { ok: true; value: unknown; attempts: TolerantParseAttempts }
   | {
       ok: false;
       code: "GEMINI_INVALID_JSON" | "GEMINI_INVALID_SHAPE";
@@ -244,12 +275,62 @@ export type TolerantParseOutcome =
       zodIssues?: ZodIssueLite[];
     };
 
+function detectEnvelopeKey(
+  obj: Record<string, unknown>,
+): EnvelopeWrapperKey | null {
+  // Trigger envelope unwrap only when the top-level object is missing one
+  // or more required schema fields AND has EXACTLY ONE wrapper key
+  // present. Multiple wrapper keys => ambiguous, do not unwrap.
+  let missing = false;
+  for (const req of ENVELOPE_REQUIRED_FIELDS) {
+    if (!(req in obj)) { missing = true; break; }
+  }
+  if (!missing) return null;
+  let found: EnvelopeWrapperKey | null = null;
+  for (const k of ENVELOPE_WRAPPER_KEYS) {
+    if (k in obj) {
+      if (found !== null) return null; // ambiguous
+      found = k;
+    }
+  }
+  return found;
+}
+
+function classifyEnvelopeChild(value: unknown): {
+  kind: EnvelopeChildKind;
+  parsed?: unknown;
+} {
+  if (isPlainObject(value)) return { kind: "object", parsed: value };
+  if (typeof value !== "string") return { kind: "other" };
+  const trimmed = value.trim();
+  // Fenced ```json ... ``` block.
+  if (trimmed.startsWith("```")) {
+    try {
+      const stripped = stripCodeFences(trimmed);
+      if (stripped.startsWith("{") || stripped.startsWith("[")) {
+        return { kind: "fenced_json", parsed: JSON.parse(stripped) };
+      }
+    } catch { /* fall through */ }
+    return { kind: "fenced_json" };
+  }
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try { return { kind: "json_string", parsed: JSON.parse(trimmed) }; }
+    catch { return { kind: "json_string" }; }
+  }
+  return { kind: "non_json_string" };
+}
+
 /**
  * Tolerant Gemini JSON parser. Tries candidates in order and returns the
  * first that satisfies `validate(candidate).success === true`:
  *   1. JSON.parse(stripCodeFences(text))
  *   2. JSON.parse(firstBalancedObject(text))
  *   3. For each parsed object from (1)/(2): conservative nested wrappers.
+ *   4. Phase 1.8c.3a: strict single-level envelope unwrap on a parsed
+ *      root that has EXACTLY ONE of ENVELOPE_WRAPPER_KEYS and is missing
+ *      a required schema field. Child may be object, JSON-like string
+ *      ({/[ prefix after trim), or ```json fenced block. Single level
+ *      only; no recursion; never parses arbitrary prose.
  *
  * On failure, threads attempts metadata + Zod issues from the best failed
  * candidate (fewest issues) so diagnostics reflect real parser behavior.
@@ -266,6 +347,11 @@ export function tolerantParseGeminiJson(
   let parseCandidateCount = 0;
   let topLevelKeys: string[] = [];
   const nestedWrapperKeys: string[] = [];
+  let envelopeWrapperKeyPresent = false;
+  let envelopeUnwrapAttempted = false;
+  let envelopeUnwrapSucceeded = false;
+  let envelopeUnwrapKey: EnvelopeWrapperKey | null = null;
+  let envelopeChildKind: EnvelopeChildKind | null = null;
 
   const keysOf = (v: unknown): string[] => (isPlainObject(v) ? Object.keys(v) : []);
   const tryValidate = (cand: unknown): boolean => {
@@ -277,12 +363,40 @@ export function tolerantParseGeminiJson(
     return false;
   };
 
+  const buildAttempts = (): TolerantParseAttempts => {
+    let best: { keys: string[]; issues: ZodIssueLite[] } | undefined;
+    for (const c of failedCandidates) {
+      if (!best || c.issues.length < best.issues.length) best = c;
+    }
+    return {
+      parse_candidate_count: parseCandidateCount,
+      parsed_json: parsedRoots.length > 0,
+      contains_code_fence: containsCodeFence,
+      top_level_keys: topLevelKeys,
+      nested_wrapper_keys: Array.from(new Set(nestedWrapperKeys)),
+      best_candidate_keys: best?.keys ?? [],
+      envelope_wrapper_key_present: envelopeWrapperKeyPresent,
+      envelope_unwrap_attempted: envelopeUnwrapAttempted,
+      envelope_unwrap_succeeded: envelopeUnwrapSucceeded,
+      envelope_unwrap_key: envelopeUnwrapKey,
+      envelope_child_kind: envelopeChildKind,
+    };
+  };
+
+  const noteEnvelopePresence = (root: unknown) => {
+    if (envelopeWrapperKeyPresent || !isPlainObject(root)) return;
+    for (const k of ENVELOPE_WRAPPER_KEYS) {
+      if (k in root) { envelopeWrapperKeyPresent = true; return; }
+    }
+  };
+
   // Candidate 1: stripped fences.
   try {
     const v = JSON.parse(stripCodeFences(text));
     parsedRoots.push(v);
     if (topLevelKeys.length === 0) topLevelKeys = keysOf(v);
-    if (tryValidate(v)) return { ok: true, value: v };
+    noteEnvelopePresence(v);
+    if (tryValidate(v)) return { ok: true, value: v, attempts: buildAttempts() };
   } catch { /* fallthrough */ }
 
   // Candidate 2: first balanced top-level {...} block from raw text.
@@ -292,7 +406,8 @@ export function tolerantParseGeminiJson(
       const v = JSON.parse(block);
       parsedRoots.push(v);
       if (topLevelKeys.length === 0) topLevelKeys = keysOf(v);
-      if (tryValidate(v)) return { ok: true, value: v };
+      noteEnvelopePresence(v);
+      if (tryValidate(v)) return { ok: true, value: v, attempts: buildAttempts() };
     } catch { /* fallthrough */ }
   }
 
@@ -301,26 +416,39 @@ export function tolerantParseGeminiJson(
     if (!isPlainObject(root)) continue;
     for (const { key, value } of nestedWrapperCandidates(root)) {
       nestedWrapperKeys.push(key);
-      if (tryValidate(value)) return { ok: true, value };
+      if (tryValidate(value)) return { ok: true, value, attempts: buildAttempts() };
     }
   }
 
-  const anyParsed = parsedRoots.length > 0;
+  // Candidate 4 (Phase 1.8c.3a): strict single-level envelope unwrap.
+  // First parsed root only. Requires exactly one wrapper key AND missing
+  // a required schema field. Never recurses. String children must be
+  // JSON-like ({, [, or ```json fenced) — never arbitrary prose.
+  for (const root of parsedRoots) {
+    if (!isPlainObject(root)) continue;
+    const key = detectEnvelopeKey(root);
+    if (key === null) continue;
+    envelopeUnwrapAttempted = true;
+    envelopeUnwrapKey = key;
+    const classified = classifyEnvelopeChild(root[key]);
+    envelopeChildKind = classified.kind;
+    if (classified.parsed !== undefined && isPlainObject(classified.parsed)) {
+      if (tryValidate(classified.parsed)) {
+        envelopeUnwrapSucceeded = true;
+        return { ok: true, value: classified.parsed, attempts: buildAttempts() };
+      }
+    }
+    break; // single-level only
+  }
+
+  const attempts = buildAttempts();
   let best: { keys: string[]; issues: ZodIssueLite[] } | undefined;
   for (const c of failedCandidates) {
     if (!best || c.issues.length < best.issues.length) best = c;
   }
-  const attempts: TolerantParseAttempts = {
-    parse_candidate_count: parseCandidateCount,
-    parsed_json: anyParsed,
-    contains_code_fence: containsCodeFence,
-    top_level_keys: topLevelKeys,
-    nested_wrapper_keys: Array.from(new Set(nestedWrapperKeys)),
-    best_candidate_keys: best?.keys ?? [],
-  };
   return {
     ok: false,
-    code: anyParsed ? "GEMINI_INVALID_SHAPE" : "GEMINI_INVALID_JSON",
+    code: parsedRoots.length > 0 ? "GEMINI_INVALID_SHAPE" : "GEMINI_INVALID_JSON",
     attempts,
     zodIssues: best?.issues,
   };
@@ -412,6 +540,13 @@ export function geminiFailureDiagnostics(
     zod_issue_paths: diagSanitizeKeyList(Array.from(paths)),
     missing_required_fields: diagSanitizeKeyList(Array.from(missing)),
     refusal_like,
+    // Phase 1.8c.3a — strict envelope unwrap diagnostics (booleans + key
+    // name + child kind only). Never includes raw child string / prose.
+    envelope_wrapper_key_present: attempts.envelope_wrapper_key_present ?? false,
+    envelope_unwrap_attempted: attempts.envelope_unwrap_attempted ?? false,
+    envelope_unwrap_succeeded: attempts.envelope_unwrap_succeeded ?? false,
+    envelope_unwrap_key: attempts.envelope_unwrap_key ?? null,
+    envelope_child_kind: attempts.envelope_child_kind ?? null,
   };
 }
 
@@ -815,6 +950,13 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     ...promptBytesDiag,
     json_parse_ok: true,
     has_text_parts: true,
+    // Phase 1.8c.3a — surface envelope frequency + unwrap outcome on
+    // every success so we can measure how often Gemini wraps responses.
+    envelope_wrapper_key_present: outcome.attempts.envelope_wrapper_key_present ?? false,
+    envelope_unwrap_attempted: outcome.attempts.envelope_unwrap_attempted ?? false,
+    envelope_unwrap_succeeded: outcome.attempts.envelope_unwrap_succeeded ?? false,
+    envelope_unwrap_key: outcome.attempts.envelope_unwrap_key ?? null,
+    envelope_child_kind: outcome.attempts.envelope_child_kind ?? null,
   });
 
   return {

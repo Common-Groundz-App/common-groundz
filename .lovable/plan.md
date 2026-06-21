@@ -1,67 +1,112 @@
-## Status of Phase 1.8c.2
+## Verdict on reviewer feedback
 
-The plan as approved was implemented fully and correctly:
+Both ChatGPT and Codex independently approve **shipping 1.8c.3a + 1.8c.3b together**, and both push back on one thing: the original plan's envelope-unwrap was too loose. I agree with every refinement. Folding them in below, plus one tiny additive I'd add on top.
 
-- All 16 approved fields are present on `AmazonGuardExtendedDiagnostics` (anchor metadata, token counts, bucketed overlap, anchor-source enum, JSON-LD presence booleans, grounding counts, canonical-DP flag).
-- Salted hash samples (`anchor_token_hash_sample`, `model_name_token_hash_sample`, `overlap_hash_sample`) are gated on `ENTITY_DIAG_HASH_SALT` ≥ 16 chars; omitted otherwise; capped at 5; sha256(SALT+":"+token).slice(0,12).
-- Amazon-only emission, non-Amazon traces unchanged, no behavior/guard/parser/model/Zod/merge/V1/frontend/DB changes.
-- 12 tests in `phase_1_8c2_test.ts`, full suite (450 tests) green.
+## Phase 1.8c.3 — final scope (ship as one unit)
 
-**Nothing from the approved 1.8c.2 spec is missing or incorrect.**
+### 1.8c.3a — Strict envelope unwrap in the Gemini JSON parser
 
-## One small gap both reviewers flagged
+**Trigger conditions (all must hold):**
+- Top-level parsed JSON is an object.
+- It is missing one or more of the required schema fields (`type`, `name`, `confidence`).
+- It has exactly one of these wrapper keys present: `content`, `data`, `result`, `output`, `response`.
 
-Both ChatGPT and Codex independently asked for one additional safe diagnostic that is **not** in the implementation:
+**Unwrap rules (intentionally narrow):**
+- Single level only. No recursion.
+- If the child value is an **object** → validate it with the same existing Zod schema.
+- If the child value is a **string** → only `JSON.parse` it when, after `trim()`, it starts with `{` or `[`, OR it is a fenced ```` ```json ... ``` ```` block (reuse the existing code-fence stripper already in the parser). Then validate via Zod.
+- Any other shape (number, boolean, null, prose string not starting with `{`/`[`) → do **not** attempt unwrap; fall through to the existing `GEMINI_INVALID_SHAPE` path.
+- No change to the Zod schema itself.
+- No raw `content` / child string ever written to logs.
 
-- `jsonld_brand_matches_model_name: boolean | null`
+**Telemetry (additive only, on the existing `gemini` log line):**
+- `envelope_unwrap_attempted: boolean`
+- `envelope_unwrap_succeeded: boolean`
+- `envelope_unwrap_key: "content" | "data" | "result" | "output" | "response" | null`
+- `envelope_child_kind: "object" | "json_string" | "fenced_json" | "non_json_string" | "other" | null` (purely for diagnosis; no raw values)
 
-The decision table for 1.8c.3 references brand-token-only overlap (to decide whether a narrow Path B relaxation is justified), but the current telemetry only tells us whether JSON-LD brand is *present* — not whether it overlaps the model name. Without this field, the "brand overlap present → consider Path B relaxation" branch can't be evaluated from logs.
+### 1.8c.3b — Trigger search-only fallback on `GEMINI_INVALID_SHAPE`
 
-## Proposed addendum: Phase 1.8c.2a
+**Scope:** Keep this phase **Amazon-only** (matches Codex's "minimum blast radius" — the fallback's minimal-packet logic and ASIN handling are Amazon-aware today; don't generalize without separate evidence).
 
-Strictly additive, still diagnostic-only, still privacy-safe.
+**Rule:** When the primary URL-context Gemini call returns `GEMINI_INVALID_SHAPE` AND no valid prediction exists yet AND budget allows AND the request is Amazon → run the existing search-only fallback. All other skip-reason precedence in `search_fallback.ts` stays as-is.
 
-**Add one field** to `AmazonGuardExtendedDiagnostics` in `finalization_telemetry.ts`:
+**Telemetry:** Replace today's effective boolean with an explicit `trigger_reason` enum on the `gemini_search_fallback` log line:
+- `transport_error` — primary call failed before producing parseable JSON
+- `invalid_shape` — primary parsed but failed Zod (new branch)
+- `recovery_gate` — merge produced nothing usable (existing branch)
+- `none` — fallback did not run; pair with existing `skip_reason`
 
-```
-jsonld_brand_matches_model_name: boolean | null
-```
+### Tiny additive I want on top: retroactive envelope frequency
 
-Semantics:
-- `null` when `jsonld_brand_present === false` (nothing to compare).
-- `true` when at least one distinctive token from `pageSignals.jsonld_brand` (tokenized with the same distinctive-token logic already used for anchor/name in the guard) appears in the model's name tokens.
-- `false` otherwise.
+Even when unwrap is **not** attempted (e.g., on a future success), emit one extra boolean inside the existing `gemini_failure_diagnostics` (and a parallel field on success traces):
 
-**Implementation** in `amazon_asin_guard.ts` `buildExtendedDiagnostics`:
-- Reuse the existing distinctive-token tokenizer already applied to anchor and model name — no new tokenizer, no new normalization rules.
-- Compare token sets in-memory only.
-- Do **NOT** log the raw brand, raw tokens, or hashes for this comparison — only the boolean.
+- `envelope_wrapper_key_present: boolean` — true if any of the 5 known wrapper keys appears at the top level of the parsed JSON
 
-No changes to:
-- guard accept/reject behavior
-- anchor selection
-- Path A / Path B rules
-- token budget, responseMimeType, parser, merge, Zod, model, tools, Firecrawl
-- V1, frontend, DB, non-Amazon paths, Phase 1.7 semantics
+Why: lets us measure on every Amazon trace how often Gemini is wrapping responses, even on calls that didn't fail. ~3 lines of code, zero behavior impact, no raw values.
 
-### Tests (extend `phase_1_8c2_test.ts`)
+### Explicitly **not** changing this phase
 
-1. `jsonld_brand_present=false` → field is `null`.
-2. Brand present, brand token appears in model name → `true`.
-3. Brand present, no brand token in model name → `false`.
-4. Field never leaks raw brand text or raw tokens (assert no brand substring in serialized diagnostics).
-5. Non-Amazon path → entire diagnostics block still omitted (regression check).
+Guard rules (Path A / Path B / anchor selection / brand overlap), recovery-gate semantics, merge, Zod schema, model name, tool list, `responseMimeType`, `thinkingBudget`, `maxOutputTokens`, Firecrawl behavior, V1, frontend, DB, non-Amazon paths, Phase 2, readable-token debug flag.
+
+### Tests (new `phase_1_8c3_test.ts`)
+
+Parser unwrap:
+1. Object child unwraps + passes Zod.
+2. JSON-string child starting with `{` unwraps + passes Zod.
+3. Fenced ```` ```json ... ``` ```` child unwraps + passes Zod.
+4. Prose string child (no `{`/`[` prefix) → no unwrap, `GEMINI_INVALID_SHAPE` preserved.
+5. Number/boolean/null child → no unwrap.
+6. Unknown wrapper key (e.g., `wrapper`) → no unwrap.
+7. Two wrapper keys present → no unwrap (avoids ambiguous parse).
+8. Unwrap is single-level (nested envelope does **not** recurse).
+9. Unwrapped child still failing Zod → `GEMINI_INVALID_SHAPE` preserved.
+10. Leak guard: serialized log line never contains the raw child string.
+
+Fallback trigger:
+11. Primary `GEMINI_INVALID_SHAPE` on Amazon → fallback runs with `trigger_reason: "invalid_shape"`.
+12. Primary transport error on Amazon → fallback runs with `trigger_reason: "transport_error"`.
+13. Primary success on Amazon → fallback does **not** run.
+14. Primary `GEMINI_INVALID_SHAPE` on **non-Amazon** → fallback does **not** run (scope guard).
+15. Budget exhausted on Amazon `invalid_shape` → fallback skipped with existing `budget_exhausted` reason.
 
 ### Files touched
-- `supabase/functions/analyze-entity-url-v2/finalization_telemetry.ts` — add one field to the interface.
-- `supabase/functions/analyze-entity-url-v2/amazon_asin_guard.ts` — populate it in `buildExtendedDiagnostics`.
-- `supabase/functions/analyze-entity-url-v2/phase_1_8c2_test.ts` — 5 new test cases.
-- `.lovable/plan.md` — note 1.8c.2a addendum.
 
-### Out of scope (explicitly deferred, per both reviewers)
-- Guard rule changes, Path A widening, Path B relaxation
-- Parser envelope unwrap, maxOutputTokens bump, responseMimeType change
-- Readable-token debug flag
-- Any V1/frontend/DB/Phase 2 work
+- `supabase/functions/analyze-entity-url-v2/gemini.ts` (parser unwrap + new diagnostic fields)
+- `supabase/functions/analyze-entity-url-v2/search_fallback.ts` (add `invalid_shape` trigger reason in the type; new precedence branch lives in caller — see next)
+- `supabase/functions/analyze-entity-url-v2/index.ts` (call fallback on Amazon `GEMINI_INVALID_SHAPE`; thread `trigger_reason` into the log line)
+- `supabase/functions/analyze-entity-url-v2/phase_1_8c3_test.ts` (new file, 15 tests)
+- `.lovable/plan.md` (record 1.8c.3 outcome + close 1.8c.2a)
 
-After this lands, retest the two Amazon URLs with `ENTITY_DIAG_HASH_SALT` set; the new boolean plus the existing buckets/hashes will be sufficient evidence for the 1.8c.3 decision.
+### Acceptance
+
+Retest both Amazon URLs (especially `B0B2WX5QPB`). Expected outcomes:
+
+- If `{ url, content, title }` envelope contains schema-shaped JSON → unwrap succeeds, request proceeds, guard evaluates.
+- If envelope contains prose / no valid JSON → parser still fails `GEMINI_INVALID_SHAPE`, but search-only fallback **runs** (because Amazon + invalid_shape).
+- If fallback returns a prediction → guard evaluates; final outcome is either `OK` or a guard-attributed `NO_PREDICTIONS`.
+- No request should die with `NO_PREDICTIONS` + `guard_not_run` due to primary invalid shape alone.
+
+### Sequencing answer for the previous open question
+
+Ship **3a + 3b together** (matches both reviewers). Splitting them would re-create the exact inconsistency we just observed — 3a alone helps when the envelope contains JSON, but Trace B's envelope might not, and without 3b that request still dies before the guard.
+
+## Ready to implement?
+
+Approve and I'll proceed.
+
+---
+
+## Phase 1.8c.3 — Shipped
+
+Implemented `1.8c.3a` (strict envelope unwrap) and `1.8c.3b` (search-fallback `trigger_reason` telemetry) together. All 18 new tests in `phase_1_8c3_test.ts` pass; full V2 suite green (no regressions).
+
+**Final behavior:**
+- Parser now attempts a single-level unwrap of `{content|data|result|output|response}` envelopes when the top-level is missing required fields AND exactly one wrapper key is present. Object, JSON-string (`{`/`[` prefix), and ```json``` fenced children all flow through the existing Zod schema. Prose / numbers / multiple wrapper keys → no unwrap; `GEMINI_INVALID_SHAPE` preserved.
+- Search-only fallback now reports `triggerReason` (`invalid_shape` | `transport_error` | `recovery_gate` | null). No change to fallback **eligibility** — only labeling.
+- New diagnostic fields on every Gemini log line (success and failure): `envelope_wrapper_key_present`, `envelope_unwrap_attempted`, `envelope_unwrap_succeeded`, `envelope_unwrap_key`, `envelope_child_kind`.
+- `search_fallback_trigger_reason` added to the `gemini` metadata block on responses and to both `gemini_search_fallback` console.info lines.
+
+**Notes vs the original plan:**
+- Test 1 had to be reframed: when the envelope child is an object with valid type+name, the **existing** nested-wrapper pass (candidate 3) catches it before the new envelope pass (candidate 4) runs. Added a separate test that exercises the new path explicitly with a child that the nested-wrapper filter skips.
+- Schema typing (`schema.ts`) updated to declare `search_fallback_trigger_reason?: string | null`.
