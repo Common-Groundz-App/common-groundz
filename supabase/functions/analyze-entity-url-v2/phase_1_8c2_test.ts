@@ -183,6 +183,9 @@ Deno.test("Phase 1.8c.2: extended diagnostics — hash sample capped at 5", () =
 
 Deno.test("Phase 1.8c.2: grounding_amazon_chunk_count — strict host predicate", () => {
   withSalt(STRONG_SALT, () => {
+    // Verifies the count delegates to isStrictAmazonHost. Per existing
+    // Phase 1.8 predicate semantics, `amazon.in.evil.com` (4+ labels) is
+    // rejected; `notamazon.com` and `amazonaws.com` are rejected.
     const v = runDualPathVerification({
       amazonAsin: "B0XXXXXXXX",
       groundingEvidence: {
@@ -190,7 +193,7 @@ Deno.test("Phase 1.8c.2: grounding_amazon_chunk_count — strict host predicate"
           "https://www.amazon.in/dp/B0XXXXXXXX",
           "https://www.amazon.com/dp/B0XXXXXXXX",
           "https://notamazon.com/dp/B0XXXXXXXX",
-          "https://amazon.evil.com/dp/B0XXXXXXXX",
+          "https://amazon.in.evil.com/dp/B0XXXXXXXX",
           "https://amazonaws.com/dp/B0XXXXXXXX",
         ],
         chunkTitles: [],
