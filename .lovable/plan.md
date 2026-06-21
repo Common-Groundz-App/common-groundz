@@ -94,3 +94,19 @@ Ship **3a + 3b together** (matches both reviewers). Splitting them would re-crea
 ## Ready to implement?
 
 Approve and I'll proceed.
+
+---
+
+## Phase 1.8c.3 — Shipped
+
+Implemented `1.8c.3a` (strict envelope unwrap) and `1.8c.3b` (search-fallback `trigger_reason` telemetry) together. All 18 new tests in `phase_1_8c3_test.ts` pass; full V2 suite green (no regressions).
+
+**Final behavior:**
+- Parser now attempts a single-level unwrap of `{content|data|result|output|response}` envelopes when the top-level is missing required fields AND exactly one wrapper key is present. Object, JSON-string (`{`/`[` prefix), and ```json``` fenced children all flow through the existing Zod schema. Prose / numbers / multiple wrapper keys → no unwrap; `GEMINI_INVALID_SHAPE` preserved.
+- Search-only fallback now reports `triggerReason` (`invalid_shape` | `transport_error` | `recovery_gate` | null). No change to fallback **eligibility** — only labeling.
+- New diagnostic fields on every Gemini log line (success and failure): `envelope_wrapper_key_present`, `envelope_unwrap_attempted`, `envelope_unwrap_succeeded`, `envelope_unwrap_key`, `envelope_child_kind`.
+- `search_fallback_trigger_reason` added to the `gemini` metadata block on responses and to both `gemini_search_fallback` console.info lines.
+
+**Notes vs the original plan:**
+- Test 1 had to be reframed: when the envelope child is an object with valid type+name, the **existing** nested-wrapper pass (candidate 3) catches it before the new envelope pass (candidate 4) runs. Added a separate test that exercises the new path explicitly with a child that the nested-wrapper filter skips.
+- Schema typing (`schema.ts`) updated to declare `search_fallback_trigger_reason?: string | null`.
