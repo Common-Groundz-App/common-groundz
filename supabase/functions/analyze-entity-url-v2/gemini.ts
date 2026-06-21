@@ -950,6 +950,13 @@ export async function runGeminiJsonMode(args: RunGeminiArgs): Promise<GeminiResu
     ...promptBytesDiag,
     json_parse_ok: true,
     has_text_parts: true,
+    // Phase 1.8c.3a — surface envelope frequency + unwrap outcome on
+    // every success so we can measure how often Gemini wraps responses.
+    envelope_wrapper_key_present: outcome.attempts.envelope_wrapper_key_present ?? false,
+    envelope_unwrap_attempted: outcome.attempts.envelope_unwrap_attempted ?? false,
+    envelope_unwrap_succeeded: outcome.attempts.envelope_unwrap_succeeded ?? false,
+    envelope_unwrap_key: outcome.attempts.envelope_unwrap_key ?? null,
+    envelope_child_kind: outcome.attempts.envelope_child_kind ?? null,
   });
 
   return {
