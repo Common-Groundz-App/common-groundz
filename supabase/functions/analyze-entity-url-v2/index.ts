@@ -885,12 +885,14 @@ serve(async (req) => {
           usedFirecrawl: recFirecrawlOk,
           mergeFlags: recFlags,
           extractPredictions: recExtract?.predictions ?? null,
+          primaryGeminiErrorCode: recPrimaryGeminiErrorCode,
         },
         { geminiInvoker: searchOnlyGeminiInvoker, applyMerge },
       );
       const recFallbackAttempted = recFb.attempted;
       const recFallbackOk = recFb.ok;
       const recFallbackSkipReason = recFb.skipReason;
+      const recFallbackTriggerReason = recFb.triggerReason;
       let recFallbackError = recFb.error;
       const recFallbackDurationMs = recFb.durationMs;
       let recFallbackUsed = recFb.used;
