@@ -76,6 +76,12 @@ export interface AmazonGuardExtendedDiagnostics {
   grounding_amazon_chunk_count: number;
   jsonld_brand_present: boolean;
   jsonld_product_name_present: boolean;
+  /**
+   * Phase 1.8c.2a — null when jsonld_brand is absent; otherwise true iff at
+   * least one distinctive brand token appears in the model-name token set.
+   * Computed in-memory only; raw brand and raw tokens are never logged.
+   */
+  jsonld_brand_matches_model_name: boolean | null;
   anchor_has_og_title: boolean;
   anchor_has_html_title: boolean;
   anchor_has_jsonld_product_name: boolean;
