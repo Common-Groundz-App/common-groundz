@@ -21,6 +21,14 @@
 // JSON-LD Product.name — and a distinctive-token overlap check against the
 // model's returned `name`. Stop-list is guard-internal; never mutates name.
 
+import { isStrictAmazonHost } from "./host_hints.ts";
+import {
+  hashToken,
+  bucketRatio,
+  type AnchorSource,
+  type AmazonGuardExtendedDiagnostics,
+} from "./finalization_telemetry.ts";
+
 export interface AmazonGroundingEvidence {
   /** groundingChunks[*].web.uri */
   chunkUris: string[];
@@ -209,6 +217,8 @@ export interface PageTitleAnchorResult {
   anchor: string | null;
   reject_reason: PageTitleAnchorRejectReason | null;
   canonical_asin_mismatch: boolean;
+  /** Phase 1.8c.2 — which signal produced the anchor. */
+  source: AnchorSource;
 }
 
 /**
@@ -222,7 +232,7 @@ export function pickPageTitleAnchor(
   requestedAsin: string | null,
 ): PageTitleAnchorResult {
   if (!pageSignals) {
-    return { anchor: null, reject_reason: null, canonical_asin_mismatch: false };
+    return { anchor: null, reject_reason: null, canonical_asin_mismatch: false, source: "none" };
   }
 
   // Canonical-ASIN consistency check first — if mismatch, page is not
@@ -236,30 +246,32 @@ export function pickPageTitleAnchor(
         anchor: null,
         reject_reason: "AMAZON_CANONICAL_ASIN_MISMATCH",
         canonical_asin_mismatch: true,
+        source: "none",
       };
     }
   }
 
-  const candidates: Array<string | null> = [
-    pageSignals.jsonld_product_name,
-    pageSignals.og_title,
-    pageSignals.twitter_title,
-    pageSignals.title,
+  const candidates: Array<{ value: string | null; source: AnchorSource }> = [
+    { value: pageSignals.jsonld_product_name, source: "jsonld_product_name" },
+    { value: pageSignals.og_title,            source: "og_title" },
+    { value: pageSignals.twitter_title,       source: "twitter_title" },
+    { value: pageSignals.title,               source: "html_title" },
   ];
   for (const c of candidates) {
-    if (c && typeof c === "string" && !isBotWallOrGeneric(c)) {
-      return { anchor: c, reject_reason: null, canonical_asin_mismatch };
+    if (c.value && typeof c.value === "string" && !isBotWallOrGeneric(c.value)) {
+      return { anchor: c.value, reject_reason: null, canonical_asin_mismatch, source: c.source };
     }
   }
   // Anything present? Then they were all bot-wall/generic.
-  if (candidates.some((c) => typeof c === "string" && c.trim().length > 0)) {
+  if (candidates.some((c) => typeof c.value === "string" && c.value.trim().length > 0)) {
     return {
       anchor: null,
       reject_reason: "BOT_WALL_OR_GENERIC",
       canonical_asin_mismatch,
+      source: "none",
     };
   }
-  return { anchor: null, reject_reason: null, canonical_asin_mismatch };
+  return { anchor: null, reject_reason: null, canonical_asin_mismatch, source: "none" };
 }
 
 export type DualPathRejectReason =
@@ -284,6 +296,8 @@ export interface DualPathDiagnostics {
   page_title_anchor_reject_reason: string | null;
   amazon_canonical_asin_mismatch: boolean;
   amazon_identity_verified_via: AmazonIdentityVerifiedVia;
+  /** Phase 1.8c.2 — extended Amazon diagnostics for guard-decision triage. */
+  extended?: AmazonGuardExtendedDiagnostics;
 }
 
 export interface DualPathArgs {
@@ -362,21 +376,43 @@ export function runDualPathVerification(args: DualPathArgs): DualPathResult {
   let pathBOk = false;
   let pathBHasDistinctive = false;
   let pathBOverlaps = false;
+  let anchorTokensArr: string[] = [];
+  let nameTokensArr: string[] = [];
+  let overlapTokensArr: string[] = [];
   if (anchorPick.anchor) {
     const anchorTokens = distinctiveTokens(anchorPick.anchor);
+    anchorTokensArr = Array.from(anchorTokens);
     pathBHasDistinctive = anchorTokens.size > 0;
     if (!pathBHasDistinctive) {
       diag.page_title_match_skip_reason = "NO_DISTINCTIVE_TOKENS";
     } else {
       const nameTokens = distinctiveTokens(args.modelName ?? "");
+      nameTokensArr = Array.from(nameTokens);
       for (const t of nameTokens) {
-        if (anchorTokens.has(t)) { pathBOverlaps = true; break; }
+        if (anchorTokens.has(t)) {
+          overlapTokensArr.push(t);
+          pathBOverlaps = true;
+        }
       }
       pathBOk = pathBOverlaps;
     }
   } else {
     diag.page_title_match_skip_reason = "NO_PAGE_TITLE_ANCHOR";
+    // Still collect model-name tokens for diagnostics so reviewers can see
+    // whether the model produced anything tokenizable.
+    nameTokensArr = Array.from(distinctiveTokens(args.modelName ?? ""));
   }
+
+  // ── Phase 1.8c.2: extended diagnostics (Amazon-only triage) ────────────
+  diag.extended = buildExtendedDiagnostics({
+    anchorPick,
+    anchorTokens: anchorTokensArr,
+    nameTokens: nameTokensArr,
+    overlapTokens: overlapTokensArr,
+    groundingEvidence: ev,
+    pageSignals: args.pageSignals ?? null,
+  });
+  diag.extended.grounding_contains_canonical_dp_url = diag.grounding_contains_canonical_dp_url;
 
   // ── Combine ─────────────────────────────────────────────────────────────
   // Case: usable anchor with distinctive tokens AND model does NOT overlap →
@@ -415,4 +451,81 @@ export function runDualPathVerification(args: DualPathArgs): DualPathResult {
   const reason = (pathAVerdict as { ok: false; reason: AmazonAsinGuardReason }).reason;
   diag.amazon_exact_match_reject_reason = reason;
   return { ok: false, reason, diagnostics: diag };
+}
+
+// ─── Phase 1.8c.2: extended diagnostics builder (Amazon-only) ──────────
+
+const HASH_SAMPLE_CAP = 5;
+
+function isAmazonChunkUri(raw: string): boolean {
+  if (!raw) return false;
+  try {
+    return isStrictAmazonHost(new URL(raw).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function takeHashSample(tokens: string[]): string[] | null {
+  // Returns null when salt is unset → caller omits the field entirely.
+  // Returns an array (possibly empty when there are no tokens) when salt
+  // is configured. Caps at HASH_SAMPLE_CAP.
+  if (tokens.length === 0) {
+    // Probe salt with a sentinel; if salt unset → omit, else emit [].
+    const probe = hashToken("__diag_probe__");
+    return probe === null ? null : [];
+  }
+  const out: string[] = [];
+  for (const t of tokens) {
+    const h = hashToken(t);
+    if (h === null) return null;
+    out.push(h);
+    if (out.length >= HASH_SAMPLE_CAP) break;
+  }
+  return out;
+}
+
+interface BuildExtendedArgs {
+  anchorPick: PageTitleAnchorResult;
+  anchorTokens: string[];
+  nameTokens: string[];
+  overlapTokens: string[];
+  groundingEvidence: AmazonGroundingEvidence;
+  pageSignals: PageSignalsForGuard | null;
+}
+
+function buildExtendedDiagnostics(args: BuildExtendedArgs): AmazonGuardExtendedDiagnostics {
+  const ps = args.pageSignals;
+  const chunkUris = args.groundingEvidence.chunkUris ?? [];
+  const retrievedUrls = args.groundingEvidence.retrievedUrls ?? [];
+  const allUris = [...chunkUris, ...retrievedUrls];
+
+  const denom = Math.min(args.anchorTokens.length, args.nameTokens.length);
+
+  const ext: AmazonGuardExtendedDiagnostics = {
+    anchor_present: !!args.anchorPick.anchor,
+    anchor_source: args.anchorPick.source,
+    anchor_token_count: args.anchorTokens.length,
+    model_name_token_count: args.nameTokens.length,
+    token_overlap_count: args.overlapTokens.length,
+    overlap_ratio_bucket: bucketRatio(args.overlapTokens.length, denom),
+    page_title_anchor_reject_reason: args.anchorPick.reject_reason ?? null,
+    grounding_contains_canonical_dp_url: false, // filled by caller's diag
+    grounding_chunk_count: chunkUris.length,
+    grounding_amazon_chunk_count: allUris.filter(isAmazonChunkUri).length,
+    jsonld_brand_present: !!(ps?.jsonld_brand && ps.jsonld_brand.trim()),
+    jsonld_product_name_present: !!(ps?.jsonld_product_name && ps.jsonld_product_name.trim()),
+    anchor_has_og_title: !!(ps?.og_title && ps.og_title.trim()),
+    anchor_has_html_title: !!(ps?.title && ps.title.trim()),
+    anchor_has_jsonld_product_name: !!(ps?.jsonld_product_name && ps.jsonld_product_name.trim()),
+  };
+
+  const anchorHashes = takeHashSample(args.anchorTokens);
+  const nameHashes = takeHashSample(args.nameTokens);
+  const overlapHashes = takeHashSample(args.overlapTokens);
+  if (anchorHashes !== null) ext.anchor_token_hash_sample = anchorHashes;
+  if (nameHashes !== null) ext.model_name_token_hash_sample = nameHashes;
+  if (overlapHashes !== null) ext.overlap_hash_sample = overlapHashes;
+
+  return ext;
 }

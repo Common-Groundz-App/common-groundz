@@ -825,6 +825,7 @@ serve(async (req) => {
             recGuardTracker.passed = guard.ok;
             recGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
             recGuardTracker.input_source = "gemini_only";
+            recGuardTracker.diagnostics = guard.diagnostics.extended ?? null;
             if (!guard.ok) {
               recGeminiPred = null;
               recWarnings.push(guard.reason as GeminiWarningCode);
@@ -920,6 +921,7 @@ serve(async (req) => {
           recGuardTracker.passed = guard.ok;
           recGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
           recGuardTracker.input_source = "gemini_only";
+          recGuardTracker.diagnostics = guard.diagnostics.extended ?? null;
           if (!guard.ok) {
             recMerged = null;
             recGeminiPred = null;
@@ -1237,6 +1239,7 @@ serve(async (req) => {
             mainGuardTracker.passed = guard.ok;
             mainGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
             mainGuardTracker.input_source = "gemini_only";
+            mainGuardTracker.diagnostics = guard.diagnostics.extended ?? null;
             if (!guard.ok) {
               mainGeminiPred = null;
               (warnings as string[]).push(guard.reason as GeminiWarningCode);
@@ -1340,6 +1343,7 @@ serve(async (req) => {
           mainGuardTracker.passed = guard.ok;
           mainGuardTracker.raw_reason_code = guard.ok ? null : guard.reason;
           mainGuardTracker.input_source = "gemini_only";
+          mainGuardTracker.diagnostics = guard.diagnostics.extended ?? null;
           if (!guard.ok) {
             mainMerged = null;
             mainGeminiPred = null;
