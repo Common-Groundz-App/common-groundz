@@ -950,6 +950,7 @@ serve(async (req) => {
           search_fallback_attempted: recFallbackAttempted,
           search_fallback_ok: recFallbackOk,
           search_fallback_skip_reason: recFallbackSkipReason,
+          search_fallback_trigger_reason: recFallbackTriggerReason,
           ...(recFallbackError !== undefined
             ? { search_fallback_error: recFallbackError as never }
             : {}),
@@ -966,6 +967,7 @@ serve(async (req) => {
           search_fallback_attempted: recFallbackAttempted,
           search_fallback_ok: recFallbackOk,
           search_fallback_skip_reason: recFallbackSkipReason,
+          search_fallback_trigger_reason: recFallbackTriggerReason,
           ...(recFallbackError !== undefined
             ? { search_fallback_error: recFallbackError as never }
             : {}),
