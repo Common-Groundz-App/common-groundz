@@ -515,6 +515,7 @@ function buildExtendedDiagnostics(args: BuildExtendedArgs): AmazonGuardExtendedD
     grounding_amazon_chunk_count: allUris.filter(isAmazonChunkUri).length,
     jsonld_brand_present: !!(ps?.jsonld_brand && ps.jsonld_brand.trim()),
     jsonld_product_name_present: !!(ps?.jsonld_product_name && ps.jsonld_product_name.trim()),
+    jsonld_brand_matches_model_name: computeJsonldBrandMatch(ps, args.nameTokens),
     anchor_has_og_title: !!(ps?.og_title && ps.og_title.trim()),
     anchor_has_html_title: !!(ps?.title && ps.title.trim()),
     anchor_has_jsonld_product_name: !!(ps?.jsonld_product_name && ps.jsonld_product_name.trim()),
