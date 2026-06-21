@@ -1381,6 +1381,7 @@ serve(async (req) => {
           search_fallback_attempted: mainFallbackAttempted,
           search_fallback_ok: mainFallbackOk,
           search_fallback_skip_reason: mainFallbackSkipReason,
+          search_fallback_trigger_reason: mainFallbackTriggerReason,
           ...(mainFallbackError !== undefined
             ? { search_fallback_error: mainFallbackError as never }
             : {}),
@@ -1394,6 +1395,7 @@ serve(async (req) => {
           search_fallback_attempted: mainFallbackAttempted,
           search_fallback_ok: mainFallbackOk,
           search_fallback_skip_reason: mainFallbackSkipReason,
+          search_fallback_trigger_reason: mainFallbackTriggerReason,
           ...(mainFallbackError !== undefined
             ? { search_fallback_error: mainFallbackError as never }
             : {}),
