@@ -1047,11 +1047,13 @@ serve(async (req) => {
             used_google_search: recGeminiBlock?.used_google_search ?? false,
             used_firecrawl: recFirecrawlOk,
             phase: 8,
-            stage: recFallbackUsed
-              ? "gemini-search-fallback"
-              : recExtract
-                ? "firecrawl-recovered"
-                : "gemini-recovered",
+            stage: recPageFallbackUsed
+              ? "page-metadata-fallback"
+              : recFallbackUsed
+                ? "gemini-search-fallback"
+                : recExtract
+                  ? "firecrawl-recovered"
+                  : "gemini-recovered",
             ...(recExtract ? { extract: recExtract.metadata } : {}),
             ...(recFirecrawlBlock ? { firecrawl: recFirecrawlBlock } : {}),
             ...(recGeminiBlock ? { gemini: recGeminiBlock } : {}),
