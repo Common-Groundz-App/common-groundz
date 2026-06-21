@@ -139,3 +139,18 @@ NEVER logged: raw `title` / `description` / `ogTitle` / `ogDescription` / `ogIma
 You retest 2–3 Amazon URLs, grep `firecrawl.shape_diag` in edge-function logs, and we use them to decide between (a) proceeding straight to Phase 2, (b) fixing how we consume Firecrawl metadata in our pipeline, (c) adjusting Firecrawl request settings, or (d) emailing Firecrawl with concrete request/response evidence (formats sent, `data_unwrap_path`, metadata presence booleans, bytes, proxy/cache state).
 
 When the investigation is done, flip `FIRECRAWL_SHAPE_DIAG_ENABLED` to `false` (one-line change) to silence the logs without removing the helper.
+---
+
+## Phase 1.8c.5 — Firecrawl request/response shape diagnostic (shipped)
+
+Diagnostic-only logging. No behavior changes.
+
+- Added exported pure helper `buildFirecrawlShapeDiagnostic` in `firecrawl.ts`. Emits one log per Firecrawl invocation with prefix `[analyze-entity-url-v2] firecrawl.shape_diag`.
+- Gated by module constant `FIRECRAWL_SHAPE_DIAG_ENABLED = true` for one-line disable.
+- New optional `diagContext: { requestId, callSite: "main" | "recovery" }` on `FirecrawlOpts`; wired at both `runFirecrawlScrape` call sites in `index.ts` (weak-signals → `"main"`, fetch-recovery → `"recovery"`).
+- Fields logged: correlation (`request_id`, `call_site`, `is_amazon`, `url_host`, `url_has_query_string`); request shape (`endpoint`, `method_used`, `formats_requested`, `only_main_content`, `wait_for_ms`, `api_timeout_ms`, `local_timeout_ms`, `max_html_bytes`, proxy/location/cache presence, `request_payload_keys`); response shape (`http_status`, `content_type`, `firecrawl_success`, `firecrawl_error_present`, `firecrawl_error_code` validated `^[A-Za-z0-9_\-.]+$` ≤40 chars, `proxy_used`, `cache_state`, `credits_used`, `response_keys`, `data_keys`, `data_unwrap_path` ∈ {body.data,body.result,body,none}, presence booleans for metadata/markdown/html/rawHtml/content/json/links/screenshot/summary, `metadata_key_count`, `metadata_keys` (first 50 sorted, ≤40 chars each), `metadata_title_present`/`metadata_description_present`/`metadata_og_title_present`/`metadata_og_description_present`, UTF-8 byte sizes for markdown/html/rawHtml/content, `json_key_count`, `html_oversize_dropped`, `duration_ms`); failure shape (`error_kind`, `aborted`, `parse_ok`, `body_parse_failed`).
+- Privacy: never logs raw title/description/og*/markdown/html/rawHtml/content/summary/json values, raw error messages, full URLs with query strings, API keys, or nested metadata values.
+- `url_host` derived from the already-validated URL the function is about to send to Firecrawl.
+- 11 new tests in `firecrawl_test.ts` covering success privacy, http_error, timeout/aborted, body parse failure, metadata cap + value exclusion, safe vs unsafe error code, UTF-8 byte sizing, request_id/call_site propagation, `data_unwrap_path` enum, ogTitle/og:title detection, and url_host/query-string derivation. All 29 tests in the file pass.
+
+Next: user retests 2–3 Amazon URLs, grep `firecrawl.shape_diag` in edge-function logs, then decide between Phase 2, Firecrawl metadata consumption fix, request-setting tweak, or emailing Firecrawl with concrete evidence. Flip `FIRECRAWL_SHAPE_DIAG_ENABLED` to `false` to disable.
