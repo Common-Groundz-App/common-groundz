@@ -466,6 +466,21 @@ function isAmazonChunkUri(raw: string): boolean {
   }
 }
 
+function computeJsonldBrandMatch(
+  ps: PageSignalsForGuard | null,
+  nameTokens: string[],
+): boolean | null {
+  const brand = ps?.jsonld_brand?.trim();
+  if (!brand) return null;
+  const brandTokens = distinctiveTokens(brand);
+  if (brandTokens.size === 0) return false;
+  const nameSet = new Set(nameTokens);
+  for (const t of brandTokens) {
+    if (nameSet.has(t)) return true;
+  }
+  return false;
+}
+
 function takeHashSample(tokens: string[]): string[] | null {
   // Returns null when salt is unset → caller omits the field entirely.
   // Returns an array (possibly empty when there are no tokens) when salt
@@ -515,6 +530,7 @@ function buildExtendedDiagnostics(args: BuildExtendedArgs): AmazonGuardExtendedD
     grounding_amazon_chunk_count: allUris.filter(isAmazonChunkUri).length,
     jsonld_brand_present: !!(ps?.jsonld_brand && ps.jsonld_brand.trim()),
     jsonld_product_name_present: !!(ps?.jsonld_product_name && ps.jsonld_product_name.trim()),
+    jsonld_brand_matches_model_name: computeJsonldBrandMatch(ps, args.nameTokens),
     anchor_has_og_title: !!(ps?.og_title && ps.og_title.trim()),
     anchor_has_html_title: !!(ps?.title && ps.title.trim()),
     anchor_has_jsonld_product_name: !!(ps?.jsonld_product_name && ps.jsonld_product_name.trim()),

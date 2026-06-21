@@ -242,6 +242,7 @@ Deno.test("Phase 1.8c.2: buildFinalization — diagnostics pass through when pre
     grounding_amazon_chunk_count: 1,
     jsonld_brand_present: true,
     jsonld_product_name_present: false,
+    jsonld_brand_matches_model_name: null,
     anchor_has_og_title: true,
     anchor_has_html_title: true,
     anchor_has_jsonld_product_name: false,
@@ -282,4 +283,62 @@ Deno.test("Phase 1.8c.2: no raw anchor or model-name tokens leak into emitted bl
       );
     }
   });
+});
+
+// ─── Phase 1.8c.2a — jsonld_brand_matches_model_name ───────────────────
+
+Deno.test("Phase 1.8c.2a: brand match — null when jsonld_brand absent", () => {
+  const page: PageSignalsForGuard = { ...AMAZON_PAGE, jsonld_brand: null };
+  const v = runDualPathVerification({
+    amazonAsin: "B0XXXXXXXX",
+    groundingEvidence: { chunkUris: [], chunkTitles: [], retrievedUrls: [] },
+    pageSignals: page,
+    modelName: "Folliwise Cleanser",
+  });
+  assertEquals(v.diagnostics.extended!.jsonld_brand_matches_model_name, null);
+});
+
+Deno.test("Phase 1.8c.2a: brand match — true when brand token appears in model name", () => {
+  const v = runDualPathVerification({
+    amazonAsin: "B0XXXXXXXX",
+    groundingEvidence: { chunkUris: [], chunkTitles: [], retrievedUrls: [] },
+    pageSignals: AMAZON_PAGE, // jsonld_brand: "Folliwise"
+    modelName: "Folliwise Cleanser",
+  });
+  assertEquals(v.diagnostics.extended!.jsonld_brand_matches_model_name, true);
+});
+
+Deno.test("Phase 1.8c.2a: brand match — false when brand token absent from model name", () => {
+  const v = runDualPathVerification({
+    amazonAsin: "B0XXXXXXXX",
+    groundingEvidence: { chunkUris: [], chunkTitles: [], retrievedUrls: [] },
+    pageSignals: AMAZON_PAGE, // jsonld_brand: "Folliwise"
+    modelName: "Acme Widget Pro",
+  });
+  assertEquals(v.diagnostics.extended!.jsonld_brand_matches_model_name, false);
+});
+
+Deno.test("Phase 1.8c.2a: brand match — raw brand never leaks into block", () => {
+  const page: PageSignalsForGuard = { ...AMAZON_PAGE, jsonld_brand: "Folliwise" };
+  const v = runDualPathVerification({
+    amazonAsin: "B0XXXXXXXX",
+    groundingEvidence: { chunkUris: [], chunkTitles: [], retrievedUrls: [] },
+    pageSignals: page,
+    modelName: "Acme Widget",
+  });
+  const ext = v.diagnostics.extended!;
+  const dump = JSON.stringify(ext).toLowerCase();
+  assert(!dump.includes("folliwise"), `must not contain raw brand: ${dump}`);
+  assertEquals(ext.jsonld_brand_matches_model_name, false);
+});
+
+Deno.test("Phase 1.8c.2a: brand match — false when brand has only stop tokens", () => {
+  const page: PageSignalsForGuard = { ...AMAZON_PAGE, jsonld_brand: "Amazon Official" };
+  const v = runDualPathVerification({
+    amazonAsin: "B0XXXXXXXX",
+    groundingEvidence: { chunkUris: [], chunkTitles: [], retrievedUrls: [] },
+    pageSignals: page,
+    modelName: "Folliwise Cleanser",
+  });
+  assertEquals(v.diagnostics.extended!.jsonld_brand_matches_model_name, false);
 });
