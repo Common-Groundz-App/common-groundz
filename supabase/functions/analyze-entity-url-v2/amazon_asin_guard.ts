@@ -412,6 +412,7 @@ export function runDualPathVerification(args: DualPathArgs): DualPathResult {
     groundingEvidence: ev,
     pageSignals: args.pageSignals ?? null,
   });
+  diag.extended.grounding_contains_canonical_dp_url = diag.grounding_contains_canonical_dp_url;
 
   // ── Combine ─────────────────────────────────────────────────────────────
   // Case: usable anchor with distinctive tokens AND model does NOT overlap →
