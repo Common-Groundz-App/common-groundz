@@ -1,156 +1,175 @@
-## Phase 1.8c.5 — Firecrawl request/response shape diagnostic (final)
+## Phase 1.8c.6 — Page-Owned Metadata as Trusted Source (revised; type-safe)
 
-**Scope:** Diagnostic-only logging. No behavior changes (no timeout/budget/parser/Gemini/Zod/merge/guard/V1/frontend/DB/non-Amazon/Phase 2 changes, no new wire-response field).
+Diagnostics confirmed Firecrawl is working and returning real page-owned data (`og:image`, `og:description`, JSON-LD, markdown, html). The remaining bugs are **consumption + priority** in our pipeline:
 
-This revision folds in **all** ChatGPT + Codex refinements from both rounds:
+1. `analyze-entity-url-v2` can return `NO_PREDICTIONS` even when direct-fetch / Firecrawl already has usable name + description + image.
+2. `fetch-url-metadata-lite` / `enrich-brand-data` can surface Google Image Search images that don't exist on the submitted page.
 
-- `request_id` correlation, `call_site: "main" | "recovery"`
-- UTF-8 byte sizes via `TextEncoder`
-- Safe error-shape fields (`error_kind`, `aborted`, `parse_ok`, `body_parse_failed`)
-- Capped metadata key list (50 keys × 40 chars, names only)
-- Exported pure helper so tests can call it without runtime coupling
-- **New (Codex round 2):** `data_unwrap_path` enum so logs are unambiguous about which object was treated as the Firecrawl data payload
-- **New (Codex round 2):** explicit metadata presence booleans
-- **New (ChatGPT round 2):** `url_host` derived from the already-validated/normalized URL the code uses for the actual Firecrawl request (not from a raw user string)
-- Designed for easy removal: single helper + single `console.log` call site per Firecrawl invocation, gated behind a `FIRECRAWL_SHAPE_DIAG_ENABLED` module constant (default `true`) so the whole feature flips off via one boolean when the investigation is done
+Fix in two ordered sub-steps: **1.8c.6-A** then **1.8c.6-B**. These are **not** Phase 1 / Phase 2 — real Phase 2 (rich metadata UI / category) still follows. Not emailing Firecrawl. Not changing Firecrawl/Gemini settings.
 
 ---
 
-### 1. New exported pure helper
+### Type-handling decision (revised per ChatGPT + Codex)
 
-In `supabase/functions/analyze-entity-url-v2/firecrawl.ts`:
+`V2Predictions.type` is the non-nullable `CanonicalEntityType` enum. `"others"` exists in that enum but has **product meaning** ("entity does not fit any current type"), **not** "unknown / user must choose". Defaulting unknown-type fallbacks to `"others"` would let users submit unchanged and pollute the DB with mistyped entities.
 
-```ts
-export function buildFirecrawlShapeDiagnostic(input: {
-  requestArgs: {
-    urlHost: string;              // host of already-normalized URL, never raw
-    urlHasQueryString: boolean;
-    isAmazon: boolean;
-    formats: string[];
-    onlyMainContent: boolean;
-    waitForMs: number;
-    apiTimeoutMs: number;
-    localTimeoutMs: number;
-    maxHtmlBytes: number;
-    payloadKeys: string[];        // Object.keys(body).sort()
-  };
-  response?: {
-    httpStatus: number;
-    contentType: string | null;
-    body: unknown;                // parsed; helper inspects shape only
-    parseOk: boolean;
-    bodyParseFailed: boolean;
-  };
-  failure?: {
-    errorKind: "http_error" | "timeout" | "parse_error" | "network_error" | "unknown";
-    aborted: boolean;
-  };
-  htmlOversizeDropped: boolean;
-  durationMs: number;
-  context: { requestId: string; callSite: "main" | "recovery" };
-}): Record<string, unknown>
-```
+**Rule for 1.8c.6-A:**
 
-Pure: no I/O, no `console.log` inside. `runFirecrawlScrape` calls it once per invocation (success + failure + timeout paths) and logs exactly one line with the stable prefix:
+- **Never** set `type: "others"` as an unknown sentinel.
+- **Never** guess type from title, URL slug, domain, product words, or a failed/rejected Gemini result.
+- The page-metadata fallback prediction is **only emitted when type is reliably resolved** from one of:
+  1. JSON-LD `@type` → canonical (`Product` → `product`, `Book` → `book`, `Movie` → `movie`, `TVSeries`/`TVSeason`/`TVEpisode` → `tv_show`, `Recipe` → `food`, `Restaurant`/`LocalBusiness`/`Hotel` → `place`, `SoftwareApplication`/`MobileApplication`/`WebApplication` → `app`, `VideoGame` → `game`, `Course` → `course`, `Event` → `event`, `Service` → `service`).
+  2. `og:type` mapped deterministically (`product`, `book`, `video.movie` → `movie`, `video.tv_show` → `tv_show`, etc. — same mapping the existing `category_resolver.ts` `PATH_ALIASES` table uses).
+  3. The existing deterministic type resolver in the pipeline, if it returns a supported canonical value.
+- If none of the above yields a type, **do not emit a fallback prediction**. Keep the current `NO_PREDICTIONS` behavior and log `page_metadata_fallback_skipped_reason: "type_unresolved"`.
+- No Zod / response / DB / frontend changes.
 
-```
-[analyze-entity-url-v2] firecrawl.shape_diag { ... }
-```
+This is safer than the earlier `"others"` proposal and is what both reviewers agreed on. A separate, intentional `needs_type_selection` UI flow can come later (out of scope here).
 
-Gated by a single module-level `FIRECRAWL_SHAPE_DIAG_ENABLED = true` constant for easy disable later.
-
-### 2. Minimal signature addition to `runFirecrawlScrape`
-
-Add optional `diagContext?: { requestId: string; callSite: "main" | "recovery" }` to `FirecrawlOpts`. Defaults to `{ requestId: "unknown", callSite: "main" }` when omitted, so the 20+ existing tests in `firecrawl_test.ts` keep working unchanged. Wire it from the two `runFirecrawlScrape` call sites in `index.ts` (main path → `"main"`, fetch-recovery path → `"recovery"`), passing the existing per-invocation `request_id`.
-
-`url_host` is computed inside `runFirecrawlScrape` from the **already-validated** URL the function is about to send to Firecrawl (the same value used for `fetch`), via `new URL(targetUrl).host`. Never from a raw caller string.
-
-### 3. Final field list
-
-**Correlation / context**
-- `request_id`, `call_site`, `is_amazon`, `url_host`, `url_has_query_string`
-
-**Request shape**
-- `endpoint: "v2/scrape"` (literal, no host string), `method_used: "scrape"`
-- `formats_requested`, `only_main_content`, `wait_for_ms`
-- `api_timeout_ms`, `local_timeout_ms`, `max_html_bytes`
-- `proxy_setting_present`, `location_setting_present`, `cache_setting_present`
-- `request_payload_keys` (keys only, sorted)
-
-**Response shape**
-- `http_status`, `content_type`
-- `firecrawl_success` (`body.success ?? null`)
-- `firecrawl_error_present` (boolean)
-- `firecrawl_error_code` — `body.error.code` / `body.code` only if a short stable string (≤40 chars, matches `/^[A-Za-z0-9_\-.]+$/`), else `null`. **Never** raw error message text.
-- `proxy_used` (`metadata.proxyUsed ?? null`)
-- `cache_state` (`metadata.cacheState ?? null`)
-- `credits_used` (`body.creditsUsed ?? null`)
-- `response_keys` (sorted), `data_keys` (sorted, only when data object found)
-- **`data_unwrap_path`** — `"body.data" | "body.result" | "body" | "none"` — records which object the diagnostic treated as the Firecrawl data payload (so we can tell shape-mismatch bugs apart from genuinely empty responses)
-- `has_metadata`, `has_markdown`, `has_html`, `has_raw_html`, `has_content`, `has_json`, `has_links`, `has_screenshot`, `has_summary`
-- `metadata_key_count` (full count)
-- `metadata_keys` — first **50** sorted keys, each truncated to **40 chars** (names only)
-- **Explicit metadata presence booleans** (key existence only, no values):
-  - `metadata_title_present`
-  - `metadata_description_present`
-  - `metadata_og_title_present` (matches both `ogTitle` and `og:title`)
-  - `metadata_og_description_present` (matches both `ogDescription` and `og:description`)
-- `markdown_bytes`, `html_bytes`, `raw_html_bytes`, `content_bytes` — measured with `new TextEncoder().encode(value).length` (UTF-8, not `.length`)
-- `json_key_count` (count of keys in `data.json` if object, else 0)
-- `html_oversize_dropped` (boolean)
-- `duration_ms`
-
-**Failure-shape fields** (always populated; null on success)
-- `error_kind`, `aborted`, `parse_ok`, `body_parse_failed`
-
-### 4. Privacy guarantees (enforced in helper + asserted in tests)
-
-NEVER logged: raw `title` / `description` / `ogTitle` / `ogDescription` / `ogImage` values; raw `markdown` / `html` / `rawHtml` / `content` / `summary` / `json` values; raw Firecrawl `error.message` text; full URLs with query strings (host only); API key; `Authorization` header; any nested metadata values.
-
-### 5. Files touched
-
-- `supabase/functions/analyze-entity-url-v2/firecrawl.ts` — add helper, add optional `diagContext` to `FirecrawlOpts`, add `FIRECRAWL_SHAPE_DIAG_ENABLED` constant, emit one `console.log` per invocation across success + failure + timeout paths. No changes to request body, formats, timeouts, return shape, or error codes.
-- `supabase/functions/analyze-entity-url-v2/index.ts` — pass `diagContext: { requestId, callSite: "main" | "recovery" }` at the two existing `runFirecrawlScrape` call sites. No other changes.
-- `supabase/functions/analyze-entity-url-v2/firecrawl_test.ts` — add these tests:
-  1. Success path: helper output contains expected booleans/key counts; raw `title`/`description`/`markdown`/`html` values absent from JSON-stringified output
-  2. Non-2xx failure: request shape + `http_status` + `error_kind: "http_error"`
-  3. Timeout: request shape + `aborted: true` + `error_kind: "timeout"`
-  4. Body parse failure: `body_parse_failed: true` + `parse_ok: false` + `error_kind: "parse_error"`
-  5. `metadata_keys` capped to 50 entries, each ≤40 chars, values absent
-  6. `firecrawl_error_code` accepts `"INSUFFICIENT_CREDITS"` but rejects long/raw error message → `null`
-  7. UTF-8 byte sizes correct for multi-byte chars (`"日本語"` → 9 bytes, not 3)
-  8. `call_site` and `request_id` propagated from `diagContext`
-  9. `data_unwrap_path` returns `"body.data"` for `{ data: {...} }`, `"body.result"` for `{ result: {...} }`, `"body"` for flat shape, `"none"` for empty
-  10. Metadata presence booleans correctly detect both `ogTitle` and `og:title` variants; absent when key missing
-  11. `url_host` is derived from a normalized URL (test passes a URL with query string and asserts `url_has_query_string: true` and host-only output)
-- `.lovable/plan.md` — append the Phase 1.8c.5 entry.
-
-### 6. Explicitly NOT changing
-
-- Firecrawl request body, `formats`, `waitFor`, `timeout`, `onlyMainContent`
-- `NORMAL_FIRECRAWL_*` / `HIGH_PRIORITY_FIRECRAWL_*` constants, `DEFAULT_MAX_HTML_BYTES`, Amazon 4 MiB bump
-- `firecrawl_recovery.ts` logic, `index.ts` orchestration / budget / eligibility
-- `schema.ts` (no new wire field)
-- Gemini, parser, Zod, merge, guard, recovery gate
-- V1, frontend, DB, Phase 2
-
-### 7. After it ships
-
-You retest 2–3 Amazon URLs, grep `firecrawl.shape_diag` in edge-function logs, and we use them to decide between (a) proceeding straight to Phase 2, (b) fixing how we consume Firecrawl metadata in our pipeline, (c) adjusting Firecrawl request settings, or (d) emailing Firecrawl with concrete request/response evidence (formats sent, `data_unwrap_path`, metadata presence booleans, bytes, proxy/cache state).
-
-When the investigation is done, flip `FIRECRAWL_SHAPE_DIAG_ENABLED` to `false` (one-line change) to silence the logs without removing the helper.
 ---
 
-## Phase 1.8c.5 — Firecrawl request/response shape diagnostic (shipped)
+### 1.8c.6-A — V2 page-metadata fallback floor (type-safe)
 
-Diagnostic-only logging. No behavior changes.
+**File area:** `supabase/functions/analyze-entity-url-v2/` (extractor / merge layer only).
 
-- Added exported pure helper `buildFirecrawlShapeDiagnostic` in `firecrawl.ts`. Emits one log per Firecrawl invocation with prefix `[analyze-entity-url-v2] firecrawl.shape_diag`.
-- Gated by module constant `FIRECRAWL_SHAPE_DIAG_ENABLED = true` for one-line disable.
-- New optional `diagContext: { requestId, callSite: "main" | "recovery" }` on `FirecrawlOpts`; wired at both `runFirecrawlScrape` call sites in `index.ts` (weak-signals → `"main"`, fetch-recovery → `"recovery"`).
-- Fields logged: correlation (`request_id`, `call_site`, `is_amazon`, `url_host`, `url_has_query_string`); request shape (`endpoint`, `method_used`, `formats_requested`, `only_main_content`, `wait_for_ms`, `api_timeout_ms`, `local_timeout_ms`, `max_html_bytes`, proxy/location/cache presence, `request_payload_keys`); response shape (`http_status`, `content_type`, `firecrawl_success`, `firecrawl_error_present`, `firecrawl_error_code` validated `^[A-Za-z0-9_\-.]+$` ≤40 chars, `proxy_used`, `cache_state`, `credits_used`, `response_keys`, `data_keys`, `data_unwrap_path` ∈ {body.data,body.result,body,none}, presence booleans for metadata/markdown/html/rawHtml/content/json/links/screenshot/summary, `metadata_key_count`, `metadata_keys` (first 50 sorted, ≤40 chars each), `metadata_title_present`/`metadata_description_present`/`metadata_og_title_present`/`metadata_og_description_present`, UTF-8 byte sizes for markdown/html/rawHtml/content, `json_key_count`, `html_oversize_dropped`, `duration_ms`); failure shape (`error_kind`, `aborted`, `parse_ok`, `body_parse_failed`).
-- Privacy: never logs raw title/description/og*/markdown/html/rawHtml/content/summary/json values, raw error messages, full URLs with query strings, API keys, or nested metadata values.
-- `url_host` derived from the already-validated URL the function is about to send to Firecrawl.
-- 11 new tests in `firecrawl_test.ts` covering success privacy, http_error, timeout/aborted, body parse failure, metadata cap + value exclusion, safe vs unsafe error code, UTF-8 byte sizing, request_id/call_site propagation, `data_unwrap_path` enum, ogTitle/og:title detection, and url_host/query-string derivation. All 29 tests in the file pass.
+#### Activation rule (all must hold)
 
-Next: user retests 2–3 Amazon URLs, grep `firecrawl.shape_diag` in edge-function logs, then decide between Phase 2, Firecrawl metadata consumption fix, request-setting tweak, or emailing Firecrawl with concrete evidence. Flip `FIRECRAWL_SHAPE_DIAG_ENABLED` to `false` to disable.
+- Current flow would otherwise return `NO_PREDICTIONS` (strict floor — never overrides a valid Gemini result).
+- Validated page-owned `name/title` present.
+- At least one of validated page-owned `description` **or** `image_url` present.
+- **Type reliably resolved** from JSON-LD → og:type → deterministic resolver (see above).
+
+`confidence ≤ 0.4`. Telemetry: `page_metadata_fallback_used: true`.
+
+#### Source precedence
+
+**Name / title**
+1. JSON-LD `name`
+2. `og:title` / `ogTitle`
+3. `twitter:title`
+4. HTML `<title>` (cleaned — strip site suffix)
+5. Firecrawl `metadata.title`
+6. First short clean markdown heading
+
+**Description**
+1. JSON-LD `description`
+2. `og:description` / `ogDescription`
+3. `twitter:description`
+4. Firecrawl / direct `metadata.description`
+5. Short clean markdown excerpt
+
+**Image** (no Google in V2 floor)
+1. JSON-LD `Product.image` (or matching `@type.image`)
+2. `og:image` / `ogImage`
+3. `twitter:image`
+4. Firecrawl `metadata.image`
+5. Reliable HTML image candidates
+
+#### Conservative merge when Gemini succeeds
+
+Gemini keeps ownership of `type`, `brand`, `tags`, `category`, `confidence`, `reasoning`.
+
+- **`image_url`** — page-owned **always wins** over Gemini. Gemini is not a reliable image source.
+- **`description`** — **conservative merge**, not blind override:
+  - Use page-owned when Gemini description is missing, empty, very short, or matches generic/boilerplate / cookie / legal patterns.
+  - Keep Gemini's when it is substantive and page metadata is weak/truncated.
+  - Recorded in `field_source.description` + `description_merge_decision`.
+- **`name`** — keep current behavior.
+
+#### Image URL validation
+
+- Resolve relative URLs against the submitted page URL.
+- Allow only `http://` / `https://`.
+- Reject `data:`, `blob:`, `javascript:`, empty, malformed.
+- Reject obvious 1×1 / tracking pixels where detectable.
+- Dedupe; prefer same-host / CDN candidates.
+- Never log raw image URLs.
+
+#### Telemetry (privacy-safe, source-only)
+
+- `page_metadata_fallback_used: boolean`
+- `page_metadata_fallback_skipped_reason`: `"missing_name" | "missing_supporting_field" | "type_unresolved" | "image_invalid" | "not_needed_gemini_succeeded" | null`
+- `field_source.name`: `json_ld | og | twitter | html_title | firecrawl | markdown | gemini | none`
+- `field_source.description`: same enum + `description_merge_decision`: `gemini_kept | page_filled_gemini_missing | page_replaced_gemini_weak`
+- `field_source.image_url`: same enum
+- `field_source.type`: `json_ld | og_type | type_resolver | gemini` (never `others_default` — that path no longer exists)
+- `image_candidate_count`
+- `image_candidate_source_counts`: `{ json_ld, og, twitter, firecrawl, html }`
+
+No raw titles, descriptions, image URLs, markdown, HTML, or model text.
+
+#### Out of scope for 1.8c.6-A
+
+V1, frontend, DB schema, **Zod schema**, response contract, Gemini model/config, `responseMimeType`, token budgets, Firecrawl request settings/timeouts, Amazon guard, recovery gate, merge rules for non-fallback paths, category matching, real Phase 2 UI, any `needs_type_selection` UI flow.
+
+---
+
+### 1.8c.6-B — Image-source priority in metadata-lite / enrich-brand-data
+
+**File area:** `supabase/functions/fetch-url-metadata-lite/index.ts`, `supabase/functions/enrich-brand-data/` (image-selection branch only).
+
+#### Entity-intent rule
+
+"Brand entity" means the **entity itself is Brand** — not a product that merely has a brand attribute. Check explicit entity type, not the presence of a brand field.
+
+- **Brand entity:** keep current behavior — Google Image Search first, page-owned image as fallback. Brand landing pages rarely expose a clean logo via OG tags.
+- **All other entities** (product, book, movie, place, food, etc.): page-owned image first:
+  1. JSON-LD product image
+  2. `og:image` / `ogImage`
+  3. `twitter:image`
+  4. Firecrawl `metadata.image`
+  5. Reliable page HTML / markdown image candidates
+  6. Google Image Search **only if** all above missing/invalid
+
+Same image-URL validation as 1.8c.6-A.
+
+#### Telemetry
+
+- `image_source`: `json_ld | og | twitter | firecrawl | page_html | google_search | none`
+- `image_priority_path`: `brand_first_google | non_brand_page_first`
+- `image_candidate_count`
+
+#### Out of scope for 1.8c.6-B
+
+Brand image priority (preserved), Google Image Search itself, schema changes, UI changes, V1, description/name handling in metadata-lite (image branch only).
+
+---
+
+### Execution order
+
+1. Implement **1.8c.6-A**.
+2. Retest: Myntra, Tira, Fila, 1–2 Amazon URLs. Verify Myntra-style PDPs no longer return `NO_PREDICTIONS` **when** JSON-LD/`og:type` gives a reliable type; confirm pages with no reliable type still cleanly skip and log `type_unresolved` instead of inventing `"others"`.
+3. Implement **1.8c.6-B**.
+4. Retest: 2–3 non-brand product URLs that previously showed wrong images, plus 1–2 brand URLs to confirm brand behavior is unchanged.
+5. Then real **Phase 2**.
+
+`FIRECRAWL_SHAPE_DIAG_ENABLED` stays on through all of 1.8c.6 validation.
+
+---
+
+### Why this is safe
+
+- Fallback only fires when current flow would return `NO_PREDICTIONS` — never overrides Gemini.
+- No `"others"` sentinel — DB cannot be polluted with mistyped entities.
+- No schema / response / DB / frontend change.
+- Page metadata can only be used when type is **deterministically** resolvable, so we don't silently mistype anything.
+- Conservative description merge protects good Gemini descriptions from weak SEO/boilerplate text.
+- Image validation blocks tracking pixels, `data:`, favicons.
+- 1.8c.6-B preserves Google-first for **explicit** Brand entities only; products with a brand attribute use page-first.
+- Everything observable via privacy-safe `field_source.*` / `image_source` / `page_metadata_fallback_skipped_reason` telemetry.
+
+---
+
+### Explicitly **not** doing
+
+- Not setting `type: "others"` (or any sentinel) when type is unknown.
+- Not guessing type from title / slug / domain / product words / failed-Gemini output.
+- Not emailing Firecrawl.
+- Not changing Firecrawl timeouts/formats/call sites.
+- Not changing Gemini model, config, parser, guard, recovery, or non-fallback merge rules.
+- Not changing brand image priority.
+- Not changing V1, frontend, DB schema, **Zod schema**, response contract, or category matching.
+- Not adding a `needs_type_selection` UI/schema flow in this phase.
+- Not combining 1.8c.6-A and 1.8c.6-B into one patch.
+
+Approve to proceed with 1.8c.6-A.
