@@ -1493,6 +1493,7 @@ serve(async (req) => {
         ok: mainFallbackOk,
         used: mainFallbackUsed,
         skip_reason: mainFallbackSkipReason,
+        trigger_reason: mainFallbackTriggerReason,
         duration_ms: mainFallbackDurationMs,
         final_prediction_source: trace.final.prediction_source,
       });
