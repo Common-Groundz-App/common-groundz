@@ -1299,6 +1299,7 @@ serve(async (req) => {
     let mainFallbackAttempted = false;
     let mainFallbackOk = false;
     let mainFallbackSkipReason: string | null = null;
+    let mainFallbackTriggerReason: string | null = null;
     let mainFallbackError: string | undefined;
     let mainFallbackDurationMs: number | undefined;
     if (!mainMerged) {
@@ -1320,12 +1321,14 @@ serve(async (req) => {
           usedFirecrawl,
           mergeFlags: mainFlags,
           extractPredictions: extract.predictions,
+          primaryGeminiErrorCode: mainPrimaryGeminiErrorCode,
         },
         { geminiInvoker: searchOnlyGeminiInvoker, applyMerge },
       );
       mainFallbackAttempted = mainFb.attempted;
       mainFallbackOk = mainFb.ok;
       mainFallbackSkipReason = mainFb.skipReason;
+      mainFallbackTriggerReason = mainFb.triggerReason;
       mainFallbackError = mainFb.error;
       mainFallbackDurationMs = mainFb.durationMs;
       // (mainMergeReturnedPredictionsBeforeGuard is hoisted above; only the
