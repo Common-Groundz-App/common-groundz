@@ -1453,6 +1453,48 @@ serve(async (req) => {
         };
       }
     }
+
+    // Phase 1.8c.6-A — page-metadata fallback floor (main branch).
+    // Synthesize a LOW-CONFIDENCE prediction from page-owned signals when
+    // the full pipeline (extractor → Firecrawl → Gemini → search-only
+    // fallback) failed to produce one. Type-safe: only fires when
+    // extract.metadata.mapped_type was deterministically resolved.
+    let mainPageFallbackDiag: PageMetadataFallbackDiagnostics | null = null;
+    let mainPageFallbackUsed = false;
+    if (!mainMerged) {
+      const fb = buildPageMetadataFallback({
+        pageSignals: extract.pageSignals ?? null,
+        extractMetadata: extract.metadata,
+        baseUrl: finalEvidenceBaseUrl,
+      });
+      mainPageFallbackDiag = fb.diagnostics;
+      if (fb.predictions) {
+        const resolved = resolveCategory({
+          type: fb.predictions.type,
+          suggested_category_path: fb.predictions.suggested_category_path,
+        });
+        fb.predictions.category_id = resolved.category_id;
+        fb.predictions.matched_category_name = resolved.matched_category_name;
+        mainMerged = fb.predictions;
+        mainPageFallbackUsed = true;
+      }
+    }
+    if (geminiBlock && mainPageFallbackDiag) {
+      geminiBlock = {
+        ...geminiBlock,
+        page_metadata_fallback_used: mainPageFallbackDiag.used,
+        page_metadata_fallback_skip_reason: mainPageFallbackDiag.skip_reason,
+        page_metadata_field_source: mainPageFallbackDiag.field_source,
+      } as typeof geminiBlock;
+    } else if (mainPageFallbackDiag) {
+      geminiBlock = {
+        used: false,
+        page_metadata_fallback_used: mainPageFallbackDiag.used,
+        page_metadata_fallback_skip_reason: mainPageFallbackDiag.skip_reason,
+        page_metadata_field_source: mainPageFallbackDiag.field_source,
+      } as typeof geminiBlock;
+    }
+
     const mainPricing = mainMerged?.additional_data.pricing as PricingBlock | undefined;
 
     const response: V2SuccessResponse = {
