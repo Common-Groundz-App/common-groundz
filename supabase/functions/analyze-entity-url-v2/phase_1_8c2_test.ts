@@ -53,13 +53,12 @@ const AMAZON_PAGE: PageSignalsForGuard = {
 
 Deno.test("Phase 1.8c.2: bucketRatio — boundaries", () => {
   assertEquals(bucketRatio(0, 4), "none");
-  assertEquals(bucketRatio(1, 4), "low");      // 0.25
-  assertEquals(bucketRatio(2, 6), "medium");   // 0.333... → low? — 2/6=0.333<0.34 → low
-  // Be explicit on the contractual edges:
-  assertEquals(bucketRatio(34, 100), "medium"); // 0.34 inclusive
-  assertEquals(bucketRatio(50, 100), "medium"); // 0.5
-  assertEquals(bucketRatio(66, 100), "medium"); // 0.66 inclusive
-  assertEquals(bucketRatio(67, 100), "high");   // >0.66
+  assertEquals(bucketRatio(1, 4), "low");        // 0.25
+  assertEquals(bucketRatio(2, 6), "low");        // 0.333 < 0.34 → low
+  assertEquals(bucketRatio(34, 100), "medium");  // 0.34 inclusive
+  assertEquals(bucketRatio(50, 100), "medium");
+  assertEquals(bucketRatio(66, 100), "medium");  // 0.66 inclusive
+  assertEquals(bucketRatio(67, 100), "high");    // >0.66
   assertEquals(bucketRatio(100, 100), "high");
 });
 
