@@ -217,6 +217,8 @@ export interface PageTitleAnchorResult {
   anchor: string | null;
   reject_reason: PageTitleAnchorRejectReason | null;
   canonical_asin_mismatch: boolean;
+  /** Phase 1.8c.2 — which signal produced the anchor. */
+  source: AnchorSource;
 }
 
 /**
@@ -230,7 +232,7 @@ export function pickPageTitleAnchor(
   requestedAsin: string | null,
 ): PageTitleAnchorResult {
   if (!pageSignals) {
-    return { anchor: null, reject_reason: null, canonical_asin_mismatch: false };
+    return { anchor: null, reject_reason: null, canonical_asin_mismatch: false, source: "none" };
   }
 
   // Canonical-ASIN consistency check first — if mismatch, page is not
@@ -244,30 +246,32 @@ export function pickPageTitleAnchor(
         anchor: null,
         reject_reason: "AMAZON_CANONICAL_ASIN_MISMATCH",
         canonical_asin_mismatch: true,
+        source: "none",
       };
     }
   }
 
-  const candidates: Array<string | null> = [
-    pageSignals.jsonld_product_name,
-    pageSignals.og_title,
-    pageSignals.twitter_title,
-    pageSignals.title,
+  const candidates: Array<{ value: string | null; source: AnchorSource }> = [
+    { value: pageSignals.jsonld_product_name, source: "jsonld_product_name" },
+    { value: pageSignals.og_title,            source: "og_title" },
+    { value: pageSignals.twitter_title,       source: "twitter_title" },
+    { value: pageSignals.title,               source: "html_title" },
   ];
   for (const c of candidates) {
-    if (c && typeof c === "string" && !isBotWallOrGeneric(c)) {
-      return { anchor: c, reject_reason: null, canonical_asin_mismatch };
+    if (c.value && typeof c.value === "string" && !isBotWallOrGeneric(c.value)) {
+      return { anchor: c.value, reject_reason: null, canonical_asin_mismatch, source: c.source };
     }
   }
   // Anything present? Then they were all bot-wall/generic.
-  if (candidates.some((c) => typeof c === "string" && c.trim().length > 0)) {
+  if (candidates.some((c) => typeof c.value === "string" && c.value.trim().length > 0)) {
     return {
       anchor: null,
       reject_reason: "BOT_WALL_OR_GENERIC",
       canonical_asin_mismatch,
+      source: "none",
     };
   }
-  return { anchor: null, reject_reason: null, canonical_asin_mismatch };
+  return { anchor: null, reject_reason: null, canonical_asin_mismatch, source: "none" };
 }
 
 export type DualPathRejectReason =
