@@ -540,6 +540,13 @@ export function geminiFailureDiagnostics(
     zod_issue_paths: diagSanitizeKeyList(Array.from(paths)),
     missing_required_fields: diagSanitizeKeyList(Array.from(missing)),
     refusal_like,
+    // Phase 1.8c.3a — strict envelope unwrap diagnostics (booleans + key
+    // name + child kind only). Never includes raw child string / prose.
+    envelope_wrapper_key_present: attempts.envelope_wrapper_key_present ?? false,
+    envelope_unwrap_attempted: attempts.envelope_unwrap_attempted ?? false,
+    envelope_unwrap_succeeded: attempts.envelope_unwrap_succeeded ?? false,
+    envelope_unwrap_key: attempts.envelope_unwrap_key ?? null,
+    envelope_child_kind: attempts.envelope_child_kind ?? null,
   };
 }
 
