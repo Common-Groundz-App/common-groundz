@@ -1,155 +1,129 @@
-## Phase 1.8c.1 — Trace & fix post-merge discard of valid Gemini fallback predictions
 
-**Single highest-priority bug:** Request `f1927a2f` showed `merge.path: "recovery"` with all 8 `field_winners: "gemini"`, yet final response was `prediction_source: "none"` / `error_code: "NO_PREDICTIONS"`. A valid prediction is being discarded between `mergePredictions` returning and the HTTP response being built.
+## Where we are
 
-Ship only this fix. **Defer** parser envelope unwrap, `maxOutputTokens` bump, `responseMimeType` removal, and any loosening of `passesRecoveryGate` / Phase 1.7 guard. If 1.8c.1 alone unblocks Amazon URLs, none of the others are needed.
-
-### Clarifications folded in from review
-1. **Use existing production source labels** — `gemini_search_fallback`, `firecrawl_recovery`, `gemini_recovery`, `gemini`, `extractor` (already defined in `index.ts` ~lines 930/932/1381 and `schema.ts`). Do **not** introduce a new `search_fallback` label.
-2. **Do not infer gate status from `field_winners`** — log actual execution.
-3. **Preserve the real guard reason code** — surface the existing enum (e.g. `AMAZON_NAME_PAGE_TITLE_MISMATCH`, `AMAZON_ASIN_GROUNDING_MISMATCH`, `AMAZON_ASIN_GROUNDING_UNAVAILABLE`, `AMAZON_CANONICAL_ASIN_MISMATCH`) as `amazon_guard.raw_reason_code`, alongside a simplified `rejection_reason`.
-4. **Prove which variable the response builder used** — add `response_builder.predictions_value_source` so we don't have to infer from a truthy boolean.
-5. **Acceptance is correctness, not "force a modal"** — a legitimate guard rejection with a documented reason is a correct outcome.
-
----
-
-### Scope
-**Untouched:** V1, frontend, DB, Zod schema, model name, tools list, fetch cap, minimal Amazon packet, Firecrawl, non-Amazon paths, `responseMimeType`, `thinkingBudget`, `maxOutputTokens`, Phase 1.7 guard semantics, `passesRecoveryGate` rules, merge rules, Phase 2.
-
----
-
-### Suspect sites between `mergePredictions` returning and the HTTP response
-1. Phase 1.7 Amazon identity guard evaluating stale `extract` instead of `mergeOut.predictions`.
-2. Redundant `passesRecoveryGate` re-check applying stricter rules than `merge.ts`.
-3. Response builder reading the wrong variable (`extract` instead of `merged`).
-4. `prediction_source` ternary lacking a branch for `merge.path === "recovery"` + fallback OK → falls through to `"none"`.
-5. Final null-check guarding on `extract == null` instead of merge output.
-
----
-
-### Implementation — diagnostic pass (commit 1, pure telemetry)
-
-In `supabase/functions/analyze-entity-url-v2/index.ts`, between `mergePredictions` and the HTTP response (covering both the recovery branch ~line 930 and the main branch ~line 1379), add this block to the existing `trace` log. **Booleans, counts, enum strings, and reason codes only — no prediction values, no raw model text, no page titles, no URLs with query strings.**
+Phase 1.8c.1 telemetry proved there is **no post-merge wiring bug**. Both Amazon runs ended with:
 
 ```
-finalization: {
-  merge_returned_predictions: boolean,         // !!mergeOut.predictions
-  merge_path: "success" | "recovery" | "none",
-  merge_field_winners_gemini_count: number,
-
-  recovery_gate: {
-    ran_inside_merge: boolean,
-    ran_again_after_merge: boolean,            // true ONLY if a redundant second check exists
-    second_check_passed: boolean | null,
-  },
-
-  amazon_guard: {
-    evaluated: boolean,
-    passed: boolean,
-    rejection_reason:                          // simplified enum
-      | "asin_mismatch"
-      | "name_unanchored"
-      | "brand_mismatch"
-      | "page_signals_missing"
-      | "grounding_unavailable"
-      | "guard_not_run"
-      | "n/a",
-    raw_reason_code: string | null,            // actual existing guard code, e.g.
-                                               // AMAZON_NAME_PAGE_TITLE_MISMATCH,
-                                               // AMAZON_ASIN_GROUNDING_MISMATCH,
-                                               // AMAZON_ASIN_GROUNDING_UNAVAILABLE,
-                                               // AMAZON_CANONICAL_ASIN_MISMATCH
-    input_source:
-      | "merge_output"
-      | "extract_only"
-      | "gemini_only"
-      | "firecrawl_only"
-      | "none",
-  },
-
-  response_builder: {
-    predictions_var_truthy: boolean,
-    predictions_value_source:                  // which variable was actually read
-      | "merge_output"
-      | "extract_only"
-      | "gemini_only"
-      | "firecrawl_only"
-      | "none",
-    chosen_source:                             // existing production labels — do NOT rename
-      | "extractor"
-      | "gemini"
-      | "gemini_recovery"
-      | "gemini_search_fallback"
-      | "firecrawl_recovery"
-      | "none",
-    chosen_source_reason:
-      | "extract_present"
-      | "merge_success"
-      | "merge_recovery_with_fallback"
-      | "merge_recovery_with_firecrawl"
-      | "all_null"
-      | "discarded_by_amazon_guard"
-      | "discarded_by_second_recovery_gate"
-      | "discarded_unknown",
-  },
-}
+merge_returned_predictions: true
+merge_path: recovery
+amazon_guard.evaluated: true
+amazon_guard.passed: false
+amazon_guard.raw_reason_code: AMAZON_NAME_PAGE_TITLE_MISMATCH
+response_builder.chosen_source_reason: discarded_by_amazon_guard
+final.prediction_source: none → NO_PREDICTIONS
 ```
 
-Implementation notes:
-- `raw_reason_code`: look up the actual constant the guard already returns and pass it through verbatim. If the guard doesn't currently emit a code in the rejection branch, add a typed return (no semantic change) so this telemetry can capture it.
-- `predictions_value_source`: set at the literal assignment site of the variable the response builder serializes — not inferred elsewhere.
-- All `_source` / `_reason` / `rejection_reason` values are constrained enums; never raw strings derived from model output.
+The prediction reached the response builder and was **intentionally** rejected by the Phase 1.7 dual-path Amazon identity guard. `NO_PREDICTIONS` is the correct output given current guard rules. What we don't yet know is whether the guard is correctly conservative or rejecting on a bad anchor / overly strict token comparison. Phase 1.8c.2 adds the diagnostics needed to choose between those possibilities, **without changing any behavior**.
 
-### Implementation — fix pass (commit 2, same PR)
+## Reviewer-driven revision (incorporated)
 
-After running the failing URLs through commit 1's telemetry, apply **one** targeted fix matching what the logs reveal:
+Both reviewers correctly flagged that the original plan's `anchor_token_sample` / `model_name_token_sample` would log raw, human-readable tokens derived from page titles and model output (e.g. `folliwise`, `botanie`). That violates the existing "no prediction values / no raw page title / no raw model output in structured logs" policy. Revised approach uses counts, salted hashes, buckets, and safe decision booleans — no raw tokens.
 
-- Guard input is `extract` → switch to `mergeOut.predictions`.
-- Response builder reads `extract` → switch to merge output.
-- `prediction_source` ternary lacks a `merge.path === "recovery"` + fallback OK branch → add mapping to `gemini_search_fallback` or `firecrawl_recovery`.
-- Redundant `passesRecoveryGate` call after merge with stricter inputs → remove (single source of truth lives in `merge.ts`).
-- Final null-check uses wrong variable → switch to merge output.
+## Scope
 
-**Do not** loosen `passesRecoveryGate`. **Do not** weaken Phase 1.7 guard rules — only correct its inputs if wrong.
+**Amazon-only. Diagnostic-only. Single file of new telemetry + pass-through wiring.**
 
----
+Untouched: V1, frontend, DB, Zod schema, model name, tools list, `responseMimeType`, `thinkingBudget`, `maxOutputTokens`, Phase 1.7 guard semantics, `passesRecoveryGate` rules, merge rules, Firecrawl, non-Amazon paths, parser, response builder, Phase 2.
 
-### Tests (`phase_1_8c1_test.ts`)
-1. Telemetry shape: every `finalization.*` field present; all enum values match the contract above; source labels match production (`gemini_search_fallback`, `firecrawl_recovery`); `raw_reason_code` is either `null` or a known guard constant.
-2. Happy recovery: extract `null`, gemini fallback valid, Amazon guard passes → `chosen_source: "gemini_search_fallback"`, `predictions_value_source: "merge_output"`, `predictions_var_truthy: true`, final response uses merged prediction.
-3. Legitimate guard rejection: gemini name fails page-title anchor → `amazon_guard.passed: false`, `rejection_reason: "name_unanchored"`, `raw_reason_code: "AMAZON_NAME_PAGE_TITLE_MISMATCH"`, `chosen_source: "none"`, `chosen_source_reason: "discarded_by_amazon_guard"`.
-4. Extract-wins regression: deterministic extract present → `chosen_source: "extractor"`, `predictions_value_source: "merge_output"` (or `"extract_only"` if that's what the code actually does — telemetry must match reality), no behavior change.
-5. No prediction values in any log line — assert log keys against an allow-list of `finalization.*` fields.
+## New telemetry — appended to existing `finalization.amazon_guard` block
 
-Run via existing Deno test harness.
+Emitted **only** when `amazon_guard.evaluated === true` AND `is_amazon === true`. Omitted entirely for non-Amazon requests.
 
----
+### Safe counts and booleans
+- `anchor_present: boolean` — re-expose `page_title_anchor_present`
+- `anchor_source: "og_title" | "twitter_title" | "html_title" | "jsonld_product_name" | "none"` — which signal produced the anchor (read from existing `pickPageTitleAnchor` output)
+- `anchor_token_count: number`
+- `model_name_token_count: number`
+- `token_overlap_count: number`
+- `overlap_ratio_bucket: "none" | "low" | "medium" | "high"` — bucketed against `min(anchor_token_count, model_name_token_count)`. Buckets: `none` = 0, `low` = (0, 0.34), `medium` = [0.34, 0.66], `high` = (0.66, 1]. Bucketed so the raw ratio can't be reverse-engineered into token identities.
+- `page_title_anchor_reject_reason: string | null` — pass through verbatim from guard diag (e.g. `BOT_WALL`, `CANONICAL_ASIN_MISMATCH`)
+- `grounding_contains_canonical_dp_url: boolean` — pass through from guard diag
+- `grounding_chunk_count: number`
+- `grounding_amazon_chunk_count: number` — count of chunk URIs whose host matches the **shared strict Amazon predicate from Phase 1.8** (no new regex, no string includes)
 
-### Acceptance
-Retest the same two Amazon ASIN URLs. Per request, report:
-- `request_id`, `merge.path`, gemini `field_winners` count
-- All `finalization.*` fields above (including `raw_reason_code` and `predictions_value_source`)
-- `final.prediction_source`, `final.error_code`
-- Whether the modal opened
+### Decision-helping JSON-LD / source booleans (from Codex)
+- `jsonld_brand_present: boolean`
+- `jsonld_product_name_present: boolean`
+- `anchor_has_og_title: boolean`
+- `anchor_has_html_title: boolean`
+- `anchor_has_jsonld_product_name: boolean`
 
-**Correctness criteria:**
-- If merge output is valid AND Amazon guard passes → final response **must** use the merged prediction; `prediction_source ∈ {gemini_search_fallback, firecrawl_recovery, gemini_recovery, gemini, extractor}`.
-- If guard rejects → `NO_PREDICTIONS` is correct, but `raw_reason_code` must be a specific guard constant (not `null` and not `"guard_not_run"`).
-- **No** request may end with `merge_returned_predictions: true` AND `chosen_source: "none"` AND `chosen_source_reason: "discarded_unknown"`. That combination = unresolved bug.
+These are existence booleans on already-extracted `pageSignals` fields — no new extraction work.
 
----
+### Salted hash samples (gated on salt presence)
+- `anchor_token_hash_sample: string[]` — up to 5 entries, format `sha256(SALT + ":" + token).slice(0, 12)`
+- `model_name_token_hash_sample: string[]` — same format, up to 5
+- `overlap_hash_sample: string[]` — up to 5 hashes that appear in both sides
 
-### Explicitly deferred
-- ❌ `url_context {url, content, title}` envelope parser — only revisit if, after 1.8c.1, primary URL-context calls still produce that envelope AND fallback also fails for the same request.
-- ❌ Amazon fallback `maxOutputTokens` 2048 → 3072 — only revisit if request `6cb7e376` still shows `finish_reason: "MAX_TOKENS"` + `json_parse_ok: false` as the sole remaining blocker.
-- ❌ Removing `responseMimeType: "application/json"` — not in this phase.
+**Salt rules:**
+- Read `ENTITY_DIAG_HASH_SALT` from Deno env at module init.
+- If unset OR empty OR shorter than 16 chars → all three `*_hash_sample` fields are **omitted entirely** (not `[]`, not `null` — absent keys). Counts/booleans/bucket still emit. We never log unsalted or weakly-salted hashes, because a bare `sha256(token).slice(0,8)` over a known brand/product vocabulary is trivially rainbow-tableable.
+- Salt is server-side only, never logged, never returned in HTTP responses.
 
----
+### Strict log-content rules (carried forward)
+- No raw HTML, no raw model text, no raw page titles, no raw URLs with query strings, no prices, no PII.
+- No raw token strings.
+- No human-readable debug flag in this phase. If counts + hashes + buckets + booleans prove insufficient, a temporary debug flag is a **separate** follow-up phase — not bundled here.
 
-### Files expected to change
-- `supabase/functions/analyze-entity-url-v2/index.ts` (telemetry block + one targeted wiring fix)
-- `supabase/functions/analyze-entity-url-v2/amazon_asin_guard.ts` (only if `raw_reason_code` needs a typed return added)
-- `supabase/functions/analyze-entity-url-v2/phase_1_8c1_test.ts` (new)
+## Files to change
 
-### Risk
-Low. Commit 1 is pure telemetry. Commit 2 is one targeted wiring correction with a one-line revert. No schema, parser, model config, merge-rule, or guard-rule changes.
+- `supabase/functions/analyze-entity-url-v2/amazon_asin_guard.ts`
+  - Extend `DualPathDiagnostics` with the read-only counters/booleans listed above.
+  - Populate them in `runDualPathVerification` from values it already computes (`anchorTokens`, `nameTokens`, `anchorPick`, `args.pageSignals`, `args.groundingEvidence`).
+  - **No control-flow changes**, no new accept/reject branches.
+- `supabase/functions/analyze-entity-url-v2/finalization_telemetry.ts`
+  - Extend `GuardTracker` / `AmazonGuard` types and `buildFinalization` to pass new fields through.
+  - Implement salted-hash helper (lazy-read salt once at module init; export a `hashToken(t)` that returns `string | null`; callers omit the field when `null`).
+  - Implement `bucketRatio(overlap, denom)` returning the enum above.
+  - Reuse the **shared strict Amazon host predicate from Phase 1.8** for `grounding_amazon_chunk_count`. Do not add a new regex or use `includes`.
+- `supabase/functions/analyze-entity-url-v2/index.ts`
+  - Thread extended diagnostics into both `mainGuardTracker` and `recGuardTracker`. No new branches.
+- `supabase/functions/analyze-entity-url-v2/phase_1_8c2_test.ts` *(new)*
+
+## Tests
+
+1. **Shape — Amazon evaluated:** all new counts/booleans/bucket fields present. Hash sample fields present iff salt is set (test both setups by stubbing env).
+2. **Shape — non-Amazon:** entire new block absent.
+3. **Shape — guard not evaluated:** new fields absent, existing `evaluated: false` preserved.
+4. **Counts correctness:** synthetic anchor with 4 distinctive tokens and model name with 3 distinctive tokens, 1 overlap → `anchor_token_count: 4`, `model_name_token_count: 3`, `token_overlap_count: 1`, `overlap_ratio_bucket: "low"`.
+5. **Bucket boundaries:** parametrized for 0 / 0.33 / 0.34 / 0.5 / 0.66 / 0.67 / 1.0 → `none / low / medium / medium / medium / high / high`.
+6. **Hash cap:** anchor with 12 distinctive tokens emits exactly 5 hashes (with salt set).
+7. **Hash determinism + cross-side match:** same token on anchor side and model side produces the same hash → that hash appears in `overlap_hash_sample`.
+8. **Hash gating — unsalted:** with `ENTITY_DIAG_HASH_SALT` unset, all three `*_hash_sample` keys are absent from the emitted block; counts/booleans/bucket still present.
+9. **Hash gating — weak salt:** with salt of length < 16, hash samples omitted.
+10. **No raw token strings anywhere:** assert no field in the emitted block matches any of the input anchor or model-name raw tokens (case-insensitive substring scan).
+11. **No raw page title / URL / model output anywhere:** assert against an allow-list of `finalization.*` field names.
+12. **Amazon host predicate reuse:** `grounding_amazon_chunk_count` counts amazon.in, amazon.com, amazon.co.uk, amazon.de hosts; does NOT count `notamazon.com`, `amazon.evil.com`, `amazonaws.com`. Imports the shared Phase 1.8 predicate (no local regex).
+13. **JSON-LD booleans pass-through:** `jsonld_brand_present` / `jsonld_product_name_present` reflect `pageSignals` content unchanged.
+14. **Anchor source pass-through:** `anchor_source` matches whichever extractor `pickPageTitleAnchor` selected; `"none"` when no anchor.
+
+## Acceptance
+
+- All existing tests still green; new file's 14 tests green.
+- Re-run the same two `amazon.in` URLs. The trace must include the new diagnostic fields. Both runs may still end in `NO_PREDICTIONS` — this phase changes no behavior.
+- Success criterion: the new fields are sufficient to choose 1.8c.3's direction from the decision table below without re-running with additional logging.
+
+## Decision table for 1.8c.3 (not implemented in this phase)
+
+| Evidence in trace | Next phase |
+|---|---|
+| `anchor_present: false` OR `page_title_anchor_reject_reason` set OR `anchor_source: "none"` | Tighten `pickPageTitleAnchor` — anchor is unusable or wrong source |
+| `anchor_present: true`, `anchor_token_count > 0`, `model_name_token_count > 0`, `overlap_ratio_bucket: "none"`, `jsonld_brand_matches` would help (use booleans) | Relax Path B to also accept brand-token-only overlap |
+| `grounding_contains_canonical_dp_url: true` AND Path A still failed | Widen Path A to accept canonical `dp/<ASIN>` URLs in any retrieved URL |
+| `overlap_ratio_bucket: "low"` or `"medium"` with low denominators (≤2 tokens each side) | Improve evidence packet upstream (more title context) rather than touching guard |
+| None of the above clear | Keep current behavior; this URL family is genuinely unverifiable by Amazon identity rules. Stop iterating on the guard. |
+
+## Explicitly deferred (do NOT ship in 1.8c.2)
+
+- `passesRecoveryGate` loosening, Phase 1.7 guard semantics changes, Path A widening, Path B relaxation, `pickPageTitleAnchor` changes
+- `responseMimeType` removal, `maxOutputTokens` bump, `url_context` envelope parser
+- Human-readable token-sample debug flag (separate follow-up if ever needed)
+- V1, frontend, DB, Zod, model, tools, Firecrawl, non-Amazon paths, Phase 2
+
+## Operational note
+
+After merge, set `ENTITY_DIAG_HASH_SALT` (≥16 random chars) as a Supabase Edge Function secret before retesting. Without it, hash samples are silently omitted and we rely on counts + buckets + booleans — which is still enough for most decision-table branches.
+
+## Risk
+
+Very low. Pure additive telemetry. No control flow, no guard rules, no parser, no model config, no schema. One-line revert per file.
