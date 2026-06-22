@@ -431,20 +431,23 @@ async function performImageSearch(
   }
 }
 
-// Search for brand logo using two-phase approach with fallback
+// Search for brand logo using two-phase approach with fallback.
+// Returns { url, source } so the handler can emit logoSource telemetry and
+// decide whether to try the Phase 1.8c.6-B page-owned fallback.
 async function searchBrandLogo(
   brandName: string,
   officialWebsite: string | null,
   apiKey: string,
   cxId: string
-): Promise<string | null> {
+): Promise<{ url: string | null; source: LogoSource }> {
   try {
     const allResults: any[] = [];
     const seenUrls = new Set<string>(); // Deduplication tracker
+    const officialHostname = officialWebsite ? safeGetHostname(officialWebsite) : null;
     
     // PHASE 1: Search official website (if available)
     if (officialWebsite) {
-      const hostname = safeGetHostname(officialWebsite);
+      const hostname = officialHostname;
       if (hostname) {
         console.log(`   🔍 Phase 1: Searching official site (${hostname})...`);
         const siteQuery = `"${brandName}" logo site:${hostname}`;
@@ -502,7 +505,7 @@ async function searchBrandLogo(
     
     if (allResults.length === 0) {
       console.log(`   ❌ No logo images found`);
-      return null;
+      return { url: null, source: 'none' };
     }
     
     // Score and rank ALL deduplicated results from both phases
@@ -524,14 +527,18 @@ async function searchBrandLogo(
     // GUARDRAIL: Only accept if score > 0 (prevents low-quality images)
     if (bestLogo && bestLogo.score > 0) {
       console.log(`   ✅ Selected logo with score: ${bestLogo.score}`);
-      return bestLogo.url;
+      const winnerHost = safeGetHostname(bestLogo.url);
+      const source: LogoSource = (officialHostname && winnerHost === officialHostname)
+        ? 'google_site_scoped'
+        : 'google_broad';
+      return { url: bestLogo.url, source };
     }
     
     console.log(`   ❌ No logo met quality threshold (best: ${bestLogo?.score})`);
-    return null;
+    return { url: null, source: 'none' };
   } catch (error) {
     console.error('❌ Logo search error:', error);
-    return null;
+    return { url: null, source: 'none' };
   }
 }
 
