@@ -1,9 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { isValidPageImageUrl } from './image_validation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+type ImagePriorityPath =
+  | 'brand_first_google'
+  | 'non_brand_page_first'
+  | 'unknown_page_first';
 
 /**
  * Sanitize product/brand names - remove junk placeholders and whitespace
