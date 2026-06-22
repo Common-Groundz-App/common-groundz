@@ -19,6 +19,7 @@ import {
   type PriceSourceHint,
   type PriceSourceUsed,
 } from "./pricing.ts";
+import { resolvePageOwnedImage } from "./image_validation.ts";
 
 // ─── Diagnostics ──────────────────────────────────────────────────────────
 
@@ -26,6 +27,12 @@ export type WinnerExtBasic = "extractor" | "gemini" | "none";
 export type WinnerImage = "extractor" | "gemini" | "firecrawl" | "none";
 export type WinnerCurrency = "extractor" | "gemini" | "firecrawl" | "none";
 export type WinnerTags = "extractor" | "gemini" | "merged" | "none";
+
+export type DescriptionSourceCorrection =
+  | "kept_gemini"
+  | "replaced_with_page"
+  | "kept_extractor"
+  | "none";
 
 export interface MergeDiagnostics {
   path: "success" | "recovery";
@@ -46,6 +53,10 @@ export interface MergeDiagnostics {
   recovery_gate_passed?: boolean;
   /** Phase 8.1A: internal honesty signal for pricing.price_source. */
   price_source_used?: PriceSourceUsed;
+  /** Phase 1.8c.6-A.2: page-owned image overrode (or replaced absent) Gemini image. */
+  page_owned_image_override_applied: boolean;
+  /** Phase 1.8c.6-A.2: which description source won in the success path. */
+  description_source_correction: DescriptionSourceCorrection;
 }
 
 export interface MergeFlags {
@@ -120,6 +131,24 @@ function isValidDescription(d: string | null | undefined): d is string {
   const letters = s.replace(/[^A-Za-z]/g, "");
   if (letters.length > 10 && letters === letters.toUpperCase()) return false;
   return true;
+}
+
+// Phase 1.8c.6-A.2: boilerplate/spammy description detector. Anything that
+// passes isValidDescription but matches these patterns is considered weak
+// and may be replaced by a page-owned description.
+const DESCRIPTION_BOILERPLATE_PATTERNS: RegExp[] = [
+  /^(buy|shop|order|get|find)\b/i,
+  /\b(best price|free shipping|cash on delivery|cod available|lowest price|online shopping)\b/i,
+  /\bonline\s+(in|at)\s+[a-z ]+$/i,
+];
+
+export function isWeakOrGenericDescription(d: string | null | undefined): boolean {
+  if (!isValidDescription(d)) return true;
+  const s = d.trim();
+  for (const p of DESCRIPTION_BOILERPLATE_PATTERNS) {
+    if (p.test(s)) return true;
+  }
+  return false;
 }
 
 function nonEmpty(s: string | null | undefined): s is string {
@@ -276,6 +305,8 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
     },
     name_junk_override_applied: false,
     price_conflict_blocked_gemini: false,
+    page_owned_image_override_applied: false,
+    description_source_correction: "none",
   };
 
   // ── Recovery path ─────────────────────────────────────────────────────
@@ -369,17 +400,40 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
     diag.name_junk_override_applied = true;
   }
 
-  // ── description: Gemini if valid, else extractor (no markdown fallback)
-  if (isValidDescription(gemini.description)) {
-    out.description = gemini.description.trim();
+  // ── description (Phase 1.8c.6-A.2): keep strong Gemini; otherwise prefer
+  //    valid page-owned description over weak/boilerplate Gemini text.
+  const geminiDescStrong = isValidDescription(gemini.description)
+    && !isWeakOrGenericDescription(gemini.description);
+  if (geminiDescStrong) {
+    out.description = gemini.description!.trim();
     diag.field_winners.description = "gemini";
+    diag.description_source_correction = "kept_gemini";
+  } else if (isValidDescription(out.description)) {
+    // Extractor (page-owned) description wins by default — explicitly mark
+    // a replacement when Gemini provided something we rejected.
+    diag.field_winners.description = "extractor";
+    diag.description_source_correction = nonEmpty(gemini.description)
+      ? "replaced_with_page"
+      : "kept_extractor";
+  } else {
+    diag.description_source_correction = "none";
   }
 
-  // ── image: extractor > Gemini (success path)
-  if (!out.image_url && gemini.image_url) {
+  // ── image (Phase 1.8c.6-A.2): page-owned (extractor > firecrawl) wins
+  //    over Gemini whenever a validated page-owned image exists.
+  const pageOwned = resolvePageOwnedImage({
+    extractImageUrl: out.image_url,
+    firecrawlImageUrl: flags.firecrawlImageUrl,
+  });
+  if (pageOwned) {
+    out.image_url = pageOwned.url;
+    diag.field_winners.image_url = pageOwned.source;
+    diag.page_owned_image_override_applied = true;
+  } else if (gemini.image_url) {
     out.image_url = gemini.image_url;
     diag.field_winners.image_url = "gemini";
   }
+
 
   // ── images: union dedupe
   const extImgs = out.images ?? [];
