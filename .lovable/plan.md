@@ -1,174 +1,70 @@
-# Phase 1.8c.6-B (Final, approved) — Intent-Aware Page-Owned Image Priority
+## Verdict on your 2 new URL tests
 
-Incorporates the final ChatGPT + Codex clarification about which entity-type value to pass from `CreateEntityDialog`. Also reflects the user's draft-leftover constraint: **AI analysis is the source of truth at the time of the metadata call; user override happens later through the form**.
+**Not working as intended — but the bug is in deployment, not in the 1.8c.6-B logic.**
 
-## The rule (locked)
+### What the logs show
 
-| Caller intent at invoke time | `fetch-url-metadata-lite` | `enrich-brand-data` |
-|---|---|---|
-| `entityType: "brand"` | **Google first**, page-owned ignored, no new HTML fetch | **Google first**, page-owned fallback only when Google fails |
-| `entityType` non-brand (product, book, place, etc.) | **Page-owned first**, Google fallback | n/a |
-| `entityType` omitted | page-owned first (safe generic-preview default; current known callers will not hit this) | n/a |
+Two `fetch-url-metadata-lite` calls were made:
+- 07:37:24 — `tirabeauty.com` (Lakme foundation)
+- 07:38:43 — `maccaron.in` (Isntree green tea toner)
 
-We never infer brand from URL, title, or domain.
+Both URLs are **non-brand product pages**. With 1.8c.6-B working, each should have:
+1. Logged `🧭 entityType: product (source=caller, path=non_brand_page_first)`
+2. Logged `🌐 Bounded HTML fetch for page-owned image: success`
+3. Logged `🖼️ Page-owned image won on path=non_brand_page_first`
+4. Returned `images[0].source === "page-owned"` (the actual Tira/Maccaron product photo)
+5. Included `image_priority_path`, `entityTypeSource`, `pageOwnedImageWon`, `pageHtmlFetchedForImage` in the `📦 Response structure` log
 
-## Caller audit (confirmed)
+**None of that happened.** Both calls show the pre-1.8c.6-B sequence:
+- No `🧭` line at all
+- "No HTML available - skipping description/favicon extraction"
+- Response structure has only the old 5 keys (`hasTitle, hasDescription, hasFavicon, imageCount, imageSources`)
+- All 5 images came from Google, none page-owned
 
-`fetch-url-metadata-lite` has exactly two callers; both wired in this same patch (no deferral):
+### Root cause
 
-1. `src/hooks/recommendations/use-entity-operations.ts` — `fetchUrlMetadata()` called from `handleEntityCreation()` which holds `correctedType: EntityType`. Pass `correctedType`.
-2. `src/components/admin/CreateEntityDialog.tsx` line 965 — the metadata invoke runs **immediately after** `aiResult` returns and **before** AI predictions are merged into `formData`. At this moment:
-   - `aiResult.data?.predictions?.type` is the freshest signal (AI just ran on the submitted URL).
-   - `formData.type` may contain a stale draft value left over from a previous session, an unrelated pre-selection, or be empty.
-   - Per the user's instruction, AI prediction wins here; manual override happens later through the form UI (subsequent edits) — not at this invoke.
+The source code is correct. I verified:
+- `supabase/functions/fetch-url-metadata-lite/index.ts` contains the new logic (lines 70–270) — confirmed `🧭 entityType:` log at line 92, bounded fetch at line 124–133, page-owned promotion at line 199–218, telemetry in response at line 293–298.
+- `image_validation.ts` exists (modified 07:00).
+- `index_test.ts` exists (modified 07:03).
+- Frontend caller is correctly wired at `CreateEntityDialog.tsx` line 977–984 — passes `entityType: resolvedEntityType` from AI prediction with the agreed fallback.
+- `use-entity-operations.ts` also passes `entityType` correctly.
 
-   Resolution order at line 965:
-   ```ts
-   entityType:
-     aiResult.data?.predictions?.type
-     ?? (formData.type && formData.type !== '' ? formData.type : null)
-     ?? null
-   ```
-   AI prediction first → non-empty `formData.type` fallback (covers the case where AI didn't return a type) → `null`.
+But the deployed Supabase Edge Function at 07:37 was still serving the **pre-1.8c.6-B build**. This is a deployment-sync issue, not a code issue. Most likely cause: the auto-deploy didn't pick up the new `image_validation.ts` sibling file, so the new `index.ts` either fails its `import './image_validation.ts'` at boot and silently falls back to a cached older bundle, or the bundler skipped the rebuild entirely.
 
-No other callers exist.
+## Plan
 
-## Scope
+### Step 1 — Force a fresh deploy of both functions
+Use `supabase--deploy_edge_functions` to redeploy:
+- `fetch-url-metadata-lite`
+- `enrich-brand-data`
 
-### In scope
-- `supabase/functions/fetch-url-metadata-lite/index.ts` — accept optional `entityType`; choose image-priority path; extract page-owned candidates on non-brand/unknown path; emit telemetry.
-- `supabase/functions/enrich-brand-data/index.ts` — keep Google-first; add page-owned official-site fallback **only when no Google candidate has `score > 0`**; no score bump.
-- New local `image_validation.ts` in each function (copy of A.2 helper; edge functions can't cross-import).
-- `src/hooks/recommendations/use-entity-operations.ts` — thread `EntityType` from `handleEntityCreation` into `fetchUrlMetadata` and include it in the invoke body.
-- `src/components/admin/CreateEntityDialog.tsx` — include `entityType` in the invoke body using the AI-first resolution above.
+This forces the bundler to pick up the new sibling files (`image_validation.ts`) and any boot-time import failure will surface in the deploy output where we can see it instead of silently reverting.
 
-### Out of scope (byte-unchanged)
-V2 (`analyze-entity-url-v2`), A.1, A.2, `merge.ts`, recovery, Gemini, Firecrawl settings, parser, guard, Zod, frontend UI behavior beyond the two invoke bodies, DB, schema, category matching, Google scoring weights, brand description cascade.
+### Step 2 — Smoke-test with a direct curl
+Hit `fetch-url-metadata-lite` once with `entityType: "product"` and the Maccaron URL, once with `entityType: "brand"` and `https://www.nykaa.com`. Inspect the `metadata` block in the response for the 5 new telemetry keys. If they appear, the new code is live.
 
-## Behavior — `fetch-url-metadata-lite/index.ts`
+### Step 3 — Pull fresh logs and confirm
+Read the latest `fetch-url-metadata-lite` logs immediately after the curls and confirm:
+- `🧭 entityType: product (source=caller, path=non_brand_page_first)` appears for the Maccaron call
+- `🌐 Bounded HTML fetch for page-owned image: success` appears
+- `🖼️ Page-owned image won on path=non_brand_page_first` appears
+- For the Nykaa brand call: `path=brand_first_google` and `pageHtmlFetchedForImage: false`
 
-**New optional request field:** `entityType?: string`. Normalized server-side: `String(entityType ?? "").trim().toLowerCase() === "brand"` → brand path. Any other non-empty value → non-brand path. Empty/missing → unknown path.
+### Step 4 — Re-run your Tira + Maccaron analyze flow from the UI
+Now that the function is live, repeat your two-URL test from the Admin dialog. Confirm logs show:
+- `entityTypeSource: caller`
+- The primary image in the UI is the actual product photo from Tira/Maccaron, not a Google search result.
 
-**Image-priority paths:**
-- `brand` → `image_priority_path: "brand_first_google"` — current Google-first behavior is **byte-identical to today**. No HTML scraping for page-owned image candidates. Existing Open Graph fallback (only when Google returns zero results) stays as-is.
-- non-brand → `image_priority_path: "non_brand_page_first"`.
-- omitted/empty → `image_priority_path: "unknown_page_first"` (same logic as non-brand).
+### Step 5 — Report
+Produce a short verdict per URL with `image_priority_path`, `pageOwnedImageWon`, primary image source, and a side-by-side of before-vs-after image. If any URL still hits Google first when it shouldn't, that becomes a follow-up patch.
 
-**Page-owned candidates (non-brand/unknown only):** extracted from page HTML in this order: `og:image` → `twitter:image` → `<link rel="image_src">`. JSON-LD `image` is not added here.
+## Out of scope
 
-**HTML acquisition (honest about network calls):**
-1. If `pageHtml` is already in memory from `extractProductName(url)` (caller didn't pass a product name) → reuse it; no new fetch; `pageHtmlFetchedForImage: false`.
-2. If `pageHtml` is empty AND path is non-brand/unknown → perform **one** bounded HTML fetch with the existing `AbortSignal.timeout(10000)` and the same User-Agent block already used in `extractProductName`. Reuse the HTML for image, description, and favicon (description/favicon currently skip entirely in this branch — a free correctness win). Set `pageHtmlFetchedForImage: true`.
-3. Brand path skips this entirely. `pageHtmlFetchedForImage` stays `false`. Zero new network cost on the brand path.
-4. Any fetch failure is silent and falls back to current Google-first behavior.
+- No source-code changes to 1.8c.6-B logic. The code is correct; this is a deploy operation.
+- No changes to `analyze-entity-url-v2`, merge, or any other flow.
+- If the redeploy surfaces a real bundling error (e.g. relative import unsupported in deployed runtime), that fix becomes a separate small patch — most likely inlining `image_validation.ts` into `index.ts` for now and revisiting the shared module split in Phase 1.8c.7.
 
-**Selection on non-brand/unknown path:**
-- Candidates pass `isValidPageImageUrl` (http/https only; rejects `data:`/`blob:`/`javascript:`/malformed/tracking pixels/favicons/`.ico`).
-- First valid page-owned candidate becomes `image` (primary) and goes first in `images[]`.
-- Google results follow, deduped by URL string.
-- If no valid page-owned candidate → behavior is identical to today (Google wins; OG fallback when Google empty).
+## Risk
 
-## Behavior — `enrich-brand-data/index.ts`
-
-Existing pipeline (Phase 1 site-scoped Google → Phase 2 broader Google → score → accept best `score > 0`) is the **primary** path and is **unchanged**.
-
-**New fallback (only runs when Google fails):**
-- If best Google candidate `score > 0` → return Google result, set `logoSource = "google_site_scoped"` or `"google_broad"`. **Identical to today.**
-- If `score ≤ 0` or no Google candidates → try page-owned official-site assets from the HTML that `scrapeDescription` already downloaded, in order:
-  1. `og:image` → `logoSource: "page_owned_og"`
-  2. `apple-touch-icon` (any size) → `logoSource: "page_owned_apple_touch_icon"`
-  3. `<link rel="icon">` with explicit `sizes` ≥ 128 → `logoSource: "page_owned_favicon"`
-- Each candidate must pass `isValidPageImageUrl`.
-- If `scrapeDescription` did not run or returned no HTML → fallback skipped cleanly. `pageOwnedLogoCandidateCount = 0`.
-- **No score bump. No competition with Google. Page-owned assets only fill the gap.**
-
-## Frontend caller wiring (in this patch)
-
-`src/hooks/recommendations/use-entity-operations.ts`:
-- `fetchUrlMetadata` gains optional `entityType?: string` (4th arg).
-- `handleEntityCreation` calls `fetchUrlMetadata(websiteUrl, undefined, undefined, correctedType)`.
-- Invoke body includes `entityType` when defined and non-empty.
-
-`src/components/admin/CreateEntityDialog.tsx`:
-- Line 965 invoke body adds the AI-first resolution shown above.
-- No other UI/state changes. Manual type override after AI analysis is a user-driven later edit and is not affected by this patch.
-
-No schema change. No DB change.
-
-## Telemetry (privacy-safe — no raw URLs/descriptions)
-
-`fetch-url-metadata-lite` response `metadata` block adds:
-- `entityType: string | null` — echoes resolved caller input.
-- `entityTypeSource: "caller" | "omitted"` — `"caller"` whenever the request body included a non-empty string; `"omitted"` otherwise.
-- `image_priority_path: "brand_first_google" | "non_brand_page_first" | "unknown_page_first"`.
-- `pageOwnedImageFound: boolean`.
-- `pageOwnedImageWon: boolean`.
-- `pageHtmlFetchedForImage: boolean` — true only when the bounded new fetch (path 2 above) ran.
-
-`enrich-brand-data` response adds:
-- `logoSource: "google_site_scoped" | "google_broad" | "page_owned_og" | "page_owned_apple_touch_icon" | "page_owned_favicon" | "none"`.
-- `pageOwnedLogoCandidateCount: number`.
-- `pageOwnedLogoUsedAsFallback: boolean`.
-
-## Files
-
-```text
-NEW
-  supabase/functions/fetch-url-metadata-lite/image_validation.ts   (copy of A.2 helper)
-  supabase/functions/enrich-brand-data/image_validation.ts         (copy of A.2 helper)
-  supabase/functions/fetch-url-metadata-lite/index_test.ts
-  supabase/functions/enrich-brand-data/index_test.ts
-
-EDITED
-  supabase/functions/fetch-url-metadata-lite/index.ts
-  supabase/functions/enrich-brand-data/index.ts
-  src/hooks/recommendations/use-entity-operations.ts
-  src/components/admin/CreateEntityDialog.tsx
-  .lovable/plan.md
-```
-
-## Tests
-
-### `fetch-url-metadata-lite` (8 tests)
-1. **Non-brand** with valid `og:image` → page-owned wins, first in `images[]`, `image_priority_path = "non_brand_page_first"`, `entityTypeSource = "caller"`, `pageOwnedImageWon = true`.
-2. **Non-brand**, no valid page-owned image → Google wins (regression guard), `pageOwnedImageWon = false`.
-3. **Explicit brand** with valid `og:image` AND Google result present → Google wins, `image_priority_path = "brand_first_google"`, `entityTypeSource = "caller"`, `pageOwnedImageWon = false`, `pageHtmlFetchedForImage = false`.
-4. **Omitted entityType** generic preview → `image_priority_path = "unknown_page_first"`, `entityTypeSource = "omitted"`, page-owned behavior applies.
-5. **Invalid page-owned image** (`data:` URL, tracking pixel, `.ico`) → does NOT override Google on non-brand path.
-6. **Dedup** — page-owned URL identical to a Google result → single entry, page-owned position wins, no duplicates.
-7. **Bounded-fetch honesty** — caller provides `productName` AND `entityType` non-brand → exactly one new HTML fetch, `pageHtmlFetchedForImage = true`.
-8. **Brand path skips fetch** — caller provides `productName` AND `entityType: "brand"` → no new HTML fetch, `pageHtmlFetchedForImage = false`.
-
-### `enrich-brand-data` (5 tests)
-9. Google `score > 0` AND page-owned `og:image` present → Google wins, `logoSource` starts with `google_`, `pageOwnedLogoUsedAsFallback = false`.
-10. Google `score ≤ 0` AND valid page-owned `og:image` → page-owned wins, `logoSource = "page_owned_og"`, `pageOwnedLogoUsedAsFallback = true`.
-11. No Google AND no page-owned → `logoSource = "none"`, current "logo not found" path unchanged.
-12. Invalid page-owned asset (favicon-only / tracking pixel / `data:`) on fallback path → ignored; result stays `"none"` if Google also failed.
-13. `scrapeDescription` returned no HTML → fallback skipped cleanly, no exception, `pageOwnedLogoCandidateCount = 0`.
-
-All telemetry assertions verify that no raw URLs or descriptions appear in any diagnostic string.
-
-## Retest matrix after ship
-
-**Non-brand product URLs** — expect page-owned image win, `entityTypeSource: "caller"`:
-- Myntra product page, Tira product page, Fila product page, Maccaron product page, one Amazon non-brand product URL, one independent shop URL.
-
-**Explicit Brand entries** — expect Google logo win, `image_priority_path: "brand_first_google"`, `pageHtmlFetchedForImage: false`:
-- Brand creation for "Myntra", "Tira", "Nykaa" — confirm logo is the actual brand mark, not site favicon or hero `og:image`.
-
-**Draft-leftover sanity check** — start brand creation with a stale `formData.type = "product"` from a draft, paste a brand URL, run analyze; verify the metadata-lite invoke received the AI-predicted `"brand"` (not the stale draft value).
-
-**Brand fallback (rare)** — obscure brand where Google returns no candidate above threshold → confirm page-owned `og:image` fallback kicks in and `pageOwnedLogoUsedAsFallback: true`.
-
-**Latency check** — review `fetch-url-metadata-lite` logs for the new bounded fetch path (`pageHtmlFetchedForImage: true`). If p95 latency on non-brand creates worsens noticeably, the 10s timeout can be tightened in a follow-up.
-
-## Risk and rollback
-
-- Brand path is **byte-identical** to today on both functions when `entityType: "brand"` is passed — and both callers now pass it.
-- Non-brand path adds at most one bounded HTML fetch (silent failure → Google fallback).
-- No DB or schema risk.
-- Rollback: revert the two `index.ts` edits and the two frontend caller edits; new `image_validation.ts` files become unused but harmless.
-
-## Next phase
-
-**1.8c.7** — unify the three duplicate `image_validation.ts` copies into a single shared module under `supabase/functions/_shared/`. Refactor only, no behavior change.
+Low. Redeploying the function only re-bundles existing committed source. If it succeeds, behavior matches the intended 1.8c.6-B plan. If it fails, the deploy output tells us exactly what's wrong (no silent regression).
