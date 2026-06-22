@@ -42,6 +42,8 @@ function makeMergeDiag(
     field_winners,
     name_junk_override_applied: false,
     price_conflict_blocked_gemini: false,
+    page_owned_image_override_applied: false,
+    description_source_correction: "none",
     ...(path === "recovery" ? { recovery_gate_passed: true } : {}),
   };
 }
