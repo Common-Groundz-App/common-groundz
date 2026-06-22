@@ -1103,6 +1103,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       } else if (metadataResult.data) {
         console.log('📄 Metadata:', metadataResult.data);
         setUrlMetadata(metadataResult.data);
+        // Phase 2: bind the just-fetched metadata to the normalized URL it
+        // belongs to, so the metadata-only modal's freshness guard refuses to
+        // surface it under a different URL later.
+        setMetadataUrl(normalizedAnalyze);
         if (!cachedMetadata) {
           setCachedMetadata(analyzeUrl, metadataResult.data);
         }
