@@ -1339,6 +1339,71 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     
     console.log('✅ Applied metadata-only (no AI predictions)');
   };
+
+  /**
+   * Phase 2: purely additive metadata-only apply. Receives the same snapshot
+   * the modal rendered from — never re-reads live state like analyzeUrl, so a
+   * user edit between Analyze and Apply cannot poison the write.
+   *
+   * Writes ONLY:
+   *  - name (if currently empty)
+   *  - website_url (if currently empty), from snapshot.websiteUrl
+   *  - images: appended/deduped; primaryMediaUrl set only if currently empty
+   *
+   * Never writes or clears: type, category, brand, price, currency, tags,
+   * description, structured product fields.
+   */
+  const applyMetadataOnlySafe = (snapshot: {
+    title?: string;
+    websiteUrl?: string;
+    images?: string[];
+  }) => {
+    const title = (snapshot.title ?? '').trim();
+    const website = (snapshot.websiteUrl ?? '').trim();
+    const incoming = Array.isArray(snapshot.images) ? snapshot.images : [];
+
+    if (title && !formData.name.trim()) {
+      handleInputChange('name', title);
+    }
+    if (website && !formData.website_url.trim()) {
+      handleInputChange('website_url', website);
+    }
+
+    if (incoming.length > 0) {
+      let addedCount = 0;
+      let firstAddedUrl: string | null = null;
+      setUploadedMedia(prev => {
+        const existing = new Set(prev.map(m => m.url));
+        const toAdd: MediaItem[] = [];
+        incoming.forEach(url => {
+          if (existing.has(url)) return;
+          existing.add(url);
+          toAdd.push({
+            id: crypto.randomUUID(),
+            url,
+            type: 'image',
+            order: prev.length + toAdd.length,
+            caption: 'From URL metadata',
+            source: 'external',
+          });
+        });
+        addedCount = toAdd.length;
+        if (toAdd.length > 0) firstAddedUrl = toAdd[0].url;
+        return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+      });
+      if (firstAddedUrl && !primaryMediaUrl) {
+        setPrimaryMediaUrl(firstAddedUrl);
+      }
+      console.log(`✅ Phase 2 applyMetadataOnlySafe: added ${addedCount} image(s)`);
+    }
+
+    setShowPreviewModal(false);
+    toast({
+      title: 'Basic metadata applied',
+      description: 'Please review and fill the remaining fields.',
+    });
+  };
+
   
   const applyPredictionsToForm = async (pred: any) => {
     let appliedCount = 0;
