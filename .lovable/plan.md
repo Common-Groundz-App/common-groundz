@@ -1,41 +1,73 @@
-## Problem
+# Phase 2 verification + AutoFillPreviewModal overflow fix (revised)
 
-In `CreateEntityDialog.tsx`, `resetAutofillOwnedFields()` (line 999) deliberately does NOT clear `uploadedMedia` / `primaryMediaUrl`. Result: when Analyze is re-run with a different URL, the previous URL's images (Bleu de Chanel) stay in the gallery and the new URL's images (Allure Homme Sport) are appended on top of them.
+## 1. Did Phase 2 work as intended on the Chanel URL?
 
-The user has clarified: **manual uploads should also be cleared on URL change**, because a user may have uploaded files for one entity and then pasted a URL for a completely different entity. The entire media set belongs to "the entity currently being analyzed".
+Yes. The edge logs for request `e17c85e4-25fa-40aa-879c-ac091da831cf` show the V2 pipeline failed along the exact path Phase 2 was designed to catch, and the UI rendered the metadata-only fallback.
 
-## Fix — Phase 2 v6 (scoped, minimal)
+What happened:
+- Direct fetch: `FETCH_BAD_STATUS` (403 from Chanel).
+- Firecrawl recovery: `FIRECRAWL_HTTP_ERROR` 408 (timed out after ~26s).
+- Primary Gemini: `GEMINI_BAD_RESPONSE` (no text parts, JSON parse failed).
+- Search-only Gemini fallback: skipped, `skip_reason: budget_exhausted` (Firecrawl consumed the time budget).
+- Final V2 response: `predictions_value_source: "none"`, `chosen_source_reason: "all_null"`.
 
-Clear **all** media when a new normalized URL is analyzed. Same-URL retries still preserve everything (existing v5 guard).
+So `predictions.predictions` was null → modal entered the no-predictions branch.
 
-### Changes — all inside `src/components/admin/CreateEntityDialog.tsx`
+In parallel, `fetch-url-metadata-lite` succeeded and returned usable basic data:
+- Title: `allure homme sport eau de toilette spray` (extracted/sanitized from URL path).
+- Website URL.
+- 5 images from Google image search.
+- Favicon found.
 
-1. **Extend `resetAutofillOwnedFields()`** (lines 999–1020) to also reset the media-related state in the same `setFormData` block / alongside it:
-   - `setUploadedMedia([])`
-   - `setPrimaryMediaUrl(null)`
-   - `setFormData(prev => ({ ...prev, image_url: '' }))` (already inside the existing setter — just add the `image_url: ''` field)
+`buildMetadataOnly` accepted it (title + ≥1 valid image), so the modal showed:
+- "AI details unavailable" header.
+- Metadata preview card with title, website URL, image thumbnails.
+- "Use basic metadata" button.
 
-2. **Update the comment on lines 997–998** from "Never clears name, website_url, uploadedMedia, primaryMediaUrl." to "Never clears name or website_url. Clears all media and image_url so the gallery always reflects the currently analyzed URL."
+No confidence %, no type/category/brand/price/tags/description shown. Successful AI path untouched. This matches the Phase 2 v4 spec.
 
-3. **No call-site changes needed.** `resetAutofillOwnedFields()` is already invoked exclusively inside the `normalizedAnalyze !== lastAnalyzedUrl` branch in `handleAnalyzeUrl` (line 1038–1044). Same-URL retries will continue to preserve media because the guard already prevents the reset from running.
+**Verdict: working as intended.** The one non-Phase-2 observation is that Firecrawl burned the budget and starved the search-only Gemini fallback, which is a future V2 tuning concern, not this fix.
 
-### Why no tagging / no `isAutofill` marker
+## 2. UI fix — metadata-only modal overflow
 
-- The user explicitly wants manual uploads cleared too on URL change, so distinguishing "autofill vs manual" provides no benefit here.
-- Avoids the React anti-pattern of nested state setters that codex flagged.
-- Avoids type changes to `MediaItem`.
-- The full reset is what already happens for every other autofill-owned field (type, description, tags, parent, etc.) — media now follows the same rule.
+Problem visible in the screenshot: the metadata preview card and long website URL push past the dialog's right edge. The root cause is in `src/components/admin/AutoFillPreviewModal.tsx`, no-predictions branch only (lines 257–329):
 
-## Out of scope (do not touch)
+- `DialogContent` is `max-w-md` with no width cap against the viewport and no `overflow-x-hidden`, so nested content can expand the dialog.
+- The URL `truncate` doesn't work because its parent has no `min-w-0`.
+- Fixed `grid-cols-4` with `h-16 w-full` tiles overflows narrow phones.
+- Footer buttons can get cramped on small screens.
 
-- `addImageToMediaGallery`, `applyMetadataOnly`, `applyMetadataOnlySafe`, `applyPredictionsToForm` insertion logic — unchanged. They will now insert into a known-empty gallery on a new URL, and into the existing gallery on a same-URL retry.
-- `normalizeUrlForCompare`, `lastAnalyzedUrl` guard, `metadataUrl` logic — unchanged.
-- `AutoFillPreviewModal.tsx` (successful and metadata-only branches) — unchanged.
-- All edge functions, V1/V2 routing, Gemini, Firecrawl, Zod, DB schema, merge rules.
+### Approved changes (strictly scoped)
 
-## Verification
+Only update the no-predictions / metadata-only branch of `AutoFillPreviewModal.tsx`.
 
-1. Analyze BLEU DE CHANEL → 5 images appear in gallery.
-2. Analyze ALLURE HOMME SPORT (different normalized URL) → BLEU images are gone; only ALLURE images present. `primaryMediaUrl` reflects an ALLURE image (or null if none).
-3. Upload a manual file, then analyze a new URL → manual file is also cleared (per user requirement).
-4. Click Analyze again on the SAME (failed or successful) URL → media is not cleared (same-URL retry guard still holds via `lastAnalyzedUrl`).
+1. **DialogContent**:
+   `w-[calc(100vw-2rem)] max-w-md sm:max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden`
+   - `100vw` ensures viewport-safe width, not parent-relative `100%`.
+   - 1rem side gutters on mobile.
+   - A bit more breathing room on `sm`+.
+   - Vertical scroll for tall content; horizontal overflow clipped.
+
+2. **Metadata preview container**: add `min-w-0 overflow-hidden max-w-full` so children can shrink inside flex/grid contexts.
+
+3. **Website URL block**: wrap the `<p>` parent with `min-w-0`, keep `truncate` on the text, and add `title={metadataOnly!.websiteUrl}` so desktop users can hover to see the full URL.
+
+4. **Image grid**: change `grid-cols-4` to `grid-cols-2 sm:grid-cols-4`, and change tile class from `h-16 w-full` to `aspect-square w-full` for consistent scaling. Still show max 4 images.
+
+5. **DialogFooter**: add `flex-col sm:flex-row` (the base `DialogFooter` already does `flex-col-reverse sm:flex-row`, but an explicit prop on the component call clarifies intent and works if overrides are needed).
+
+6. **Scroll padding safety**: rely on the existing `DialogContent` padding; no additional sticky footer needed.
+
+### Out of scope (do not touch)
+
+- Successful-prediction branch of `AutoFillPreviewModal.tsx`.
+- `applyPredictionsToForm`, `applyMetadataOnlySafe`, `buildMetadataOnly`, `pickValidImages`, `resetAutofillOwnedFields`, `normalizeUrlForCompare`.
+- `CreateEntityDialog.tsx` state logic (`lastAnalyzedUrl`, `metadataUrl`).
+- All edge functions, V1, DB, Gemini, Firecrawl, Zod, merge rules, confidence display.
+
+### Verification after build
+
+- Open the metadata-only dialog for the Chanel URL.
+- Desktop: no horizontal overflow, URL truncates with ellipsis, images 1×4.
+- Mobile (375px): no horizontal overflow, images 2×2, URL truncates, footer buttons stack.
+- Successful AI prediction modal remains visually unchanged.

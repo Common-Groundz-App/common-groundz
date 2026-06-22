@@ -995,8 +995,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   };
 
   // Clear autofill-owned fields at Analyze-start for a NEW normalized URL.
-  // Never clears name or website_url. Clears all media and image_url so the
-  // gallery always reflects the currently analyzed URL.
+  // Never clears name, website_url, uploadedMedia, primaryMediaUrl.
   const resetAutofillOwnedFields = () => {
     setFormData(prev => ({
       ...prev,
@@ -1014,13 +1013,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       price_info: {},
       nutritional_info: {},
       external_ratings: {},
-      image_url: '',
     }));
     setSelectedTagNames([]);
     setSelectedParent(null);
     setAiFilledFields(new Set());
-    setUploadedMedia([]);
-    setPrimaryMediaUrl(null);
   };
 
   // Call edge function to analyze URL
