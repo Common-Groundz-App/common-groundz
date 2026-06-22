@@ -15,11 +15,26 @@ import { Lightbulb, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
+export interface MetadataOnlySnapshot {
+  title?: string;
+  websiteUrl?: string;
+  images?: string[];
+}
+
 interface AutoFillPreviewModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   predictions: any;
   onApply: () => void;
+  /**
+   * Phase 2: optional metadata-only fallback snapshot. Only consumed in the
+   * no-predictions branch. When non-null, the modal renders a basic metadata
+   * preview and a "Use basic metadata" button. The snapshot is the exact
+   * payload passed to onApplyMetadataOnly — capturing the analyzed URL at
+   * render time so post-render edits to the URL input cannot poison apply.
+   */
+  metadataOnly?: MetadataOnlySnapshot | null;
+  onApplyMetadataOnly?: (snapshot: MetadataOnlySnapshot) => void;
 }
 
 interface PreviewFieldProps {
