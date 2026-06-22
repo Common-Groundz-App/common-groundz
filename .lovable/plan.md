@@ -91,3 +91,16 @@ Wire both new fields into the existing telemetry log line in `index.ts` if not a
 4. If needed, surface new diagnostic fields in `index.ts` telemetry log.
 5. Append 1.8c.6-A.2 section to `.lovable/plan.md`.
 6. User retests Myntra / Tira / Fila / Amazon non-brand product URLs where Gemini succeeded but a wrong image was shown. If page-owned image now wins, proceed to 1.8c.6-B.
+
+---
+
+## 1.8c.6-A.2 — page_owned_field_source_correction (SHIPPED)
+
+Implemented inside merge.ts success path (no recovery/Firecrawl/Gemini/parser/Zod/frontend/DB changes).
+
+- New shared module `image_validation.ts`: `isValidPageImageUrl` (http/https only, rejects data/blob/javascript/empty/malformed, rejects 1x1/pixel/favicon/beacon/transparent/spacer/blank placeholders) + `resolvePageOwnedImage({extractImageUrl, firecrawlImageUrl})` → page-owned (extractor > firecrawl) > null.
+- merge.ts success path: page-owned image overrides Gemini image when present and valid. `images[]` order = page-owned first, extractor, gemini (deduped).
+- merge.ts new `isWeakOrGenericDescription`: extends `isValidDescription` with boilerplate regex (`^(buy|shop|order|get|find)`, `best price|free shipping|cash on delivery|cod available|lowest price|online shopping`, `online (in|at) …`). Strong Gemini description kept; weak/boilerplate replaced by valid extractor description.
+- New `MergeDiagnostics` fields: `page_owned_image_override_applied: boolean`, `description_source_correction: "kept_gemini" | "replaced_with_page" | "kept_extractor" | "none"`. Existing `field_winners.image_url` union already supports `"firecrawl"`.
+- Tests: 9 new tests in `merge_test.ts` (extractor-image wins, firecrawl-image wins when extractor missing, no-page keeps Gemini, invalid data: rejected, weak Gemini replaced, strong Gemini kept, semantic-field regression, privacy/no-raw-URLs-or-descriptions in diagnostics, images[] order + dedupe). Updated `phase_1_8c1_test.ts` test helper for the two new fields. All 21 test files pass.
+- Untouched: recovery path, junk-name override, pricing, Firecrawl/Gemini/parser/guard/Zod/frontend/DB/V1/category matching, fetch-url-metadata-lite, enrich-brand-data.
