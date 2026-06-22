@@ -106,8 +106,40 @@ serve(async (req) => {
 
     // Step 2: Search for brand logo
     console.log(`🖼️  Searching for brand logo...`);
-    const brandLogo = await searchBrandLogo(brandName, officialWebsite, googleApiKey, googleCxId);
-    console.log(`   → Logo: ${brandLogo || 'not found'}`);
+    const googleLogoResult = await searchBrandLogo(brandName, officialWebsite, googleApiKey, googleCxId);
+    let brandLogo: string | null = googleLogoResult.url;
+    let logoSource: LogoSource = googleLogoResult.source;
+    let pageOwnedLogoCandidateCount = 0;
+    let pageOwnedLogoUsedAsFallback = false;
+    console.log(`   → Google logo: ${brandLogo || 'not found'} (source=${logoSource})`);
+
+    // Step 2b: Phase 1.8c.6-B — page-owned official-site fallback.
+    // Runs ONLY when Google produced no acceptable candidate (score ≤ 0 or empty).
+    // No score bump, never competes with a valid Google result.
+    if (!brandLogo && officialWebsite) {
+      console.log(`   ↪️ Google failed, trying page-owned official-site fallback...`);
+      const officialHtml = await fetchOfficialSiteHtml(officialWebsite);
+      if (officialHtml) {
+        const candidates = extractBrandPageOwnedCandidates(officialHtml, officialWebsite);
+        pageOwnedLogoCandidateCount = candidates.length;
+        for (const cand of candidates) {
+          if (isValidPageImageUrl(cand.url)) {
+            brandLogo = cand.url;
+            logoSource = cand.source;
+            pageOwnedLogoUsedAsFallback = true;
+            console.log(`   ✅ Page-owned fallback logo accepted (source=${logoSource})`);
+            break;
+          }
+        }
+        if (!pageOwnedLogoUsedAsFallback) {
+          console.log(`   ❌ No valid page-owned fallback (candidates=${pageOwnedLogoCandidateCount})`);
+        }
+      } else {
+        console.log(`   ❌ Could not fetch official site HTML for fallback`);
+      }
+    }
+
+    if (!brandLogo) logoSource = 'none';
 
     // Step 3: Get brand description (smart cascade)
     console.log(`📝 Getting brand description...`);
@@ -159,10 +191,15 @@ serve(async (req) => {
       website: officialWebsite,
       description: description,
       descriptionSource: descriptionSource,
+      // Phase 1.8c.6-B telemetry — no raw URLs leaked.
+      logoSource,
+      pageOwnedLogoCandidateCount,
+      pageOwnedLogoUsedAsFallback,
       enriched: !!(brandLogo || officialWebsite || description)
     };
 
-    console.log(`✅ Brand enrichment complete:`, enrichmentResult);
+    console.log(`✅ Brand enrichment complete (logoSource=${logoSource}, fallbackUsed=${pageOwnedLogoUsedAsFallback})`);
+
 
     return new Response(
       JSON.stringify(enrichmentResult),
