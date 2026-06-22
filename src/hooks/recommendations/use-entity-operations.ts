@@ -21,15 +21,22 @@ export const useEntityOperations = () => {
   const fetchUrlMetadata = async (
     url: string, 
     productName?: string,
-    brandName?: string
+    brandName?: string,
+    entityType?: string
   ): Promise<any> => {
     try {
+      const body: Record<string, unknown> = {
+        url,
+        productName: productName || null,
+        brandName: brandName || null,
+      };
+      // Phase 1.8c.6-B: thread caller intent so the function can pick
+      // the right image-priority path (brand → Google-first, others → page-first).
+      if (entityType && typeof entityType === 'string' && entityType.trim() !== '') {
+        body.entityType = entityType.trim();
+      }
       const { data, error } = await supabase.functions.invoke('fetch-url-metadata-lite', {
-        body: { 
-          url,
-          productName: productName || null,
-          brandName: brandName || null
-        }
+        body,
       });
 
       if (error) throw error;
@@ -80,7 +87,8 @@ export const useEntityOperations = () => {
       }
 
       if (websiteUrl) {
-        const urlMetadata = await fetchUrlMetadata(websiteUrl);
+        // Pass the corrected final entity type so brand creates stay Google-first.
+        const urlMetadata = await fetchUrlMetadata(websiteUrl, undefined, undefined, correctedType);
         if (urlMetadata) {
           name = name || urlMetadata.title;
           description = description || urlMetadata.description;
