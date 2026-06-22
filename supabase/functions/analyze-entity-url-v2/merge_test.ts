@@ -344,3 +344,131 @@ Deno.test("8.1A: recovery with trusted Gemini price → source=gemini, legacy pr
   assertEquals(pricing.price_source, "gemini");
   assertEquals(pricing.sale_price, 99);
 });
+
+// ─── Phase 1.8c.6-A.2: page_owned_field_source_correction ────────────────
+
+const STRONG_GEMINI_DESC =
+  "An enriched, informative description from grounding sources with concrete features and clear product specifics for buyers.";
+const STRONG_EXT_DESC =
+  "A solid, accurate page-owned description that clearly explains the product, its features, and its intended audience for buyers.";
+
+Deno.test("A.2: page-owned extractor image wins over Gemini image on success", () => {
+  const { predictions, diagnostics } = mergePredictions({
+    extract: makeExtract({ image_url: "https://example.com/page.jpg", images: [{ url: "https://example.com/page.jpg" }] }),
+    gemini: makeGemini({ image_url: "https://google.com/gem.jpg", images: [{ url: "https://google.com/gem.jpg" }] }),
+    flags: noFlags,
+  });
+  assertEquals(predictions!.image_url, "https://example.com/page.jpg");
+  assertEquals(diagnostics.field_winners.image_url, "extractor");
+  assertEquals(diagnostics.page_owned_image_override_applied, true);
+});
+
+Deno.test("A.2: Firecrawl metadata image wins when extractor image is missing", () => {
+  const { predictions, diagnostics } = mergePredictions({
+    extract: makeExtract({ image_url: null, images: [] }),
+    gemini: makeGemini({ image_url: "https://google.com/gem.jpg" }),
+    flags: { priceConflict: false, firecrawlCurrency: null, firecrawlImageUrl: "https://firecrawl.example.com/fc.jpg" },
+  });
+  assertEquals(predictions!.image_url, "https://firecrawl.example.com/fc.jpg");
+  assertEquals(diagnostics.field_winners.image_url, "firecrawl");
+  assertEquals(diagnostics.page_owned_image_override_applied, true);
+});
+
+Deno.test("A.2: no page image keeps Gemini image (current behavior)", () => {
+  const { predictions, diagnostics } = mergePredictions({
+    extract: makeExtract({ image_url: null, images: [] }),
+    gemini: makeGemini({ image_url: "https://google.com/gem.jpg" }),
+    flags: noFlags,
+  });
+  assertEquals(predictions!.image_url, "https://google.com/gem.jpg");
+  assertEquals(diagnostics.field_winners.image_url, "gemini");
+  assertEquals(diagnostics.page_owned_image_override_applied, false);
+});
+
+Deno.test("A.2: invalid page image (data:) does NOT override Gemini image", () => {
+  const { predictions, diagnostics } = mergePredictions({
+    extract: makeExtract({ image_url: "data:image/png;base64,AAA", images: [] }),
+    gemini: makeGemini({ image_url: "https://google.com/gem.jpg" }),
+    flags: noFlags,
+  });
+  assertEquals(predictions!.image_url, "https://google.com/gem.jpg");
+  assertEquals(diagnostics.field_winners.image_url, "gemini");
+  assertEquals(diagnostics.page_owned_image_override_applied, false);
+});
+
+Deno.test("A.2: weak/boilerplate Gemini description gets replaced by page description", () => {
+  const { predictions, diagnostics } = mergePredictions({
+    extract: makeExtract({ description: STRONG_EXT_DESC }),
+    gemini: makeGemini({
+      description: "Buy Acme Widget online at best price with free shipping and cash on delivery available all over India today.",
+    }),
+    flags: noFlags,
+  });
+  assertEquals(predictions!.description, STRONG_EXT_DESC);
+  assertEquals(diagnostics.field_winners.description, "extractor");
+  assertEquals(diagnostics.description_source_correction, "replaced_with_page");
+});
+
+Deno.test("A.2: strong Gemini description is kept", () => {
+  const { predictions, diagnostics } = mergePredictions({
+    extract: makeExtract({ description: STRONG_EXT_DESC }),
+    gemini: makeGemini({ description: STRONG_GEMINI_DESC }),
+    flags: noFlags,
+  });
+  assertEquals(predictions!.description, STRONG_GEMINI_DESC);
+  assertEquals(diagnostics.field_winners.description, "gemini");
+  assertEquals(diagnostics.description_source_correction, "kept_gemini");
+});
+
+Deno.test("A.2: semantic fields are unchanged when correction fires", () => {
+  const extract = makeExtract({
+    description: STRONG_EXT_DESC,
+    additional_data: { brand: "Acme", price: 50, currency: "USD" },
+  });
+  const gemini = makeGemini({
+    description: "Buy now at best price online in India",
+    additional_data: { brand: "Acme", price: 99, currency: "USD" },
+  });
+  const { predictions } = mergePredictions({ extract, gemini, flags: noFlags });
+  assertEquals(predictions!.type, "product");
+  assertEquals(predictions!.name, "Acme Widget");
+  assertEquals(predictions!.additional_data.brand, "Acme");
+  assertEquals(predictions!.additional_data.price, 50);
+  assertEquals(predictions!.additional_data.currency, "USD");
+  assert(predictions!.tags.length > 0);
+});
+
+Deno.test("A.2: diagnostics do not contain raw image URLs or description text", () => {
+  const { diagnostics } = mergePredictions({
+    extract: makeExtract({ image_url: "https://secret.example.com/private.jpg", description: STRONG_EXT_DESC }),
+    gemini: makeGemini({ image_url: "https://gem.example.com/g.jpg", description: STRONG_GEMINI_DESC }),
+    flags: { priceConflict: false, firecrawlCurrency: null, firecrawlImageUrl: "https://fc.example.com/fc.jpg" },
+  });
+  const blob = JSON.stringify(diagnostics);
+  assert(!blob.includes("secret.example.com"));
+  assert(!blob.includes("gem.example.com"));
+  assert(!blob.includes("fc.example.com"));
+  assert(!blob.includes("private.jpg"));
+  assert(!blob.includes(STRONG_EXT_DESC));
+  assert(!blob.includes(STRONG_GEMINI_DESC));
+});
+
+Deno.test("A.2: images[] places page-owned image first and dedupes duplicates", () => {
+  const pageUrl = "https://example.com/page.jpg";
+  const gemUrl = "https://google.com/gem.jpg";
+  const { predictions } = mergePredictions({
+    extract: makeExtract({
+      image_url: pageUrl,
+      images: [{ url: pageUrl }, { url: "https://example.com/extra.jpg" }],
+    }),
+    gemini: makeGemini({
+      image_url: gemUrl,
+      images: [{ url: gemUrl }, { url: pageUrl }],
+    }),
+    flags: noFlags,
+  });
+  const urls = predictions!.images.map((i) => i.url);
+  assertEquals(urls[0], pageUrl);
+  assertEquals(urls.filter((u) => u === pageUrl).length, 1);
+  assert(urls.includes(gemUrl));
+});
