@@ -256,7 +256,7 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
 
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-yellow-500" />
@@ -270,37 +270,40 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
           </DialogHeader>
 
           {hasMetadataOnly && (
-            <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+            <div className="space-y-3 rounded-md border bg-muted/30 p-3 min-w-0 overflow-hidden max-w-full">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">
                 Metadata preview
               </p>
               {metadataOnly!.title && (
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-xs text-muted-foreground">Title</Label>
                   <p className="text-sm font-medium break-words">{metadataOnly!.title}</p>
                 </div>
               )}
               {metadataOnly!.websiteUrl && (
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-xs text-muted-foreground">Website URL</Label>
-                  <p className="text-xs font-mono truncate text-muted-foreground">
+                  <p
+                    className="text-xs font-mono truncate text-muted-foreground"
+                    title={metadataOnly!.websiteUrl}
+                  >
                     {metadataOnly!.websiteUrl}
                   </p>
                 </div>
               )}
               {Array.isArray(metadataOnly!.images) && metadataOnly!.images.length > 0 && (
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <Label className="text-xs text-muted-foreground">
                     Images ({metadataOnly!.images.length})
                   </Label>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {metadataOnly!.images.slice(0, 4).map((src, i) => (
                       <ImageWithFallback
                         key={`${src}-${i}`}
                         src={src}
                         alt={metadataOnly!.title || `Metadata image ${i + 1}`}
                         entityType="product"
-                        className="h-16 w-full rounded object-cover"
+                        className="aspect-square w-full rounded object-cover"
                       />
                     ))}
                   </div>
@@ -310,11 +313,11 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
           )}
 
           {requestId && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground break-all">
               Request ID: <span className="font-mono">{requestId}</span>
             </p>
           )}
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 flex-col sm:flex-row">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
@@ -328,6 +331,7 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
       </Dialog>
     );
   }
+
 
   const pred = predictions.predictions;
   const confidence = pred.confidence || 0;
