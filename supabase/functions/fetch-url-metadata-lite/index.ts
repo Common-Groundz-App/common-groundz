@@ -196,7 +196,28 @@ serve(async (req) => {
     
     console.log(`✅ Found ${images.length} images from Google`);
     
-    // Step 3: Fallback to Open Graph if Google returns nothing
+    // Phase 1.8c.6-B — page-owned image priority for non-brand/unknown paths.
+    // For brand path, behavior is byte-identical to today (Google wins).
+    let pageOwnedImageFound = false;
+    let pageOwnedImageWon = false;
+    if (!isBrand && pageHtml) {
+      const candidates = extractPageOwnedImageCandidates(pageHtml);
+      const validCandidate = candidates.find((c) => isValidPageImageUrl(c));
+      if (validCandidate) {
+        pageOwnedImageFound = true;
+        // Promote to primary: place first, dedupe any matching Google entry.
+        const deduped = images.filter((img) => img.url !== validCandidate);
+        images.length = 0;
+        images.push({ url: validCandidate, source: 'page-owned' });
+        for (const img of deduped) images.push(img);
+        pageOwnedImageWon = true;
+        console.log(`🖼️ Page-owned image won on path=${imagePriorityPath}`);
+      } else {
+        console.log(`🖼️ No valid page-owned image found on path=${imagePriorityPath}`);
+      }
+    }
+    
+    // Step 3: Fallback to Open Graph if Google returns nothing AND no page-owned win
     if (images.length === 0) {
       console.log('⚠️ No Google results, trying Open Graph fallback...');
       const ogImage = await extractOpenGraphImage(url);
@@ -240,7 +261,12 @@ serve(async (req) => {
       hasDescription: !!description,
       hasFavicon: !!favicon,
       imageCount: images.length,
-      imageSources: images.map(i => i.source)
+      imageSources: images.map(i => i.source),
+      image_priority_path: imagePriorityPath,
+      entityTypeSource,
+      pageOwnedImageFound,
+      pageOwnedImageWon,
+      pageHtmlFetchedForImage,
     }, null, 2));
     
     // Step 7: Return results with full compatibility
@@ -263,6 +289,13 @@ serve(async (req) => {
           imageCount: images.length,
           sources: images.map(img => img.source),
           usedOpenGraphFallback: usedOpenGraphFallback,
+          // Phase 1.8c.6-B telemetry — no raw URLs/descriptions leak here.
+          entityType: rawEntityType || null,
+          entityTypeSource,
+          image_priority_path: imagePriorityPath,
+          pageOwnedImageFound,
+          pageOwnedImageWon,
+          pageHtmlFetchedForImage,
           timestamp: new Date().toISOString(),
         }
       }),
@@ -270,6 +303,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
+    
     
   } catch (error) {
     console.error('❌ Error:', error);
