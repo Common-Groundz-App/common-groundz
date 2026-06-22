@@ -19,6 +19,7 @@ import {
   type PriceSourceHint,
   type PriceSourceUsed,
 } from "./pricing.ts";
+import { resolvePageOwnedImage } from "./image_validation.ts";
 
 // ─── Diagnostics ──────────────────────────────────────────────────────────
 
