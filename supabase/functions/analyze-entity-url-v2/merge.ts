@@ -305,6 +305,8 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
     },
     name_junk_override_applied: false,
     price_conflict_blocked_gemini: false,
+    page_owned_image_override_applied: false,
+    description_source_correction: "none",
   };
 
   // ── Recovery path ─────────────────────────────────────────────────────
