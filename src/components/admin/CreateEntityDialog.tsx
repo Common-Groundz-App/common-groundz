@@ -2537,6 +2537,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onOpenChange={setShowPreviewModal}
         predictions={aiPredictions}
         onApply={applyAiPredictions}
+        metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
+        onApplyMetadataOnly={applyMetadataOnlySafe}
       />
       
       {/* URL Mismatch Warning Dialog */}
