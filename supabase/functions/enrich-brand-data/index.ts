@@ -761,3 +761,93 @@ function extractAboutSection(html: string): string | null {
 
   return null;
 }
+
+// Phase 1.8c.6-B — bounded fetch of the official site HTML, used only when
+// Google returned no acceptable logo. Silent on failure.
+async function fetchOfficialSiteHtml(websiteUrl: string): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(websiteUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
+// Phase 1.8c.6-B — extract page-owned brand asset candidates from official-site
+// HTML in priority order: og:image → apple-touch-icon (any size) → <link rel="icon">
+// with explicit sizes ≥ 128. Returns absolute URLs only (relative refs are resolved
+// against the official site origin). No favicon.ico fallback — that's a site asset,
+// not a brand mark.
+function extractBrandPageOwnedCandidates(
+  html: string,
+  officialWebsite: string,
+): Array<{ url: string; source: LogoSource }> {
+  if (!html) return [];
+  let origin = '';
+  try {
+    origin = new URL(officialWebsite).origin;
+  } catch {
+    return [];
+  }
+  const resolve = (raw: string): string | null => {
+    const v = raw.trim();
+    if (!v) return null;
+    try {
+      return new URL(v, origin).href;
+    } catch {
+      return null;
+    }
+  };
+  const out: Array<{ url: string; source: LogoSource }> = [];
+
+  const og = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+  if (og && og[1]) {
+    const r = resolve(og[1]);
+    if (r) out.push({ url: r, source: 'page_owned_og' });
+  }
+
+  const apple = html.match(/<link[^>]*rel=["']apple-touch-icon(?:-precomposed)?["'][^>]*href=["']([^"']+)["']/i);
+  if (apple && apple[1]) {
+    const r = resolve(apple[1]);
+    if (r) out.push({ url: r, source: 'page_owned_apple_touch_icon' });
+  }
+
+  // <link rel="icon"> with explicit sizes ≥ 128. Scan all matches, accept the first.
+  const iconTagRe = /<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*>/gi;
+  const tags = html.match(iconTagRe) || [];
+  for (const tag of tags) {
+    const sizesMatch = tag.match(/sizes=["']([^"']+)["']/i);
+    if (!sizesMatch) continue;
+    const sizes = sizesMatch[1].toLowerCase();
+    // sizes like "192x192" or "128x128 256x256"
+    let maxDim = 0;
+    for (const tok of sizes.split(/\s+/)) {
+      const m = tok.match(/^(\d+)x(\d+)$/);
+      if (m) {
+        const d = Math.min(parseInt(m[1], 10), parseInt(m[2], 10));
+        if (d > maxDim) maxDim = d;
+      }
+    }
+    if (maxDim < 128) continue;
+    const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
+    if (!hrefMatch) continue;
+    const r = resolve(hrefMatch[1]);
+    if (r) {
+      out.push({ url: r, source: 'page_owned_favicon' });
+      break;
+    }
+  }
+
+  return out;
+}
+
