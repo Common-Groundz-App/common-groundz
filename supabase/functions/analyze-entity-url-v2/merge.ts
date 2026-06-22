@@ -400,17 +400,40 @@ export function mergePredictions(args: MergeArgs): MergeOutput {
     diag.name_junk_override_applied = true;
   }
 
-  // ── description: Gemini if valid, else extractor (no markdown fallback)
-  if (isValidDescription(gemini.description)) {
-    out.description = gemini.description.trim();
+  // ── description (Phase 1.8c.6-A.2): keep strong Gemini; otherwise prefer
+  //    valid page-owned description over weak/boilerplate Gemini text.
+  const geminiDescStrong = isValidDescription(gemini.description)
+    && !isWeakOrGenericDescription(gemini.description);
+  if (geminiDescStrong) {
+    out.description = gemini.description!.trim();
     diag.field_winners.description = "gemini";
+    diag.description_source_correction = "kept_gemini";
+  } else if (isValidDescription(out.description)) {
+    // Extractor (page-owned) description wins by default — explicitly mark
+    // a replacement when Gemini provided something we rejected.
+    diag.field_winners.description = "extractor";
+    diag.description_source_correction = nonEmpty(gemini.description)
+      ? "replaced_with_page"
+      : "kept_extractor";
+  } else {
+    diag.description_source_correction = "none";
   }
 
-  // ── image: extractor > Gemini (success path)
-  if (!out.image_url && gemini.image_url) {
+  // ── image (Phase 1.8c.6-A.2): page-owned (extractor > firecrawl) wins
+  //    over Gemini whenever a validated page-owned image exists.
+  const pageOwned = resolvePageOwnedImage({
+    extractImageUrl: out.image_url,
+    firecrawlImageUrl: flags.firecrawlImageUrl,
+  });
+  if (pageOwned) {
+    out.image_url = pageOwned.url;
+    diag.field_winners.image_url = pageOwned.source;
+    diag.page_owned_image_override_applied = true;
+  } else if (gemini.image_url) {
     out.image_url = gemini.image_url;
     diag.field_winners.image_url = "gemini";
   }
+
 
   // ── images: union dedupe
   const extImgs = out.images ?? [];
