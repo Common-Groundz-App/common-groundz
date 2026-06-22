@@ -1,175 +1,93 @@
-## Phase 1.8c.6 — Page-Owned Metadata as Trusted Source (revised; type-safe)
+## 1.8c.6-A.2 — page_owned_field_source_correction (revised per ChatGPT + Codex)
 
-Diagnostics confirmed Firecrawl is working and returning real page-owned data (`og:image`, `og:description`, JSON-LD, markdown, html). The remaining bugs are **consumption + priority** in our pipeline:
+Adds a second sub-part inside 1.8c.6-A. The already-shipped 1.8c.6-A.1 (page_metadata_fallback_floor) is not touched. This sub-part fixes the remaining original complaint: wrong images / generic descriptions appearing even when Gemini analysis succeeds.
 
-1. `analyze-entity-url-v2` can return `NO_PREDICTIONS` even when direct-fetch / Firecrawl already has usable name + description + image.
-2. `fetch-url-metadata-lite` / `enrich-brand-data` can surface Google Image Search images that don't exist on the submitted page.
+Both reviewers approved with two refinements, both incorporated below:
+- Define "page-owned image" to include both extractor image AND Firecrawl metadata image (`flags.firecrawlImageUrl`), via a shared resolver so A.1 and A.2 agree on what counts as page-owned.
+- Run every candidate image through a shared validator before it can override Gemini; never accept raw page image values blindly.
 
-Fix in two ordered sub-steps: **1.8c.6-A** then **1.8c.6-B**. These are **not** Phase 1 / Phase 2 — real Phase 2 (rich metadata UI / category) still follows. Not emailing Firecrawl. Not changing Firecrawl/Gemini settings.
+### Scope (success path of `mergePredictions` only)
 
----
+#### 1. Image override (page-owned wins on success)
 
-### Type-handling decision (revised per ChatGPT + Codex)
+Define page-owned image source order (highest first):
+1. `extract.image_url` (extractor / page direct fetch)
+2. `flags.firecrawlImageUrl` (Firecrawl metadata image — already plumbed today, only used in recovery; now also consulted in success)
+3. (none → keep Gemini)
 
-`V2Predictions.type` is the non-nullable `CanonicalEntityType` enum. `"others"` exists in that enum but has **product meaning** ("entity does not fit any current type"), **not** "unknown / user must choose". Defaulting unknown-type fallbacks to `"others"` would let users submit unchanged and pollute the DB with mistyped entities.
-
-**Rule for 1.8c.6-A:**
-
-- **Never** set `type: "others"` as an unknown sentinel.
-- **Never** guess type from title, URL slug, domain, product words, or a failed/rejected Gemini result.
-- The page-metadata fallback prediction is **only emitted when type is reliably resolved** from one of:
-  1. JSON-LD `@type` → canonical (`Product` → `product`, `Book` → `book`, `Movie` → `movie`, `TVSeries`/`TVSeason`/`TVEpisode` → `tv_show`, `Recipe` → `food`, `Restaurant`/`LocalBusiness`/`Hotel` → `place`, `SoftwareApplication`/`MobileApplication`/`WebApplication` → `app`, `VideoGame` → `game`, `Course` → `course`, `Event` → `event`, `Service` → `service`).
-  2. `og:type` mapped deterministically (`product`, `book`, `video.movie` → `movie`, `video.tv_show` → `tv_show`, etc. — same mapping the existing `category_resolver.ts` `PATH_ALIASES` table uses).
-  3. The existing deterministic type resolver in the pipeline, if it returns a supported canonical value.
-- If none of the above yields a type, **do not emit a fallback prediction**. Keep the current `NO_PREDICTIONS` behavior and log `page_metadata_fallback_skipped_reason: "type_unresolved"`.
-- No Zod / response / DB / frontend changes.
-
-This is safer than the earlier `"others"` proposal and is what both reviewers agreed on. A separate, intentional `needs_type_selection` UI flow can come later (out of scope here).
-
----
-
-### 1.8c.6-A — V2 page-metadata fallback floor (type-safe)
-
-**File area:** `supabase/functions/analyze-entity-url-v2/` (extractor / merge layer only).
-
-#### Activation rule (all must hold)
-
-- Current flow would otherwise return `NO_PREDICTIONS` (strict floor — never overrides a valid Gemini result).
-- Validated page-owned `name/title` present.
-- At least one of validated page-owned `description` **or** `image_url` present.
-- **Type reliably resolved** from JSON-LD → og:type → deterministic resolver (see above).
-
-`confidence ≤ 0.4`. Telemetry: `page_metadata_fallback_used: true`.
-
-#### Source precedence
-
-**Name / title**
-1. JSON-LD `name`
-2. `og:title` / `ogTitle`
-3. `twitter:title`
-4. HTML `<title>` (cleaned — strip site suffix)
-5. Firecrawl `metadata.title`
-6. First short clean markdown heading
-
-**Description**
-1. JSON-LD `description`
-2. `og:description` / `ogDescription`
-3. `twitter:description`
-4. Firecrawl / direct `metadata.description`
-5. Short clean markdown excerpt
-
-**Image** (no Google in V2 floor)
-1. JSON-LD `Product.image` (or matching `@type.image`)
-2. `og:image` / `ogImage`
-3. `twitter:image`
-4. Firecrawl `metadata.image`
-5. Reliable HTML image candidates
-
-#### Conservative merge when Gemini succeeds
-
-Gemini keeps ownership of `type`, `brand`, `tags`, `category`, `confidence`, `reasoning`.
-
-- **`image_url`** — page-owned **always wins** over Gemini. Gemini is not a reliable image source.
-- **`description`** — **conservative merge**, not blind override:
-  - Use page-owned when Gemini description is missing, empty, very short, or matches generic/boilerplate / cookie / legal patterns.
-  - Keep Gemini's when it is substantive and page metadata is weak/truncated.
-  - Recorded in `field_source.description` + `description_merge_decision`.
-- **`name`** — keep current behavior.
-
-#### Image URL validation
-
-- Resolve relative URLs against the submitted page URL.
-- Allow only `http://` / `https://`.
+A new shared helper `resolvePageOwnedImage(extract, flags)` in `merge.ts` (or a new small `image_validation.ts` shared with `page_metadata_fallback.ts`) returns the first candidate that passes validation. Validation rules (extracted as a single helper, reused by A.1 and A.2):
+- Absolute URL, or safely resolved against the submitted page URL.
+- `http://` or `https://` only.
 - Reject `data:`, `blob:`, `javascript:`, empty, malformed.
-- Reject obvious 1×1 / tracking pixels where detectable.
-- Dedupe; prefer same-host / CDN candidates.
-- Never log raw image URLs.
+- Reject obvious 1×1 tracking pixels, favicons, common placeholder paths where detectable by extension/path hints.
+- Dedupe.
 
-#### Telemetry (privacy-safe, source-only)
+Behavior change in success path:
+- If `resolvePageOwnedImage` returns a value, set `out.image_url` to it and mark `field_winners.image_url = "extractor"` (when from extract) or `"firecrawl"` (when from `firecrawlImageUrl`). Set new diagnostic `page_owned_image_override_applied = true`.
+- If it returns null, keep current behavior (existing rule: Gemini fills only if extractor had none).
 
-- `page_metadata_fallback_used: boolean`
-- `page_metadata_fallback_skipped_reason`: `"missing_name" | "missing_supporting_field" | "type_unresolved" | "image_invalid" | "not_needed_gemini_succeeded" | null`
-- `field_source.name`: `json_ld | og | twitter | html_title | firecrawl | markdown | gemini | none`
-- `field_source.description`: same enum + `description_merge_decision`: `gemini_kept | page_filled_gemini_missing | page_replaced_gemini_weak`
-- `field_source.image_url`: same enum
-- `field_source.type`: `json_ld | og_type | type_resolver | gemini` (never `others_default` — that path no longer exists)
-- `image_candidate_count`
-- `image_candidate_source_counts`: `{ json_ld, og, twitter, firecrawl, html }`
+`images[]` dedupe order on success:
+1. Final page-owned image (if any) — first, never duplicated.
+2. Other extractor images.
+3. Gemini images.
+Existing `dedupeImages` already removes URL duplicates; pass arrays in this order.
 
-No raw titles, descriptions, image URLs, markdown, HTML, or model text.
+#### 2. Description correction (replace weak Gemini description)
 
-#### Out of scope for 1.8c.6-A
+New helper `isWeakOrGenericDescription(d)` returns true when:
+- missing / empty, OR
+- fails existing `isValidDescription` (length <40 or >600, contains `<` or `{`, all-caps), OR
+- matches small boilerplate regex set: `/^(buy|shop|order|get|find)\b/i`, `/\b(best price|free shipping|cash on delivery|cod available|lowest price|online shopping)\b/i`, `/\bonline\s+(in|at)\s+[a-z ]+$/i`.
 
-V1, frontend, DB schema, **Zod schema**, response contract, Gemini model/config, `responseMimeType`, token budgets, Firecrawl request settings/timeouts, Amazon guard, recovery gate, merge rules for non-fallback paths, category matching, real Phase 2 UI, any `needs_type_selection` UI flow.
+Success-path rule:
+- If `isValidDescription(gemini.description)` AND not `isWeakOrGenericDescription(gemini.description)` → keep Gemini (current behavior). `description_source_correction = "kept_gemini"`.
+- Else if extract description is present and `isValidDescription` passes → use extract description. `field_winners.description = "extractor"`, `description_source_correction = "replaced_with_page"`.
+- Else keep whatever `out.description` already has. `description_source_correction = "kept_extractor"` or `"none"`.
 
----
+### Out of scope (untouched)
 
-### 1.8c.6-B — Image-source priority in metadata-lite / enrich-brand-data
+- Semantic fields: `type`, `name`, `brand`, `tags`, `category_id`, `suggested_category_path`, `matched_category_name`, `confidence`, `reasoning`, `price`, `currency`, `pricing` block.
+- Junk-name override (unchanged).
+- Recovery path (unchanged — already uses `firecrawlImageUrl` first).
+- Firecrawl settings, Gemini config, response_schema, parser, recovery gate, Amazon guard, Zod, frontend, DB, V1, category matching.
+- `fetch-url-metadata-lite`, `enrich-brand-data` (wait for 1.8c.6-B).
+- Google Image Search (not introduced in V2).
 
-**File area:** `supabase/functions/fetch-url-metadata-lite/index.ts`, `supabase/functions/enrich-brand-data/` (image-selection branch only).
+### Telemetry (privacy-safe; no raw URLs or descriptions)
 
-#### Entity-intent rule
+Extend `MergeDiagnostics`:
+- `field_winners.image_url`: existing union supports `"extractor" | "gemini" | "firecrawl" | "none"`. Used as described above.
+- `field_winners.description`: when replacement fires, `"extractor"`.
+- New: `page_owned_image_override_applied: boolean`.
+- New: `description_source_correction: "kept_gemini" | "replaced_with_page" | "kept_extractor" | "none"`.
 
-"Brand entity" means the **entity itself is Brand** — not a product that merely has a brand attribute. Check explicit entity type, not the presence of a brand field.
+Wire both new fields into the existing telemetry log line in `index.ts` if not auto-included. Never log raw `image_url` or `description` strings — source/decision enums only. Reuse existing redaction.
 
-- **Brand entity:** keep current behavior — Google Image Search first, page-owned image as fallback. Brand landing pages rarely expose a clean logo via OG tags.
-- **All other entities** (product, book, movie, place, food, etc.): page-owned image first:
-  1. JSON-LD product image
-  2. `og:image` / `ogImage`
-  3. `twitter:image`
-  4. Firecrawl `metadata.image`
-  5. Reliable page HTML / markdown image candidates
-  6. Google Image Search **only if** all above missing/invalid
+### Files touched
 
-Same image-URL validation as 1.8c.6-A.
+- `supabase/functions/analyze-entity-url-v2/merge.ts` — success-path image + description rules, new helpers, diagnostic fields.
+- `supabase/functions/analyze-entity-url-v2/image_validation.ts` (new, small) OR helper inside `merge.ts` — shared image validator + `resolvePageOwnedImage`. If new module, `page_metadata_fallback.ts` is updated to import from it (no behavior change for A.1).
+- `supabase/functions/analyze-entity-url-v2/merge_test.ts` — append the tests below (existing tests preserved).
+- `supabase/functions/analyze-entity-url-v2/index.ts` — only if the two new diagnostic fields need to be surfaced into the existing telemetry payload; no behavioral change.
+- `.lovable/plan.md` — append the 1.8c.6-A.2 section.
 
-#### Telemetry
+### Tests (Deno test on `MergeOutput`)
 
-- `image_source`: `json_ld | og | twitter | firecrawl | page_html | google_search | none`
-- `image_priority_path`: `brand_first_google | non_brand_page_first`
-- `image_candidate_count`
+1. Page-owned (extractor) image wins on successful Gemini result — extract image A, gemini image B → `predictions.image_url === A`, `field_winners.image_url === "extractor"`, `page_owned_image_override_applied === true`.
+2. Firecrawl metadata image wins when extractor image missing (Codex refinement) — extract image null, `flags.firecrawlImageUrl = F`, gemini image B → `predictions.image_url === F`, `field_winners.image_url === "firecrawl"`, `page_owned_image_override_applied === true`.
+3. No page image at all keeps current behavior — extract image null, no firecrawl image, gemini image B → `predictions.image_url === B`, `field_winners.image_url === "gemini"`, `page_owned_image_override_applied === false`.
+4. Invalid page image does NOT override Gemini (validation gate) — extract image `"data:image/png;base64,..."`, gemini image B → `predictions.image_url === B`, `field_winners.image_url === "gemini"`, `page_owned_image_override_applied === false`.
+5. Weak / boilerplate Gemini description gets replaced — extract description strong, gemini `"Buy XYZ online at best price"` → page text wins, `description_source_correction === "replaced_with_page"`, `field_winners.description === "extractor"`.
+6. Strong Gemini description is kept — gemini valid 100-char informative description → Gemini wins, `description_source_correction === "kept_gemini"`, `field_winners.description === "gemini"`.
+7. Semantic-field regression — assert `type`, `name`, `brand`, `tags`, `confidence`, `reasoning`, `price`, `currency`, `pricing` identical to current success-path output for the same fixture.
+8. Privacy — JSON-stringify diagnostics; assert it does not contain the test image URL substrings or description text substrings.
+9. `images[]` order — page-owned image is first in `predictions.images` and appears exactly once even when also present in extractor.images or gemini.images.
 
-#### Out of scope for 1.8c.6-B
+### Execution
 
-Brand image priority (preserved), Google Image Search itself, schema changes, UI changes, V1, description/name handling in metadata-lite (image branch only).
-
----
-
-### Execution order
-
-1. Implement **1.8c.6-A**.
-2. Retest: Myntra, Tira, Fila, 1–2 Amazon URLs. Verify Myntra-style PDPs no longer return `NO_PREDICTIONS` **when** JSON-LD/`og:type` gives a reliable type; confirm pages with no reliable type still cleanly skip and log `type_unresolved` instead of inventing `"others"`.
-3. Implement **1.8c.6-B**.
-4. Retest: 2–3 non-brand product URLs that previously showed wrong images, plus 1–2 brand URLs to confirm brand behavior is unchanged.
-5. Then real **Phase 2**.
-
-`FIRECRAWL_SHAPE_DIAG_ENABLED` stays on through all of 1.8c.6 validation.
-
----
-
-### Why this is safe
-
-- Fallback only fires when current flow would return `NO_PREDICTIONS` — never overrides Gemini.
-- No `"others"` sentinel — DB cannot be polluted with mistyped entities.
-- No schema / response / DB / frontend change.
-- Page metadata can only be used when type is **deterministically** resolvable, so we don't silently mistype anything.
-- Conservative description merge protects good Gemini descriptions from weak SEO/boilerplate text.
-- Image validation blocks tracking pixels, `data:`, favicons.
-- 1.8c.6-B preserves Google-first for **explicit** Brand entities only; products with a brand attribute use page-first.
-- Everything observable via privacy-safe `field_source.*` / `image_source` / `page_metadata_fallback_skipped_reason` telemetry.
-
----
-
-### Explicitly **not** doing
-
-- Not setting `type: "others"` (or any sentinel) when type is unknown.
-- Not guessing type from title / slug / domain / product words / failed-Gemini output.
-- Not emailing Firecrawl.
-- Not changing Firecrawl timeouts/formats/call sites.
-- Not changing Gemini model, config, parser, guard, recovery, or non-fallback merge rules.
-- Not changing brand image priority.
-- Not changing V1, frontend, DB schema, **Zod schema**, response contract, or category matching.
-- Not adding a `needs_type_selection` UI/schema flow in this phase.
-- Not combining 1.8c.6-A and 1.8c.6-B into one patch.
-
-Approve to proceed with 1.8c.6-A.
+1. Add shared image validator + `resolvePageOwnedImage`. If a new module, update `page_metadata_fallback.ts` to import the same validator (no behavior change for A.1; tests for A.1 must still pass).
+2. Edit `merge.ts` success path: image override + description correction + new diagnostic fields.
+3. Append the 9 tests to `merge_test.ts`. Run via `supabase--test_edge_functions` on `analyze-entity-url-v2`; all pre-existing tests must still pass.
+4. If needed, surface new diagnostic fields in `index.ts` telemetry log.
+5. Append 1.8c.6-A.2 section to `.lovable/plan.md`.
+6. User retests Myntra / Tira / Fila / Amazon non-brand product URLs where Gemini succeeded but a wrong image was shown. If page-owned image now wins, proceed to 1.8c.6-B.
