@@ -1,9 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { isValidPageImageUrl } from './image_validation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+type LogoSource =
+  | 'google_site_scoped'
+  | 'google_broad'
+  | 'page_owned_og'
+  | 'page_owned_apple_touch_icon'
+  | 'page_owned_favicon'
+  | 'none';
 
 // Domain configuration for filtering search results
 const DOMAIN_CONFIG = {
