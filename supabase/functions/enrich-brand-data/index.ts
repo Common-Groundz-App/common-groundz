@@ -1,9 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { isValidPageImageUrl } from './image_validation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+type LogoSource =
+  | 'google_site_scoped'
+  | 'google_broad'
+  | 'page_owned_og'
+  | 'page_owned_apple_touch_icon'
+  | 'page_owned_favicon'
+  | 'none';
 
 // Domain configuration for filtering search results
 const DOMAIN_CONFIG = {
@@ -97,8 +106,40 @@ serve(async (req) => {
 
     // Step 2: Search for brand logo
     console.log(`🖼️  Searching for brand logo...`);
-    const brandLogo = await searchBrandLogo(brandName, officialWebsite, googleApiKey, googleCxId);
-    console.log(`   → Logo: ${brandLogo || 'not found'}`);
+    const googleLogoResult = await searchBrandLogo(brandName, officialWebsite, googleApiKey, googleCxId);
+    let brandLogo: string | null = googleLogoResult.url;
+    let logoSource: LogoSource = googleLogoResult.source;
+    let pageOwnedLogoCandidateCount = 0;
+    let pageOwnedLogoUsedAsFallback = false;
+    console.log(`   → Google logo: ${brandLogo || 'not found'} (source=${logoSource})`);
+
+    // Step 2b: Phase 1.8c.6-B — page-owned official-site fallback.
+    // Runs ONLY when Google produced no acceptable candidate (score ≤ 0 or empty).
+    // No score bump, never competes with a valid Google result.
+    if (!brandLogo && officialWebsite) {
+      console.log(`   ↪️ Google failed, trying page-owned official-site fallback...`);
+      const officialHtml = await fetchOfficialSiteHtml(officialWebsite);
+      if (officialHtml) {
+        const candidates = extractBrandPageOwnedCandidates(officialHtml, officialWebsite);
+        pageOwnedLogoCandidateCount = candidates.length;
+        for (const cand of candidates) {
+          if (isValidPageImageUrl(cand.url)) {
+            brandLogo = cand.url;
+            logoSource = cand.source;
+            pageOwnedLogoUsedAsFallback = true;
+            console.log(`   ✅ Page-owned fallback logo accepted (source=${logoSource})`);
+            break;
+          }
+        }
+        if (!pageOwnedLogoUsedAsFallback) {
+          console.log(`   ❌ No valid page-owned fallback (candidates=${pageOwnedLogoCandidateCount})`);
+        }
+      } else {
+        console.log(`   ❌ Could not fetch official site HTML for fallback`);
+      }
+    }
+
+    if (!brandLogo) logoSource = 'none';
 
     // Step 3: Get brand description (smart cascade)
     console.log(`📝 Getting brand description...`);
@@ -150,10 +191,15 @@ serve(async (req) => {
       website: officialWebsite,
       description: description,
       descriptionSource: descriptionSource,
+      // Phase 1.8c.6-B telemetry — no raw URLs leaked.
+      logoSource,
+      pageOwnedLogoCandidateCount,
+      pageOwnedLogoUsedAsFallback,
       enriched: !!(brandLogo || officialWebsite || description)
     };
 
-    console.log(`✅ Brand enrichment complete:`, enrichmentResult);
+    console.log(`✅ Brand enrichment complete (logoSource=${logoSource}, fallbackUsed=${pageOwnedLogoUsedAsFallback})`);
+
 
     return new Response(
       JSON.stringify(enrichmentResult),
@@ -385,20 +431,23 @@ async function performImageSearch(
   }
 }
 
-// Search for brand logo using two-phase approach with fallback
+// Search for brand logo using two-phase approach with fallback.
+// Returns { url, source } so the handler can emit logoSource telemetry and
+// decide whether to try the Phase 1.8c.6-B page-owned fallback.
 async function searchBrandLogo(
   brandName: string,
   officialWebsite: string | null,
   apiKey: string,
   cxId: string
-): Promise<string | null> {
+): Promise<{ url: string | null; source: LogoSource }> {
   try {
     const allResults: any[] = [];
     const seenUrls = new Set<string>(); // Deduplication tracker
+    const officialHostname = officialWebsite ? safeGetHostname(officialWebsite) : null;
     
     // PHASE 1: Search official website (if available)
     if (officialWebsite) {
-      const hostname = safeGetHostname(officialWebsite);
+      const hostname = officialHostname;
       if (hostname) {
         console.log(`   🔍 Phase 1: Searching official site (${hostname})...`);
         const siteQuery = `"${brandName}" logo site:${hostname}`;
@@ -456,7 +505,7 @@ async function searchBrandLogo(
     
     if (allResults.length === 0) {
       console.log(`   ❌ No logo images found`);
-      return null;
+      return { url: null, source: 'none' };
     }
     
     // Score and rank ALL deduplicated results from both phases
@@ -478,14 +527,18 @@ async function searchBrandLogo(
     // GUARDRAIL: Only accept if score > 0 (prevents low-quality images)
     if (bestLogo && bestLogo.score > 0) {
       console.log(`   ✅ Selected logo with score: ${bestLogo.score}`);
-      return bestLogo.url;
+      const winnerHost = safeGetHostname(bestLogo.url);
+      const source: LogoSource = (officialHostname && winnerHost === officialHostname)
+        ? 'google_site_scoped'
+        : 'google_broad';
+      return { url: bestLogo.url, source };
     }
     
     console.log(`   ❌ No logo met quality threshold (best: ${bestLogo?.score})`);
-    return null;
+    return { url: null, source: 'none' };
   } catch (error) {
     console.error('❌ Logo search error:', error);
-    return null;
+    return { url: null, source: 'none' };
   }
 }
 
@@ -708,3 +761,93 @@ function extractAboutSection(html: string): string | null {
 
   return null;
 }
+
+// Phase 1.8c.6-B — bounded fetch of the official site HTML, used only when
+// Google returned no acceptable logo. Silent on failure.
+async function fetchOfficialSiteHtml(websiteUrl: string): Promise<string | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(websiteUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
+// Phase 1.8c.6-B — extract page-owned brand asset candidates from official-site
+// HTML in priority order: og:image → apple-touch-icon (any size) → <link rel="icon">
+// with explicit sizes ≥ 128. Returns absolute URLs only (relative refs are resolved
+// against the official site origin). No favicon.ico fallback — that's a site asset,
+// not a brand mark.
+function extractBrandPageOwnedCandidates(
+  html: string,
+  officialWebsite: string,
+): Array<{ url: string; source: LogoSource }> {
+  if (!html) return [];
+  let origin = '';
+  try {
+    origin = new URL(officialWebsite).origin;
+  } catch {
+    return [];
+  }
+  const resolve = (raw: string): string | null => {
+    const v = raw.trim();
+    if (!v) return null;
+    try {
+      return new URL(v, origin).href;
+    } catch {
+      return null;
+    }
+  };
+  const out: Array<{ url: string; source: LogoSource }> = [];
+
+  const og = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+  if (og && og[1]) {
+    const r = resolve(og[1]);
+    if (r) out.push({ url: r, source: 'page_owned_og' });
+  }
+
+  const apple = html.match(/<link[^>]*rel=["']apple-touch-icon(?:-precomposed)?["'][^>]*href=["']([^"']+)["']/i);
+  if (apple && apple[1]) {
+    const r = resolve(apple[1]);
+    if (r) out.push({ url: r, source: 'page_owned_apple_touch_icon' });
+  }
+
+  // <link rel="icon"> with explicit sizes ≥ 128. Scan all matches, accept the first.
+  const iconTagRe = /<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*>/gi;
+  const tags = html.match(iconTagRe) || [];
+  for (const tag of tags) {
+    const sizesMatch = tag.match(/sizes=["']([^"']+)["']/i);
+    if (!sizesMatch) continue;
+    const sizes = sizesMatch[1].toLowerCase();
+    // sizes like "192x192" or "128x128 256x256"
+    let maxDim = 0;
+    for (const tok of sizes.split(/\s+/)) {
+      const m = tok.match(/^(\d+)x(\d+)$/);
+      if (m) {
+        const d = Math.min(parseInt(m[1], 10), parseInt(m[2], 10));
+        if (d > maxDim) maxDim = d;
+      }
+    }
+    if (maxDim < 128) continue;
+    const hrefMatch = tag.match(/href=["']([^"']+)["']/i);
+    if (!hrefMatch) continue;
+    const r = resolve(hrefMatch[1]);
+    if (r) {
+      out.push({ url: r, source: 'page_owned_favicon' });
+      break;
+    }
+  }
+
+  return out;
+}
+

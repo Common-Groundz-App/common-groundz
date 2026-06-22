@@ -1,9 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { isValidPageImageUrl } from './image_validation.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+type ImagePriorityPath =
+  | 'brand_first_google'
+  | 'non_brand_page_first'
+  | 'unknown_page_first';
 
 /**
  * Sanitize product/brand names - remove junk placeholders and whitespace
@@ -57,15 +63,33 @@ serve(async (req) => {
   }
 
   try {
-    const { url, productName: providedProductName, brandName: providedBrandName } = await req.json();
+    const {
+      url,
+      productName: providedProductName,
+      brandName: providedBrandName,
+      entityType: providedEntityType,
+    } = await req.json();
     
     if (!url) {
       throw new Error('URL is required');
     }
     
+    // Phase 1.8c.6-B — resolve caller intent for image-priority path.
+    // brand → Google-first (no new HTML fetch for page-owned image).
+    // any other non-empty type → page-owned first, Google fallback.
+    // omitted/empty → unknown_page_first (safe default for generic previews).
+    const rawEntityType = typeof providedEntityType === 'string' ? providedEntityType.trim() : '';
+    const entityTypeNorm = rawEntityType.toLowerCase();
+    const entityTypeSource: 'caller' | 'omitted' = rawEntityType ? 'caller' : 'omitted';
+    const isBrand = entityTypeNorm === 'brand';
+    const imagePriorityPath: ImagePriorityPath = isBrand
+      ? 'brand_first_google'
+      : (rawEntityType ? 'non_brand_page_first' : 'unknown_page_first');
+    
     console.log(`🔍 Processing URL: ${url}`);
     console.log(`📦 Raw product name: ${providedProductName || 'none'}`);
     console.log(`🏢 Raw brand name: ${providedBrandName || 'none'}`);
+    console.log(`🧭 entityType: ${rawEntityType || 'omitted'} (source=${entityTypeSource}, path=${imagePriorityPath})`);
     
     // Step 1: Sanitize inputs
     const sanitizedProductName = sanitizeEntityName(providedProductName);
@@ -79,6 +103,7 @@ serve(async (req) => {
     let brandName: string | null = sanitizedBrandName;
     let pageHtml = '';
     let extractionMethod: string;
+    let pageHtmlFetchedForImage = false;
 
     if (sanitizedProductName && sanitizedProductName.length > 3) {
       productName = sanitizedProductName;
@@ -91,6 +116,20 @@ serve(async (req) => {
       pageHtml = extracted.html;
       extractionMethod = 'scraped-from-html';
       console.log(`📝 Extracted product name: "${productName}"`);
+    }
+    
+    // Phase 1.8c.6-B — for non-brand/unknown paths, ensure we have HTML so we
+    // can look for page-owned image candidates. Brand path skips this fetch
+    // entirely (byte-identical behavior to today on brand).
+    if (!pageHtml && !isBrand) {
+      const fetched = await fetchPageHtml(url);
+      if (fetched) {
+        pageHtml = fetched;
+        pageHtmlFetchedForImage = true;
+        console.log(`🌐 Bounded HTML fetch for page-owned image: success`);
+      } else {
+        console.log(`🌐 Bounded HTML fetch for page-owned image: failed (silent)`);
+      }
     }
     
     // Step 3: Get brand name (use sanitized, extract from domain, or skip)
@@ -157,7 +196,28 @@ serve(async (req) => {
     
     console.log(`✅ Found ${images.length} images from Google`);
     
-    // Step 3: Fallback to Open Graph if Google returns nothing
+    // Phase 1.8c.6-B — page-owned image priority for non-brand/unknown paths.
+    // For brand path, behavior is byte-identical to today (Google wins).
+    let pageOwnedImageFound = false;
+    let pageOwnedImageWon = false;
+    if (!isBrand && pageHtml) {
+      const candidates = extractPageOwnedImageCandidates(pageHtml);
+      const validCandidate = candidates.find((c) => isValidPageImageUrl(c));
+      if (validCandidate) {
+        pageOwnedImageFound = true;
+        // Promote to primary: place first, dedupe any matching Google entry.
+        const deduped = images.filter((img) => img.url !== validCandidate);
+        images.length = 0;
+        images.push({ url: validCandidate, source: 'page-owned' });
+        for (const img of deduped) images.push(img);
+        pageOwnedImageWon = true;
+        console.log(`🖼️ Page-owned image won on path=${imagePriorityPath}`);
+      } else {
+        console.log(`🖼️ No valid page-owned image found on path=${imagePriorityPath}`);
+      }
+    }
+    
+    // Step 3: Fallback to Open Graph if Google returns nothing AND no page-owned win
     if (images.length === 0) {
       console.log('⚠️ No Google results, trying Open Graph fallback...');
       const ogImage = await extractOpenGraphImage(url);
@@ -201,7 +261,12 @@ serve(async (req) => {
       hasDescription: !!description,
       hasFavicon: !!favicon,
       imageCount: images.length,
-      imageSources: images.map(i => i.source)
+      imageSources: images.map(i => i.source),
+      image_priority_path: imagePriorityPath,
+      entityTypeSource,
+      pageOwnedImageFound,
+      pageOwnedImageWon,
+      pageHtmlFetchedForImage,
     }, null, 2));
     
     // Step 7: Return results with full compatibility
@@ -224,6 +289,13 @@ serve(async (req) => {
           imageCount: images.length,
           sources: images.map(img => img.source),
           usedOpenGraphFallback: usedOpenGraphFallback,
+          // Phase 1.8c.6-B telemetry — no raw URLs/descriptions leak here.
+          entityType: rawEntityType || null,
+          entityTypeSource,
+          image_priority_path: imagePriorityPath,
+          pageOwnedImageFound,
+          pageOwnedImageWon,
+          pageHtmlFetchedForImage,
           timestamp: new Date().toISOString(),
         }
       }),
@@ -231,6 +303,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
+    
     
   } catch (error) {
     console.error('❌ Error:', error);
@@ -428,4 +501,47 @@ async function extractOpenGraphImage(url: string): Promise<string | null> {
     return null;
   }
 }
+
+/**
+ * Phase 1.8c.6-B — Bounded HTML fetch used only when the upstream extractor
+ * didn't already pull HTML (i.e. caller provided a productName so the
+ * extractor was skipped) AND the path is non-brand/unknown. Silent on failure.
+ */
+async function fetchPageHtml(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) return '';
+    return await response.text();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Phase 1.8c.6-B — extract page-owned image candidates from HTML in priority
+ * order: og:image → twitter:image → <link rel="image_src">. Returns absolute
+ * URLs only when the source meta tag already contains one; relative URLs are
+ * passed through and will be rejected by isValidPageImageUrl.
+ */
+function extractPageOwnedImageCandidates(html: string): string[] {
+  if (!html) return [];
+  const out: string[] = [];
+  const og = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+  if (og && og[1]) out.push(og[1].trim());
+  const tw = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i);
+  if (tw && tw[1]) out.push(tw[1].trim());
+  const src = html.match(/<link[^>]*rel=["']image_src["'][^>]*href=["']([^"']+)["']/i);
+  if (src && src[1]) out.push(src[1].trim());
+  return out;
+}
+
 

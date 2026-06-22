@@ -959,14 +959,27 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       
       console.log(`🤖 AI extracted: name="${aiProductName || 'none'}", brand="${aiBrandName || 'none'}"`);
       
-      // Then call metadata function with AI-extracted product name AND brand
+      // Then call metadata function with AI-extracted product name AND brand.
+      // Phase 1.8c.6-B: also pass the AI-predicted entity type so the function
+      // picks the right image-priority path (brand → Google-first, others → page-first).
+      // AI prediction is the source of truth at this moment; formData.type may be
+      // stale draft state. If AI didn't return a type, fall back to a non-empty
+      // formData.type, otherwise omit.
+      const aiPredictedType = aiResult.data?.predictions?.type;
+      const resolvedEntityType =
+        (typeof aiPredictedType === 'string' && aiPredictedType.trim() !== '')
+          ? aiPredictedType.trim()
+          : (typeof formData.type === 'string' && formData.type.trim() !== ''
+              ? formData.type.trim()
+              : null);
       const metadataResult = cachedMetadata 
         ? { data: cachedMetadata, error: null }
         : await supabase.functions.invoke('fetch-url-metadata-lite', { 
             body: { 
               url: analyzeUrl,
               productName: aiProductName || null,
-              brandName: aiBrandName || null
+              brandName: aiBrandName || null,
+              entityType: resolvedEntityType,
             } 
           });
       
