@@ -112,6 +112,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [showUrlMismatchDialog, setShowUrlMismatchDialog] = useState(false);
   const [urlMismatchMessage, setUrlMismatchMessage] = useState('');
   const [urlMetadata, setUrlMetadata] = useState<any>(null);
+  // Phase 2: normalized URL of the most recent Analyze attempt (success or
+  // failure). Used to decide whether a new Analyze should clear stale
+  // autofill-owned fields. Same-URL retries do NOT clear again.
+  const [lastAnalyzedUrl, setLastAnalyzedUrl] = useState<string | null>(null);
+  // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
+  // by the metadata-only modal as a freshness guard so URL A's metadata never
+  // surfaces under URL B.
+  const [metadataUrl, setMetadataUrl] = useState<string | null>(null);
   
   // Progressive disclosure state (user variant only)
   const [isFormExpanded, setIsFormExpanded] = useState(variant === 'admin'); // Admin always expanded
