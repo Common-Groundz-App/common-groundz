@@ -502,3 +502,46 @@ async function extractOpenGraphImage(url: string): Promise<string | null> {
   }
 }
 
+/**
+ * Phase 1.8c.6-B — Bounded HTML fetch used only when the upstream extractor
+ * didn't already pull HTML (i.e. caller provided a productName so the
+ * extractor was skipped) AND the path is non-brand/unknown. Silent on failure.
+ */
+async function fetchPageHtml(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) return '';
+    return await response.text();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Phase 1.8c.6-B — extract page-owned image candidates from HTML in priority
+ * order: og:image → twitter:image → <link rel="image_src">. Returns absolute
+ * URLs only when the source meta tag already contains one; relative URLs are
+ * passed through and will be rejected by isValidPageImageUrl.
+ */
+function extractPageOwnedImageCandidates(html: string): string[] {
+  if (!html) return [];
+  const out: string[] = [];
+  const og = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
+  if (og && og[1]) out.push(og[1].trim());
+  const tw = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*name=["']twitter:image["']/i);
+  if (tw && tw[1]) out.push(tw[1].trim());
+  const src = html.match(/<link[^>]*rel=["']image_src["'][^>]*href=["']([^"']+)["']/i);
+  if (src && src[1]) out.push(src[1].trim());
+  return out;
+}
+
+
