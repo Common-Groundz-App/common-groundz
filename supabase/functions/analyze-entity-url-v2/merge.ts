@@ -28,6 +28,12 @@ export type WinnerImage = "extractor" | "gemini" | "firecrawl" | "none";
 export type WinnerCurrency = "extractor" | "gemini" | "firecrawl" | "none";
 export type WinnerTags = "extractor" | "gemini" | "merged" | "none";
 
+export type DescriptionSourceCorrection =
+  | "kept_gemini"
+  | "replaced_with_page"
+  | "kept_extractor"
+  | "none";
+
 export interface MergeDiagnostics {
   path: "success" | "recovery";
   gemini_used: boolean;
@@ -47,6 +53,10 @@ export interface MergeDiagnostics {
   recovery_gate_passed?: boolean;
   /** Phase 8.1A: internal honesty signal for pricing.price_source. */
   price_source_used?: PriceSourceUsed;
+  /** Phase 1.8c.6-A.2: page-owned image overrode (or replaced absent) Gemini image. */
+  page_owned_image_override_applied: boolean;
+  /** Phase 1.8c.6-A.2: which description source won in the success path. */
+  description_source_correction: DescriptionSourceCorrection;
 }
 
 export interface MergeFlags {
