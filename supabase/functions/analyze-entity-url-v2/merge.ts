@@ -133,6 +133,24 @@ function isValidDescription(d: string | null | undefined): d is string {
   return true;
 }
 
+// Phase 1.8c.6-A.2: boilerplate/spammy description detector. Anything that
+// passes isValidDescription but matches these patterns is considered weak
+// and may be replaced by a page-owned description.
+const DESCRIPTION_BOILERPLATE_PATTERNS: RegExp[] = [
+  /^(buy|shop|order|get|find)\b/i,
+  /\b(best price|free shipping|cash on delivery|cod available|lowest price|online shopping)\b/i,
+  /\bonline\s+(in|at)\s+[a-z ]+$/i,
+];
+
+export function isWeakOrGenericDescription(d: string | null | undefined): boolean {
+  if (!isValidDescription(d)) return true;
+  const s = d.trim();
+  for (const p of DESCRIPTION_BOILERPLATE_PATTERNS) {
+    if (p.test(s)) return true;
+  }
+  return false;
+}
+
 function nonEmpty(s: string | null | undefined): s is string {
   return typeof s === "string" && s.trim().length > 0;
 }
