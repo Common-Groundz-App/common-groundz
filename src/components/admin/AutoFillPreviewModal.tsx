@@ -233,7 +233,9 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
   open,
   onOpenChange,
   predictions,
-  onApply
+  onApply,
+  metadataOnly = null,
+  onApplyMetadataOnly,
 }) => {
   // Request ID is surfaced from V2 success metadata or error envelope.
   const requestId: string | null =
@@ -241,32 +243,86 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
     predictions?.request_id ??
     null;
 
-  // No predictions available → render inline failure state with optional
-  // request_id. This appears only after the analyze request has resolved
-  // (loading states never open the modal). "Apply to form" is hidden.
+  // No predictions available → render inline failure state. When Phase 2
+  // metadata-only data exists, surface a basic preview + "Use basic metadata"
+  // action; otherwise keep the original Close-only state.
   if (!predictions?.predictions) {
+    const hasMetadataOnly =
+      !!metadataOnly &&
+      (
+        (typeof metadataOnly.title === 'string' && metadataOnly.title.trim().length > 0) ||
+        (Array.isArray(metadataOnly.images) && metadataOnly.images.length > 0)
+      );
+
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-yellow-500" />
-              AI couldn't extract details
+              AI details unavailable
             </DialogTitle>
             <DialogDescription>
-              AI couldn't extract reliable details from this URL. You can fill
-              the form manually or try again.
+              {hasMetadataOnly
+                ? 'We found basic URL metadata that can help start the form. Please review and complete the remaining fields.'
+                : "AI couldn't extract reliable details from this URL. You can fill the form manually or try again."}
             </DialogDescription>
           </DialogHeader>
+
+          {hasMetadataOnly && (
+            <div className="space-y-3 rounded-md border bg-muted/30 p-3">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Metadata preview
+              </p>
+              {metadataOnly!.title && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Title</Label>
+                  <p className="text-sm font-medium break-words">{metadataOnly!.title}</p>
+                </div>
+              )}
+              {metadataOnly!.websiteUrl && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Website URL</Label>
+                  <p className="text-xs font-mono truncate text-muted-foreground">
+                    {metadataOnly!.websiteUrl}
+                  </p>
+                </div>
+              )}
+              {Array.isArray(metadataOnly!.images) && metadataOnly!.images.length > 0 && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">
+                    Images ({metadataOnly!.images.length})
+                  </Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {metadataOnly!.images.slice(0, 4).map((src, i) => (
+                      <ImageWithFallback
+                        key={`${src}-${i}`}
+                        src={src}
+                        alt={metadataOnly!.title || `Metadata image ${i + 1}`}
+                        entityType="product"
+                        className="h-16 w-full rounded object-cover"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {requestId && (
             <p className="text-xs text-muted-foreground">
               Request ID: <span className="font-mono">{requestId}</span>
             </p>
           )}
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
+            {hasMetadataOnly && onApplyMetadataOnly && (
+              <Button onClick={() => onApplyMetadataOnly(metadataOnly!)}>
+                Use basic metadata
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
