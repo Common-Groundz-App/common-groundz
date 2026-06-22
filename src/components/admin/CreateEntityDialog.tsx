@@ -919,6 +919,106 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     console.log(`🖼️ Added ${source} image to gallery:`, imageUrl);
   };
 
+  // ─── Phase 2 helpers ────────────────────────────────────────────────────
+  // Conservative URL normalizer: lowercases hostname, drops a single trailing
+  // slash on non-root paths, strips the #hash fragment (fragments never
+  // identify a page server-side). Does NOT strip query strings — a query
+  // change is a genuinely different URL.
+  const normalizeUrlForCompare = (input: string | null | undefined): string | null => {
+    if (!input) return null;
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    try {
+      const u = new URL(trimmed);
+      u.hostname = u.hostname.toLowerCase();
+      if (u.pathname.length > 1 && u.pathname.endsWith('/')) {
+        u.pathname = u.pathname.slice(0, -1);
+      }
+      u.hash = '';
+      return u.toString();
+    } catch {
+      return trimmed;
+    }
+  };
+
+  // Filter raw metadata image entries down to safe, deduped http(s) URLs.
+  const pickValidImages = (meta: any): string[] => {
+    const raw: any[] = Array.isArray(meta?.images)
+      ? meta.images
+      : meta?.image
+      ? [meta.image]
+      : [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const item of raw) {
+      const url = typeof item === 'string' ? item : item?.url;
+      if (typeof url !== 'string') continue;
+      const trimmed = url.trim();
+      if (!trimmed) continue;
+      if (/^(data:|blob:|javascript:)/i.test(trimmed)) continue;
+      try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+        const key = parsed.toString();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(trimmed);
+        if (out.length >= 8) break;
+      } catch {
+        continue;
+      }
+    }
+    return out;
+  };
+
+  // Build the Phase 2 metadata-only snapshot. Returns null unless the metadata
+  // is fresh for the current analyze URL AND has at least a non-empty title
+  // or one valid image. A website URL alone is not enough.
+  const buildMetadataOnly = (): {
+    title?: string;
+    websiteUrl?: string;
+    images?: string[];
+  } | null => {
+    const normalized = normalizeUrlForCompare(analyzeUrl);
+    if (!metadataUrl || !normalized || metadataUrl !== normalized) return null;
+    const title =
+      typeof urlMetadata?.title === 'string' ? urlMetadata.title.trim() : '';
+    const images = pickValidImages(urlMetadata);
+    if (!title && images.length === 0) return null;
+    return {
+      title: title || undefined,
+      // Snapshot the analyzed URL at render time so a post-render edit to
+      // analyzeUrl cannot poison the applied website_url.
+      websiteUrl: analyzeUrl.trim() || undefined,
+      images,
+    };
+  };
+
+  // Clear autofill-owned fields at Analyze-start for a NEW normalized URL.
+  // Never clears name, website_url, uploadedMedia, primaryMediaUrl.
+  const resetAutofillOwnedFields = () => {
+    setFormData(prev => ({
+      ...prev,
+      type: '',
+      description: '',
+      category_id: null,
+      authors: [],
+      languages: [],
+      isbn: '',
+      publication_year: null,
+      ingredients: [],
+      metadata: {},
+      cast_crew: {},
+      specifications: {},
+      price_info: {},
+      nutritional_info: {},
+      external_ratings: {},
+    }));
+    setSelectedTagNames([]);
+    setSelectedParent(null);
+    setAiFilledFields(new Set());
+  };
+
   // Call edge function to analyze URL
   const handleAnalyzeUrl = async () => {
     if (!analyzeUrl || !isValidUrl(analyzeUrl)) {
@@ -931,13 +1031,19 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
 
     setAnalyzing(true);
-    
-    // Clear old state before analyzing new URL
-    setUrlMetadata(null);
-    setAiPredictions(null);
-    setUploadedMedia([]);
-    setPrimaryMediaUrl(null);
-    setSelectedParent(null);
+
+    // Phase 2: only clear stale autofill state when the normalized URL has
+    // actually changed. Same-URL retries after a failure must NOT re-clear.
+    const normalizedAnalyze = normalizeUrlForCompare(analyzeUrl);
+    if (normalizedAnalyze && normalizedAnalyze !== lastAnalyzedUrl) {
+      resetAutofillOwnedFields();
+      setAiPredictions(null);
+      setUrlMetadata(null);
+      setMetadataUrl(null);
+      setUrlMismatchMessage('');
+    }
+    setLastAnalyzedUrl(normalizedAnalyze);
+
     
     try {
       // Route to V1 or V2 based on admin engine flag. Never log the full URL (may contain tokens/PII).
