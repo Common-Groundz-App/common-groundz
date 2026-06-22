@@ -63,15 +63,33 @@ serve(async (req) => {
   }
 
   try {
-    const { url, productName: providedProductName, brandName: providedBrandName } = await req.json();
+    const {
+      url,
+      productName: providedProductName,
+      brandName: providedBrandName,
+      entityType: providedEntityType,
+    } = await req.json();
     
     if (!url) {
       throw new Error('URL is required');
     }
     
+    // Phase 1.8c.6-B — resolve caller intent for image-priority path.
+    // brand → Google-first (no new HTML fetch for page-owned image).
+    // any other non-empty type → page-owned first, Google fallback.
+    // omitted/empty → unknown_page_first (safe default for generic previews).
+    const rawEntityType = typeof providedEntityType === 'string' ? providedEntityType.trim() : '';
+    const entityTypeNorm = rawEntityType.toLowerCase();
+    const entityTypeSource: 'caller' | 'omitted' = rawEntityType ? 'caller' : 'omitted';
+    const isBrand = entityTypeNorm === 'brand';
+    const imagePriorityPath: ImagePriorityPath = isBrand
+      ? 'brand_first_google'
+      : (rawEntityType ? 'non_brand_page_first' : 'unknown_page_first');
+    
     console.log(`🔍 Processing URL: ${url}`);
     console.log(`📦 Raw product name: ${providedProductName || 'none'}`);
     console.log(`🏢 Raw brand name: ${providedBrandName || 'none'}`);
+    console.log(`🧭 entityType: ${rawEntityType || 'omitted'} (source=${entityTypeSource}, path=${imagePriorityPath})`);
     
     // Step 1: Sanitize inputs
     const sanitizedProductName = sanitizeEntityName(providedProductName);
@@ -85,6 +103,7 @@ serve(async (req) => {
     let brandName: string | null = sanitizedBrandName;
     let pageHtml = '';
     let extractionMethod: string;
+    let pageHtmlFetchedForImage = false;
 
     if (sanitizedProductName && sanitizedProductName.length > 3) {
       productName = sanitizedProductName;
@@ -97,6 +116,20 @@ serve(async (req) => {
       pageHtml = extracted.html;
       extractionMethod = 'scraped-from-html';
       console.log(`📝 Extracted product name: "${productName}"`);
+    }
+    
+    // Phase 1.8c.6-B — for non-brand/unknown paths, ensure we have HTML so we
+    // can look for page-owned image candidates. Brand path skips this fetch
+    // entirely (byte-identical behavior to today on brand).
+    if (!pageHtml && !isBrand) {
+      const fetched = await fetchPageHtml(url);
+      if (fetched) {
+        pageHtml = fetched;
+        pageHtmlFetchedForImage = true;
+        console.log(`🌐 Bounded HTML fetch for page-owned image: success`);
+      } else {
+        console.log(`🌐 Bounded HTML fetch for page-owned image: failed (silent)`);
+      }
     }
     
     // Step 3: Get brand name (use sanitized, extract from domain, or skip)
