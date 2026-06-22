@@ -112,6 +112,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [showUrlMismatchDialog, setShowUrlMismatchDialog] = useState(false);
   const [urlMismatchMessage, setUrlMismatchMessage] = useState('');
   const [urlMetadata, setUrlMetadata] = useState<any>(null);
+  // Phase 2: normalized URL of the most recent Analyze attempt (success or
+  // failure). Used to decide whether a new Analyze should clear stale
+  // autofill-owned fields. Same-URL retries do NOT clear again.
+  const [lastAnalyzedUrl, setLastAnalyzedUrl] = useState<string | null>(null);
+  // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
+  // by the metadata-only modal as a freshness guard so URL A's metadata never
+  // surfaces under URL B.
+  const [metadataUrl, setMetadataUrl] = useState<string | null>(null);
   
   // Progressive disclosure state (user variant only)
   const [isFormExpanded, setIsFormExpanded] = useState(variant === 'admin'); // Admin always expanded
@@ -911,6 +919,106 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     console.log(`🖼️ Added ${source} image to gallery:`, imageUrl);
   };
 
+  // ─── Phase 2 helpers ────────────────────────────────────────────────────
+  // Conservative URL normalizer: lowercases hostname, drops a single trailing
+  // slash on non-root paths, strips the #hash fragment (fragments never
+  // identify a page server-side). Does NOT strip query strings — a query
+  // change is a genuinely different URL.
+  const normalizeUrlForCompare = (input: string | null | undefined): string | null => {
+    if (!input) return null;
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    try {
+      const u = new URL(trimmed);
+      u.hostname = u.hostname.toLowerCase();
+      if (u.pathname.length > 1 && u.pathname.endsWith('/')) {
+        u.pathname = u.pathname.slice(0, -1);
+      }
+      u.hash = '';
+      return u.toString();
+    } catch {
+      return trimmed;
+    }
+  };
+
+  // Filter raw metadata image entries down to safe, deduped http(s) URLs.
+  const pickValidImages = (meta: any): string[] => {
+    const raw: any[] = Array.isArray(meta?.images)
+      ? meta.images
+      : meta?.image
+      ? [meta.image]
+      : [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const item of raw) {
+      const url = typeof item === 'string' ? item : item?.url;
+      if (typeof url !== 'string') continue;
+      const trimmed = url.trim();
+      if (!trimmed) continue;
+      if (/^(data:|blob:|javascript:)/i.test(trimmed)) continue;
+      try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') continue;
+        const key = parsed.toString();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(trimmed);
+        if (out.length >= 8) break;
+      } catch {
+        continue;
+      }
+    }
+    return out;
+  };
+
+  // Build the Phase 2 metadata-only snapshot. Returns null unless the metadata
+  // is fresh for the current analyze URL AND has at least a non-empty title
+  // or one valid image. A website URL alone is not enough.
+  const buildMetadataOnly = (): {
+    title?: string;
+    websiteUrl?: string;
+    images?: string[];
+  } | null => {
+    const normalized = normalizeUrlForCompare(analyzeUrl);
+    if (!metadataUrl || !normalized || metadataUrl !== normalized) return null;
+    const title =
+      typeof urlMetadata?.title === 'string' ? urlMetadata.title.trim() : '';
+    const images = pickValidImages(urlMetadata);
+    if (!title && images.length === 0) return null;
+    return {
+      title: title || undefined,
+      // Snapshot the analyzed URL at render time so a post-render edit to
+      // analyzeUrl cannot poison the applied website_url.
+      websiteUrl: analyzeUrl.trim() || undefined,
+      images,
+    };
+  };
+
+  // Clear autofill-owned fields at Analyze-start for a NEW normalized URL.
+  // Never clears name, website_url, uploadedMedia, primaryMediaUrl.
+  const resetAutofillOwnedFields = () => {
+    setFormData(prev => ({
+      ...prev,
+      type: '',
+      description: '',
+      category_id: null,
+      authors: [],
+      languages: [],
+      isbn: '',
+      publication_year: null,
+      ingredients: [],
+      metadata: {},
+      cast_crew: {},
+      specifications: {},
+      price_info: {},
+      nutritional_info: {},
+      external_ratings: {},
+    }));
+    setSelectedTagNames([]);
+    setSelectedParent(null);
+    setAiFilledFields(new Set());
+  };
+
   // Call edge function to analyze URL
   const handleAnalyzeUrl = async () => {
     if (!analyzeUrl || !isValidUrl(analyzeUrl)) {
@@ -923,13 +1031,19 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
 
     setAnalyzing(true);
-    
-    // Clear old state before analyzing new URL
-    setUrlMetadata(null);
-    setAiPredictions(null);
-    setUploadedMedia([]);
-    setPrimaryMediaUrl(null);
-    setSelectedParent(null);
+
+    // Phase 2: only clear stale autofill state when the normalized URL has
+    // actually changed. Same-URL retries after a failure must NOT re-clear.
+    const normalizedAnalyze = normalizeUrlForCompare(analyzeUrl);
+    if (normalizedAnalyze && normalizedAnalyze !== lastAnalyzedUrl) {
+      resetAutofillOwnedFields();
+      setAiPredictions(null);
+      setUrlMetadata(null);
+      setMetadataUrl(null);
+      setUrlMismatchMessage('');
+    }
+    setLastAnalyzedUrl(normalizedAnalyze);
+
     
     try {
       // Route to V1 or V2 based on admin engine flag. Never log the full URL (may contain tokens/PII).
@@ -989,6 +1103,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       } else if (metadataResult.data) {
         console.log('📄 Metadata:', metadataResult.data);
         setUrlMetadata(metadataResult.data);
+        // Phase 2: bind the just-fetched metadata to the normalized URL it
+        // belongs to, so the metadata-only modal's freshness guard refuses to
+        // surface it under a different URL later.
+        setMetadataUrl(normalizedAnalyze);
         if (!cachedMetadata) {
           setCachedMetadata(analyzeUrl, metadataResult.data);
         }
@@ -1221,6 +1339,71 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     
     console.log('✅ Applied metadata-only (no AI predictions)');
   };
+
+  /**
+   * Phase 2: purely additive metadata-only apply. Receives the same snapshot
+   * the modal rendered from — never re-reads live state like analyzeUrl, so a
+   * user edit between Analyze and Apply cannot poison the write.
+   *
+   * Writes ONLY:
+   *  - name (if currently empty)
+   *  - website_url (if currently empty), from snapshot.websiteUrl
+   *  - images: appended/deduped; primaryMediaUrl set only if currently empty
+   *
+   * Never writes or clears: type, category, brand, price, currency, tags,
+   * description, structured product fields.
+   */
+  const applyMetadataOnlySafe = (snapshot: {
+    title?: string;
+    websiteUrl?: string;
+    images?: string[];
+  }) => {
+    const title = (snapshot.title ?? '').trim();
+    const website = (snapshot.websiteUrl ?? '').trim();
+    const incoming = Array.isArray(snapshot.images) ? snapshot.images : [];
+
+    if (title && !formData.name.trim()) {
+      handleInputChange('name', title);
+    }
+    if (website && !formData.website_url.trim()) {
+      handleInputChange('website_url', website);
+    }
+
+    if (incoming.length > 0) {
+      let addedCount = 0;
+      let firstAddedUrl: string | null = null;
+      setUploadedMedia(prev => {
+        const existing = new Set(prev.map(m => m.url));
+        const toAdd: MediaItem[] = [];
+        incoming.forEach(url => {
+          if (existing.has(url)) return;
+          existing.add(url);
+          toAdd.push({
+            id: crypto.randomUUID(),
+            url,
+            type: 'image',
+            order: prev.length + toAdd.length,
+            caption: 'From URL metadata',
+            source: 'external',
+          });
+        });
+        addedCount = toAdd.length;
+        if (toAdd.length > 0) firstAddedUrl = toAdd[0].url;
+        return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+      });
+      if (firstAddedUrl && !primaryMediaUrl) {
+        setPrimaryMediaUrl(firstAddedUrl);
+      }
+      console.log(`✅ Phase 2 applyMetadataOnlySafe: added ${addedCount} image(s)`);
+    }
+
+    setShowPreviewModal(false);
+    toast({
+      title: 'Basic metadata applied',
+      description: 'Please review and fill the remaining fields.',
+    });
+  };
+
   
   const applyPredictionsToForm = async (pred: any) => {
     let appliedCount = 0;
@@ -2354,6 +2537,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onOpenChange={setShowPreviewModal}
         predictions={aiPredictions}
         onApply={applyAiPredictions}
+        metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
+        onApplyMetadataOnly={applyMetadataOnlySafe}
       />
       
       {/* URL Mismatch Warning Dialog */}
