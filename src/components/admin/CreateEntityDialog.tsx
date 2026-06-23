@@ -113,9 +113,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [urlMismatchMessage, setUrlMismatchMessage] = useState('');
   const [urlMetadata, setUrlMetadata] = useState<any>(null);
   // Phase 2: normalized URL of the most recent Analyze attempt (success or
-  // failure). Used to decide whether a new Analyze should clear stale
-  // autofill-owned fields. Same-URL retries do NOT clear again.
+  // failure). Used for analysis retry / metadata-freshness logic only.
+  // Does NOT drive form/media reset anymore — see lastAppliedUrl.
   const [lastAnalyzedUrl, setLastAnalyzedUrl] = useState<string | null>(null);
+  // Phase 2 v8: normalized URL of the result currently committed to the
+  // form (via Apply to Form / Use basic metadata). Drives the
+  // reset-on-different-URL behavior inside the apply handlers.
+  const [lastAppliedUrl, setLastAppliedUrl] = useState<string | null>(null);
+  // Phase 2 v8: URL snapshot captured at the moment the preview modal opens
+  // for a successful AI prediction. Apply handlers read this — never the
+  // live analyzeUrl input — so a post-render edit cannot poison apply.
+  const [predictionUrlSnapshot, setPredictionUrlSnapshot] = useState<string | null>(null);
   // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
   // by the metadata-only modal as a freshness guard so URL A's metadata never
   // surfaces under URL B.
@@ -994,12 +1002,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     };
   };
 
-  // Clear autofill-owned fields at Analyze-start for a NEW normalized URL.
-  // Never clears name or website_url. Clears all media and image_url so the
-  // gallery always reflects the currently analyzed URL.
-  const resetAutofillOwnedFields = () => {
+  // Phase 2 v8: Runs only from the Apply handlers when the user commits a
+  // different URL than `lastAppliedUrl`. Clears all entity form fields,
+  // structured fields, and media so the new applied result fully replaces
+  // the previous entity. Never runs from Analyze — Analyze is preview-only
+  // and must not mutate form/media state.
+  const resetEntityFormForNewAppliedUrl = () => {
     setFormData(prev => ({
       ...prev,
+      name: '',
+      website_url: '',
       type: '',
       description: '',
       category_id: null,
@@ -1036,15 +1048,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
     setAnalyzing(true);
 
-    // Phase 2: only clear stale autofill state when the normalized URL has
-    // actually changed. Same-URL retries after a failure must NOT re-clear.
+    // Phase 2 v8: Analyze is preview-only. Do NOT mutate form/media state
+    // here. Only clear analysis-side state for a new normalized URL so the
+    // preview modal doesn't surface stale predictions/metadata. The form
+    // reset happens later, inside the Apply handlers, via
+    // resetEntityFormForNewAppliedUrl().
     const normalizedAnalyze = normalizeUrlForCompare(analyzeUrl);
     if (normalizedAnalyze && normalizedAnalyze !== lastAnalyzedUrl) {
-      resetAutofillOwnedFields();
       setAiPredictions(null);
       setUrlMetadata(null);
       setMetadataUrl(null);
       setUrlMismatchMessage('');
+      setPredictionUrlSnapshot(null);
     }
     setLastAnalyzedUrl(normalizedAnalyze);
 
@@ -1188,6 +1203,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       
       // Show preview modal if we have metadata OR any AI envelope (success or failure).
       if (metadataResult.data || aiResult.data || v2Failed) {
+        // Phase 2 v8: capture the normalized URL the modal is opening for,
+        // so Apply uses this snapshot — not the live analyzeUrl input —
+        // when deciding whether to reset and what to commit.
+        setPredictionUrlSnapshot(normalizedAnalyze);
         setShowPreviewModal(true);
       }
       
@@ -1212,6 +1231,26 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     } finally {
       setAnalyzing(false);
     }
+  };
+
+  // Phase 2 v8: Single controlled gate for committing an analyzed URL's
+  // result into the form. Compares the modal's captured snapshot URL
+  // against lastAppliedUrl; if different, performs a full entity reset
+  // before invoking the apply function. Always updates lastAppliedUrl
+  // afterwards. Both Apply to Form and Use basic metadata go through this.
+  const commitApply = (snapshotUrl: string | null | undefined, applyFn: () => void | Promise<void>) => {
+    const normalized = snapshotUrl ? normalizeUrlForCompare(snapshotUrl) : null;
+    const isDifferent = !!normalized && normalized !== lastAppliedUrl;
+    if (isDifferent) {
+      resetEntityFormForNewAppliedUrl();
+    }
+    // React 18 batches state updates inside this synchronous handler, so
+    // the reset and the apply commit together. Apply functions use
+    // functional setFormData/setUploadedMedia/setPrimaryMediaUrl updates
+    // where they depend on post-reset state.
+    const result = applyFn();
+    if (normalized) setLastAppliedUrl(normalized);
+    return result;
   };
 
   // Apply AI predictions to form
@@ -1246,11 +1285,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         }
       }
       
-      // Apply AI predictions
-      await applyPredictionsToForm(pred);
+      // Apply AI predictions, gated by the URL-snapshot reset logic
+      await commitApply(predictionUrlSnapshot, () => applyPredictionsToForm(pred));
     } else {
       // Apply metadata only (no AI predictions available)
-      await applyMetadataOnly();
+      await commitApply(predictionUrlSnapshot, () => applyMetadataOnly());
     }
   };
 
@@ -1366,11 +1405,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     const website = (snapshot.websiteUrl ?? '').trim();
     const incoming = Array.isArray(snapshot.images) ? snapshot.images : [];
 
-    if (title && !formData.name.trim()) {
-      handleInputChange('name', title);
+    // Phase 2 v8: use functional setFormData so the empty-guard reads the
+    // post-reset state when this runs in the same handler as
+    // resetEntityFormForNewAppliedUrl().
+    if (title) {
+      setFormData(prev => prev.name.trim() ? prev : { ...prev, name: title });
     }
-    if (website && !formData.website_url.trim()) {
-      handleInputChange('website_url', website);
+    if (website) {
+      setFormData(prev => prev.website_url.trim() ? prev : { ...prev, website_url: website });
     }
 
     if (incoming.length > 0) {
@@ -1395,8 +1437,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         if (toAdd.length > 0) firstAddedUrl = toAdd[0].url;
         return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
       });
-      if (firstAddedUrl && !primaryMediaUrl) {
-        setPrimaryMediaUrl(firstAddedUrl);
+      // Phase 2 v8: functional update so a just-reset primary (null) is seen.
+      if (firstAddedUrl) {
+        setPrimaryMediaUrl(prev => prev || firstAddedUrl!);
       }
       console.log(`✅ Phase 2 applyMetadataOnlySafe: added ${addedCount} image(s)`);
     }
@@ -1545,10 +1588,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         setUploadedMedia(prev => [...prev, ...newMediaItems]);
         imagesApplied = newMediaItems.length;
         
-        // Set primary if no primary exists
-        if (!primaryMediaUrl) {
-          setPrimaryMediaUrl(newMediaItems[0].url);
-        }
+        // Phase 2 v8: functional update so a just-reset primary (null) is seen.
+        setPrimaryMediaUrl(prev => prev || newMediaItems[0].url);
         
         console.log(`✅ Batched ${imagesApplied} metadata images to gallery`);
       }
@@ -1598,10 +1639,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         setUploadedMedia(prev => [...prev, ...newMediaItems]);
         imagesApplied = newMediaItems.length;
         
-        // Set primary if no primary exists
-        if (!primaryMediaUrl) {
-          setPrimaryMediaUrl(newMediaItems[0].url);
-        }
+        // Phase 2 v8: functional update so a just-reset primary (null) is seen.
+        setPrimaryMediaUrl(prev => prev || newMediaItems[0].url);
         
         console.log(`✅ Batched ${imagesApplied} AI images to gallery`);
       }
@@ -2542,7 +2581,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         predictions={aiPredictions}
         onApply={applyAiPredictions}
         metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
-        onApplyMetadataOnly={applyMetadataOnlySafe}
+        onApplyMetadataOnly={(snapshot) => commitApply(snapshot.websiteUrl, () => applyMetadataOnlySafe(snapshot))}
       />
       
       {/* URL Mismatch Warning Dialog */}
@@ -2563,7 +2602,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               if (aiPredictions?.predictions) {
-                applyPredictionsToForm(aiPredictions.predictions);
+                commitApply(predictionUrlSnapshot, () => applyPredictionsToForm(aiPredictions.predictions));
               }
               setShowUrlMismatchDialog(false);
             }}>
