@@ -1405,11 +1405,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     const website = (snapshot.websiteUrl ?? '').trim();
     const incoming = Array.isArray(snapshot.images) ? snapshot.images : [];
 
-    if (title && !formData.name.trim()) {
-      handleInputChange('name', title);
+    // Phase 2 v8: use functional setFormData so the empty-guard reads the
+    // post-reset state when this runs in the same handler as
+    // resetEntityFormForNewAppliedUrl().
+    if (title) {
+      setFormData(prev => prev.name.trim() ? prev : { ...prev, name: title });
     }
-    if (website && !formData.website_url.trim()) {
-      handleInputChange('website_url', website);
+    if (website) {
+      setFormData(prev => prev.website_url.trim() ? prev : { ...prev, website_url: website });
     }
 
     if (incoming.length > 0) {
@@ -1434,9 +1437,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         if (toAdd.length > 0) firstAddedUrl = toAdd[0].url;
         return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
       });
-      if (firstAddedUrl && !primaryMediaUrl) {
-        setPrimaryMediaUrl(firstAddedUrl);
+      // Phase 2 v8: functional update so a just-reset primary (null) is seen.
+      if (firstAddedUrl) {
+        setPrimaryMediaUrl(prev => prev || firstAddedUrl!);
       }
+      console.log(`✅ Phase 2 applyMetadataOnlySafe: added ${addedCount} image(s)`);
+    }
       console.log(`✅ Phase 2 applyMetadataOnlySafe: added ${addedCount} image(s)`);
     }
 
