@@ -1233,6 +1233,26 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
   };
 
+  // Phase 2 v8: Single controlled gate for committing an analyzed URL's
+  // result into the form. Compares the modal's captured snapshot URL
+  // against lastAppliedUrl; if different, performs a full entity reset
+  // before invoking the apply function. Always updates lastAppliedUrl
+  // afterwards. Both Apply to Form and Use basic metadata go through this.
+  const commitApply = (snapshotUrl: string | null | undefined, applyFn: () => void | Promise<void>) => {
+    const normalized = snapshotUrl ? normalizeUrlForCompare(snapshotUrl) : null;
+    const isDifferent = !!normalized && normalized !== lastAppliedUrl;
+    if (isDifferent) {
+      resetEntityFormForNewAppliedUrl();
+    }
+    // React 18 batches state updates inside this synchronous handler, so
+    // the reset and the apply commit together. Apply functions use
+    // functional setFormData/setUploadedMedia/setPrimaryMediaUrl updates
+    // where they depend on post-reset state.
+    const result = applyFn();
+    if (normalized) setLastAppliedUrl(normalized);
+    return result;
+  };
+
   // Apply AI predictions to form
   const applyAiPredictions = async () => {
     // Check if we have ANY data to apply (AI predictions OR metadata)
@@ -1265,11 +1285,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         }
       }
       
-      // Apply AI predictions
-      await applyPredictionsToForm(pred);
+      // Apply AI predictions, gated by the URL-snapshot reset logic
+      await commitApply(predictionUrlSnapshot, () => applyPredictionsToForm(pred));
     } else {
       // Apply metadata only (no AI predictions available)
-      await applyMetadataOnly();
+      await commitApply(predictionUrlSnapshot, () => applyMetadataOnly());
     }
   };
 
