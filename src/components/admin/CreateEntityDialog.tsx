@@ -2583,7 +2583,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         predictions={aiPredictions}
         onApply={applyAiPredictions}
         metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
-        onApplyMetadataOnly={applyMetadataOnlySafe}
+        onApplyMetadataOnly={(snapshot) => commitApply(snapshot.websiteUrl, () => applyMetadataOnlySafe(snapshot))}
       />
       
       {/* URL Mismatch Warning Dialog */}
