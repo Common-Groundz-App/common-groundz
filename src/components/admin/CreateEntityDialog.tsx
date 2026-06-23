@@ -1443,8 +1443,6 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       }
       console.log(`✅ Phase 2 applyMetadataOnlySafe: added ${addedCount} image(s)`);
     }
-      console.log(`✅ Phase 2 applyMetadataOnlySafe: added ${addedCount} image(s)`);
-    }
 
     setShowPreviewModal(false);
     toast({
