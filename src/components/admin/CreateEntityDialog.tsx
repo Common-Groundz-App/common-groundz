@@ -113,9 +113,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [urlMismatchMessage, setUrlMismatchMessage] = useState('');
   const [urlMetadata, setUrlMetadata] = useState<any>(null);
   // Phase 2: normalized URL of the most recent Analyze attempt (success or
-  // failure). Used to decide whether a new Analyze should clear stale
-  // autofill-owned fields. Same-URL retries do NOT clear again.
+  // failure). Used for analysis retry / metadata-freshness logic only.
+  // Does NOT drive form/media reset anymore — see lastAppliedUrl.
   const [lastAnalyzedUrl, setLastAnalyzedUrl] = useState<string | null>(null);
+  // Phase 2 v8: normalized URL of the result currently committed to the
+  // form (via Apply to Form / Use basic metadata). Drives the
+  // reset-on-different-URL behavior inside the apply handlers.
+  const [lastAppliedUrl, setLastAppliedUrl] = useState<string | null>(null);
+  // Phase 2 v8: URL snapshot captured at the moment the preview modal opens
+  // for a successful AI prediction. Apply handlers read this — never the
+  // live analyzeUrl input — so a post-render edit cannot poison apply.
+  const [predictionUrlSnapshot, setPredictionUrlSnapshot] = useState<string | null>(null);
   // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
   // by the metadata-only modal as a freshness guard so URL A's metadata never
   // surfaces under URL B.
