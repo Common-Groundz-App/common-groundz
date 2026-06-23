@@ -1048,15 +1048,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
     setAnalyzing(true);
 
-    // Phase 2: only clear stale autofill state when the normalized URL has
-    // actually changed. Same-URL retries after a failure must NOT re-clear.
+    // Phase 2 v8: Analyze is preview-only. Do NOT mutate form/media state
+    // here. Only clear analysis-side state for a new normalized URL so the
+    // preview modal doesn't surface stale predictions/metadata. The form
+    // reset happens later, inside the Apply handlers, via
+    // resetEntityFormForNewAppliedUrl().
     const normalizedAnalyze = normalizeUrlForCompare(analyzeUrl);
     if (normalizedAnalyze && normalizedAnalyze !== lastAnalyzedUrl) {
-      resetAutofillOwnedFields();
       setAiPredictions(null);
       setUrlMetadata(null);
       setMetadataUrl(null);
       setUrlMismatchMessage('');
+      setPredictionUrlSnapshot(null);
     }
     setLastAnalyzedUrl(normalizedAnalyze);
 
