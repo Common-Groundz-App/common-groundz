@@ -2604,7 +2604,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               if (aiPredictions?.predictions) {
-                applyPredictionsToForm(aiPredictions.predictions);
+                commitApply(predictionUrlSnapshot, () => applyPredictionsToForm(aiPredictions.predictions));
               }
               setShowUrlMismatchDialog(false);
             }}>
