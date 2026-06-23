@@ -1002,12 +1002,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     };
   };
 
-  // Clear autofill-owned fields at Analyze-start for a NEW normalized URL.
-  // Never clears name or website_url. Clears all media and image_url so the
-  // gallery always reflects the currently analyzed URL.
-  const resetAutofillOwnedFields = () => {
+  // Phase 2 v8: Runs only from the Apply handlers when the user commits a
+  // different URL than `lastAppliedUrl`. Clears all entity form fields,
+  // structured fields, and media so the new applied result fully replaces
+  // the previous entity. Never runs from Analyze — Analyze is preview-only
+  // and must not mutate form/media state.
+  const resetEntityFormForNewAppliedUrl = () => {
     setFormData(prev => ({
       ...prev,
+      name: '',
+      website_url: '',
       type: '',
       description: '',
       category_id: null,
