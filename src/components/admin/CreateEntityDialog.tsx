@@ -1203,6 +1203,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       
       // Show preview modal if we have metadata OR any AI envelope (success or failure).
       if (metadataResult.data || aiResult.data || v2Failed) {
+        // Phase 2 v8: capture the normalized URL the modal is opening for,
+        // so Apply uses this snapshot — not the live analyzeUrl input —
+        // when deciding whether to reset and what to commit.
+        setPredictionUrlSnapshot(normalizedAnalyze);
         setShowPreviewModal(true);
       }
       
