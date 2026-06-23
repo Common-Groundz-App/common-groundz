@@ -1641,10 +1641,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         setUploadedMedia(prev => [...prev, ...newMediaItems]);
         imagesApplied = newMediaItems.length;
         
-        // Set primary if no primary exists
-        if (!primaryMediaUrl) {
-          setPrimaryMediaUrl(newMediaItems[0].url);
-        }
+        // Phase 2 v8: functional update so a just-reset primary (null) is seen.
+        setPrimaryMediaUrl(prev => prev || newMediaItems[0].url);
         
         console.log(`✅ Batched ${imagesApplied} AI images to gallery`);
       }
