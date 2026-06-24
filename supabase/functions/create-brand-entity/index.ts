@@ -252,9 +252,9 @@ serve(async (req) => {
 
     if (!brandEntity) throw new Error('Failed to create brand after multiple slug conflict retries');
 
-    return new Response(JSON.stringify({ success: true, brandEntity, alreadyExisted: false }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-    });
+    return new Response(JSON.stringify({
+      success: true, status: 'created', brandEntity, alreadyExisted: false
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
     console.error('❌ Error in create-brand-entity:', error);
