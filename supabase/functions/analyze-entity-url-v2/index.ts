@@ -1216,6 +1216,12 @@ serve(async (req) => {
           usedFirecrawl: recFirecrawlOk,
           extractPresent: recExtract !== null,
         });
+        // Phase 3.1: dark-ship entityDraft alongside existing response.
+        const { draft: recDraft, status: recDraftStatus } = await assembleEntityDraft({
+          client: supabaseService, url: safe.url, predictions: recMerged, requestId: request_id,
+        });
+        (response as unknown as { entityDraft: EntityDraft | null }).entityDraft = recDraft;
+        (response.metadata as unknown as { entityDraftStatus: EntityDraftStatus }).entityDraftStatus = recDraftStatus;
         return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
 
