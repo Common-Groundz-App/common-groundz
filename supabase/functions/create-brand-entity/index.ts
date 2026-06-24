@@ -104,6 +104,13 @@ serve(async (req) => {
 
       if (brandByWebsite) {
         if (brandByWebsite.is_deleted) {
+          if (!shouldWrite) {
+            console.log(`🛡️ Soft-deleted brand by website found, confirmCreate=false → confirm_required`);
+            return new Response(JSON.stringify({
+              success: true, status: 'confirm_required',
+              candidate: { id: brandByWebsite.id, name: brandByWebsite.name, kind: 'restore_soft_deleted_by_website' }
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+          }
           console.log(`♻️ Found soft-deleted brand by website: ${brandByWebsite.id}, restoring...`);
           const { data: restoredBrand, error: restoreError } = await supabaseAdmin
             .from('entities')
@@ -117,6 +124,7 @@ serve(async (req) => {
                 ...(brandByWebsite.metadata || {}),
                 restored: true, restored_at: new Date().toISOString(),
                 restored_from: 'website_match',
+                restored_by: userId,
                 enriched: !!(logo || website || description),
                 enrichment_date: logo || website || description ? new Date().toISOString() : null
               }
@@ -127,14 +135,14 @@ serve(async (req) => {
 
           if (restoreError) { console.error('❌ Error restoring brand by website:', restoreError); throw restoreError; }
           console.log(`✅ Restored soft-deleted brand by website: ${restoredBrand.id}`);
-          return new Response(JSON.stringify({ success: true, brandEntity: restoredBrand, alreadyExisted: true }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-          });
+          return new Response(JSON.stringify({
+            success: true, status: 'restored', brandEntity: restoredBrand, alreadyExisted: true
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         } else {
           console.log(`✅ Brand already exists (matched by website): ${brandByWebsite.id}`);
-          return new Response(JSON.stringify({ success: true, brandEntity: brandByWebsite, alreadyExisted: true }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-          });
+          return new Response(JSON.stringify({
+            success: true, status: 'existing_found', brandEntity: brandByWebsite, alreadyExisted: true
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
       }
     }
