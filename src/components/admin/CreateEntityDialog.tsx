@@ -576,7 +576,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }));
   }, [formData.type]);
 
-  // Auto-search and select parent brand entity based on AI-extracted brand name
+  // Phase 3.1: READ-ONLY pre-selection of an existing parent brand entity.
+  // This function MUST NEVER call create-brand-entity or any other write.
+  // If no match (or only ambiguous matches) is found it returns null and
+  // leaves the parent selector untouched — admin picks/creates manually.
+  // Auto-creation was removed in Phase 3.1; it will return in Phase 3.2
+  // behind an explicit user-confirmed BrandPicker action.
   const autoSelectParentBrand = async (brandName: string) => {
     if (!brandName || brandName.length < 2) {
       console.log('⚠️ Brand name too short for auto-selection');
