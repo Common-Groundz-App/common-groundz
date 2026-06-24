@@ -85,6 +85,114 @@ import {
   buildPageMetadataFallback,
   type PageMetadataFallbackDiagnostics,
 } from "./page_metadata_fallback.ts";
+import {
+  buildEntityDraft,
+  type ExistingBrandMatch,
+} from "./entity_draft.ts";
+import type {
+  EntityDraft,
+  EntityDraftStatus,
+} from "../_shared/contracts/entityDraft.types.ts";
+
+// Phase 3.1 — READ-ONLY helper audit:
+//   Every helper reachable from Analyze (fetcher, extractor, firecrawl,
+//   gemini, merge, category_resolver, page_metadata_fallback, pricing)
+//   is read-only: zero entity/brand/media writes, zero storage writes,
+//   zero enrichment inserts. The only DB read added by Phase 3.1 is a
+//   bounded ilike SELECT against `entities` for brand pre-matching used
+//   to assemble entityDraft.brandCandidates — no writes.
+
+// Lazy import wrapper for the Zod schema. If the import fails at module
+// load time we surface 'schema_unavailable' on every response — that
+// indicates a bug to fix before merge, never a silent skip.
+let _validateEntityDraft:
+  | ((d: unknown) => EntityDraft)
+  | null = null;
+let _schemaImportError: unknown = null;
+try {
+  const mod = await import("../_shared/contracts/entityDraft.schema.ts");
+  _validateEntityDraft = mod.validateEntityDraft;
+} catch (e) {
+  _schemaImportError = e;
+  console.error("[analyze-entity-url-v2] entityDraft schema import FAILED — fix before merge", e);
+}
+
+async function lookupExistingBrandMatches(
+  client: ReturnType<typeof createClient>,
+  brandName: string | null,
+): Promise<ExistingBrandMatch[]> {
+  if (!brandName || brandName.length < 2) return [];
+  try {
+    const slugLike = brandName.toLowerCase().replace(/\s+/g, "-");
+    const { data, error } = await client
+      .from("entities")
+      .select("id, name, image_url, slug, website_url")
+      .eq("type", "brand")
+      .eq("is_deleted", false)
+      .or(`name.ilike.%${brandName}%,slug.ilike.%${slugLike}%`)
+      .limit(5);
+    if (error) {
+      console.warn("[analyze-entity-url-v2] brand lookup error (non-fatal):", error.message);
+      return [];
+    }
+    return (data ?? []) as ExistingBrandMatch[];
+  } catch (e) {
+    console.warn("[analyze-entity-url-v2] brand lookup threw (non-fatal):", String(e));
+    return [];
+  }
+}
+
+/** Build + validate the entityDraft. Never throws — returns a tri-state
+ *  diagnostic so the caller can attach it to response.metadata without
+ *  affecting the existing predictions response. */
+async function assembleEntityDraft(args: {
+  client: ReturnType<typeof createClient>;
+  url: string;
+  predictions: V2Predictions | null;
+  requestId: string;
+}): Promise<{ draft: EntityDraft | null; status: EntityDraftStatus }> {
+  if (!_validateEntityDraft) {
+    console.error("[analyze-entity-url-v2] entityDraftStatus=schema_unavailable", {
+      request_id: args.requestId,
+      import_error: String(_schemaImportError),
+    });
+    return { draft: null, status: "schema_unavailable" };
+  }
+  let assembled: EntityDraft;
+  try {
+    const aiBrand =
+      args.predictions &&
+      typeof (args.predictions.additional_data as { brand?: unknown } | undefined)?.brand === "string"
+        ? ((args.predictions.additional_data as { brand: string }).brand).trim()
+        : null;
+    const existingBrandMatches = aiBrand
+      ? await lookupExistingBrandMatches(args.client, aiBrand)
+      : [];
+    assembled = buildEntityDraft({
+      inputMethod: "url",
+      inputRef: args.url,
+      predictions: args.predictions,
+      existingBrandMatches,
+    });
+  } catch (e) {
+    console.error("[analyze-entity-url-v2] entityDraftStatus=build_failed", {
+      request_id: args.requestId,
+      error: String(e),
+      stack: e instanceof Error ? e.stack : undefined,
+    });
+    return { draft: null, status: "build_failed" };
+  }
+  try {
+    const validated = _validateEntityDraft(assembled);
+    return { draft: validated, status: "ok" };
+  } catch (e) {
+    console.error("[analyze-entity-url-v2] entityDraftStatus=validation_failed", {
+      request_id: args.requestId,
+      error: String(e),
+    });
+    return { draft: null, status: "validation_failed" };
+  }
+}
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
