@@ -157,6 +157,13 @@ serve(async (req) => {
       .maybeSingle();
 
     if (softDeletedBrand) {
+      if (!shouldWrite) {
+        console.log(`🛡️ Soft-deleted brand by name found, confirmCreate=false → confirm_required`);
+        return new Response(JSON.stringify({
+          success: true, status: 'confirm_required',
+          candidate: { id: softDeletedBrand.id, name: softDeletedBrand.name, kind: 'restore_soft_deleted_by_name' }
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
       console.log(`♻️ Found soft-deleted brand by name: ${softDeletedBrand.id}, restoring...`);
       const { data: restoredBrand, error: restoreError } = await supabaseAdmin
         .from('entities')
@@ -170,6 +177,7 @@ serve(async (req) => {
             ...(softDeletedBrand.metadata || {}),
             restored: true, restored_at: new Date().toISOString(),
             restored_from: 'name_match',
+            restored_by: userId,
             enriched: !!(logo || website || description),
             enrichment_date: logo || website || description ? new Date().toISOString() : null
           }
@@ -180,9 +188,19 @@ serve(async (req) => {
 
       if (restoreError) { console.error('❌ Error restoring brand by name:', restoreError); throw restoreError; }
       console.log(`✅ Restored soft-deleted brand by name: ${restoredBrand.id}`);
-      return new Response(JSON.stringify({ success: true, brandEntity: restoredBrand, alreadyExisted: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-      });
+      return new Response(JSON.stringify({
+        success: true, status: 'restored', brandEntity: restoredBrand, alreadyExisted: true
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    }
+
+    // Phase 3.1: no existing brand and no soft-deleted match.
+    // Require explicit confirmCreate before inserting a new row.
+    if (!shouldWrite) {
+      console.log(`🛡️ No existing brand, confirmCreate=false → confirm_required (no write)`);
+      return new Response(JSON.stringify({
+        success: true, status: 'confirm_required',
+        candidate: { name: brandName, kind: 'create_new' }
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
     // Step 2: Generate slug
