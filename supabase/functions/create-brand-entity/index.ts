@@ -55,7 +55,14 @@ serve(async (req) => {
     }
 
     // === Now parse body ===
-    const { brandName, sourceUrl, logo, website, description } = await req.json();
+    // Phase 3.1: `confirmCreate` is OPTIONAL and backward-compatible.
+    //   - Existing brand match → returns existing_found (no flag needed).
+    //   - Missing brand or soft-deleted brand + confirmCreate !== true
+    //     → returns { status: 'confirm_required' } with HTTP 200 and
+    //       does NOT write. Legacy callers that previously created on
+    //       missing must opt-in by passing confirmCreate: true.
+    //   - confirmCreate === true → create / restore as before.
+    const { brandName, sourceUrl, logo, website, description, confirmCreate } = await req.json();
 
     if (!brandName || brandName.length < 2) {
       return new Response(JSON.stringify({ error: 'Valid brand name is required', code: 'INVALID_INPUT' }), {
@@ -63,7 +70,9 @@ serve(async (req) => {
       });
     }
 
-    console.log(`🏢 Creating brand entity: "${brandName}"`);
+    const shouldWrite = confirmCreate === true;
+
+    console.log(`🏢 create-brand-entity: "${brandName}" (confirmCreate=${shouldWrite})`);
     console.log(`📍 Source URL: ${sourceUrl || 'none'}`);
     console.log(`👤 Authenticated User ID: ${userId}`);
 
@@ -78,8 +87,8 @@ serve(async (req) => {
 
     if (existingBrand) {
       console.log(`✅ Brand already exists: ${existingBrand.id}`);
-      return new Response(JSON.stringify({ 
-        success: true, brandEntity: existingBrand, alreadyExisted: true 
+      return new Response(JSON.stringify({
+        success: true, status: 'existing_found', brandEntity: existingBrand, alreadyExisted: true
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
