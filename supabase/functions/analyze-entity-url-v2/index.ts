@@ -1726,6 +1726,12 @@ serve(async (req) => {
       usedFirecrawl,
       extractPresent: extract.predictions !== null,
     });
+    // Phase 3.1: dark-ship entityDraft alongside existing response.
+    const { draft: mainDraft, status: mainDraftStatus } = await assembleEntityDraft({
+      client: supabaseService, url: safe.url, predictions: mainMerged, requestId: request_id,
+    });
+    (response as unknown as { entityDraft: EntityDraft | null }).entityDraft = mainDraft;
+    (response.metadata as unknown as { entityDraftStatus: EntityDraftStatus }).entityDraftStatus = mainDraftStatus;
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
   } catch (err) {
     console.error("[analyze-entity-url-v2] unhandled error:", { request_id, err: String(err) });
