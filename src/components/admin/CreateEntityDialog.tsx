@@ -1168,15 +1168,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         console.log('🤖 AI Analysis:', aiResult.data);
         setAiPredictions(aiResult.data);
         
-        // NEW: Auto-select parent brand if extracted by AI (use already-extracted aiBrandName)
+        // Phase 3.1: auto-select existing parent brand only (READ-ONLY).
+        // Auto-creation has been removed — `create-brand-entity` now
+        // requires explicit confirmCreate from a user-confirmed code
+        // path (planned in Phase 3.2 BrandPicker). If no exact match is
+        // found here we deliberately do NOTHING so the admin can pick
+        // or create a brand manually via the existing parent selector.
         if (aiBrandName && aiBrandName.length >= 2) {
-          const foundParent = await autoSelectParentBrand(aiBrandName);
-          
-          // If no parent found, trigger Phase 2 (auto-creation)
-          if (!foundParent) {
-            console.log(`🚀 No parent found, will auto-create brand: "${aiBrandName}"`);
-            await autoCreateParentBrand(aiBrandName, analyzeUrl);
-          }
+          await autoSelectParentBrand(aiBrandName);
         }
         
         // V2 scaffold-only / no-predictions signal: success but null predictions.
