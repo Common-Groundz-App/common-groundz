@@ -55,7 +55,14 @@ serve(async (req) => {
     }
 
     // === Now parse body ===
-    const { brandName, sourceUrl, logo, website, description } = await req.json();
+    // Phase 3.1: `confirmCreate` is OPTIONAL and backward-compatible.
+    //   - Existing brand match → returns existing_found (no flag needed).
+    //   - Missing brand or soft-deleted brand + confirmCreate !== true
+    //     → returns { status: 'confirm_required' } with HTTP 200 and
+    //       does NOT write. Legacy callers that previously created on
+    //       missing must opt-in by passing confirmCreate: true.
+    //   - confirmCreate === true → create / restore as before.
+    const { brandName, sourceUrl, logo, website, description, confirmCreate } = await req.json();
 
     if (!brandName || brandName.length < 2) {
       return new Response(JSON.stringify({ error: 'Valid brand name is required', code: 'INVALID_INPUT' }), {
@@ -63,7 +70,9 @@ serve(async (req) => {
       });
     }
 
-    console.log(`🏢 Creating brand entity: "${brandName}"`);
+    const shouldWrite = confirmCreate === true;
+
+    console.log(`🏢 create-brand-entity: "${brandName}" (confirmCreate=${shouldWrite})`);
     console.log(`📍 Source URL: ${sourceUrl || 'none'}`);
     console.log(`👤 Authenticated User ID: ${userId}`);
 
@@ -78,8 +87,8 @@ serve(async (req) => {
 
     if (existingBrand) {
       console.log(`✅ Brand already exists: ${existingBrand.id}`);
-      return new Response(JSON.stringify({ 
-        success: true, brandEntity: existingBrand, alreadyExisted: true 
+      return new Response(JSON.stringify({
+        success: true, status: 'existing_found', brandEntity: existingBrand, alreadyExisted: true
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
@@ -95,6 +104,13 @@ serve(async (req) => {
 
       if (brandByWebsite) {
         if (brandByWebsite.is_deleted) {
+          if (!shouldWrite) {
+            console.log(`🛡️ Soft-deleted brand by website found, confirmCreate=false → confirm_required`);
+            return new Response(JSON.stringify({
+              success: true, status: 'confirm_required',
+              candidate: { id: brandByWebsite.id, name: brandByWebsite.name, kind: 'restore_soft_deleted_by_website' }
+            }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+          }
           console.log(`♻️ Found soft-deleted brand by website: ${brandByWebsite.id}, restoring...`);
           const { data: restoredBrand, error: restoreError } = await supabaseAdmin
             .from('entities')
@@ -108,6 +124,7 @@ serve(async (req) => {
                 ...(brandByWebsite.metadata || {}),
                 restored: true, restored_at: new Date().toISOString(),
                 restored_from: 'website_match',
+                restored_by: userId,
                 enriched: !!(logo || website || description),
                 enrichment_date: logo || website || description ? new Date().toISOString() : null
               }
@@ -118,14 +135,14 @@ serve(async (req) => {
 
           if (restoreError) { console.error('❌ Error restoring brand by website:', restoreError); throw restoreError; }
           console.log(`✅ Restored soft-deleted brand by website: ${restoredBrand.id}`);
-          return new Response(JSON.stringify({ success: true, brandEntity: restoredBrand, alreadyExisted: true }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-          });
+          return new Response(JSON.stringify({
+            success: true, status: 'restored', brandEntity: restoredBrand, alreadyExisted: true
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         } else {
           console.log(`✅ Brand already exists (matched by website): ${brandByWebsite.id}`);
-          return new Response(JSON.stringify({ success: true, brandEntity: brandByWebsite, alreadyExisted: true }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-          });
+          return new Response(JSON.stringify({
+            success: true, status: 'existing_found', brandEntity: brandByWebsite, alreadyExisted: true
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
       }
     }
@@ -140,6 +157,13 @@ serve(async (req) => {
       .maybeSingle();
 
     if (softDeletedBrand) {
+      if (!shouldWrite) {
+        console.log(`🛡️ Soft-deleted brand by name found, confirmCreate=false → confirm_required`);
+        return new Response(JSON.stringify({
+          success: true, status: 'confirm_required',
+          candidate: { id: softDeletedBrand.id, name: softDeletedBrand.name, kind: 'restore_soft_deleted_by_name' }
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+      }
       console.log(`♻️ Found soft-deleted brand by name: ${softDeletedBrand.id}, restoring...`);
       const { data: restoredBrand, error: restoreError } = await supabaseAdmin
         .from('entities')
@@ -153,6 +177,7 @@ serve(async (req) => {
             ...(softDeletedBrand.metadata || {}),
             restored: true, restored_at: new Date().toISOString(),
             restored_from: 'name_match',
+            restored_by: userId,
             enriched: !!(logo || website || description),
             enrichment_date: logo || website || description ? new Date().toISOString() : null
           }
@@ -163,9 +188,19 @@ serve(async (req) => {
 
       if (restoreError) { console.error('❌ Error restoring brand by name:', restoreError); throw restoreError; }
       console.log(`✅ Restored soft-deleted brand by name: ${restoredBrand.id}`);
-      return new Response(JSON.stringify({ success: true, brandEntity: restoredBrand, alreadyExisted: true }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-      });
+      return new Response(JSON.stringify({
+        success: true, status: 'restored', brandEntity: restoredBrand, alreadyExisted: true
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+    }
+
+    // Phase 3.1: no existing brand and no soft-deleted match.
+    // Require explicit confirmCreate before inserting a new row.
+    if (!shouldWrite) {
+      console.log(`🛡️ No existing brand, confirmCreate=false → confirm_required (no write)`);
+      return new Response(JSON.stringify({
+        success: true, status: 'confirm_required',
+        candidate: { name: brandName, kind: 'create_new' }
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
     // Step 2: Generate slug
@@ -217,9 +252,9 @@ serve(async (req) => {
 
     if (!brandEntity) throw new Error('Failed to create brand after multiple slug conflict retries');
 
-    return new Response(JSON.stringify({ success: true, brandEntity, alreadyExisted: false }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-    });
+    return new Response(JSON.stringify({
+      success: true, status: 'created', brandEntity, alreadyExisted: false
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
 
   } catch (error) {
     console.error('❌ Error in create-brand-entity:', error);

@@ -576,7 +576,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }));
   }, [formData.type]);
 
-  // Auto-search and select parent brand entity based on AI-extracted brand name
+  // Phase 3.1: READ-ONLY pre-selection of an existing parent brand entity.
+  // This function MUST NEVER call create-brand-entity or any other write.
+  // If no match (or only ambiguous matches) is found it returns null and
+  // leaves the parent selector untouched — admin picks/creates manually.
+  // Auto-creation was removed in Phase 3.1; it will return in Phase 3.2
+  // behind an explicit user-confirmed BrandPicker action.
   const autoSelectParentBrand = async (brandName: string) => {
     if (!brandName || brandName.length < 2) {
       console.log('⚠️ Brand name too short for auto-selection');
@@ -1168,15 +1173,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         console.log('🤖 AI Analysis:', aiResult.data);
         setAiPredictions(aiResult.data);
         
-        // NEW: Auto-select parent brand if extracted by AI (use already-extracted aiBrandName)
+        // Phase 3.1: auto-select existing parent brand only (READ-ONLY).
+        // Auto-creation has been removed — `create-brand-entity` now
+        // requires explicit confirmCreate from a user-confirmed code
+        // path (planned in Phase 3.2 BrandPicker). If no exact match is
+        // found here we deliberately do NOTHING so the admin can pick
+        // or create a brand manually via the existing parent selector.
         if (aiBrandName && aiBrandName.length >= 2) {
-          const foundParent = await autoSelectParentBrand(aiBrandName);
-          
-          // If no parent found, trigger Phase 2 (auto-creation)
-          if (!foundParent) {
-            console.log(`🚀 No parent found, will auto-create brand: "${aiBrandName}"`);
-            await autoCreateParentBrand(aiBrandName, analyzeUrl);
-          }
+          await autoSelectParentBrand(aiBrandName);
         }
         
         // V2 scaffold-only / no-predictions signal: success but null predictions.
