@@ -37,6 +37,7 @@ import { CategorySelector } from './CategorySelector';
 import { SimpleTagInput } from './SimpleTagInput';
 import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
+import { useEntityReviewUsesDraft } from '@/hooks/useEntityReviewUsesDraft';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -2505,7 +2506,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onApply={applyAiPredictions}
         metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
         onApplyMetadataOnly={(snapshot) => commitApply(snapshot.websiteUrl, () => applyMetadataOnlySafe(snapshot))}
+        useDraftReview={useDraftReviewFlag}
+        entityDraft={aiPredictions?.entityDraft ?? null}
+        onApplyDraft={async (overrides) => {
+          await handleSubmit(overrides);
+        }}
       />
+      
       
       {/* URL Mismatch Warning Dialog */}
       <AlertDialog open={showUrlMismatchDialog} onOpenChange={setShowUrlMismatchDialog}>
