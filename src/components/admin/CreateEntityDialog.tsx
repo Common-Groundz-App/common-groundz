@@ -1698,8 +1698,20 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         }
       }
 
+    // Resolve effective parent / metadata / primary image from overrides.
+    // `undefined` means "no override" — fall back to React state. `null` is
+    // a valid override meaning "no parent / no image".
+    const resolvedParent =
+      overrides && 'parentOverride' in overrides
+        ? overrides.parentOverride ?? null
+        : selectedParent;
+    const overrideMetadata = overrides?.metadataOverride ?? {};
+    const overridePrimaryImage =
+      overrides && 'imageOverride' in overrides ? overrides.imageOverride : undefined;
+
     const metadata = {
       ...formData.metadata,
+      ...overrideMetadata,
       business_hours: businessHours,
       contact: contactInfo,
       ...(formData.type === 'others' && otherTypeReason.trim() && {
@@ -1715,8 +1727,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         .replace(/\s+/g, '-')
         .replace(/^-+|-+$/g, '');
       
-      const hierarchicalSlug = selectedParent 
-        ? `${selectedParent.slug || selectedParent.id}-${baseSlug}`
+      const hierarchicalSlug = resolvedParent 
+        ? `${resolvedParent.slug || resolvedParent.id}-${baseSlug}`
         : baseSlug;
 
       const { data: newEntity, error } = await supabase
@@ -1725,13 +1737,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           name: formData.name.trim(),
           type: formData.type as any,
           description: formData.description || null,
-          image_url: primaryMediaUrl || uploadedMedia[0]?.url || formData.image_url.trim() || null,
+          image_url:
+            (overridePrimaryImage !== undefined ? overridePrimaryImage : null) ||
+            primaryMediaUrl ||
+            uploadedMedia[0]?.url ||
+            formData.image_url.trim() ||
+            null,
           website_url: formData.website_url.trim() || null,
           venue: formData.venue.trim() || null,
           metadata,
           created_by: user?.id || null,
           slug: hierarchicalSlug,
-          parent_id: selectedParent?.id || null,
+          parent_id: resolvedParent?.id || null,
           category_id: formData.category_id || null,
           // Type-specific columns
           authors: formData.authors.length > 0 ? formData.authors : null,
@@ -2419,7 +2436,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           <div className="flex gap-2">
             {isLastTab() ? (
               <Button 
-                onClick={handleSubmit} 
+                onClick={() => handleSubmit()} 
                 disabled={loading || !isCurrentStepValid}
                 className={`bg-gradient-to-r from-brand-orange to-brand-orange/90 hover:from-brand-orange/90 hover:to-brand-orange text-white shadow-md hover:shadow-lg transition-all duration-300 ${
                   !isCurrentStepValid && "opacity-50 cursor-not-allowed"
