@@ -15,6 +15,9 @@ import { Lightbulb, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
+import type { EntityDraft } from '@/types/entityDraft';
+import { DraftReviewBody, DraftApplyOverrides } from './entity-create/DraftReviewBody';
+
 export interface MetadataOnlySnapshot {
   title?: string;
   websiteUrl?: string;
@@ -35,6 +38,15 @@ interface AutoFillPreviewModalProps {
    */
   metadataOnly?: MetadataOnlySnapshot | null;
   onApplyMetadataOnly?: (snapshot: MetadataOnlySnapshot) => void;
+  /**
+   * Phase 3.2: when true AND `entityDraft` is non-null, render the draft
+   * review UI (BrandPicker + ImageCandidateGrid) instead of either legacy
+   * branch. Gated by the admin-only `entity_extraction.review_uses_draft`
+   * app_config flag.
+   */
+  useDraftReview?: boolean;
+  entityDraft?: EntityDraft | null;
+  onApplyDraft?: (overrides: DraftApplyOverrides) => Promise<void> | void;
 }
 
 interface PreviewFieldProps {
@@ -236,12 +248,49 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
   onApply,
   metadataOnly = null,
   onApplyMetadataOnly,
+  useDraftReview = false,
+  entityDraft = null,
+  onApplyDraft,
 }) => {
   // Request ID is surfaced from V2 success metadata or error envelope.
   const requestId: string | null =
     predictions?.metadata?.request_id ??
     predictions?.request_id ??
     null;
+
+  // Phase 3.2 — admin draft-driven review branch. Takes precedence over
+  // legacy success/metadata-only branches when the flag is on and a draft
+  // is attached. Never renders during normal operation for non-admins.
+  if (useDraftReview && entityDraft && onApplyDraft) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              Review draft
+            </DialogTitle>
+            <DialogDescription>
+              Confirm the brand and primary image before saving.
+            </DialogDescription>
+          </DialogHeader>
+          <DraftReviewBody
+            draft={entityDraft}
+            onCancel={() => onOpenChange(false)}
+            onApply={async (overrides) => {
+              await onApplyDraft(overrides);
+              onOpenChange(false);
+            }}
+          />
+          {requestId && (
+            <p className="text-xs text-muted-foreground break-all pt-2">
+              Request ID: <span className="font-mono">{requestId}</span>
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   // No predictions available → render inline failure state. When Phase 2
   // metadata-only data exists, surface a basic preview + "Use basic metadata"

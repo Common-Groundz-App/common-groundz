@@ -271,6 +271,8 @@ interface AnalysisTrace {
   // Booleans, counts, and constrained enums only. NEVER raw model output,
   // page titles, brand names, product names, full URLs, or PII.
   finalization?: Finalization;
+  // Phase 3.1/3.2 — draft assembly outcome surfaced in trace for observability.
+  entity_draft_status?: "ok" | "build_failed" | "validation_failed" | "schema_unavailable";
 }
 
 // Phase 1.8c.1 — finalization telemetry types/helpers live in a sibling
@@ -1222,6 +1224,7 @@ serve(async (req) => {
         });
         (response as unknown as { entityDraft: EntityDraft | null }).entityDraft = recDraft;
         (response.metadata as unknown as { entityDraftStatus: EntityDraftStatus }).entityDraftStatus = recDraftStatus;
+        trace.entity_draft_status = recDraftStatus;
         return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
       }
 
@@ -1732,6 +1735,7 @@ serve(async (req) => {
     });
     (response as unknown as { entityDraft: EntityDraft | null }).entityDraft = mainDraft;
     (response.metadata as unknown as { entityDraftStatus: EntityDraftStatus }).entityDraftStatus = mainDraftStatus;
+    trace.entity_draft_status = mainDraftStatus;
     return new Response(JSON.stringify(response), { status: 200, headers: jsonHeaders });
   } catch (err) {
     console.error("[analyze-entity-url-v2] unhandled error:", { request_id, err: String(err) });

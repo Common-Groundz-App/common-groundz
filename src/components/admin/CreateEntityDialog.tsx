@@ -37,6 +37,7 @@ import { CategorySelector } from './CategorySelector';
 import { SimpleTagInput } from './SimpleTagInput';
 import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
+import { useEntityReviewUsesDraft } from '@/hooks/useEntityReviewUsesDraft';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -106,6 +107,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [analyzeUrl, setAnalyzeUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
+  const useDraftReviewFlag = useEntityReviewUsesDraft();
   const [showAnalyzeButton, setShowAnalyzeButton] = useState(false);
   const [aiPredictions, setAiPredictions] = useState<any>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -722,117 +724,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
   };
 
-  // Auto-create parent brand entity if it doesn't exist
-  const autoCreateParentBrand = async (brandName: string, sourceUrl: string) => {
-    if (!brandName || brandName.length < 2) {
-      console.log('⚠️ Brand name too short for auto-creation');
-      return null;
-    }
-
-    console.log(`🚀 Auto-creating brand entity: "${brandName}"`);
-    
-    // Show loading toast
-    toast({
-      title: "Creating Brand",
-      description: `Enriching ${brandName} data...`,
-    });
-
-    try {
-      // Step 1: Enrich brand data first (logo, website, description)
-      console.log(`🔍 Enriching brand data for: "${brandName}"`);
-      const { data: enrichedData, error: enrichError } = await supabase.functions.invoke('enrich-brand-data', {
-        body: { brandName }
-      });
-
-      if (enrichError) {
-        console.warn('⚠️ Brand enrichment failed, creating with minimal data:', enrichError);
-      }
-
-      const enrichmentResult = enrichedData || { logo: null, website: null, description: null };
-      console.log(`✅ Brand enrichment complete:`, enrichmentResult);
-
-      // Step 2: Create brand with enriched data
-      toast({
-        title: "Creating Brand",
-        description: `Setting up ${brandName}...`,
-      });
-
-      const { data, error } = await supabase.functions.invoke('create-brand-entity', {
-        body: {
-          brandName: brandName,
-          sourceUrl: sourceUrl,
-          userId: user?.id || null,
-          logo: enrichmentResult.logo,
-          website: enrichmentResult.website,
-          description: enrichmentResult.description
-        }
-      });
-
-      if (error) throw error;
-
-      if (!data?.brandEntity) {
-        throw new Error('No brand entity returned from creation');
-      }
-
-      const createdBrand = data.brandEntity;
-      const alreadyExisted = data.alreadyExisted;
-
-      console.log(`✅ Brand entity ${alreadyExisted ? 'found' : 'created'}: ${createdBrand.id}`);
-
-      // Convert to Entity type and set as parent
-      const parentEntity: Entity = {
-        id: createdBrand.id,
-        name: createdBrand.name,
-        type: EntityType.Brand,
-        image_url: createdBrand.image_url,
-        slug: createdBrand.slug,
-        description: createdBrand.description,
-        api_ref: null,
-        api_source: null,
-        metadata: createdBrand.metadata || {},
-        venue: null,
-        website_url: createdBrand.website_url,
-        category_id: null,
-        popularity_score: null,
-        photo_reference: null,
-        created_at: createdBrand.created_at,
-        updated_at: createdBrand.updated_at,
-        authors: null,
-        publication_year: null,
-        isbn: null,
-        languages: null,
-        external_ratings: null,
-        price_info: null,
-        specifications: null,
-        cast_crew: null,
-        ingredients: null,
-        nutritional_info: null,
-        last_enriched_at: null,
-        enrichment_source: null,
-        data_quality_score: null
-      };
-
-      setSelectedParent(parentEntity);
-
-      toast({
-        title: alreadyExisted ? "Brand Linked" : "Brand Created",
-        description: alreadyExisted 
-          ? `Linked to existing ${createdBrand.name}` 
-          : `Created and linked ${createdBrand.name}`,
-      });
-
-      return createdBrand;
-
-    } catch (error: any) {
-      console.error('❌ Failed to auto-create brand:', error);
-      toast({
-        title: "Brand Creation Failed",
-        description: `Couldn't create ${brandName}. You can select parent manually.`,
-        variant: "destructive"
-      });
-      return null;
-    }
-  };
+  // Phase 3.2 — `autoCreateParentBrand` has been removed. Brand creation
+  // now flows exclusively through `DraftReviewBody` → `create-brand-entity`
+  // with explicit `confirmCreate: true`. Analyze must never write.
 
   const resetForm = () => {
     setFormData({
@@ -1703,7 +1597,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   };
 
 
-  const handleSubmit = async () => {
+  /**
+   * Phase 3.2 — accepts optional `overrides` so callers (e.g. DraftReviewBody)
+   * can pass an explicit parent, metadata patch, and primary image without
+   * round-tripping through React state. When overrides are omitted, behavior
+   * is identical to the pre-Phase-3.2 implementation.
+   */
+  const handleSubmit = async (overrides?: {
+    parentOverride?: Entity | null;
+    metadataOverride?: Record<string, any>;
+    imageOverride?: string | null;
+  }) => {
     // Gate submission for user variant
     if (variant === 'user' && !user) {
       toast({
@@ -1796,8 +1700,20 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         }
       }
 
+    // Resolve effective parent / metadata / primary image from overrides.
+    // `undefined` means "no override" — fall back to React state. `null` is
+    // a valid override meaning "no parent / no image".
+    const resolvedParent =
+      overrides && 'parentOverride' in overrides
+        ? overrides.parentOverride ?? null
+        : selectedParent;
+    const overrideMetadata = overrides?.metadataOverride ?? {};
+    const overridePrimaryImage =
+      overrides && 'imageOverride' in overrides ? overrides.imageOverride : undefined;
+
     const metadata = {
       ...formData.metadata,
+      ...overrideMetadata,
       business_hours: businessHours,
       contact: contactInfo,
       ...(formData.type === 'others' && otherTypeReason.trim() && {
@@ -1813,8 +1729,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         .replace(/\s+/g, '-')
         .replace(/^-+|-+$/g, '');
       
-      const hierarchicalSlug = selectedParent 
-        ? `${selectedParent.slug || selectedParent.id}-${baseSlug}`
+      const hierarchicalSlug = resolvedParent 
+        ? `${resolvedParent.slug || resolvedParent.id}-${baseSlug}`
         : baseSlug;
 
       const { data: newEntity, error } = await supabase
@@ -1823,13 +1739,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           name: formData.name.trim(),
           type: formData.type as any,
           description: formData.description || null,
-          image_url: primaryMediaUrl || uploadedMedia[0]?.url || formData.image_url.trim() || null,
+          image_url:
+            (overridePrimaryImage !== undefined ? overridePrimaryImage : null) ||
+            primaryMediaUrl ||
+            uploadedMedia[0]?.url ||
+            formData.image_url.trim() ||
+            null,
           website_url: formData.website_url.trim() || null,
           venue: formData.venue.trim() || null,
           metadata,
           created_by: user?.id || null,
           slug: hierarchicalSlug,
-          parent_id: selectedParent?.id || null,
+          parent_id: resolvedParent?.id || null,
           category_id: formData.category_id || null,
           // Type-specific columns
           authors: formData.authors.length > 0 ? formData.authors : null,
@@ -2517,7 +2438,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           <div className="flex gap-2">
             {isLastTab() ? (
               <Button 
-                onClick={handleSubmit} 
+                onClick={() => handleSubmit()} 
                 disabled={loading || !isCurrentStepValid}
                 className={`bg-gradient-to-r from-brand-orange to-brand-orange/90 hover:from-brand-orange/90 hover:to-brand-orange text-white shadow-md hover:shadow-lg transition-all duration-300 ${
                   !isCurrentStepValid && "opacity-50 cursor-not-allowed"
@@ -2586,7 +2507,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onApply={applyAiPredictions}
         metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
         onApplyMetadataOnly={(snapshot) => commitApply(snapshot.websiteUrl, () => applyMetadataOnlySafe(snapshot))}
+        useDraftReview={useDraftReviewFlag}
+        entityDraft={aiPredictions?.entityDraft ?? null}
+        onApplyDraft={async (overrides) => {
+          await handleSubmit(overrides);
+        }}
       />
+      
       
       {/* URL Mismatch Warning Dialog */}
       <AlertDialog open={showUrlMismatchDialog} onOpenChange={setShowUrlMismatchDialog}>
