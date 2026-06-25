@@ -1595,7 +1595,17 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   };
 
 
-  const handleSubmit = async () => {
+  /**
+   * Phase 3.2 — accepts optional `overrides` so callers (e.g. DraftReviewBody)
+   * can pass an explicit parent, metadata patch, and primary image without
+   * round-tripping through React state. When overrides are omitted, behavior
+   * is identical to the pre-Phase-3.2 implementation.
+   */
+  const handleSubmit = async (overrides?: {
+    parentOverride?: Entity | null;
+    metadataOverride?: Record<string, any>;
+    imageOverride?: string | null;
+  }) => {
     // Gate submission for user variant
     if (variant === 'user' && !user) {
       toast({
