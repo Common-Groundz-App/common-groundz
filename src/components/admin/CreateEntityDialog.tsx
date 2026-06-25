@@ -107,6 +107,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [analyzeUrl, setAnalyzeUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
+  const useDraftReviewFlag = useEntityReviewUsesDraft();
   const [showAnalyzeButton, setShowAnalyzeButton] = useState(false);
   const [aiPredictions, setAiPredictions] = useState<any>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
