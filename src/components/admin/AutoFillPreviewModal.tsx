@@ -46,6 +46,10 @@ interface AutoFillPreviewModalProps {
    */
   useDraftReview?: boolean;
   entityDraft?: EntityDraft | null;
+  /** Phase 3.2 bugfix — forwarded to DraftReviewBody so the pure patch
+   *  builder can run without round-tripping through the host's React state. */
+  urlMetadata?: any | null;
+  analyzedUrlSnapshot?: string | null;
   onApplyDraft?: (overrides: DraftApplyOverrides) => Promise<void> | void;
 }
 
