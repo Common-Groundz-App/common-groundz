@@ -171,6 +171,59 @@ export function buildEntityDraft(input: BuildEntityDraftInput): EntityDraft {
     // Leave brandCandidates empty; Phase 3.2 treats this as not_applicable.
   }
 
+  // === Brand fallback chain (only when no candidates yet AND not a brand) ===
+  // Conservative: structured signals were already tried above. Here we try
+  // slug-based then title-ampersand patterns. Both produce `suggested_new`
+  // candidates with confidence ≤ 0.4 and NEVER set recommendedBrandIndex —
+  // the admin must explicitly confirm in BrandPicker.
+  const brandFallbackSources: string[] = [];
+  if (brandCandidates.length === 0 && predictions?.type && predictions.type !== "brand") {
+    const slugBrand = inferBrandFromUrlSlug(inputRef);
+    const titleBrand = inferBrandFromTitleAmpersand(predictions?.name ?? null);
+
+    // Normalize agreement: if slug brand and title-ampersand brand slugify to
+    // the same value, keep only the title version (nicer display) and tag
+    // the source as both. Avoids emitting duplicate fallback candidates.
+    let merged: { name: string; sources: string[]; confidence: number } | null = null;
+    if (slugBrand && titleBrand && slugifyForCompare(titleBrand) === slugifyForCompare(slugBrand)) {
+      merged = { name: titleBrand, sources: ["slug", "title_ampersand"], confidence: 0.4 };
+    }
+
+    if (merged) {
+      brandCandidates.push({
+        name: merged.name,
+        source: "ai_inference",
+        confidence: merged.confidence,
+        reason: "Inferred from URL slug and title (low confidence — please confirm)",
+        status: "suggested_new",
+      });
+      brandFallbackSources.push(...merged.sources);
+    } else {
+      if (slugBrand) {
+        brandCandidates.push({
+          name: slugBrand,
+          source: "ai_inference",
+          confidence: 0.35,
+          reason: "Inferred from URL slug (low confidence — please confirm)",
+          status: "suggested_new",
+        });
+        brandFallbackSources.push("slug");
+      }
+      if (titleBrand) {
+        brandCandidates.push({
+          name: titleBrand,
+          source: "ai_inference",
+          confidence: 0.35,
+          reason: "Inferred from product title ampersand pattern (low confidence — please confirm)",
+          status: "suggested_new",
+        });
+        brandFallbackSources.push("title_ampersand");
+      }
+    }
+  }
+
+
+
   // === Image candidates ===
   const rawImages: ImageCandidate[] = [];
 
@@ -294,7 +347,80 @@ export function buildEntityDraft(input: BuildEntityDraftInput): EntityDraft {
     recommendedBrandIndex,
     recommendedImageIndex,
     sourceEvidence: evidence,
+    warnings: brandFallbackSources.length
+      ? brandFallbackSources.map((s) => `brand_fallback_source:${s}`)
+      : undefined,
   };
 
   return draft;
 }
+
+// ─── Brand fallback helpers (Phase 3.2 bugfix) ─────────────────────────────
+// Phrase-level descriptor stoplist. Token-level blocks (e.g. blocking any
+// phrase containing "Black") would reject real brands like "Black & Decker".
+const AMP_DESCRIPTOR_STOPLIST: ReadonlySet<string> = new Set([
+  "salt & pepper", "bed & bath", "peace & love", "sun & sand",
+  "hugs & kisses", "health & beauty", "arts & crafts", "rock & roll",
+  "tried & true", "rules & regulations", "food & drink", "men & women",
+  "mom & baby", "wear & tear", "trial & error", "cause & effect",
+  "tea & coffee", "wine & dine", "hide & seek", "rise & shine",
+  "give & take", "now & then", "back & forth", "up & down",
+  "in & out", "give & receive", "buy & sell",
+]);
+
+function slugifyForCompare(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/&/g, " ")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function toTitleCase(s: string): string {
+  return s.replace(/\b([a-z])([a-z0-9]*)\b/gi, (_m, a: string, b: string) =>
+    a.toUpperCase() + b.toLowerCase()
+  );
+}
+
+/** Extract a plausible brand from the URL slug. Conservative: the LAST
+ *  non-numeric path segment is assumed to be the product slug; brand is
+ *  taken as its first 1–2 hyphen tokens (each ≥ 3 chars, alphabetic).
+ *  Returns null for anything ambiguous. */
+function inferBrandFromUrlSlug(inputRef: string): string | null {
+  try {
+    const u = new URL(inputRef);
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (parts.length === 0) return null;
+    let slug: string | null = null;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      if (!/^\d+$/.test(parts[i])) { slug = parts[i]; break; }
+    }
+    if (!slug) return null;
+    // Strip trailing -<digits> (often product IDs)
+    slug = slug.replace(/[-_]\d+$/g, "");
+    const tokens = slug.split(/[-_]+/).filter((t) => /^[a-z][a-z0-9]+$/i.test(t));
+    if (tokens.length === 0) return null;
+    const STOP = new Set(["the", "and", "for", "with", "buy", "shop", "product", "products", "en", "in"]);
+    const head = tokens.filter((t) => !STOP.has(t.toLowerCase())).slice(0, 2);
+    if (head.length === 0) return null;
+    // Require at least one token ≥ 3 chars to avoid junk
+    if (!head.some((t) => t.length >= 3)) return null;
+    return toTitleCase(head.join(" "));
+  } catch {
+    return null;
+  }
+}
+
+/** Detect a `Foo & Bar` (or `Foo and Bar`) ampersand brand pattern at the
+ *  START of the product title. Phrase-level descriptor stoplist applies. */
+function inferBrandFromTitleAmpersand(title: string | null): string | null {
+  if (!title) return null;
+  const m = title.match(/^\s*([A-Z][A-Za-z0-9]+)\s*(?:&|and)\s*([A-Z][A-Za-z0-9]+)\b/);
+  if (!m) return null;
+  const phrase = `${m[1]} & ${m[2]}`;
+  if (AMP_DESCRIPTOR_STOPLIST.has(phrase.toLowerCase())) return null;
+  return phrase;
+}
+

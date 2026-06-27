@@ -1607,6 +1607,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     parentOverride?: Entity | null;
     metadataOverride?: Record<string, any>;
     imageOverride?: string | null;
+    /** Phase 3.2 bugfix — full-field patch from DraftReviewBody. When
+     *  present, its values take precedence over current React form state
+     *  for validation, slug generation, and insert. Avoids state races. */
+    formPatch?: import('./entity-create/buildEntityFormPatch').EntityFormPatch;
+    tagsOverride?: string[];
   }) => {
     // Gate submission for user variant
     if (variant === 'user' && !user) {
@@ -1618,7 +1623,30 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       return;
     }
 
-    if (!formData.name.trim() || !formData.type) {
+    // Resolve effective field values: explicit formPatch wins, then state.
+    const patch = overrides?.formPatch ?? {};
+    const eff = {
+      name: (patch.name ?? formData.name ?? '') as string,
+      type: (patch.type ?? formData.type ?? '') as string,
+      description: (patch.description ?? formData.description ?? '') as string,
+      website_url: (patch.website_url ?? formData.website_url ?? '') as string,
+      image_url: (patch.image_url ?? formData.image_url ?? '') as string,
+      category_id: (patch.category_id !== undefined ? patch.category_id : formData.category_id) as string | null,
+      authors: (patch.authors ?? formData.authors) as string[],
+      languages: (patch.languages ?? formData.languages) as string[],
+      isbn: (patch.isbn ?? formData.isbn) as string,
+      publication_year: (patch.publication_year ?? formData.publication_year) as number | null,
+      ingredients: (patch.ingredients ?? formData.ingredients) as string[],
+      metadata: patch.metadata ? { ...formData.metadata, ...patch.metadata } : formData.metadata,
+      cast_crew: patch.cast_crew ? { ...formData.cast_crew, ...patch.cast_crew } : formData.cast_crew,
+      specifications: patch.specifications ? { ...formData.specifications, ...patch.specifications } : formData.specifications,
+      price_info: patch.price_info ? { ...formData.price_info, ...patch.price_info } : formData.price_info,
+      nutritional_info: patch.nutritional_info ? { ...formData.nutritional_info, ...patch.nutritional_info } : formData.nutritional_info,
+      external_ratings: patch.external_ratings ? { ...formData.external_ratings, ...patch.external_ratings } : formData.external_ratings,
+    };
+    const effTags = overrides?.tagsOverride ?? selectedTagNames;
+
+    if (!eff.name.trim() || !eff.type) {
       toast({
         title: 'Validation Error',
         description: 'Name and type are required',
@@ -1628,7 +1656,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
 
     // Validate "others" type requires explanation
-    if (formData.type === 'others' && !otherTypeReason.trim()) {
+    if (eff.type === 'others' && !otherTypeReason.trim()) {
       toast({
         title: 'Validation Error',
         description: 'Please explain why this entity doesn\'t fit existing types',
@@ -1636,41 +1664,36 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       });
       return;
     }
-    
-    // Validate type-specific required fields from config
-    const typeConfig = entityTypeConfig[formData.type];
+
+    // Validate type-specific required fields from config (uses effective values)
+    const typeConfig = entityTypeConfig[eff.type];
     if (typeConfig?.requiredFields) {
       for (const fieldKey of typeConfig.requiredFields) {
         const fieldConfig = typeConfig.fields.find(f => f.key === fieldKey);
         if (!fieldConfig) continue;
-        
+
         const storageColumn = fieldConfig.storageColumn || 'metadata';
-        let value;
-        
+        let value: any;
+
         switch (storageColumn) {
           case 'metadata':
-            value = formData.metadata?.[fieldKey];
-            break;
+            value = eff.metadata?.[fieldKey]; break;
           case 'cast_crew':
-            value = formData.cast_crew?.[fieldKey];
-            break;
+            value = eff.cast_crew?.[fieldKey]; break;
           case 'specifications':
-            value = formData.specifications?.[fieldKey];
-            break;
+            value = eff.specifications?.[fieldKey]; break;
           case 'price_info':
-            value = formData.price_info?.[fieldKey];
-            break;
+            value = eff.price_info?.[fieldKey]; break;
           default:
-            value = formData[storageColumn as keyof typeof formData];
+            value = (eff as any)[storageColumn];
         }
-        
-        // Check if value is empty (handles strings, arrays, null, undefined)
+
         const isEmpty = !value || (Array.isArray(value) && value.length === 0) || value === '';
-        
+
         if (isEmpty) {
           toast({
             title: 'Validation Error',
-            description: `${fieldConfig.label} is required for ${getEntityTypeLabel(formData.type)}`,
+            description: `${fieldConfig.label} is required for ${getEntityTypeLabel(eff.type)}`,
             variant: 'destructive'
           });
           return;
@@ -1681,14 +1704,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setLoading(true);
     try {
       // Check for duplicate website URL if provided (only among non-deleted entities)
-      if (formData.website_url.trim()) {
+      if (eff.website_url.trim()) {
         const { data: existingEntity, error: checkError } = await supabase
           .from('entities')
           .select('id, name')
-          .eq('website_url', formData.website_url.trim())
+          .eq('website_url', eff.website_url.trim())
           .eq('is_deleted', false)
           .maybeSingle();
-        
+
         if (existingEntity && !checkError) {
           toast({
             title: 'Duplicate Website URL',
@@ -1712,70 +1735,73 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       overrides && 'imageOverride' in overrides ? overrides.imageOverride : undefined;
 
     const metadata = {
-      ...formData.metadata,
+      ...eff.metadata,
       ...overrideMetadata,
       business_hours: businessHours,
       contact: contactInfo,
-      ...(formData.type === 'others' && otherTypeReason.trim() && {
+      ...(eff.type === 'others' && otherTypeReason.trim() && {
         other_type_reason: otherTypeReason.trim()
       })
     };
 
-      // Generate slug based on parent context
-      const baseSlug = formData.name
+
+
+      // Generate slug based on parent context — use effective name
+      const baseSlug = eff.name
         .toLowerCase()
         .trim()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
         .replace(/^-+|-+$/g, '');
-      
-      const hierarchicalSlug = resolvedParent 
+
+      const hierarchicalSlug = resolvedParent
         ? `${resolvedParent.slug || resolvedParent.id}-${baseSlug}`
         : baseSlug;
 
       const { data: newEntity, error } = await supabase
         .from('entities')
         .insert([{
-          name: formData.name.trim(),
-          type: formData.type as any,
-          description: formData.description || null,
+          name: eff.name.trim(),
+          type: eff.type as any,
+          description: eff.description || null,
           image_url:
             (overridePrimaryImage !== undefined ? overridePrimaryImage : null) ||
             primaryMediaUrl ||
             uploadedMedia[0]?.url ||
-            formData.image_url.trim() ||
+            eff.image_url.trim() ||
             null,
-          website_url: formData.website_url.trim() || null,
+          website_url: eff.website_url.trim() || null,
           venue: formData.venue.trim() || null,
           metadata,
           created_by: user?.id || null,
           slug: hierarchicalSlug,
           parent_id: resolvedParent?.id || null,
-          category_id: formData.category_id || null,
-          // Type-specific columns
-          authors: formData.authors.length > 0 ? formData.authors : null,
-          languages: formData.languages.length > 0 ? formData.languages : null,
-          isbn: formData.isbn || null,
-          publication_year: formData.publication_year || null,
-          cast_crew: Object.keys(formData.cast_crew).length > 0 ? formData.cast_crew : null,
-          ingredients: formData.ingredients.length > 0 ? formData.ingredients : null,
-          specifications: Object.keys(formData.specifications).length > 0 ? formData.specifications : null,
-          price_info: Object.keys(formData.price_info).length > 0 ? formData.price_info : null,
-          nutritional_info: Object.keys(formData.nutritional_info).length > 0 ? formData.nutritional_info : null,
-          external_ratings: Object.keys(formData.external_ratings).length > 0 ? formData.external_ratings : null,
+          category_id: eff.category_id || null,
+          // Type-specific columns (effective values)
+          authors: eff.authors.length > 0 ? eff.authors : null,
+          languages: eff.languages.length > 0 ? eff.languages : null,
+          isbn: eff.isbn || null,
+          publication_year: eff.publication_year || null,
+          cast_crew: Object.keys(eff.cast_crew).length > 0 ? eff.cast_crew : null,
+          ingredients: eff.ingredients.length > 0 ? eff.ingredients : null,
+          specifications: Object.keys(eff.specifications).length > 0 ? eff.specifications : null,
+          price_info: Object.keys(eff.price_info).length > 0 ? eff.price_info : null,
+          nutritional_info: Object.keys(eff.nutritional_info).length > 0 ? eff.nutritional_info : null,
+          external_ratings: Object.keys(eff.external_ratings).length > 0 ? eff.external_ratings : null,
         }])
         .select()
         .single();
 
       if (error) throw error;
 
-      // Convert tag names to Tag objects and save
-      if (newEntity && selectedTagNames.length > 0) {
+      // Convert tag names to Tag objects and save (effective tags)
+      if (newEntity && effTags.length > 0) {
         try {
           // Convert all tag names to Tag objects (creates if needed)
           const tagObjects = await Promise.all(
-            selectedTagNames.map(name => getOrCreateTag(name))
+            effTags.map(name => getOrCreateTag(name))
           );
+
           
           // Create tag assignments
           const tagAssignments = tagObjects.map(tag => ({
@@ -2508,11 +2534,29 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
         onApplyMetadataOnly={(snapshot) => commitApply(snapshot.websiteUrl, () => applyMetadataOnlySafe(snapshot))}
         useDraftReview={useDraftReviewFlag}
-        entityDraft={aiPredictions?.entityDraft ?? null}
+        entityDraft={(() => {
+          // Phase 3.2 bugfix — merge urlMetadata.images into the draft's
+          // imageCandidates so the picker shows the lite-metadata images
+          // that the AI/V2 path may have missed.
+          const baseDraft = aiPredictions?.entityDraft ?? null;
+          if (!baseDraft) return null;
+          const metaImgs = pickValidImages(urlMetadata);
+          if (metaImgs.length === 0) return baseDraft;
+          const existing = new Set(
+            (baseDraft.imageCandidates ?? []).map((c: any) => c.url)
+          );
+          const extras = metaImgs
+            .filter((u) => !existing.has(u))
+            .map((u) => ({ url: u, source: 'page_metadata' as const, confidence: 0.55 }));
+          return { ...baseDraft, imageCandidates: [...(baseDraft.imageCandidates ?? []), ...extras] };
+        })()}
+        urlMetadata={urlMetadata}
+        analyzedUrlSnapshot={predictionUrlSnapshot}
         onApplyDraft={async (overrides) => {
           await handleSubmit(overrides);
         }}
       />
+
       
       
       {/* URL Mismatch Warning Dialog */}

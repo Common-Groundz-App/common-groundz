@@ -46,6 +46,10 @@ interface AutoFillPreviewModalProps {
    */
   useDraftReview?: boolean;
   entityDraft?: EntityDraft | null;
+  /** Phase 3.2 bugfix — forwarded to DraftReviewBody so the pure patch
+   *  builder can run without round-tripping through the host's React state. */
+  urlMetadata?: any | null;
+  analyzedUrlSnapshot?: string | null;
   onApplyDraft?: (overrides: DraftApplyOverrides) => Promise<void> | void;
 }
 
@@ -250,6 +254,8 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
   onApplyMetadataOnly,
   useDraftReview = false,
   entityDraft = null,
+  urlMetadata = null,
+  analyzedUrlSnapshot = null,
   onApplyDraft,
 }) => {
   // Request ID is surfaced from V2 success metadata or error envelope.
@@ -276,6 +282,9 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
           </DialogHeader>
           <DraftReviewBody
             draft={entityDraft}
+            predictions={predictions?.predictions ?? null}
+            urlMetadata={urlMetadata}
+            analyzedUrl={analyzedUrlSnapshot}
             onCancel={() => onOpenChange(false)}
             onApply={async (overrides) => {
               await onApplyDraft(overrides);

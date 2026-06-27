@@ -9,27 +9,44 @@ import { Entity, EntityType } from '@/services/recommendation/types';
 import { BrandPicker, BrandDecision } from './BrandPicker';
 import { ImageCandidateGrid, ImageSelection } from './ImageCandidateGrid';
 import type { EntityDraft } from '@/types/entityDraft';
+import {
+  buildEntityFormPatchFromPredictions,
+  type EntityFormPatch,
+} from './buildEntityFormPatch';
 
 export interface DraftApplyOverrides {
   parentOverride: Entity | null;
   metadataOverride: Record<string, any>;
   imageOverride: string | null;
+  /** Phase 3.2 bugfix — full-field patch computed from predictions +
+   *  urlMetadata so handleSubmit can validate & insert without relying on
+   *  React state catching up. */
+  formPatch: EntityFormPatch;
+  /** Tags live outside formData in the host dialog; shipped explicitly. */
+  tagsOverride?: string[];
 }
 
 interface DraftReviewBodyProps {
   draft: EntityDraft;
   onCancel: () => void;
-  /**
-   * Called once the user clicks Apply & Save. Translates the draft
-   * decisions into explicit overrides that the host's handleSubmit
-   * consumes directly — never via React state.
-   */
+  /** Raw V2 predictions object — used by the pure patch builder. */
+  predictions?: any | null;
+  /** Lightweight metadata payload from fetch-url-metadata-lite. */
+  urlMetadata?: any | null;
+  /** Analyzed-URL snapshot captured at modal open. */
+  analyzedUrl?: string | null;
+  /** Called once the user clicks Apply & Save. Translates the draft
+   *  decisions into explicit overrides that the host's handleSubmit
+   *  consumes directly — never via React state. */
   onApply: (overrides: DraftApplyOverrides) => Promise<void> | void;
 }
 
 export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   draft,
   onCancel,
+  predictions = null,
+  urlMetadata = null,
+  analyzedUrl = null,
   onApply,
 }) => {
   const { toast } = useToast();
@@ -44,6 +61,25 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
     galleryUrls: [],
   });
   const [submitting, setSubmitting] = useState(false);
+
+  // Precompute the pure patch once. Stable across renders unless inputs
+  // change — guarantees DraftReviewBody never reads live React state.
+  const baseFormPatch = useMemo<EntityFormPatch>(
+    () =>
+      buildEntityFormPatchFromPredictions({
+        predictions: predictions ?? {
+          name: draft.nameGuess,
+          type: draft.typeGuess,
+          description: draft.descriptionGuess,
+          category_id: draft.categoryHint?.id,
+          matched_category_name: draft.categoryHint?.path,
+          additional_data: draft.structuredHints,
+        },
+        urlMetadata,
+        analyzedUrl,
+      }),
+    [predictions, urlMetadata, analyzedUrl, draft],
+  );
 
   const canApply = useMemo(() => {
     if (!brandDecision) return false;
@@ -130,12 +166,18 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
         delete metadataOverride.brand_status;
       }
 
-      const imageOverride = imageSelection.primaryUrl;
+      // Compose the final patch — primary image override wins over patch.
+      const finalPatch: EntityFormPatch = { ...baseFormPatch };
+      if (imageSelection.primaryUrl) {
+        finalPatch.image_url = imageSelection.primaryUrl;
+      }
 
       await onApply({
         parentOverride,
         metadataOverride,
-        imageOverride,
+        imageOverride: imageSelection.primaryUrl ?? finalPatch.image_url ?? null,
+        formPatch: finalPatch,
+        tagsOverride: finalPatch.tags,
       });
     } finally {
       setSubmitting(false);
@@ -150,12 +192,12 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
         silent auto-creation.
       </div>
 
-      {draft.nameGuess && (
+      {(baseFormPatch.name || draft.nameGuess) && (
         <div className="space-y-1">
           <Label className="text-xs uppercase tracking-wide text-muted-foreground">
             Name (suggested)
           </Label>
-          <p className="text-sm font-medium">{draft.nameGuess}</p>
+          <p className="text-sm font-medium">{baseFormPatch.name ?? draft.nameGuess}</p>
         </div>
       )}
 
