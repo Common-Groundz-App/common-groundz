@@ -7,6 +7,9 @@
 // React state races when committing a Draft Apply & Save.
 
 import { entityTypeConfig, type EntityFieldConfig } from '../../../../shared/config/entityTypeConfig';
+// NOTE: CreateEntityDialog.tsx (one level up) imports the same module via
+// '../../../shared/config/entityTypeConfig'. This file is one level deeper
+// (entity-create/), hence the extra '../'.
 
 export interface EntityFormPatch {
   name?: string;
