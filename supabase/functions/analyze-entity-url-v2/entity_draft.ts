@@ -171,6 +171,59 @@ export function buildEntityDraft(input: BuildEntityDraftInput): EntityDraft {
     // Leave brandCandidates empty; Phase 3.2 treats this as not_applicable.
   }
 
+  // === Brand fallback chain (only when no candidates yet AND not a brand) ===
+  // Conservative: structured signals were already tried above. Here we try
+  // slug-based then title-ampersand patterns. Both produce `suggested_new`
+  // candidates with confidence ≤ 0.4 and NEVER set recommendedBrandIndex —
+  // the admin must explicitly confirm in BrandPicker.
+  const brandFallbackSources: string[] = [];
+  if (brandCandidates.length === 0 && predictions?.type && predictions.type !== "brand") {
+    const slugBrand = inferBrandFromUrlSlug(inputRef);
+    const titleBrand = inferBrandFromTitleAmpersand(predictions?.name ?? null);
+
+    // Normalize agreement: if slug brand and title-ampersand brand slugify to
+    // the same value, keep only the title version (nicer display) and tag
+    // the source as both. Avoids emitting duplicate fallback candidates.
+    let merged: { name: string; sources: string[]; confidence: number } | null = null;
+    if (slugBrand && titleBrand && slugifyForCompare(titleBrand) === slugifyForCompare(slugBrand)) {
+      merged = { name: titleBrand, sources: ["slug", "title_ampersand"], confidence: 0.4 };
+    }
+
+    if (merged) {
+      brandCandidates.push({
+        name: merged.name,
+        source: "ai_inference",
+        confidence: merged.confidence,
+        reason: "Inferred from URL slug and title (low confidence — please confirm)",
+        status: "suggested_new",
+      });
+      brandFallbackSources.push(...merged.sources);
+    } else {
+      if (slugBrand) {
+        brandCandidates.push({
+          name: slugBrand,
+          source: "ai_inference",
+          confidence: 0.35,
+          reason: "Inferred from URL slug (low confidence — please confirm)",
+          status: "suggested_new",
+        });
+        brandFallbackSources.push("slug");
+      }
+      if (titleBrand) {
+        brandCandidates.push({
+          name: titleBrand,
+          source: "ai_inference",
+          confidence: 0.35,
+          reason: "Inferred from product title ampersand pattern (low confidence — please confirm)",
+          status: "suggested_new",
+        });
+        brandFallbackSources.push("title_ampersand");
+      }
+    }
+  }
+
+
+
   // === Image candidates ===
   const rawImages: ImageCandidate[] = [];
 
