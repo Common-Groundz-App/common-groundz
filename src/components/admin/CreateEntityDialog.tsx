@@ -1607,6 +1607,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     parentOverride?: Entity | null;
     metadataOverride?: Record<string, any>;
     imageOverride?: string | null;
+    /** Phase 3.2 bugfix — full-field patch from DraftReviewBody. When
+     *  present, its values take precedence over current React form state
+     *  for validation, slug generation, and insert. Avoids state races. */
+    formPatch?: import('./entity-create/buildEntityFormPatch').EntityFormPatch;
+    tagsOverride?: string[];
   }) => {
     // Gate submission for user variant
     if (variant === 'user' && !user) {
@@ -1618,7 +1623,30 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       return;
     }
 
-    if (!formData.name.trim() || !formData.type) {
+    // Resolve effective field values: explicit formPatch wins, then state.
+    const patch = overrides?.formPatch ?? {};
+    const eff = {
+      name: (patch.name ?? formData.name ?? '') as string,
+      type: (patch.type ?? formData.type ?? '') as string,
+      description: (patch.description ?? formData.description ?? '') as string,
+      website_url: (patch.website_url ?? formData.website_url ?? '') as string,
+      image_url: (patch.image_url ?? formData.image_url ?? '') as string,
+      category_id: (patch.category_id !== undefined ? patch.category_id : formData.category_id) as string | null,
+      authors: (patch.authors ?? formData.authors) as string[],
+      languages: (patch.languages ?? formData.languages) as string[],
+      isbn: (patch.isbn ?? formData.isbn) as string,
+      publication_year: (patch.publication_year ?? formData.publication_year) as number | null,
+      ingredients: (patch.ingredients ?? formData.ingredients) as string[],
+      metadata: patch.metadata ? { ...formData.metadata, ...patch.metadata } : formData.metadata,
+      cast_crew: patch.cast_crew ? { ...formData.cast_crew, ...patch.cast_crew } : formData.cast_crew,
+      specifications: patch.specifications ? { ...formData.specifications, ...patch.specifications } : formData.specifications,
+      price_info: patch.price_info ? { ...formData.price_info, ...patch.price_info } : formData.price_info,
+      nutritional_info: patch.nutritional_info ? { ...formData.nutritional_info, ...patch.nutritional_info } : formData.nutritional_info,
+      external_ratings: patch.external_ratings ? { ...formData.external_ratings, ...patch.external_ratings } : formData.external_ratings,
+    };
+    const effTags = overrides?.tagsOverride ?? selectedTagNames;
+
+    if (!eff.name.trim() || !eff.type) {
       toast({
         title: 'Validation Error',
         description: 'Name and type are required',
@@ -1628,7 +1656,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
 
     // Validate "others" type requires explanation
-    if (formData.type === 'others' && !otherTypeReason.trim()) {
+    if (eff.type === 'others' && !otherTypeReason.trim()) {
       toast({
         title: 'Validation Error',
         description: 'Please explain why this entity doesn\'t fit existing types',
@@ -1636,41 +1664,36 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       });
       return;
     }
-    
-    // Validate type-specific required fields from config
-    const typeConfig = entityTypeConfig[formData.type];
+
+    // Validate type-specific required fields from config (uses effective values)
+    const typeConfig = entityTypeConfig[eff.type];
     if (typeConfig?.requiredFields) {
       for (const fieldKey of typeConfig.requiredFields) {
         const fieldConfig = typeConfig.fields.find(f => f.key === fieldKey);
         if (!fieldConfig) continue;
-        
+
         const storageColumn = fieldConfig.storageColumn || 'metadata';
-        let value;
-        
+        let value: any;
+
         switch (storageColumn) {
           case 'metadata':
-            value = formData.metadata?.[fieldKey];
-            break;
+            value = eff.metadata?.[fieldKey]; break;
           case 'cast_crew':
-            value = formData.cast_crew?.[fieldKey];
-            break;
+            value = eff.cast_crew?.[fieldKey]; break;
           case 'specifications':
-            value = formData.specifications?.[fieldKey];
-            break;
+            value = eff.specifications?.[fieldKey]; break;
           case 'price_info':
-            value = formData.price_info?.[fieldKey];
-            break;
+            value = eff.price_info?.[fieldKey]; break;
           default:
-            value = formData[storageColumn as keyof typeof formData];
+            value = (eff as any)[storageColumn];
         }
-        
-        // Check if value is empty (handles strings, arrays, null, undefined)
+
         const isEmpty = !value || (Array.isArray(value) && value.length === 0) || value === '';
-        
+
         if (isEmpty) {
           toast({
             title: 'Validation Error',
-            description: `${fieldConfig.label} is required for ${getEntityTypeLabel(formData.type)}`,
+            description: `${fieldConfig.label} is required for ${getEntityTypeLabel(eff.type)}`,
             variant: 'destructive'
           });
           return;
@@ -1681,14 +1704,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setLoading(true);
     try {
       // Check for duplicate website URL if provided (only among non-deleted entities)
-      if (formData.website_url.trim()) {
+      if (eff.website_url.trim()) {
         const { data: existingEntity, error: checkError } = await supabase
           .from('entities')
           .select('id, name')
-          .eq('website_url', formData.website_url.trim())
+          .eq('website_url', eff.website_url.trim())
           .eq('is_deleted', false)
           .maybeSingle();
-        
+
         if (existingEntity && !checkError) {
           toast({
             title: 'Duplicate Website URL',
@@ -1712,14 +1735,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       overrides && 'imageOverride' in overrides ? overrides.imageOverride : undefined;
 
     const metadata = {
-      ...formData.metadata,
+      ...eff.metadata,
       ...overrideMetadata,
       business_hours: businessHours,
       contact: contactInfo,
-      ...(formData.type === 'others' && otherTypeReason.trim() && {
+      ...(eff.type === 'others' && otherTypeReason.trim() && {
         other_type_reason: otherTypeReason.trim()
       })
     };
+
+
 
       // Generate slug based on parent context
       const baseSlug = formData.name
