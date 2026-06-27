@@ -1746,61 +1746,62 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
 
 
-      // Generate slug based on parent context
-      const baseSlug = formData.name
+      // Generate slug based on parent context — use effective name
+      const baseSlug = eff.name
         .toLowerCase()
         .trim()
         .replace(/[^a-z0-9\s-]/g, '')
         .replace(/\s+/g, '-')
         .replace(/^-+|-+$/g, '');
-      
-      const hierarchicalSlug = resolvedParent 
+
+      const hierarchicalSlug = resolvedParent
         ? `${resolvedParent.slug || resolvedParent.id}-${baseSlug}`
         : baseSlug;
 
       const { data: newEntity, error } = await supabase
         .from('entities')
         .insert([{
-          name: formData.name.trim(),
-          type: formData.type as any,
-          description: formData.description || null,
+          name: eff.name.trim(),
+          type: eff.type as any,
+          description: eff.description || null,
           image_url:
             (overridePrimaryImage !== undefined ? overridePrimaryImage : null) ||
             primaryMediaUrl ||
             uploadedMedia[0]?.url ||
-            formData.image_url.trim() ||
+            eff.image_url.trim() ||
             null,
-          website_url: formData.website_url.trim() || null,
+          website_url: eff.website_url.trim() || null,
           venue: formData.venue.trim() || null,
           metadata,
           created_by: user?.id || null,
           slug: hierarchicalSlug,
           parent_id: resolvedParent?.id || null,
-          category_id: formData.category_id || null,
-          // Type-specific columns
-          authors: formData.authors.length > 0 ? formData.authors : null,
-          languages: formData.languages.length > 0 ? formData.languages : null,
-          isbn: formData.isbn || null,
-          publication_year: formData.publication_year || null,
-          cast_crew: Object.keys(formData.cast_crew).length > 0 ? formData.cast_crew : null,
-          ingredients: formData.ingredients.length > 0 ? formData.ingredients : null,
-          specifications: Object.keys(formData.specifications).length > 0 ? formData.specifications : null,
-          price_info: Object.keys(formData.price_info).length > 0 ? formData.price_info : null,
-          nutritional_info: Object.keys(formData.nutritional_info).length > 0 ? formData.nutritional_info : null,
-          external_ratings: Object.keys(formData.external_ratings).length > 0 ? formData.external_ratings : null,
+          category_id: eff.category_id || null,
+          // Type-specific columns (effective values)
+          authors: eff.authors.length > 0 ? eff.authors : null,
+          languages: eff.languages.length > 0 ? eff.languages : null,
+          isbn: eff.isbn || null,
+          publication_year: eff.publication_year || null,
+          cast_crew: Object.keys(eff.cast_crew).length > 0 ? eff.cast_crew : null,
+          ingredients: eff.ingredients.length > 0 ? eff.ingredients : null,
+          specifications: Object.keys(eff.specifications).length > 0 ? eff.specifications : null,
+          price_info: Object.keys(eff.price_info).length > 0 ? eff.price_info : null,
+          nutritional_info: Object.keys(eff.nutritional_info).length > 0 ? eff.nutritional_info : null,
+          external_ratings: Object.keys(eff.external_ratings).length > 0 ? eff.external_ratings : null,
         }])
         .select()
         .single();
 
       if (error) throw error;
 
-      // Convert tag names to Tag objects and save
-      if (newEntity && selectedTagNames.length > 0) {
+      // Convert tag names to Tag objects and save (effective tags)
+      if (newEntity && effTags.length > 0) {
         try {
           // Convert all tag names to Tag objects (creates if needed)
           const tagObjects = await Promise.all(
-            selectedTagNames.map(name => getOrCreateTag(name))
+            effTags.map(name => getOrCreateTag(name))
           );
+
           
           // Create tag assignments
           const tagAssignments = tagObjects.map(tag => ({
