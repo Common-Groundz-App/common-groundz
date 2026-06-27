@@ -2508,11 +2508,29 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
         onApplyMetadataOnly={(snapshot) => commitApply(snapshot.websiteUrl, () => applyMetadataOnlySafe(snapshot))}
         useDraftReview={useDraftReviewFlag}
-        entityDraft={aiPredictions?.entityDraft ?? null}
+        entityDraft={(() => {
+          // Phase 3.2 bugfix — merge urlMetadata.images into the draft's
+          // imageCandidates so the picker shows the lite-metadata images
+          // that the AI/V2 path may have missed.
+          const baseDraft = aiPredictions?.entityDraft ?? null;
+          if (!baseDraft) return null;
+          const metaImgs = pickValidImages(urlMetadata);
+          if (metaImgs.length === 0) return baseDraft;
+          const existing = new Set(
+            (baseDraft.imageCandidates ?? []).map((c: any) => c.url)
+          );
+          const extras = metaImgs
+            .filter((u) => !existing.has(u))
+            .map((u) => ({ url: u, source: 'page_metadata' as const, confidence: 0.55 }));
+          return { ...baseDraft, imageCandidates: [...(baseDraft.imageCandidates ?? []), ...extras] };
+        })()}
+        urlMetadata={urlMetadata}
+        analyzedUrlSnapshot={predictionUrlSnapshot}
         onApplyDraft={async (overrides) => {
           await handleSubmit(overrides);
         }}
       />
+
       
       
       {/* URL Mismatch Warning Dialog */}
