@@ -2060,6 +2060,32 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         }
       }
 
+      // Phase 3.3A-2 — persist suspected duplicate pairs (idempotent).
+      // Only runs if the user clicked "It's different, continue".
+      if (overrides?._duplicateConfirmed && newEntity && dupCandidates.length > 0) {
+        try {
+          const rows = dupCandidates.map(c => ({
+            entity_a_id: newEntity.id,
+            entity_b_id: c.id,
+            similarity_score: c.score,
+            detection_method: (c.reasons[0] || 'fuzzy_name').slice(0, 40),
+            status: 'pending' as const,
+          }));
+          const { error: dupInsErr } = await supabase
+            .from('duplicate_entities')
+            .upsert(rows, { onConflict: 'entity_a_id,entity_b_id,detection_method', ignoreDuplicates: true });
+          if (dupInsErr) console.warn('duplicate_entities persist failed:', dupInsErr);
+        } catch (e) {
+          console.warn('duplicate_entities persist error:', e);
+        }
+        setDupCandidates([]);
+      }
+
+      // Phase 3.3A — revoke blob URLs we created during this submit.
+      trackedBlobsRef.current.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
+      trackedBlobsRef.current.clear();
+      pendingFilesRef.current.clear();
+
       toast({
         title: 'Success',
         description: 'Entity created successfully',
