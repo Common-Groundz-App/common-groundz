@@ -50,7 +50,10 @@ interface AutoFillPreviewModalProps {
    *  builder can run without round-tripping through the host's React state. */
   urlMetadata?: any | null;
   analyzedUrlSnapshot?: string | null;
-  onApplyDraft?: (overrides: DraftApplyOverrides) => Promise<void> | void;
+  /** Phase 3.2 v6 — Stage 2 "Apply to Form" handler. Hands resolved
+   *  overrides to the host so the host form is prefilled. The host's
+   *  Save button is the only entity write path. */
+  onPrefillForm?: (overrides: DraftApplyOverrides) => Promise<void> | void;
 }
 
 interface PreviewFieldProps {
@@ -256,7 +259,7 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
   entityDraft = null,
   urlMetadata = null,
   analyzedUrlSnapshot = null,
-  onApplyDraft,
+  onPrefillForm,
 }) => {
   // Request ID is surfaced from V2 success metadata or error envelope.
   const requestId: string | null =
@@ -264,20 +267,25 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
     predictions?.request_id ??
     null;
 
-  // Phase 3.2 — admin draft-driven review branch. Takes precedence over
-  // legacy success/metadata-only branches when the flag is on and a draft
-  // is attached. Never renders during normal operation for non-admins.
-  if (useDraftReview && entityDraft && onApplyDraft) {
+  // Phase 3.2 v6 — Two-stage draft review (Brand → Entity Draft). Takes
+  // precedence over legacy success/metadata-only branches when the flag is
+  // on and a draft is attached. Never renders during normal operation for
+  // non-admins.
+  if (useDraftReview && entityDraft && onPrefillForm) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent
+          className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
               Review draft
             </DialogTitle>
             <DialogDescription>
-              Confirm the brand and primary image before saving.
+              Confirm the brand, then review the entity draft before prefilling the form.
             </DialogDescription>
           </DialogHeader>
           <DraftReviewBody
@@ -286,8 +294,8 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
             urlMetadata={urlMetadata}
             analyzedUrl={analyzedUrlSnapshot}
             onCancel={() => onOpenChange(false)}
-            onApply={async (overrides) => {
-              await onApplyDraft(overrides);
+            onPrefillForm={async (overrides) => {
+              await onPrefillForm(overrides);
               onOpenChange(false);
             }}
           />
@@ -314,7 +322,11 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
 
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-md sm:max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent
+          className="w-[calc(100vw-2rem)] max-w-md sm:max-w-lg max-h-[85vh] overflow-y-auto overflow-x-hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-yellow-500" />
@@ -397,7 +409,11 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-2xl max-h-[85vh] overflow-y-auto"
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />

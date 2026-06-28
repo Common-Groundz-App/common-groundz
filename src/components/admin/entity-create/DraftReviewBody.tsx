@@ -2,12 +2,13 @@ import React, { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { Loader2, Sparkles, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { BrandPicker, BrandDecision } from './BrandPicker';
 import { ImageCandidateGrid, ImageSelection } from './ImageCandidateGrid';
+import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import type { EntityDraft } from '@/types/entityDraft';
 import {
   buildEntityFormPatchFromPredictions,
@@ -18,9 +19,8 @@ export interface DraftApplyOverrides {
   parentOverride: Entity | null;
   metadataOverride: Record<string, any>;
   imageOverride: string | null;
-  /** Phase 3.2 bugfix — full-field patch computed from predictions +
-   *  urlMetadata so handleSubmit can validate & insert without relying on
-   *  React state catching up. */
+  /** Pure patch computed from predictions + urlMetadata — used by the host
+   *  to prefill the form without React-state races. */
   formPatch: EntityFormPatch;
   /** Tags live outside formData in the host dialog; shipped explicitly. */
   tagsOverride?: string[];
@@ -35,11 +35,14 @@ interface DraftReviewBodyProps {
   urlMetadata?: any | null;
   /** Analyzed-URL snapshot captured at modal open. */
   analyzedUrl?: string | null;
-  /** Called once the user clicks Apply & Save. Translates the draft
-   *  decisions into explicit overrides that the host's handleSubmit
-   *  consumes directly — never via React state. */
-  onApply: (overrides: DraftApplyOverrides) => Promise<void> | void;
+  /** Phase 3.2 v6 — Stage 2 "Apply to Form" handler. Hands the resolved
+   *  brand + image + full patch to the host so the host's form is
+   *  prefilled. The host form's own Save button is the ONLY entity
+   *  write path. This modal never creates the entity. */
+  onPrefillForm: (overrides: DraftApplyOverrides) => Promise<void> | void;
 }
+
+type Stage = 'brand' | 'entity';
 
 export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   draft,
@@ -47,23 +50,28 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   predictions = null,
   urlMetadata = null,
   analyzedUrl = null,
-  onApply,
+  onPrefillForm,
 }) => {
   const { toast } = useToast();
-  const [brandDecision, setBrandDecision] = useState<BrandDecision | null>(() => {
-    if (draft.brandCandidates.length === 0) {
-      return { kind: 'not_applicable' };
-    }
-    return null;
-  });
+  const noBrandCandidates = draft.brandCandidates.length === 0;
+
+  // If there are no brand candidates at all (e.g. predictions.type === 'brand'),
+  // skip Stage 1 entirely and go straight to entity review with
+  // brand_status='not_applicable'.
+  const [stage, setStage] = useState<Stage>(noBrandCandidates ? 'entity' : 'brand');
+  const [brandDecision, setBrandDecision] = useState<BrandDecision | null>(
+    noBrandCandidates ? { kind: 'not_applicable' } : null,
+  );
+  const [resolvedParent, setResolvedParent] = useState<Entity | null>(null);
+  const [resolvedBrandMetadata, setResolvedBrandMetadata] = useState<Record<string, any>>({});
   const [imageSelection, setImageSelection] = useState<ImageSelection>({
     primaryUrl: null,
     galleryUrls: [],
   });
-  const [submitting, setSubmitting] = useState(false);
+  const [stage1Busy, setStage1Busy] = useState(false);
+  const [stage2Busy, setStage2Busy] = useState(false);
 
-  // Precompute the pure patch once. Stable across renders unless inputs
-  // change — guarantees DraftReviewBody never reads live React state.
+  // Pure patch — stable across renders unless inputs change.
   const baseFormPatch = useMemo<EntityFormPatch>(
     () =>
       buildEntityFormPatchFromPredictions({
@@ -81,21 +89,19 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
     [predictions, urlMetadata, analyzedUrl, draft],
   );
 
-  const canApply = useMemo(() => {
-    if (!brandDecision) return false;
-    return true;
-  }, [brandDecision]);
+  // ─── Stage 1: brand confirm + (optional) create ───────────────────────
+  const confirmLabel =
+    brandDecision?.kind === 'create_new'
+      ? 'Create Brand & Continue'
+      : 'Confirm Brand & Continue';
 
-  const handleApplyClick = async () => {
-    if (!brandDecision || submitting) return;
-    setSubmitting(true);
+  const handleConfirmBrand = async () => {
+    if (!brandDecision || stage1Busy) return;
+    setStage1Busy(true);
     try {
-      let parentOverride: Entity | null = null;
-      const metadataOverride: Record<string, any> = {};
+      let parent: Entity | null = null;
+      const metaPatch: Record<string, any> = {};
 
-      // Resolve parent from BrandDecision. Never read React state — always
-      // pass through the explicit overrides object so handleSubmit cannot
-      // race the next render.
       if (brandDecision.kind === 'existing') {
         const { data: brandRow, error } = await supabase
           .from('entities')
@@ -109,10 +115,9 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
             description: 'Could not load the selected brand. Please try again.',
             variant: 'destructive',
           });
-          setSubmitting(false);
           return;
         }
-        parentOverride = {
+        parent = {
           id: brandRow.id,
           name: brandRow.name,
           type: brandRow.type as EntityType,
@@ -123,7 +128,8 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
           metadata: (brandRow.metadata as Record<string, any>) ?? {},
         } as unknown as Entity;
       } else if (brandDecision.kind === 'create_new') {
-        // confirmCreate: true → admin already explicitly confirmed in BrandPicker.
+        // confirmCreate:true — admin explicitly confirmed in BrandPicker AND
+        // again by clicking "Create Brand & Continue".
         const { data, error } = await supabase.functions.invoke('create-brand-entity', {
           body: {
             brandName: brandDecision.candidate.name,
@@ -140,11 +146,10 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
             description: error?.message || 'Could not create the new brand.',
             variant: 'destructive',
           });
-          setSubmitting(false);
           return;
         }
         const created = data.brandEntity;
-        parentOverride = {
+        parent = {
           id: created.id,
           name: created.name,
           type: EntityType.Brand,
@@ -154,59 +159,154 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
           website_url: created.website_url,
           metadata: created.metadata || {},
         } as unknown as Entity;
+        toast({
+          title: 'Brand created',
+          description: `"${created.name}" is now in your entities.`,
+        });
       } else if (brandDecision.kind === 'not_sure' || brandDecision.kind === 'not_listed') {
-        metadataOverride.brand_status = 'unknown';
+        metaPatch.brand_status = 'unknown';
       } else if (brandDecision.kind === 'not_applicable') {
-        metadataOverride.brand_status = 'not_applicable';
+        metaPatch.brand_status = 'not_applicable';
       }
 
-      // brand_status is only stored when no parent is set; if a parent is
-      // resolved, drop the field outright so a row can never carry both.
-      if (parentOverride) {
-        delete metadataOverride.brand_status;
-      }
+      // brand_status is mutually exclusive with a resolved parent.
+      if (parent) delete metaPatch.brand_status;
 
-      // Compose the final patch — primary image override wins over patch.
+      setResolvedParent(parent);
+      setResolvedBrandMetadata(metaPatch);
+      setStage('entity');
+    } finally {
+      setStage1Busy(false);
+    }
+  };
+
+  // ─── Stage 2: prefill the host form ───────────────────────────────────
+  const handlePrefill = async () => {
+    if (stage2Busy) return;
+    setStage2Busy(true);
+    try {
       const finalPatch: EntityFormPatch = { ...baseFormPatch };
-      if (imageSelection.primaryUrl) {
-        finalPatch.image_url = imageSelection.primaryUrl;
-      }
+      const primary =
+        imageSelection.primaryUrl ??
+        draft.imageCandidates[draft.recommendedImageIndex ?? 0]?.url ??
+        baseFormPatch.image_url ??
+        null;
+      if (primary) finalPatch.image_url = primary;
 
-      await onApply({
-        parentOverride,
-        metadataOverride,
-        imageOverride: imageSelection.primaryUrl ?? finalPatch.image_url ?? null,
+      await onPrefillForm({
+        parentOverride: resolvedParent,
+        metadataOverride: resolvedBrandMetadata,
+        imageOverride: primary,
         formPatch: finalPatch,
         tagsOverride: finalPatch.tags,
       });
     } finally {
-      setSubmitting(false);
+      setStage2Busy(false);
     }
   };
 
+  // ─── Render ───────────────────────────────────────────────────────────
+  if (stage === 'brand') {
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Step 1 of 2 — Confirm the brand for this entity.
+        </div>
+
+        <BrandPicker
+          candidates={draft.brandCandidates}
+          recommendedIndex={draft.recommendedBrandIndex}
+          value={brandDecision}
+          onChange={setBrandDecision}
+        />
+
+        {brandDecision?.kind === 'create_new' && (
+          <p className="text-xs text-muted-foreground">
+            This will create the brand now. You can still cancel entity creation later.
+          </p>
+        )}
+
+        {draft.warnings && draft.warnings.length > 0 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              {draft.warnings.join(' · ')}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={onCancel} disabled={stage1Busy}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmBrand} disabled={!brandDecision || stage1Busy}>
+            {stage1Busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Stage 2 — entity review + primary image
+  const nameDisplay = baseFormPatch.name ?? draft.nameGuess ?? '';
+  const typeDisplay = baseFormPatch.type ?? draft.typeGuess ?? '';
+  const categoryDisplay = draft.categoryHint?.path ?? '';
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Sparkles className="h-4 w-4 text-primary" />
-        Review the draft below. Brand and image selections are explicit — no
-        silent auto-creation.
+      <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Step 2 of 2 — Review entity details and pick the primary image.
+        </div>
+        {!noBrandCandidates && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setStage('brand')}
+            disabled={stage2Busy}
+            className="h-7 px-2"
+          >
+            <ArrowLeft className="h-3 w-3 mr-1" /> Back
+          </Button>
+        )}
       </div>
 
-      {(baseFormPatch.name || draft.nameGuess) && (
-        <div className="space-y-1">
-          <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-            Name (suggested)
-          </Label>
-          <p className="text-sm font-medium">{baseFormPatch.name ?? draft.nameGuess}</p>
-        </div>
-      )}
-
-      <BrandPicker
-        candidates={draft.brandCandidates}
-        recommendedIndex={draft.recommendedBrandIndex}
-        value={brandDecision}
-        onChange={setBrandDecision}
-      />
+      <div className="grid gap-3 rounded-md border bg-muted/30 p-3">
+        {nameDisplay && (
+          <div className="space-y-1">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Name</Label>
+            <p className="text-sm font-medium">{nameDisplay}</p>
+          </div>
+        )}
+        {typeDisplay && (
+          <div className="space-y-1">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Type</Label>
+            <p className="text-sm">{getEntityTypeLabel(typeDisplay)}</p>
+          </div>
+        )}
+        {categoryDisplay && (
+          <div className="space-y-1">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Category</Label>
+            <p className="text-sm">{categoryDisplay}</p>
+          </div>
+        )}
+        {resolvedParent ? (
+          <div className="space-y-1">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Brand</Label>
+            <p className="text-sm">{resolvedParent.name}</p>
+          </div>
+        ) : resolvedBrandMetadata.brand_status ? (
+          <div className="space-y-1">
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Brand</Label>
+            <p className="text-sm text-muted-foreground italic">
+              {resolvedBrandMetadata.brand_status === 'not_applicable' ? 'Not applicable' : 'Unknown'}
+            </p>
+          </div>
+        ) : null}
+      </div>
 
       <ImageCandidateGrid
         candidates={draft.imageCandidates}
@@ -215,22 +315,13 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
         onChange={setImageSelection}
       />
 
-      {draft.warnings && draft.warnings.length > 0 && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="text-xs">
-            {draft.warnings.join(' · ')}
-          </AlertDescription>
-        </Alert>
-      )}
-
       <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={onCancel} disabled={submitting}>
+        <Button variant="outline" onClick={onCancel} disabled={stage2Busy}>
           Cancel
         </Button>
-        <Button onClick={handleApplyClick} disabled={!canApply || submitting}>
-          {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-          Apply & Save
+        <Button onClick={handlePrefill} disabled={stage2Busy}>
+          {stage2Busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          Apply to Form
         </Button>
       </div>
     </div>
