@@ -1,101 +1,165 @@
-## Phase 3.2 v6 — Two-Stage Review (Option A, locked)
+# Phase 3.3A — Final plan (v4, ready to build)
 
-Adopts ChatGPT + Codex's Option A and clarifications, plus a new accidental-close guard across all stages.
+Both reviewers approve v3. v4 folds in their three asks and bakes in two schema facts I just verified.
 
-### Flow (Flag ON)
+## What changes from v3
+
+1. **Save order locked: upload-first, insert-second (ChatGPT).** On host-form Save the pending-upload flow is strictly:
+   1. Resolve every `pendingUpload` marker into a real CDN URL via `uploadEntityImage(file, userId)`.
+   2. If the primary image is a pending upload, replace `formData.image_url` with the real URL **before** the `entities` insert.
+   3. Insert the entity with the final real `image_url` (never `blob:`, never a marker).
+   4. Insert media rows with the resolved real URLs, primary first.
+   5. Revoke all tracked blob URLs.
+
+   Guard: an `assert` step right before insert verifies `image_url` does not start with `blob:` and no `MediaItem.url` starts with `blob:` — throws a clear error if violated (defense-in-depth).
+
+2. **Idempotent duplicate persistence (ChatGPT).** The post-insert write into `duplicate_entities` uses `INSERT … ON CONFLICT (entity_a_id, entity_b_id, detection_method) DO NOTHING` so retries never surface a unique-violation toast.
+
+3. **Telemetry stamp is conditional (ChatGPT).** `metadata.creation_source` is only set to `'url'` when the entity was created from the URL/draft-review flow (i.e. `analyzedUrl` exists or `lastAppliedUrl` is set). Plain manual creation stamps `'manual'`. Same for `creation_flow` (`'phase_3_draft_review'` vs `'manual_form'`).
+
+4. **Duplicate-pair preflight is a no-op (Codex, verified).** Live query of `duplicate_entities` shows 110 rows and **zero** existing pair/method groups, so `CREATE UNIQUE INDEX` will apply cleanly. The migration still uses `IF NOT EXISTS` for safety.
+
+5. **Acceptance checks switched to before/after snapshots (Codex).** `duplicate_entities.created_at` does exist (verified), but snapshot deltas are more robust and version-proof — using them.
+
+## Implementation order
 
 ```text
-Analyze URL
-  ↓
-Stage 1 — Review Brand
-  • Brand candidates + logo (if any) + website/reason
-  • Pick: existing | create new (confirm) | not sure | not listed | not applicable
-  • NO entity/product images
-  • Button: "Confirm Brand & Continue"  (changes to "Create Brand & Continue" when create_new is the pending choice, with helper text: "This creates the brand now. You can still cancel entity creation later.")
-  ↓
-  If create_new + confirmed → call create-brand-entity (confirmCreate:true)
-  Else → no brand write
-  ↓
-Stage 2 — Review Entity Draft
-  • Summary: suggested name / type / category
-  • ImageCandidateGrid (V2 + urlMetadata merged) → pick primary
-  • Button: "Apply to Form"  (never "Save")
-  ↓
-Modal closes → host form prefilled via buildEntityFormPatchFromPredictions
-  + parentOverride (Stage 1) + image_url (Stage 2 primary)
-  ↓
-User reviews/edits full host form
-  ↓
-Host form Save → entity created
+3.3A-1   Gallery completion (admin-only)
+3.3A-2   Duplicate check (read-only before insert; persist after insert)
+── STOP — share validation results with user before any 3.3B work ──
 ```
 
-Flag OFF: legacy `AutoFillPreviewModal` flow untouched.
+---
 
-### Write-path contract (precise wording)
+## Phase 3.3A-1 — Gallery completion
 
-- Before Confirm Brand → cancel/close/ESC = **zero writes**.
-- After explicit `create_new` confirm in Stage 1 → brand row may persist even if Stage 2 or host form is later cancelled. Documented trade-off of confirming brand creation early.
-- Closing Stage 2 → **no entity write**, ever.
-- Entity creation happens **only** via the host form's existing Save button.
-- `existing` / `not_sure` / `not_listed` / `not_applicable` → zero brand writes.
+`src/components/admin/entity-create/ImageCandidateGrid.tsx`
+- Re-enable per-tile checkbox; selection model `{ primaryUrl, galleryUrls[] }`.
+- `MAX_MEDIA_ITEMS = 4` total (primary + gallery). Extra checkboxes disabled with helper text.
+- Primary cannot also be in gallery (auto-removed on promote).
+- Dedupe comparison key: exact URL with optional strip of `utm_*`, `fbclid`, `gclid`, `mc_*` **for comparison only**. **Stored URL is always byte-identical** to the source.
+- Source + confidence chips per tile: `Official site` / `Google Images` / `Firecrawl` / `Page metadata` / `User upload`; confidence dot green ≥0.7, amber ≥0.4, grey otherwise.
+- **"Upload your own" tile (Option A):** opens picker → store `File` + `previewUrl = URL.createObjectURL(file)` in component state → append as `{ source: 'user_upload', confidence: 1, pendingUpload: { file, previewUrl } }`. No network call.
+- **"No image" toggle:** clears primary + gallery; sets `noImageChosen=true`.
+- **Blob lifecycle:** track a `Set<string>` of created blob URLs; `URL.revokeObjectURL` on tile remove, "No image" toggle, modal close, component unmount, and after Save resolves.
 
-### Accidental-close guard (new, applies to all stages)
+`DraftReviewBody.tsx`
+- Stage 2 passes `{ imageOverride, galleryOverride: Array<string | PendingUpload>, noImageChosen }` to `onPrefillForm`.
 
-The draft modal closes **only** on intentional user action:
-- `X` icon in header
-- "Cancel" button
-- ESC key
+`CreateEntityDialog.tsx` — `handlePrefillFromDraft`
+- `imageOverride` → `formData.image_url` (string) or pass-through pending-upload marker.
+- `galleryOverride` → appended to host form's Entity Media area as `MediaItem`s (`source: 'draft_candidate'`), primary at index 0, deduped on exact URL.
+- `noImageChosen=true` → skip image fills entirely.
+- **Zero DB writes, zero storage writes.**
 
-It does **not** close on:
-- Outside / overlay click (`onPointerDownOutside` → `preventDefault`)
-- Focus loss (`onInteractOutside` → `preventDefault` for non-keyboard interactions)
-- Auto-close after Stage 1 success (we only advance the internal stage, not dismiss)
+`CreateEntityDialog.tsx` — host-form Save (strict order, per ChatGPT clarification)
+1. **Resolve pending uploads** to real CDN URLs (parallel `Promise.allSettled`).
+2. **Patch `formData.image_url`** if the primary was a pending upload; patch matching `MediaItem.url`s.
+3. **Assert** no remaining `blob:` URLs in `image_url` or media list — throw on violation.
+4. **Insert entity** with final real `image_url`.
+5. **Insert media rows** primary-first, deduped on exact URL.
+6. If any media row insert fails: entity persists, warning toast lists failed URLs, `console.error` for retry (partial-failure handling, not rollback).
+7. **Revoke** every tracked blob URL.
 
-Implementation: pass `onPointerDownOutside`/`onInteractOutside` handlers on the Radix `DialogContent` inside `AutoFillPreviewModal` that call `event.preventDefault()` when `useDraftReview` is on. ESC remains enabled (Radix default). Same guard is also applied to the existing legacy modal so the UX is consistent regardless of flag.
+## Phase 3.3A-2 — Duplicate check
 
-### Brand inference fix (do first)
+**New edge function** `supabase/functions/check-entity-duplicates/index.ts`
+- Input: `{ name, type, parentId?, websiteUrl?, sourceUrl?, slug?, apiSource?, apiRef? }` — **no `brandId`**.
+- Signals → `reasons[]` chips:
+  - `pg_trgm` similarity on `lower(name)` scoped by `type`, threshold 0.55.
+  - Exact `lower(slug)` match on `entities.slug`.
+  - Match in `entity_slug_history.old_slug`.
+  - Same `parent_id` boost.
+  - `website_url` host match.
+  - `metadata->>'created_from_url'` host + path-prefix match against `sourceUrl`.
+  - `(api_source, api_ref)` exact match when both present.
+- Output: `DuplicateCandidate[]` `{ id, name, slug, image_url, type, parent_name?, score, reasons[] }`.
+- **No DB writes** in this function.
+- Admin-only (returns 403 otherwise).
+- Best-effort in-memory per-user rate limit: 30 req/min (acknowledged non-durable in serverless; sufficient for admin-only 3.3A).
 
-In `supabase/functions/analyze-entity-url-v2/entity_draft.ts`:
-- `inferBrandFromUrlSlug`: if the last path segment contains `_`, take the substring **before the first `_`** as the brand slug candidate.
-- Display formatting: short all-lower tokens with internal `-` (≤4 chars per side) → uppercase preserving hyphen (`axis-y` → `AXIS-Y`); otherwise Title Case (`dot-key` → `Dot Key`), and prefer the title-ampersand display form (`Dot & Key`) when slug + title agree.
-- Confidence ≤ 0.4, `status: 'suggested_new'`, never `recommendedBrandIndex`.
-- Telemetry warning: `brand_fallback_source:slug_before_underscore`.
+**Migration (3.3A-2, schema only — no new tables, no GRANTs needed)**
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-### Code changes
+CREATE INDEX IF NOT EXISTS entities_name_trgm
+  ON public.entities USING gin (lower(name) gin_trgm_ops)
+  WHERE is_deleted = false;
 
-**Frontend**
+CREATE INDEX IF NOT EXISTS entities_lower_name_type
+  ON public.entities (lower(name), type)
+  WHERE is_deleted = false;
+
+-- Preflight verified: 110 rows in duplicate_entities, zero existing pair/method groups,
+-- so this applies cleanly. IF NOT EXISTS for safety on re-runs.
+CREATE UNIQUE INDEX IF NOT EXISTS duplicate_entities_pair_method_uniq
+  ON public.duplicate_entities (entity_a_id, entity_b_id, detection_method);
+```
+
+**`CreateEntityDialog.handleSubmit`**
+- Before insert: call `check-entity-duplicates`. If matches → inline "Did you mean?" step:
+  - **Use existing** → fire `onSelectExistingEntity({ id, slug, name, type })`. Admin impl = navigate. **Zero writes.**
+  - **It's different, continue** → continue with the upload-first save order above. After successful entity insert, persist one row per shown match with `ON CONFLICT (entity_a_id, entity_b_id, detection_method) DO NOTHING`:
+    ```
+    entity_a_id      = existing match id
+    entity_b_id      = newly created entity id
+    similarity_score = match score
+    detection_method = 'auto_phase33a'
+    status           = 'pending'
+    ```
+  - **Cancel** → close step. **Zero writes.**
+- Stamp `metadata` on insert payload (conditional, per ChatGPT):
+  - URL/draft flow: `{ creation_source: 'url', creation_flow: 'phase_3_draft_review', created_from_url: analyzedUrl, duplicate_candidates_seen: n, duplicate_decision: 'continue_new' | 'no_candidates' }`
+  - Manual flow: `{ creation_source: 'manual', creation_flow: 'manual_form' }` (no duplicate fields).
+
+---
+
+## Files
+
+**Add**
+- `supabase/functions/check-entity-duplicates/index.ts`
+- Migration: `pg_trgm` + 2 query indexes + 1 unique index
+
+**Edit**
+- `src/components/admin/entity-create/ImageCandidateGrid.tsx`
 - `src/components/admin/entity-create/DraftReviewBody.tsx`
-  - Add `stage: 'brand' | 'entity'` local state.
-  - Stage 1: `BrandPicker` + brand logo block only; button "Confirm Brand & Continue" (or "Create Brand & Continue" + helper note when pending choice is `create_new`).
-  - Stage 1 → 2 transition: if `create_new` confirmed, invoke `create-brand-entity` with `confirmCreate:true`; on success store `parentOverride` and advance. Errors stay on Stage 1.
-  - Stage 2: name/type/category summary + `ImageCandidateGrid` + "Apply to Form" button.
-  - Replaces `onApply` with `onPrefillForm(overrides)`; removes any `handleSubmit` invocation.
-  - Uses `buildEntityFormPatchFromPredictions` for the full patch (no partial fills).
-- `src/components/admin/entity-create/AutoFillPreviewModal.tsx`
-  - Add `onPrefillForm` prop and forward.
-  - Add `onPointerDownOutside`/`onInteractOutside` guards on `DialogContent` (applied for both flag states for consistency).
-- `src/components/admin/CreateEntityDialog.tsx`
-  - New `handlePrefillFromDraft(overrides)`: merge `formPatch` into `formData`, set `tags`, set `selectedParent` from `parentOverride`, merge `metadataOverride`, set `image_url` from `imageOverride`; then close the draft modal. **No** `handleSubmit` call here.
-  - `handleSubmit` keeps its `overrides` signature (unused in flag-ON path now) — no behavioral change for flag-OFF.
+- `src/components/admin/AutoFillPreviewModal.tsx` (prop pass-through only)
+- `src/components/admin/CreateEntityDialog.tsx` (gallery prefill, upload-first save order, blob-URL assertion, dedupe step, conditional telemetry, `onSelectExistingEntity`)
 
-**Edge function**
-- `supabase/functions/analyze-entity-url-v2/entity_draft.ts`: brand-slug fix + telemetry above.
-- No new endpoints, no migration, no gallery writes.
+**Not touched in this pass**
+`entities.approval_status`, RLS, moderation queue, quota function, `PendingReviewBadge`, `App.tsx` routes.
 
-### Field parity for Stage 2 → host form prefill
+---
 
-`buildEntityFormPatchFromPredictions` already covers, and we verify mapping for:
-name, type, description, website_url, category_id, tags, metadata, specifications, cast_crew, price_info, nutritional_info, external_ratings, ingredients, authors, languages, isbn, publication_year, image_url, plus `selectedParent` (from Stage 1) and `metadata.brand_status` (mutually exclusive with `selectedParent`).
+## Acceptance checks (snapshot-based, per Codex)
 
-### Acceptance checks
-1. Flag OFF: legacy Apply-to-form unchanged.
-2. Outside click / overlay click on draft modal at any stage → modal stays open. X / Cancel / ESC → closes.
-3. AXIS-Y URL: Stage 1 lists `AXIS-Y` (suggested_new, not recommended), no `Axis Dark`.
-4. Stage 1 cancel before confirm → zero writes (verified via logs).
-5. Stage 1 `create_new` + confirm → brand row created; cancel Stage 2 → brand persists, no entity row.
-6. Stage 2 "Apply to Form" → modal closes; host form shows all legacy-parity fields populated; no DB write.
-7. Host form Save → entity created with resolved parent + chosen primary image.
-8. `not_sure` / `not_listed` → `metadata.brand_status = 'unknown'`; `not_applicable` → `'not_applicable'`; both cleared if a parent is later set.
+Before starting any flow: capture `dupCountBefore = SELECT count(*) FROM duplicate_entities`.
 
-### Out of scope
-Gallery/multi-image writes, `enrich-brand-data` changes, flag-OFF UI changes.
+**3.3A-1**
+1. Primary + 2 gallery + 1 local upload → Apply to Form → host form shows 4 media items (primary index 0), `image_url` set, **zero network requests to storage or DB** (verify in network tab).
+2. 5th selection disabled with helper text.
+3. "No image" → primary/gallery cleared, host form skips image fields.
+4. Save with one forced media-row failure → entity persists, warning toast lists the failed URL, the other 3 media rows persist.
+5. **No `blob:` URL anywhere in DB**: `SELECT image_url FROM entities WHERE id=<new>` and `SELECT url FROM entity_photos WHERE entity_id=<new>` — none start with `blob:`.
+6. Signed/transform query params on stored URLs are byte-identical to the source.
+7. After modal close mid-flow with pending uploads → no leaked `blob:` URLs in DevTools memory snapshot.
+
+**3.3A-2**
+8. "Sony XM5" with existing "Sony WH-1000XM5" → "Did you mean?" shows that match. **Use existing** → `onSelectExistingEntity` fires (admin navigates); `dupCountAfter == dupCountBefore`.
+9. **Cancel** → `dupCountAfter == dupCountBefore`.
+10. **Continue creating new** → entity inserted, `dupCountAfter == dupCountBefore + N` (N = matches shown). All new rows have `entity_b_id` = new id and `detection_method='auto_phase33a'`.
+11. Re-running the same continue-new flow with the same entity id → no error (ON CONFLICT DO NOTHING), `dupCountAfter` unchanged from previous step.
+12. Telemetry: URL-flow entity has 5 `metadata` keys (`creation_source='url'`, `creation_flow`, `created_from_url`, `duplicate_candidates_seen`, `duplicate_decision`). Manual-flow entity has only `creation_source='manual'` + `creation_flow='manual_form'`.
+
+---
+
+## Phase 3.3B — designed, NOT built in this pass
+
+Captured for continuity; only built after 3.3A acceptance passes and the user explicitly approves.
+
+- **Preflight (must run first):** `SELECT DISTINCT approval_status FROM public.entities;` → normalize anything outside `(pending, approved, rejected, NULL)` → then add CHECK.
+- **3.3B-1:** Reuse `entities.approval_status`. Add CHECK + `approved_at` / `approved_by` / `rejection_reason`. BEFORE INSERT trigger: admin → `'approved'`, else `'pending'`. RLS SELECT: `approval_status='approved' OR created_by=auth.uid() OR has_role(auth.uid(),'admin')`. Status UPDATE admin-only.
+- **3.3B-2:** Moderation queue page, pending badge, quota function + BEFORE INSERT trigger (10/24h non-admin), client precheck for friendly UX. Server trigger is source of truth.
+
+## Out of scope (3.4+)
+Non-admin rollout, Search / Lens / Barcode entry points, full merge-duplicates admin tool, reputation-based auto-approve, bulk approve, public pending visibility with badge.
