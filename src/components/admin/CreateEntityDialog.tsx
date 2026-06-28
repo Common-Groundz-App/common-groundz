@@ -1793,6 +1793,82 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     const overridePrimaryImage =
       overrides && 'imageOverride' in overrides ? overrides.imageOverride : undefined;
 
+      // ─── Phase 3.3A-2 — pre-insert duplicate check ───────────────────
+      // Read-only fuzzy-name/website/slug match; only runs once per submit.
+      if (!overrides?._duplicateConfirmed) {
+        try {
+          const { data: dupData, error: dupErr } = await supabase.functions.invoke(
+            'check-entity-duplicates',
+            {
+              body: {
+                name: eff.name.trim(),
+                type: eff.type,
+                parentId: resolvedParent?.id ?? null,
+                websiteUrl: eff.website_url.trim() || null,
+              },
+            }
+          );
+          if (!dupErr && dupData?.candidates?.length > 0) {
+            console.log('🔎 Duplicate candidates found:', dupData.candidates.length);
+            pendingSubmitOverridesRef.current = overrides;
+            setDupCandidates(dupData.candidates as DuplicateCandidate[]);
+            setDupDialogOpen(true);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('Duplicate check failed (non-fatal):', e);
+        }
+      }
+
+      // ─── Phase 3.3A-1 — resolve pending uploads (blob:) → CDN URLs ────
+      // Required BEFORE entity insert so entities.image_url is never a blob:.
+      const blobPrefix = 'blob:';
+      const hasPending =
+        uploadedMedia.some(m => m.url.startsWith(blobPrefix)) ||
+        (typeof primaryMediaUrl === 'string' && primaryMediaUrl.startsWith(blobPrefix));
+      const resolvedUrlByBlob = new Map<string, string>();
+      if (hasPending) {
+        if (!user?.id) {
+          toast({ title: 'Sign-in required to upload images', variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
+        try {
+          for (const m of uploadedMedia) {
+            if (!m.url.startsWith(blobPrefix)) continue;
+            const file = pendingFilesRef.current.get(m.url);
+            if (!file) continue;
+            const realUrl = await uploadEntityImage(file, user.id);
+            resolvedUrlByBlob.set(m.url, realUrl);
+          }
+        } catch (uErr) {
+          console.error('Pending upload failed:', uErr);
+          toast({
+            title: 'Image upload failed',
+            description: uErr instanceof Error ? uErr.message : 'Try again.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      const resolvePrimary = (u: string | null | undefined) =>
+        (u && u.startsWith(blobPrefix) && resolvedUrlByBlob.get(u)) || u || null;
+      const resolvedPrimaryMedia = resolvePrimary(primaryMediaUrl);
+      const resolvedFirstMedia = resolvePrimary(uploadedMedia[0]?.url);
+      const resolvedOverridePrimary = overridePrimaryImage !== undefined
+        ? resolvePrimary(overridePrimaryImage as string | null)
+        : undefined;
+
+    // Phase 3.3A telemetry: stamp creation_source only when invoked from the
+    // URL/draft flow. Manual creations stay 'manual'.
+    const creationSource = overrides?._fromDraftFlow ? 'url' : 'manual';
+    const telemetryStamp: Record<string, unknown> = { creation_source: creationSource };
+    if (overrides?._fromDraftFlow && (analyzeUrl || lastAppliedUrl)) {
+      telemetryStamp.created_from_url = analyzeUrl || lastAppliedUrl;
+    }
+
     const metadata = {
       ...eff.metadata,
       ...overrideMetadata,
@@ -1800,7 +1876,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       contact: contactInfo,
       ...(eff.type === 'others' && otherTypeReason.trim() && {
         other_type_reason: otherTypeReason.trim()
-      })
+      }),
+      ...telemetryStamp,
     };
 
 
