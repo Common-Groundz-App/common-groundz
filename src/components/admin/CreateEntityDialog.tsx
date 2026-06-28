@@ -126,6 +126,15 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   // for a successful AI prediction. Apply handlers read this — never the
   // live analyzeUrl input — so a post-render edit cannot poison apply.
   const [predictionUrlSnapshot, setPredictionUrlSnapshot] = useState<string | null>(null);
+  // Phase 3.3A — pending local uploads. Map<blobUrl, File>. The MediaItem's
+  // `url` is the blob URL until host-form Save resolves it to a real CDN URL.
+  // Tracked by ref so the lookup is sync, plus a Set for blob-revoke lifecycle.
+  const pendingFilesRef = useRef<Map<string, File>>(new Map());
+  const trackedBlobsRef = useRef<Set<string>>(new Set());
+  // Phase 3.3A — duplicate-check state for the pre-insert "Did you mean?" step.
+  const [dupCandidates, setDupCandidates] = useState<import('./entity-create/DuplicateConfirmDialog').DuplicateCandidate[]>([]);
+  const [dupDialogOpen, setDupDialogOpen] = useState(false);
+  const pendingSubmitOverridesRef = useRef<any>(undefined);
   // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
   // by the metadata-only modal as a freshness guard so URL A's metadata never
   // surfaces under URL B.
