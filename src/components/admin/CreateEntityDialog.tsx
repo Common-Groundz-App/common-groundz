@@ -2732,6 +2732,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         urlMetadata={urlMetadata}
         analyzedUrlSnapshot={predictionUrlSnapshot}
         onPrefillForm={async (overrides) => {
+          prefilledFromDraftRef.current = true;
           // Phase 3.2 v6 — Stage 2 "Apply to Form": prefill host form state,
           // do NOT create the entity. The host form's Save button is the
           // only entity write path.
