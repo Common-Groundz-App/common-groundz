@@ -2871,7 +2871,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           const prev = pendingSubmitOverridesRef.current || {};
           pendingSubmitOverridesRef.current = undefined;
           // Re-submit, skipping the duplicate check this time.
-          void handleSubmit({ ...prev, _duplicateConfirmed: true });
+          void handleSubmit({ ...prev, _duplicateConfirmed: true, _fromDraftFlow: prefilledFromDraftRef.current });
         }}
       />
     </Dialog>
