@@ -178,7 +178,9 @@ export function buildEntityDraft(input: BuildEntityDraftInput): EntityDraft {
   // the admin must explicitly confirm in BrandPicker.
   const brandFallbackSources: string[] = [];
   if (brandCandidates.length === 0 && predictions?.type && predictions.type !== "brand") {
-    const slugBrand = inferBrandFromUrlSlug(inputRef);
+    const slugBrandResult = inferBrandFromUrlSlug(inputRef);
+    const slugBrand = slugBrandResult?.name ?? null;
+    const slugSource = slugBrandResult?.source ?? "slug";
     const titleBrand = inferBrandFromTitleAmpersand(predictions?.name ?? null);
 
     // Normalize agreement: if slug brand and title-ampersand brand slugify to
@@ -186,7 +188,7 @@ export function buildEntityDraft(input: BuildEntityDraftInput): EntityDraft {
     // the source as both. Avoids emitting duplicate fallback candidates.
     let merged: { name: string; sources: string[]; confidence: number } | null = null;
     if (slugBrand && titleBrand && slugifyForCompare(titleBrand) === slugifyForCompare(slugBrand)) {
-      merged = { name: titleBrand, sources: ["slug", "title_ampersand"], confidence: 0.4 };
+      merged = { name: titleBrand, sources: [slugSource, "title_ampersand"], confidence: 0.4 };
     }
 
     if (merged) {
@@ -207,7 +209,7 @@ export function buildEntityDraft(input: BuildEntityDraftInput): EntityDraft {
           reason: "Inferred from URL slug (low confidence — please confirm)",
           status: "suggested_new",
         });
-        brandFallbackSources.push("slug");
+        brandFallbackSources.push(slugSource);
       }
       if (titleBrand) {
         brandCandidates.push({
