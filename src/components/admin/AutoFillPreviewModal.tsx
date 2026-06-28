@@ -50,7 +50,10 @@ interface AutoFillPreviewModalProps {
    *  builder can run without round-tripping through the host's React state. */
   urlMetadata?: any | null;
   analyzedUrlSnapshot?: string | null;
-  onApplyDraft?: (overrides: DraftApplyOverrides) => Promise<void> | void;
+  /** Phase 3.2 v6 — Stage 2 "Apply to Form" handler. Hands resolved
+   *  overrides to the host so the host form is prefilled. The host's
+   *  Save button is the only entity write path. */
+  onPrefillForm?: (overrides: DraftApplyOverrides) => Promise<void> | void;
 }
 
 interface PreviewFieldProps {
