@@ -1975,9 +1975,15 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           console.error('No authenticated user for media upload');
         } else {
           try {
+            // Phase 3.3A — rewrite any blob: URLs to their resolved CDN URLs.
+            const rewrittenMedia: MediaItem[] = uploadedMedia.map(m =>
+              m.url.startsWith('blob:') && resolvedUrlByBlob.has(m.url)
+                ? { ...m, url: resolvedUrlByBlob.get(m.url)!, source: 'external' as const }
+                : m
+            );
             // Separate external URLs from uploaded files
-            const externalMedia = uploadedMedia.filter(item => item.source === 'external');
-            const uploadedFiles = uploadedMedia.filter(item => item.source !== 'external');
+            const externalMedia = rewrittenMedia.filter(item => item.source === 'external');
+            const uploadedFiles = rewrittenMedia.filter(item => item.source !== 'external');
             
             const uploadedPhotos: any[] = [];
             
