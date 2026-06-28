@@ -1839,8 +1839,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             if (!m.url.startsWith(blobPrefix)) continue;
             const file = pendingFilesRef.current.get(m.url);
             if (!file) continue;
-            const realUrl = await uploadEntityImage(file, user.id);
-            resolvedUrlByBlob.set(m.url, realUrl);
+            const result = await uploadEntityImage(file, user.id);
+            if (!result?.success || !result.url) {
+              throw new Error(result?.error || 'Upload failed');
+            }
+            resolvedUrlByBlob.set(m.url, result.url);
           }
         } catch (uErr) {
           console.error('Pending upload failed:', uErr);
