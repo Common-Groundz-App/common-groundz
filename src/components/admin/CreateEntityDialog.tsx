@@ -2552,8 +2552,57 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         })()}
         urlMetadata={urlMetadata}
         analyzedUrlSnapshot={predictionUrlSnapshot}
-        onApplyDraft={async (overrides) => {
-          await handleSubmit(overrides);
+        onPrefillForm={async (overrides) => {
+          // Phase 3.2 v6 — Stage 2 "Apply to Form": prefill host form state,
+          // do NOT create the entity. The host form's Save button is the
+          // only entity write path.
+          const patch = overrides.formPatch ?? {};
+          if (patch.type) handleInputChange('type', patch.type);
+          if (patch.name) handleInputChange('name', patch.name);
+          if (patch.description) handleInputChange('description', patch.description);
+          if (patch.website_url) handleInputChange('website_url', patch.website_url);
+          if (patch.category_id !== undefined) handleInputChange('category_id', patch.category_id);
+          if (Array.isArray(overrides.tagsOverride)) {
+            setSelectedTagNames(overrides.tagsOverride);
+          }
+          // Structured columns — merge so we never wipe existing manual edits.
+          if (patch.metadata) {
+            setFormData(prev => ({ ...prev, metadata: { ...prev.metadata, ...patch.metadata, ...overrides.metadataOverride } }));
+          } else if (overrides.metadataOverride && Object.keys(overrides.metadataOverride).length > 0) {
+            setFormData(prev => ({ ...prev, metadata: { ...prev.metadata, ...overrides.metadataOverride } }));
+          }
+          if (patch.cast_crew) setFormData(prev => ({ ...prev, cast_crew: { ...prev.cast_crew, ...patch.cast_crew } }));
+          if (patch.specifications) setFormData(prev => ({ ...prev, specifications: { ...prev.specifications, ...patch.specifications } }));
+          if (patch.price_info) setFormData(prev => ({ ...prev, price_info: { ...prev.price_info, ...patch.price_info } }));
+          if (patch.nutritional_info) setFormData(prev => ({ ...prev, nutritional_info: { ...prev.nutritional_info, ...patch.nutritional_info } }));
+          if (patch.external_ratings) setFormData(prev => ({ ...prev, external_ratings: { ...prev.external_ratings, ...patch.external_ratings } }));
+          if (Array.isArray(patch.authors) && patch.authors.length) setFormData(prev => ({ ...prev, authors: patch.authors! }));
+          if (Array.isArray(patch.languages) && patch.languages.length) setFormData(prev => ({ ...prev, languages: patch.languages! }));
+          if (patch.isbn) setFormData(prev => ({ ...prev, isbn: patch.isbn! }));
+          if (patch.publication_year != null) setFormData(prev => ({ ...prev, publication_year: patch.publication_year! }));
+          if (Array.isArray(patch.ingredients) && patch.ingredients.length) setFormData(prev => ({ ...prev, ingredients: patch.ingredients! }));
+
+          // Parent (brand) — resolved during Stage 1.
+          setSelectedParent(overrides.parentOverride);
+
+          // Primary image — set image_url + add to media gallery + mark primary.
+          const primary = overrides.imageOverride ?? patch.image_url ?? null;
+          if (primary) {
+            handleInputChange('image_url', primary);
+            addImageToMediaGallery(primary, 'ai');
+            setPrimaryMediaUrl(primary);
+          }
+
+          // Mark this URL as the last applied so the analyze-reset guard
+          // doesn't wipe the prefill if the user re-analyzes the same URL.
+          if (predictionUrlSnapshot) {
+            setLastAppliedUrl(normalizeUrlForCompare(predictionUrlSnapshot));
+          }
+
+          toast({
+            title: 'Draft applied',
+            description: 'Review the form and click Save to create the entity.',
+          });
         }}
       />
 
