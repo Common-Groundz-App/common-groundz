@@ -2837,6 +2837,38 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Phase 3.3A-2 — "Did you mean?" pre-insert duplicate dialog */}
+      <DuplicateConfirmDialog
+        open={dupDialogOpen}
+        candidates={dupCandidates}
+        onCancel={() => {
+          setDupDialogOpen(false);
+          pendingSubmitOverridesRef.current = undefined;
+        }}
+        onUseExisting={(c) => {
+          setDupDialogOpen(false);
+          pendingSubmitOverridesRef.current = undefined;
+          toast({
+            title: 'Using existing entity',
+            description: c.name,
+          });
+          onEntityCreated({
+            id: c.id, name: c.name, type: c.type,
+            image_url: c.image_url || undefined,
+          });
+          resetForm();
+          onOpenChange(false);
+        }}
+        onContinueNew={() => {
+          setDupDialogOpen(false);
+          const prev = pendingSubmitOverridesRef.current || {};
+          pendingSubmitOverridesRef.current = undefined;
+          // Re-submit, skipping the duplicate check this time.
+          void handleSubmit({ ...prev, _duplicateConfirmed: true });
+        }}
+      />
     </Dialog>
+
   );
 };
