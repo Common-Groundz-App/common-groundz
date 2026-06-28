@@ -259,7 +259,7 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
   entityDraft = null,
   urlMetadata = null,
   analyzedUrlSnapshot = null,
-  onApplyDraft,
+  onPrefillForm,
 }) => {
   // Request ID is surfaced from V2 success metadata or error envelope.
   const requestId: string | null =
@@ -267,20 +267,25 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
     predictions?.request_id ??
     null;
 
-  // Phase 3.2 — admin draft-driven review branch. Takes precedence over
-  // legacy success/metadata-only branches when the flag is on and a draft
-  // is attached. Never renders during normal operation for non-admins.
-  if (useDraftReview && entityDraft && onApplyDraft) {
+  // Phase 3.2 v6 — Two-stage draft review (Brand → Entity Draft). Takes
+  // precedence over legacy success/metadata-only branches when the flag is
+  // on and a draft is attached. Never renders during normal operation for
+  // non-admins.
+  if (useDraftReview && entityDraft && onPrefillForm) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent
+          className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
               Review draft
             </DialogTitle>
             <DialogDescription>
-              Confirm the brand and primary image before saving.
+              Confirm the brand, then review the entity draft before prefilling the form.
             </DialogDescription>
           </DialogHeader>
           <DraftReviewBody
@@ -289,8 +294,8 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
             urlMetadata={urlMetadata}
             analyzedUrl={analyzedUrlSnapshot}
             onCancel={() => onOpenChange(false)}
-            onApply={async (overrides) => {
-              await onApplyDraft(overrides);
+            onPrefillForm={async (overrides) => {
+              await onPrefillForm(overrides);
               onOpenChange(false);
             }}
           />
