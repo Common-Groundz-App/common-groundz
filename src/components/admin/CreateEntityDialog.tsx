@@ -2642,7 +2642,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           <div className="flex gap-2">
             {isLastTab() ? (
               <Button 
-                onClick={() => handleSubmit()} 
+                onClick={() => handleSubmit({ _fromDraftFlow: prefilledFromDraftRef.current })} 
                 disabled={loading || !isCurrentStepValid}
                 className={`bg-gradient-to-r from-brand-orange to-brand-orange/90 hover:from-brand-orange/90 hover:to-brand-orange text-white shadow-md hover:shadow-lg transition-all duration-300 ${
                   !isCurrentStepValid && "opacity-50 cursor-not-allowed"
