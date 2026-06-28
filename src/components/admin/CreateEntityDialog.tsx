@@ -2638,12 +2638,36 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           // Parent (brand) — resolved during Stage 1.
           setSelectedParent(overrides.parentOverride);
 
-          // Primary image — set image_url + add to media gallery + mark primary.
-          const primary = overrides.imageOverride ?? patch.image_url ?? null;
-          if (primary) {
-            handleInputChange('image_url', primary);
-            addImageToMediaGallery(primary, 'ai');
-            setPrimaryMediaUrl(primary);
+          // Phase 3.3A — handle "No image" first.
+          if (overrides.noImageChosen) {
+            handleInputChange('image_url', '');
+            setPrimaryMediaUrl(null);
+          } else {
+            // Primary image (remote URL or pending blob: preview).
+            const primaryPending = overrides.primaryPending ?? null;
+            const primary = primaryPending
+              ? primaryPending.previewUrl
+              : (overrides.imageOverride ?? patch.image_url ?? null);
+            if (primary) {
+              handleInputChange('image_url', primary);
+              if (primaryPending) {
+                pendingFilesRef.current.set(primaryPending.previewUrl, primaryPending.file);
+                trackedBlobsRef.current.add(primaryPending.previewUrl);
+                // Add primary itself to media list as a pending item.
+                addGalleryToMediaList([], [primaryPending]);
+              } else {
+                addImageToMediaGallery(primary, 'ai');
+              }
+              setPrimaryMediaUrl(primary);
+            }
+            // Gallery (remote + pending) — primary already added above.
+            const galleryRemote = (overrides.galleryOverride ?? [])
+              .filter(u => !primary || u !== primary);
+            const galleryPending = (overrides.pendingUploads ?? [])
+              .filter(p => !primaryPending || p.previewUrl !== primaryPending.previewUrl);
+            if (galleryRemote.length > 0 || galleryPending.length > 0) {
+              addGalleryToMediaList(galleryRemote, galleryPending);
+            }
           }
 
           // Mark this URL as the last applied so the analyze-reset guard
