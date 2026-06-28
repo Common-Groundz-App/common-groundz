@@ -386,11 +386,28 @@ function toTitleCase(s: string): string {
   );
 }
 
-/** Extract a plausible brand from the URL slug. Conservative: the LAST
- *  non-numeric path segment is assumed to be the product slug; brand is
- *  taken as its first 1–2 hyphen tokens (each ≥ 3 chars, alphabetic).
+/** Format a hyphenated slug fragment for display. Short brand-style tokens
+ *  like `axis-y` (each side ≤ 4 chars, alphabetic) → `AXIS-Y`. Anything
+ *  longer → Title Case with spaces. */
+function formatSlugBrand(slugFragment: string): string {
+  const tokens = slugFragment.split(/-+/).filter(Boolean);
+  if (tokens.length === 0) return "";
+  const allShort = tokens.every((t) => t.length <= 4 && /^[a-z][a-z0-9]*$/i.test(t));
+  if (allShort && tokens.length >= 2) {
+    return tokens.map((t) => t.toUpperCase()).join("-");
+  }
+  return toTitleCase(tokens.join(" "));
+}
+
+/** Extract a plausible brand from the URL slug. Two strategies:
+ *  1. If the last non-numeric path segment contains `_`, take the substring
+ *     before the first `_` as the brand slug candidate (e.g.
+ *     `axis-y_dark-spot-...` → `AXIS-Y`). Source = `slug_before_underscore`.
+ *  2. Otherwise take the first 1–2 hyphen tokens as the brand. Source = `slug`.
  *  Returns null for anything ambiguous. */
-function inferBrandFromUrlSlug(inputRef: string): string | null {
+function inferBrandFromUrlSlug(
+  inputRef: string,
+): { name: string; source: "slug" | "slug_before_underscore" } | null {
   try {
     const u = new URL(inputRef);
     const parts = u.pathname.split("/").filter(Boolean);
@@ -400,16 +417,25 @@ function inferBrandFromUrlSlug(inputRef: string): string | null {
       if (!/^\d+$/.test(parts[i])) { slug = parts[i]; break; }
     }
     if (!slug) return null;
-    // Strip trailing -<digits> (often product IDs)
+
+    // Strategy 1: split on first underscore — segment-before-underscore is brand.
+    if (slug.includes("_")) {
+      const head = slug.split("_")[0];
+      const cleaned = head.replace(/^-+|-+$/g, "");
+      if (cleaned && /[a-z]/i.test(cleaned)) {
+        return { name: formatSlugBrand(cleaned), source: "slug_before_underscore" };
+      }
+    }
+
+    // Strategy 2: legacy — first 1–2 hyphen tokens.
     slug = slug.replace(/[-_]\d+$/g, "");
     const tokens = slug.split(/[-_]+/).filter((t) => /^[a-z][a-z0-9]+$/i.test(t));
     if (tokens.length === 0) return null;
     const STOP = new Set(["the", "and", "for", "with", "buy", "shop", "product", "products", "en", "in"]);
     const head = tokens.filter((t) => !STOP.has(t.toLowerCase())).slice(0, 2);
     if (head.length === 0) return null;
-    // Require at least one token ≥ 3 chars to avoid junk
     if (!head.some((t) => t.length >= 3)) return null;
-    return toTitleCase(head.join(" "));
+    return { name: toTitleCase(head.join(" ")), source: "slug" };
   } catch {
     return null;
   }
