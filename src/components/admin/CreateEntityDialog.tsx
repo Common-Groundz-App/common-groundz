@@ -137,6 +137,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [dupCandidates, setDupCandidates] = useState<import('./entity-create/DuplicateConfirmDialog').DuplicateCandidate[]>([]);
   const [dupDialogOpen, setDupDialogOpen] = useState(false);
   const pendingSubmitOverridesRef = useRef<any>(undefined);
+  const prefilledFromDraftRef = useRef<boolean>(false);
   // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
   // by the metadata-only modal as a freshness guard so URL A's metadata never
   // surfaces under URL B.
