@@ -38,6 +38,8 @@ import { SimpleTagInput } from './SimpleTagInput';
 import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
 import { useEntityReviewUsesDraft } from '@/hooks/useEntityReviewUsesDraft';
+import { DuplicateConfirmDialog, type DuplicateCandidate } from './entity-create/DuplicateConfirmDialog';
+import { uploadEntityImage } from '@/services/entityImageService';
 
 interface CreateEntityDialogProps {
   open: boolean;
