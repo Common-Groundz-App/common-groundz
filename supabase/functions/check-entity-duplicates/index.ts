@@ -142,20 +142,20 @@ serve(async (req) => {
     const SELECT = 'id, name, slug, image_url, type, parent_id, website_url, api_source, api_ref, metadata, parent:parent_id(name)';
 
     // 1) Fuzzy name match scoped by type via pg_trgm.
-    const { data: trgmRows } = await supabaseAdmin
-      .rpc('match_entities_by_name', { _name: name, _type: type, _threshold: 0.55, _limit: 8 })
-      .select('*' as any) as any;
-    // Fallback: if RPC isn't available, do a simple ILIKE+similarity using SQL via .from
+    const { data: trgmRows, error: rpcError } = await supabaseAdmin
+      .rpc('match_entities_by_name', { _name: name, _type: type, _threshold: 0.55, _limit: 8 });
     let nameMatches: any[] = Array.isArray(trgmRows) ? trgmRows : [];
+    if (rpcError) console.warn('match_entities_by_name failed, falling back to ILIKE:', rpcError);
     if (nameMatches.length === 0) {
+      const firstWord = name.split(/\s+/)[0] ?? name;
       const { data } = await supabaseAdmin
         .from('entities')
         .select(SELECT)
         .eq('is_deleted', false)
-        .eq('type', type)
-        .ilike('name', `%${name.split(' ')[0] ?? name}%`)
+        .eq('type', type as any)
+        .ilike('name', `%${firstWord}%`)
         .limit(8);
-      nameMatches = data ?? [];
+      nameMatches = (data ?? []).map((r: any) => ({ ...r, similarity: 0.55 }));
     }
     for (const row of nameMatches) {
       const sim = typeof row.similarity === 'number' ? row.similarity : 0.6;

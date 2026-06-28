@@ -4600,6 +4600,27 @@ export type Database = {
         Args: { notification_ids: string[] }
         Returns: string[]
       }
+      match_entities_by_name: {
+        Args: {
+          _limit?: number
+          _name: string
+          _threshold?: number
+          _type: string
+        }
+        Returns: {
+          api_ref: string
+          api_source: string
+          id: string
+          image_url: string
+          metadata: Json
+          name: string
+          parent_id: string
+          similarity: number
+          slug: string
+          type: string
+          website_url: string
+        }[]
+      }
       match_product_relationships: {
         Args: {
           filter_entity_id?: string

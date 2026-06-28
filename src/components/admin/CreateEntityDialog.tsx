@@ -38,6 +38,8 @@ import { SimpleTagInput } from './SimpleTagInput';
 import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
 import { useEntityReviewUsesDraft } from '@/hooks/useEntityReviewUsesDraft';
+import { DuplicateConfirmDialog, type DuplicateCandidate } from './entity-create/DuplicateConfirmDialog';
+import { uploadEntityImage } from '@/services/entityImageService';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -126,6 +128,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   // for a successful AI prediction. Apply handlers read this — never the
   // live analyzeUrl input — so a post-render edit cannot poison apply.
   const [predictionUrlSnapshot, setPredictionUrlSnapshot] = useState<string | null>(null);
+  // Phase 3.3A — pending local uploads. Map<blobUrl, File>. The MediaItem's
+  // `url` is the blob URL until host-form Save resolves it to a real CDN URL.
+  // Tracked by ref so the lookup is sync, plus a Set for blob-revoke lifecycle.
+  const pendingFilesRef = useRef<Map<string, File>>(new Map());
+  const trackedBlobsRef = useRef<Set<string>>(new Set());
+  // Phase 3.3A — duplicate-check state for the pre-insert "Did you mean?" step.
+  const [dupCandidates, setDupCandidates] = useState<import('./entity-create/DuplicateConfirmDialog').DuplicateCandidate[]>([]);
+  const [dupDialogOpen, setDupDialogOpen] = useState(false);
+  const pendingSubmitOverridesRef = useRef<any>(undefined);
+  const prefilledFromDraftRef = useRef<boolean>(false);
   // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
   // by the metadata-only modal as a freshness guard so URL A's metadata never
   // surfaces under URL B.
@@ -753,6 +765,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setContactInfo({});
     setSelectedParent(null);
     setUploadedMedia([]);
+    prefilledFromDraftRef.current = false;
+    trackedBlobsRef.current.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
+    trackedBlobsRef.current.clear();
+    pendingFilesRef.current.clear();
     setShowMediaUploadModal(false);
     setDraftRestored(false);
     setDraftCheckComplete(false);
@@ -825,6 +841,48 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     
     console.log(`🖼️ Added ${source} image to gallery:`, imageUrl);
   };
+
+  // Phase 3.3A — add a batch of remote URLs + pending local uploads as
+  // MediaItems. Pending uploads carry a blob: URL; pendingFilesRef holds the
+  // real File and is consumed at host-form Save time.
+  const addGalleryToMediaList = (
+    remoteUrls: string[],
+    pendingUploads: { file: File; previewUrl: string }[],
+  ) => {
+    const items: MediaItem[] = [];
+    for (const url of remoteUrls) {
+      if (!url) continue;
+      items.push({
+        id: crypto.randomUUID(), url, type: 'image',
+        order: 0, caption: 'AI-extracted', source: 'external',
+      });
+    }
+    for (const pu of pendingUploads) {
+      pendingFilesRef.current.set(pu.previewUrl, pu.file);
+      trackedBlobsRef.current.add(pu.previewUrl);
+      items.push({
+        id: crypto.randomUUID(), url: pu.previewUrl, type: 'image',
+        order: 0, caption: 'User upload (pending)', source: 'external',
+      });
+    }
+    if (items.length === 0) return;
+    setUploadedMedia(prev => {
+      const existing = new Set(prev.map(p => p.url));
+      const additions = items.filter(it => !existing.has(it.url));
+      return [...prev, ...additions.map((it, i) => ({ ...it, order: prev.length + i }))];
+    });
+  };
+
+  // Revoke any tracked blob URLs on unmount as a safety net.
+  useEffect(() => {
+    const tracked = trackedBlobsRef.current;
+    return () => {
+      tracked.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
+      tracked.clear();
+      pendingFilesRef.current.clear();
+    };
+  }, []);
+
 
   // ─── Phase 2 helpers ────────────────────────────────────────────────────
   // Conservative URL normalizer: lowercases hostname, drops a single trailing
@@ -1612,6 +1670,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
      *  for validation, slug generation, and insert. Avoids state races. */
     formPatch?: import('./entity-create/buildEntityFormPatch').EntityFormPatch;
     tagsOverride?: string[];
+    /** Phase 3.3A — set true when the user has already chosen
+     *  "It's different, continue" in the duplicate dialog, so we skip the
+     *  pre-insert duplicate check on this re-submit. */
+    _duplicateConfirmed?: boolean;
+    /** Phase 3.3A — telemetry: marks this submit as coming from URL/draft flow. */
+    _fromDraftFlow?: boolean;
   }) => {
     // Gate submission for user variant
     if (variant === 'user' && !user) {
@@ -1734,6 +1798,85 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     const overridePrimaryImage =
       overrides && 'imageOverride' in overrides ? overrides.imageOverride : undefined;
 
+      // ─── Phase 3.3A-2 — pre-insert duplicate check ───────────────────
+      // Read-only fuzzy-name/website/slug match; only runs once per submit.
+      if (!overrides?._duplicateConfirmed) {
+        try {
+          const { data: dupData, error: dupErr } = await supabase.functions.invoke(
+            'check-entity-duplicates',
+            {
+              body: {
+                name: eff.name.trim(),
+                type: eff.type,
+                parentId: resolvedParent?.id ?? null,
+                websiteUrl: eff.website_url.trim() || null,
+              },
+            }
+          );
+          if (!dupErr && dupData?.candidates?.length > 0) {
+            console.log('🔎 Duplicate candidates found:', dupData.candidates.length);
+            pendingSubmitOverridesRef.current = overrides;
+            setDupCandidates(dupData.candidates as DuplicateCandidate[]);
+            setDupDialogOpen(true);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {
+          console.warn('Duplicate check failed (non-fatal):', e);
+        }
+      }
+
+      // ─── Phase 3.3A-1 — resolve pending uploads (blob:) → CDN URLs ────
+      // Required BEFORE entity insert so entities.image_url is never a blob:.
+      const blobPrefix = 'blob:';
+      const hasPending =
+        uploadedMedia.some(m => m.url.startsWith(blobPrefix)) ||
+        (typeof primaryMediaUrl === 'string' && primaryMediaUrl.startsWith(blobPrefix));
+      const resolvedUrlByBlob = new Map<string, string>();
+      if (hasPending) {
+        if (!user?.id) {
+          toast({ title: 'Sign-in required to upload images', variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
+        try {
+          for (const m of uploadedMedia) {
+            if (!m.url.startsWith(blobPrefix)) continue;
+            const file = pendingFilesRef.current.get(m.url);
+            if (!file) continue;
+            const result = await uploadEntityImage(file, user.id);
+            if (!result?.success || !result.url) {
+              throw new Error(result?.error || 'Upload failed');
+            }
+            resolvedUrlByBlob.set(m.url, result.url);
+          }
+        } catch (uErr) {
+          console.error('Pending upload failed:', uErr);
+          toast({
+            title: 'Image upload failed',
+            description: uErr instanceof Error ? uErr.message : 'Try again.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+      const resolvePrimary = (u: string | null | undefined) =>
+        (u && u.startsWith(blobPrefix) && resolvedUrlByBlob.get(u)) || u || null;
+      const resolvedPrimaryMedia = resolvePrimary(primaryMediaUrl);
+      const resolvedFirstMedia = resolvePrimary(uploadedMedia[0]?.url);
+      const resolvedOverridePrimary = overridePrimaryImage !== undefined
+        ? resolvePrimary(overridePrimaryImage as string | null)
+        : undefined;
+
+    // Phase 3.3A telemetry: stamp creation_source only when invoked from the
+    // URL/draft flow. Manual creations stay 'manual'.
+    const creationSource = overrides?._fromDraftFlow ? 'url' : 'manual';
+    const telemetryStamp: Record<string, unknown> = { creation_source: creationSource };
+    if (overrides?._fromDraftFlow && (analyzeUrl || lastAppliedUrl)) {
+      telemetryStamp.created_from_url = analyzeUrl || lastAppliedUrl;
+    }
+
     const metadata = {
       ...eff.metadata,
       ...overrideMetadata,
@@ -1741,7 +1884,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       contact: contactInfo,
       ...(eff.type === 'others' && otherTypeReason.trim() && {
         other_type_reason: otherTypeReason.trim()
-      })
+      }),
+      ...telemetryStamp,
     };
 
 
@@ -1764,12 +1908,19 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           name: eff.name.trim(),
           type: eff.type as any,
           description: eff.description || null,
-          image_url:
-            (overridePrimaryImage !== undefined ? overridePrimaryImage : null) ||
-            primaryMediaUrl ||
-            uploadedMedia[0]?.url ||
-            eff.image_url.trim() ||
-            null,
+          image_url: (() => {
+            const candidate =
+              (resolvedOverridePrimary !== undefined ? resolvedOverridePrimary : null) ||
+              resolvedPrimaryMedia ||
+              resolvedFirstMedia ||
+              eff.image_url.trim() ||
+              null;
+            // Hard guarantee: never persist blob: URLs.
+            if (typeof candidate === 'string' && candidate.startsWith('blob:')) {
+              throw new Error('Internal: unresolved pending upload reached insert');
+            }
+            return candidate;
+          })(),
           website_url: eff.website_url.trim() || null,
           venue: formData.venue.trim() || null,
           metadata,
@@ -1829,9 +1980,15 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           console.error('No authenticated user for media upload');
         } else {
           try {
+            // Phase 3.3A — rewrite any blob: URLs to their resolved CDN URLs.
+            const rewrittenMedia: MediaItem[] = uploadedMedia.map(m =>
+              m.url.startsWith('blob:') && resolvedUrlByBlob.has(m.url)
+                ? { ...m, url: resolvedUrlByBlob.get(m.url)!, source: 'external' as const }
+                : m
+            );
             // Separate external URLs from uploaded files
-            const externalMedia = uploadedMedia.filter(item => item.source === 'external');
-            const uploadedFiles = uploadedMedia.filter(item => item.source !== 'external');
+            const externalMedia = rewrittenMedia.filter(item => item.source === 'external');
+            const uploadedFiles = rewrittenMedia.filter(item => item.source !== 'external');
             
             const uploadedPhotos: any[] = [];
             
@@ -1907,6 +2064,32 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           }
         }
       }
+
+      // Phase 3.3A-2 — persist suspected duplicate pairs (idempotent).
+      // Only runs if the user clicked "It's different, continue".
+      if (overrides?._duplicateConfirmed && newEntity && dupCandidates.length > 0) {
+        try {
+          const rows = dupCandidates.map(c => ({
+            entity_a_id: newEntity.id,
+            entity_b_id: c.id,
+            similarity_score: c.score,
+            detection_method: (c.reasons[0] || 'fuzzy_name').slice(0, 40),
+            status: 'pending' as const,
+          }));
+          const { error: dupInsErr } = await supabase
+            .from('duplicate_entities')
+            .upsert(rows, { onConflict: 'entity_a_id,entity_b_id,detection_method', ignoreDuplicates: true });
+          if (dupInsErr) console.warn('duplicate_entities persist failed:', dupInsErr);
+        } catch (e) {
+          console.warn('duplicate_entities persist error:', e);
+        }
+        setDupCandidates([]);
+      }
+
+      // Phase 3.3A — revoke blob URLs we created during this submit.
+      trackedBlobsRef.current.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
+      trackedBlobsRef.current.clear();
+      pendingFilesRef.current.clear();
 
       toast({
         title: 'Success',
@@ -2464,7 +2647,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           <div className="flex gap-2">
             {isLastTab() ? (
               <Button 
-                onClick={() => handleSubmit()} 
+                onClick={() => handleSubmit({ _fromDraftFlow: prefilledFromDraftRef.current })} 
                 disabled={loading || !isCurrentStepValid}
                 className={`bg-gradient-to-r from-brand-orange to-brand-orange/90 hover:from-brand-orange/90 hover:to-brand-orange text-white shadow-md hover:shadow-lg transition-all duration-300 ${
                   !isCurrentStepValid && "opacity-50 cursor-not-allowed"
@@ -2553,6 +2736,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         urlMetadata={urlMetadata}
         analyzedUrlSnapshot={predictionUrlSnapshot}
         onPrefillForm={async (overrides) => {
+          prefilledFromDraftRef.current = true;
           // Phase 3.2 v6 — Stage 2 "Apply to Form": prefill host form state,
           // do NOT create the entity. The host form's Save button is the
           // only entity write path.
@@ -2585,12 +2769,36 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           // Parent (brand) — resolved during Stage 1.
           setSelectedParent(overrides.parentOverride);
 
-          // Primary image — set image_url + add to media gallery + mark primary.
-          const primary = overrides.imageOverride ?? patch.image_url ?? null;
-          if (primary) {
-            handleInputChange('image_url', primary);
-            addImageToMediaGallery(primary, 'ai');
-            setPrimaryMediaUrl(primary);
+          // Phase 3.3A — handle "No image" first.
+          if (overrides.noImageChosen) {
+            handleInputChange('image_url', '');
+            setPrimaryMediaUrl(null);
+          } else {
+            // Primary image (remote URL or pending blob: preview).
+            const primaryPending = overrides.primaryPending ?? null;
+            const primary = primaryPending
+              ? primaryPending.previewUrl
+              : (overrides.imageOverride ?? patch.image_url ?? null);
+            if (primary) {
+              handleInputChange('image_url', primary);
+              if (primaryPending) {
+                pendingFilesRef.current.set(primaryPending.previewUrl, primaryPending.file);
+                trackedBlobsRef.current.add(primaryPending.previewUrl);
+                // Add primary itself to media list as a pending item.
+                addGalleryToMediaList([], [primaryPending]);
+              } else {
+                addImageToMediaGallery(primary, 'ai');
+              }
+              setPrimaryMediaUrl(primary);
+            }
+            // Gallery (remote + pending) — primary already added above.
+            const galleryRemote = (overrides.galleryOverride ?? [])
+              .filter(u => !primary || u !== primary);
+            const galleryPending = (overrides.pendingUploads ?? [])
+              .filter(p => !primaryPending || p.previewUrl !== primaryPending.previewUrl);
+            if (galleryRemote.length > 0 || galleryPending.length > 0) {
+              addGalleryToMediaList(galleryRemote, galleryPending);
+            }
           }
 
           // Mark this URL as the last applied so the analyze-reset guard
@@ -2635,6 +2843,38 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Phase 3.3A-2 — "Did you mean?" pre-insert duplicate dialog */}
+      <DuplicateConfirmDialog
+        open={dupDialogOpen}
+        candidates={dupCandidates}
+        onCancel={() => {
+          setDupDialogOpen(false);
+          pendingSubmitOverridesRef.current = undefined;
+        }}
+        onUseExisting={(c) => {
+          setDupDialogOpen(false);
+          pendingSubmitOverridesRef.current = undefined;
+          toast({
+            title: 'Using existing entity',
+            description: c.name,
+          });
+          onEntityCreated({
+            id: c.id, name: c.name, type: c.type,
+            image_url: c.image_url || undefined,
+          });
+          resetForm();
+          onOpenChange(false);
+        }}
+        onContinueNew={() => {
+          setDupDialogOpen(false);
+          const prev = pendingSubmitOverridesRef.current || {};
+          pendingSubmitOverridesRef.current = undefined;
+          // Re-submit, skipping the duplicate check this time.
+          void handleSubmit({ ...prev, _duplicateConfirmed: true, _fromDraftFlow: prefilledFromDraftRef.current });
+        }}
+      />
     </Dialog>
+
   );
 };

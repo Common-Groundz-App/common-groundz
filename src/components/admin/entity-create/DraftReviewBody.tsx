@@ -7,7 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { BrandPicker, BrandDecision } from './BrandPicker';
-import { ImageCandidateGrid, ImageSelection } from './ImageCandidateGrid';
+import { ImageCandidateGrid } from './ImageCandidateGrid';
+import { ImageSelectionV2, PendingUpload } from './types';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import type { EntityDraft } from '@/types/entityDraft';
 import {
@@ -19,6 +20,14 @@ export interface DraftApplyOverrides {
   parentOverride: Entity | null;
   metadataOverride: Record<string, any>;
   imageOverride: string | null;
+  /** Phase 3.3A — multi-select gallery (remote URLs first, primary index 0). */
+  galleryOverride?: string[];
+  /** Phase 3.3A — local files the admin uploaded; resolved at host-form Save. */
+  pendingUploads?: PendingUpload[];
+  /** Phase 3.3A — primary is a local pending upload (not a remote URL). */
+  primaryPending?: PendingUpload | null;
+  /** Phase 3.3A — admin explicitly chose "no image". */
+  noImageChosen?: boolean;
   /** Pure patch computed from predictions + urlMetadata — used by the host
    *  to prefill the form without React-state races. */
   formPatch: EntityFormPatch;
@@ -64,9 +73,12 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   );
   const [resolvedParent, setResolvedParent] = useState<Entity | null>(null);
   const [resolvedBrandMetadata, setResolvedBrandMetadata] = useState<Record<string, any>>({});
-  const [imageSelection, setImageSelection] = useState<ImageSelection>({
+  const [imageSelection, setImageSelection] = useState<ImageSelectionV2>({
     primaryUrl: null,
+    primaryPending: null,
     galleryUrls: [],
+    galleryPending: [],
+    noImageChosen: false,
   });
   const [stage1Busy, setStage1Busy] = useState(false);
   const [stage2Busy, setStage2Busy] = useState(false);
@@ -186,17 +198,31 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
     setStage2Busy(true);
     try {
       const finalPatch: EntityFormPatch = { ...baseFormPatch };
-      const primary =
-        imageSelection.primaryUrl ??
-        draft.imageCandidates[draft.recommendedImageIndex ?? 0]?.url ??
-        baseFormPatch.image_url ??
-        null;
-      if (primary) finalPatch.image_url = primary;
+
+      // Resolve primary: explicit selection > pending upload > default.
+      let primary: string | null = null;
+      if (imageSelection.noImageChosen) {
+        primary = null;
+        delete finalPatch.image_url;
+      } else if (imageSelection.primaryPending) {
+        primary = imageSelection.primaryPending.previewUrl; // blob:, host swaps on Save
+      } else {
+        primary =
+          imageSelection.primaryUrl ??
+          draft.imageCandidates[draft.recommendedImageIndex ?? 0]?.url ??
+          baseFormPatch.image_url ??
+          null;
+      }
+      if (primary && !imageSelection.noImageChosen) finalPatch.image_url = primary;
 
       await onPrefillForm({
         parentOverride: resolvedParent,
         metadataOverride: resolvedBrandMetadata,
-        imageOverride: primary,
+        imageOverride: imageSelection.noImageChosen ? null : primary,
+        galleryOverride: imageSelection.noImageChosen ? [] : imageSelection.galleryUrls,
+        pendingUploads: imageSelection.noImageChosen ? [] : imageSelection.galleryPending,
+        primaryPending: imageSelection.noImageChosen ? null : imageSelection.primaryPending,
+        noImageChosen: imageSelection.noImageChosen,
         formPatch: finalPatch,
         tagsOverride: finalPatch.tags,
       });
