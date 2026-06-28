@@ -73,9 +73,12 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   );
   const [resolvedParent, setResolvedParent] = useState<Entity | null>(null);
   const [resolvedBrandMetadata, setResolvedBrandMetadata] = useState<Record<string, any>>({});
-  const [imageSelection, setImageSelection] = useState<ImageSelection>({
+  const [imageSelection, setImageSelection] = useState<ImageSelectionV2>({
     primaryUrl: null,
+    primaryPending: null,
     galleryUrls: [],
+    galleryPending: [],
+    noImageChosen: false,
   });
   const [stage1Busy, setStage1Busy] = useState(false);
   const [stage2Busy, setStage2Busy] = useState(false);
