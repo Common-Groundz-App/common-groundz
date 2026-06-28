@@ -188,7 +188,7 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
       const finalPatch: EntityFormPatch = { ...baseFormPatch };
       const primary =
         imageSelection.primaryUrl ??
-        (draft.imageCandidates[draft.recommendedImageIndex ?? 0]?.url ?? null) ??
+        draft.imageCandidates[draft.recommendedImageIndex ?? 0]?.url ??
         baseFormPatch.image_url ??
         null;
       if (primary) finalPatch.image_url = primary;
