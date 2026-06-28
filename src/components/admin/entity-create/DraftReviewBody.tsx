@@ -198,17 +198,31 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
     setStage2Busy(true);
     try {
       const finalPatch: EntityFormPatch = { ...baseFormPatch };
-      const primary =
-        imageSelection.primaryUrl ??
-        draft.imageCandidates[draft.recommendedImageIndex ?? 0]?.url ??
-        baseFormPatch.image_url ??
-        null;
-      if (primary) finalPatch.image_url = primary;
+
+      // Resolve primary: explicit selection > pending upload > default.
+      let primary: string | null = null;
+      if (imageSelection.noImageChosen) {
+        primary = null;
+        delete finalPatch.image_url;
+      } else if (imageSelection.primaryPending) {
+        primary = imageSelection.primaryPending.previewUrl; // blob:, host swaps on Save
+      } else {
+        primary =
+          imageSelection.primaryUrl ??
+          draft.imageCandidates[draft.recommendedImageIndex ?? 0]?.url ??
+          baseFormPatch.image_url ??
+          null;
+      }
+      if (primary && !imageSelection.noImageChosen) finalPatch.image_url = primary;
 
       await onPrefillForm({
         parentOverride: resolvedParent,
         metadataOverride: resolvedBrandMetadata,
-        imageOverride: primary,
+        imageOverride: imageSelection.noImageChosen ? null : primary,
+        galleryOverride: imageSelection.noImageChosen ? [] : imageSelection.galleryUrls,
+        pendingUploads: imageSelection.noImageChosen ? [] : imageSelection.galleryPending,
+        primaryPending: imageSelection.noImageChosen ? null : imageSelection.primaryPending,
+        noImageChosen: imageSelection.noImageChosen,
         formPatch: finalPatch,
         tagsOverride: finalPatch.tags,
       });
