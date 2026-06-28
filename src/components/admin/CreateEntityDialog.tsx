@@ -837,6 +837,48 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     console.log(`🖼️ Added ${source} image to gallery:`, imageUrl);
   };
 
+  // Phase 3.3A — add a batch of remote URLs + pending local uploads as
+  // MediaItems. Pending uploads carry a blob: URL; pendingFilesRef holds the
+  // real File and is consumed at host-form Save time.
+  const addGalleryToMediaList = (
+    remoteUrls: string[],
+    pendingUploads: { file: File; previewUrl: string }[],
+  ) => {
+    const items: MediaItem[] = [];
+    for (const url of remoteUrls) {
+      if (!url) continue;
+      items.push({
+        id: crypto.randomUUID(), url, type: 'image',
+        order: 0, caption: 'AI-extracted', source: 'external',
+      });
+    }
+    for (const pu of pendingUploads) {
+      pendingFilesRef.current.set(pu.previewUrl, pu.file);
+      trackedBlobsRef.current.add(pu.previewUrl);
+      items.push({
+        id: crypto.randomUUID(), url: pu.previewUrl, type: 'image',
+        order: 0, caption: 'User upload (pending)', source: 'external',
+      });
+    }
+    if (items.length === 0) return;
+    setUploadedMedia(prev => {
+      const existing = new Set(prev.map(p => p.url));
+      const additions = items.filter(it => !existing.has(it.url));
+      return [...prev, ...additions.map((it, i) => ({ ...it, order: prev.length + i }))];
+    });
+  };
+
+  // Revoke any tracked blob URLs on unmount as a safety net.
+  useEffect(() => {
+    const tracked = trackedBlobsRef.current;
+    return () => {
+      tracked.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
+      tracked.clear();
+      pendingFilesRef.current.clear();
+    };
+  }, []);
+
+
   // ─── Phase 2 helpers ────────────────────────────────────────────────────
   // Conservative URL normalizer: lowercases hostname, drops a single trailing
   // slash on non-root paths, strips the #hash fragment (fragments never
