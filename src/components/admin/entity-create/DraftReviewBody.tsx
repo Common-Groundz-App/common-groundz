@@ -7,7 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { BrandPicker, BrandDecision } from './BrandPicker';
-import { ImageCandidateGrid, ImageSelection } from './ImageCandidateGrid';
+import { ImageCandidateGrid } from './ImageCandidateGrid';
+import { ImageSelectionV2, PendingUpload } from './types';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import type { EntityDraft } from '@/types/entityDraft';
 import {
@@ -19,6 +20,14 @@ export interface DraftApplyOverrides {
   parentOverride: Entity | null;
   metadataOverride: Record<string, any>;
   imageOverride: string | null;
+  /** Phase 3.3A — multi-select gallery (remote URLs first, primary index 0). */
+  galleryOverride?: string[];
+  /** Phase 3.3A — local files the admin uploaded; resolved at host-form Save. */
+  pendingUploads?: PendingUpload[];
+  /** Phase 3.3A — primary is a local pending upload (not a remote URL). */
+  primaryPending?: PendingUpload | null;
+  /** Phase 3.3A — admin explicitly chose "no image". */
+  noImageChosen?: boolean;
   /** Pure patch computed from predictions + urlMetadata — used by the host
    *  to prefill the form without React-state races. */
   formPatch: EntityFormPatch;
