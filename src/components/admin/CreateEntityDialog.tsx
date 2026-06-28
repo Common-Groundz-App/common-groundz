@@ -1665,6 +1665,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
      *  for validation, slug generation, and insert. Avoids state races. */
     formPatch?: import('./entity-create/buildEntityFormPatch').EntityFormPatch;
     tagsOverride?: string[];
+    /** Phase 3.3A — set true when the user has already chosen
+     *  "It's different, continue" in the duplicate dialog, so we skip the
+     *  pre-insert duplicate check on this re-submit. */
+    _duplicateConfirmed?: boolean;
+    /** Phase 3.3A — telemetry: marks this submit as coming from URL/draft flow. */
+    _fromDraftFlow?: boolean;
   }) => {
     // Gate submission for user variant
     if (variant === 'user' && !user) {
