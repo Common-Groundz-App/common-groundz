@@ -765,6 +765,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setContactInfo({});
     setSelectedParent(null);
     setUploadedMedia([]);
+    prefilledFromDraftRef.current = false;
+    trackedBlobsRef.current.forEach(u => { try { URL.revokeObjectURL(u); } catch {} });
+    trackedBlobsRef.current.clear();
+    pendingFilesRef.current.clear();
     setShowMediaUploadModal(false);
     setDraftRestored(false);
     setDraftCheckComplete(false);
