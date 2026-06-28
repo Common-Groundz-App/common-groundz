@@ -1903,12 +1903,19 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           name: eff.name.trim(),
           type: eff.type as any,
           description: eff.description || null,
-          image_url:
-            (overridePrimaryImage !== undefined ? overridePrimaryImage : null) ||
-            primaryMediaUrl ||
-            uploadedMedia[0]?.url ||
-            eff.image_url.trim() ||
-            null,
+          image_url: (() => {
+            const candidate =
+              (resolvedOverridePrimary !== undefined ? resolvedOverridePrimary : null) ||
+              resolvedPrimaryMedia ||
+              resolvedFirstMedia ||
+              eff.image_url.trim() ||
+              null;
+            // Hard guarantee: never persist blob: URLs.
+            if (typeof candidate === 'string' && candidate.startsWith('blob:')) {
+              throw new Error('Internal: unresolved pending upload reached insert');
+            }
+            return candidate;
+          })(),
           website_url: eff.website_url.trim() || null,
           venue: formData.venue.trim() || null,
           metadata,
