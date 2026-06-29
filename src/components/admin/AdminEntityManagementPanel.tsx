@@ -751,6 +751,7 @@ export const AdminEntityManagementPanel = () => {
                       <div>
                         <div className="font-medium flex items-center gap-2">
                           {entity.name}
+                          <EntityApprovalChip status={(entity as any).approval_status} />
                           {entity.is_deleted && (
                             <Badge variant="destructive" className="text-xs">
                               Deleted
