@@ -34,6 +34,7 @@ export const useAdminEntities = () => {
           name,
           type,
           image_url,
+          approval_status,
           ai_dynamic_review_summary,
           ai_dynamic_review_summary_last_generated_at,
           ai_dynamic_review_summary_model_used

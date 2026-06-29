@@ -41,6 +41,7 @@ import { CreateEntityDialog } from './CreateEntityDialog';
 import { AdminEntityPlaceIdTool } from './AdminEntityPlaceIdTool';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { EntityApprovalChip } from './moderation/EntityApprovalChip';
 
 // Constants for bulk operations
 const MAX_BULK_REFRESH = 50; // Limit per run to prevent API abuse
@@ -750,6 +751,7 @@ export const AdminEntityManagementPanel = () => {
                       <div>
                         <div className="font-medium flex items-center gap-2">
                           {entity.name}
+                          <EntityApprovalChip status={(entity as any).approval_status} />
                           {entity.is_deleted && (
                             <Badge variant="destructive" className="text-xs">
                               Deleted

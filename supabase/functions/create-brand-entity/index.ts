@@ -229,7 +229,9 @@ serve(async (req) => {
           image_url: logo || null, website_url: website || null,
           description: description || `${brandName} brand`,
           created_by: userId, // Derived from JWT, not client input
-          user_created: true, approval_status: 'approved',
+          // approval_status intentionally omitted — entities_enforce_creation BEFORE INSERT
+          // trigger is the source of truth (admin → 'approved', else 'pending').
+          user_created: true,
           metadata: {
             auto_created: true, created_from_product_url: sourceUrl,
             creation_method: 'enriched-auto-create',

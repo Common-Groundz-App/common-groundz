@@ -36,6 +36,8 @@ import { TrustSummaryCard } from './TrustSummaryCard';
 import { ReviewsSection } from './ReviewsSection';
 import { EntitySidebar } from './EntitySidebar';
 import { EntityTabsContent } from './EntityTabsContent';
+import { EntityModerationBanner } from '@/components/entity/EntityModerationBanner';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 
@@ -140,6 +142,7 @@ const EntityV4 = () => {
 
   // Fetch circle rating data and user following data
   const { user, isLoading: authLoading } = useAuth();
+  const { isAdmin } = useIsAdmin();
   const { requireAuth } = useAuthPrompt();
   
   // Initialize image refresh hook (queryClient and toast already declared above)
@@ -501,6 +504,20 @@ const EntityV4 = () => {
         {/* Background refetches are now completely silent - no badge shown */}
         
         <div className="min-h-screen bg-gray-50">
+          {/* Moderation banner — only visible to creator or admin */}
+          {entity && (() => {
+            const isCreator = !!user?.id && (entity as any).created_by === user.id;
+            return (
+              <div className="container mx-auto px-4 pt-4">
+                <EntityModerationBanner
+                  approvalStatus={(entity as any).approval_status}
+                  rejectionReason={(entity as any).rejection_reason}
+                  viewerCanSee={isCreator || isAdmin}
+                />
+              </div>
+            );
+          })()}
+
           {/* SECTION 1: Header & Primary Actions */}
           <EntityHeader
             entity={entity}

@@ -9,6 +9,7 @@ import { formatRelativeDate } from '@/utils/dateUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { EntityApprovalChip } from './moderation/EntityApprovalChip';
 
 export const AdminEntitiesPanel = () => {
   const { entities, isLoading, isGenerating, isBulkGenerating, generateEntitySummary, generateBulkEntitySummaries } = useAdminEntities();
@@ -119,6 +120,7 @@ export const AdminEntitiesPanel = () => {
                         <MapPin className="h-3 w-3 mr-1" />
                         {getEntityTypeLabel(entity.type)}
                       </Badge>
+                      <EntityApprovalChip status={(entity as any).approval_status} />
                     </div>
                     
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
