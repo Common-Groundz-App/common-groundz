@@ -21,6 +21,10 @@ import { AdminUserManagementPanel } from '@/components/admin/AdminUserManagement
 import { AdminMediaCleanupPanel } from '@/components/admin/AdminMediaCleanupPanel';
 import { AdminFeatureFlagsPanel } from '@/components/admin/AdminFeatureFlagsPanel';
 import AdminSidebar from '@/components/admin/AdminSidebar';
+import { PendingEntitiesQueue } from '@/components/admin/moderation/PendingEntitiesQueue';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
 
 const AdminPortal = () => {
   const { user } = useAuth();
@@ -140,12 +144,20 @@ const AdminPortal = () => {
     </div>
   );
 
+  const renderModerationContent = () => (
+    <div className="space-y-6">
+      <PendingEntitiesQueue />
+    </div>
+  );
+
   const renderActiveContent = () => {
     switch (activeTab) {
       case 'overview':
         return renderOverviewContent();
       case 'entity-management':
         return renderEntityManagementContent();
+      case 'moderation':
+        return renderModerationContent();
       case 'content-management':
         return renderContentManagementContent();
       case 'suggestions-management':
@@ -164,6 +176,17 @@ const AdminPortal = () => {
         return renderOverviewContent();
     }
   };
+
+  // Pending count for mobile tab badge
+  const { data: pendingCount } = useQuery({
+    queryKey: ['admin-pending-entity-count'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_pending_entity_count');
+      if (error) return 0;
+      return (data as number) ?? 0;
+    },
+    refetchInterval: 60_000,
+  });
 
   return (
     <div className="min-h-screen bg-background">
@@ -220,6 +243,19 @@ const AdminPortal = () => {
                   }`}
                 >
                   Entities
+                </button>
+                <button
+                  onClick={() => setActiveTab('moderation')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+                    activeTab === 'moderation'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Moderation
+                  {pendingCount && pendingCount > 0 ? (
+                    <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">{pendingCount}</Badge>
+                  ) : null}
                 </button>
                 <button
                   onClick={() => setActiveTab('content-management')}

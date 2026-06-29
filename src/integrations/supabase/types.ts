@@ -692,7 +692,9 @@ export type Database = {
           ai_dynamic_review_summary_model_used: string | null
           api_ref: string | null
           api_source: string | null
-          approval_status: string | null
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
           authors: string[] | null
           cast_crew: Json | null
           category_id: string | null
@@ -727,6 +729,9 @@ export type Database = {
           recent_likes_24h: number | null
           recent_recommendations_24h: number | null
           recent_views_24h: number | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           seasonal_boost: number | null
@@ -750,7 +755,9 @@ export type Database = {
           ai_dynamic_review_summary_model_used?: string | null
           api_ref?: string | null
           api_source?: string | null
-          approval_status?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           authors?: string[] | null
           cast_crew?: Json | null
           category_id?: string | null
@@ -785,6 +792,9 @@ export type Database = {
           recent_likes_24h?: number | null
           recent_recommendations_24h?: number | null
           recent_views_24h?: number | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           seasonal_boost?: number | null
@@ -808,7 +818,9 @@ export type Database = {
           ai_dynamic_review_summary_model_used?: string | null
           api_ref?: string | null
           api_source?: string | null
-          approval_status?: string | null
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
           authors?: string[] | null
           cast_crew?: Json | null
           category_id?: string | null
@@ -843,6 +855,9 @@ export type Database = {
           recent_likes_24h?: number | null
           recent_recommendations_24h?: number | null
           recent_views_24h?: number | null
+          rejected_at?: string | null
+          rejected_by?: string | null
+          rejection_reason?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           seasonal_boost?: number | null
@@ -3968,6 +3983,85 @@ export type Database = {
         }
         Returns: boolean
       }
+      admin_moderate_entity: {
+        Args: {
+          _action: string
+          _actor_id: string
+          _entity_id: string
+          _expected_status?: string
+          _reason?: string
+        }
+        Returns: {
+          about_source: string | null
+          about_updated_at: string | null
+          ai_dynamic_review_summary: string | null
+          ai_dynamic_review_summary_last_generated_at: string | null
+          ai_dynamic_review_summary_model_used: string | null
+          api_ref: string | null
+          api_source: string | null
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
+          authors: string[] | null
+          cast_crew: Json | null
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          data_quality_score: number | null
+          description: string | null
+          enrichment_source: string | null
+          external_rating: number | null
+          external_rating_count: number | null
+          external_ratings: Json | null
+          geographic_boost: number | null
+          id: string
+          image_url: string | null
+          ingredients: string[] | null
+          is_claimed: boolean
+          is_deleted: boolean
+          is_verified: boolean | null
+          isbn: string | null
+          languages: string[] | null
+          last_enriched_at: string | null
+          last_trending_update: string | null
+          metadata: Json | null
+          name: string
+          nutritional_info: Json | null
+          open_graph_data: Json | null
+          parent_id: string | null
+          photo_reference: string | null
+          popularity_score: number | null
+          price_info: Json | null
+          publication_year: number | null
+          recent_likes_24h: number | null
+          recent_recommendations_24h: number | null
+          recent_views_24h: number | null
+          rejected_at: string | null
+          rejected_by: string | null
+          rejection_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          seasonal_boost: number | null
+          slug: string | null
+          specifications: Json | null
+          stored_photo_urls: Json | null
+          trending_score: number | null
+          type: Database["public"]["Enums"]["entity_type"]
+          updated_at: string
+          user_created: boolean | null
+          venue: string | null
+          verification_date: string | null
+          view_velocity: number | null
+          website_url: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "entities"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_pending_entity_count: { Args: never; Returns: number }
       calculate_enhanced_trending_score: {
         Args: { p_entity_id: string }
         Returns: number
@@ -4013,6 +4107,14 @@ export type Database = {
       }
       check_admin_permission: {
         Args: { required_permission?: string }
+        Returns: boolean
+      }
+      check_entity_creation_quota: {
+        Args: {
+          _max_pending?: number
+          _user_id: string
+          _window_hours?: number
+        }
         Returns: boolean
       }
       check_entity_save: {
@@ -4583,6 +4685,7 @@ export type Database = {
       is_admin_user: { Args: { user_email: string }; Returns: boolean }
       is_current_user_admin: { Args: never; Returns: boolean }
       is_email_verified: { Args: { check_user_id: string }; Returns: boolean }
+      is_non_admin_entity_creation_enabled: { Args: never; Returns: boolean }
       is_query_fresh: {
         Args: { query_text: string; ttl_hours?: number }
         Returns: boolean
