@@ -41,6 +41,7 @@ import { CreateEntityDialog } from './CreateEntityDialog';
 import { AdminEntityPlaceIdTool } from './AdminEntityPlaceIdTool';
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { EntityApprovalChip } from './moderation/EntityApprovalChip';
 
 // Constants for bulk operations
 const MAX_BULK_REFRESH = 50; // Limit per run to prevent API abuse
