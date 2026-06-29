@@ -1,165 +1,231 @@
-# Phase 3.3A — Final plan (v4, ready to build)
+## Phase 3.3B v7 — Moderation & Rollout Safety Rails (final, ready to build)
 
-Both reviewers approve v3. v4 folds in their three asks and bakes in two schema facts I just verified.
+v7 keeps the entire v6 design and folds in three corrections from the reviewers. No architectural change.
 
-## What changes from v3
-
-1. **Save order locked: upload-first, insert-second (ChatGPT).** On host-form Save the pending-upload flow is strictly:
-   1. Resolve every `pendingUpload` marker into a real CDN URL via `uploadEntityImage(file, userId)`.
-   2. If the primary image is a pending upload, replace `formData.image_url` with the real URL **before** the `entities` insert.
-   3. Insert the entity with the final real `image_url` (never `blob:`, never a marker).
-   4. Insert media rows with the resolved real URLs, primary first.
-   5. Revoke all tracked blob URLs.
-
-   Guard: an `assert` step right before insert verifies `image_url` does not start with `blob:` and no `MediaItem.url` starts with `blob:` — throws a clear error if violated (defense-in-depth).
-
-2. **Idempotent duplicate persistence (ChatGPT).** The post-insert write into `duplicate_entities` uses `INSERT … ON CONFLICT (entity_a_id, entity_b_id, detection_method) DO NOTHING` so retries never surface a unique-violation toast.
-
-3. **Telemetry stamp is conditional (ChatGPT).** `metadata.creation_source` is only set to `'url'` when the entity was created from the URL/draft-review flow (i.e. `analyzedUrl` exists or `lastAppliedUrl` is set). Plain manual creation stamps `'manual'`. Same for `creation_flow` (`'phase_3_draft_review'` vs `'manual_form'`).
-
-4. **Duplicate-pair preflight is a no-op (Codex, verified).** Live query of `duplicate_entities` shows 110 rows and **zero** existing pair/method groups, so `CREATE UNIQUE INDEX` will apply cleanly. The migration still uses `IF NOT EXISTS` for safety.
-
-5. **Acceptance checks switched to before/after snapshots (Codex).** `duplicate_entities.created_at` does exist (verified), but snapshot deltas are more robust and version-proof — using them.
-
-## Implementation order
-
-```text
-3.3A-1   Gallery completion (admin-only)
-3.3A-2   Duplicate check (read-only before insert; persist after insert)
-── STOP — share validation results with user before any 3.3B work ──
-```
+Product model (unchanged, confirmed correct):
+- `approved` → public
+- `pending` → public (creator's first post/review is visible to everyone immediately)
+- `rejected` → hidden from public; creator + admins still see it with reason
+- Moderation is **post-hoc takedown**, never pre-publication gating
 
 ---
 
-## Phase 3.3A-1 — Gallery completion
+### Changes from v6 (the only diffs)
 
-`src/components/admin/entity-create/ImageCandidateGrid.tsx`
-- Re-enable per-tile checkbox; selection model `{ primaryUrl, galleryUrls[] }`.
-- `MAX_MEDIA_ITEMS = 4` total (primary + gallery). Extra checkboxes disabled with helper text.
-- Primary cannot also be in gallery (auto-removed on promote).
-- Dedupe comparison key: exact URL with optional strip of `utm_*`, `fbclid`, `gclid`, `mc_*` **for comparison only**. **Stored URL is always byte-identical** to the source.
-- Source + confidence chips per tile: `Official site` / `Google Images` / `Firecrawl` / `Page metadata` / `User upload`; confidence dot green ≥0.7, amber ≥0.4, grey otherwise.
-- **"Upload your own" tile (Option A):** opens picker → store `File` + `previewUrl = URL.createObjectURL(file)` in component state → append as `{ source: 'user_upload', confidence: 1, pendingUpload: { file, previewUrl } }`. No network call.
-- **"No image" toggle:** clears primary + gallery; sets `noImageChosen=true`.
-- **Blob lifecycle:** track a `Set<string>` of created blob URLs; `URL.revokeObjectURL` on tile remove, "No image" toggle, modal close, component unmount, and after Save resolves.
+**Fix 1 — Trigger `created_by` spoofing (blocker, Codex)**
 
-`DraftReviewBody.tsx`
-- Stage 2 passes `{ imageOverride, galleryOverride: Array<string | PendingUpload>, noImageChosen }` to `onPrefillForm`.
+v6 used `NEW.created_by := COALESCE(NEW.created_by, auth.uid())`. For an authenticated non-admin client that supplies `created_by = '<admin-uuid>'`, COALESCE preserves the spoofed value and the next branch (`has_role(NEW.created_by,'admin')`) auto-approves the row.
 
-`CreateEntityDialog.tsx` — `handlePrefillFromDraft`
-- `imageOverride` → `formData.image_url` (string) or pass-through pending-upload marker.
-- `galleryOverride` → appended to host form's Entity Media area as `MediaItem`s (`source: 'draft_candidate'`), primary at index 0, deduped on exact URL.
-- `noImageChosen=true` → skip image fills entirely.
-- **Zero DB writes, zero storage writes.**
+Restore the safe form: whenever there is an authenticated client session, overwrite unconditionally; only fall back to a client-supplied value when there is no session (service-role path), and require it to be present.
 
-`CreateEntityDialog.tsx` — host-form Save (strict order, per ChatGPT clarification)
-1. **Resolve pending uploads** to real CDN URLs (parallel `Promise.allSettled`).
-2. **Patch `formData.image_url`** if the primary was a pending upload; patch matching `MediaItem.url`s.
-3. **Assert** no remaining `blob:` URLs in `image_url` or media list — throw on violation.
-4. **Insert entity** with final real `image_url`.
-5. **Insert media rows** primary-first, deduped on exact URL.
-6. If any media row insert fails: entity persists, warning toast lists failed URLs, `console.error` for retry (partial-failure handling, not rollback).
-7. **Revoke** every tracked blob URL.
-
-## Phase 3.3A-2 — Duplicate check
-
-**New edge function** `supabase/functions/check-entity-duplicates/index.ts`
-- Input: `{ name, type, parentId?, websiteUrl?, sourceUrl?, slug?, apiSource?, apiRef? }` — **no `brandId`**.
-- Signals → `reasons[]` chips:
-  - `pg_trgm` similarity on `lower(name)` scoped by `type`, threshold 0.55.
-  - Exact `lower(slug)` match on `entities.slug`.
-  - Match in `entity_slug_history.old_slug`.
-  - Same `parent_id` boost.
-  - `website_url` host match.
-  - `metadata->>'created_from_url'` host + path-prefix match against `sourceUrl`.
-  - `(api_source, api_ref)` exact match when both present.
-- Output: `DuplicateCandidate[]` `{ id, name, slug, image_url, type, parent_name?, score, reasons[] }`.
-- **No DB writes** in this function.
-- Admin-only (returns 403 otherwise).
-- Best-effort in-memory per-user rate limit: 30 req/min (acknowledged non-durable in serverless; sufficient for admin-only 3.3A).
-
-**Migration (3.3A-2, schema only — no new tables, no GRANTs needed)**
 ```sql
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
+-- BEFORE INSERT ON public.entities
+IF auth.uid() IS NOT NULL THEN
+  NEW.created_by := auth.uid();   -- client cannot spoof
+END IF;
 
-CREATE INDEX IF NOT EXISTS entities_name_trgm
-  ON public.entities USING gin (lower(name) gin_trgm_ops)
-  WHERE is_deleted = false;
+IF NEW.created_by IS NULL THEN
+  RAISE EXCEPTION 'created_by required' USING ERRCODE = '23502';
+END IF;
 
-CREATE INDEX IF NOT EXISTS entities_lower_name_type
-  ON public.entities (lower(name), type)
-  WHERE is_deleted = false;
+IF public.has_role(NEW.created_by, 'admin') THEN
+  NEW.approval_status := 'approved';
+  NEW.approved_by     := NEW.created_by;
+  NEW.approved_at     := now();
+  NEW.rejection_reason := NULL;
+  NEW.rejected_by      := NULL;
+  NEW.rejected_at      := NULL;
+ELSE
+  NEW.approval_status := 'pending';
+  NEW.approved_by     := NULL;
+  NEW.approved_at     := NULL;
+  NEW.rejection_reason := NULL;
+  NEW.rejected_by      := NULL;
+  NEW.rejected_at      := NULL;
+END IF;
 
--- Preflight verified: 110 rows in duplicate_entities, zero existing pair/method groups,
--- so this applies cleanly. IF NOT EXISTS for safety on re-runs.
-CREATE UNIQUE INDEX IF NOT EXISTS duplicate_entities_pair_method_uniq
-  ON public.duplicate_entities (entity_a_id, entity_b_id, detection_method);
+RETURN NEW;
 ```
 
-**`CreateEntityDialog.handleSubmit`**
-- Before insert: call `check-entity-duplicates`. If matches → inline "Did you mean?" step:
-  - **Use existing** → fire `onSelectExistingEntity({ id, slug, name, type })`. Admin impl = navigate. **Zero writes.**
-  - **It's different, continue** → continue with the upload-first save order above. After successful entity insert, persist one row per shown match with `ON CONFLICT (entity_a_id, entity_b_id, detection_method) DO NOTHING`:
-    ```
-    entity_a_id      = existing match id
-    entity_b_id      = newly created entity id
-    similarity_score = match score
-    detection_method = 'auto_phase33a'
-    status           = 'pending'
-    ```
-  - **Cancel** → close step. **Zero writes.**
-- Stamp `metadata` on insert payload (conditional, per ChatGPT):
-  - URL/draft flow: `{ creation_source: 'url', creation_flow: 'phase_3_draft_review', created_from_url: analyzedUrl, duplicate_candidates_seen: n, duplicate_decision: 'continue_new' | 'no_candidates' }`
-  - Manual flow: `{ creation_source: 'manual', creation_flow: 'manual_form' }` (no duplicate fields).
+Note: service-role edge functions (`create-brand-entity`, `extract-product-relationships`) run with no `auth.uid()`, so the `IF auth.uid() IS NOT NULL` branch is skipped and the explicit `NEW.created_by` they pass is honoured — that is the legitimate "system actor" path validated by the service-role insert audit (step 1 below).
+
+**Fix 2 — Backfill only NULLs, abort on unexpected values (Codex)**
+
+v6 had two conflicting statements: a preflight that aborts on unexpected `approval_status` values, and a backfill that silently rewrote them to `approved`. Drop the silent rewrite; only normalise NULL legacy rows.
+
+```sql
+-- Preflight: abort if any unexpected non-null value exists
+DO $$
+DECLARE bad_count integer;
+BEGIN
+  SELECT count(*) INTO bad_count
+  FROM public.entities
+  WHERE approval_status IS NOT NULL
+    AND approval_status NOT IN ('approved','pending','rejected');
+  IF bad_count > 0 THEN
+    RAISE EXCEPTION 'Aborting: % entities have unexpected approval_status values', bad_count;
+  END IF;
+END $$;
+
+-- Only NULL legacy rows are trusted-converted (current snapshot: 0 nulls)
+UPDATE public.entities
+SET approval_status = 'approved'
+WHERE approval_status IS NULL;
+```
+
+**Fix 3 — Helper grants: drop `anon` (both reviewers)**
+
+`public.is_non_admin_entity_creation_enabled()` reveals a private `entity_creation.*` flag. Anonymous users cannot INSERT anyway, so `anon` does not need it.
+
+```sql
+REVOKE ALL ON FUNCTION public.is_non_admin_entity_creation_enabled() FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.is_non_admin_entity_creation_enabled() TO authenticated, service_role;
+```
+
+**Acceptance check #4 expanded (Codex)**
+Acceptance check #4 now explicitly covers the spoofing attempt: as a non-admin authenticated session, attempt `INSERT … (created_by = '<known-admin-uuid>', approval_status = 'approved')`. Result must be: row inserted with `created_by = auth.uid()` (the caller, not the spoofed admin) and `approval_status = 'pending'`. Verify the spoofed admin uuid does **not** appear anywhere on the row.
 
 ---
 
-## Files
+### Everything else carried forward from v6 (unchanged)
+
+**Trust chain** for moderation — unchanged from v6:
+```text
+client JWT
+  → moderate-entity edge function: supabase.auth.getClaims(token)
+  → edge function verifies has_role(claims.sub, 'admin') via service role
+  → edge function (service-role client) calls admin_moderate_entity_wrapped(_entity_id, _action, _reason, _actor := claims.sub)
+  → wrapper re-checks has_role(_actor, 'admin')
+  → wrapper sets app.moderation_actor_id + app.bypass_approval GUCs (is_local := true)
+  → wrapper calls admin_moderate_entity(_entity_id, _action, _reason)
+  → inner RPC reads GUC, re-verifies admin, UPDATE … RETURNING … INTO, audit row only on real change
+```
+Client-supplied actor is never trusted; the wrapper is callable only by `service_role`.
+
+**RLS on `public.entities`** — unchanged from v6:
+- Preflight `SELECT polname FROM pg_policy WHERE polrelid='public.entities'::regclass AND polcmd='r'`; abort on any unexpected permissive SELECT policy.
+- Drop `Anyone can view non-deleted entities`.
+- `Public sees non-rejected entities`: `is_deleted=false AND approval_status <> 'rejected'`.
+- `Creators see own entities`: `is_deleted=false AND created_by = auth.uid()`.
+- Existing admin ALL policy unchanged.
+- INSERT policy:
+```sql
+CREATE POLICY "Users can create entities" ON public.entities
+  FOR INSERT WITH CHECK (
+    public.has_role(auth.uid(),'admin')
+    OR (
+      auth.uid() IS NOT NULL
+      AND created_by = auth.uid()
+      AND public.is_non_admin_entity_creation_enabled()
+    )
+  );
+```
+
+**Column hardening** — unchanged from v6:
+- `approval_status NOT NULL DEFAULT 'pending'`, CHECK in `('approved','pending','rejected')`.
+- Add `approved_by`, `approved_at`, `rejection_reason`, `rejected_by`, `rejected_at`.
+- Partial index `entities_pending_idx (created_at DESC) WHERE approval_status='pending' AND is_deleted=false`.
+
+**`BEFORE UPDATE` trigger guard** — unchanged from v6 (null-safe cast preserved):
+Protect `approval_status, approved_by, approved_at, rejection_reason, rejected_by, rejected_at, created_by` unless:
+```sql
+public.has_role(auth.uid(),'admin')
+OR (
+  current_setting('app.bypass_approval', true) = 'admin_verified'
+  AND public.has_role(NULLIF(current_setting('app.moderation_actor_id', true), '')::uuid, 'admin')
+)
+```
+
+**Moderation RPCs** — unchanged from v6:
+- `admin_moderate_entity(_entity_id, _action, _reason)` — SECURITY DEFINER, locked `search_path=public`. Reads actor via `NULLIF(current_setting('app.moderation_actor_id', true), '')::uuid`; re-checks admin (raises `42501` if false); validates action; reject requires reason (`22023` if missing); `UPDATE … WHERE approval_status='pending' RETURNING id INTO _changed`; raises `40001` `already_moderated` if NULL; writes `admin_actions` only on success. `REVOKE ALL FROM public, anon, authenticated; GRANT EXECUTE TO service_role`.
+- `admin_moderate_entity_wrapped(_entity_id, _action, _reason, _actor)` — SECURITY DEFINER, locked search_path. Re-checks `has_role(_actor,'admin')`; `set_config('app.moderation_actor_id', _actor::text, true)`; `set_config('app.bypass_approval', 'admin_verified', true)`; calls inner. `REVOKE ALL FROM public, anon, authenticated; GRANT EXECUTE TO service_role`.
+
+**Helper functions** — unchanged from v6 except Fix 3 above:
+- `public.is_non_admin_entity_creation_enabled()` — SECURITY DEFINER, STABLE, locked search_path. **Grants: `authenticated, service_role` only (no `anon`).**
+- `public.admin_pending_entity_count()` — SECURITY DEFINER, returns 0 for non-admins, real count for admins. `GRANT EXECUTE TO authenticated, service_role`.
+- `public.check_entity_creation_quota(_user_id uuid)` — internal guard `auth.uid() = _user_id OR has_role(auth.uid(),'admin')` else raise `forbidden`. `REVOKE ALL FROM public, anon; GRANT EXECUTE TO authenticated, service_role`. Not wired to UI in 3.3B.
+
+**app_config seeds** (ON CONFLICT DO NOTHING) — unchanged:
+- `entity_creation.non_admin_enabled` → `{"enabled": false}`
+- `entity_creation.daily_quota_non_admin` → `{"cap": 5}`
+- Verify `get_public_flags()` does not expose either key.
+
+**Edge function `supabase/functions/moderate-entity/index.ts`** — unchanged from v6:
+- 401 if no Bearer; `getClaims(token)` → 401 on failure
+- Service-role admin gate via `has_role(claims.sub,'admin')` → 403 on false
+- Body schema (zod): `{ entity_id: uuid, action: 'approve'|'reject', reason?: string }`; reject requires non-empty reason
+- Calls `admin_moderate_entity_wrapped(entity_id, action, reason, claims.sub)` via service-role client
+- Error mapping: `forbidden`→403, `already_moderated`→409, `reason_required`/`bad_action`→400
+- Deno tests: 401, 403, 200 first approve, 409 second approve same row, `admin_actions` delta = +1 only
+
+**Admin Moderation UI** — unchanged from v6:
+- New "Moderation" tab inside `AdminPortal.tsx` (no new top-level route)
+- `src/components/admin/moderation/PendingEntitiesQueue.tsx` — single-row approve/reject (no bulk)
+- `src/components/admin/moderation/RejectEntityDialog.tsx` — non-empty reason required
+- `src/components/entity/EntityModerationBanner.tsx`:
+  - Public on pending: render nothing
+  - Creator on pending: "Awaiting review — visible to everyone"
+  - Creator on rejected: banner with `rejection_reason`
+  - Admin on pending: inline Approve / Reject
+- Admin entity list/cards render `Pending` / `Rejected` chips
+- Nav badge fed by `admin_pending_entity_count()`
+- Hooks: `src/hooks/admin/usePendingEntities.ts`, `usePendingEntityCount.ts`
+
+**Out of scope (3.4+)** — unchanged:
+`create-entity-as-user`, bulk moderation, re-approve / un-reject, creator notifications, duplicate-merge UX, public Submit-an-Entity UI.
+
+---
+
+### Implementation order (strict)
+
+1. **Service-role insert audit (BLOCKING).** Read every `entities` insert in `supabase/functions/extract-product-relationships/index.ts` (lines 182, 502, 577). For each:
+   - If a real user actor is in scope → set `created_by = userId`, expected status `approved` (admin) or `pending` (non-admin)
+   - If not → choose explicit strategy: (a) skip insert, (b) stamp a system-admin uuid from `app_config.system_actor.entity_auto_create`, or (c) refactor caller to pass actor
+   - Re-confirm `create-brand-entity` already passes `created_by` (admin actor) and will land as `approved`.
+   - Confirm no other edge function writes to `entities`.
+   - Record the decision per insert site in `.lovable/plan.md` **before** the migration runs.
+2. **Migration** (single file): preflight (NULL-only backfill + abort on unexpected non-null + unexpected SELECT policy check), column hardening, triggers (with Fix 1 form), RLS swap, partial index, 5 functions (`is_non_admin_entity_creation_enabled` with Fix 3 grants, `admin_pending_entity_count`, `check_entity_creation_quota`, `admin_moderate_entity`, `admin_moderate_entity_wrapped`), app_config seeds.
+3. **`moderate-entity` edge function** + Deno tests.
+4. **AdminPortal Moderation tab** + reject dialog + nav badge.
+5. **`EntityModerationBanner`** + admin chips.
+6. Run **all 14 acceptance checks**; share results before any 3.4 work.
+
+### Acceptance checks (14 total, snapshot-based)
+
+Capture `publicCountBefore = count(*) FROM entities WHERE is_deleted=false` as anon before starting.
+
+1. Migration day: anon `publicCountAfter == publicCountBefore`.
+2. Admin rejects 1 pending row → anon count drops by exactly 1; creator still sees row + reason; admin sees row.
+3. Admin creates via `CreateEntityDialog` → row is `approved` immediately.
+4. **Spoofing check (Fix 1):** Flag `false`: simulated non-admin direct insert → RLS 403. Flag `true`: insert succeeds as `pending`; non-admin attempt with `created_by = '<known-admin-uuid>'` and `approval_status = 'approved'` → row persisted with `created_by = auth.uid()` (caller, not the spoofed admin) and `approval_status = 'pending'`; the spoofed admin uuid appears nowhere on the row.
+5. Non-admin `UPDATE approval_status` → trigger blocks, row unchanged.
+6. `moderate-entity` approve → 200, `admin_actions` +1. Second approve same row → 409, `admin_actions` unchanged.
+7. Reject without reason → 400. With reason → row hidden from public, creator banner shows reason.
+8. Direct authenticated `supabase.rpc('admin_moderate_entity', …)` → permission denied. Same for `admin_moderate_entity_wrapped`.
+9. `admin_pending_entity_count()` as non-admin → 0; as admin → real count.
+10. `select get_public_flags()` does **not** expose any `entity_creation.*` key.
+11. Preflight: temporarily add a dummy permissive SELECT policy on an `entities` clone → migration aborts with clear error.
+12. `create-brand-entity` end-to-end (admin) → created brand is `approved`.
+13. `extract-product-relationships` end-to-end against a test product URL → every inserted row has non-null `created_by` and the documented `approval_status` per the audit decision.
+14. Direct authenticated `supabase.rpc('check_entity_creation_quota', { _user_id: '<other-user-uuid>' })` → permission denied; with own uuid → returns count. **Also:** direct anon `supabase.rpc('is_non_admin_entity_creation_enabled')` → permission denied (Fix 3 verification).
+
+### Files
 
 **Add**
-- `supabase/functions/check-entity-duplicates/index.ts`
-- Migration: `pg_trgm` + 2 query indexes + 1 unique index
+- One migration (preflight, columns, triggers, RLS swap, partial index, 5 functions with locked grants, app_config seeds).
+- `supabase/functions/moderate-entity/index.ts` + `index_test.ts`.
+- `src/components/admin/moderation/PendingEntitiesQueue.tsx`
+- `src/components/admin/moderation/RejectEntityDialog.tsx`
+- `src/components/entity/EntityModerationBanner.tsx`
+- `src/hooks/admin/usePendingEntities.ts`, `usePendingEntityCount.ts`
 
 **Edit**
-- `src/components/admin/entity-create/ImageCandidateGrid.tsx`
-- `src/components/admin/entity-create/DraftReviewBody.tsx`
-- `src/components/admin/AutoFillPreviewModal.tsx` (prop pass-through only)
-- `src/components/admin/CreateEntityDialog.tsx` (gallery prefill, upload-first save order, blob-URL assertion, dedupe step, conditional telemetry, `onSelectExistingEntity`)
+- `src/pages/AdminPortal.tsx` — add Moderation tab + badge slot.
+- Admin entity list/card components — Pending/Rejected chips.
+- Entity detail page — mount `EntityModerationBanner`.
+- `supabase/functions/extract-product-relationships/index.ts` — apply audit decisions from step 1.
 
-**Not touched in this pass**
-`entities.approval_status`, RLS, moderation queue, quota function, `PendingReviewBadge`, `App.tsx` routes.
-
----
-
-## Acceptance checks (snapshot-based, per Codex)
-
-Before starting any flow: capture `dupCountBefore = SELECT count(*) FROM duplicate_entities`.
-
-**3.3A-1**
-1. Primary + 2 gallery + 1 local upload → Apply to Form → host form shows 4 media items (primary index 0), `image_url` set, **zero network requests to storage or DB** (verify in network tab).
-2. 5th selection disabled with helper text.
-3. "No image" → primary/gallery cleared, host form skips image fields.
-4. Save with one forced media-row failure → entity persists, warning toast lists the failed URL, the other 3 media rows persist.
-5. **No `blob:` URL anywhere in DB**: `SELECT image_url FROM entities WHERE id=<new>` and `SELECT url FROM entity_photos WHERE entity_id=<new>` — none start with `blob:`.
-6. Signed/transform query params on stored URLs are byte-identical to the source.
-7. After modal close mid-flow with pending uploads → no leaked `blob:` URLs in DevTools memory snapshot.
-
-**3.3A-2**
-8. "Sony XM5" with existing "Sony WH-1000XM5" → "Did you mean?" shows that match. **Use existing** → `onSelectExistingEntity` fires (admin navigates); `dupCountAfter == dupCountBefore`.
-9. **Cancel** → `dupCountAfter == dupCountBefore`.
-10. **Continue creating new** → entity inserted, `dupCountAfter == dupCountBefore + N` (N = matches shown). All new rows have `entity_b_id` = new id and `detection_method='auto_phase33a'`.
-11. Re-running the same continue-new flow with the same entity id → no error (ON CONFLICT DO NOTHING), `dupCountAfter` unchanged from previous step.
-12. Telemetry: URL-flow entity has 5 `metadata` keys (`creation_source='url'`, `creation_flow`, `created_from_url`, `duplicate_candidates_seen`, `duplicate_decision`). Manual-flow entity has only `creation_source='manual'` + `creation_flow='manual_form'`.
-
----
-
-## Phase 3.3B — designed, NOT built in this pass
-
-Captured for continuity; only built after 3.3A acceptance passes and the user explicitly approves.
-
-- **Preflight (must run first):** `SELECT DISTINCT approval_status FROM public.entities;` → normalize anything outside `(pending, approved, rejected, NULL)` → then add CHECK.
-- **3.3B-1:** Reuse `entities.approval_status`. Add CHECK + `approved_at` / `approved_by` / `rejection_reason`. BEFORE INSERT trigger: admin → `'approved'`, else `'pending'`. RLS SELECT: `approval_status='approved' OR created_by=auth.uid() OR has_role(auth.uid(),'admin')`. Status UPDATE admin-only.
-- **3.3B-2:** Moderation queue page, pending badge, quota function + BEFORE INSERT trigger (10/24h non-admin), client precheck for friendly UX. Server trigger is source of truth.
-
-## Out of scope (3.4+)
-Non-admin rollout, Search / Lens / Barcode entry points, full merge-duplicates admin tool, reputation-based auto-approve, bulk approve, public pending visibility with badge.
+**Not touched**
+- `CreateEntityDialog.tsx` (admin-only writer; trigger handles status).
+- `useAppConfig.ts` / `get_public_flags` (creation/quota flags stay private).
+- Any non-admin creation surface (none exists in 3.3B).
