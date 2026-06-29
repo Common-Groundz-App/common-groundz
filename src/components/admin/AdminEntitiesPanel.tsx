@@ -9,6 +9,7 @@ import { formatRelativeDate } from '@/utils/dateUtils';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { EntityApprovalChip } from './moderation/EntityApprovalChip';
 
 export const AdminEntitiesPanel = () => {
   const { entities, isLoading, isGenerating, isBulkGenerating, generateEntitySummary, generateBulkEntitySummaries } = useAdminEntities();
