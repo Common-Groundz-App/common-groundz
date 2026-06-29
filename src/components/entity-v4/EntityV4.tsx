@@ -36,6 +36,8 @@ import { TrustSummaryCard } from './TrustSummaryCard';
 import { ReviewsSection } from './ReviewsSection';
 import { EntitySidebar } from './EntitySidebar';
 import { EntityTabsContent } from './EntityTabsContent';
+import { EntityModerationBanner } from '@/components/entity/EntityModerationBanner';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 
