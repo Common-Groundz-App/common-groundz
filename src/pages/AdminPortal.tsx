@@ -245,6 +245,19 @@ const AdminPortal = () => {
                   Entities
                 </button>
                 <button
+                  onClick={() => setActiveTab('moderation')}
+                  className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-1.5 ${
+                    activeTab === 'moderation'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Moderation
+                  {pendingCount && pendingCount > 0 ? (
+                    <Badge variant="destructive" className="h-5 px-1.5 text-[10px]">{pendingCount}</Badge>
+                  ) : null}
+                </button>
+                <button
                   onClick={() => setActiveTab('content-management')}
                   className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                     activeTab === 'content-management'
