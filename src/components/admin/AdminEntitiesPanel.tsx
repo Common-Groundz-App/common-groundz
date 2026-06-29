@@ -120,6 +120,7 @@ export const AdminEntitiesPanel = () => {
                         <MapPin className="h-3 w-3 mr-1" />
                         {getEntityTypeLabel(entity.type)}
                       </Badge>
+                      <EntityApprovalChip status={(entity as any).approval_status} />
                     </div>
                     
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
