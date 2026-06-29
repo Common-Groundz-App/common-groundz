@@ -1,87 +1,60 @@
+## Phase 3.3B v7.3 — Patch migration
 
-# Phase 3.3B v7.2 — Moderation rails (hardened bypass)
+I agree with both blockers. They're real and match the originally approved plan. Proposing a small patch migration on top of v7.2 (no rollback of what's already live).
 
-Same scope as v7.1, with three security/correctness fixes from review:
+### Change 1: Protect `created_by` in BEFORE UPDATE trigger
 
-1. **Dual-GUC bypass in the BEFORE UPDATE trigger.** The trigger no longer trusts `app.bypass_approval` alone. It also requires `app.moderation_actor_id` to be set to a uuid that `has_role(..., 'admin')` confirms. Closes the failure mode where a future SECURITY DEFINER function accidentally (or maliciously) sets only `app.bypass_approval`.
-2. **`admin_moderate_entity` sets both GUCs.** Before the UPDATE: `set_config('app.bypass_approval','admin_verified', true)` **and** `set_config('app.moderation_actor_id', _actor_id::text, true)`. Both are cleared after the UPDATE.
-3. **CHECK constraint is dropped and recreated**, not "added if missing", so the definition is guaranteed to be exactly `approval_status IN ('approved','pending','rejected')`.
-
-Everything else is unchanged from v7.1 (see [.lovable/plan.md](mem://) for the full text):
-
-- Service-role insert audit: confirmed only `create-brand-entity` inserts into `entities`; no code change needed.
-- Preflight: abort on unexpected `approval_status` values; abort on any unexpected permissive SELECT/ALL policy on `public.entities`.
-- New moderation columns (`approved_by/at`, `rejected_by/at`, `rejection_reason`).
-- Backfill only NULL `approval_status` rows.
-- `DEFAULT 'pending'`, `NOT NULL`, pending-queue partial index, secondary status index.
-- `app_config` flag `entity_creation.non_admin_enabled` + `is_non_admin_entity_creation_enabled()` helper granted only to `authenticated` and `service_role`.
-- BEFORE INSERT trigger forces `created_by := auth.uid()` for client sessions, requires service-role to supply `created_by`, and routes admin vs non-admin to `approved` vs `pending`.
-- `admin_moderate_entity(entity_id, action, actor_id, reason, expected_status)` — service-role only, approve/reject only (no reset), optimistic concurrency, post-hoc takedown allowed, audit row written only on a real status transition.
-- `admin_pending_entity_count()` — admin-only, for the nav badge.
-- `check_entity_creation_quota(...)` — prepared, unused, locked to self-or-admin.
-- RLS swap: public sees approved + pending, never rejected (creator + admins still see their own rejected rows); non-admin INSERT stays blocked behind the flag.
-- Edge function `moderate-entity` with Deno tests (approve, reject-with-reason, missing reason → 400, non-admin → 403, conflict → 409, idempotent no-op writes no audit row).
-- Admin UI: Moderation tab in `AdminPortal`, `PendingEntitiesQueue`, `RejectEntityDialog`, `EntityModerationBanner` (creator/admin only), `EntityApprovalChip` (admin contexts only).
-- Acceptance checks 1–11 unchanged.
-
-## Technical detail for the three changes
-
-**BEFORE UPDATE trigger** (only the bypass block changes):
+Recreate `public.entities_protect_moderation_fields()` so `fields_changed` also detects:
 
 ```sql
-DECLARE
-  bypass_ok    boolean := false;
-  bypass_flag  text;
-  actor_text   text;
-  actor_uuid   uuid;
-BEGIN
-  ...
-  BEGIN
-    bypass_flag := current_setting('app.bypass_approval',     true);
-    actor_text  := current_setting('app.moderation_actor_id', true);
-  EXCEPTION WHEN OTHERS THEN
-    bypass_flag := NULL; actor_text := NULL;
-  END;
-
-  IF bypass_flag = 'admin_verified'
-     AND actor_text IS NOT NULL AND actor_text <> '' THEN
-    BEGIN
-      actor_uuid := actor_text::uuid;
-    EXCEPTION WHEN invalid_text_representation THEN
-      actor_uuid := NULL;
-    END;
-    IF actor_uuid IS NOT NULL AND public.has_role(actor_uuid, 'admin'::public.app_role) THEN
-      bypass_ok := true;
-    END IF;
-  END IF;
-
-  IF NOT (is_admin OR bypass_ok) THEN
-    RAISE EXCEPTION 'insufficient_privilege: moderation fields are admin-only'
-      USING ERRCODE = '42501';
-  END IF;
+OR NEW.created_by IS DISTINCT FROM OLD.created_by
 ```
 
-**`admin_moderate_entity`** (GUC block):
+Same dual-GUC bypass logic, same admin check, same error code. Only the change-detection set widens. Net effect: only admins (or the verified moderation RPC) can alter `created_by`. Closes the spoofing gap on UPDATE that mirrors the INSERT-side fix.
+
+### Change 2: Block `rejected → approved` in `admin_moderate_entity`
+
+Inside the RPC, after loading `current_row` and before the UPDATE, add:
 
 ```sql
-PERFORM set_config('app.bypass_approval',     'admin_verified',     true);
-PERFORM set_config('app.moderation_actor_id', _actor_id::text,      true);
--- ... UPDATE ...
-PERFORM set_config('app.bypass_approval',     '', true);
-PERFORM set_config('app.moderation_actor_id', '', true);
+IF current_row.approval_status = 'rejected' AND _action = 'approve' THEN
+  RAISE EXCEPTION 'invalid_transition: re-approve/un-reject is out of scope for 3.3B'
+    USING ERRCODE = '22023';
+END IF;
 ```
 
-**CHECK constraint**:
+Allowed transitions after this patch:
+- `pending → approved`
+- `pending → rejected`
+- `approved → rejected` (post-hoc takedown — still in scope)
+- `approved → approved` no-op (no audit row)
+- `rejected → rejected` no-op (no audit row)
 
-```sql
-ALTER TABLE public.entities DROP CONSTRAINT IF EXISTS entities_approval_status_check;
-ALTER TABLE public.entities
-  ADD CONSTRAINT entities_approval_status_check
-  CHECK (approval_status IN ('approved','pending','rejected'));
+Blocked:
+- `rejected → approved` → 400 from edge function (mapped via `invalid_transition` substring).
+
+### Edge function tweak
+
+`supabase/functions/moderate-entity/index.ts` already maps `conflict` → 409 and generic errors → 500. Add one more mapping so the new exception surfaces cleanly:
+
+```ts
+if (msg.includes('invalid_transition')) return json(409, { error: msg });
 ```
 
-## Net effect
+(409 fits better than 400 here — it's a state conflict, not a bad request shape.)
 
-No functional behavior change for the happy paths in acceptance checks 1–11; the dual-GUC requirement only matters for hypothetical future paths that try to bypass the trigger. The migration remains a single file, no new RPCs, no schema additions beyond v7.1.
+### No other changes
 
-After approval I'll run the migration, then implement the `moderate-entity` edge function + tests, the AdminPortal Moderation tab, the queue, the reject dialog, and the moderation banner / chip, and post the acceptance-check results before moving to 3.4.
+- No schema changes.
+- No RLS changes.
+- No UI changes — the Moderation queue only shows `pending`, so the blocked transition isn't reachable from the current UI anyway; this is defense-in-depth for the RPC surface.
+- `admin_pending_entity_count`, `check_entity_creation_quota`, INSERT trigger, GUC handling, preflight — all untouched.
+
+### Acceptance checks (delta only)
+
+1. As admin, `UPDATE entities SET created_by = '<other-uuid>' WHERE id = '<mine>'` from a normal client session → `42501 insufficient_privilege`.
+2. Call `admin_moderate_entity(<rejected_id>, 'approve', <admin_uuid>, NULL, 'rejected')` → raises `invalid_transition`, no row mutated, no `admin_actions` row written.
+3. `pending → approved`, `pending → rejected`, `approved → rejected` still succeed and write exactly one audit row each.
+4. `approved → approved` and `rejected → rejected` no-ops still write zero audit rows.
+
+After approval I'll ship the patch migration + the one-line edge function mapping, then re-run the relevant acceptance checks before moving to 3.4.
