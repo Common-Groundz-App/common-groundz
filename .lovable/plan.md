@@ -1,60 +1,50 @@
-## Phase 3.3B v7.3 — Patch migration
+## Phase 3.3B v7.4 — No-op short-circuit + explicit grants
 
-I agree with both blockers. They're real and match the originally approved plan. Proposing a small patch migration on top of v7.2 (no rollback of what's already live).
+Both points are valid. Agree.
 
-### Change 1: Protect `created_by` in BEFORE UPDATE trigger
+### Change A: True no-op short-circuit
 
-Recreate `public.entities_protect_moderation_fields()` so `fields_changed` also detects:
-
-```sql
-OR NEW.created_by IS DISTINCT FROM OLD.created_by
-```
-
-Same dual-GUC bypass logic, same admin check, same error code. Only the change-detection set widens. Net effect: only admins (or the verified moderation RPC) can alter `created_by`. Closes the spoofing gap on UPDATE that mirrors the INSERT-side fix.
-
-### Change 2: Block `rejected → approved` in `admin_moderate_entity`
-
-Inside the RPC, after loading `current_row` and before the UPDATE, add:
+Inside `admin_moderate_entity`, immediately after loading `current_row` and running the `_expected_status` and `invalid_transition` guards — **before** setting any GUC and **before** the UPDATE — short-circuit:
 
 ```sql
-IF current_row.approval_status = 'rejected' AND _action = 'approve' THEN
-  RAISE EXCEPTION 'invalid_transition: re-approve/un-reject is out of scope for 3.3B'
-    USING ERRCODE = '22023';
+IF _action = 'approve' AND current_row.approval_status = 'approved' THEN
+  RETURN current_row;
+END IF;
+
+IF _action = 'reject' AND current_row.approval_status = 'rejected' THEN
+  RETURN current_row;
 END IF;
 ```
 
-Allowed transitions after this patch:
-- `pending → approved`
-- `pending → rejected`
-- `approved → rejected` (post-hoc takedown — still in scope)
-- `approved → approved` no-op (no audit row)
-- `rejected → rejected` no-op (no audit row)
+Effect: `approved → approved` and `rejected → rejected` no longer touch `approved_by/at`, `rejected_by/at`, or `rejection_reason`, and no audit row is written. Matches the originally documented "no audit row on no-op" contract. Changing a rejection reason later, if ever needed, becomes a separate explicit audited action — out of scope for 3.3B.
 
-Blocked:
-- `rejected → approved` → 400 from edge function (mapped via `invalid_transition` substring).
+This also lets us drop the `did_change` variable; the audit `INSERT` becomes unconditional in the remaining code path, since by the time we reach it we know the status really changed.
 
-### Edge function tweak
+### Change B: Re-assert RPC permissions
 
-`supabase/functions/moderate-entity/index.ts` already maps `conflict` → 409 and generic errors → 500. Add one more mapping so the new exception surfaces cleanly:
+After the `CREATE OR REPLACE FUNCTION public.admin_moderate_entity(...)`:
 
-```ts
-if (msg.includes('invalid_transition')) return json(409, { error: msg });
+```sql
+REVOKE ALL ON FUNCTION public.admin_moderate_entity(uuid, text, uuid, text, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.admin_moderate_entity(uuid, text, uuid, text, text)
+  TO service_role;
 ```
 
-(409 fits better than 400 here — it's a state conflict, not a bad request shape.)
+Defensive — Postgres normally preserves grants across `CREATE OR REPLACE`, but restating keeps the surface explicit and grep-able.
 
-### No other changes
+### Nothing else changes
 
-- No schema changes.
-- No RLS changes.
-- No UI changes — the Moderation queue only shows `pending`, so the blocked transition isn't reachable from the current UI anyway; this is defense-in-depth for the RPC surface.
-- `admin_pending_entity_count`, `check_entity_creation_quota`, INSERT trigger, GUC handling, preflight — all untouched.
+- The BEFORE UPDATE trigger update from v7.3 (now also protecting `created_by`) stays as-is.
+- The `rejected → approved` block from v7.3 stays.
+- Dual-GUC bypass, `_expected_status` optimistic-concurrency check, edge function, UI — all untouched.
 
 ### Acceptance checks (delta only)
 
-1. As admin, `UPDATE entities SET created_by = '<other-uuid>' WHERE id = '<mine>'` from a normal client session → `42501 insufficient_privilege`.
-2. Call `admin_moderate_entity(<rejected_id>, 'approve', <admin_uuid>, NULL, 'rejected')` → raises `invalid_transition`, no row mutated, no `admin_actions` row written.
-3. `pending → approved`, `pending → rejected`, `approved → rejected` still succeed and write exactly one audit row each.
-4. `approved → approved` and `rejected → rejected` no-ops still write zero audit rows.
+1. `admin_moderate_entity(<approved_id>, 'approve', <admin>, NULL, NULL)` → returns the row unchanged; `approved_at` is **not** bumped; zero new `admin_actions` rows.
+2. `admin_moderate_entity(<rejected_id>, 'reject', <admin>, 'new reason', NULL)` → returns the row unchanged; `rejection_reason` is **not** overwritten; zero new `admin_actions` rows.
+3. `pending → approved`, `pending → rejected`, `approved → rejected` still write exactly one audit row and update moderation columns.
+4. `rejected → approved` still raises `invalid_transition`.
+5. `SELECT has_function_privilege('authenticated', 'public.admin_moderate_entity(uuid,text,uuid,text,text)', 'EXECUTE')` → `false`.
 
-After approval I'll ship the patch migration + the one-line edge function mapping, then re-run the relevant acceptance checks before moving to 3.4.
+After approval I'll ship the patch migration only — no code or UI changes needed.
