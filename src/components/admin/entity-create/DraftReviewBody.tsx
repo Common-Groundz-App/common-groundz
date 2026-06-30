@@ -88,6 +88,9 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   });
   const [stage1Busy, setStage1Busy] = useState(false);
   const [stage2Busy, setStage2Busy] = useState(false);
+  const [websiteConflict, setWebsiteConflict] = useState<WebsiteConflictInfo | null>(null);
+  const brandPickerRef = useRef<BrandPickerHandle>(null);
+
 
   // Pure patch — stable across renders unless inputs change.
   const baseFormPatch = useMemo<EntityFormPatch>(
