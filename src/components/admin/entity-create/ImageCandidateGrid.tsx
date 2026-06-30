@@ -279,22 +279,26 @@ export const ImageCandidateGrid: React.FC<Props> = ({
             {tiles.map((t) => {
               const primary = isPrimary(t);
               const inGallery = isInGallery(t);
-              const checkboxDisabled = !primary && !inGallery && totalSelected >= MAX_MEDIA_ITEMS;
+              const broken = isBroken(t);
+              const checkboxDisabled =
+                broken || (!primary && !inGallery && totalSelected >= MAX_MEDIA_ITEMS);
               return (
                 <div
                   key={t.key}
                   className={cn(
                     'relative group rounded-md overflow-hidden border-2 transition-all',
-                    primary ? 'border-primary ring-2 ring-primary/20'
-                            : inGallery ? 'border-primary/50'
-                            : 'border-transparent hover:border-muted-foreground/30',
+                    broken ? 'border-destructive/40 opacity-50'
+                      : primary ? 'border-primary ring-2 ring-primary/20'
+                      : inGallery ? 'border-primary/50'
+                      : 'border-transparent hover:border-muted-foreground/30',
                   )}
                 >
                   <button
                     type="button"
-                    onClick={() => setPrimary(t)}
-                    className="block w-full cursor-pointer"
-                    title="Set as primary"
+                    onClick={() => !broken && setPrimary(t)}
+                    disabled={broken}
+                    className={cn('block w-full', broken ? 'cursor-not-allowed' : 'cursor-pointer')}
+                    title={broken ? 'Image unavailable' : 'Set as primary'}
                   >
                     {t.pending ? (
                       <img src={t.url} alt="upload preview" className="aspect-square w-full object-cover bg-muted" />
@@ -302,18 +306,27 @@ export const ImageCandidateGrid: React.FC<Props> = ({
                       <ImageWithFallback
                         src={t.url} alt="Candidate" entityType="product"
                         className="aspect-square w-full object-cover bg-muted"
+                        onError={() => markBroken(t.url)}
                       />
                     )}
                   </button>
 
+                  {broken && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-background/85 text-destructive">
+                        Image unavailable
+                      </span>
+                    </div>
+                  )}
+
                   {/* Top-left badges */}
                   <div className="absolute top-1 left-1 flex flex-col gap-1 pointer-events-none">
-                    {primary && (
+                    {primary && !broken && (
                       <Badge className="text-[10px] px-1.5 py-0 flex items-center gap-0.5">
                         <Star className="h-2.5 w-2.5" /> Primary
                       </Badge>
                     )}
-                    {t.recommended && !primary && (
+                    {t.recommended && !primary && !broken && (
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Suggested</Badge>
                     )}
                   </div>
@@ -323,10 +336,10 @@ export const ImageCandidateGrid: React.FC<Props> = ({
                     <label className={cn(
                       'flex items-center justify-center rounded bg-background/80 backdrop-blur p-0.5',
                       checkboxDisabled && 'opacity-40',
-                    )} title={checkboxDisabled ? `Max ${MAX_MEDIA_ITEMS} images` : 'Add to gallery'}>
+                    )} title={broken ? 'Image unavailable' : checkboxDisabled ? `Max ${MAX_MEDIA_ITEMS} images` : 'Add to gallery'}>
                       <Checkbox
-                        checked={inGallery}
-                        disabled={primary || checkboxDisabled}
+                        checked={inGallery && !broken}
+                        disabled={primary || checkboxDisabled || broken}
                         onCheckedChange={(c) => toggleGallery(t, c === true)}
                       />
                     </label>
