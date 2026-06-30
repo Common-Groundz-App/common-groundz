@@ -64,7 +64,17 @@ serve(async (req) => {
     //       does NOT write. Legacy callers that previously created on
     //       missing must opt-in by passing confirmCreate: true.
     //   - confirmCreate === true → create / restore as before.
-    const { brandName, sourceUrl, logo, website, description, confirmCreate } = await req.json();
+    const {
+      brandName,
+      sourceUrl,
+      logo,
+      website,
+      description,
+      confirmCreate,
+      creationContext,
+      allowWebsiteConflict,
+    } = await req.json();
+
 
     if (!brandName || brandName.length < 2) {
       return new Response(JSON.stringify({ error: 'Valid brand name is required', code: 'INVALID_INPUT' }), {
