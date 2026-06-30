@@ -391,6 +391,83 @@ export function AdminFeatureFlagsPanel() {
         </CardContent>
       </Card>
 
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Plan v10 — Entity creation pipeline switcher */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Entity creation pipeline
+          </CardTitle>
+          <CardDescription>
+            Controls how the Create Entity dialog behaves after Analyze. Switching here
+            replaces the SQL toggle for <code>entity_extraction.review_uses_draft</code>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+            <p className="font-medium mb-1">Currently selected</p>
+            {rows.isLoading ? (
+              <Skeleton className="h-5 w-48" />
+            ) : (
+              <span className="font-medium">
+                {reviewDraftEnabled
+                  ? 'Draft Review — brand created only after confirmation'
+                  : 'Legacy — auto-create brand during Analyze'}
+              </span>
+            )}
+            {reviewDraftRow?.updated_at && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Updated {formatDistanceToNow(new Date(reviewDraftRow.updated_at), { addSuffix: true })}
+                {reviewDraftRow.updated_reason ? ` — “${reviewDraftRow.updated_reason}”` : ''}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Affects: Create Entity dialog (admin), Analyze URL button. Does not change
+              entity visibility or moderation rules.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={rows.isLoading || setFlag.isPending}
+              onClick={() =>
+                reviewDraftEnabled &&
+                setPending({ key: 'entity_extraction.review_uses_draft', nextEnabled: false })
+              }
+              className={`text-left rounded-lg border p-4 transition-colors ${
+                !reviewDraftEnabled ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+              }`}
+            >
+              <p className="font-medium">Legacy — auto-create brand</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Analyze writes the brand immediately and prefills the form. Original behavior.
+              </p>
+            </button>
+            <button
+              type="button"
+              disabled={rows.isLoading || setFlag.isPending}
+              onClick={() =>
+                !reviewDraftEnabled &&
+                setPending({ key: 'entity_extraction.review_uses_draft', nextEnabled: true })
+              }
+              className={`text-left rounded-lg border p-4 transition-colors ${
+                reviewDraftEnabled ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+              }`}
+            >
+              <p className="font-medium">Draft Review — confirm before write</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Analyze returns a draft only. Admin confirms the brand and entity in two stages.
+              </p>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
