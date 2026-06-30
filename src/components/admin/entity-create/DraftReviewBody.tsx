@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -6,15 +6,21 @@ import { Loader2, Sparkles, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from '@/services/recommendation/types';
-import { BrandPicker, BrandDecision } from './BrandPicker';
+import {
+  BrandPicker,
+  type BrandDecision,
+  type BrandPickerHandle,
+  type WebsiteConflictInfo,
+} from './BrandPicker';
 import { ImageCandidateGrid } from './ImageCandidateGrid';
 import { ImageSelectionV2, PendingUpload } from './types';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import type { EntityDraft } from '@/types/entityDraft';
+import type { EntityDraft, BrandCandidate } from '@/types/entityDraft';
 import {
   buildEntityFormPatchFromPredictions,
   type EntityFormPatch,
 } from './buildEntityFormPatch';
+
 
 export interface DraftApplyOverrides {
   parentOverride: Entity | null;
