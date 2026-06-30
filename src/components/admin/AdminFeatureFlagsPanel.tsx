@@ -391,9 +391,7 @@ export function AdminFeatureFlagsPanel() {
         </CardContent>
       </Card>
 
-          </div>
-        </CardContent>
-      </Card>
+
 
       {/* Plan v10 — Entity creation pipeline switcher */}
       <Card>
