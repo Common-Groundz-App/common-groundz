@@ -1,7 +1,7 @@
 // Phase 3.3A-1 — multi-select gallery with source/confidence chips,
 // local-upload tile, and a "No image" toggle. Holds local Files in memory;
 // no storage or DB writes happen here.
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -69,6 +69,12 @@ export const ImageCandidateGrid: React.FC<Props> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Track all blob URLs we create so we can revoke on unmount.
   const blobsRef = useRef<Set<string>>(new Set());
+  // Plan v10 — broken-image tracker. Tiles whose <img onError> fires are
+  // greyed, disabled, and excluded from totalSelected.
+  const [brokenUrls, setBrokenUrls] = useState<Set<string>>(new Set());
+  const markBroken = useCallback((url: string) => {
+    setBrokenUrls((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
+  }, []);
 
   // Seed default primary on first mount only.
   useEffect(() => {
@@ -92,6 +98,30 @@ export const ImageCandidateGrid: React.FC<Props> = ({
       blobsRef.current.clear();
     };
   }, []);
+
+  // Plan v10 — when a broken URL is currently primary or in gallery, fire
+  // one idempotent onChange to remove it. Guarded by a ref so we never loop.
+  const cleanedBrokenRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (brokenUrls.size === 0) return;
+    let next = value;
+    let dirty = false;
+    if (next.primaryUrl && brokenUrls.has(next.primaryUrl) && !cleanedBrokenRef.current.has(next.primaryUrl)) {
+      cleanedBrokenRef.current.add(next.primaryUrl);
+      next = { ...next, primaryUrl: null };
+      dirty = true;
+    }
+    const beforeLen = next.galleryUrls.length;
+    const filtered = next.galleryUrls.filter((u) => {
+      if (brokenUrls.has(u)) { cleanedBrokenRef.current.add(u); return false; }
+      return true;
+    });
+    if (filtered.length !== beforeLen) {
+      next = { ...next, galleryUrls: filtered };
+      dirty = true;
+    }
+    if (dirty) onChange(next);
+  }, [brokenUrls, value, onChange]);
 
   const tiles: Tile[] = [
     ...candidates.map((c, i) => ({
@@ -118,9 +148,12 @@ export const ImageCandidateGrid: React.FC<Props> = ({
       })),
   ];
 
+  const isBroken = (t: Tile) => !t.pending && brokenUrls.has(t.url);
+
   const totalSelected =
-    (value.primaryUrl || value.primaryPending ? 1 : 0) +
-    value.galleryUrls.length + value.galleryPending.length;
+    ((value.primaryUrl && !brokenUrls.has(value.primaryUrl)) || value.primaryPending ? 1 : 0) +
+    value.galleryUrls.filter((u) => !brokenUrls.has(u)).length +
+    value.galleryPending.length;
 
   const isPrimary = (t: Tile) =>
     (t.pending ? value.primaryPending?.previewUrl === t.pending.previewUrl
@@ -246,22 +279,26 @@ export const ImageCandidateGrid: React.FC<Props> = ({
             {tiles.map((t) => {
               const primary = isPrimary(t);
               const inGallery = isInGallery(t);
-              const checkboxDisabled = !primary && !inGallery && totalSelected >= MAX_MEDIA_ITEMS;
+              const broken = isBroken(t);
+              const checkboxDisabled =
+                broken || (!primary && !inGallery && totalSelected >= MAX_MEDIA_ITEMS);
               return (
                 <div
                   key={t.key}
                   className={cn(
                     'relative group rounded-md overflow-hidden border-2 transition-all',
-                    primary ? 'border-primary ring-2 ring-primary/20'
-                            : inGallery ? 'border-primary/50'
-                            : 'border-transparent hover:border-muted-foreground/30',
+                    broken ? 'border-destructive/40 opacity-50'
+                      : primary ? 'border-primary ring-2 ring-primary/20'
+                      : inGallery ? 'border-primary/50'
+                      : 'border-transparent hover:border-muted-foreground/30',
                   )}
                 >
                   <button
                     type="button"
-                    onClick={() => setPrimary(t)}
-                    className="block w-full cursor-pointer"
-                    title="Set as primary"
+                    onClick={() => !broken && setPrimary(t)}
+                    disabled={broken}
+                    className={cn('block w-full', broken ? 'cursor-not-allowed' : 'cursor-pointer')}
+                    title={broken ? 'Image unavailable' : 'Set as primary'}
                   >
                     {t.pending ? (
                       <img src={t.url} alt="upload preview" className="aspect-square w-full object-cover bg-muted" />
@@ -269,18 +306,27 @@ export const ImageCandidateGrid: React.FC<Props> = ({
                       <ImageWithFallback
                         src={t.url} alt="Candidate" entityType="product"
                         className="aspect-square w-full object-cover bg-muted"
+                        onError={() => markBroken(t.url)}
                       />
                     )}
                   </button>
 
+                  {broken && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-background/85 text-destructive">
+                        Image unavailable
+                      </span>
+                    </div>
+                  )}
+
                   {/* Top-left badges */}
                   <div className="absolute top-1 left-1 flex flex-col gap-1 pointer-events-none">
-                    {primary && (
+                    {primary && !broken && (
                       <Badge className="text-[10px] px-1.5 py-0 flex items-center gap-0.5">
                         <Star className="h-2.5 w-2.5" /> Primary
                       </Badge>
                     )}
-                    {t.recommended && !primary && (
+                    {t.recommended && !primary && !broken && (
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0">Suggested</Badge>
                     )}
                   </div>
@@ -290,10 +336,10 @@ export const ImageCandidateGrid: React.FC<Props> = ({
                     <label className={cn(
                       'flex items-center justify-center rounded bg-background/80 backdrop-blur p-0.5',
                       checkboxDisabled && 'opacity-40',
-                    )} title={checkboxDisabled ? `Max ${MAX_MEDIA_ITEMS} images` : 'Add to gallery'}>
+                    )} title={broken ? 'Image unavailable' : checkboxDisabled ? `Max ${MAX_MEDIA_ITEMS} images` : 'Add to gallery'}>
                       <Checkbox
-                        checked={inGallery}
-                        disabled={primary || checkboxDisabled}
+                        checked={inGallery && !broken}
+                        disabled={primary || checkboxDisabled || broken}
                         onCheckedChange={(c) => toggleGallery(t, c === true)}
                       />
                     </label>

@@ -33,6 +33,8 @@ type PendingChange =
   | { key: 'mux.mode'; nextMode: 'live' | 'test' }
   | { key: 'mux.prewarm_enabled'; nextEnabled: boolean }
   | { key: 'entity_extraction.version'; nextVersion: 'v1' | 'v2' }
+  // Plan v10 — pipeline switcher: Legacy auto-create vs. Draft Review.
+  | { key: 'entity_extraction.review_uses_draft'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -83,6 +85,10 @@ export function AdminFeatureFlagsPanel() {
   const extractionVersion: 'v1' | 'v2' =
     extractionRow?.value?.version === 'v2' ? 'v2' : 'v1';
 
+  // Plan v10 — current pipeline value. Default false → legacy auto-create.
+  const reviewDraftRow = rows.data?.find((r) => r.key === 'entity_extraction.review_uses_draft');
+  const reviewDraftEnabled: boolean = reviewDraftRow?.value?.enabled === true;
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
@@ -100,7 +106,11 @@ export function AdminFeatureFlagsPanel() {
             ? pending.nextVersion === 'v2'
               ? 'Switch entity URL extraction to Version 2 (Experimental)?'
               : 'Switch entity URL extraction to Version 1 (Stable)?'
-            : '';
+            : pending?.key === 'entity_extraction.review_uses_draft'
+              ? pending.nextEnabled
+                ? 'Switch to Draft Review pipeline?'
+                : 'Switch back to Legacy auto-create pipeline?'
+              : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -117,9 +127,13 @@ export function AdminFeatureFlagsPanel() {
             : 'Video taps will stop prefetching HLS manifests/segments. Does NOT affect Mux uploads or video playback — only the on-tap prefetch optimization.'
           : pending?.key === 'entity_extraction.version'
             ? pending.nextVersion === 'v2'
-              ? 'The Analyze URL button in Create Entity will route to the experimental analyze-entity-url-v2 function. This is admin-only and may be unstable. V2 is currently a scaffold and returns no AI prefill yet.'
+              ? 'The Analyze URL button in Create Entity will route to the experimental analyze-entity-url-v2 function. This is admin-only and may be unstable.'
               : 'The Analyze URL button in Create Entity will route to the stable analyze-entity-url function (current default behavior).'
-            : '';
+            : pending?.key === 'entity_extraction.review_uses_draft'
+              ? pending.nextEnabled
+                ? 'Analyze will return a draft only. No brand or entity rows are written until the admin explicitly confirms in the two-stage review UI. Use this for safe testing and side-by-side comparison.'
+                : 'Analyze will auto-create the parent brand and prefill the form in one step (legacy behavior). No draft review.'
+              : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -142,10 +156,16 @@ export function AdminFeatureFlagsPanel() {
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'entity_extraction.version') {
         await setFlag.mutateAsync({
           key: 'entity_extraction.version',
           value: { version: pending.nextVersion },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_extraction.review_uses_draft',
+          value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
       }
@@ -365,6 +385,81 @@ export function AdminFeatureFlagsPanel() {
               <p className="font-medium">Version 2 — Experimental</p>
               <p className="text-xs text-muted-foreground mt-1">
                 Calls <code>analyze-entity-url-v2</code>. Currently a scaffold and returns no AI prefill yet.
+              </p>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+
+
+      {/* Plan v10 — Entity creation pipeline switcher */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Entity creation pipeline
+          </CardTitle>
+          <CardDescription>
+            Controls how the Create Entity dialog behaves after Analyze. Switching here
+            replaces the SQL toggle for <code>entity_extraction.review_uses_draft</code>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+            <p className="font-medium mb-1">Currently selected</p>
+            {rows.isLoading ? (
+              <Skeleton className="h-5 w-48" />
+            ) : (
+              <span className="font-medium">
+                {reviewDraftEnabled
+                  ? 'Draft Review — brand created only after confirmation'
+                  : 'Legacy — auto-create brand during Analyze'}
+              </span>
+            )}
+            {reviewDraftRow?.updated_at && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Updated {formatDistanceToNow(new Date(reviewDraftRow.updated_at), { addSuffix: true })}
+                {reviewDraftRow.updated_reason ? ` — “${reviewDraftRow.updated_reason}”` : ''}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Affects: Create Entity dialog (admin), Analyze URL button. Does not change
+              entity visibility or moderation rules.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={rows.isLoading || setFlag.isPending}
+              onClick={() =>
+                reviewDraftEnabled &&
+                setPending({ key: 'entity_extraction.review_uses_draft', nextEnabled: false })
+              }
+              className={`text-left rounded-lg border p-4 transition-colors ${
+                !reviewDraftEnabled ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+              }`}
+            >
+              <p className="font-medium">Legacy — auto-create brand</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Analyze writes the brand immediately and prefills the form. Original behavior.
+              </p>
+            </button>
+            <button
+              type="button"
+              disabled={rows.isLoading || setFlag.isPending}
+              onClick={() =>
+                !reviewDraftEnabled &&
+                setPending({ key: 'entity_extraction.review_uses_draft', nextEnabled: true })
+              }
+              className={`text-left rounded-lg border p-4 transition-colors ${
+                reviewDraftEnabled ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
+              }`}
+            >
+              <p className="font-medium">Draft Review — confirm before write</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Analyze returns a draft only. Admin confirms the brand and entity in two stages.
               </p>
             </button>
           </div>

@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Check, AlertCircle, X } from 'lucide-react';
+import { Check, Plus, AlertTriangle, Loader2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BrandCandidate } from '@/types/entityDraft';
+import { brandDuplicateCheck, type BrandDuplicateMatch } from '@/utils/brandDuplicateCheck';
+import { normalizeBrandName } from '@/utils/brandNormalize';
 
 /**
- * BrandDecision is the explicit, conceptual model returned to the caller.
- * It never calls `create-brand-entity` itself — translation to writes
- * happens in DraftReviewBody.handleApply.
+ * BrandDecision — explicit conceptual model returned to the caller.
+ * Translation to writes happens in DraftReviewBody.handleConfirmBrand
+ * (Stage 1 footer is the ONLY brand-write trigger).
  */
 export type BrandDecision =
   | { kind: 'existing'; entityId: string; candidate: BrandCandidate }
@@ -34,9 +36,9 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
   value,
   onChange,
 }) => {
-  // Track the "pending" create-new candidate awaiting Confirm.
-  const [pendingNew, setPendingNew] = useState<BrandCandidate | null>(null);
-
+  // Plan v10 — grouped sections.
+  const existing = candidates.filter((c) => c.status === 'matched_existing');
+  const suggested = candidates.filter((c) => c.status === 'suggested_new');
   const recommended =
     typeof recommendedIndex === 'number' ? candidates[recommendedIndex] ?? null : null;
 
@@ -49,19 +51,74 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
 
   const handleCandidateClick = (cand: BrandCandidate) => {
     if (cand.status === 'matched_existing' && cand.id) {
-      // Safe to one-click select.
-      setPendingNew(null);
       onChange({ kind: 'existing', entityId: cand.id, candidate: cand });
     } else if (cand.status === 'suggested_new') {
-      // Requires confirm step — never auto-select.
-      onChange(null);
-      setPendingNew(cand);
+      // Plan v10 — no inline confirm step; one click sets the decision.
+      // Footer "Create Brand & Continue" is the sole write trigger.
+      onChange({ kind: 'create_new', candidate: cand });
     }
   };
 
-  if (defaultCollapsedNotApplicable && !value) {
-    onChange({ kind: 'not_applicable' });
-  }
+  // Default to not_applicable when caller requests it (e.g. type === 'brand').
+  useEffect(() => {
+    if (defaultCollapsedNotApplicable && !value) {
+      onChange({ kind: 'not_applicable' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultCollapsedNotApplicable]);
+
+  // ── Manual "Create new brand…" ─────────────────────────────────────────
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualWebsite, setManualWebsite] = useState('');
+  const [manualLogo, setManualLogo] = useState('');
+  const [dupChecking, setDupChecking] = useState(false);
+  const [dupMatches, setDupMatches] = useState<BrandDuplicateMatch[]>([]);
+  const [overrideDup, setOverrideDup] = useState(false);
+  const debounceRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!manualOpen) return;
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    const trimmed = manualName.trim();
+    if (trimmed.length < 2) {
+      setDupMatches([]);
+      setDupChecking(false);
+      return;
+    }
+    setDupChecking(true);
+    debounceRef.current = window.setTimeout(async () => {
+      const matches = await brandDuplicateCheck(trimmed);
+      setDupMatches(matches);
+      setDupChecking(false);
+    }, 350);
+    return () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    };
+  }, [manualName, manualOpen]);
+
+  const exactDup = dupMatches.find((m) => m.isExactNormalized);
+  const trimmed = manualName.trim();
+  const canSubmitManual = trimmed.length >= 2 && (!exactDup || overrideDup);
+
+  const submitManual = () => {
+    if (!canSubmitManual) return;
+    const candidate: BrandCandidate = {
+      name: trimmed,
+      websiteUrl: manualWebsite.trim() || undefined,
+      logoUrl: manualLogo.trim() || undefined,
+      source: 'admin_manual',
+      confidence: 1,
+      reason: 'Entered manually by admin',
+      status: 'suggested_new',
+    };
+    onChange({ kind: 'create_new', candidate });
+    setManualOpen(false);
+  };
+
+  // Highlight manual selection visually when active.
+  const manualSelected =
+    value?.kind === 'create_new' && (value.candidate as BrandCandidate).source === 'admin_manual';
 
   return (
     <div className="space-y-3">
@@ -69,128 +126,294 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
         Brand / Parent
       </Label>
 
-      {candidates.length === 0 && (
-        <p className="text-sm text-muted-foreground">No brand candidates found.</p>
-      )}
-
-      <div className="space-y-2">
-        {candidates.map((cand, idx) => {
-          const selected = isSelected(cand);
-          const isRecommended = recommended === cand;
-          const isMatched = cand.status === 'matched_existing';
-          return (
-            <button
-              key={`${cand.name}-${idx}`}
-              type="button"
-              onClick={() => handleCandidateClick(cand)}
-              className={cn(
-                'w-full text-left rounded-md border p-3 transition-colors',
-                selected
-                  ? 'border-primary bg-primary/5'
-                  : pendingNew === cand
-                    ? 'border-yellow-500 bg-yellow-500/5'
-                    : 'border-border hover:bg-muted/50',
-              )}
-            >
-              <div className="flex items-start gap-3">
-                {cand.logoUrl && (
-                  <img
-                    src={cand.logoUrl}
-                    alt=""
-                    className="h-8 w-8 rounded object-contain bg-muted flex-shrink-0"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium truncate">{cand.name}</p>
-                    {isMatched && (
-                      <Badge variant="secondary" className="text-xs gap-1">
-                        <Check className="h-3 w-3" /> in database
-                      </Badge>
+      {/* ── Existing brands ─────────────────────────────────────────────── */}
+      {existing.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Existing brands ({existing.length})
+          </p>
+          <div className="space-y-2">
+            {existing.map((cand, idx) => {
+              const selected = isSelected(cand);
+              const isRecommended = recommended === cand;
+              return (
+                <button
+                  key={`e-${cand.id ?? cand.name}-${idx}`}
+                  type="button"
+                  onClick={() => handleCandidateClick(cand)}
+                  className={cn(
+                    'w-full text-left rounded-md border p-3 transition-colors',
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:bg-muted/50',
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    {cand.logoUrl ? (
+                      <img
+                        src={cand.logoUrl}
+                        alt=""
+                        className="h-8 w-8 rounded object-contain bg-muted flex-shrink-0"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
+                        }}
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded bg-muted flex-shrink-0" />
                     )}
-                    {cand.status === 'suggested_new' && (
-                      <Badge variant="outline" className="text-xs">new</Badge>
-                    )}
-                    {isRecommended && (
-                      <Badge className="text-xs">recommended</Badge>
-                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium truncate">{cand.name}</p>
+                        <Badge variant="secondary" className="text-xs gap-1">
+                          <Check className="h-3 w-3" /> in database
+                        </Badge>
+                        {isRecommended && <Badge className="text-xs">recommended</Badge>}
+                      </div>
+                      {cand.websiteUrl && (
+                        <p className="text-xs text-muted-foreground truncate" title={cand.websiteUrl}>
+                          {cand.websiteUrl}
+                        </p>
+                      )}
+                      {cand.reason && (
+                        <p className="text-xs text-muted-foreground mt-1">{cand.reason}</p>
+                      )}
+                    </div>
                   </div>
-                  {cand.websiteUrl && (
-                    <p className="text-xs text-muted-foreground truncate" title={cand.websiteUrl}>
-                      {cand.websiteUrl}
-                    </p>
-                  )}
-                  {cand.reason && (
-                    <p className="text-xs text-muted-foreground mt-1">{cand.reason}</p>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {pendingNew && (
-        <Alert>
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Confirm new brand</AlertTitle>
-          <AlertDescription className="space-y-2">
-            <p className="text-xs">
-              No matching brand was found for <strong>{pendingNew.name}</strong>. Create it as a
-              new brand entity?
-            </p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => {
-                  onChange({ kind: 'create_new', candidate: pendingNew });
-                }}
-              >
-                Confirm create
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setPendingNew(null);
-                  onChange(null);
-                }}
-              >
-                <X className="h-4 w-4 mr-1" /> Cancel
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
+                </button>
+              );
+            })}
+          </div>
+        </div>
       )}
 
+      {/* ── Suggested new brands ────────────────────────────────────────── */}
+      {suggested.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Suggested new brand{suggested.length > 1 ? 's' : ''}
+          </p>
+          <div className="space-y-2">
+            {suggested.map((cand, idx) => {
+              const selected = isSelected(cand);
+              return (
+                <button
+                  key={`s-${cand.name}-${idx}`}
+                  type="button"
+                  onClick={() => handleCandidateClick(cand)}
+                  className={cn(
+                    'w-full text-left rounded-md border p-3 transition-colors',
+                    selected
+                      ? 'border-primary bg-primary/5'
+                      : 'border-border hover:bg-muted/50',
+                  )}
+                >
+                  <div className="flex items-start gap-3">
+                    {cand.logoUrl ? (
+                      <img
+                        src={cand.logoUrl}
+                        alt=""
+                        className="h-8 w-8 rounded object-contain bg-muted flex-shrink-0"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
+                        }}
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded bg-muted flex-shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium truncate">{cand.name}</p>
+                        <Badge variant="outline" className="text-xs">new</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Inferred from URL — confirm to create.
+                      </p>
+                      {cand.websiteUrl && (
+                        <p className="text-xs text-muted-foreground truncate" title={cand.websiteUrl}>
+                          {cand.websiteUrl}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {candidates.length === 0 && !manualOpen && (
+        <p className="text-sm text-muted-foreground">
+          No brand candidates were detected. Create one manually or skip below.
+        </p>
+      )}
+
+      {/* ── Manual create form ──────────────────────────────────────────── */}
+      {!manualOpen ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setManualOpen(true);
+            onChange(null);
+          }}
+          className={cn(manualSelected && 'border-primary bg-primary/5')}
+        >
+          <Plus className="h-4 w-4 mr-1" /> Create new brand…
+        </Button>
+      ) : (
+        <div className="rounded-md border p-3 space-y-3 bg-muted/30">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Create new brand</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setManualOpen(false);
+                setManualName('');
+                setManualWebsite('');
+                setManualLogo('');
+                setDupMatches([]);
+                setOverrideDup(false);
+              }}
+              className="h-7 px-2"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Brand name *</Label>
+            <Input
+              value={manualName}
+              onChange={(e) => {
+                setManualName(e.target.value);
+                setOverrideDup(false);
+              }}
+              placeholder="e.g. AXIS-Y"
+              autoFocus
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="space-y-2">
+              <Label className="text-xs">Website (optional)</Label>
+              <Input
+                value={manualWebsite}
+                onChange={(e) => setManualWebsite(e.target.value)}
+                placeholder="https://"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Logo URL (optional)</Label>
+              <Input
+                value={manualLogo}
+                onChange={(e) => setManualLogo(e.target.value)}
+                placeholder="https://"
+              />
+            </div>
+          </div>
+
+          {/* Duplicate-check feedback */}
+          {dupChecking && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Loader2 className="h-3 w-3 animate-spin" /> Checking for duplicates…
+            </p>
+          )}
+          {!dupChecking && dupMatches.length > 0 && (
+            <div className="rounded border border-amber-500/40 bg-amber-500/5 p-2 space-y-2">
+              <p className="text-xs font-medium flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                {exactDup
+                  ? `"${exactDup.name}" already exists`
+                  : `${dupMatches.length} possibly matching brand${dupMatches.length > 1 ? 's' : ''} found`}
+              </p>
+              <ul className="space-y-1">
+                {dupMatches.slice(0, 4).map((m) => (
+                  <li key={m.id} className="flex items-center gap-2 text-xs">
+                    {m.image_url && (
+                      <img
+                        src={m.image_url}
+                        alt=""
+                        className="h-5 w-5 rounded object-contain bg-muted flex-shrink-0"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
+                        }}
+                      />
+                    )}
+                    <span className="truncate flex-1">{m.name}</span>
+                    <button
+                      type="button"
+                      className="text-primary hover:underline"
+                      onClick={() => {
+                        const cand: BrandCandidate = {
+                          id: m.id,
+                          name: m.name,
+                          logoUrl: m.image_url ?? undefined,
+                          websiteUrl: m.website_url ?? undefined,
+                          source: 'existing_entity',
+                          confidence: m.isExactNormalized ? 0.95 : 0.6,
+                          reason: 'Selected from duplicate check',
+                          status: 'matched_existing',
+                        };
+                        onChange({ kind: 'existing', entityId: m.id, candidate: cand });
+                        setManualOpen(false);
+                      }}
+                    >
+                      Use this
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {exactDup && (
+                <label className="flex items-center gap-2 text-xs cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={overrideDup}
+                    onChange={(e) => setOverrideDup(e.target.checked)}
+                  />
+                  Create anyway
+                </label>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              size="sm"
+              onClick={submitManual}
+              disabled={!canSubmitManual || dupChecking}
+            >
+              Use this brand
+            </Button>
+          </div>
+          {manualSelected && (
+            <p className="text-[11px] text-muted-foreground">
+              Selected — click "Create Brand &amp; Continue" below to create it.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Catch-alls ──────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2 pt-1">
         <Button
           size="sm"
           variant={value?.kind === 'not_sure' ? 'default' : 'outline'}
-          onClick={() => {
-            setPendingNew(null);
-            onChange({ kind: 'not_sure' });
-          }}
+          onClick={() => onChange({ kind: 'not_sure' })}
         >
           Not sure
         </Button>
         <Button
           size="sm"
           variant={value?.kind === 'not_listed' ? 'default' : 'outline'}
-          onClick={() => {
-            setPendingNew(null);
-            onChange({ kind: 'not_listed' });
-          }}
+          onClick={() => onChange({ kind: 'not_listed' })}
         >
           Brand not listed
         </Button>
         <Button
           size="sm"
           variant={value?.kind === 'not_applicable' ? 'default' : 'outline'}
-          onClick={() => {
-            setPendingNew(null);
-            onChange({ kind: 'not_applicable' });
-          }}
+          onClick={() => onChange({ kind: 'not_applicable' })}
         >
           Not applicable
         </Button>

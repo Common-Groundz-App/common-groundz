@@ -20,7 +20,9 @@ export type CandidateSource =
   | 'page_metadata'
   | 'ai_inference'
   | 'existing_entity'
-  | 'user_upload';
+  | 'user_upload'
+  // Plan v10 — manual "Create new brand…" entry from BrandPicker.
+  | 'admin_manual';
 
 export type BrandStatus =
   | 'matched_existing'
