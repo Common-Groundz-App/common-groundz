@@ -124,9 +124,12 @@ export const ImageCandidateGrid: React.FC<Props> = ({
       })),
   ];
 
+  const isBroken = (t: Tile) => !t.pending && brokenUrls.has(t.url);
+
   const totalSelected =
-    (value.primaryUrl || value.primaryPending ? 1 : 0) +
-    value.galleryUrls.length + value.galleryPending.length;
+    ((value.primaryUrl && !brokenUrls.has(value.primaryUrl)) || value.primaryPending ? 1 : 0) +
+    value.galleryUrls.filter((u) => !brokenUrls.has(u)).length +
+    value.galleryPending.length;
 
   const isPrimary = (t: Tile) =>
     (t.pending ? value.primaryPending?.previewUrl === t.pending.previewUrl
