@@ -414,7 +414,7 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
           <Button variant="outline" onClick={onCancel} disabled={stage1Busy}>
             Cancel
           </Button>
-          <Button onClick={handleConfirmBrand} disabled={!brandDecision || stage1Busy}>
+          <Button onClick={handleConfirmBrand} disabled={!brandDecision || stage1Busy || !!websiteConflict}>
             {stage1Busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {confirmLabel}
           </Button>
