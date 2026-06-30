@@ -117,29 +117,123 @@ try {
   console.error("[analyze-entity-url-v2] entityDraft schema import FAILED — fix before merge", e);
 }
 
+import { normalizeBrandName } from "../_shared/brand_normalize.ts";
+import { slugifyBrandName } from "../_shared/brand_slug.ts";
+import { brandTokens } from "../_shared/brand_tokens.ts";
+
+// Plan v10 — Existing-brand matching (backend, service-role) — RPC-free.
+//
+// Filters on EVERY query:    type='brand' AND is_deleted=false AND approval_status<>'rejected'.
+// All result sets capped at LIMIT 50. JS normalization runs in-memory.
+//
+// Steps:
+//  1. Slug exact via slugifyBrandName(name).
+//  2. (website match handled at call site if a brand site is known — not here.)
+//  3. Tokenized capped fetch + JS normalized compare (firstToken length>=3).
+//  4. Normalized-prefix capped fetch (per ChatGPT) — interleaved ILIKE on the
+//     first 3 chars of normalizeBrandName(name) so collapsed inputs like
+//     "axisy" still match a row stored as "AXIS-Y" / slug "axis-y".
+//  5. Plain ILIKE fallback if steps 1+3+4 all empty.
+//
+// Short-token guard: if no token has length>=3 AND normalized name has length<3,
+// step 3 and the normalized-prefix path are skipped — rely on slug + plain ILIKE.
 async function lookupExistingBrandMatches(
   client: ReturnType<typeof createClient>,
   brandName: string | null,
 ): Promise<ExistingBrandMatch[]> {
-  if (!brandName || brandName.length < 2) return [];
-  try {
-    const slugLike = brandName.toLowerCase().replace(/\s+/g, "-");
-    const { data, error } = await client
-      .from("entities")
-      .select("id, name, image_url, slug, website_url")
-      .eq("type", "brand")
-      .eq("is_deleted", false)
-      .or(`name.ilike.%${brandName}%,slug.ilike.%${slugLike}%`)
-      .limit(5);
-    if (error) {
-      console.warn("[analyze-entity-url-v2] brand lookup error (non-fatal):", error.message);
+  if (!brandName || brandName.trim().length < 2) return [];
+  const name = brandName.trim();
+  const normalized = normalizeBrandName(name);
+  const slug = slugifyBrandName(name);
+  const tokens = brandTokens(name);
+  const firstLongToken = tokens.find((t) => t.length >= 3) ?? null;
+
+  const collected = new Map<string, ExistingBrandMatch>();
+  const baseSelect = "id, name, image_url, slug, website_url";
+
+  async function fetchCapped(orClause: string): Promise<ExistingBrandMatch[]> {
+    try {
+      const { data, error } = await client
+        .from("entities")
+        .select(baseSelect)
+        .eq("type", "brand")
+        .eq("is_deleted", false)
+        .neq("approval_status", "rejected")
+        .or(orClause)
+        .limit(50);
+      if (error) {
+        console.warn("[analyze-entity-url-v2] brand lookup error (non-fatal):", error.message);
+        return [];
+      }
+      return (data ?? []) as ExistingBrandMatch[];
+    } catch (e) {
+      console.warn("[analyze-entity-url-v2] brand lookup threw (non-fatal):", String(e));
       return [];
     }
-    return (data ?? []) as ExistingBrandMatch[];
-  } catch (e) {
-    console.warn("[analyze-entity-url-v2] brand lookup threw (non-fatal):", String(e));
-    return [];
   }
+
+  // Step 1 — slug exact.
+  if (slug) {
+    try {
+      const { data, error } = await client
+        .from("entities")
+        .select(baseSelect)
+        .eq("type", "brand")
+        .eq("is_deleted", false)
+        .neq("approval_status", "rejected")
+        .eq("slug", slug)
+        .limit(5);
+      if (!error && data) {
+        for (const row of data as ExistingBrandMatch[]) collected.set(row.id, row);
+      }
+    } catch (e) {
+      console.warn("[analyze-entity-url-v2] slug-exact lookup threw (non-fatal):", String(e));
+    }
+  }
+
+  // Step 3 — tokenized capped fetch + JS normalized compare.
+  if (firstLongToken) {
+    const safe = firstLongToken.replace(/[%,()]/g, "");
+    if (safe.length >= 3) {
+      const rows = await fetchCapped(`name.ilike.%${safe}%,slug.ilike.%${safe}%`);
+      for (const row of rows) {
+        if (
+          normalizeBrandName(row.name ?? "") === normalized ||
+          (row.slug && normalizeBrandName(row.slug) === normalized)
+        ) {
+          collected.set(row.id, row);
+        }
+      }
+    }
+  }
+
+  // Step 4 — normalized-prefix capped fetch (per ChatGPT). Interleave the first
+  // 3 chars of the normalized name with `%` so `axi` matches `AXIS-Y` whose
+  // name contains those chars in order even with separators.
+  if (normalized.length >= 3) {
+    const p = normalized.slice(0, 3).split("").map((c) => c.replace(/[%,()]/g, ""));
+    if (p.every((c) => c.length === 1)) {
+      const pattern = `%${p[0]}%${p[1]}%${p[2]}%`;
+      const rows = await fetchCapped(`name.ilike.${pattern},slug.ilike.${pattern}`);
+      for (const row of rows) {
+        if (
+          normalizeBrandName(row.name ?? "") === normalized ||
+          (row.slug && normalizeBrandName(row.slug) === normalized)
+        ) {
+          collected.set(row.id, row);
+        }
+      }
+    }
+  }
+
+  // Step 5 — plain ILIKE fallback when nothing else hit. Top 3, fuzzy display.
+  if (collected.size === 0 && firstLongToken) {
+    const safe = firstLongToken.replace(/[%,()]/g, "");
+    const rows = await fetchCapped(`name.ilike.%${safe}%,slug.ilike.%${safe}%`);
+    for (const row of rows.slice(0, 3)) collected.set(row.id, row);
+  }
+
+  return Array.from(collected.values()).slice(0, 5);
 }
 
 /** Build + validate the entityDraft. Never throws — returns a tri-state
