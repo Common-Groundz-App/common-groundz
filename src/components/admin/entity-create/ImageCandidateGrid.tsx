@@ -1,7 +1,7 @@
 // Phase 3.3A-1 — multi-select gallery with source/confidence chips,
 // local-upload tile, and a "No image" toggle. Holds local Files in memory;
 // no storage or DB writes happen here.
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
