@@ -33,6 +33,8 @@ type PendingChange =
   | { key: 'mux.mode'; nextMode: 'live' | 'test' }
   | { key: 'mux.prewarm_enabled'; nextEnabled: boolean }
   | { key: 'entity_extraction.version'; nextVersion: 'v1' | 'v2' }
+  // Plan v10 — pipeline switcher: Legacy auto-create vs. Draft Review.
+  | { key: 'entity_extraction.review_uses_draft'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
