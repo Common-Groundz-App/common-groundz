@@ -99,6 +99,30 @@ export const ImageCandidateGrid: React.FC<Props> = ({
     };
   }, []);
 
+  // Plan v10 — when a broken URL is currently primary or in gallery, fire
+  // one idempotent onChange to remove it. Guarded by a ref so we never loop.
+  const cleanedBrokenRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (brokenUrls.size === 0) return;
+    let next = value;
+    let dirty = false;
+    if (next.primaryUrl && brokenUrls.has(next.primaryUrl) && !cleanedBrokenRef.current.has(next.primaryUrl)) {
+      cleanedBrokenRef.current.add(next.primaryUrl);
+      next = { ...next, primaryUrl: null };
+      dirty = true;
+    }
+    const beforeLen = next.galleryUrls.length;
+    const filtered = next.galleryUrls.filter((u) => {
+      if (brokenUrls.has(u)) { cleanedBrokenRef.current.add(u); return false; }
+      return true;
+    });
+    if (filtered.length !== beforeLen) {
+      next = { ...next, galleryUrls: filtered };
+      dirty = true;
+    }
+    if (dirty) onChange(next);
+  }, [brokenUrls, value, onChange]);
+
   const tiles: Tile[] = [
     ...candidates.map((c, i) => ({
       key: `r-${i}-${c.url}`,
