@@ -329,8 +329,6 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   };
 
 
-    }
-  };
 
   // ─── Stage 2: prefill the host form ───────────────────────────────────
   const handlePrefill = async () => {
