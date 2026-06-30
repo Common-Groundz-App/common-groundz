@@ -69,6 +69,12 @@ export const ImageCandidateGrid: React.FC<Props> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Track all blob URLs we create so we can revoke on unmount.
   const blobsRef = useRef<Set<string>>(new Set());
+  // Plan v10 — broken-image tracker. Tiles whose <img onError> fires are
+  // greyed, disabled, and excluded from totalSelected.
+  const [brokenUrls, setBrokenUrls] = useState<Set<string>>(new Set());
+  const markBroken = useCallback((url: string) => {
+    setBrokenUrls((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
+  }, []);
 
   // Seed default primary on first mount only.
   useEffect(() => {
