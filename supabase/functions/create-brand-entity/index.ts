@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { normalizeBrandName } from '../_shared/brand_normalize.ts';
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,7 +64,17 @@ serve(async (req) => {
     //       does NOT write. Legacy callers that previously created on
     //       missing must opt-in by passing confirmCreate: true.
     //   - confirmCreate === true → create / restore as before.
-    const { brandName, sourceUrl, logo, website, description, confirmCreate } = await req.json();
+    const {
+      brandName,
+      sourceUrl,
+      logo,
+      website,
+      description,
+      confirmCreate,
+      creationContext,
+      allowWebsiteConflict,
+    } = await req.json();
+
 
     if (!brandName || brandName.length < 2) {
       return new Response(JSON.stringify({ error: 'Valid brand name is required', code: 'INVALID_INPUT' }), {
@@ -103,7 +115,41 @@ serve(async (req) => {
         .maybeSingle();
 
       if (brandByWebsite) {
-        if (brandByWebsite.is_deleted) {
+        const normalizedSubmitted = normalizeBrandName(brandName);
+        const normalizedExisting = normalizeBrandName(brandByWebsite.name || '');
+        const namesMatch = normalizedSubmitted === normalizedExisting && normalizedSubmitted.length > 0;
+        const isManualDraftReview = creationContext === 'draft_review_manual';
+
+        // Plan v3.1 — name-mismatch gate. If the submitted name differs from the
+        // brand already owning this website AND admin came through the manual
+        // draft-review form, never silently hijack: return website_conflict so
+        // the admin can decide (Clear website / Use existing brand / Create anyway).
+        if (!namesMatch && isManualDraftReview && allowWebsiteConflict !== true) {
+          console.log(`🛡️ brand_dedup_website_conflict_returned: submitted="${brandName}" existing="${brandByWebsite.name}" website="${website}"`);
+          return new Response(JSON.stringify({
+            success: true,
+            status: 'website_conflict',
+            candidate: {
+              id: brandByWebsite.id,
+              name: brandByWebsite.name,
+              slug: brandByWebsite.slug,
+              image_url: brandByWebsite.image_url,
+              website_url: brandByWebsite.website_url,
+            },
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
+
+        // If we get here under draft_review_manual + allowWebsiteConflict=true with name mismatch,
+        // skip the website-hijack entirely and fall through to slug + insert below.
+        if (!namesMatch && isManualDraftReview && allowWebsiteConflict === true) {
+          console.log(`🟡 brand_dedup_skipped_website_under_confirm: submitted="${brandName}" existing="${brandByWebsite.name}" website="${website}"`);
+          // do NOT return — fall through past this block.
+        } else if (brandByWebsite.is_deleted) {
+          // Soft-deleted restore — only when names match OR we are in legacy/suggested-new
+          // (i.e. NOT draft_review_manual with name mismatch, which was already handled above).
+          if (!namesMatch && isManualDraftReview) {
+            // Already handled above; cannot reach here.
+          }
           if (!shouldWrite) {
             console.log(`🛡️ Soft-deleted brand by website found, confirmCreate=false → confirm_required`);
             return new Response(JSON.stringify({
@@ -145,6 +191,7 @@ serve(async (req) => {
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         }
       }
+
     }
 
     // Step 1.6: Check for soft-deleted brand by name

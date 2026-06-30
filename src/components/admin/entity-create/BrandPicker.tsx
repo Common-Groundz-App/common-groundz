@@ -1,13 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Check, Plus, AlertTriangle, Loader2, X } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Check, Plus, AlertTriangle, Loader2, X, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BrandCandidate } from '@/types/entityDraft';
 import { brandDuplicateCheck, type BrandDuplicateMatch } from '@/utils/brandDuplicateCheck';
-import { normalizeBrandName } from '@/utils/brandNormalize';
 
 /**
  * BrandDecision — explicit conceptual model returned to the caller.
@@ -21,22 +27,61 @@ export type BrandDecision =
   | { kind: 'not_listed' }
   | { kind: 'not_applicable' };
 
+export interface WebsiteConflictInfo {
+  candidate: {
+    id: string;
+    name: string;
+    slug?: string | null;
+    image_url?: string | null;
+    website_url?: string | null;
+  };
+  submittedName: string;
+  submittedWebsite: string;
+}
+
+export interface BrandPickerHandle {
+  clearManualWebsite: () => void;
+}
+
 interface BrandPickerProps {
   candidates: BrandCandidate[];
   recommendedIndex?: number;
   defaultCollapsedNotApplicable?: boolean;
   value: BrandDecision | null;
   onChange: (decision: BrandDecision | null) => void;
+  /** Plan v3.1 — when set, the manual form area renders a blocking conflict alert. */
+  websiteConflict?: WebsiteConflictInfo | null;
+  onClearWebsite?: () => void;
+  onUseExistingFromConflict?: () => void;
+  onCreateAnyway?: () => void;
 }
 
-export const BrandPicker: React.FC<BrandPickerProps> = ({
-  candidates,
-  recommendedIndex,
-  defaultCollapsedNotApplicable = false,
-  value,
-  onChange,
-}) => {
-  // Plan v10 — grouped sections.
+/** Empty is valid; otherwise must parse as http(s) URL. */
+function isValidOptionalUrl(value: string): boolean {
+  const v = value.trim();
+  if (!v) return true;
+  try {
+    const u = new URL(v);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(function BrandPicker(
+  {
+    candidates,
+    recommendedIndex,
+    defaultCollapsedNotApplicable = false,
+    value,
+    onChange,
+    websiteConflict = null,
+    onClearWebsite,
+    onUseExistingFromConflict,
+    onCreateAnyway,
+  },
+  ref,
+) {
   const existing = candidates.filter((c) => c.status === 'matched_existing');
   const suggested = candidates.filter((c) => c.status === 'suggested_new');
   const recommended =
@@ -53,13 +98,10 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
     if (cand.status === 'matched_existing' && cand.id) {
       onChange({ kind: 'existing', entityId: cand.id, candidate: cand });
     } else if (cand.status === 'suggested_new') {
-      // Plan v10 — no inline confirm step; one click sets the decision.
-      // Footer "Create Brand & Continue" is the sole write trigger.
       onChange({ kind: 'create_new', candidate: cand });
     }
   };
 
-  // Default to not_applicable when caller requests it (e.g. type === 'brand').
   useEffect(() => {
     if (defaultCollapsedNotApplicable && !value) {
       onChange({ kind: 'not_applicable' });
@@ -76,6 +118,21 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
   const [dupMatches, setDupMatches] = useState<BrandDuplicateMatch[]>([]);
   const [overrideDup, setOverrideDup] = useState(false);
   const debounceRef = useRef<number | null>(null);
+
+  // Plan v3.1 — track original name; first divergence clears stale URLs once.
+  const originalNameRef = useRef<string>('');
+  const staleClearedRef = useRef(false);
+
+  // Expose imperative clearManualWebsite for the Clear-website conflict action.
+  useImperativeHandle(
+    ref,
+    () => ({
+      clearManualWebsite: () => {
+        setManualWebsite('');
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
     if (!manualOpen) return;
@@ -98,13 +155,50 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
   }, [manualName, manualOpen]);
 
   const exactDup = dupMatches.find((m) => m.isExactNormalized);
-  const trimmed = manualName.trim();
-  const canSubmitManual = trimmed.length >= 2 && (!exactDup || overrideDup);
+  const trimmedName = manualName.trim();
+  const websiteValid = isValidOptionalUrl(manualWebsite);
+  const logoValid = isValidOptionalUrl(manualLogo);
+  const canSubmitManual =
+    trimmedName.length >= 2 &&
+    websiteValid &&
+    logoValid &&
+    (!exactDup || overrideDup);
 
-  const submitManual = () => {
-    if (!canSubmitManual) return;
+  // Plan v3.1 — first time name diverges from the name when form opened,
+  // clear stale website/logo exactly once.
+  useEffect(() => {
+    if (!manualOpen) return;
+    if (staleClearedRef.current) return;
+    if (trimmedName && trimmedName !== originalNameRef.current) {
+      if (manualWebsite || manualLogo) {
+        setManualWebsite('');
+        setManualLogo('');
+      }
+      staleClearedRef.current = true;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trimmedName, manualOpen]);
+
+  // Plan v3.1 — live-sync the manual decision so the parent footer enables
+  // without requiring the inner "Use typed brand" click.
+  const lastSyncedRef = useRef<string>('');
+  useEffect(() => {
+    if (!manualOpen) return;
+    const syncKey = `${trimmedName}|${manualWebsite.trim()}|${manualLogo.trim()}|${overrideDup ? '1' : '0'}|${exactDup?.id ?? ''}`;
+    if (!canSubmitManual) {
+      // If currently-active decision is the manual one, clear it.
+      if (
+        value?.kind === 'create_new' &&
+        (value.candidate as BrandCandidate).source === 'admin_manual'
+      ) {
+        onChange(null);
+        lastSyncedRef.current = '';
+      }
+      return;
+    }
+    if (syncKey === lastSyncedRef.current) return;
     const candidate: BrandCandidate = {
-      name: trimmed,
+      name: trimmedName,
       websiteUrl: manualWebsite.trim() || undefined,
       logoUrl: manualLogo.trim() || undefined,
       source: 'admin_manual',
@@ -113,12 +207,49 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
       status: 'suggested_new',
     };
     onChange({ kind: 'create_new', candidate });
-    setManualOpen(false);
+    lastSyncedRef.current = syncKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canSubmitManual, manualOpen, trimmedName, manualWebsite, manualLogo, overrideDup, exactDup?.id]);
+
+  // Inner "Use typed brand" shortcut — same as live-sync but explicit + closes form.
+  const submitManual = () => {
+    if (!canSubmitManual) return;
+    const candidate: BrandCandidate = {
+      name: trimmedName,
+      websiteUrl: manualWebsite.trim() || undefined,
+      logoUrl: manualLogo.trim() || undefined,
+      source: 'admin_manual',
+      confidence: 1,
+      reason: 'Entered manually by admin',
+      status: 'suggested_new',
+    };
+    onChange({ kind: 'create_new', candidate });
   };
 
-  // Highlight manual selection visually when active.
   const manualSelected =
     value?.kind === 'create_new' && (value.candidate as BrandCandidate).source === 'admin_manual';
+
+  const openManual = () => {
+    setManualOpen(true);
+    originalNameRef.current = manualName.trim();
+    staleClearedRef.current = false;
+    // Don't clobber an existing active decision: leave value alone.
+  };
+
+  const closeManual = () => {
+    setManualOpen(false);
+    setManualName('');
+    setManualWebsite('');
+    setManualLogo('');
+    setDupMatches([]);
+    setOverrideDup(false);
+    originalNameRef.current = '';
+    staleClearedRef.current = false;
+    if (manualSelected) {
+      onChange(null);
+      lastSyncedRef.current = '';
+    }
+  };
 
   return (
     <div className="space-y-3">
@@ -253,10 +384,7 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
         <Button
           variant="outline"
           size="sm"
-          onClick={() => {
-            setManualOpen(true);
-            onChange(null);
-          }}
+          onClick={openManual}
           className={cn(manualSelected && 'border-primary bg-primary/5')}
         >
           <Plus className="h-4 w-4 mr-1" /> Create new brand…
@@ -268,14 +396,7 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setManualOpen(false);
-                setManualName('');
-                setManualWebsite('');
-                setManualLogo('');
-                setDupMatches([]);
-                setOverrideDup(false);
-              }}
+              onClick={closeManual}
               className="h-7 px-2"
             >
               <X className="h-3.5 w-3.5" />
@@ -301,7 +422,13 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
                 value={manualWebsite}
                 onChange={(e) => setManualWebsite(e.target.value)}
                 placeholder="https://"
+                className={cn(!websiteValid && 'border-destructive focus-visible:ring-destructive')}
               />
+              {!websiteValid && (
+                <p className="text-[11px] text-destructive">
+                  Enter a valid http(s) URL or leave blank.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label className="text-xs">Logo URL (optional)</Label>
@@ -309,7 +436,13 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
                 value={manualLogo}
                 onChange={(e) => setManualLogo(e.target.value)}
                 placeholder="https://"
+                className={cn(!logoValid && 'border-destructive focus-visible:ring-destructive')}
               />
+              {!logoValid && (
+                <p className="text-[11px] text-destructive">
+                  Enter a valid http(s) URL or leave blank.
+                </p>
+              )}
             </div>
           </div>
 
@@ -359,7 +492,7 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
                         setManualOpen(false);
                       }}
                     >
-                      Use this
+                      Use existing brand
                     </button>
                   </li>
                 ))}
@@ -377,16 +510,52 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
             </div>
           )}
 
+          {/* Plan v3.1 — Website conflict alert (blocking) */}
+          {websiteConflict && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="space-y-2">
+                <p className="text-xs">
+                  The website <span className="font-mono">{websiteConflict.submittedWebsite}</span> already
+                  belongs to brand <strong>{websiteConflict.candidate.name}</strong>. Choose how to proceed:
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onClearWebsite}
+                  >
+                    Clear website
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onUseExistingFromConflict}
+                  >
+                    Use existing brand
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={onCreateAnyway}
+                  >
+                    Create anyway
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex justify-end gap-2 pt-1">
             <Button
               size="sm"
               onClick={submitManual}
               disabled={!canSubmitManual || dupChecking}
             >
-              Use this brand
+              Use typed brand
             </Button>
           </div>
-          {manualSelected && (
+          {manualSelected && !websiteConflict && (
             <p className="text-[11px] text-muted-foreground">
               Selected — click "Create Brand &amp; Continue" below to create it.
             </p>
@@ -420,4 +589,4 @@ export const BrandPicker: React.FC<BrandPickerProps> = ({
       </div>
     </div>
   );
-};
+});

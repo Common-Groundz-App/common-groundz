@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -6,15 +6,21 @@ import { Loader2, Sparkles, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from '@/services/recommendation/types';
-import { BrandPicker, BrandDecision } from './BrandPicker';
+import {
+  BrandPicker,
+  type BrandDecision,
+  type BrandPickerHandle,
+  type WebsiteConflictInfo,
+} from './BrandPicker';
 import { ImageCandidateGrid } from './ImageCandidateGrid';
 import { ImageSelectionV2, PendingUpload } from './types';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import type { EntityDraft } from '@/types/entityDraft';
+import type { EntityDraft, BrandCandidate } from '@/types/entityDraft';
 import {
   buildEntityFormPatchFromPredictions,
   type EntityFormPatch,
 } from './buildEntityFormPatch';
+
 
 export interface DraftApplyOverrides {
   parentOverride: Entity | null;
@@ -82,6 +88,9 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   });
   const [stage1Busy, setStage1Busy] = useState(false);
   const [stage2Busy, setStage2Busy] = useState(false);
+  const [websiteConflict, setWebsiteConflict] = useState<WebsiteConflictInfo | null>(null);
+  const brandPickerRef = useRef<BrandPickerHandle>(null);
+
 
   // Pure patch — stable across renders unless inputs change.
   const baseFormPatch = useMemo<EntityFormPatch>(
@@ -107,9 +116,82 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
       ? 'Create Brand & Continue'
       : 'Confirm Brand & Continue';
 
+  /** Shared brand-create call. Returns the resolved Entity on success, or null
+   *  if the caller should not advance (toast already shown, or conflict surfaced). */
+  const createBrandViaEdgeFn = async (
+    candidate: BrandCandidate,
+    options: { websiteOverride?: string | null; allowWebsiteConflict?: boolean } = {},
+  ): Promise<Entity | null> => {
+    const websiteToSend =
+      options.websiteOverride !== undefined
+        ? options.websiteOverride
+        : candidate.websiteUrl ?? null;
+    const isManualDraftReview = candidate.source === 'admin_manual';
+    const { data, error } = await supabase.functions.invoke('create-brand-entity', {
+      body: {
+        brandName: candidate.name,
+        sourceUrl: draft.inputRef,
+        logo: candidate.logoUrl ?? null,
+        website: websiteToSend,
+        description: candidate.reason ?? null,
+        confirmCreate: true,
+        ...(isManualDraftReview ? { creationContext: 'draft_review_manual' } : {}),
+        ...(options.allowWebsiteConflict ? { allowWebsiteConflict: true } : {}),
+      },
+    });
+
+    // Plan v3.1 — status-first branching. Conflicts must NOT be treated as success.
+    if (data?.status === 'website_conflict') {
+      setWebsiteConflict({
+        candidate: data.candidate,
+        submittedName: candidate.name,
+        submittedWebsite: websiteToSend || '',
+      });
+      return null;
+    }
+    if (data?.status === 'confirm_required') {
+      // Defensive — current flow always sends confirmCreate:true, but surface clearly.
+      toast({
+        title: 'Confirmation required',
+        description: 'The brand needs explicit confirmation. Please try again.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+    if (error || !data?.success || !data?.brandEntity) {
+      toast({
+        title: 'Brand creation failed',
+        description: error?.message || 'Could not create the new brand.',
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    const created = data.brandEntity;
+    return {
+      id: created.id,
+      name: created.name,
+      type: EntityType.Brand,
+      image_url: created.image_url,
+      slug: created.slug,
+      description: created.description,
+      website_url: created.website_url,
+      metadata: created.metadata || {},
+    } as unknown as Entity;
+  };
+
+  const advanceToStage2 = (parent: Entity | null, metaPatch: Record<string, any>) => {
+    if (parent) delete metaPatch.brand_status;
+    setResolvedParent(parent);
+    setResolvedBrandMetadata(metaPatch);
+    setWebsiteConflict(null);
+    setStage('entity');
+  };
+
   const handleConfirmBrand = async () => {
     if (!brandDecision || stage1Busy) return;
     setStage1Busy(true);
+    setWebsiteConflict(null);
     try {
       let parent: Entity | null = null;
       const metaPatch: Record<string, any> = {};
@@ -140,37 +222,9 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
           metadata: (brandRow.metadata as Record<string, any>) ?? {},
         } as unknown as Entity;
       } else if (brandDecision.kind === 'create_new') {
-        // confirmCreate:true — admin explicitly confirmed in BrandPicker AND
-        // again by clicking "Create Brand & Continue".
-        const { data, error } = await supabase.functions.invoke('create-brand-entity', {
-          body: {
-            brandName: brandDecision.candidate.name,
-            sourceUrl: draft.inputRef,
-            logo: brandDecision.candidate.logoUrl ?? null,
-            website: brandDecision.candidate.websiteUrl ?? null,
-            description: brandDecision.candidate.reason ?? null,
-            confirmCreate: true,
-          },
-        });
-        if (error || !data?.brandEntity) {
-          toast({
-            title: 'Brand creation failed',
-            description: error?.message || 'Could not create the new brand.',
-            variant: 'destructive',
-          });
-          return;
-        }
-        const created = data.brandEntity;
-        parent = {
-          id: created.id,
-          name: created.name,
-          type: EntityType.Brand,
-          image_url: created.image_url,
-          slug: created.slug,
-          description: created.description,
-          website_url: created.website_url,
-          metadata: created.metadata || {},
-        } as unknown as Entity;
+        const created = await createBrandViaEdgeFn(brandDecision.candidate);
+        if (!created) return; // conflict or error — stay on Stage 1
+        parent = created;
         toast({
           title: 'Brand created',
           description: `"${created.name}" is now in your entities.`,
@@ -181,16 +235,100 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
         metaPatch.brand_status = 'not_applicable';
       }
 
-      // brand_status is mutually exclusive with a resolved parent.
-      if (parent) delete metaPatch.brand_status;
-
-      setResolvedParent(parent);
-      setResolvedBrandMetadata(metaPatch);
-      setStage('entity');
+      advanceToStage2(parent, metaPatch);
     } finally {
       setStage1Busy(false);
     }
   };
+
+  // ─── Website-conflict actions (Plan v3.1) ─────────────────────────────
+  const handleConflictClearWebsite = async () => {
+    if (!websiteConflict || !brandDecision || brandDecision.kind !== 'create_new') return;
+    // Clear the manual form's website field visibly.
+    brandPickerRef.current?.clearManualWebsite();
+    setWebsiteConflict(null);
+    // Update the in-flight candidate so the retry actually sends an empty website.
+    const updatedCandidate: BrandCandidate = {
+      ...brandDecision.candidate,
+      websiteUrl: undefined,
+    };
+    setBrandDecision({ kind: 'create_new', candidate: updatedCandidate });
+    setStage1Busy(true);
+    try {
+      const created = await createBrandViaEdgeFn(updatedCandidate, { websiteOverride: null });
+      if (!created) return;
+      toast({ title: 'Brand created', description: `"${created.name}" is now in your entities.` });
+      advanceToStage2(created, {});
+    } finally {
+      setStage1Busy(false);
+    }
+  };
+
+  const handleConflictUseExisting = async () => {
+    if (!websiteConflict) return;
+    setStage1Busy(true);
+    try {
+      const { data: brandRow, error } = await supabase
+        .from('entities')
+        .select('id, name, slug, image_url, website_url, description, type, metadata, created_at, updated_at')
+        .eq('id', websiteConflict.candidate.id)
+        .eq('is_deleted', false)
+        .maybeSingle();
+      if (error || !brandRow) {
+        toast({
+          title: 'Brand lookup failed',
+          description: 'Could not load the existing brand.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const parent = {
+        id: brandRow.id,
+        name: brandRow.name,
+        type: brandRow.type as EntityType,
+        image_url: brandRow.image_url ?? undefined,
+        slug: brandRow.slug ?? undefined,
+        description: brandRow.description ?? undefined,
+        website_url: brandRow.website_url ?? undefined,
+        metadata: (brandRow.metadata as Record<string, any>) ?? {},
+      } as unknown as Entity;
+      // Switch the decision cleanly so any retry does NOT reuse manual creationContext.
+      setBrandDecision({
+        kind: 'existing',
+        entityId: brandRow.id,
+        candidate: {
+          id: brandRow.id,
+          name: brandRow.name,
+          logoUrl: brandRow.image_url ?? undefined,
+          websiteUrl: brandRow.website_url ?? undefined,
+          source: 'existing_entity',
+          confidence: 1,
+          reason: 'Selected from website conflict',
+          status: 'matched_existing',
+        },
+      });
+      advanceToStage2(parent, {});
+    } finally {
+      setStage1Busy(false);
+    }
+  };
+
+  const handleConflictCreateAnyway = async () => {
+    if (!websiteConflict || !brandDecision || brandDecision.kind !== 'create_new') return;
+    setStage1Busy(true);
+    try {
+      const created = await createBrandViaEdgeFn(brandDecision.candidate, {
+        allowWebsiteConflict: true,
+      });
+      if (!created) return;
+      toast({ title: 'Brand created', description: `"${created.name}" is now in your entities.` });
+      advanceToStage2(created, {});
+    } finally {
+      setStage1Busy(false);
+    }
+  };
+
+
 
   // ─── Stage 2: prefill the host form ───────────────────────────────────
   const handlePrefill = async () => {
@@ -241,11 +379,21 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
         </div>
 
         <BrandPicker
+          ref={brandPickerRef}
           candidates={draft.brandCandidates}
           recommendedIndex={draft.recommendedBrandIndex}
           value={brandDecision}
-          onChange={setBrandDecision}
+          onChange={(d) => {
+            setBrandDecision(d);
+            // Any change in decision invalidates a stale conflict alert.
+            if (websiteConflict) setWebsiteConflict(null);
+          }}
+          websiteConflict={websiteConflict}
+          onClearWebsite={handleConflictClearWebsite}
+          onUseExistingFromConflict={handleConflictUseExisting}
+          onCreateAnyway={handleConflictCreateAnyway}
         />
+
 
         {brandDecision?.kind === 'create_new' && (
           <p className="text-xs text-muted-foreground">
@@ -266,7 +414,7 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
           <Button variant="outline" onClick={onCancel} disabled={stage1Busy}>
             Cancel
           </Button>
-          <Button onClick={handleConfirmBrand} disabled={!brandDecision || stage1Busy}>
+          <Button onClick={handleConfirmBrand} disabled={!brandDecision || stage1Busy || !!websiteConflict}>
             {stage1Busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             {confirmLabel}
           </Button>
