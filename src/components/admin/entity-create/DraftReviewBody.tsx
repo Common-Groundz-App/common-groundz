@@ -379,11 +379,21 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
         </div>
 
         <BrandPicker
+          ref={brandPickerRef}
           candidates={draft.brandCandidates}
           recommendedIndex={draft.recommendedBrandIndex}
           value={brandDecision}
-          onChange={setBrandDecision}
+          onChange={(d) => {
+            setBrandDecision(d);
+            // Any change in decision invalidates a stale conflict alert.
+            if (websiteConflict) setWebsiteConflict(null);
+          }}
+          websiteConflict={websiteConflict}
+          onClearWebsite={handleConflictClearWebsite}
+          onUseExistingFromConflict={handleConflictUseExisting}
+          onCreateAnyway={handleConflictCreateAnyway}
         />
+
 
         {brandDecision?.kind === 'create_new' && (
           <p className="text-xs text-muted-foreground">
