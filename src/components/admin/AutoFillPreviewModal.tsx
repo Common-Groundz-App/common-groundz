@@ -275,11 +275,11 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] overflow-y-auto overflow-x-hidden"
+          className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
           onPointerDownOutside={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
         >
-          <DialogHeader>
+          <DialogHeader className="px-6 pt-6 pb-3 shrink-0 border-b">
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-primary" />
               Review draft
@@ -288,26 +288,29 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
               Confirm the brand, then review the entity draft before prefilling the form.
             </DialogDescription>
           </DialogHeader>
-          <DraftReviewBody
-            draft={entityDraft}
-            predictions={predictions?.predictions ?? null}
-            urlMetadata={urlMetadata}
-            analyzedUrl={analyzedUrlSnapshot}
-            onCancel={() => onOpenChange(false)}
-            onPrefillForm={async (overrides) => {
-              await onPrefillForm(overrides);
-              onOpenChange(false);
-            }}
-          />
-          {requestId && (
-            <p className="text-xs text-muted-foreground break-all pt-2">
-              Request ID: <span className="font-mono">{requestId}</span>
-            </p>
-          )}
+          <div className="flex flex-col flex-1 min-h-0 px-6 py-4">
+            <DraftReviewBody
+              draft={entityDraft}
+              predictions={predictions?.predictions ?? null}
+              urlMetadata={urlMetadata}
+              analyzedUrl={analyzedUrlSnapshot}
+              onCancel={() => onOpenChange(false)}
+              onPrefillForm={async (overrides) => {
+                await onPrefillForm(overrides);
+                onOpenChange(false);
+              }}
+            />
+            {requestId && (
+              <p className="text-xs text-muted-foreground break-all pt-2 shrink-0">
+                Request ID: <span className="font-mono">{requestId}</span>
+              </p>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     );
   }
+
 
   // No predictions available → render inline failure state. When Phase 2
   // metadata-only data exists, surface a basic preview + "Use basic metadata"
