@@ -83,6 +83,8 @@ serve(async (req) => {
     }
 
     const shouldWrite = confirmCreate === true;
+    let websiteConflictWithBrandId: string | null = null;
+    let dropWebsiteDueToConflict = false;
 
     console.log(`🏢 create-brand-entity: "${brandName}" (confirmCreate=${shouldWrite})`);
     console.log(`📍 Source URL: ${sourceUrl || 'none'}`);
@@ -141,8 +143,12 @@ serve(async (req) => {
 
         // If we get here under draft_review_manual + allowWebsiteConflict=true with name mismatch,
         // skip the website-hijack entirely and fall through to slug + insert below.
+        // Plan v3.2 — force website = null before insert to avoid partial-unique-index
+        // collision on entities.website_url, and record the conflict in metadata.
         if (!namesMatch && isManualDraftReview && allowWebsiteConflict === true) {
-          console.log(`🟡 brand_dedup_skipped_website_under_confirm: submitted="${brandName}" existing="${brandByWebsite.name}" website="${website}"`);
+          console.log(`🟡 brand_created_without_website_due_to_conflict: submitted="${brandName}" existing="${brandByWebsite.name}" website_dropped="${website}"`);
+          websiteConflictWithBrandId = brandByWebsite.id;
+          dropWebsiteDueToConflict = true;
           // do NOT return — fall through past this block.
         } else if (brandByWebsite.is_deleted) {
           // Soft-deleted restore — only when names match OR we are in legacy/suggested-new
@@ -273,7 +279,9 @@ serve(async (req) => {
         .from('entities')
         .insert({
           name: brandName, type: 'brand', slug,
-          image_url: logo || null, website_url: website || null,
+          image_url: logo || null,
+          // Plan v3.2 — defensively null website when conflict override is active
+          website_url: dropWebsiteDueToConflict ? null : (website || null),
           description: description || `${brandName} brand`,
           created_by: userId, // Derived from JWT, not client input
           // approval_status intentionally omitted — entities_enforce_creation BEFORE INSERT
@@ -284,7 +292,12 @@ serve(async (req) => {
             creation_method: 'enriched-auto-create',
             enriched: !!(logo || website || description),
             enrichment_date: logo || website || description ? new Date().toISOString() : null,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            ...(dropWebsiteDueToConflict ? {
+              website_dropped_due_to_conflict: true,
+              website_conflict_with_brand_id: websiteConflictWithBrandId,
+              website_conflict_submitted_website: website ?? null,
+            } : {}),
           }
         })
         .select().single();

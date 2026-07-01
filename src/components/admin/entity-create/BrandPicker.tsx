@@ -119,6 +119,11 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
   const [overrideDup, setOverrideDup] = useState(false);
   const debounceRef = useRef<number | null>(null);
 
+  // Plan v3.2 — live logo preview state; only submit logoUrl when preview succeeds.
+  type LogoPreviewState = 'idle' | 'loading' | 'ok' | 'failed';
+  const [logoPreviewState, setLogoPreviewState] = useState<LogoPreviewState>('idle');
+  const logoTimeoutRef = useRef<number | null>(null);
+
   // Plan v3.1 — track original name; first divergence clears stale URLs once.
   const originalNameRef = useRef<string>('');
   const staleClearedRef = useRef(false);
@@ -164,6 +169,58 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
     logoValid &&
     (!exactDup || overrideDup);
 
+  // Plan v3.2 — live logo preview with 5s timeout. Only gate the manual candidate's
+  // logoUrl by preview success; do NOT block brand creation itself.
+  useEffect(() => {
+    if (logoTimeoutRef.current) {
+      window.clearTimeout(logoTimeoutRef.current);
+      logoTimeoutRef.current = null;
+    }
+    const trimmed = manualLogo.trim();
+    if (!trimmed || !logoValid) {
+      setLogoPreviewState('idle');
+      return;
+    }
+    setLogoPreviewState('loading');
+    const img = new window.Image();
+    const timeoutId = window.setTimeout(() => {
+      setLogoPreviewState('failed');
+      try {
+        console.warn('brand_logo_preview_failed', {
+          host: new URL(trimmed).hostname,
+          reason: 'timeout',
+        });
+      } catch {
+        console.warn('brand_logo_preview_failed', { host: 'unknown', reason: 'timeout' });
+      }
+      img.src = '';
+    }, 5000);
+    logoTimeoutRef.current = timeoutId;
+    img.onload = () => {
+      window.clearTimeout(timeoutId);
+      setLogoPreviewState('ok');
+    };
+    img.onerror = () => {
+      window.clearTimeout(timeoutId);
+      setLogoPreviewState('failed');
+      try {
+        console.warn('brand_logo_preview_failed', {
+          host: new URL(trimmed).hostname,
+          reason: 'onerror',
+        });
+      } catch {
+        console.warn('brand_logo_preview_failed', { host: 'unknown', reason: 'onerror' });
+      }
+    };
+    img.src = trimmed;
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [manualLogo, logoValid]);
+
+  const effectiveLogoForSubmit = () =>
+    logoPreviewState === 'ok' ? manualLogo.trim() : undefined;
+
   // Plan v3.1 — first time name diverges from the name when form opened,
   // clear stale website/logo exactly once.
   useEffect(() => {
@@ -184,7 +241,7 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
   const lastSyncedRef = useRef<string>('');
   useEffect(() => {
     if (!manualOpen) return;
-    const syncKey = `${trimmedName}|${manualWebsite.trim()}|${manualLogo.trim()}|${overrideDup ? '1' : '0'}|${exactDup?.id ?? ''}`;
+    const syncKey = `${trimmedName}|${manualWebsite.trim()}|${manualLogo.trim()}|${overrideDup ? '1' : '0'}|${exactDup?.id ?? ''}|${logoPreviewState}`;
     if (!canSubmitManual) {
       // If currently-active decision is the manual one, clear it.
       if (
@@ -200,7 +257,8 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
     const candidate: BrandCandidate = {
       name: trimmedName,
       websiteUrl: manualWebsite.trim() || undefined,
-      logoUrl: manualLogo.trim() || undefined,
+      // Plan v3.2 — only include logoUrl when preview has actually loaded successfully.
+      logoUrl: effectiveLogoForSubmit(),
       source: 'admin_manual',
       confidence: 1,
       reason: 'Entered manually by admin',
@@ -209,15 +267,16 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
     onChange({ kind: 'create_new', candidate });
     lastSyncedRef.current = syncKey;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSubmitManual, manualOpen, trimmedName, manualWebsite, manualLogo, overrideDup, exactDup?.id]);
+  }, [canSubmitManual, manualOpen, trimmedName, manualWebsite, manualLogo, overrideDup, exactDup?.id, logoPreviewState]);
 
-  // Inner "Use typed brand" shortcut — same as live-sync but explicit + closes form.
+  // Inner "Use typed brand" shortcut — same as live-sync but explicit.
   const submitManual = () => {
     if (!canSubmitManual) return;
     const candidate: BrandCandidate = {
       name: trimmedName,
       websiteUrl: manualWebsite.trim() || undefined,
-      logoUrl: manualLogo.trim() || undefined,
+      // Plan v3.2 — same gating as live-sync.
+      logoUrl: effectiveLogoForSubmit(),
       source: 'admin_manual',
       confidence: 1,
       reason: 'Entered manually by admin',
@@ -225,6 +284,7 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
     };
     onChange({ kind: 'create_new', candidate });
   };
+
 
   const manualSelected =
     value?.kind === 'create_new' && (value.candidate as BrandCandidate).source === 'admin_manual';
@@ -317,11 +377,11 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
         </div>
       )}
 
-      {/* ── Suggested new brands ────────────────────────────────────────── */}
-      {suggested.length > 0 && (
+      {/* ── Suggested new brands (+ manual-selected row) ────────────────── */}
+      {(suggested.length > 0 || manualSelected) && (
         <div className="space-y-1.5">
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Suggested new brand{suggested.length > 1 ? 's' : ''}
+            Suggested new brand{suggested.length + (manualSelected ? 1 : 0) > 1 ? 's' : ''}
           </p>
           <div className="space-y-2">
             {suggested.map((cand, idx) => {
@@ -369,9 +429,52 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
                 </button>
               );
             })}
+
+            {/* Plan v3.2 — manual-selected row (visual confirmation for "Use typed brand") */}
+            {manualSelected && value?.kind === 'create_new' && (
+              <div
+                key="manual-selected-row"
+                className="w-full text-left rounded-md border p-3 border-primary bg-primary/5"
+              >
+                <div className="flex items-start gap-3">
+                  {value.candidate.logoUrl && logoPreviewState === 'ok' ? (
+                    <img
+                      src={value.candidate.logoUrl}
+                      alt=""
+                      className="h-8 w-8 rounded object-contain bg-muted flex-shrink-0"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
+                      }}
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded bg-muted flex-shrink-0 flex items-center justify-center text-[11px] font-medium text-muted-foreground">
+                      {value.candidate.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium truncate">{value.candidate.name}</p>
+                      <Badge variant="outline" className="text-xs">new</Badge>
+                      <Badge className="text-xs gap-1">
+                        <Check className="h-3 w-3" /> selected
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Inferred from manual entry — click "Create Brand &amp; Continue" below to create it.
+                    </p>
+                    {value.candidate.websiteUrl && (
+                      <p className="text-xs text-muted-foreground truncate" title={value.candidate.websiteUrl}>
+                        {value.candidate.websiteUrl}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
+
 
       {candidates.length === 0 && !manualOpen && (
         <p className="text-sm text-muted-foreground">
@@ -432,16 +535,47 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
             </div>
             <div className="space-y-2">
               <Label className="text-xs">Logo URL (optional)</Label>
-              <Input
-                value={manualLogo}
-                onChange={(e) => setManualLogo(e.target.value)}
-                placeholder="https://"
-                className={cn(!logoValid && 'border-destructive focus-visible:ring-destructive')}
-              />
+              <div className="flex items-start gap-2">
+                <Input
+                  value={manualLogo}
+                  onChange={(e) => setManualLogo(e.target.value)}
+                  placeholder="https://…/logo.png"
+                  className={cn(
+                    'flex-1',
+                    !logoValid && 'border-destructive focus-visible:ring-destructive',
+                    logoValid && logoPreviewState === 'failed' && 'border-amber-500 focus-visible:ring-amber-500',
+                  )}
+                />
+                {/* Reserved 32px preview slot */}
+                <div className="h-8 w-8 flex-shrink-0 rounded border bg-muted flex items-center justify-center overflow-hidden">
+                  {logoPreviewState === 'loading' && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                  )}
+                  {logoPreviewState === 'ok' && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={manualLogo.trim()}
+                      alt=""
+                      className="h-full w-full object-contain"
+                    />
+                  )}
+                  {logoPreviewState === 'failed' && (
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                  )}
+                </div>
+              </div>
               {!logoValid && (
                 <p className="text-[11px] text-destructive">
                   Enter a valid http(s) URL or leave blank.
                 </p>
+              )}
+              {logoValid && logoPreviewState === 'failed' && (
+                <p className="text-[11px] text-amber-600">
+                  This logo URL could not be loaded (redirect or non-image). The brand will be created without a logo — you can add one later. Use a direct image URL ending in .png/.jpg/.svg/.webp.
+                </p>
+              )}
+              {logoValid && logoPreviewState === 'loading' && (
+                <p className="text-[11px] text-muted-foreground">Checking logo…</p>
               )}
             </div>
           </div>
@@ -463,20 +597,23 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
               <ul className="space-y-1">
                 {dupMatches.slice(0, 4).map((m) => (
                   <li key={m.id} className="flex items-center gap-2 text-xs">
-                    {m.image_url && (
-                      <img
-                        src={m.image_url}
-                        alt=""
-                        className="h-5 w-5 rounded object-contain bg-muted flex-shrink-0"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
-                        }}
-                      />
-                    )}
+                    {/* Reserved logo slot for consistent alignment */}
+                    <div className="h-5 w-5 flex-shrink-0 rounded bg-muted overflow-hidden flex items-center justify-center">
+                      {m.image_url && (
+                        <img
+                          src={m.image_url}
+                          alt=""
+                          className="h-full w-full object-contain"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
+                    </div>
                     <span className="truncate flex-1">{m.name}</span>
                     <button
                       type="button"
-                      className="text-primary hover:underline"
+                      className="text-primary hover:underline flex-shrink-0"
                       onClick={() => {
                         const cand: BrandCandidate = {
                           id: m.id,
@@ -538,10 +675,15 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
                     size="sm"
                     variant="destructive"
                     onClick={onCreateAnyway}
+                    title="Creates the new brand with website left empty (you can add a website later)."
                   >
-                    Create anyway
+                    Create without website
                   </Button>
                 </div>
+                <p className="text-[11px] text-muted-foreground pt-1">
+                  "Create without website" will create <strong>{websiteConflict.submittedName}</strong> with the
+                  website field left empty to avoid a conflict.
+                </p>
               </AlertDescription>
             </Alert>
           )}
@@ -550,9 +692,14 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
             <Button
               size="sm"
               onClick={submitManual}
-              disabled={!canSubmitManual || dupChecking}
+              disabled={!canSubmitManual || dupChecking || manualSelected}
+              variant={manualSelected ? 'secondary' : 'default'}
             >
-              Use typed brand
+              {manualSelected ? (
+                <><Check className="h-3.5 w-3.5 mr-1" />Selected</>
+              ) : (
+                'Use typed brand'
+              )}
             </Button>
           </div>
           {manualSelected && !websiteConflict && (
