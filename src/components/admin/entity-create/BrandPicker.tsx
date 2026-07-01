@@ -632,10 +632,15 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
                     size="sm"
                     variant="destructive"
                     onClick={onCreateAnyway}
+                    title="Creates the new brand with website left empty (you can add a website later)."
                   >
-                    Create anyway
+                    Create without website
                   </Button>
                 </div>
+                <p className="text-[11px] text-muted-foreground pt-1">
+                  "Create without website" will create <strong>{websiteConflict.submittedName}</strong> with the
+                  website field left empty to avoid a conflict.
+                </p>
               </AlertDescription>
             </Alert>
           )}
@@ -644,9 +649,14 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
             <Button
               size="sm"
               onClick={submitManual}
-              disabled={!canSubmitManual || dupChecking}
+              disabled={!canSubmitManual || dupChecking || manualSelected}
+              variant={manualSelected ? 'secondary' : 'default'}
             >
-              Use typed brand
+              {manualSelected ? (
+                <><Check className="h-3.5 w-3.5 mr-1" />Selected</>
+              ) : (
+                'Use typed brand'
+              )}
             </Button>
           </div>
           {manualSelected && !websiteConflict && (
