@@ -169,6 +169,58 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
     logoValid &&
     (!exactDup || overrideDup);
 
+  // Plan v3.2 — live logo preview with 5s timeout. Only gate the manual candidate's
+  // logoUrl by preview success; do NOT block brand creation itself.
+  useEffect(() => {
+    if (logoTimeoutRef.current) {
+      window.clearTimeout(logoTimeoutRef.current);
+      logoTimeoutRef.current = null;
+    }
+    const trimmed = manualLogo.trim();
+    if (!trimmed || !logoValid) {
+      setLogoPreviewState('idle');
+      return;
+    }
+    setLogoPreviewState('loading');
+    const img = new window.Image();
+    const timeoutId = window.setTimeout(() => {
+      setLogoPreviewState('failed');
+      try {
+        console.warn('brand_logo_preview_failed', {
+          host: new URL(trimmed).hostname,
+          reason: 'timeout',
+        });
+      } catch {
+        console.warn('brand_logo_preview_failed', { host: 'unknown', reason: 'timeout' });
+      }
+      img.src = '';
+    }, 5000);
+    logoTimeoutRef.current = timeoutId;
+    img.onload = () => {
+      window.clearTimeout(timeoutId);
+      setLogoPreviewState('ok');
+    };
+    img.onerror = () => {
+      window.clearTimeout(timeoutId);
+      setLogoPreviewState('failed');
+      try {
+        console.warn('brand_logo_preview_failed', {
+          host: new URL(trimmed).hostname,
+          reason: 'onerror',
+        });
+      } catch {
+        console.warn('brand_logo_preview_failed', { host: 'unknown', reason: 'onerror' });
+      }
+    };
+    img.src = trimmed;
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [manualLogo, logoValid]);
+
+  const effectiveLogoForSubmit = () =>
+    logoPreviewState === 'ok' ? manualLogo.trim() : undefined;
+
   // Plan v3.1 — first time name diverges from the name when form opened,
   // clear stale website/logo exactly once.
   useEffect(() => {
