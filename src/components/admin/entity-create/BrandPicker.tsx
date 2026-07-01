@@ -492,16 +492,47 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
             </div>
             <div className="space-y-2">
               <Label className="text-xs">Logo URL (optional)</Label>
-              <Input
-                value={manualLogo}
-                onChange={(e) => setManualLogo(e.target.value)}
-                placeholder="https://"
-                className={cn(!logoValid && 'border-destructive focus-visible:ring-destructive')}
-              />
+              <div className="flex items-start gap-2">
+                <Input
+                  value={manualLogo}
+                  onChange={(e) => setManualLogo(e.target.value)}
+                  placeholder="https://…/logo.png"
+                  className={cn(
+                    'flex-1',
+                    !logoValid && 'border-destructive focus-visible:ring-destructive',
+                    logoValid && logoPreviewState === 'failed' && 'border-amber-500 focus-visible:ring-amber-500',
+                  )}
+                />
+                {/* Reserved 32px preview slot */}
+                <div className="h-8 w-8 flex-shrink-0 rounded border bg-muted flex items-center justify-center overflow-hidden">
+                  {logoPreviewState === 'loading' && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                  )}
+                  {logoPreviewState === 'ok' && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={manualLogo.trim()}
+                      alt=""
+                      className="h-full w-full object-contain"
+                    />
+                  )}
+                  {logoPreviewState === 'failed' && (
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                  )}
+                </div>
+              </div>
               {!logoValid && (
                 <p className="text-[11px] text-destructive">
                   Enter a valid http(s) URL or leave blank.
                 </p>
+              )}
+              {logoValid && logoPreviewState === 'failed' && (
+                <p className="text-[11px] text-amber-600">
+                  This logo URL could not be loaded (redirect or non-image). The brand will be created without a logo — you can add one later. Use a direct image URL ending in .png/.jpg/.svg/.webp.
+                </p>
+              )}
+              {logoValid && logoPreviewState === 'loading' && (
+                <p className="text-[11px] text-muted-foreground">Checking logo…</p>
               )}
             </div>
           </div>
