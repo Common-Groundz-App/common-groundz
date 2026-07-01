@@ -436,67 +436,69 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   const categoryDisplay = draft.categoryHint?.path ?? '';
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          Step 2 of 2 — Review entity details and pick the primary image.
+    <div className="flex flex-col min-h-0 flex-1">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 space-y-5">
+        <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Step 2 of 2 — Review entity details and pick the primary image.
+          </div>
+          {!noBrandCandidates && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setStage('brand')}
+              disabled={stage2Busy}
+              className="h-7 px-2"
+            >
+              <ArrowLeft className="h-3 w-3 mr-1" /> Back
+            </Button>
+          )}
         </div>
-        {!noBrandCandidates && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setStage('brand')}
-            disabled={stage2Busy}
-            className="h-7 px-2"
-          >
-            <ArrowLeft className="h-3 w-3 mr-1" /> Back
-          </Button>
-        )}
+
+        <div className="grid gap-3 rounded-md border bg-muted/30 p-3">
+          {nameDisplay && (
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Name</Label>
+              <p className="text-sm font-medium break-words">{nameDisplay}</p>
+            </div>
+          )}
+          {typeDisplay && (
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Type</Label>
+              <p className="text-sm">{getEntityTypeLabel(typeDisplay)}</p>
+            </div>
+          )}
+          {categoryDisplay && (
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Category</Label>
+              <p className="text-sm break-words">{categoryDisplay}</p>
+            </div>
+          )}
+          {resolvedParent ? (
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Brand</Label>
+              <p className="text-sm break-words">{resolvedParent.name}</p>
+            </div>
+          ) : resolvedBrandMetadata.brand_status ? (
+            <div className="space-y-1">
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">Brand</Label>
+              <p className="text-sm text-muted-foreground italic">
+                {resolvedBrandMetadata.brand_status === 'not_applicable' ? 'Not applicable' : 'Unknown'}
+              </p>
+            </div>
+          ) : null}
+        </div>
+
+        <ImageCandidateGrid
+          candidates={draft.imageCandidates}
+          recommendedIndex={draft.recommendedImageIndex}
+          value={imageSelection}
+          onChange={setImageSelection}
+        />
       </div>
 
-      <div className="grid gap-3 rounded-md border bg-muted/30 p-3">
-        {nameDisplay && (
-          <div className="space-y-1">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Name</Label>
-            <p className="text-sm font-medium">{nameDisplay}</p>
-          </div>
-        )}
-        {typeDisplay && (
-          <div className="space-y-1">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Type</Label>
-            <p className="text-sm">{getEntityTypeLabel(typeDisplay)}</p>
-          </div>
-        )}
-        {categoryDisplay && (
-          <div className="space-y-1">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Category</Label>
-            <p className="text-sm">{categoryDisplay}</p>
-          </div>
-        )}
-        {resolvedParent ? (
-          <div className="space-y-1">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Brand</Label>
-            <p className="text-sm">{resolvedParent.name}</p>
-          </div>
-        ) : resolvedBrandMetadata.brand_status ? (
-          <div className="space-y-1">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Brand</Label>
-            <p className="text-sm text-muted-foreground italic">
-              {resolvedBrandMetadata.brand_status === 'not_applicable' ? 'Not applicable' : 'Unknown'}
-            </p>
-          </div>
-        ) : null}
-      </div>
-
-      <ImageCandidateGrid
-        candidates={draft.imageCandidates}
-        recommendedIndex={draft.recommendedImageIndex}
-        value={imageSelection}
-        onChange={setImageSelection}
-      />
-
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex justify-end gap-2 pt-3 mt-3 border-t bg-background shrink-0">
         <Button variant="outline" onClick={onCancel} disabled={stage2Busy}>
           Cancel
         </Button>
@@ -508,3 +510,4 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
     </div>
   );
 };
+
