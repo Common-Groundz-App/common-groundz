@@ -502,6 +502,27 @@ export async function buildEntityDraft(input: BuildEntityDraftInput): Promise<En
     });
   }
 
+  // === Fix Pack v3.3 — own-origin favicon fallback (bounded 2s) ==========
+  // Only for the top brand candidate that has no logoUrl but has a websiteUrl.
+  const topCandidate = brandCandidates[0];
+  if (topCandidate && !topCandidate.logoUrl && topCandidate.websiteUrl) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+    try {
+      const found = await tryOwnOriginFavicon(topCandidate.websiteUrl, controller.signal);
+      if (found) {
+        topCandidate.logoUrl = found;
+        console.log(JSON.stringify({
+          event: "v2_logo_favicon_fallback_ok",
+          brand: topCandidate.name,
+          url: found,
+        }));
+      }
+    } catch { /* ignore */ }
+    finally { clearTimeout(timeoutId); }
+  }
+
+
   const draft: EntityDraft = {
     schemaVersion: ENTITY_DRAFT_SCHEMA_VERSION,
     inputMethod,
