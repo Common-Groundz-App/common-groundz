@@ -377,11 +377,11 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
         </div>
       )}
 
-      {/* ── Suggested new brands ────────────────────────────────────────── */}
-      {suggested.length > 0 && (
+      {/* ── Suggested new brands (+ manual-selected row) ────────────────── */}
+      {(suggested.length > 0 || manualSelected) && (
         <div className="space-y-1.5">
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Suggested new brand{suggested.length > 1 ? 's' : ''}
+            Suggested new brand{suggested.length + (manualSelected ? 1 : 0) > 1 ? 's' : ''}
           </p>
           <div className="space-y-2">
             {suggested.map((cand, idx) => {
@@ -429,9 +429,52 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
                 </button>
               );
             })}
+
+            {/* Plan v3.2 — manual-selected row (visual confirmation for "Use typed brand") */}
+            {manualSelected && value?.kind === 'create_new' && (
+              <div
+                key="manual-selected-row"
+                className="w-full text-left rounded-md border p-3 border-primary bg-primary/5"
+              >
+                <div className="flex items-start gap-3">
+                  {value.candidate.logoUrl && logoPreviewState === 'ok' ? (
+                    <img
+                      src={value.candidate.logoUrl}
+                      alt=""
+                      className="h-8 w-8 rounded object-contain bg-muted flex-shrink-0"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
+                      }}
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded bg-muted flex-shrink-0 flex items-center justify-center text-[11px] font-medium text-muted-foreground">
+                      {value.candidate.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium truncate">{value.candidate.name}</p>
+                      <Badge variant="outline" className="text-xs">new</Badge>
+                      <Badge className="text-xs gap-1">
+                        <Check className="h-3 w-3" /> selected
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Inferred from manual entry — click "Create Brand &amp; Continue" below to create it.
+                    </p>
+                    {value.candidate.websiteUrl && (
+                      <p className="text-xs text-muted-foreground truncate" title={value.candidate.websiteUrl}>
+                        {value.candidate.websiteUrl}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
+
 
       {candidates.length === 0 && !manualOpen && (
         <p className="text-sm text-muted-foreground">
