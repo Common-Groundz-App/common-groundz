@@ -554,20 +554,23 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
               <ul className="space-y-1">
                 {dupMatches.slice(0, 4).map((m) => (
                   <li key={m.id} className="flex items-center gap-2 text-xs">
-                    {m.image_url && (
-                      <img
-                        src={m.image_url}
-                        alt=""
-                        className="h-5 w-5 rounded object-contain bg-muted flex-shrink-0"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.visibility = 'hidden';
-                        }}
-                      />
-                    )}
+                    {/* Reserved logo slot for consistent alignment */}
+                    <div className="h-5 w-5 flex-shrink-0 rounded bg-muted overflow-hidden flex items-center justify-center">
+                      {m.image_url && (
+                        <img
+                          src={m.image_url}
+                          alt=""
+                          className="h-full w-full object-contain"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      )}
+                    </div>
                     <span className="truncate flex-1">{m.name}</span>
                     <button
                       type="button"
-                      className="text-primary hover:underline"
+                      className="text-primary hover:underline flex-shrink-0"
                       onClick={() => {
                         const cand: BrandCandidate = {
                           id: m.id,
