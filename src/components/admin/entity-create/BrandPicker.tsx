@@ -241,7 +241,7 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
   const lastSyncedRef = useRef<string>('');
   useEffect(() => {
     if (!manualOpen) return;
-    const syncKey = `${trimmedName}|${manualWebsite.trim()}|${manualLogo.trim()}|${overrideDup ? '1' : '0'}|${exactDup?.id ?? ''}`;
+    const syncKey = `${trimmedName}|${manualWebsite.trim()}|${manualLogo.trim()}|${overrideDup ? '1' : '0'}|${exactDup?.id ?? ''}|${logoPreviewState}`;
     if (!canSubmitManual) {
       // If currently-active decision is the manual one, clear it.
       if (
@@ -257,7 +257,8 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
     const candidate: BrandCandidate = {
       name: trimmedName,
       websiteUrl: manualWebsite.trim() || undefined,
-      logoUrl: manualLogo.trim() || undefined,
+      // Plan v3.2 — only include logoUrl when preview has actually loaded successfully.
+      logoUrl: effectiveLogoForSubmit(),
       source: 'admin_manual',
       confidence: 1,
       reason: 'Entered manually by admin',
@@ -266,15 +267,16 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
     onChange({ kind: 'create_new', candidate });
     lastSyncedRef.current = syncKey;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canSubmitManual, manualOpen, trimmedName, manualWebsite, manualLogo, overrideDup, exactDup?.id]);
+  }, [canSubmitManual, manualOpen, trimmedName, manualWebsite, manualLogo, overrideDup, exactDup?.id, logoPreviewState]);
 
-  // Inner "Use typed brand" shortcut — same as live-sync but explicit + closes form.
+  // Inner "Use typed brand" shortcut — same as live-sync but explicit.
   const submitManual = () => {
     if (!canSubmitManual) return;
     const candidate: BrandCandidate = {
       name: trimmedName,
       websiteUrl: manualWebsite.trim() || undefined,
-      logoUrl: manualLogo.trim() || undefined,
+      // Plan v3.2 — same gating as live-sync.
+      logoUrl: effectiveLogoForSubmit(),
       source: 'admin_manual',
       confidence: 1,
       reason: 'Entered manually by admin',
@@ -282,6 +284,7 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
     };
     onChange({ kind: 'create_new', candidate });
   };
+
 
   const manualSelected =
     value?.kind === 'create_new' && (value.candidate as BrandCandidate).source === 'admin_manual';
