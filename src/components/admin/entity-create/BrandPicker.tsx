@@ -312,7 +312,7 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 min-w-0 w-full overflow-hidden">
       <Label className="text-xs uppercase tracking-wide text-muted-foreground">
         Brand / Parent
       </Label>
