@@ -279,7 +279,9 @@ serve(async (req) => {
         .from('entities')
         .insert({
           name: brandName, type: 'brand', slug,
-          image_url: logo || null, website_url: website || null,
+          image_url: logo || null,
+          // Plan v3.2 — defensively null website when conflict override is active
+          website_url: dropWebsiteDueToConflict ? null : (website || null),
           description: description || `${brandName} brand`,
           created_by: userId, // Derived from JWT, not client input
           // approval_status intentionally omitted — entities_enforce_creation BEFORE INSERT
@@ -290,7 +292,12 @@ serve(async (req) => {
             creation_method: 'enriched-auto-create',
             enriched: !!(logo || website || description),
             enrichment_date: logo || website || description ? new Date().toISOString() : null,
-            created_at: new Date().toISOString()
+            created_at: new Date().toISOString(),
+            ...(dropWebsiteDueToConflict ? {
+              website_dropped_due_to_conflict: true,
+              website_conflict_with_brand_id: websiteConflictWithBrandId,
+              website_conflict_submitted_website: website ?? null,
+            } : {}),
           }
         })
         .select().single();
