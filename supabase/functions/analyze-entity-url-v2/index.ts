@@ -262,7 +262,7 @@ async function assembleEntityDraft(args: {
     const existingBrandMatches = aiBrand
       ? await lookupExistingBrandMatches(args.client, aiBrand)
       : [];
-    assembled = buildEntityDraft({
+    assembled = await buildEntityDraft({
       inputMethod: "url",
       inputRef: args.url,
       predictions: args.predictions,
