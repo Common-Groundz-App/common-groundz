@@ -119,6 +119,11 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
   const [overrideDup, setOverrideDup] = useState(false);
   const debounceRef = useRef<number | null>(null);
 
+  // Plan v3.2 — live logo preview state; only submit logoUrl when preview succeeds.
+  type LogoPreviewState = 'idle' | 'loading' | 'ok' | 'failed';
+  const [logoPreviewState, setLogoPreviewState] = useState<LogoPreviewState>('idle');
+  const logoTimeoutRef = useRef<number | null>(null);
+
   // Plan v3.1 — track original name; first divergence clears stale URLs once.
   const originalNameRef = useRef<string>('');
   const staleClearedRef = useRef(false);
