@@ -83,6 +83,8 @@ serve(async (req) => {
     }
 
     const shouldWrite = confirmCreate === true;
+    let websiteConflictWithBrandId: string | null = null;
+    let dropWebsiteDueToConflict = false;
 
     console.log(`🏢 create-brand-entity: "${brandName}" (confirmCreate=${shouldWrite})`);
     console.log(`📍 Source URL: ${sourceUrl || 'none'}`);
