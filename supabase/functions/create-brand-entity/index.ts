@@ -141,8 +141,12 @@ serve(async (req) => {
 
         // If we get here under draft_review_manual + allowWebsiteConflict=true with name mismatch,
         // skip the website-hijack entirely and fall through to slug + insert below.
+        // Plan v3.2 — force website = null before insert to avoid partial-unique-index
+        // collision on entities.website_url, and record the conflict in metadata.
         if (!namesMatch && isManualDraftReview && allowWebsiteConflict === true) {
-          console.log(`🟡 brand_dedup_skipped_website_under_confirm: submitted="${brandName}" existing="${brandByWebsite.name}" website="${website}"`);
+          console.log(`🟡 brand_created_without_website_due_to_conflict: submitted="${brandName}" existing="${brandByWebsite.name}" website_dropped="${website}"`);
+          websiteConflictWithBrandId = brandByWebsite.id;
+          dropWebsiteDueToConflict = true;
           // do NOT return — fall through past this block.
         } else if (brandByWebsite.is_deleted) {
           // Soft-deleted restore — only when names match OR we are in legacy/suggested-new
