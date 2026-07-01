@@ -250,7 +250,7 @@ export interface BuildEntityDraftInput {
   extraImageUrls?: Array<{ url: string; source: ImageCandidate["source"]; confidence?: number }>;
 }
 
-export function buildEntityDraft(input: BuildEntityDraftInput): EntityDraft {
+export async function buildEntityDraft(input: BuildEntityDraftInput): Promise<EntityDraft> {
   const { predictions, existingBrandMatches, inputMethod, inputRef } = input;
 
   const aiBrandName: string | null =
@@ -274,10 +274,38 @@ export function buildEntityDraft(input: BuildEntityDraftInput): EntityDraft {
       : existingBrandMatches;
 
     for (const b of ordered.slice(0, 5)) {
+      // Fix Pack v3.3 — filter stored logo URL through V2 normalizer.
+      let filteredLogo: string | undefined = undefined;
+      if (b.image_url) {
+        const normalized = normalizeLogoUrl(b.image_url);
+        if (!normalized) {
+          console.log(JSON.stringify({
+            event: "v2_logo_rejected",
+            reason: "redirect_wrapper_empty",
+            brand: b.name,
+            rawHost: (() => { try { return new URL(b.image_url!).hostname; } catch { return "unknown"; } })(),
+          }));
+        } else {
+          const rejectReason = isRejectedLogoUrl(normalized);
+          if (rejectReason) {
+            console.log(JSON.stringify({
+              event: "v2_logo_rejected", reason: rejectReason, brand: b.name,
+              rawHost: (() => { try { return new URL(normalized).hostname; } catch { return "unknown"; } })(),
+            }));
+          } else if (!isAcceptableLogo(normalized, b.website_url, "existing_entity")) {
+            console.log(JSON.stringify({
+              event: "v2_logo_rejected", reason: "non_image_url", brand: b.name,
+              rawHost: (() => { try { return new URL(normalized).hostname; } catch { return "unknown"; } })(),
+            }));
+          } else {
+            filteredLogo = normalized;
+          }
+        }
+      }
       brandCandidates.push({
         id: b.id,
         name: b.name,
-        logoUrl: b.image_url ?? undefined,
+        logoUrl: filteredLogo,
         websiteUrl: b.website_url ?? undefined,
         source: "existing_entity",
         confidence: exact && b.id === exact.id ? 0.95 : 0.6,
@@ -288,6 +316,7 @@ export function buildEntityDraft(input: BuildEntityDraftInput): EntityDraft {
         status: "matched_existing",
       });
     }
+
 
     // Always include the AI-suggested name as a "suggested_new" candidate
     // so Phase 3.2 UI can offer the explicit create path.
