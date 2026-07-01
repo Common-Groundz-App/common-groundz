@@ -378,45 +378,45 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   // ─── Render ───────────────────────────────────────────────────────────
   if (stage === 'brand') {
     return (
-      <div className="space-y-5">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Sparkles className="h-4 w-4 text-primary" />
-          Step 1 of 2 — Confirm the brand for this entity.
+      <div className="flex flex-col min-h-0 flex-1">
+        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 space-y-5">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Sparkles className="h-4 w-4 text-primary" />
+            Step 1 of 2 — Confirm the brand for this entity.
+          </div>
+
+          <BrandPicker
+            ref={brandPickerRef}
+            candidates={draft.brandCandidates}
+            recommendedIndex={draft.recommendedBrandIndex}
+            value={brandDecision}
+            onChange={(d) => {
+              setBrandDecision(d);
+              if (websiteConflict) setWebsiteConflict(null);
+            }}
+            websiteConflict={websiteConflict}
+            onClearWebsite={handleConflictClearWebsite}
+            onUseExistingFromConflict={handleConflictUseExisting}
+            onCreateAnyway={handleConflictCreateAnyway}
+          />
+
+          {brandDecision?.kind === 'create_new' && (
+            <p className="text-xs text-muted-foreground">
+              This will create the brand now. You can still cancel entity creation later.
+            </p>
+          )}
+
+          {draft.warnings && draft.warnings.length > 0 && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                {draft.warnings.join(' · ')}
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
-        <BrandPicker
-          ref={brandPickerRef}
-          candidates={draft.brandCandidates}
-          recommendedIndex={draft.recommendedBrandIndex}
-          value={brandDecision}
-          onChange={(d) => {
-            setBrandDecision(d);
-            // Any change in decision invalidates a stale conflict alert.
-            if (websiteConflict) setWebsiteConflict(null);
-          }}
-          websiteConflict={websiteConflict}
-          onClearWebsite={handleConflictClearWebsite}
-          onUseExistingFromConflict={handleConflictUseExisting}
-          onCreateAnyway={handleConflictCreateAnyway}
-        />
-
-
-        {brandDecision?.kind === 'create_new' && (
-          <p className="text-xs text-muted-foreground">
-            This will create the brand now. You can still cancel entity creation later.
-          </p>
-        )}
-
-        {draft.warnings && draft.warnings.length > 0 && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              {draft.warnings.join(' · ')}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-end gap-2 pt-3 mt-3 border-t bg-background shrink-0">
           <Button variant="outline" onClick={onCancel} disabled={stage1Busy}>
             Cancel
           </Button>
@@ -428,6 +428,7 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
       </div>
     );
   }
+
 
   // Stage 2 — entity review + primary image
   const nameDisplay = baseFormPatch.name ?? draft.nameGuess ?? '';
