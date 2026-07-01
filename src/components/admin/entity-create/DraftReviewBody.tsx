@@ -317,11 +317,17 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
     if (!websiteConflict || !brandDecision || brandDecision.kind !== 'create_new') return;
     setStage1Busy(true);
     try {
+      // Plan v3.2 — defense-in-depth: also null the website in the retry payload
+      // so the backend never sees the conflicting URL.
       const created = await createBrandViaEdgeFn(brandDecision.candidate, {
         allowWebsiteConflict: true,
+        websiteOverride: null,
       });
       if (!created) return;
-      toast({ title: 'Brand created', description: `"${created.name}" is now in your entities.` });
+      toast({
+        title: 'Brand created without website',
+        description: `"${created.name}" was created. Website was left empty to avoid a conflict — you can add one later.`,
+      });
       advanceToStage2(created, {});
     } finally {
       setStage1Busy(false);
