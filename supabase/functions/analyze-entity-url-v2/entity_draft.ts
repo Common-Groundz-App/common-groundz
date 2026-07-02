@@ -517,24 +517,146 @@ export async function buildEntityDraft(input: BuildEntityDraftInput): Promise<En
     });
   }
 
-  // === Fix Pack v3.3 — own-origin favicon fallback (bounded 2s) ==========
-  // Only for the top brand candidate that has no logoUrl but has a websiteUrl.
-  const topCandidate = brandCandidates[0];
-  if (topCandidate && !topCandidate.logoUrl && topCandidate.websiteUrl) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 2000);
-    try {
-      const found = await tryOwnOriginFavicon(topCandidate.websiteUrl, controller.signal);
-      if (found) {
-        topCandidate.logoUrl = found;
+  // === V2 Brand Logo Parity — global 4s enrichment stage =================
+  // Sequence (all under ONE shared AbortController):
+  //   1. Retailer/source-site suppression (pick correct brand candidate).
+  //   2. Skip if picked candidate already has a valid logo (curated wins).
+  //   3. Skip if normalized-dupe of an existing DB brand match.
+  //   4. Google CSE website lookup (if picked has no websiteUrl).
+  //   5. Google CSE image lookup (if picked has no logoUrl).
+  //   6. Own-origin favicon fallback (last resort).
+  // Any error / abort / missing creds / flag off → candidate keeps prior
+  // state. Analyze never fails because of this stage.
+  const totalBudgetMs = input.logoLookup?.totalBudgetMs ?? 4000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), totalBudgetMs);
+  const enrichStart = Date.now();
+  const remainingMs = () => Math.max(0, totalBudgetMs - (Date.now() - enrichStart));
+
+  try {
+    // ── Step 1: pick target candidate (retailer suppression) ─────────────
+    let picked = pickTopBrandCandidate(brandCandidates, inputRef);
+    if (picked) {
+      const pickedIdx = brandCandidates.indexOf(picked);
+
+      // ── Step 2: never override curated existing logo ───────────────────
+      const alreadyHasValidLogo = !!picked.logoUrl;
+      if (alreadyHasValidLogo) {
         console.log(JSON.stringify({
-          event: "v2_logo_favicon_fallback_ok",
-          brand: topCandidate.name,
-          url: found,
+          event: "v2_brand_logo_skipped", reason: "already_has_logo",
+          candidateSource: picked.source,
         }));
+      } else {
+        // ── Step 3: skip if normalized-dupe of an existing DB brand ─────
+        const pickedNorm = normalizeBrandName(picked.name);
+        const isDupe =
+          picked.status === "suggested_new" &&
+          existingBrandMatches.some(
+            (b) => normalizeBrandName(b.name || "") === pickedNorm && !!b.image_url,
+          );
+        if (isDupe) {
+          console.log(JSON.stringify({
+            event: "v2_brand_logo_skipped", reason: "normalized_dupe",
+          }));
+        } else {
+          console.log(JSON.stringify({
+            event: "v2_brand_logo_stage_start",
+            candidateSource: picked.source,
+            hasWebsite: !!picked.websiteUrl,
+            hasLogo: !!picked.logoUrl,
+          }));
+
+          const lookupCfg = input.logoLookup;
+          const canUseGoogle =
+            !!lookupCfg?.enabled && !!lookupCfg.googleApiKey && !!lookupCfg.googleCxId;
+          if (lookupCfg && !lookupCfg.enabled) {
+            console.log(JSON.stringify({ event: "v2_brand_logo_skipped", reason: "flag_off" }));
+          } else if (lookupCfg?.enabled && !canUseGoogle) {
+            console.log(JSON.stringify({ event: "v2_brand_logo_skipped", reason: "no_google_creds" }));
+          }
+
+          // ── Step 4: website lookup ──────────────────────────────────
+          if (canUseGoogle && !picked.websiteUrl && remainingMs() > 0) {
+            const t = Date.now();
+            try {
+              const w = await findOfficialBrandWebsite(
+                picked.name, lookupCfg!.googleApiKey!, lookupCfg!.googleCxId!, controller.signal,
+              );
+              const ms = Date.now() - t;
+              if (w) {
+                picked.websiteUrl = w;
+                evidence.push({
+                  field: "website", value: sanitizeEvidenceValue(w),
+                  source: "google_cse", confidence: 0.6,
+                });
+              }
+              console.log(JSON.stringify({ event: "v2_brand_website_lookup", ok: !!w, ms }));
+            } catch {
+              console.log(JSON.stringify({ event: "v2_brand_website_lookup", ok: false, ms: Date.now() - t }));
+            }
+          }
+
+          // ── Step 5: logo image lookup ───────────────────────────────
+          if (canUseGoogle && !picked.logoUrl && remainingMs() > 0) {
+            const t = Date.now();
+            const filterPipeline = (raw: string): string | null => {
+              const n = normalizeLogoUrl(raw);
+              if (!n) return null;
+              if (isRejectedLogoUrl(n)) return null;
+              if (!isAcceptableLogo(n, picked!.websiteUrl, "google_images")) return null;
+              return n;
+            };
+            try {
+              const res = await searchBrandLogoV2(
+                picked.name, picked.websiteUrl ?? null,
+                lookupCfg!.googleApiKey!, lookupCfg!.googleCxId!,
+                controller.signal, filterPipeline,
+              );
+              const ms = Date.now() - t;
+              if (res.url) {
+                picked.logoUrl = res.url;
+                evidence.push({
+                  field: "logo", value: sanitizeEvidenceValue(res.url),
+                  source: "google_images", confidence: 0.6,
+                });
+                console.log(JSON.stringify({
+                  event: "v2_brand_logo_lookup", ok: true, ms,
+                  source: "google_images", phase: res.phase,
+                  scoreBucket: res.score >= 20 ? "high" : res.score >= 10 ? "med" : "low",
+                }));
+              } else {
+                console.log(JSON.stringify({
+                  event: "v2_brand_logo_lookup", ok: false, ms, source: "none",
+                }));
+              }
+            } catch {
+              console.log(JSON.stringify({
+                event: "v2_brand_logo_lookup", ok: false, ms: Date.now() - t, source: "none",
+              }));
+            }
+          }
+
+          // ── Step 6: own-origin favicon fallback (shared signal) ─────
+          if (!picked.logoUrl && picked.websiteUrl && remainingMs() > 0) {
+            try {
+              const found = await tryOwnOriginFavicon(picked.websiteUrl, controller.signal);
+              if (found) {
+                picked.logoUrl = found;
+                console.log(JSON.stringify({
+                  event: "v2_brand_logo_lookup", ok: true, source: "favicon",
+                }));
+              }
+            } catch { /* ignore */ }
+          }
+
+          // Reflect any brand picker index change (retailer suppression may
+          // have swapped a lower-ranked candidate to the front).
+          void pickedIdx;
+        }
       }
-    } catch { /* ignore */ }
-    finally { clearTimeout(timeoutId); }
+    }
+  } finally {
+    clearTimeout(timeoutId);
   }
 
 
