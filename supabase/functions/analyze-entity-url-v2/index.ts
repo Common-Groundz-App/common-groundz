@@ -244,6 +244,12 @@ async function assembleEntityDraft(args: {
   url: string;
   predictions: V2Predictions | null;
   requestId: string;
+  /** V2 Brand Logo Parity — resolved once per request in serve(). */
+  logoLookup?: {
+    enabled: boolean;
+    googleApiKey?: string | null;
+    googleCxId?: string | null;
+  };
 }): Promise<{ draft: EntityDraft | null; status: EntityDraftStatus }> {
   if (!_validateEntityDraft) {
     console.error("[analyze-entity-url-v2] entityDraftStatus=schema_unavailable", {
@@ -267,6 +273,7 @@ async function assembleEntityDraft(args: {
       inputRef: args.url,
       predictions: args.predictions,
       existingBrandMatches,
+      logoLookup: args.logoLookup,
     });
   } catch (e) {
     console.error("[analyze-entity-url-v2] entityDraftStatus=build_failed", {
@@ -287,6 +294,29 @@ async function assembleEntityDraft(args: {
     return { draft: null, status: "validation_failed" };
   }
 }
+
+/** Resolve the V2 brand-logo-lookup config once per request: reads the
+ *  admin-only kill-switch flag from app_config and the Google CSE creds
+ *  from env. Returns { enabled:false } on any error so the enrichment
+ *  stage safely no-ops. */
+async function resolveLogoLookupConfig(
+  client: ReturnType<typeof createClient>,
+): Promise<{ enabled: boolean; googleApiKey?: string | null; googleCxId?: string | null }> {
+  let enabled = true; // default to on when flag row missing
+  try {
+    const { data } = await client
+      .from("app_config")
+      .select("value")
+      .eq("key", "entity_extraction.v2_brand_logo_lookup_enabled")
+      .maybeSingle();
+    const v = (data?.value as { enabled?: unknown } | null | undefined)?.enabled;
+    if (typeof v === "boolean") enabled = v;
+  } catch { /* keep default */ }
+  const googleApiKey = Deno.env.get("GOOGLE_CUSTOM_SEARCH_API_KEY") ?? null;
+  const googleCxId = Deno.env.get("GOOGLE_CUSTOM_SEARCH_CX") ?? null;
+  return { enabled, googleApiKey, googleCxId };
+}
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
