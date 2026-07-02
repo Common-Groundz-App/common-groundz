@@ -253,6 +253,16 @@ export interface BuildEntityDraftInput {
   /** Optional extra image URLs already collected by the pipeline
    *  (page metadata, Firecrawl). Predictions.images is always included. */
   extraImageUrls?: Array<{ url: string; source: ImageCandidate["source"]; confidence?: number }>;
+  /** V2 Brand Logo Parity — optional Google CSE credentials + flag. When
+   *  omitted or `enabled=false` or missing creds, the enrichment stage
+   *  no-ops. Only the own-origin favicon fallback runs (as before). */
+  logoLookup?: {
+    enabled: boolean;
+    googleApiKey?: string | null;
+    googleCxId?: string | null;
+    /** Hard global budget for website + image + favicon combined. */
+    totalBudgetMs?: number;
+  };
 }
 
 export async function buildEntityDraft(input: BuildEntityDraftInput): Promise<EntityDraft> {
