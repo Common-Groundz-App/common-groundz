@@ -28,14 +28,17 @@ function safeHostname(url?: string | null): string | null {
   try { return new URL(url).hostname.replace(/^www\./, '').toLowerCase(); }
   catch { return null; }
 }
-function safePathPrefix(url?: string | null): string | null {
+function normalizeFullUrl(url?: string | null): string | null {
   if (!url) return null;
   try {
     const u = new URL(url);
-    const parts = u.pathname.split('/').filter(Boolean);
-    return parts.length > 0 ? `/${parts[0]}` : null;
+    const host = u.hostname.replace(/^www\./, '').toLowerCase();
+    let path = u.pathname.replace(/\/+$/, '');
+    if (path === '') path = '/';
+    return `${u.protocol}//${host}${path}`;
   } catch { return null; }
 }
+
 
 interface Body {
   name?: string;
@@ -117,11 +120,13 @@ serve(async (req) => {
 
     const slug = body.slug?.trim() || null;
     const websiteHost = safeHostname(body.websiteUrl);
+    const websiteUrlNorm = normalizeFullUrl(body.websiteUrl);
     const sourceHost = safeHostname(body.sourceUrl);
-    const sourcePathPrefix = safePathPrefix(body.sourceUrl);
+    const sourceUrlNorm = normalizeFullUrl(body.sourceUrl);
     const parentId = body.parentId || null;
     const apiSource = body.apiSource || null;
     const apiRef = body.apiRef || null;
+
 
     const collected = new Map<string, Candidate>();
     const add = (row: any, score: number, reason: string) => {
@@ -182,36 +187,34 @@ serve(async (req) => {
       }
     }
 
-    // 4) website_url host match.
-    if (websiteHost) {
+    // 4) website_url exact normalized-URL match (host-only match caused false positives on retailer domains).
+    if (websiteHost && websiteUrlNorm) {
       const { data } = await supabaseAdmin
         .from('entities').select(SELECT)
-        .eq('is_deleted', false).ilike('website_url', `%${websiteHost}%`).limit(8);
+        .eq('is_deleted', false).ilike('website_url', `%${websiteHost}%`).limit(20);
       (data ?? []).forEach(r => {
-        const host = safeHostname(r.website_url);
-        if (host === websiteHost) add(r, 0.85, 'Same website');
+        if (normalizeFullUrl(r.website_url) === websiteUrlNorm) {
+          add(r, 0.85, 'Same website');
+        }
       });
     }
 
-    // 5) metadata->>'created_from_url' host + path-prefix match.
-    if (sourceHost) {
+    // 5) metadata->>'created_from_url' EXACT normalized-URL match.
+    // Prior host+first-path-segment/host-only fallbacks matched unrelated products on shared retailer paths (e.g. `/en/products/...`).
+    if (sourceHost && sourceUrlNorm) {
       const { data } = await supabaseAdmin
         .from('entities').select(SELECT)
         .eq('is_deleted', false)
         .filter('metadata->>created_from_url', 'ilike', `%${sourceHost}%`)
-        .limit(8);
+        .limit(20);
       (data ?? []).forEach(r => {
         const fromUrl = (r.metadata as any)?.created_from_url;
-        const host = safeHostname(fromUrl);
-        if (host !== sourceHost) return;
-        const path = safePathPrefix(fromUrl);
-        if (sourcePathPrefix && path === sourcePathPrefix) {
+        if (normalizeFullUrl(fromUrl) === sourceUrlNorm) {
           add(r, 0.8, 'Created from same source URL');
-        } else {
-          add(r, 0.6, 'Created from same site');
         }
       });
     }
+
 
     // 6) (api_source, api_ref) exact.
     if (apiSource && apiRef) {

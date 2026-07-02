@@ -159,18 +159,19 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                 isMobile 
                   ? 'w-full h-48 mb-4 rounded-lg overflow-hidden' 
                   : 'flex-shrink-0 h-24 w-24 min-w-[96px] rounded-lg overflow-hidden'
-                } relative group`}>
+                } relative group ${entity.type === 'brand' ? 'bg-muted' : ''}`}>
                 <ImageWithFallback
                   src={entityImage}
                   alt={entityData.name}
                   entityType={entity.type}
-                  className="h-full w-full object-cover"
+                  className={`h-full w-full ${entity.type === 'brand' ? 'object-contain' : 'object-cover'}`}
                   onError={() => {
                     console.log('EntityHeader: Hero image failed to load (expired/403), showing refresh button');
                     setIsImageExpired(true);
                   }}
                   suppressConsoleErrors={false}
                 />
+
                 
                 {/* Refresh Button - Only shown when image is expired AND user is authenticated */}
                 {user && isImageExpired && onRefreshHeroImage && (
