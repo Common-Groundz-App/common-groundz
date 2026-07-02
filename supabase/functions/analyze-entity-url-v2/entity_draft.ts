@@ -785,3 +785,58 @@ function inferBrandFromTitleAmpersand(title: string | null): string | null {
   return phrase;
 }
 
+/** V2 Brand Logo Parity — pick the target brand candidate for enrichment.
+ *  Priority: (1) matched_existing exact by normalized name, (2) matched_existing
+ *  partial, (3) suggested_new sorted by descending confidence. Then applies
+ *  retailer suppression: if the picked candidate's normalized name matches
+ *  the inputRef host base AND a distinct alternative exists, prefer the
+ *  alternative (Medicube > Maccaron rule).
+ *  Returns null when brandCandidates is empty. Rearranges the input array
+ *  so the picked candidate becomes brandCandidates[0]. */
+function pickTopBrandCandidate(
+  brandCandidates: BrandCandidate[],
+  inputRef: string,
+): BrandCandidate | null {
+  if (brandCandidates.length === 0) return null;
+
+  // Rank: matched_existing (with a heuristic confidence signal) before suggested_new,
+  // and within each group in descending confidence.
+  const ranked = [...brandCandidates].sort((a, b) => {
+    const rankA = a.status === "matched_existing" ? 0 : 1;
+    const rankB = b.status === "matched_existing" ? 0 : 1;
+    if (rankA !== rankB) return rankA - rankB;
+    return (b.confidence ?? 0) - (a.confidence ?? 0);
+  });
+
+  let picked = ranked[0];
+
+  // Retailer/source-site suppression — compare normalized name against
+  // the host's first label (e.g. "maccaron" from "maccaron.in").
+  try {
+    const host = new URL(inputRef).hostname.toLowerCase().replace(/^www\./, "");
+    const hostBase = host.split(".")[0];
+    const pickedNorm = normalizeBrandName(picked.name);
+    if (hostBase && pickedNorm && pickedNorm === normalizeBrandName(hostBase)) {
+      const alt = ranked.find(
+        (c) => normalizeBrandName(c.name) !== pickedNorm,
+      );
+      if (alt) {
+        console.log(JSON.stringify({
+          event: "v2_brand_logo_retailer_skipped", fromHost: hostBase,
+        }));
+        picked = alt;
+      }
+    }
+  } catch { /* malformed url — skip suppression */ }
+
+  // Move picked to index 0 so downstream callers that peek at
+  // brandCandidates[0] see the correct target.
+  const currentIdx = brandCandidates.indexOf(picked);
+  if (currentIdx > 0) {
+    brandCandidates.splice(currentIdx, 1);
+    brandCandidates.unshift(picked);
+  }
+  return picked;
+}
+
+
