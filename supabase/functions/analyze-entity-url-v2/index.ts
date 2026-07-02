@@ -844,6 +844,10 @@ serve(async (req) => {
       return respondError(403, "NOT_ADMIN", "Forbidden");
     }
 
+    // V2 Brand Logo Parity — resolve kill-switch flag + Google CSE creds once
+    // per request. Passed into both assembleEntityDraft call sites below.
+    const logoLookupConfig = await resolveLogoLookupConfig(supabaseService);
+
     // === Body parse ===
     let rawBody: unknown;
     try {
