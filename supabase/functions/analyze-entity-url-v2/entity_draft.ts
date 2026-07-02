@@ -16,6 +16,11 @@ import type {
 } from "../_shared/contracts/entityDraft.types.ts";
 import { ENTITY_DRAFT_SCHEMA_VERSION } from "../_shared/contracts/entityDraft.types.ts";
 import type { V2Predictions } from "./schema.ts";
+import { normalizeBrandName } from "../_shared/brand_normalize.ts";
+import {
+  findOfficialBrandWebsite,
+  searchBrandLogoV2,
+} from "./brand_logo_lookup.ts";
 
 const MAX_EVIDENCE_VALUE_CHARS = 200;
 const MAX_IMAGE_CANDIDATES = 12;
