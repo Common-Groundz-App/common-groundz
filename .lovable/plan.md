@@ -1,109 +1,81 @@
-# V2 Brand Logo Parity — Plan v3 (final)
+# V2 Brand Logo Lookup — Option B (revised, top-5 website eval, V2-only)
 
-Applies both reviewer corrections. No legacy edits, no public shape changes.
+Scope: `supabase/functions/analyze-entity-url-v2/brand_logo_lookup.ts` only. Legacy (`enrich-brand-data`, `fetch-url-metadata-lite`, analyze-entity-url v1) is not touched. No public shape or frontend changes.
 
-## Problem
+## 1. Website resolution — evaluate top 5 CSE results (not just rank 1)
 
-Legacy `enrich-brand-data` actively fetches brand logos: Google CSE web search → official site → Google CSE image search (site-scoped + broad) → scored ranking → HTML favicon fallback. It succeeds most of the time.
+Rewrite `findOfficialBrandWebsite` so the top-N (N = 5, matching current `num=5`) results are all considered:
 
-V2 (`analyze-entity-url-v2/entity_draft.ts`) does no active lookup:
-- `matched_existing` reuses `entities.image_url`.
-- `suggested_new` candidates are pushed with no `websiteUrl` and no `logoUrl`.
-- The Fix Pack v3.3 own-origin favicon fallback only runs when `websiteUrl` is already populated — which suggested-new candidates never have.
+1. **Score every result** with the existing `scoreWebsiteResult`. Preserve original CSE rank (1–5) for telemetry.
+2. **Hard-reject** (regardless of score) any result whose hostname or path falls into a block bucket:
+   - Hostname or apex-domain matches `MAJOR_MARKETPLACES`, `BEAUTY_RETAILERS`, `SOCIAL_MEDIA`, `REVIEW_SITES`, or `AGGREGATOR_HOSTS`.
+   - Subdomain of a known marketplace (`*.amazon.*`, `*.ebay.*`, `*.walmart.*`, etc.).
+   - Path is a product/listing page: `/product`, `/products/`, `/p/`, `/item`, `/pd/`, `/dp/`, `/sku`, `/collections/`, `/catalog/`, `/shop/`, `/store/`.
+   - Log with reason enum: `blocked_retailer` | `blocked_social` | `blocked_review` | `blocked_aggregator` | `blocked_marketplace_subdomain` | `blocked_product_path`.
+3. **Sort survivors** by score desc; on ties prefer the shorter hostname (fewer labels; secondary tiebreak = shorter full string). Rationale: `medicube.us` beats `shop.medicube.us` / `medicube.co.kr`.
+4. **Acceptance** walks the sorted survivors:
+   - First survivor with `score >= 10` → accept (tier `"high"`).
+   - Else first survivor with `score >= 6` AND `isBrandOwnedDomain(host, brand)` → accept (tier `"medium"`).
+   - Else return `null`.
+5. `isBrandOwnedDomain(host, brand)`: take the first hostname label (`domainBase`), compare against `normalizeBrandName(brand)`:
+   - exact match, `brand + s`, `brand - s`, `official-<brand>` / `<brand>-official`, `get<brand>`, `<brand>hq`, `<brand>cosmetics`, `<brand>beauty` → true.
+   - Combined with the score-≥-6 gate this admits `medicube.us` even when its CSE title lacks the word "official".
 
-Result: suggested-new brands (Medicube, AXIS-Y, etc.) essentially never get a logo in V2.
+This fixes Medicube: rank 1 (Maccaron / retailer) is rejected as `blocked_retailer`, rank 2 (`medicube.us`) is accepted.
 
-## Fix (V2-only)
+## 2. Site-scoped logo search — unchanged, still preferred
 
-### Files
+`"{brand}" logo site:{officialHost}` remains phase 1 when a website is resolved. Scoring unchanged.
 
-**New:** `supabase/functions/analyze-entity-url-v2/brand_logo_lookup.ts`
-- `findOfficialBrandWebsite(brandName, apiKey, cxId, signal)` — port of legacy `findOfficialWebsite` (Google CSE web query `"<brand>" official site`, same social/blocklist filters).
-- `searchBrandLogoV2(brandName, officialWebsite, apiKey, cxId, signal)` — port of legacy `searchBrandLogo` + `scoreLogoImage` (site-scoped phase, broad phase, dedupe, scored ranking, `score > 0` guardrail).
-- Every returned URL is passed through the existing v3.3 filters (`normalizeLogoUrl` → `isRejectedLogoUrl` → `isAcceptableLogo`) before being accepted. No exceptions.
+## 3. Broad fallback query — simplified
 
-**Edit:** `supabase/functions/analyze-entity-url-v2/entity_draft.ts` — insert the bounded enrichment stage between brand-candidate assembly and the existing own-origin favicon block.
+Replace the current `"{brand}" official brand logo -site:{host} -product -buy -shop` and `transparent png` variants with a single query: `"{brand}" brand logo`. Legacy still runs its own richer broad queries — we're not touching that path.
 
-**Edit:** `supabase/functions/analyze-entity-url-v2/index.ts` — read env, pass into `buildEntityDraft`, gate on flag.
+## 4. Broad fallback runs only if site-scoped fails
 
-**New migration:** add `entity_extraction.v2_brand_logo_lookup_enabled` to the `set_app_flag` allowlist and validator; seed row.
+After scoring the site-scoped batch, walk candidates in score order through the caller's `filter(...)`. If any survivor has `score > 0`, return it and skip broad entirely. Broad runs only when:
+- No website was resolved, OR
+- Site-scoped produced zero filter-surviving candidates with `score > 0`.
 
-### Enrichment stage — ordered rules
+## 5. V2 filters — unchanged
 
-1. **Pick the target candidate by confidence, not array index.** Priority:
-   1. `matched_existing` with exact normalized-name match
-   2. `matched_existing` partial match
-   3. `suggested_new` candidates in descending `confidence`
-2. **Retailer/source-site suppression.** If the top candidate's normalized name matches the host of `inputRef` (e.g. "maccaron" for `maccaron.in`) AND a lower-ranked distinct brand exists in candidates, prefer the distinct brand. Log `v2_brand_logo_retailer_skipped { fromHost }`. This is the Medicube-vs-Maccaron rule.
-3. **Never override curated data.** Skip lookup entirely when the picked candidate already has a valid `logoUrl` that survives v3.3 filters.
-4. **Skip if normalized-dupe of an existing DB brand.** Uses `normalizeBrandName` from `_shared/brand_normalize.ts`.
-5. **Website resolve** — only if picked candidate has no `websiteUrl`. Attach on success, record `SourceEvidence { source: "google_cse" }`.
-6. **Logo lookup** — only if still no `logoUrl` after step 5. On success, set `logoUrl`, record `SourceEvidence { source: "google_images" }`.
-7. **Own-origin favicon fallback** (existing v3.3 code) runs last, sharing the same abort signal — no separate 2s budget.
+All existing v3.3 filters remain active via the caller-provided `filter(...)` closure: `share.google`, `google.com/url`, `encrypted-tbn*.gstatic.com`, `/s2/favicons`, `/imgres`, proxy hosts, non-image URLs, `srsltid`/UTM stripping. No new filter code inside this module.
 
-### Global timeout (correction #2)
+## 6. Session cache — cache negatives too
 
-- **One shared `AbortController`, 4 s total budget** covering steps 5 + 6 + 7 combined.
-- Step 6 gets `max(0, 4000 − elapsed)` ms. Step 7 gets `max(0, 4000 − elapsed)` ms.
-- Budget expiry / any fetch throw → candidate keeps whatever it had. Analyze never fails because of logo lookup.
-- Feature-flag off → whole stage no-ops in a single branch, no CSE call.
-- Missing `GOOGLE_CUSTOM_SEARCH_API_KEY` or `GOOGLE_CUSTOM_SEARCH_CX` → log `v2_brand_logo_skipped { reason: "no_google_creds" }` and no-op.
+The per-Analyze cache already stores accepted website URLs. Extend to also cache `null` under the same key (`normalizeBrandName(brand) + '|' + host`) when website resolution returns `null`. Prevents a second candidate with the same normalized brand in one Analyze from re-issuing CSE just to be rejected again. Applied wherever the cache currently lives (no relocation).
 
-### Env vars
+## 7. Validation telemetry (server-side `console.log`, no PII, no full URLs)
 
-Reuse legacy names exactly (verified in `enrich-brand-data/index.ts:86-87`):
-- `GOOGLE_CUSTOM_SEARCH_API_KEY`
-- `GOOGLE_CUSTOM_SEARCH_CX`
+Add / extend inside `brand_logo_lookup.ts`:
 
-No new secrets. No aliases.
+- `v2_brand_website_evaluated` — `{ brand, count }` once per resolution.
+- `v2_brand_website_candidate` — `{ rank, host, score, tier: "high"|"medium"|"none" }` per top-5 result.
+- `v2_brand_website_rejected` — `{ rank, host, score, reason: "blocked_retailer"|"blocked_social"|"blocked_review"|"blocked_aggregator"|"blocked_marketplace_subdomain"|"blocked_product_path"|"low_score"|"not_brand_owned" }` per rejected result.
+- `v2_brand_website_accepted` — `{ rank, host, score, tier }` when a survivor is chosen.
+- `v2_brand_logo_phase` — `{ phase: "site_scoped"|"broad"|"none", ok, score }` once per resolved logo.
+- Keep existing `v2_brand_logo_quota_exhausted`.
 
-### Feature flag (correction #1)
+Log only hostname (never full URL), integer rank, numeric score, and reason enum.
 
-Key: `entity_extraction.v2_brand_logo_lookup_enabled`
-Value shape: `{ "enabled": boolean }` (matches `entity_extraction.review_uses_draft` pattern)
+## 8. Explicitly NOT changed
 
-Migration must:
-1. Add key to the `_key IN (...)` allowlist inside `public.set_app_flag`.
-2. Add an `ELSIF _key = 'entity_extraction.v2_brand_logo_lookup_enabled' THEN` branch that validates exactly `{ "enabled": boolean }` (matching the existing `review_uses_draft` validation pattern).
-3. Seed the row with `{"enabled": true}` if missing (idempotent `INSERT … WHERE NOT EXISTS`).
-4. Admin-only: **not** exposed via `get_public_flags`. Not added to `ALLOWED_KEYS` in `useAppFlagsAdmin.ts` in this migration — UI toggle can be added later; the flag exists purely as an emergency kill-switch until then.
+- `enrich-brand-data/*`, `fetch-url-metadata-lite/*`, `analyze-entity-url` v1 — untouched.
+- `entity_draft.ts` — untouched except for the negative-cache line if the cache lives there.
+- `pickTopBrandCandidate`, retailer suppression, 4 s global budget, feature flag `entity_extraction.v2_brand_logo_lookup_enabled`, own-origin favicon fallback — unchanged.
+- `BrandCandidate` shape, migrations, frontend — unchanged.
+- `scoreWebsiteResult` / `scoreLogoImage` formulas — unchanged; only the acceptance gate around `scoreWebsiteResult` changes.
 
-### Session cache
+## 9. Validation
 
-Per-Analyze in-memory `Map<string, string | null>` keyed by `normalizeBrandName(name) + '|' + host`. Prevents duplicate CSE calls within one invocation. Not persisted.
-
-### Filter reuse (unchanged)
-
-All Google results go through the existing v3.3 filters — `share.google`, `encrypted-tbn*.gstatic.com`, `/s2/favicons`, `/imgres`, redirect wrappers, `srsltid`/UTM stripping, non-image rejection, etc.
-
-### Telemetry (server-side `console.log`, no URLs/PII)
-
-- `v2_brand_logo_stage_start` — `{ candidateSource, hasWebsite, hasLogo }`
-- `v2_brand_logo_retailer_skipped` — `{ fromHost }`
-- `v2_brand_website_lookup` — `{ ok, ms }`
-- `v2_brand_logo_lookup` — `{ ok, ms, source, scoreBucket }`
-- `v2_brand_logo_rejected` — reuses existing reason enum
-- `v2_brand_logo_quota_exhausted` — distinct signal on HTTP 429 / `quotaExceeded`
-- `v2_brand_logo_skipped` — `{ reason: "no_google_creds" | "flag_off" | "already_has_logo" | "normalized_dupe" }`
-
-### Explicitly NOT changed
-
-- `enrich-brand-data`, `fetch-url-metadata-lite`, `_shared/`.
-- Public `BrandCandidate` shape.
-- v3.3 normalizer, reject lists, own-origin favicon logic (only the abort signal it uses is unified).
-- Frontend (`BrandPicker`, `DraftReviewBody`, `AutoFillPreviewModal`).
-- `matched_existing` candidates that already have a valid logo.
-- `get_public_flags`.
-
-## Validation
-
-1. Re-analyze `maccaron.in/.../medicube_...` → **Medicube** (not Maccaron) is the enriched candidate and gets a `google_images` or favicon logo in BrandPicker.
-2. A curated DB brand with existing `image_url` keeps it — no Google override.
-3. Retailer-suppression path logs `v2_brand_logo_retailer_skipped`.
-4. `share.google` / `encrypted-tbn*` / non-image results still filtered.
-5. Google 429 → `v2_brand_logo_quota_exhausted` logged; Analyze completes.
-6. 4 s global budget expires → Analyze completes with no logo attached, no error surfaced.
-7. `UPDATE app_config SET value='{"enabled": false}' WHERE key='entity_extraction.v2_brand_logo_lookup_enabled'` → next Analyze skips stage (`v2_brand_logo_skipped { reason: "flag_off" }`).
-8. Migration idempotency: re-running `set_app_flag` with the same value succeeds; invalid shape (`true` instead of `{"enabled": true}`) raises `invalid_value_for_key`.
-9. Legacy smoke: flip pipeline flag to legacy, analyze one URL, succeeds unchanged; `git diff` shows zero changes under `enrich-brand-data/`, `fetch-url-metadata-lite/`, `_shared/`.
-10. Latency: P95 Analyze increases by ≤ 4 s only when top candidate had no logo; unchanged otherwise.
+1. Re-analyze `maccaron.in/.../medicube_...`:
+   - `v2_brand_website_evaluated { count: 5 }`.
+   - `v2_brand_website_rejected { rank: 1, host: "maccaron.in", reason: "blocked_retailer" }`.
+   - `v2_brand_website_accepted { rank: 2|3, host: "medicube.us", tier: "high"|"medium" }`.
+   - `v2_brand_logo_phase { phase: "site_scoped", ok: true }`; broad phase does not run.
+   - Final logo comes from `medicube.us`.
+2. Brand with no brand-owned site in top 5 → all rejected, `null` returned, broad fallback runs `"{brand}" brand logo`.
+3. Top 5 contains both `brand.com` (score 12) and `shop.brand.com` (score 12) → tiebreak picks `brand.com`.
+4. Second candidate with same normalized brand in one Analyze → negative-cache hit, no duplicate CSE call.
+5. Google 429 → `v2_brand_logo_quota_exhausted` still fires; Analyze completes.
+6. `git diff` shows changes only in `brand_logo_lookup.ts` (and one cache-key line in `entity_draft.ts` if that's where the map lives).
