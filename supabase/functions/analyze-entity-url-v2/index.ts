@@ -1349,6 +1349,7 @@ serve(async (req) => {
         // Phase 3.1: dark-ship entityDraft alongside existing response.
         const { draft: recDraft, status: recDraftStatus } = await assembleEntityDraft({
           client: supabaseService, url: safe.url, predictions: recMerged, requestId: request_id,
+          logoLookup: logoLookupConfig,
         });
         (response as unknown as { entityDraft: EntityDraft | null }).entityDraft = recDraft;
         (response.metadata as unknown as { entityDraftStatus: EntityDraftStatus }).entityDraftStatus = recDraftStatus;
@@ -1860,6 +1861,7 @@ serve(async (req) => {
     // Phase 3.1: dark-ship entityDraft alongside existing response.
     const { draft: mainDraft, status: mainDraftStatus } = await assembleEntityDraft({
       client: supabaseService, url: safe.url, predictions: mainMerged, requestId: request_id,
+      logoLookup: logoLookupConfig,
     });
     (response as unknown as { entityDraft: EntityDraft | null }).entityDraft = mainDraft;
     (response.metadata as unknown as { entityDraftStatus: EntityDraftStatus }).entityDraftStatus = mainDraftStatus;
