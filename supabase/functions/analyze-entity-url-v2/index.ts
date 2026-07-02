@@ -244,6 +244,12 @@ async function assembleEntityDraft(args: {
   url: string;
   predictions: V2Predictions | null;
   requestId: string;
+  /** V2 Brand Logo Parity — resolved once per request in serve(). */
+  logoLookup?: {
+    enabled: boolean;
+    googleApiKey?: string | null;
+    googleCxId?: string | null;
+  };
 }): Promise<{ draft: EntityDraft | null; status: EntityDraftStatus }> {
   if (!_validateEntityDraft) {
     console.error("[analyze-entity-url-v2] entityDraftStatus=schema_unavailable", {
@@ -267,6 +273,7 @@ async function assembleEntityDraft(args: {
       inputRef: args.url,
       predictions: args.predictions,
       existingBrandMatches,
+      logoLookup: args.logoLookup,
     });
   } catch (e) {
     console.error("[analyze-entity-url-v2] entityDraftStatus=build_failed", {
@@ -287,6 +294,29 @@ async function assembleEntityDraft(args: {
     return { draft: null, status: "validation_failed" };
   }
 }
+
+/** Resolve the V2 brand-logo-lookup config once per request: reads the
+ *  admin-only kill-switch flag from app_config and the Google CSE creds
+ *  from env. Returns { enabled:false } on any error so the enrichment
+ *  stage safely no-ops. */
+async function resolveLogoLookupConfig(
+  client: ReturnType<typeof createClient>,
+): Promise<{ enabled: boolean; googleApiKey?: string | null; googleCxId?: string | null }> {
+  let enabled = true; // default to on when flag row missing
+  try {
+    const { data } = await client
+      .from("app_config")
+      .select("value")
+      .eq("key", "entity_extraction.v2_brand_logo_lookup_enabled")
+      .maybeSingle();
+    const v = (data?.value as { enabled?: unknown } | null | undefined)?.enabled;
+    if (typeof v === "boolean") enabled = v;
+  } catch { /* keep default */ }
+  const googleApiKey = Deno.env.get("GOOGLE_CUSTOM_SEARCH_API_KEY") ?? null;
+  const googleCxId = Deno.env.get("GOOGLE_CUSTOM_SEARCH_CX") ?? null;
+  return { enabled, googleApiKey, googleCxId };
+}
+
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -814,6 +844,10 @@ serve(async (req) => {
       return respondError(403, "NOT_ADMIN", "Forbidden");
     }
 
+    // V2 Brand Logo Parity — resolve kill-switch flag + Google CSE creds once
+    // per request. Passed into both assembleEntityDraft call sites below.
+    const logoLookupConfig = await resolveLogoLookupConfig(supabaseService);
+
     // === Body parse ===
     let rawBody: unknown;
     try {
@@ -1315,6 +1349,7 @@ serve(async (req) => {
         // Phase 3.1: dark-ship entityDraft alongside existing response.
         const { draft: recDraft, status: recDraftStatus } = await assembleEntityDraft({
           client: supabaseService, url: safe.url, predictions: recMerged, requestId: request_id,
+          logoLookup: logoLookupConfig,
         });
         (response as unknown as { entityDraft: EntityDraft | null }).entityDraft = recDraft;
         (response.metadata as unknown as { entityDraftStatus: EntityDraftStatus }).entityDraftStatus = recDraftStatus;
@@ -1826,6 +1861,7 @@ serve(async (req) => {
     // Phase 3.1: dark-ship entityDraft alongside existing response.
     const { draft: mainDraft, status: mainDraftStatus } = await assembleEntityDraft({
       client: supabaseService, url: safe.url, predictions: mainMerged, requestId: request_id,
+      logoLookup: logoLookupConfig,
     });
     (response as unknown as { entityDraft: EntityDraft | null }).entityDraft = mainDraft;
     (response.metadata as unknown as { entityDraftStatus: EntityDraftStatus }).entityDraftStatus = mainDraftStatus;
