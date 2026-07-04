@@ -983,11 +983,11 @@ const EntityDetailV2 = () => {
                         onClick={() => navigate(`${getEntityUrlWithParent(parentEntity)}?preview=true`)}
                       >
                         {parentEntity.image_url && (
-                          <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0">
+                          <div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center p-1">
                             <ImageWithFallback
                               src={parentEntity.image_url}
                               alt={parentEntity.name}
-                              className="w-full h-full object-cover"
+                              className="w-full h-full object-contain"
                               fallbackSrc={getEntityTypeFallbackImage(parentEntity.type)}
                             />
                           </div>
