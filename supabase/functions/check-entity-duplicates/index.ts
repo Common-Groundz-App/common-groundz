@@ -110,10 +110,11 @@ serve(async (req) => {
       });
     }
 
-    const body = (await req.json().catch(() => ({}))) as Body;
+    const mode = body.mode === 'exact_url_preflight' ? 'exact_url_preflight' : 'full';
     const name = (body.name ?? '').trim();
     const type = (body.type ?? '').trim();
-    if (!name || !type) {
+    // In 'full' mode, name+type are required. In 'exact_url_preflight' they're optional.
+    if (mode === 'full' && (!name || !type)) {
       return new Response(JSON.stringify({ candidates: [] }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -127,6 +128,7 @@ serve(async (req) => {
     const parentId = body.parentId || null;
     const apiSource = body.apiSource || null;
     const apiRef = body.apiRef || null;
+
 
 
     const collected = new Map<string, Candidate>();
