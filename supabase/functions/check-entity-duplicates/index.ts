@@ -150,6 +150,41 @@ serve(async (req) => {
 
     const SELECT = 'id, name, slug, image_url, type, parent_id, website_url, api_source, api_ref, metadata, parent:parent_id(name)';
 
+    // ─── exact_url_preflight — run ONLY normalized-URL equality against
+    // entities.website_url and metadata->>created_from_url. Skip name/slug/
+    // api_ref/parent-boost/host heuristics. Returns immediately.
+    if (mode === 'exact_url_preflight') {
+      if (websiteHost && websiteUrlNorm) {
+        const { data } = await supabaseAdmin
+          .from('entities').select(SELECT)
+          .eq('is_deleted', false).ilike('website_url', `%${websiteHost}%`).limit(20);
+        (data ?? []).forEach(r => {
+          if (normalizeFullUrl(r.website_url) === websiteUrlNorm) {
+            add(r, 1.0, 'Same website');
+          }
+        });
+      }
+      if (sourceHost && sourceUrlNorm) {
+        const { data } = await supabaseAdmin
+          .from('entities').select(SELECT)
+          .eq('is_deleted', false)
+          .filter('metadata->>created_from_url', 'ilike', `%${sourceHost}%`)
+          .limit(20);
+        (data ?? []).forEach(r => {
+          const fromUrl = (r.metadata as any)?.created_from_url;
+          if (normalizeFullUrl(fromUrl) === sourceUrlNorm) {
+            add(r, 1.0, 'Created from same source URL');
+          }
+        });
+      }
+      const candidates = Array.from(collected.values()).slice(0, 6);
+      return new Response(JSON.stringify({ candidates, mode }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+
+
     // 1) Fuzzy name match scoped by type via pg_trgm.
     const { data: trgmRows, error: rpcError } = await supabaseAdmin
       .rpc('match_entities_by_name', { _name: name, _type: type, _threshold: 0.55, _limit: 8 });
