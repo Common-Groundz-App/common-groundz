@@ -1010,7 +1010,48 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       return;
     }
 
+    // ─── Exact-URL preflight duplicate check ─────────────────────────────
+    // Runs BEFORE any AI/scrape credits are spent. Only checks deterministic
+    // URL equality (normalized website_url + metadata.created_from_url).
+    // Bypassed once when the admin picks "Continue Anyway" on the dialog.
+    if (skipEarlyDupCheckOnceRef.current) {
+      skipEarlyDupCheckOnceRef.current = false;
+    } else if (!preflightInFlightRef.current) {
+      preflightInFlightRef.current = true;
+      setAnalyzing(true); // reuse spinner while preflight round-trips
+      try {
+        const preflightPromise = supabase.functions.invoke('check-entity-duplicates', {
+          body: {
+            mode: 'exact_url_preflight',
+            sourceUrl: analyzeUrl,
+            websiteUrl: analyzeUrl,
+          },
+        });
+        const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+          setTimeout(() => resolve({ data: null, error: new Error('preflight timeout') }), 2000)
+        );
+        const { data, error } = await Promise.race([preflightPromise, timeoutPromise]) as any;
+        if (!error && data?.candidates?.length > 0) {
+          setPendingAnalyzeUrl(analyzeUrl);
+          setPreflightDupCandidates(data.candidates as DuplicateCandidate[]);
+          setPreflightDupOpen(true);
+          setAnalyzing(false);
+          preflightInFlightRef.current = false;
+          return; // block pipeline — no AI/scrape credits spent
+        }
+        if (error) {
+          console.warn('Exact-URL preflight failed (non-fatal, proceeding):', error);
+        }
+      } catch (e) {
+        console.warn('Exact-URL preflight threw (non-fatal, proceeding):', e);
+      } finally {
+        preflightInFlightRef.current = false;
+      }
+      // preflight miss → fall through to normal Analyze (setAnalyzing already true)
+    }
+
     setAnalyzing(true);
+
 
     // Phase 2 v8: Analyze is preview-only. Do NOT mutate form/media state
     // here. Only clear analysis-side state for a new normalized URL so the
