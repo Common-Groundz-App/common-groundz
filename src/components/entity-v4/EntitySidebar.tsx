@@ -120,12 +120,14 @@ export const EntitySidebar: React.FC<EntitySidebarProps> = ({
               className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors group"
               onClick={() => navigate(getEntityUrlWithParent(parentEntity))}
             >
-              <ImageWithFallback
-                src={parentEntity.image_url}
-                alt={parentEntity.name}
-                fallbackSrc={getEntityTypeFallbackImage(parentEntity.type)}
-                className="w-12 h-12 rounded-lg object-cover"
-              />
+              <div className="w-12 h-12 rounded-lg overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center p-1">
+                <ImageWithFallback
+                  src={parentEntity.image_url}
+                  alt={parentEntity.name}
+                  fallbackSrc={getEntityTypeFallbackImage(parentEntity.type)}
+                  className="w-full h-full object-contain"
+                />
+              </div>
               <div className="flex-1 min-w-0">
                 <h4 className="font-medium text-sm truncate group-hover:text-primary transition-colors">
                   {parentEntity.name}
