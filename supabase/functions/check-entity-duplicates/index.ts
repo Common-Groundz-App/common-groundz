@@ -110,6 +110,7 @@ serve(async (req) => {
       });
     }
 
+    const body = (await req.json().catch(() => ({}))) as Body;
     const mode = body.mode === 'exact_url_preflight' ? 'exact_url_preflight' : 'full';
     const name = (body.name ?? '').trim();
     const type = (body.type ?? '').trim();
