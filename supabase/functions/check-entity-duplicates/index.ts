@@ -41,6 +41,7 @@ function normalizeFullUrl(url?: string | null): string | null {
 
 
 interface Body {
+  mode?: 'full' | 'exact_url_preflight';
   name?: string;
   type?: string;
   parentId?: string | null;
