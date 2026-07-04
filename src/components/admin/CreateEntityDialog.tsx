@@ -39,6 +39,7 @@ import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
 import { useEntityReviewUsesDraft } from '@/hooks/useEntityReviewUsesDraft';
 import { DuplicateConfirmDialog, type DuplicateCandidate } from './entity-create/DuplicateConfirmDialog';
+import { ExactUrlDuplicateDialog } from './entity-create/ExactUrlDuplicateDialog';
 import { uploadEntityImage } from '@/services/entityImageService';
 
 interface CreateEntityDialogProps {
@@ -138,6 +139,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [dupDialogOpen, setDupDialogOpen] = useState(false);
   const pendingSubmitOverridesRef = useRef<any>(undefined);
   const prefilledFromDraftRef = useRef<boolean>(false);
+  // Exact-URL preflight (fires before Analyze spends AI/scrape credits).
+  const [preflightDupCandidates, setPreflightDupCandidates] = useState<DuplicateCandidate[]>([]);
+  const [preflightDupOpen, setPreflightDupOpen] = useState(false);
+  const [pendingAnalyzeUrl, setPendingAnalyzeUrl] = useState<string | null>(null);
+  const skipEarlyDupCheckOnceRef = useRef<boolean>(false);
+  const preflightInFlightRef = useRef<boolean>(false);
   // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
   // by the metadata-only modal as a freshness guard so URL A's metadata never
   // surfaces under URL B.
@@ -1003,7 +1010,48 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       return;
     }
 
+    // ─── Exact-URL preflight duplicate check ─────────────────────────────
+    // Runs BEFORE any AI/scrape credits are spent. Only checks deterministic
+    // URL equality (normalized website_url + metadata.created_from_url).
+    // Bypassed once when the admin picks "Continue Anyway" on the dialog.
+    if (skipEarlyDupCheckOnceRef.current) {
+      skipEarlyDupCheckOnceRef.current = false;
+    } else if (!preflightInFlightRef.current) {
+      preflightInFlightRef.current = true;
+      setAnalyzing(true); // reuse spinner while preflight round-trips
+      try {
+        const preflightPromise = supabase.functions.invoke('check-entity-duplicates', {
+          body: {
+            mode: 'exact_url_preflight',
+            sourceUrl: analyzeUrl,
+            websiteUrl: analyzeUrl,
+          },
+        });
+        const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+          setTimeout(() => resolve({ data: null, error: new Error('preflight timeout') }), 2000)
+        );
+        const { data, error } = await Promise.race([preflightPromise, timeoutPromise]) as any;
+        if (!error && data?.candidates?.length > 0) {
+          setPendingAnalyzeUrl(analyzeUrl);
+          setPreflightDupCandidates(data.candidates as DuplicateCandidate[]);
+          setPreflightDupOpen(true);
+          setAnalyzing(false);
+          preflightInFlightRef.current = false;
+          return; // block pipeline — no AI/scrape credits spent
+        }
+        if (error) {
+          console.warn('Exact-URL preflight failed (non-fatal, proceeding):', error);
+        }
+      } catch (e) {
+        console.warn('Exact-URL preflight threw (non-fatal, proceeding):', e);
+      } finally {
+        preflightInFlightRef.current = false;
+      }
+      // preflight miss → fall through to normal Analyze (setAnalyzing already true)
+    }
+
     setAnalyzing(true);
+
 
     // Phase 2 v8: Analyze is preview-only. Do NOT mutate form/media state
     // here. Only clear analysis-side state for a new normalized URL so the
@@ -2874,7 +2922,38 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           void handleSubmit({ ...prev, _duplicateConfirmed: true, _fromDraftFlow: prefilledFromDraftRef.current });
         }}
       />
+
+      {/* Exact-URL preflight duplicate dialog (fires before Analyze spends credits) */}
+      <ExactUrlDuplicateDialog
+        open={preflightDupOpen}
+        candidates={preflightDupCandidates}
+        onCancel={() => {
+          setPreflightDupOpen(false);
+          setPreflightDupCandidates([]);
+          setPendingAnalyzeUrl(null);
+        }}
+        onOpenExisting={(c) => {
+          setPreflightDupOpen(false);
+          setPreflightDupCandidates([]);
+          setPendingAnalyzeUrl(null);
+          toast({ title: 'Using existing entity', description: c.name });
+          onEntityCreated({
+            id: c.id, name: c.name, type: c.type,
+            image_url: c.image_url || undefined,
+          });
+          resetForm();
+          onOpenChange(false);
+        }}
+        onContinueAnyway={() => {
+          setPreflightDupOpen(false);
+          setPreflightDupCandidates([]);
+          setPendingAnalyzeUrl(null);
+          skipEarlyDupCheckOnceRef.current = true;
+          void handleAnalyzeUrl();
+        }}
+      />
     </Dialog>
+
 
   );
 };
