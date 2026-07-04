@@ -39,6 +39,7 @@ import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
 import { useEntityReviewUsesDraft } from '@/hooks/useEntityReviewUsesDraft';
 import { DuplicateConfirmDialog, type DuplicateCandidate } from './entity-create/DuplicateConfirmDialog';
+import { ExactUrlDuplicateDialog } from './entity-create/ExactUrlDuplicateDialog';
 import { uploadEntityImage } from '@/services/entityImageService';
 
 interface CreateEntityDialogProps {
