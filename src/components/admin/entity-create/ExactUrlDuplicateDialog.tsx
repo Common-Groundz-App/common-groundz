@@ -55,7 +55,7 @@ export const ExactUrlDuplicateDialog: React.FC<Props> = ({
                   ))}
                 </div>
               </div>
-              <Button size="sm" variant="outline" onClick={() => onOpenExisting(c)}>
+              <Button size="sm" onClick={() => onOpenExisting(c)}>
                 Open Existing
               </Button>
             </div>

@@ -2936,13 +2936,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           setPreflightDupOpen(false);
           setPreflightDupCandidates([]);
           setPendingAnalyzeUrl(null);
-          toast({ title: 'Using existing entity', description: c.name });
-          onEntityCreated({
-            id: c.id, name: c.name, type: c.type,
-            image_url: c.image_url || undefined,
-          });
           resetForm();
           onOpenChange(false);
+          toast({ title: 'Opening existing entity', description: c.name });
+          navigate(`/entity/${c.slug || c.id}`);
         }}
         onContinueAnyway={() => {
           setPreflightDupOpen(false);
