@@ -1,56 +1,65 @@
-# Fix Pack v2: duplicate false-positives + brand logo cropping
+## Problem
 
-Applying ChatGPT's revisions. Both fixes stay narrowly scoped.
+Duplicate detection currently runs **only at final "Create Entity" submit**. Re-analyzing an already-indexed URL (e.g. the maccaron Medicube pore-pad URL) forces the admin through Analyze → Brand step → Image step → full form, then fails with "Duplicate Website URL". All the work — and the AI/scrape credits — are wasted.
 
----
+## Solution: exact-URL preflight before Analyze
 
-## Issue 1 — "Did you mean one of these?" shows unrelated maccaron products
+Run a **URL-only** duplicate check the instant the admin clicks Analyze, **before** invoking `analyze-entity-url` / `analyze-entity-url-v2`. If the URL exactly matches an existing entity's `website_url` or `metadata.created_from_url` (after normalization), block the pipeline and show a dedicated dialog. Fuzzy name/slug matching stays exactly where it is today (final submit), unchanged.
 
-**Root cause** (`supabase/functions/check-entity-duplicates/index.ts`):
+## Edge function change — `supabase/functions/check-entity-duplicates/index.ts`
 
-- Step 4 ("Same website") uses `ilike('%host%')` — hostname-only match, so every `maccaron.in` product looks like a duplicate of every other one.
-- Step 5 has a fallback that adds low-confidence "Created from same site" hits based on hostname alone, and even its strict branch uses only `host + first-path-segment`. Maccaron URLs all start with `/en`, so the "strict" branch is also noise.
+Add a new `mode` field to the request body. When `mode === 'exact_url_preflight'`:
 
-**Fix**:
+- Skip auth-preserving behavior? No — keep the existing admin gate and rate limit as-is.
+- Skip **everything** except:
+  - **Rule A** — `entities.website_url` normalized-full-URL equality (current Step 4 logic).
+  - **Rule B** — `metadata->>'created_from_url'` normalized-full-URL equality (current Step 5 logic).
+- Skip: name similarity (Step 1), slug (Step 2), slug history (Step 3), api_ref (Step 6), parent-boost. **Do NOT** reintroduce same-host / same-path-prefix heuristics.
+- `name` and `type` become **optional** in this mode; the function no longer early-returns when they're missing.
+- Response shape unchanged: `{ candidates: [...] }`. Each hit's `reasons` will be `["Same website"]` or `["Created from same source URL"]`.
 
-- **`normalizeFullUrl(url)`** helper: lowercase host, strip `www.`, drop `#hash` + `?query`, drop trailing `/`. Return `null` on parse failure.
-- **Step 4** — replace host-only match with **exact normalized full-URL equality**:
-  - Query `entities` by `website_url ilike '%host%'` to shrink the set, then in JS keep only rows where `normalizeFullUrl(r.website_url) === normalizeFullUrl(body.websiteUrl)`. Reason label stays "Same website", score 0.85.
-- **Step 5** — remove entirely:
-  - Both the 0.6 "Created from same site" fallback and the 0.8 "host + first-path-segment" branch are unreliable for retailer URLs (`/en/products/...` collides across brands).
-  - The legitimate signal — same source URL exactly — is already covered by extending step 5's replacement to also compare `normalizeFullUrl(metadata.created_from_url) === normalizeFullUrl(body.sourceUrl)` when `sourceUrl` is present. Same 0.8 score, label "Created from same source URL". No path-prefix branch, no host-only fallback.
-- **Steps 1 (name similarity), 2 (slug), 3 (slug history), 6 (api_source+api_ref) — unchanged.**
-- Parent-boost logic unchanged.
+Default mode (no `mode` field, or `mode === 'full'`) — behavior is **identical to today**. This is a purely additive change.
 
-Result: Medicube pore pad no longer surfaces S.NATURE / Axis-Y. Re-submitting the exact same maccaron URL still triggers a duplicate. URL variants with `?utm=...`, `#frag`, or trailing `/` still normalize-match.
+## Frontend change — `src/components/admin/CreateEntityDialog.tsx`
 
----
+At the top of the Analyze click handler (~line 1026, right before `fnName = analyzeEngine === 'v2' ? …`):
 
-## Issue 2 — Medicube logo is cropped on entity page
+1. Disable the Analyze button and show its existing loading state.
+2. Call `check-entity-duplicates` with `{ mode: 'exact_url_preflight', sourceUrl: url, websiteUrl: url }`, wrapped in a 2s timeout.
+3. Branches:
+   - **Hit** → stash the URL in a new `pendingAnalyzeUrl` state, set a new `exactUrlDupCandidates` state, open the new `ExactUrlDuplicateDialog` (below), and `return` before invoking analyze. **No AI/scrape credits are spent.**
+   - **Miss** → proceed with normal Analyze flow.
+   - **Preflight error / timeout** → log a `console.warn`, do **not** block, fall through to normal Analyze. Final-submit duplicate check remains the safety net.
 
-Wide brand marks get cropped by `object-cover` on a square tile — correct for product photos, wrong for logos.
+Add a one-shot bypass flag `skipEarlyDupCheckOnce`. "Continue Anyway" sets it, re-triggers Analyze for the same URL, and the flag is cleared immediately after that single Analyze call starts. A subsequent Analyze click for the same URL runs the preflight again.
 
-**Fix** in `src/components/entity-v4/EntityHeader.tsx` (line 167):
+## New component — `src/components/admin/entity-create/ExactUrlDuplicateDialog.tsx`
 
-- When `entity.type === 'brand'`, use `object-contain bg-muted`. All other types keep `object-cover` untouched.
+Small variant of `DuplicateConfirmDialog` with stronger copy — the existing dialog stays untouched and continues to serve the final-submit fuzzy case.
 
-Explore search dropdown: **not changed in this pass** — the user hasn't confirmed it looks broken there for other brands. If they later spot the same cropping in the dropdown for a brand row, we'll apply the identical `type === 'brand' ? contain : cover` conditional to that component only.
+- **Title**: "This URL already exists"
+- **Body**: "We found an entity created from the same URL."
+- Shows the matched entity card (image, name, type, parent) — reuse the row layout from `DuplicateConfirmDialog`.
+- Actions:
+  - **Open Existing** — navigate to the existing entity page (same handler as `onUseExisting`).
+  - **Continue Anyway** — sets `skipEarlyDupCheckOnce = true`, re-invokes Analyze once.
+  - **Cancel** — closes dialog, clears `pendingAnalyzeUrl`, does nothing else.
 
----
+## Explicitly NOT changed
 
-## Files changed
-
-- `supabase/functions/check-entity-duplicates/index.ts` — add `normalizeFullUrl`; rewrite step 4 to exact full-URL equality; delete step 5's path-prefix branch and 0.6 fallback, replace with exact full-URL match on `metadata.created_from_url` when `body.sourceUrl` is provided.
-- `src/components/entity-v4/EntityHeader.tsx` — conditional `object-contain bg-muted` for brand entities on line ~167.
-
-## Not touched
-
-- Analyze pipeline (v1/v2), brand_logo_lookup, entity_draft, BrandPicker, DraftReviewBody, DuplicateConfirmDialog UI, migrations, RLS, other entity cards, explore dropdown component, name-similarity / slug / api-ref duplicate paths.
+- Fuzzy name/slug/api_ref/parent-boost paths in `check-entity-duplicates` — untouched.
+- Final-submit duplicate check in `CreateEntityDialog` (~line 1806) — untouched; stays as safety net.
+- `analyze-entity-url` / `analyze-entity-url-v2` edge functions.
+- `brand_logo_lookup`, `entity_draft`, `BrandPicker`, `DraftReviewBody`, `EntityHeader`, migrations, RLS, other entity cards, explore dropdown.
+- Existing `DuplicateConfirmDialog` component and its callers.
 
 ## Validation
 
-- Analyze Medicube pore pad → duplicate dialog does not appear (or only shows genuine name matches).
-- Submit the same maccaron URL twice → duplicate dialog shows the first entity as "Same website" (via `website_url`) or "Created from same source URL" (via `metadata.created_from_url`).
-- Same URL with `?utm_source=x` or trailing `/` → still matches after normalization.
-- Medicube entity page header → full "medicube BEAUTY" logo visible, letterboxed against neutral background.
-- Any product entity page → image still fills tile via `object-cover` (unchanged).
+1. Re-analyze the maccaron Medicube URL → **ExactUrlDuplicateDialog** appears before any Analyze spinner or brand step; Medicube entity is listed; no AI/scrape credits consumed.
+2. Same URL with `?utm_source=x`, `#frag`, or trailing `/` → still matches (normalization already handles this).
+3. A different maccaron product URL (e.g. Axis-Y) → preflight passes, Analyze runs normally, no dialog.
+4. Preflight simulated failure (block the function in devtools) → warning logged, Analyze proceeds normally, final-submit check still catches the dupe later.
+5. "Continue Anyway" → Analyze runs once. Cancel that flow, click Analyze again on the same URL → preflight fires again (one-shot bypass, not persistent).
+6. "Open Existing" → navigates to the existing entity page, dialog closes.
+7. Double-clicking Analyze while preflight in-flight → second click is ignored (button disabled).
+8. Non-duplicate URL → visually identical to today's flow, ~150ms added round-trip.
