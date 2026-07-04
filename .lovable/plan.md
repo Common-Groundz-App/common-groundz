@@ -1,44 +1,41 @@
-## Fix "Open Existing" navigation + brand orange styling
+## Changes
 
-Two small changes to the exact-URL preflight duplicate flow.
+### 1. Remove the "Opening existing entity" toast
 
-### 1. `src/components/admin/CreateEntityDialog.tsx` — `onOpenExisting`
+**File:** `src/components/admin/CreateEntityDialog.tsx` — inside the `onOpenExisting` handler wired to `ExactUrlDuplicateDialog`.
 
-Current handler calls `onEntityCreated(...)` which bubbles up as the parent's "Entity created" toast and does no navigation. Replace it with a direct `react-router` navigation to the existing entity page (`navigate` and `useNavigate` are already imported and initialized in this file).
+Drop the `toast({ title: "Opening existing entity — ${c.name}" })` call. Keep everything else identical:
+- Close the preflight dialog
+- Reset form / preflight state
+- `navigate(`/entity/${c.slug || c.id}`)`
 
-Replace the `onOpenExisting` prop on `<ExactUrlDuplicateDialog>` (around lines 2935–2946) with:
+Rationale: the route change is the feedback. A toast for a plain navigation is noise.
 
-```tsx
-onOpenExisting={(c) => {
-  setPreflightDupOpen(false);
-  setPreflightDupCandidates([]);
-  setPendingAnalyzeUrl(null);
-  resetForm();
-  onOpenChange(false);
-  toast({ title: 'Opening existing entity', description: c.name });
-  navigate(`/entity/${c.slug || c.id}`);
-}}
-```
+### 2. Fix cropped logos in the "Part of" card
 
-`DuplicateCandidate` already exposes `slug` and `id`, matching the pattern used elsewhere in the file (`navigate('/entity/${newEntity.slug}')`, line 2158) and the `getEntityUrl` helper.
+**File:** `src/pages/EntityDetailV2.tsx` (~lines 985–994).
 
-### 2. `src/components/admin/entity-create/ExactUrlDuplicateDialog.tsx` — brand-orange "Open Existing" button
+**Why images look inconsistent:** the parent thumbnail is rendered inside a fixed 48×48 square with `object-cover`. `object-cover` fills the box by *cropping* whatever doesn't fit.
+- Cosmix's logo (`part_of_1.png`) is already roughly square → no visible crop, looks fine.
+- Medicube's logo (`part_of-2.png`) is a wide wordmark → the sides get chopped off and it appears zoomed-in / cut.
 
-The "Open Existing" button currently uses `variant="outline"`. Change it to the app's default primary variant (which is brand orange per the design system) so it stands out as the recommended action:
+Brand logos (which is what "Part of" almost always shows — a Brand parent) should never be cropped. They should be shown in full, letterboxed inside the tile.
+
+**Fix:** switch the thumbnail to `object-contain` with a small inner padding and a neutral background, so both square icons and wide wordmarks render fully without distortion.
 
 ```tsx
-<Button size="sm" onClick={() => onOpenExisting(c)}>
-  Open Existing
-</Button>
+<div className="w-12 h-12 rounded-md overflow-hidden bg-muted flex-shrink-0 flex items-center justify-center p-1">
+  <ImageWithFallback
+    src={parentEntity.image_url}
+    alt={parentEntity.name}
+    className="w-full h-full object-contain"
+    fallbackSrc={getEntityTypeFallbackImage(parentEntity.type)}
+  />
+</div>
 ```
 
-(Dropping `variant="outline"` makes it use the default `bg-primary` — brand orange — with white foreground. No hardcoded colors, no token changes.)
+This is a scoped, presentation-only change — no logic, no other components touched. The sibling "Part of" card in `src/components/entity-v4/EntitySidebar.tsx` is a separate surface and is **not** modified in this plan (let me know if you want it aligned too).
 
-### Not touched
-- `check-entity-duplicates` edge function, preflight logic, `handleAnalyzeUrl`, `onContinueAnyway`, `onCancel`, the fuzzy `DuplicateConfirmDialog`, or any other file. `onEntityCreated` semantics remain "created a NEW entity", which is what the parent toast reflects.
-
-### Validation
-1. Re-analyze the medicube URL → "This URL already exists" dialog appears.
-2. Click **Open Existing** → dialog + create modal close, toast "Opening existing entity — ZERO PORE PAD 2.0 70pads (155g)", route changes to `/entity/<slug>`. No misleading "Entity created" toast.
-3. **Continue Anyway** and **Cancel** behavior unchanged.
-4. Button is visibly brand-orange in both light and dark mode.
+### Out of scope
+- No changes to preflight logic, `ExactUrlDuplicateDialog`, or edge functions.
+- No changes to the entity page hero, other thumbnails, or layout.
