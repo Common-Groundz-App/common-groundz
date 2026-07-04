@@ -2922,7 +2922,38 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           void handleSubmit({ ...prev, _duplicateConfirmed: true, _fromDraftFlow: prefilledFromDraftRef.current });
         }}
       />
+
+      {/* Exact-URL preflight duplicate dialog (fires before Analyze spends credits) */}
+      <ExactUrlDuplicateDialog
+        open={preflightDupOpen}
+        candidates={preflightDupCandidates}
+        onCancel={() => {
+          setPreflightDupOpen(false);
+          setPreflightDupCandidates([]);
+          setPendingAnalyzeUrl(null);
+        }}
+        onOpenExisting={(c) => {
+          setPreflightDupOpen(false);
+          setPreflightDupCandidates([]);
+          setPendingAnalyzeUrl(null);
+          toast({ title: 'Using existing entity', description: c.name });
+          onEntityCreated({
+            id: c.id, name: c.name, type: c.type,
+            image_url: c.image_url || undefined,
+          });
+          resetForm();
+          onOpenChange(false);
+        }}
+        onContinueAnyway={() => {
+          setPreflightDupOpen(false);
+          setPreflightDupCandidates([]);
+          setPendingAnalyzeUrl(null);
+          skipEarlyDupCheckOnceRef.current = true;
+          void handleAnalyzeUrl();
+        }}
+      />
     </Dialog>
+
 
   );
 };
