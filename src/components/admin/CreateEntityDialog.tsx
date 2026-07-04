@@ -139,6 +139,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [dupDialogOpen, setDupDialogOpen] = useState(false);
   const pendingSubmitOverridesRef = useRef<any>(undefined);
   const prefilledFromDraftRef = useRef<boolean>(false);
+  // Exact-URL preflight (fires before Analyze spends AI/scrape credits).
+  const [preflightDupCandidates, setPreflightDupCandidates] = useState<DuplicateCandidate[]>([]);
+  const [preflightDupOpen, setPreflightDupOpen] = useState(false);
+  const [pendingAnalyzeUrl, setPendingAnalyzeUrl] = useState<string | null>(null);
+  const skipEarlyDupCheckOnceRef = useRef<boolean>(false);
+  const preflightInFlightRef = useRef<boolean>(false);
   // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
   // by the metadata-only modal as a freshness guard so URL A's metadata never
   // surfaces under URL B.
