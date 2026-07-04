@@ -2938,7 +2938,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           setPendingAnalyzeUrl(null);
           resetForm();
           onOpenChange(false);
-          toast({ title: 'Opening existing entity', description: c.name });
+          
           navigate(`/entity/${c.slug || c.id}`);
         }}
         onContinueAnyway={() => {
