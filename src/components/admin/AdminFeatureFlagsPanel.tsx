@@ -35,6 +35,7 @@ type PendingChange =
   | { key: 'entity_extraction.version'; nextVersion: 'v1' | 'v2' }
   // Plan v10 — pipeline switcher: Legacy auto-create vs. Draft Review.
   | { key: 'entity_extraction.review_uses_draft'; nextEnabled: boolean }
+  | { key: 'entity_creation.non_admin_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -85,9 +86,12 @@ export function AdminFeatureFlagsPanel() {
   const extractionVersion: 'v1' | 'v2' =
     extractionRow?.value?.version === 'v2' ? 'v2' : 'v1';
 
-  // Plan v10 — current pipeline value. Default false → legacy auto-create.
   const reviewDraftRow = rows.data?.find((r) => r.key === 'entity_extraction.review_uses_draft');
   const reviewDraftEnabled: boolean = reviewDraftRow?.value?.enabled === true;
+
+  // Phase 3.4E — Non-admin entity creation kill-switch. Default OFF.
+  const nonAdminEntityRow = rows.data?.find((r) => r.key === 'entity_creation.non_admin_enabled');
+  const nonAdminEntityEnabled: boolean = nonAdminEntityRow?.value?.enabled === true;
 
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
