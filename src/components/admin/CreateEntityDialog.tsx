@@ -43,6 +43,7 @@ import { DuplicateConfirmDialog, type DuplicateCandidate } from './entity-create
 import { ExactUrlDuplicateDialog } from './entity-create/ExactUrlDuplicateDialog';
 import { uploadEntityImage } from '@/services/entityImageService';
 import type { BrandCandidate } from '@/types/entityDraft';
+import { PostCreateContinuation, type CreatedEntitySummary } from './entity-create/PostCreateContinuation';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -68,6 +69,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   // handleSubmit routes through create_brand_and_entity_atomic instead of
   // a direct entities.insert.
   const [pendingBrandForAtomic, setPendingBrandForAtomic] = useState<BrandCandidate | null>(null);
+  // Phase 3.4D — post-create continuation prompt (view / post / just save).
+  const [continuationEntity, setContinuationEntity] = useState<CreatedEntitySummary | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -2268,10 +2271,22 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         type: newEntity.type,
         image_url: newEntity.image_url || undefined,
       } : undefined);
-      
-      // Navigate to the newly created entity
+
+      // Phase 3.4D — for non-admin (variant === 'user') creations, show the
+      // post-create continuation prompt instead of auto-navigating. Admin
+      // behavior (auto-navigate to the entity page) is preserved.
       if (newEntity) {
-        navigate(`/entity/${newEntity.slug}`);
+        if (variant === 'user') {
+          setContinuationEntity({
+            id: newEntity.id,
+            name: newEntity.name,
+            slug: newEntity.slug,
+            type: newEntity.type,
+            isPending: !isAdmin,
+          });
+        } else {
+          navigate(`/entity/${newEntity.slug}`);
+        }
       }
     } catch (error: any) {
       console.error('Error creating entity:', error);
@@ -2307,6 +2322,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -3068,7 +3084,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         }}
       />
     </Dialog>
-
-
+    <PostCreateContinuation
+      open={!!continuationEntity}
+      entity={continuationEntity}
+      onClose={() => setContinuationEntity(null)}
+    />
+    </>
   );
 };
