@@ -231,13 +231,22 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
           metadata: (brandRow.metadata as Record<string, any>) ?? {},
         } as unknown as Entity;
       } else if (brandDecision.kind === 'create_new') {
-        const created = await createBrandViaEdgeFn(brandDecision.candidate);
-        if (!created) return; // conflict or error — stay on Stage 1
-        parent = created;
-        toast({
-          title: 'Brand created',
-          description: `"${created.name}" is now in your entities.`,
-        });
+        if (deferBrandCreationForAtomic) {
+          // Phase 3.4C — non-admin: don't create the brand now. Hand it to
+          // the host and advance with parent=null; the atomic RPC at submit
+          // creates brand + entity in one transaction.
+          onDeferBrandCreation?.(brandDecision.candidate);
+          metaPatch.brand_status = 'pending_atomic';
+          metaPatch.pending_atomic_brand_name = brandDecision.candidate.name;
+        } else {
+          const created = await createBrandViaEdgeFn(brandDecision.candidate);
+          if (!created) return; // conflict or error — stay on Stage 1
+          parent = created;
+          toast({
+            title: 'Brand created',
+            description: `"${created.name}" is now in your entities.`,
+          });
+        }
       } else if (brandDecision.kind === 'not_sure' || brandDecision.kind === 'not_listed') {
         metaPatch.brand_status = 'unknown';
       } else if (brandDecision.kind === 'not_applicable') {
