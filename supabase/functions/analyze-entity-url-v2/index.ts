@@ -860,8 +860,18 @@ serve(async (req) => {
       _role: "admin",
     });
 
-    if (roleError || !isAdmin) {
-      return respondError(403, "NOT_ADMIN", "Forbidden");
+    if (roleError) {
+      return respondError(500, "ROLE_CHECK_FAILED", "Role check failed");
+    }
+    if (!isAdmin) {
+      // Phase 3.4B — allow non-admins iff feature flag is on, and rate-limit them.
+      const enabled = await isNonAdminEntityCreationEnabled(supabaseService);
+      if (!enabled) {
+        return respondError(403, "NON_ADMIN_DISABLED", "Entity creation is not available for your account right now.");
+      }
+      if (!analyzeRateAllow(userId)) {
+        return respondError(429, "RATE_LIMITED", "Too many analyze requests. Please slow down.");
+      }
     }
 
     // V2 Brand Logo Parity — resolve kill-switch flag + Google CSE creds once
