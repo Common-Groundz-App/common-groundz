@@ -866,6 +866,7 @@ serve(async (req) => {
     if (!isAdmin) {
       // Phase 3.4B — allow non-admins iff feature flag is on, and rate-limit them.
       const enabled = await isNonAdminEntityCreationEnabled(supabaseService);
+      console.log(`[analyze-v2] non-admin gate: flag_enabled=${enabled}`);
       if (!enabled) {
         return respondError(403, "NON_ADMIN_DISABLED", "Entity creation is not available for your account right now.");
       }
