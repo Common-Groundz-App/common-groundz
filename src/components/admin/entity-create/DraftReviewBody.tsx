@@ -73,6 +73,8 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   urlMetadata = null,
   analyzedUrl = null,
   onPrefillForm,
+  deferBrandCreationForAtomic = false,
+  onDeferBrandCreation,
 }) => {
   const { toast } = useToast();
   const noBrandCandidates = draft.brandCandidates.length === 0;
