@@ -307,6 +307,8 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
                 await onPrefillForm(overrides);
                 onOpenChange(false);
               }}
+              deferBrandCreationForAtomic={deferBrandCreationForAtomic}
+              onDeferBrandCreation={onDeferBrandCreation}
             />
             {requestId && (
               <p className="text-xs text-muted-foreground break-all pt-2 shrink-0">
