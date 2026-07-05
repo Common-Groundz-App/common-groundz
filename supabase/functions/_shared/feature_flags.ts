@@ -21,6 +21,12 @@ export async function isNonAdminEntityCreationEnabled(
     );
 
   const { data, error } = await client.rpc("is_non_admin_entity_creation_enabled");
+  if (error) {
+    console.warn(
+      "[feature_flags] is_non_admin_entity_creation_enabled RPC failed, defaulting to disabled:",
+      error.message,
+    );
+  }
   const value = !error && data === true;
   cached = { value, expiresAt: now + TTL_MS };
   return value;
