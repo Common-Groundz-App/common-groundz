@@ -100,9 +100,12 @@ serve(async (req) => {
       _user_id: userId, _role: 'admin',
     });
     if (!isAdmin) {
-      return new Response(JSON.stringify({ error: 'Forbidden', code: 'NOT_ADMIN' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const enabled = await isNonAdminEntityCreationEnabled(supabaseAdmin);
+      if (!enabled) {
+        return new Response(JSON.stringify({ error: 'Forbidden', code: 'NON_ADMIN_DISABLED' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     if (!rateLimit(userId)) {
