@@ -17,6 +17,7 @@ const ALLOWED_KEYS = [
   'mux.prewarm_enabled',
   'entity_extraction.version',
   'entity_extraction.review_uses_draft',
+  'entity_creation.non_admin_enabled',
 ] as const;
 
 type AllowedKey = (typeof ALLOWED_KEYS)[number];
