@@ -114,7 +114,11 @@ export function AdminFeatureFlagsPanel() {
               ? pending.nextEnabled
                 ? 'Switch to Draft Review pipeline?'
                 : 'Switch back to Legacy auto-create pipeline?'
-              : '';
+              : pending?.key === 'entity_creation.non_admin_enabled'
+                ? pending.nextEnabled
+                  ? 'Enable non-admin entity creation?'
+                  : 'Disable non-admin entity creation?'
+                : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -137,7 +141,11 @@ export function AdminFeatureFlagsPanel() {
               ? pending.nextEnabled
                 ? 'Analyze will return a draft only. No brand or entity rows are written until the admin explicitly confirms in the two-stage review UI. Use this for safe testing and side-by-side comparison.'
                 : 'Analyze will auto-create the parent brand and prefill the form in one step (legacy behavior). No draft review.'
-              : '';
+              : pending?.key === 'entity_creation.non_admin_enabled'
+                ? pending.nextEnabled
+                  ? 'Signed-in non-admins can create entities via the V2 Draft Review flow. New entities are pending (limited to 10 per user per 24h) until an admin approves them.'
+                  : 'Only admins can create entities. Any non-admin call to the atomic RPC or gated edge functions will be rejected.'
+                : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -166,9 +174,15 @@ export function AdminFeatureFlagsPanel() {
           value: { version: pending.nextVersion },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'entity_extraction.review_uses_draft') {
         await setFlag.mutateAsync({
           key: 'entity_extraction.review_uses_draft',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_creation.non_admin_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
