@@ -504,19 +504,7 @@ const EntityV4 = () => {
         {/* Background refetches are now completely silent - no badge shown */}
         
         <div className="min-h-screen bg-gray-50">
-          {/* Moderation banner — only visible to creator or admin */}
-          {entity && (() => {
-            const isCreator = !!user?.id && (entity as any).created_by === user.id;
-            return (
-              <div className="container mx-auto px-4 pt-4">
-                <EntityModerationBanner
-                  approvalStatus={(entity as any).approval_status}
-                  rejectionReason={(entity as any).rejection_reason}
-                  viewerCanSee={isCreator || isAdmin}
-                />
-              </div>
-            );
-          })()}
+          {/* Moderation banner intentionally removed — pending state is surfaced via the post-create continuation modal. */}
 
           {/* SECTION 1: Header & Primary Actions */}
           <EntityHeader
