@@ -55,6 +55,13 @@ interface DraftReviewBodyProps {
    *  prefilled. The host form's own Save button is the ONLY entity
    *  write path. This modal never creates the entity. */
   onPrefillForm: (overrides: DraftApplyOverrides) => Promise<void> | void;
+  /** Phase 3.4C — non-admin mode. When true, Stage 1 must NOT call
+   *  create-brand-entity for kind='create_new'. Instead, the picked brand
+   *  is handed to the host via `onDeferBrandCreation` and Stage 2 proceeds
+   *  with parent=null; the host routes the final submit through the atomic
+   *  RPC so brand + entity are created in one transaction. */
+  deferBrandCreationForAtomic?: boolean;
+  onDeferBrandCreation?: (brand: BrandCandidate) => void;
 }
 
 type Stage = 'brand' | 'entity';
