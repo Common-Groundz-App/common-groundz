@@ -69,6 +69,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   // handleSubmit routes through create_brand_and_entity_atomic instead of
   // a direct entities.insert.
   const [pendingBrandForAtomic, setPendingBrandForAtomic] = useState<BrandCandidate | null>(null);
+  // Phase 3.4D — post-create continuation prompt (view / post / just save).
+  const [continuationEntity, setContinuationEntity] = useState<CreatedEntitySummary | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
