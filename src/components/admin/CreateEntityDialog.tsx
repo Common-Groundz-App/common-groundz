@@ -62,6 +62,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   prefillName                  // ✅ Optional prefill for user mode
 }) => {
   const { user } = useAuth();
+  const { isAdmin } = useIsAdmin();
+  // Phase 3.4C — non-admin brand-plus-entity atomic-RPC payload.
+  // When set at Stage 1 for a non-admin creating a brand new brand,
+  // handleSubmit routes through create_brand_and_entity_atomic instead of
+  // a direct entities.insert.
+  const [pendingBrandForAtomic, setPendingBrandForAtomic] = useState<BrandCandidate | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
