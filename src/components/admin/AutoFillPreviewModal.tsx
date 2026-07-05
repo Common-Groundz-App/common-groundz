@@ -266,6 +266,8 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
   urlMetadata = null,
   analyzedUrlSnapshot = null,
   onPrefillForm,
+  deferBrandCreationForAtomic = false,
+  onDeferBrandCreation,
 }) => {
   // Request ID is surfaced from V2 success metadata or error envelope.
   const requestId: string | null =
