@@ -3037,16 +3037,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onUseExisting={(c) => {
           setDupDialogOpen(false);
           pendingSubmitOverridesRef.current = undefined;
-          toast({
-            title: 'Using existing entity',
-            description: c.name,
-          });
-          onEntityCreated({
-            id: c.id, name: c.name, type: c.type,
-            image_url: c.image_url || undefined,
-          });
           resetForm();
           onOpenChange(false);
+          navigate(`/entity/${c.slug || c.id}`);
         }}
         onContinueNew={() => {
           setDupDialogOpen(false);

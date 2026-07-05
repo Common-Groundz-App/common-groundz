@@ -1,25 +1,32 @@
-# Fix: Non-admin still gets "V2 engine failed" (403)
+## Two small fixes in the non-admin entity creation flow
 
-## Diagnosis
+### 1. "Use this" on the duplicate dialog — navigate to the existing entity
 
-- The flag `entity_creation.non_admin_enabled` **is ON** in the database (flipped at 06:52 UTC), and the `is_non_admin_entity_creation_enabled()` function exists with correct permissions for the backend.
-- The edge logs show your two failed attempts at ~07:15 UTC (12:45 PM IST) — both returned **HTTP 403** from `analyze-entity-url-v2`, served by **deployment version 78**.
-- The code in the repo is correct: it allows non-admins when the flag is ON. But the **deployed version of the function is stale** — it was last deployed before the Phase 3.4B flag-gate change, so the live function still rejects all non-admins unconditionally with 403. Your earlier frontend fix (routing non-admins to v2) is working — it's the backend that's running old code.
+**File:** `src/components/admin/CreateEntityDialog.tsx` (the `onUseExisting` handler around line 3037)
 
-## Plan
+Currently the handler:
+- fires a generic "Using existing entity" toast,
+- calls `onEntityCreated(...)` (which triggers the parent's "entity created" toast — misleading, since nothing was created),
+- closes the dialog with no navigation.
 
-1. **Redeploy the three edge functions** that share the flag helper, so the live code matches the repo:
-   - `analyze-entity-url-v2`
-   - `check-entity-duplicates`
-   - `create-brand-entity`
-2. **Add diagnostic logging** (small, no PII):
-   - In `supabase/functions/_shared/feature_flags.ts`: log a warning if the flag RPC errors (currently it fails silently and defaults to "disabled").
-   - In `analyze-entity-url-v2`: one log line when a non-admin is allowed/blocked by the gate, so future issues are visible in logs.
-3. **Validate**:
-   - Call the deployed function to confirm non-admins are no longer 403-blocked.
-   - You retry the same Maccaron URL as the non-admin user — full V2 analysis (Firecrawl + Gemini) should now run instead of the basic-metadata fallback.
+Change it to mirror `ExactUrlDuplicateDialog`'s `onOpenExisting` behavior (lines 3069-3077):
+- close the duplicate dialog,
+- clear pending overrides,
+- `resetForm()` + `onOpenChange(false)`,
+- `navigate(\`/entity/${c.slug || c.id}\`)`,
+- do NOT call `onEntityCreated` and do NOT show the "created" toast. Optional lightweight toast like "Opening existing entity" is fine, but no "entity created" language.
 
-## Technical details
+`DuplicateCandidate` already exposes `slug`, so no type changes needed.
 
-- No database changes, no frontend changes, no flag changes.
-- Only the two files above get minor logging additions; the main fix is the redeploy itself.
+### 2. Remove the "Pending review" disclaimer on the entity page
+
+**File:** `src/components/entity-v4/EntityV4.tsx` (lines 507-519)
+
+Remove the `EntityModerationBanner` block entirely so neither the creator nor admins see the yellow "Pending review / This entity is publicly visible but still awaiting admin review…" banner on the entity detail page. The pending state is already communicated in the post-create continuation modal ("Your entity is under review — visible with a Pending badge until an admin approves it."), so the on-page banner is redundant.
+
+We keep `EntityModerationBanner.tsx` on disk untouched (in case it's reused elsewhere) — we only stop rendering it in `EntityV4`.
+
+### Out of scope
+- No changes to the "It's different — continue" flow or the PostCreateContinuation modal (user confirmed those are good).
+- No database, RLS, or edge function changes.
+- No changes to the admin flow behavior beyond what's above (admins also stop seeing the on-page banner, matching the user's "there shouldn't be any disclaimer" ask).
