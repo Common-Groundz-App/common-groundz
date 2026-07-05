@@ -94,6 +94,16 @@ serve(async (req) => {
     }
 
     const shouldWrite = confirmCreate === true;
+
+    // Phase 3.4B — non-admins may only preflight through this function.
+    // Actual brand creation MUST go through create_brand_and_entity_atomic RPC
+    // so quota + atomicity + trigger-enforced pending status all apply.
+    if (!isAdmin && shouldWrite) {
+      return new Response(JSON.stringify({
+        error: 'Use atomic RPC for non-admin brand creation',
+        code: 'USE_ATOMIC_RPC',
+      }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     let websiteConflictWithBrandId: string | null = null;
     let dropWebsiteDueToConflict = false;
 
