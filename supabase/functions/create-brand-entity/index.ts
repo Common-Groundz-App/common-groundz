@@ -51,10 +51,20 @@ serve(async (req) => {
       _role: 'admin'
     });
 
-    if (roleError || !isAdmin) {
-      return new Response(JSON.stringify({ error: 'Forbidden', code: 'NOT_ADMIN' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    if (roleError) {
+      return new Response(JSON.stringify({ error: 'Role check failed', code: 'ROLE_CHECK_FAILED' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+    }
+
+    // Phase 3.4B — non-admin gate: feature flag + preflight-only surface.
+    if (!isAdmin) {
+      const enabled = await isNonAdminEntityCreationEnabled(supabaseAdmin);
+      if (!enabled) {
+        return new Response(JSON.stringify({ error: 'Forbidden', code: 'NON_ADMIN_DISABLED' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // === Now parse body ===
