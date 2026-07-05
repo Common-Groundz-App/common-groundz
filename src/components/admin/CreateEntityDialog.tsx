@@ -38,9 +38,11 @@ import { SimpleTagInput } from './SimpleTagInput';
 import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
 import { useEntityReviewUsesDraft } from '@/hooks/useEntityReviewUsesDraft';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { DuplicateConfirmDialog, type DuplicateCandidate } from './entity-create/DuplicateConfirmDialog';
 import { ExactUrlDuplicateDialog } from './entity-create/ExactUrlDuplicateDialog';
 import { uploadEntityImage } from '@/services/entityImageService';
+import type { BrandCandidate } from '@/types/entityDraft';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -60,6 +62,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   prefillName                  // ✅ Optional prefill for user mode
 }) => {
   const { user } = useAuth();
+  const { isAdmin } = useIsAdmin();
+  // Phase 3.4C — non-admin brand-plus-entity atomic-RPC payload.
+  // When set at Stage 1 for a non-admin creating a brand new brand,
+  // handleSubmit routes through create_brand_and_entity_atomic instead of
+  // a direct entities.insert.
+  const [pendingBrandForAtomic, setPendingBrandForAtomic] = useState<BrandCandidate | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -110,7 +118,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [analyzeUrl, setAnalyzeUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
-  const useDraftReviewFlag = useEntityReviewUsesDraft();
+  const useDraftReviewFlagRaw = useEntityReviewUsesDraft();
+  // Phase 3.4C — non-admins (variant === 'user') are always forced onto the
+  // V2 Draft Review path; the admin-only useEntityReviewUsesDraft flag never
+  // downgrades them to the legacy Analyze flow.
+  const useDraftReviewFlag = variant === 'user' ? true : useDraftReviewFlagRaw;
   const [showAnalyzeButton, setShowAnalyzeButton] = useState(false);
   const [aiPredictions, setAiPredictions] = useState<any>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -789,6 +801,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setUrlMetadata(null);
     setFieldErrors({});
     setAiFilledFields(new Set());
+    setPendingBrandForAtomic(null);
     setActiveTab('basic');
     
     // Reset progressive disclosure state (user variant only)
@@ -1950,7 +1963,110 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         ? `${resolvedParent.slug || resolvedParent.id}-${baseSlug}`
         : baseSlug;
 
-      const { data: newEntity, error } = await supabase
+      // ─── Phase 3.4C — non-admin preflight + atomic RPC branch ────────
+      // Quota is authoritatively enforced by the DB trigger and
+      // create_brand_and_entity_atomic. This client preflight only
+      // gives users a friendly early-exit instead of a raw DB error.
+      let atomicNewEntity: any | null = null;
+      if (!isAdmin && user?.id) {
+        const requiredSlots = pendingBrandForAtomic ? 2 : 1;
+        const { data: quotaData, error: quotaErr } = await supabase.rpc(
+          'get_entity_creation_quota_status',
+          {
+            _user_id: user.id,
+            _max_entities: 10,
+            _window_hours: 24,
+            _required_count: requiredSlots,
+          },
+        );
+        if (quotaErr) {
+          toast({
+            title: 'Could not verify your daily limit',
+            description: quotaErr.message || 'Please try again in a moment.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+        const quota = (quotaData ?? {}) as {
+          allowed?: boolean; used?: number; max?: number; remaining?: number;
+        };
+        if (!quota.allowed) {
+          toast({
+            title: 'Daily limit reached',
+            description:
+              requiredSlots === 2
+                ? `You have ${quota.remaining ?? 0} slot(s) left today and need 2 to create a brand + product. Try "Not sure" for the brand.`
+                : 'You can create up to 10 new entities per day.',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+
+        // Atomic brand + entity path
+        if (pendingBrandForAtomic) {
+          const brandC = pendingBrandForAtomic;
+          const { data: rpcData, error: rpcErr } = await supabase.rpc(
+            'create_brand_and_entity_atomic',
+            {
+              _brand_name: brandC.name,
+              _entity_name: eff.name.trim(),
+              _entity_type: eff.type as any,
+              _brand_website_url: brandC.websiteUrl ?? null,
+              _brand_image_url: brandC.logoUrl ?? null,
+              _brand_description: brandC.reason ?? null,
+              _entity_category_id: eff.category_id || null,
+              _entity_description: eff.description || null,
+              _entity_website_url: eff.website_url.trim() || null,
+              _entity_image_url:
+                (resolvedOverridePrimary !== undefined
+                  ? resolvedOverridePrimary
+                  : null) ||
+                resolvedPrimaryMedia ||
+                resolvedFirstMedia ||
+                eff.image_url.trim() ||
+                null,
+              _entity_metadata: metadata,
+            },
+          );
+          if (rpcErr) {
+            const msg = rpcErr.message || '';
+            const description =
+              msg.includes('entity_creation_quota_exceeded')
+                ? 'You can create up to 10 new entities per day.'
+                : msg.includes('conflict_requires_admin')
+                ? 'This brand needs admin review. Try "Not sure" for the brand for now.'
+                : msg.includes('non_admin_entity_creation_disabled')
+                ? "Entity creation isn't available for your account right now."
+                : msg.includes('invalid_url')
+                ? 'One of the URLs looks invalid. Please check and try again.'
+                : msg.includes('metadata_too_large')
+                ? 'Additional data is too large. Please simplify and retry.'
+                : msg.includes('slug_generation_failed')
+                ? 'Could not generate a unique URL slug. Try a different name.'
+                : msg || 'Could not create the entity.';
+            toast({ title: 'Create failed', description, variant: 'destructive' });
+            setLoading(false);
+            return;
+          }
+          const result = (rpcData ?? {}) as { entity?: any; brand?: any };
+          atomicNewEntity = result.entity ?? null;
+          if (!atomicNewEntity) {
+            toast({
+              title: 'Create failed',
+              description: 'Unexpected empty response.',
+              variant: 'destructive',
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      const { data: newEntity, error } = atomicNewEntity
+        ? { data: atomicNewEntity, error: null as any }
+        : await supabase
         .from('entities')
         .insert([{
           name: eff.name.trim(),
@@ -2783,6 +2899,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         })()}
         urlMetadata={urlMetadata}
         analyzedUrlSnapshot={predictionUrlSnapshot}
+        deferBrandCreationForAtomic={!isAdmin}
+        onDeferBrandCreation={setPendingBrandForAtomic}
         onPrefillForm={async (overrides) => {
           prefilledFromDraftRef.current = true;
           // Phase 3.2 v6 — Stage 2 "Apply to Form": prefill host form state,

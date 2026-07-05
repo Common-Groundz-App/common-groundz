@@ -4109,14 +4109,6 @@ export type Database = {
         Args: { required_permission?: string }
         Returns: boolean
       }
-      check_entity_creation_quota: {
-        Args: {
-          _max_pending?: number
-          _user_id: string
-          _window_hours?: number
-        }
-        Returns: boolean
-      }
       check_entity_save: {
         Args: { p_entity_id: string; p_user_id: string }
         Returns: boolean
@@ -4132,6 +4124,22 @@ export type Database = {
       cleanup_expired_cached_photos: { Args: never; Returns: number }
       cleanup_old_rate_limits: { Args: never; Returns: undefined }
       cleanup_spaced_hashtags: { Args: never; Returns: Json }
+      create_brand_and_entity_atomic: {
+        Args: {
+          _brand_description?: string
+          _brand_image_url?: string
+          _brand_name: string
+          _brand_website_url?: string
+          _entity_category_id?: string
+          _entity_description?: string
+          _entity_image_url?: string
+          _entity_metadata?: Json
+          _entity_name: string
+          _entity_type: Database["public"]["Enums"]["entity_type"]
+          _entity_website_url?: string
+        }
+        Returns: Json
+      }
       create_storage_open_policy: {
         Args: { bucket_id: string }
         Returns: boolean
@@ -4383,6 +4391,15 @@ export type Database = {
           table_name: string
           total_rows: number
         }[]
+      }
+      get_entity_creation_quota_status: {
+        Args: {
+          _max_entities?: number
+          _required_count?: number
+          _user_id: string
+          _window_hours?: number
+        }
+        Returns: Json
       }
       get_entity_follower_names: {
         Args: { follower_limit?: number; input_entity_id: string }
@@ -4922,6 +4939,10 @@ export type Database = {
       user_has_pending_suggestion: {
         Args: { entity_uuid: string; user_uuid: string }
         Returns: boolean
+      }
+      validate_entity_http_url: {
+        Args: { _field_name: string; _url: string }
+        Returns: string
       }
     }
     Enums: {

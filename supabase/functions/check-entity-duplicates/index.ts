@@ -2,6 +2,7 @@
 // No DB writes. Returns candidates the host UI shows in a "Did you mean?" step.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isNonAdminEntityCreationEnabled } from '../_shared/feature_flags.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -99,9 +100,12 @@ serve(async (req) => {
       _user_id: userId, _role: 'admin',
     });
     if (!isAdmin) {
-      return new Response(JSON.stringify({ error: 'Forbidden', code: 'NOT_ADMIN' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      const enabled = await isNonAdminEntityCreationEnabled(supabaseAdmin);
+      if (!enabled) {
+        return new Response(JSON.stringify({ error: 'Forbidden', code: 'NON_ADMIN_DISABLED' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
     if (!rateLimit(userId)) {

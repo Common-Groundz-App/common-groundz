@@ -55,6 +55,13 @@ interface DraftReviewBodyProps {
    *  prefilled. The host form's own Save button is the ONLY entity
    *  write path. This modal never creates the entity. */
   onPrefillForm: (overrides: DraftApplyOverrides) => Promise<void> | void;
+  /** Phase 3.4C — non-admin mode. When true, Stage 1 must NOT call
+   *  create-brand-entity for kind='create_new'. Instead, the picked brand
+   *  is handed to the host via `onDeferBrandCreation` and Stage 2 proceeds
+   *  with parent=null; the host routes the final submit through the atomic
+   *  RPC so brand + entity are created in one transaction. */
+  deferBrandCreationForAtomic?: boolean;
+  onDeferBrandCreation?: (brand: BrandCandidate) => void;
 }
 
 type Stage = 'brand' | 'entity';
@@ -66,6 +73,8 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
   urlMetadata = null,
   analyzedUrl = null,
   onPrefillForm,
+  deferBrandCreationForAtomic = false,
+  onDeferBrandCreation,
 }) => {
   const { toast } = useToast();
   const noBrandCandidates = draft.brandCandidates.length === 0;
@@ -222,13 +231,22 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
           metadata: (brandRow.metadata as Record<string, any>) ?? {},
         } as unknown as Entity;
       } else if (brandDecision.kind === 'create_new') {
-        const created = await createBrandViaEdgeFn(brandDecision.candidate);
-        if (!created) return; // conflict or error — stay on Stage 1
-        parent = created;
-        toast({
-          title: 'Brand created',
-          description: `"${created.name}" is now in your entities.`,
-        });
+        if (deferBrandCreationForAtomic) {
+          // Phase 3.4C — non-admin: don't create the brand now. Hand it to
+          // the host and advance with parent=null; the atomic RPC at submit
+          // creates brand + entity in one transaction.
+          onDeferBrandCreation?.(brandDecision.candidate);
+          metaPatch.brand_status = 'pending_atomic';
+          metaPatch.pending_atomic_brand_name = brandDecision.candidate.name;
+        } else {
+          const created = await createBrandViaEdgeFn(brandDecision.candidate);
+          if (!created) return; // conflict or error — stay on Stage 1
+          parent = created;
+          toast({
+            title: 'Brand created',
+            description: `"${created.name}" is now in your entities.`,
+          });
+        }
       } else if (brandDecision.kind === 'not_sure' || brandDecision.kind === 'not_listed') {
         metaPatch.brand_status = 'unknown';
       } else if (brandDecision.kind === 'not_applicable') {

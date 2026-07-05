@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeBrandName } from '../_shared/brand_normalize.ts';
+import { isNonAdminEntityCreationEnabled } from '../_shared/feature_flags.ts';
 
 
 const corsHeaders = {
@@ -50,10 +51,20 @@ serve(async (req) => {
       _role: 'admin'
     });
 
-    if (roleError || !isAdmin) {
-      return new Response(JSON.stringify({ error: 'Forbidden', code: 'NOT_ADMIN' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    if (roleError) {
+      return new Response(JSON.stringify({ error: 'Role check failed', code: 'ROLE_CHECK_FAILED' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+    }
+
+    // Phase 3.4B — non-admin gate: feature flag + preflight-only surface.
+    if (!isAdmin) {
+      const enabled = await isNonAdminEntityCreationEnabled(supabaseAdmin);
+      if (!enabled) {
+        return new Response(JSON.stringify({ error: 'Forbidden', code: 'NON_ADMIN_DISABLED' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // === Now parse body ===
@@ -83,6 +94,24 @@ serve(async (req) => {
     }
 
     const shouldWrite = confirmCreate === true;
+
+    // Phase 3.4B — non-admins may only preflight through this function.
+    // Actual brand creation MUST go through create_brand_and_entity_atomic RPC
+    // so quota + atomicity + trigger-enforced pending status all apply.
+    if (!isAdmin && shouldWrite) {
+      return new Response(JSON.stringify({
+        error: 'Use atomic RPC for non-admin brand creation',
+        code: 'USE_ATOMIC_RPC',
+      }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Website-conflict override + soft-delete restore are admin-only surfaces.
+    if (!isAdmin && (allowWebsiteConflict === true || creationContext === 'draft_review_manual')) {
+      return new Response(JSON.stringify({
+        error: 'This action requires an admin',
+        code: 'CONFLICT_REQUIRES_ADMIN',
+      }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     let websiteConflictWithBrandId: string | null = null;
     let dropWebsiteDueToConflict = false;
 

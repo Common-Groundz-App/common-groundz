@@ -54,6 +54,12 @@ interface AutoFillPreviewModalProps {
    *  overrides to the host so the host form is prefilled. The host's
    *  Save button is the only entity write path. */
   onPrefillForm?: (overrides: DraftApplyOverrides) => Promise<void> | void;
+  /** Phase 3.4C — when true (non-admin flow), DraftReviewBody must NOT call
+   *  create-brand-entity at Stage 1. Instead, it stashes the pending brand
+   *  via `onDeferBrandCreation` and advances; the host then routes through
+   *  create_brand_and_entity_atomic at submit. */
+  deferBrandCreationForAtomic?: boolean;
+  onDeferBrandCreation?: (brand: import('@/types/entityDraft').BrandCandidate) => void;
 }
 
 interface PreviewFieldProps {
@@ -260,6 +266,8 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
   urlMetadata = null,
   analyzedUrlSnapshot = null,
   onPrefillForm,
+  deferBrandCreationForAtomic = false,
+  onDeferBrandCreation,
 }) => {
   // Request ID is surfaced from V2 success metadata or error envelope.
   const requestId: string | null =
@@ -299,6 +307,8 @@ export const AutoFillPreviewModal: React.FC<AutoFillPreviewModalProps> = ({
                 await onPrefillForm(overrides);
                 onOpenChange(false);
               }}
+              deferBrandCreationForAtomic={deferBrandCreationForAtomic}
+              onDeferBrandCreation={onDeferBrandCreation}
             />
             {requestId && (
               <p className="text-xs text-muted-foreground break-all pt-2 shrink-0">

@@ -25,6 +25,26 @@ import {
 import { assertSafeUrl, SsrfError } from "./ssrf.ts";
 import { FetchError, type FetchResult, validateAndFetchUrl } from "./fetcher.ts";
 import { extractFromHtml, type ExtractResult } from "./extractor.ts";
+import { isNonAdminEntityCreationEnabled } from "../_shared/feature_flags.ts";
+
+// Phase 3.4B — per-user sliding window rate limit for non-admins.
+// Best-effort per-instance limiter; not durable across cold starts or
+// instances. Move to DB-backed limiter if abuse appears.
+const ANALYZE_RATE_WINDOW_MS = 5 * 60 * 1000; // 5 min
+const ANALYZE_RATE_MAX = 20;
+const analyzeRateBucket = new Map<string, number[]>();
+function analyzeRateAllow(userId: string): boolean {
+  const now = Date.now();
+  const arr = analyzeRateBucket.get(userId) ?? [];
+  const kept = arr.filter((t) => now - t < ANALYZE_RATE_WINDOW_MS);
+  if (kept.length >= ANALYZE_RATE_MAX) {
+    analyzeRateBucket.set(userId, kept);
+    return false;
+  }
+  kept.push(now);
+  analyzeRateBucket.set(userId, kept);
+  return true;
+}
 import { detectWeakSignals } from "./weak_signals.ts";
 import {
   isKnownJsHeavyHost,
@@ -840,8 +860,18 @@ serve(async (req) => {
       _role: "admin",
     });
 
-    if (roleError || !isAdmin) {
-      return respondError(403, "NOT_ADMIN", "Forbidden");
+    if (roleError) {
+      return respondError(500, "ROLE_CHECK_FAILED", "Role check failed");
+    }
+    if (!isAdmin) {
+      // Phase 3.4B — allow non-admins iff feature flag is on, and rate-limit them.
+      const enabled = await isNonAdminEntityCreationEnabled(supabaseService);
+      if (!enabled) {
+        return respondError(403, "NON_ADMIN_DISABLED", "Entity creation is not available for your account right now.");
+      }
+      if (!analyzeRateAllow(userId)) {
+        return respondError(429, "RATE_LIMITED", "Too many analyze requests. Please slow down.");
+      }
     }
 
     // V2 Brand Logo Parity — resolve kill-switch flag + Google CSE creds once
