@@ -35,6 +35,7 @@ type PendingChange =
   | { key: 'entity_extraction.version'; nextVersion: 'v1' | 'v2' }
   // Plan v10 — pipeline switcher: Legacy auto-create vs. Draft Review.
   | { key: 'entity_extraction.review_uses_draft'; nextEnabled: boolean }
+  | { key: 'entity_creation.non_admin_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -85,9 +86,12 @@ export function AdminFeatureFlagsPanel() {
   const extractionVersion: 'v1' | 'v2' =
     extractionRow?.value?.version === 'v2' ? 'v2' : 'v1';
 
-  // Plan v10 — current pipeline value. Default false → legacy auto-create.
   const reviewDraftRow = rows.data?.find((r) => r.key === 'entity_extraction.review_uses_draft');
   const reviewDraftEnabled: boolean = reviewDraftRow?.value?.enabled === true;
+
+  // Phase 3.4E — Non-admin entity creation kill-switch. Default OFF.
+  const nonAdminEntityRow = rows.data?.find((r) => r.key === 'entity_creation.non_admin_enabled');
+  const nonAdminEntityEnabled: boolean = nonAdminEntityRow?.value?.enabled === true;
 
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
@@ -110,7 +114,11 @@ export function AdminFeatureFlagsPanel() {
               ? pending.nextEnabled
                 ? 'Switch to Draft Review pipeline?'
                 : 'Switch back to Legacy auto-create pipeline?'
-              : '';
+              : pending?.key === 'entity_creation.non_admin_enabled'
+                ? pending.nextEnabled
+                  ? 'Enable non-admin entity creation?'
+                  : 'Disable non-admin entity creation?'
+                : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -133,7 +141,11 @@ export function AdminFeatureFlagsPanel() {
               ? pending.nextEnabled
                 ? 'Analyze will return a draft only. No brand or entity rows are written until the admin explicitly confirms in the two-stage review UI. Use this for safe testing and side-by-side comparison.'
                 : 'Analyze will auto-create the parent brand and prefill the form in one step (legacy behavior). No draft review.'
-              : '';
+              : pending?.key === 'entity_creation.non_admin_enabled'
+                ? pending.nextEnabled
+                  ? 'Signed-in non-admins can create entities via the V2 Draft Review flow. New entities are pending (limited to 10 per user per 24h) until an admin approves them.'
+                  : 'Only admins can create entities. Any non-admin call to the atomic RPC or gated edge functions will be rejected.'
+                : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -162,9 +174,15 @@ export function AdminFeatureFlagsPanel() {
           value: { version: pending.nextVersion },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'entity_extraction.review_uses_draft') {
         await setFlag.mutateAsync({
           key: 'entity_extraction.review_uses_draft',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_creation.non_admin_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
@@ -465,6 +483,51 @@ export function AdminFeatureFlagsPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Phase 3.4E — Non-admin entity creation kill-switch */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Non-admin entity creation
+          </CardTitle>
+          <CardDescription>
+            Lets signed-in users create entities through the V2 Draft Review flow.
+            Non-admin-created entities are pending and limited to 10 new entities per day.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="non-admin-entity" className="text-base">
+                Allow non-admin entity creation
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, signed-in non-admins can submit entities via the V2 Draft Review
+                flow. Submissions land as <code>pending</code> until an admin approves them, and
+                each user is capped at 10 new entities per 24 hours. When disabled, only admins
+                can create entities and the atomic RPC + gated edge functions reject non-admin
+                calls.
+              </p>
+              {nonAdminEntityRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(nonAdminEntityRow.updated_at), { addSuffix: true })}
+                  {nonAdminEntityRow.updated_reason ? ` — “${nonAdminEntityRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="non-admin-entity"
+              checked={nonAdminEntityEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({ key: 'entity_creation.non_admin_enabled', nextEnabled: checked })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
 
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
