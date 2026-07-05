@@ -38,9 +38,11 @@ import { SimpleTagInput } from './SimpleTagInput';
 import { AutoFillPreviewModal } from './AutoFillPreviewModal';
 import { useAnalyzeUrlEngine } from '@/hooks/useAnalyzeUrlEngine';
 import { useEntityReviewUsesDraft } from '@/hooks/useEntityReviewUsesDraft';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { DuplicateConfirmDialog, type DuplicateCandidate } from './entity-create/DuplicateConfirmDialog';
 import { ExactUrlDuplicateDialog } from './entity-create/ExactUrlDuplicateDialog';
 import { uploadEntityImage } from '@/services/entityImageService';
+import type { BrandCandidate } from '@/types/entityDraft';
 
 interface CreateEntityDialogProps {
   open: boolean;
