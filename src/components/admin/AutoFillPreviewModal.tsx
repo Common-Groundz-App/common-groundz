@@ -54,6 +54,12 @@ interface AutoFillPreviewModalProps {
    *  overrides to the host so the host form is prefilled. The host's
    *  Save button is the only entity write path. */
   onPrefillForm?: (overrides: DraftApplyOverrides) => Promise<void> | void;
+  /** Phase 3.4C — when true (non-admin flow), DraftReviewBody must NOT call
+   *  create-brand-entity at Stage 1. Instead, it stashes the pending brand
+   *  via `onDeferBrandCreation` and advances; the host then routes through
+   *  create_brand_and_entity_atomic at submit. */
+  deferBrandCreationForAtomic?: boolean;
+  onDeferBrandCreation?: (brand: import('@/types/entityDraft').BrandCandidate) => void;
 }
 
 interface PreviewFieldProps {
