@@ -110,7 +110,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [analyzeUrl, setAnalyzeUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
-  const useDraftReviewFlag = useEntityReviewUsesDraft();
+  const useDraftReviewFlagRaw = useEntityReviewUsesDraft();
+  // Phase 3.4C — non-admins (variant === 'user') are always forced onto the
+  // V2 Draft Review path; the admin-only useEntityReviewUsesDraft flag never
+  // downgrades them to the legacy Analyze flow.
+  const useDraftReviewFlag = variant === 'user' ? true : useDraftReviewFlagRaw;
   const [showAnalyzeButton, setShowAnalyzeButton] = useState(false);
   const [aiPredictions, setAiPredictions] = useState<any>(null);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
