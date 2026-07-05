@@ -1,49 +1,44 @@
-# Phase 3.4E — Admin UI switch for `entity_creation.non_admin_enabled`
+# Phase 3.4 audit + non-admin V2 routing fix
 
-Wire the existing (default OFF) DB flag into the admin Feature Flags panel using the same `app_config` / `set_app_flag` mechanism as the other flags. No automatic flip — admin toggles manually.
+## Root cause
 
-## 1. Migration: extend `set_app_flag` allowlist
+`src/hooks/useAnalyzeUrlEngine.ts` hard-codes `engine = 'v1'` for every non-admin, regardless of any flag. Consequences:
 
-New migration that replaces `public.set_app_flag` with the same body but adds `'entity_creation.non_admin_enabled'` to:
+- The non-admin analyze in `admin.png` vs `non_admin.png` diverges because the admin hits `analyze-entity-url-v2` (Firecrawl + Gemini), while the non-admin hits legacy `analyze-entity-url` (v1), which for an unsupported host like `maccaron.in` only returns basic OG metadata — exactly what the "AI details unavailable" modal shows.
+- Phase 3.4's contract is: non-admin entity creation happens exclusively through the **V2 Draft Review** flow. Routing non-admins to v1 contradicts that; v1 has no draft-review contract and no non-admin gating.
 
-- the allowed `_key` IN-list
-- a validation branch requiring shape `{ "enabled": boolean }` (exact key set = `['enabled']`, `jsonb_typeof = 'boolean'`)
+Edge-function side is already correct: `analyze-entity-url-v2` calls `isNonAdminEntityCreationEnabled()` at line 868 and permits non-admin callers when the flag is ON. So the only blocker is the client-side engine selector.
 
-Everything else in `set_app_flag` (admin gate, insert/update logic, return shape) is unchanged. No new grants needed (function grants already cover `authenticated`). The `app_config` row itself already exists from migration `20260629080245` with default `{"enabled": false}` — we do NOT re-seed or change it.
+Everything else from 3.4A–E checks out:
+- DB: `is_non_admin_entity_creation_enabled()` RPC + `set_app_flag` allowlist entry + `{"enabled": boolean}` shape validation.
+- Edge: `analyze-entity-url-v2`, `check-entity-duplicates`, `create-brand-entity` all gate via the shared helper.
+- Client: `PostCreateContinuation`, admin `AdminFeatureFlagsPanel` switch, `useAppFlagsAdmin` allowlist all present.
+- No leftover dead code found from the grep sweep.
 
-## 2. Admin allowlist hook
+## Fix
 
-`src/hooks/admin/useAppFlagsAdmin.ts`:
-- Add `'entity_creation.non_admin_enabled'` to `ALLOWED_KEYS` so the admin rows query fetches it alongside the others.
+Rewrite `useAnalyzeUrlEngine` so it picks v2 for non-admins whenever non-admin entity creation is enabled, without leaking the admin-only `entity_extraction.version` row to non-admins.
 
-## 3. Admin panel UI
+```text
+role         non-admin flag OFF     non-admin flag ON
+admin        reads app_config       reads app_config (unchanged)
+non-admin    'v1' (unchanged)       'v2'  ← new
+```
 
-`src/components/admin/AdminFeatureFlagsPanel.tsx`:
+### Technical details
 
-- Extend `PendingChange` union with `{ key: 'entity_creation.non_admin_enabled'; nextEnabled: boolean }`.
-- Read the row: `nonAdminEntityRow = rows.data?.find(r => r.key === 'entity_creation.non_admin_enabled')`; `nonAdminEntityEnabled = nonAdminEntityRow?.value?.enabled === true` (default false).
-- Add a new `Card` after the existing "Entity creation pipeline" card:
-  - Title: **Non-admin entity creation**
-  - Description: "Lets signed-in users create entities through the V2 Draft Review flow. Non-admin-created entities are pending and limited to 10 new entities per day."
-  - Body: single row with `Label` **Allow non-admin entity creation** + subtext, updated-at line, and a `Switch` that opens the confirmation dialog with `{ key: 'entity_creation.non_admin_enabled', nextEnabled: checked }`.
-- Extend `confirmTitle` / `confirmDesc` branches:
-  - Title: "Enable non-admin entity creation?" / "Disable non-admin entity creation?"
-  - Desc ON: "Signed-in non-admins can create entities via the V2 Draft Review flow. New entities are `pending` (limited to 10 per user per 24h) until an admin approves them."
-  - Desc OFF: "Only admins can create entities. Any non-admin call to the atomic RPC or gated edge functions will be rejected."
-- Extend `applyPending` with the matching `setFlag.mutateAsync({ key: 'entity_creation.non_admin_enabled', value: { enabled: pending.nextEnabled }, reason })` branch.
+1. `src/hooks/useAnalyzeUrlEngine.ts`
+   - Keep the current admin branch (reads `entity_extraction.version` from `app_config`).
+   - For non-admins, call the existing public RPC `supabase.rpc('is_non_admin_entity_creation_enabled')` (already `SECURITY DEFINER`, callable by `anon`/`authenticated`) inside a `useQuery` gated on `!isAdmin`.
+     - Returns `'v2'` when the RPC resolves `true`, else `'v1'`.
+   - Loading state combines admin loading + whichever branch's query is loading.
+   - No new DB migration and no RLS changes — the RPC is already exposed and reads the same `app_config` key the admin panel writes.
 
-No changes to edge functions, RLS, atomic RPC, or client entity-creation flow — they already read the same key via `is_non_admin_entity_creation_enabled()` and the shared `feature_flags.ts` helper.
+2. No other files change. `CreateEntityDialog` already switches on `engine === 'v2'` and passes the correct props; the edge-function-side non-admin gate is already in place; the Draft Review UI and `PostCreateContinuation` already trigger correctly when v2 returns.
 
-## Technical notes
+## Validation
 
-- Flag stays default OFF (existing row untouched).
-- Value shape enforced server-side: `{ "enabled": boolean }`.
-- No changes to `useAppConfig` / `get_public_flags` — this flag is admin/edge-only and not needed on the public read path.
-- Migration is additive; safe to re-run (uses `CREATE OR REPLACE FUNCTION`).
-
-## Validation checklist
-
-1. Feature Flags tab shows the new "Allow non-admin entity creation" switch, defaulting to OFF.
-2. Toggling ON → confirm dialog → `app_config.entity_creation.non_admin_enabled = {"enabled": true}`; toggling OFF reverses it.
-3. With flag OFF: non-admin call to `create_brand_and_entity_atomic` fails with `non_admin_entity_creation_disabled` (already implemented); admin flow unchanged.
-4. With flag ON: non-admin V2 Draft Review submission succeeds and lands as `pending`.
+1. Admin, flag ON → still uses v2, admin flow unchanged (admin panel row still drives version).
+2. Non-admin, flag ON → hits `analyze-entity-url-v2`, Draft Review renders, submission lands as `pending` (as in your last validation).
+3. Non-admin, flag OFF → falls back to v1 (current behavior), edge functions still reject direct RPC attempts.
+4. Non-admin RPC read of `entity_extraction.version` is never attempted (no RLS noise in logs).
