@@ -2,6 +2,7 @@
 // No DB writes. Returns candidates the host UI shows in a "Did you mean?" step.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { isNonAdminEntityCreationEnabled } from '../_shared/feature_flags.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
