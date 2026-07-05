@@ -484,6 +484,51 @@ export function AdminFeatureFlagsPanel() {
         </CardContent>
       </Card>
 
+      {/* Phase 3.4E — Non-admin entity creation kill-switch */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Non-admin entity creation
+          </CardTitle>
+          <CardDescription>
+            Lets signed-in users create entities through the V2 Draft Review flow.
+            Non-admin-created entities are pending and limited to 10 new entities per day.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="non-admin-entity" className="text-base">
+                Allow non-admin entity creation
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, signed-in non-admins can submit entities via the V2 Draft Review
+                flow. Submissions land as <code>pending</code> until an admin approves them, and
+                each user is capped at 10 new entities per 24 hours. When disabled, only admins
+                can create entities and the atomic RPC + gated edge functions reject non-admin
+                calls.
+              </p>
+              {nonAdminEntityRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(nonAdminEntityRow.updated_at), { addSuffix: true })}
+                  {nonAdminEntityRow.updated_reason ? ` — “${nonAdminEntityRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="non-admin-entity"
+              checked={nonAdminEntityEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({ key: 'entity_creation.non_admin_enabled', nextEnabled: checked })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
