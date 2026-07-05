@@ -104,6 +104,14 @@ serve(async (req) => {
         code: 'USE_ATOMIC_RPC',
       }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
+
+    // Website-conflict override + soft-delete restore are admin-only surfaces.
+    if (!isAdmin && (allowWebsiteConflict === true || creationContext === 'draft_review_manual')) {
+      return new Response(JSON.stringify({
+        error: 'This action requires an admin',
+        code: 'CONFLICT_REQUIRES_ADMIN',
+      }), { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     let websiteConflictWithBrandId: string | null = null;
     let dropWebsiteDueToConflict = false;
 
