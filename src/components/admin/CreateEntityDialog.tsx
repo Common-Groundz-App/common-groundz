@@ -2898,6 +2898,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         })()}
         urlMetadata={urlMetadata}
         analyzedUrlSnapshot={predictionUrlSnapshot}
+        deferBrandCreationForAtomic={!isAdmin}
+        onDeferBrandCreation={setPendingBrandForAtomic}
         onPrefillForm={async (overrides) => {
           prefilledFromDraftRef.current = true;
           // Phase 3.2 v6 — Stage 2 "Apply to Form": prefill host form state,
