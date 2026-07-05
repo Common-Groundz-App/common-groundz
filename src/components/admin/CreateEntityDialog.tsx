@@ -3084,7 +3084,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         }}
       />
     </Dialog>
-
-
+    <PostCreateContinuation
+      open={!!continuationEntity}
+      entity={continuationEntity}
+      onClose={() => setContinuationEntity(null)}
+    />
+    </>
   );
 };
