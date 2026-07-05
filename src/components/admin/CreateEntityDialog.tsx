@@ -43,6 +43,7 @@ import { DuplicateConfirmDialog, type DuplicateCandidate } from './entity-create
 import { ExactUrlDuplicateDialog } from './entity-create/ExactUrlDuplicateDialog';
 import { uploadEntityImage } from '@/services/entityImageService';
 import type { BrandCandidate } from '@/types/entityDraft';
+import { PostCreateContinuation, type CreatedEntitySummary } from './entity-create/PostCreateContinuation';
 
 interface CreateEntityDialogProps {
   open: boolean;
