@@ -2271,10 +2271,22 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         type: newEntity.type,
         image_url: newEntity.image_url || undefined,
       } : undefined);
-      
-      // Navigate to the newly created entity
+
+      // Phase 3.4D — for non-admin (variant === 'user') creations, show the
+      // post-create continuation prompt instead of auto-navigating. Admin
+      // behavior (auto-navigate to the entity page) is preserved.
       if (newEntity) {
-        navigate(`/entity/${newEntity.slug}`);
+        if (variant === 'user') {
+          setContinuationEntity({
+            id: newEntity.id,
+            name: newEntity.name,
+            slug: newEntity.slug,
+            type: newEntity.type,
+            isPending: !isAdmin,
+          });
+        } else {
+          navigate(`/entity/${newEntity.slug}`);
+        }
       }
     } catch (error: any) {
       console.error('Error creating entity:', error);
