@@ -17,6 +17,7 @@ const CandidateSourceSchema = z.enum([
   "official_site",
   "google_images",
   "google_cse",
+  "google_grounding",
   "places_photo",
   "book_cover",
   "movie_poster",
