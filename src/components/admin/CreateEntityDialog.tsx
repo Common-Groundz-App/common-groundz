@@ -126,6 +126,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [analyzeUrl, setAnalyzeUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
+  // Phase 3.5a — Search-to-Draft tab visibility + active-tab state.
+  const searchToDraftEnabled = useSearchToDraftEnabled();
+  const [createEntityTab, setCreateEntityTab] = useState<'url' | 'search'>('url');
   const useDraftReviewFlagRaw = useEntityReviewUsesDraft();
   // Phase 3.4C — non-admins (variant === 'user') are always forced onto the
   // V2 Draft Review path; the admin-only useEntityReviewUsesDraft flag never
