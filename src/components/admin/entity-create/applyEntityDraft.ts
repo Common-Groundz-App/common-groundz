@@ -33,12 +33,12 @@ export interface SearchPredictionsShape {
     name: string;
     type: string;
     description: string;
-    website_url?: string;
   };
   entityDraft: EntityDraft;
-  metadata: {
-    analyzed_url: string;
-  };
+  /** Full citation URL — kept for diagnostics / continuation only. Never
+   *  passed to the DraftReviewBody as `analyzed_url`, because citation
+   *  pages are usually review/list URLs, not the entity's real website. */
+  searchSourceUrl: string;
 }
 
 export function buildSearchPredictions(payload: SearchCandidatePayload): SearchPredictionsShape {
@@ -49,14 +49,9 @@ export function buildSearchPredictions(payload: SearchCandidatePayload): SearchP
       name: candidate.name,
       type: candidate.type,
       description: candidate.description ?? '',
-      // We deliberately do NOT pre-fill website_url with the citation URL —
-      // it's usually a review/list page, not the entity's website. The
-      // reviewer can paste one before Save.
     },
     entityDraft: draft,
-    metadata: {
-      analyzed_url: candidate.sourceUrl,
-    },
+    searchSourceUrl: candidate.sourceUrl,
   };
 }
 
