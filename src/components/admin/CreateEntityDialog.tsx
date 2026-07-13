@@ -44,6 +44,11 @@ import { ExactUrlDuplicateDialog } from './entity-create/ExactUrlDuplicateDialog
 import { uploadEntityImage } from '@/services/entityImageService';
 import type { BrandCandidate } from '@/types/entityDraft';
 import { PostCreateContinuation, type CreatedEntitySummary } from './entity-create/PostCreateContinuation';
+// Phase 3.5a — Search-to-Draft (additive, sits alongside URL flow).
+import { SearchEntryPanel, type ExistingMatch as SearchExistingMatch } from './entity-create/SearchEntryPanel';
+import { buildSearchPredictions, enrichBrandCandidatesWithExistingMatch, type SearchCandidatePayload } from './entity-create/applyEntityDraft';
+import { useSearchToDraftEnabled } from '@/hooks/useSearchToDraftEnabled';
+import { Search as SearchIcon, Link2 } from 'lucide-react';
 
 interface CreateEntityDialogProps {
   open: boolean;
