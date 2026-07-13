@@ -2350,6 +2350,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
         {/* URL Hero Section - Available for both variants */}
         <div className="space-y-4 animate-fade-in">
+            <Tabs value={createEntityTab} onValueChange={(v) => setCreateEntityTab(v as 'url' | 'search')}>
+              {searchToDraftEnabled && (
+                <TabsList className="grid w-full grid-cols-2 mb-3">
+                  <TabsTrigger value="url" className="gap-2">
+                    <Link2 className="h-4 w-4" /> Paste URL
+                  </TabsTrigger>
+                  <TabsTrigger value="search" className="gap-2">
+                    <SearchIcon className="h-4 w-4" /> Search
+                  </TabsTrigger>
+                </TabsList>
+              )}
+              <TabsContent value="url" className="mt-0">
             {/* URL Auto-Fill Hero Card */}
             <div className="relative overflow-hidden rounded-lg border-2 border-brand-orange/30 bg-gradient-to-br from-brand-orange/5 to-transparent p-6 shadow-sm">
               <div className="flex items-start gap-3 mb-4">
