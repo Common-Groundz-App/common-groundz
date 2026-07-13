@@ -2482,6 +2482,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 </div>
               )}
             </div>
+              </TabsContent>
+              {searchToDraftEnabled && (
+                <TabsContent value="search" className="mt-0">
+                  <SearchEntryPanel
+                    onPick={handleSearchPick}
+                    onOpenExisting={handleSearchOpenExisting}
+                  />
+                </TabsContent>
+              )}
+            </Tabs>
             
             {/* Manual Entry Button - Only show for user variant when form is collapsed */}
             {variant === 'user' && !isFormExpanded && !urlAnalysisComplete && (
