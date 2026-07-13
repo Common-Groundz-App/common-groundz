@@ -1023,6 +1023,35 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setPrimaryMediaUrl(null);
   };
 
+  // Phase 3.5a — Search-to-Draft handlers.
+  // "Open" on an existing CommonGroundz match → navigate + close dialog.
+  const handleSearchOpenExisting = (match: SearchExistingMatch) => {
+    if (match.slug) {
+      navigate(`/entity/${match.slug}`);
+    } else {
+      navigate(`/entity/${match.id}`);
+    }
+    onOpenChange(false);
+  };
+
+  // "Review & create" on a web candidate → enrich brand candidates against
+  // the DB (upgrade suggested_new → matched_existing on hit), then reuse
+  // the existing AutoFillPreviewModal draft-review path by shaping
+  // aiPredictions to the same shape the URL flow uses.
+  const handleSearchPick = async (payload: SearchCandidatePayload) => {
+    let draft = payload.draft;
+    try {
+      const enriched = await enrichBrandCandidatesWithExistingMatch(draft.brandCandidates);
+      draft = { ...draft, brandCandidates: enriched };
+    } catch (e) {
+      console.warn('[CreateEntityDialog] brand enrichment failed:', e);
+    }
+    const predictions = buildSearchPredictions({ ...payload, draft });
+    setAiPredictions(predictions);
+    setPredictionUrlSnapshot(payload.candidate.sourceUrl);
+    setShowPreviewModal(true);
+  };
+
   // Call edge function to analyze URL
   const handleAnalyzeUrl = async () => {
     if (!analyzeUrl || !isValidUrl(analyzeUrl)) {
