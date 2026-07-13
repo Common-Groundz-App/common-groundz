@@ -2955,7 +2955,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onApply={applyAiPredictions}
         metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
         onApplyMetadataOnly={(snapshot) => commitApply(snapshot.websiteUrl, () => applyMetadataOnlySafe(snapshot))}
-        useDraftReview={useDraftReviewFlag}
+        useDraftReview={useDraftReviewFlag || Boolean(aiPredictions?.__fromSearch)}
         entityDraft={(() => {
           // Phase 3.2 bugfix — merge urlMetadata.images into the draft's
           // imageCandidates so the picker shows the lite-metadata images
