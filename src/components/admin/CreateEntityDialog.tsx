@@ -1048,7 +1048,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     }
     const predictions = buildSearchPredictions({ ...payload, draft });
     setAiPredictions(predictions);
-    setPredictionUrlSnapshot(payload.candidate.sourceUrl);
+    // Intentionally leave predictionUrlSnapshot null — the citation URL
+    // must NOT flow into website_url via buildEntityFormPatchFromPredictions.
+    setPredictionUrlSnapshot(null);
     setShowPreviewModal(true);
   };
 
