@@ -3336,6 +3336,24 @@ export type Database = {
           },
         ]
       }
+      search_rate_limits: {
+        Row: {
+          count: number
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          user_id: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       social_influence_scores: {
         Row: {
           category: string
@@ -4683,6 +4701,10 @@ export type Database = {
         Args: { rec_id: string; viewer_id: string }
         Returns: undefined
       }
+      increment_search_rate_limit: {
+        Args: { _user_id: string }
+        Returns: number
+      }
       insert_post_entity: {
         Args: { p_entity_id: string; p_post_id: string }
         Returns: undefined
@@ -4703,6 +4725,7 @@ export type Database = {
       is_current_user_admin: { Args: never; Returns: boolean }
       is_email_verified: { Args: { check_user_id: string }; Returns: boolean }
       is_non_admin_entity_creation_enabled: { Args: never; Returns: boolean }
+      is_non_admin_search_to_draft_enabled: { Args: never; Returns: boolean }
       is_query_fresh: {
         Args: { query_text: string; ttl_hours?: number }
         Returns: boolean
@@ -4846,6 +4869,7 @@ export type Database = {
           would_change: boolean
         }[]
       }
+      prune_search_rate_limits: { Args: never; Returns: undefined }
       repair_hashtag_relationships: { Args: never; Returns: Json }
       run_duplicate_detection: {
         Args: never

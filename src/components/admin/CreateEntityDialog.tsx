@@ -44,6 +44,11 @@ import { ExactUrlDuplicateDialog } from './entity-create/ExactUrlDuplicateDialog
 import { uploadEntityImage } from '@/services/entityImageService';
 import type { BrandCandidate } from '@/types/entityDraft';
 import { PostCreateContinuation, type CreatedEntitySummary } from './entity-create/PostCreateContinuation';
+// Phase 3.5a — Search-to-Draft (additive, sits alongside URL flow).
+import { SearchEntryPanel, type ExistingMatch as SearchExistingMatch } from './entity-create/SearchEntryPanel';
+import { buildSearchPredictions, enrichBrandCandidatesWithExistingMatch, type SearchCandidatePayload } from './entity-create/applyEntityDraft';
+import { useSearchToDraftEnabled } from '@/hooks/useSearchToDraftEnabled';
+import { Search as SearchIcon, Link2 } from 'lucide-react';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -121,6 +126,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [analyzeUrl, setAnalyzeUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
+  // Phase 3.5a — Search-to-Draft tab visibility + active-tab state.
+  const searchToDraftEnabled = useSearchToDraftEnabled();
+  const [createEntityTab, setCreateEntityTab] = useState<'url' | 'search'>('url');
   const useDraftReviewFlagRaw = useEntityReviewUsesDraft();
   // Phase 3.4C — non-admins (variant === 'user') are always forced onto the
   // V2 Draft Review path; the admin-only useEntityReviewUsesDraft flag never
@@ -1013,6 +1021,37 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setAiFilledFields(new Set());
     setUploadedMedia([]);
     setPrimaryMediaUrl(null);
+  };
+
+  // Phase 3.5a — Search-to-Draft handlers.
+  // "Open" on an existing CommonGroundz match → navigate + close dialog.
+  const handleSearchOpenExisting = (match: SearchExistingMatch) => {
+    if (match.slug) {
+      navigate(`/entity/${match.slug}`);
+    } else {
+      navigate(`/entity/${match.id}`);
+    }
+    onOpenChange(false);
+  };
+
+  // "Review & create" on a web candidate → enrich brand candidates against
+  // the DB (upgrade suggested_new → matched_existing on hit), then reuse
+  // the existing AutoFillPreviewModal draft-review path by shaping
+  // aiPredictions to the same shape the URL flow uses.
+  const handleSearchPick = async (payload: SearchCandidatePayload) => {
+    let draft = payload.draft;
+    try {
+      const enriched = await enrichBrandCandidatesWithExistingMatch(draft.brandCandidates);
+      draft = { ...draft, brandCandidates: enriched };
+    } catch (e) {
+      console.warn('[CreateEntityDialog] brand enrichment failed:', e);
+    }
+    const predictions = buildSearchPredictions({ ...payload, draft });
+    setAiPredictions(predictions);
+    // Intentionally leave predictionUrlSnapshot null — the citation URL
+    // must NOT flow into website_url via buildEntityFormPatchFromPredictions.
+    setPredictionUrlSnapshot(null);
+    setShowPreviewModal(true);
   };
 
   // Call edge function to analyze URL
@@ -2342,6 +2381,18 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
         {/* URL Hero Section - Available for both variants */}
         <div className="space-y-4 animate-fade-in">
+            <Tabs value={createEntityTab} onValueChange={(v) => setCreateEntityTab(v as 'url' | 'search')}>
+              {searchToDraftEnabled && (
+                <TabsList className="grid w-full grid-cols-2 mb-3">
+                  <TabsTrigger value="url" className="gap-2">
+                    <Link2 className="h-4 w-4" /> Paste URL
+                  </TabsTrigger>
+                  <TabsTrigger value="search" className="gap-2">
+                    <SearchIcon className="h-4 w-4" /> Search
+                  </TabsTrigger>
+                </TabsList>
+              )}
+              <TabsContent value="url" className="mt-0">
             {/* URL Auto-Fill Hero Card */}
             <div className="relative overflow-hidden rounded-lg border-2 border-brand-orange/30 bg-gradient-to-br from-brand-orange/5 to-transparent p-6 shadow-sm">
               <div className="flex items-start gap-3 mb-4">
@@ -2462,6 +2513,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 </div>
               )}
             </div>
+              </TabsContent>
+              {searchToDraftEnabled && (
+                <TabsContent value="search" className="mt-0">
+                  <SearchEntryPanel
+                    onPick={handleSearchPick}
+                    onOpenExisting={handleSearchOpenExisting}
+                  />
+                </TabsContent>
+              )}
+            </Tabs>
             
             {/* Manual Entry Button - Only show for user variant when form is collapsed */}
             {variant === 'user' && !isFormExpanded && !urlAnalysisComplete && (
@@ -2896,7 +2957,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onApply={applyAiPredictions}
         metadataOnly={!aiPredictions?.predictions ? buildMetadataOnly() : null}
         onApplyMetadataOnly={(snapshot) => commitApply(snapshot.websiteUrl, () => applyMetadataOnlySafe(snapshot))}
-        useDraftReview={useDraftReviewFlag}
+        useDraftReview={useDraftReviewFlag || Boolean(aiPredictions?.__fromSearch)}
         entityDraft={(() => {
           // Phase 3.2 bugfix — merge urlMetadata.images into the draft's
           // imageCandidates so the picker shows the lite-metadata images
