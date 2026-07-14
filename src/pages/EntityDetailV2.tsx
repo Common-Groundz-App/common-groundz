@@ -89,6 +89,18 @@ const EntityDetailV2 = () => {
     refreshData
   } = useEntityDetail(slug || '');
 
+  useEffect(() => {
+    if (composeHandledRef.current) return;
+    if (searchParams.get('compose') !== 'review') return;
+    if (!user || !entity) return;
+    composeHandledRef.current = true;
+    setIsReviewFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('compose');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, user, entity, setSearchParams]);
+
+
   const {
     entityWithChildren,
     parentEntity,
