@@ -1,0 +1,596 @@
+// Phase 3.5b — Selected-candidate image enrichment.
+//
+// Called on-demand when a user clicks "Review & create" on a web search
+// candidate that has no image. Fetches the candidate's sourceUrl HTML,
+// extracts a page-owned image (og:image, twitter:image, JSON-LD image, etc.),
+// and returns it so the Draft Review modal can prepend it to the image grid.
+//
+// STRICT boundaries:
+// - SSRF-safe: source URL, every redirect target, and the extracted image
+//   URL all pass through `assertSafeUrl`.
+// - Cache checked BEFORE rate limit. Hits never consume quota.
+// - Total server time budget ~6s. Client caps at 6.5s.
+// - Never blocks review: any failure returns imageUrl=null; frontend opens
+//   Draft Review regardless.
+// - Privacy: logs only host/method/latency/errorCode/cached — never full URL,
+//   never HTML, never query strings.
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  isNonAdminEntityCreationEnabled,
+  isNonAdminSearchToDraftEnabled,
+} from "../_shared/feature_flags.ts";
+import { assertSafeUrl, SsrfError } from "./ssrf.ts";
+import { isValidPageImageUrl } from "./image_validation.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+// ---- budgets ----
+const TOTAL_BUDGET_MS = 6_000;
+const PAGE_FETCH_TIMEOUT_MS = 4_000;
+const IMAGE_PROBE_TIMEOUT_MS = 1_500;
+const MAX_REDIRECTS = 3;
+const MAX_BODY_BYTES = 512 * 1024;
+const HOURLY_LIMIT = 60;
+
+// ---- cache ----
+type ExtractMethod = "og" | "twitter" | "image_src" | "json_ld";
+type ErrorCode =
+  | "timeout"
+  | "blocked"
+  | "no_image"
+  | "unsafe_url"
+  | "invalid_content_type"
+  | "rate_limited";
+
+interface CachedResult {
+  imageUrl: string | null;
+  source: "page_metadata" | null;
+  method: ExtractMethod | null;
+  errorCode?: ErrorCode;
+}
+interface CacheEntry {
+  result: CachedResult;
+  expiresAt: number;
+}
+const CACHE_MAX = 300;
+const cache = new Map<string, CacheEntry>();
+function cacheGet(key: string): CachedResult | null {
+  const e = cache.get(key);
+  if (!e) return null;
+  if (Date.now() > e.expiresAt) {
+    cache.delete(key);
+    return null;
+  }
+  // refresh LRU
+  cache.delete(key);
+  cache.set(key, e);
+  return e.result;
+}
+function cachePut(key: string, result: CachedResult, ttlMs: number) {
+  if (cache.size >= CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+  }
+  cache.set(key, { result, expiresAt: Date.now() + ttlMs });
+}
+function ttlFor(result: CachedResult): number | null {
+  if (result.imageUrl) return 60 * 60 * 1000; // 60 min positive
+  switch (result.errorCode) {
+    case "no_image":
+      return 20 * 60 * 1000;
+    case "unsafe_url":
+    case "invalid_content_type":
+      return 60 * 60 * 1000;
+    // timeout / blocked / rate_limited -> not cached (transient)
+    default:
+      return null;
+  }
+}
+
+// ---- helpers ----
+function jsonResp(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+function safeHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+/** Normalize source URL to a stable cache key: lowercase host, strip fragment
+ * and common tracking params. */
+function normalizeCacheKey(input: string): string | null {
+  try {
+    const u = new URL(input.trim());
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    u.hostname = u.hostname.toLowerCase();
+    u.hash = "";
+    const strip = [
+      "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+      "gclid", "fbclid", "msclkid", "mc_cid", "mc_eid",
+    ];
+    for (const p of strip) u.searchParams.delete(p);
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch with total timeout, manual redirects (SSRF-checked per hop),
+ *  body size cap. Returns null string on any handled failure via throw. */
+async function safeFetchHtml(
+  startUrl: string,
+  totalDeadline: number,
+): Promise<{ finalUrl: string; html: string }> {
+  let currentUrl = startUrl;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    // SSRF-check every hop.
+    const safe = await assertSafeUrl(currentUrl);
+    currentUrl = safe.url;
+
+    const remaining = totalDeadline - Date.now();
+    if (remaining <= 200) throw new Error("timeout");
+    const perHopTimeout = Math.min(PAGE_FETCH_TIMEOUT_MS, remaining - 100);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), perHopTimeout);
+    let resp: Response;
+    try {
+      resp = await fetch(currentUrl, {
+        method: "GET",
+        redirect: "manual",
+        signal: controller.signal,
+        headers: {
+          "Accept": "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.9",
+          "User-Agent":
+            "Mozilla/5.0 (compatible; CommonGroundzBot/1.0; +https://common-groundz.lovable.app/bot)",
+        },
+      });
+    } catch (e) {
+      if (e instanceof Error && (e.name === "AbortError" || e.message?.includes("aborted"))) {
+        throw new Error("timeout");
+      }
+      throw new Error("blocked");
+    } finally {
+      clearTimeout(timer);
+    }
+
+    // Manual redirect handling.
+    if (resp.status >= 300 && resp.status < 400) {
+      const loc = resp.headers.get("location");
+      // consume body to free connection
+      try { await resp.arrayBuffer(); } catch { /* noop */ }
+      if (!loc) throw new Error("no_image");
+      if (hop >= MAX_REDIRECTS) throw new Error("blocked");
+      // Resolve relative redirects against the current absolute URL.
+      let nextUrl: string;
+      try { nextUrl = new URL(loc, currentUrl).toString(); }
+      catch { throw new Error("unsafe_url"); }
+      currentUrl = nextUrl;
+      continue;
+    }
+
+    if (!resp.ok) throw new Error("no_image");
+
+    const ct = (resp.headers.get("content-type") || "").toLowerCase();
+    if (!ct.includes("text/html") && !ct.includes("application/xhtml")) {
+      throw new Error("no_image");
+    }
+
+    // Read body with cap. Slurp then substring — HTML is bounded above by 512KB.
+    let html: string;
+    try {
+      const reader = resp.body?.getReader();
+      if (!reader) {
+        html = await resp.text();
+      } else {
+        let received = 0;
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            received += value.byteLength;
+            if (received > MAX_BODY_BYTES) {
+              try { await reader.cancel(); } catch { /* noop */ }
+              break;
+            }
+            chunks.push(value);
+          }
+        }
+        // Concatenate.
+        const total = chunks.reduce((n, c) => n + c.byteLength, 0);
+        const merged = new Uint8Array(total);
+        let off = 0;
+        for (const c of chunks) { merged.set(c, off); off += c.byteLength; }
+        html = new TextDecoder("utf-8", { fatal: false }).decode(merged);
+      }
+    } catch {
+      throw new Error("no_image");
+    }
+    // We only need the head; truncate to first 256KB to speed regex.
+    if (html.length > 256_000) html = html.slice(0, 256_000);
+    return { finalUrl: currentUrl, html };
+  }
+  throw new Error("blocked");
+}
+
+// ---- extraction ----
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&#(\d+);/g, (_, d) => String.fromCharCode(parseInt(d, 10)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
+function findMetaContent(html: string, property: string): string | null {
+  // Handles both name="..." and property="..." with either attribute order.
+  const patterns = [
+    new RegExp(
+      `<meta[^>]+(?:property|name)\\s*=\\s*["']${property}["'][^>]*content\\s*=\\s*["']([^"']+)["']`,
+      "i",
+    ),
+    new RegExp(
+      `<meta[^>]+content\\s*=\\s*["']([^"']+)["'][^>]*(?:property|name)\\s*=\\s*["']${property}["']`,
+      "i",
+    ),
+  ];
+  for (const re of patterns) {
+    const m = re.exec(html);
+    if (m && m[1]) return decodeEntities(m[1].trim());
+  }
+  return null;
+}
+
+function findLinkImageSrc(html: string): string | null {
+  const patterns = [
+    /<link[^>]+rel\s*=\s*["']image_src["'][^>]*href\s*=\s*["']([^"']+)["']/i,
+    /<link[^>]+href\s*=\s*["']([^"']+)["'][^>]*rel\s*=\s*["']image_src["']/i,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(html);
+    if (m && m[1]) return decodeEntities(m[1].trim());
+  }
+  return null;
+}
+
+function findJsonLdImage(html: string): string | null {
+  const re = /<script[^>]+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const raw = m[1].trim();
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw);
+      const url = pickJsonLdImage(parsed);
+      if (url) return url;
+    } catch {
+      // Not valid JSON — skip.
+    }
+  }
+  return null;
+}
+function pickJsonLdImage(node: unknown): string | null {
+  if (!node) return null;
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const u = pickJsonLdImage(item);
+      if (u) return u;
+    }
+    return null;
+  }
+  if (typeof node !== "object") return null;
+  const obj = node as Record<string, unknown>;
+  const img = obj["image"];
+  if (typeof img === "string" && img.length > 0) return img;
+  if (Array.isArray(img)) {
+    for (const it of img) {
+      if (typeof it === "string" && it.length > 0) return it;
+      if (it && typeof it === "object") {
+        const url = (it as Record<string, unknown>).url;
+        if (typeof url === "string" && url.length > 0) return url;
+      }
+    }
+  }
+  if (img && typeof img === "object") {
+    const url = (img as Record<string, unknown>).url;
+    if (typeof url === "string" && url.length > 0) return url;
+  }
+  // Recurse a bit into common containers.
+  for (const key of ["mainEntity", "@graph"]) {
+    const child = obj[key];
+    if (child) {
+      const u = pickJsonLdImage(child);
+      if (u) return u;
+    }
+  }
+  return null;
+}
+
+function extractImage(html: string): { url: string; method: ExtractMethod } | null {
+  const og = findMetaContent(html, "og:image:secure_url") ??
+    findMetaContent(html, "og:image");
+  if (og) return { url: og, method: "og" };
+  const tw = findMetaContent(html, "twitter:image") ??
+    findMetaContent(html, "twitter:image:src");
+  if (tw) return { url: tw, method: "twitter" };
+  const linkSrc = findLinkImageSrc(html);
+  if (linkSrc) return { url: linkSrc, method: "image_src" };
+  const ld = findJsonLdImage(html);
+  if (ld) return { url: ld, method: "json_ld" };
+  return null;
+}
+
+/** Best-effort image content-type HEAD probe. */
+async function probeImageContentType(
+  url: string,
+  deadline: number,
+): Promise<boolean> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 100) return true; // budget spent; trust extension/URL
+  const perTimeout = Math.min(IMAGE_PROBE_TIMEOUT_MS, remaining - 50);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), perTimeout);
+  try {
+    const resp = await fetch(url, {
+      method: "HEAD",
+      redirect: "manual",
+      signal: controller.signal,
+    });
+    // If server rejects HEAD, treat as OK (many CDNs 405 on HEAD).
+    if (resp.status === 405 || resp.status === 501) return true;
+    if (resp.status >= 300 && resp.status < 400) return true; // don't chase image redirects for probe
+    if (!resp.ok) return false;
+    const ct = (resp.headers.get("content-type") || "").toLowerCase();
+    return ct.startsWith("image/");
+  } catch {
+    return true; // treat probe failure as inconclusive → keep the image
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// ---- handler ----
+serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const started = Date.now();
+  const deadline = started + TOTAL_BUDGET_MS;
+  let host = "";
+  let method: ExtractMethod | null = null;
+  let cached = false;
+
+  try {
+    // 1. Auth.
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return jsonResp({ error: "Unauthorized" }, 401);
+    }
+    const supabaseAnon = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } },
+    );
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } =
+      await supabaseAnon.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return jsonResp({ error: "Unauthorized" }, 401);
+    }
+    const userId = claimsData.claims.sub;
+
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { autoRefreshToken: false, persistSession: false } },
+    );
+
+    // 2. Flag gate (admin bypasses).
+    const { data: isAdminData } = await supabaseAdmin.rpc("has_role", {
+      _user_id: userId,
+      _role: "admin",
+    });
+    const isAdmin = isAdminData === true;
+    if (!isAdmin) {
+      const [creationEnabled, searchEnabled] = await Promise.all([
+        isNonAdminEntityCreationEnabled(supabaseAdmin),
+        isNonAdminSearchToDraftEnabled(supabaseAdmin),
+      ]);
+      if (!creationEnabled || !searchEnabled) {
+        return jsonResp({ error: "search_disabled" }, 403);
+      }
+    }
+
+    // 3. Validate input.
+    const body = (await req.json().catch(() => ({}))) as {
+      sourceUrl?: string;
+      name?: string;
+    };
+    const sourceUrlRaw = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : "";
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (sourceUrlRaw.length < 8 || sourceUrlRaw.length > 2048) {
+      return jsonResp({ error: "invalid_input" }, 400);
+    }
+    if (name.length < 1 || name.length > 200) {
+      return jsonResp({ error: "invalid_input" }, 400);
+    }
+    const cacheKey = normalizeCacheKey(sourceUrlRaw);
+    if (!cacheKey) return jsonResp({ error: "invalid_input" }, 400);
+    host = safeHost(cacheKey);
+
+    // 4. Cache lookup BEFORE rate limit.
+    const cachedResult = cacheGet(cacheKey);
+    if (cachedResult) {
+      cached = true;
+      method = cachedResult.method;
+      const latencyMs = Date.now() - started;
+      console.log(JSON.stringify({
+        fn: "enrich-candidate-image",
+        host, method, latencyMs, cached: true,
+        errorCode: cachedResult.errorCode ?? null,
+      }));
+      return jsonResp({
+        imageUrl: cachedResult.imageUrl,
+        source: cachedResult.source,
+        method: cachedResult.method,
+        diagnostics: {
+          latencyMs,
+          fetched: false,
+          cached: true,
+          ...(cachedResult.errorCode ? { errorCode: cachedResult.errorCode } : {}),
+        },
+      });
+    }
+
+    // 5. Rate limit (only on cache miss).
+    const { data: rateCount, error: rateErr } = await supabaseAdmin.rpc(
+      "increment_image_enrich_rate_limit",
+      { _user_id: userId },
+    );
+    if (rateErr) {
+      console.warn("[enrich-candidate-image] rate rpc failed:", rateErr.message);
+    } else if (typeof rateCount === "number" && rateCount > HOURLY_LIMIT) {
+      const latencyMs = Date.now() - started;
+      console.log(JSON.stringify({
+        fn: "enrich-candidate-image",
+        host, latencyMs, cached: false, errorCode: "rate_limited",
+      }));
+      return jsonResp({
+        imageUrl: null, source: null, method: null,
+        diagnostics: { latencyMs, fetched: false, cached: false, errorCode: "rate_limited" },
+      }, 429);
+    }
+
+    // Opportunistic prune.
+    if (Math.random() < 0.01) {
+      supabaseAdmin.rpc("prune_image_enrich_rate_limits").catch(() => {});
+    }
+
+    // 6. SSRF-safe fetch + extract.
+    let result: CachedResult;
+    try {
+      const { finalUrl, html } = await safeFetchHtml(cacheKey, deadline);
+      const found = extractImage(html);
+      if (!found) {
+        result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
+      } else {
+        // Resolve relative to final URL.
+        let absImg: string;
+        try { absImg = new URL(found.url, finalUrl).toString(); }
+        catch {
+          result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
+          const ttl = ttlFor(result);
+          if (ttl) cachePut(cacheKey, result, ttl);
+          const latencyMs = Date.now() - started;
+          console.log(JSON.stringify({
+            fn: "enrich-candidate-image",
+            host, method: found.method, latencyMs, cached: false, errorCode: "no_image",
+          }));
+          return jsonResp({
+            imageUrl: null, source: null, method: null,
+            diagnostics: { latencyMs, fetched: true, cached: false, errorCode: "no_image" },
+          });
+        }
+
+        // Basic validity (tracking pixel/favicon/data:/non-http filter).
+        if (!isValidPageImageUrl(absImg)) {
+          result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
+        } else {
+          // SSRF-check the extracted image URL too.
+          try {
+            await assertSafeUrl(absImg);
+          } catch (e) {
+            if (e instanceof SsrfError) {
+              result = { imageUrl: null, source: null, method: null, errorCode: "unsafe_url" };
+            } else {
+              result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
+            }
+            method = found.method;
+            const ttl = ttlFor(result);
+            if (ttl) cachePut(cacheKey, result, ttl);
+            const latencyMs = Date.now() - started;
+            console.log(JSON.stringify({
+              fn: "enrich-candidate-image",
+              host, method, latencyMs, cached: false, errorCode: result.errorCode,
+            }));
+            return jsonResp({
+              imageUrl: null, source: null, method: null,
+              diagnostics: { latencyMs, fetched: true, cached: false, errorCode: result.errorCode },
+            });
+          }
+
+          // Optional HEAD probe.
+          const okType = await probeImageContentType(absImg, deadline);
+          if (!okType) {
+            result = {
+              imageUrl: null, source: null, method: null,
+              errorCode: "invalid_content_type",
+            };
+          } else {
+            result = {
+              imageUrl: absImg, source: "page_metadata", method: found.method,
+            };
+          }
+          method = found.method;
+        }
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      let errorCode: ErrorCode;
+      if (e instanceof SsrfError) errorCode = "unsafe_url";
+      else if (msg === "timeout") errorCode = "timeout";
+      else if (msg === "no_image") errorCode = "no_image";
+      else if (msg === "unsafe_url") errorCode = "unsafe_url";
+      else errorCode = "blocked";
+      result = { imageUrl: null, source: null, method: null, errorCode };
+    }
+
+    // 7. Cache per policy.
+    const ttl = ttlFor(result);
+    if (ttl) cachePut(cacheKey, result, ttl);
+
+    const latencyMs = Date.now() - started;
+    console.log(JSON.stringify({
+      fn: "enrich-candidate-image",
+      host, method: result.method ?? method, latencyMs, cached: false,
+      errorCode: result.errorCode ?? null,
+    }));
+
+    return jsonResp({
+      imageUrl: result.imageUrl,
+      source: result.source,
+      method: result.method,
+      diagnostics: {
+        latencyMs,
+        fetched: true,
+        cached: false,
+        ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+      },
+    });
+  } catch (err) {
+    const latencyMs = Date.now() - started;
+    console.error("[enrich-candidate-image] unhandled:", (err as Error).message);
+    return jsonResp({
+      imageUrl: null, source: null, method: null,
+      diagnostics: { latencyMs, fetched: false, cached: false, errorCode: "blocked" as ErrorCode },
+    }, 200);
+  }
+});

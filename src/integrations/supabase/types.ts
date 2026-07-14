@@ -1552,6 +1552,24 @@ export type Database = {
         }
         Relationships: []
       }
+      image_enrich_rate_limits: {
+        Row: {
+          count: number
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          count?: number
+          user_id: string
+          window_start: string
+        }
+        Update: {
+          count?: number
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       image_health_results: {
         Row: {
           checked_at: string
@@ -4697,6 +4715,10 @@ export type Database = {
         Args: { item_id: string; table_name: string }
         Returns: undefined
       }
+      increment_image_enrich_rate_limit: {
+        Args: { _user_id: string }
+        Returns: number
+      }
       increment_recommendation_view: {
         Args: { rec_id: string; viewer_id: string }
         Returns: undefined
@@ -4869,6 +4891,7 @@ export type Database = {
           would_change: boolean
         }[]
       }
+      prune_image_enrich_rate_limits: { Args: never; Returns: undefined }
       prune_search_rate_limits: { Args: never; Returns: undefined }
       repair_hashtag_relationships: { Args: never; Returns: Json }
       run_duplicate_detection: {

@@ -6,8 +6,39 @@
 // means the entire brand-picker / image-picker / prefill flow is shared
 // with the URL analyze path — no duplicate review UI.
 
-import type { EntityDraft, BrandCandidate } from '@/types/entityDraft';
+import type { EntityDraft, BrandCandidate, ImageCandidate } from '@/types/entityDraft';
 import { supabase } from '@/integrations/supabase/client';
+
+export type EnrichedImageMethod = 'og' | 'twitter' | 'image_src' | 'json_ld';
+
+/** Phase 3.5b — Prepend a page-metadata image to an EntityDraft's imageCandidates.
+ *  Idempotent: no-op if the same URL is already present. Never mutates input. */
+export function mergeEnrichedImage(
+  draft: EntityDraft,
+  imageUrl: string,
+  method: EnrichedImageMethod,
+): EntityDraft {
+  if (!imageUrl) return draft;
+  const existing = draft.imageCandidates ?? [];
+  if (existing.some((c) => c.url === imageUrl)) return draft;
+  const reasonByMethod: Record<EnrichedImageMethod, string> = {
+    og: 'og:image from source page',
+    twitter: 'twitter:image from source page',
+    image_src: 'link rel=image_src from source page',
+    json_ld: 'JSON-LD image from source page',
+  };
+  const enriched: ImageCandidate = {
+    url: imageUrl,
+    source: 'page_metadata',
+    confidence: 0.75,
+    reason: reasonByMethod[method],
+  };
+  return {
+    ...draft,
+    imageCandidates: [enriched, ...existing],
+    recommendedImageIndex: 0,
+  };
+}
 
 export interface SearchCandidatePayload {
   draft: EntityDraft;

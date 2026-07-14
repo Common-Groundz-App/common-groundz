@@ -5,15 +5,17 @@
 // CommonGroundz match.
 
 import React, { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, ExternalLink } from 'lucide-react';
+import { Search, ExternalLink, Loader2, PenSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import type { SearchCandidatePayload } from './applyEntityDraft';
+import { useAuth } from '@/contexts/AuthContext';
+import { mergeEnrichedImage, type EnrichedImageMethod, type SearchCandidatePayload } from './applyEntityDraft';
 
 export interface ExistingMatch {
   id: string;
@@ -38,7 +40,7 @@ interface SearchResponse {
 
 interface SearchEntryPanelProps {
   onPick: (payload: SearchCandidatePayload) => void;
-  onOpenExisting: (match: ExistingMatch) => void;
+  onOpenExisting: (match: ExistingMatch, intent?: 'view' | 'review') => void;
 }
 
 function confidenceLabel(c: number): string {
@@ -47,11 +49,24 @@ function confidenceLabel(c: number): string {
   return 'Lower';
 }
 
+// Phase 3.5b — client-side cap for on-click image enrichment. Server budget
+// is 6s; add 500ms for network + serialization.
+const ENRICH_CLIENT_TIMEOUT_MS = 6_500;
+
+interface EnrichResponse {
+  imageUrl: string | null;
+  source: 'page_metadata' | null;
+  method: EnrichedImageMethod | null;
+  diagnostics?: { latencyMs: number; fetched: boolean; cached: boolean; errorCode?: string };
+}
+
 export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOpenExisting }) => {
+  const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [enrichingIndex, setEnrichingIndex] = useState<number | null>(null);
 
   const canSearch = query.trim().length >= 3 && !loading;
 
@@ -101,6 +116,46 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
       runSearch();
     }
   };
+
+  /** Phase 3.5b — on Review & create: for web candidates without an image,
+   *  request one page-metadata image enrichment. Regardless of outcome
+   *  (success, null, timeout, 429, SSRF-block), call onPick exactly once so
+   *  Draft Review still opens. No error toast. */
+  const handleReviewCreate = async (payload: SearchCandidatePayload, idx: number) => {
+    if (enrichingIndex !== null) return;
+    const { candidate } = payload;
+    if (candidate.imageUrl) {
+      onPick(payload);
+      return;
+    }
+    setEnrichingIndex(idx);
+    let enrichedPayload = payload;
+    try {
+      const enrichPromise = supabase.functions.invoke('enrich-candidate-image', {
+        body: { sourceUrl: candidate.sourceUrl, name: candidate.name },
+      });
+      const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+        setTimeout(
+          () => resolve({ data: null, error: new Error('client_timeout') }),
+          ENRICH_CLIENT_TIMEOUT_MS,
+        ),
+      );
+      const raced = await Promise.race([enrichPromise, timeoutPromise]);
+      const data = (raced as any).data as EnrichResponse | null;
+      if (data?.imageUrl && data.method) {
+        enrichedPayload = {
+          ...payload,
+          draft: mergeEnrichedImage(payload.draft, data.imageUrl, data.method),
+        };
+      }
+    } catch (e) {
+      console.warn('[SearchEntryPanel] image enrichment failed:', (e as Error).message);
+    } finally {
+      setEnrichingIndex(null);
+      onPick(enrichedPayload);
+    }
+  };
+  
 
   const errorCode = result?.diagnostics?.errorCode;
   const hasCandidates = (result?.candidates.length ?? 0) > 0;
@@ -182,9 +237,25 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                       <p className="truncate text-sm font-medium text-foreground">{m.name}</p>
                       <p className="text-xs text-muted-foreground">{getEntityTypeLabel(m.type as any)}</p>
                     </div>
-                    <Button size="sm" variant="secondary" onClick={() => onOpenExisting(m)}>
-                      Open
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {user && (
+                        <Button
+                          size="sm"
+                          onClick={() => onOpenExisting(m, 'review')}
+                          className="gap-1"
+                        >
+                          <PenSquare className="h-3.5 w-3.5" />
+                          Write review
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => onOpenExisting(m, 'view')}
+                      >
+                        Open
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -230,8 +301,20 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       </div>
-                      <Button size="sm" onClick={() => onPick(p)}>
-                        Review &amp; create
+                      <Button
+                        size="sm"
+                        onClick={() => handleReviewCreate(p, idx)}
+                        disabled={enrichingIndex !== null}
+                        className="gap-1 min-w-[128px]"
+                      >
+                        {enrichingIndex === idx ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Preparing…
+                          </>
+                        ) : (
+                          <>Review &amp; create</>
+                        )}
                       </Button>
                     </div>
                   );

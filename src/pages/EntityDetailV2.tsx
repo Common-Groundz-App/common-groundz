@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,6 +72,11 @@ const EntityDetailV2 = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
+
+  // Phase 3.5b — auto-open ReviewForm when arriving via ?compose=review deep link.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const composeHandledRef = useRef(false);
+
   
   const {
     entity,
@@ -83,6 +88,18 @@ const EntityDetailV2 = () => {
     error,
     refreshData
   } = useEntityDetail(slug || '');
+
+  useEffect(() => {
+    if (composeHandledRef.current) return;
+    if (searchParams.get('compose') !== 'review') return;
+    if (!user || !entity) return;
+    composeHandledRef.current = true;
+    setIsReviewFormOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('compose');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, user, entity, setSearchParams]);
+
 
   const {
     entityWithChildren,

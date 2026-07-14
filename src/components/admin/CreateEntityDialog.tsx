@@ -1025,12 +1025,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
   // Phase 3.5a — Search-to-Draft handlers.
   // "Open" on an existing CommonGroundz match → navigate + close dialog.
-  const handleSearchOpenExisting = (match: SearchExistingMatch) => {
-    if (match.slug) {
-      navigate(`/entity/${match.slug}`);
-    } else {
-      navigate(`/entity/${match.id}`);
-    }
+  const handleSearchOpenExisting = (match: SearchExistingMatch, intent: 'view' | 'review' = 'view') => {
+    const base = match.slug ? `/entity/${match.slug}` : `/entity/${match.id}`;
+    const url = intent === 'review' ? `${base}?compose=review` : base;
+    navigate(url);
     onOpenChange(false);
   };
 
