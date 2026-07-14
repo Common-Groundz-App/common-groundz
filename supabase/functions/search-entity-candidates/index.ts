@@ -332,11 +332,16 @@ async function callGemini(
     raw = await resp.json();
   } catch (e) {
     clearTimeout(timer);
-    console.warn("[search-entity-candidates] Gemini call failed:", (e as Error).message);
+    const isAbort = e instanceof Error && (e.name === "AbortError" || e.message?.includes("aborted"));
+    const errorCode: "timeout" | "grounding_unavailable" = isAbort ? "timeout" : "grounding_unavailable";
+    console.warn(
+      `[search-entity-candidates] Gemini call failed:`,
+      JSON.stringify({ errorCode, isAbort, message: (e as Error).message, latencyMs: Date.now() - geminiStart }),
+    );
     return {
       candidates: [], groundingSources: [], hasSearchEntryPoint: false,
       renderedContentLength: 0, renderedContentHash: null,
-      rawRenderedContent: null, errorCode: "grounding_unavailable",
+      rawRenderedContent: null, errorCode,
     };
   }
 
