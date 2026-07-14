@@ -72,6 +72,11 @@ const EntityDetailV2 = () => {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [timelineReviewId, setTimelineReviewId] = useState<string | null>(null);
   const [isTimelineViewerOpen, setIsTimelineViewerOpen] = useState(false);
+
+  // Phase 3.5b — auto-open ReviewForm when arriving via ?compose=review deep link.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const composeHandledRef = useRef(false);
+
   
   const {
     entity,
