@@ -118,6 +118,46 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
     }
   };
 
+  /** Phase 3.5b — on Review & create: for web candidates without an image,
+   *  request one page-metadata image enrichment. Regardless of outcome
+   *  (success, null, timeout, 429, SSRF-block), call onPick exactly once so
+   *  Draft Review still opens. No error toast. */
+  const handleReviewCreate = async (payload: SearchCandidatePayload, idx: number) => {
+    if (enrichingIndex !== null) return;
+    const { candidate } = payload;
+    if (candidate.imageUrl) {
+      onPick(payload);
+      return;
+    }
+    setEnrichingIndex(idx);
+    let enrichedPayload = payload;
+    try {
+      const enrichPromise = supabase.functions.invoke('enrich-candidate-image', {
+        body: { sourceUrl: candidate.sourceUrl, name: candidate.name },
+      });
+      const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+        setTimeout(
+          () => resolve({ data: null, error: new Error('client_timeout') }),
+          ENRICH_CLIENT_TIMEOUT_MS,
+        ),
+      );
+      const raced = await Promise.race([enrichPromise, timeoutPromise]);
+      const data = (raced as any).data as EnrichResponse | null;
+      if (data?.imageUrl && data.method) {
+        enrichedPayload = {
+          ...payload,
+          draft: mergeEnrichedImage(payload.draft, data.imageUrl, data.method),
+        };
+      }
+    } catch (e) {
+      console.warn('[SearchEntryPanel] image enrichment failed:', (e as Error).message);
+    } finally {
+      setEnrichingIndex(null);
+      onPick(enrichedPayload);
+    }
+  };
+  void navigate; // reserved for future direct-navigate paths
+
   const errorCode = result?.diagnostics?.errorCode;
   const hasCandidates = (result?.candidates.length ?? 0) > 0;
   const hasExisting = (result?.existingMatches.length ?? 0) > 0;
