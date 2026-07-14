@@ -40,7 +40,7 @@ interface SearchResponse {
 
 interface SearchEntryPanelProps {
   onPick: (payload: SearchCandidatePayload) => void;
-  onOpenExisting: (match: ExistingMatch) => void;
+  onOpenExisting: (match: ExistingMatch, intent?: 'view' | 'review') => void;
 }
 
 function confidenceLabel(c: number): string {
@@ -49,11 +49,25 @@ function confidenceLabel(c: number): string {
   return 'Lower';
 }
 
+// Phase 3.5b — client-side cap for on-click image enrichment. Server budget
+// is 6s; add 500ms for network + serialization.
+const ENRICH_CLIENT_TIMEOUT_MS = 6_500;
+
+interface EnrichResponse {
+  imageUrl: string | null;
+  source: 'page_metadata' | null;
+  method: EnrichedImageMethod | null;
+  diagnostics?: { latencyMs: number; fetched: boolean; cached: boolean; errorCode?: string };
+}
+
 export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOpenExisting }) => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [enrichingIndex, setEnrichingIndex] = useState<number | null>(null);
 
   const canSearch = query.trim().length >= 3 && !loading;
 
