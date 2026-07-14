@@ -156,7 +156,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
       onPick(enrichedPayload);
     }
   };
-  void navigate; // reserved for future direct-navigate paths
+  
 
   const errorCode = result?.diagnostics?.errorCode;
   const hasCandidates = (result?.candidates.length ?? 0) > 0;
