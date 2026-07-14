@@ -62,7 +62,6 @@ interface EnrichResponse {
 
 export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOpenExisting }) => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResponse | null>(null);
