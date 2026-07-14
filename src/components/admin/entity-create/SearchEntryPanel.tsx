@@ -5,15 +5,17 @@
 // CommonGroundz match.
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, ExternalLink } from 'lucide-react';
+import { Search, ExternalLink, Loader2, PenSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import type { SearchCandidatePayload } from './applyEntityDraft';
+import { useAuth } from '@/contexts/AuthContext';
+import { mergeEnrichedImage, type EnrichedImageMethod, type SearchCandidatePayload } from './applyEntityDraft';
 
 export interface ExistingMatch {
   id: string;
