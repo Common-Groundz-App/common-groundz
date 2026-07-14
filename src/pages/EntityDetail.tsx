@@ -98,6 +98,21 @@ const EntityDetailOriginal = () => {
     refreshData
   } = useEntityDetail(entitySlug);
 
+  // Phase 3.5b — auto-open ReviewForm when arriving via ?compose=review deep link.
+  const [composeSearchParams, setComposeSearchParams] = useSearchParams();
+  const composeHandledRef = useRef(false);
+  useEffect(() => {
+    if (composeHandledRef.current) return;
+    if (composeSearchParams.get('compose') !== 'review') return;
+    if (!user || !entity) return;
+    composeHandledRef.current = true;
+    setIsReviewFormOpen(true);
+    const next = new URLSearchParams(composeSearchParams);
+    next.delete('compose');
+    setComposeSearchParams(next, { replace: true });
+  }, [composeSearchParams, user, entity, setComposeSearchParams]);
+
+
   // Handle slug redirects and canonical redirect
   useEffect(() => {
     const handleRedirects = async () => {
