@@ -269,7 +269,7 @@ async function callGemini(
   renderedContentLength: number;
   renderedContentHash: string | null;
   rawRenderedContent: string | null;
-  errorCode: null | "grounding_unavailable" | "parse_failed";
+  errorCode: null | "grounding_unavailable" | "parse_failed" | "timeout";
 }> {
   const prompt = [
     `User query: "${query}"`,
