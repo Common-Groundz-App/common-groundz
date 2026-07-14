@@ -271,6 +271,7 @@ async function callGemini(
   rawRenderedContent: string | null;
   errorCode: null | "grounding_unavailable" | "parse_failed" | "timeout";
 }> {
+  const geminiStart = Date.now();
   const prompt = [
     `User query: "${query}"`,
     `Type hint: "${typeHint ?? "unknown"}"`,
