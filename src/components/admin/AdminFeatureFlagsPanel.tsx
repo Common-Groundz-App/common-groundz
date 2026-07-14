@@ -36,6 +36,7 @@ type PendingChange =
   // Plan v10 — pipeline switcher: Legacy auto-create vs. Draft Review.
   | { key: 'entity_extraction.review_uses_draft'; nextEnabled: boolean }
   | { key: 'entity_creation.non_admin_enabled'; nextEnabled: boolean }
+  | { key: 'search_to_draft.non_admin_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -93,6 +94,10 @@ export function AdminFeatureFlagsPanel() {
   const nonAdminEntityRow = rows.data?.find((r) => r.key === 'entity_creation.non_admin_enabled');
   const nonAdminEntityEnabled: boolean = nonAdminEntityRow?.value?.enabled === true;
 
+  // Phase 3.5a — Search-to-Draft non-admin gate. Default OFF.
+  const searchToDraftRow = rows.data?.find((r) => r.key === 'search_to_draft.non_admin_enabled');
+  const searchToDraftEnabled: boolean = searchToDraftRow?.value?.enabled === true;
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
@@ -118,7 +123,11 @@ export function AdminFeatureFlagsPanel() {
                 ? pending.nextEnabled
                   ? 'Enable non-admin entity creation?'
                   : 'Disable non-admin entity creation?'
-                : '';
+                : pending?.key === 'search_to_draft.non_admin_enabled'
+                  ? pending.nextEnabled
+                    ? 'Enable Search-to-draft for non-admins?'
+                    : 'Disable Search-to-draft for non-admins?'
+                  : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -145,7 +154,11 @@ export function AdminFeatureFlagsPanel() {
                 ? pending.nextEnabled
                   ? 'Signed-in non-admins can create entities via the V2 Draft Review flow. New entities are pending (limited to 10 per user per 24h) until an admin approves them.'
                   : 'Only admins can create entities. Any non-admin call to the atomic RPC or gated edge functions will be rejected.'
-                : '';
+                : pending?.key === 'search_to_draft.non_admin_enabled'
+                  ? pending.nextEnabled
+                    ? 'Non-admin users will see the Search tab in Create Entity, powered by Gemini grounded search. Requires non-admin entity creation to also be enabled.'
+                    : 'Only admins will see the Search tab in Create Entity. The search-entity-candidates edge function will reject non-admin calls.'
+                  : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -180,9 +193,15 @@ export function AdminFeatureFlagsPanel() {
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'entity_creation.non_admin_enabled') {
         await setFlag.mutateAsync({
           key: 'entity_creation.non_admin_enabled',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'search_to_draft.non_admin_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
@@ -527,6 +546,50 @@ export function AdminFeatureFlagsPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Phase 3.5a — Search-to-Draft non-admin gate */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Search-to-draft for non-admins
+          </CardTitle>
+          <CardDescription>
+            When ON, non-admin users see the Search tab in Create Entity using Gemini grounded search.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="non-admin-search-to-draft" className="text-base">
+                Allow non-admin Search-to-draft
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, signed-in non-admins see the Search tab in Create Entity powered by
+                Gemini grounded search. Also requires <code>Non-admin entity creation</code> to be
+                enabled. When disabled, only admins see the Search tab and the
+                <code> search-entity-candidates</code> edge function rejects non-admin calls.
+              </p>
+              {searchToDraftRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(searchToDraftRow.updated_at), { addSuffix: true })}
+                  {searchToDraftRow.updated_reason ? ` — “${searchToDraftRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="non-admin-search-to-draft"
+              checked={searchToDraftEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({ key: 'search_to_draft.non_admin_enabled', nextEnabled: checked })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+
 
 
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
