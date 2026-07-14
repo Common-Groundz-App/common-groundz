@@ -35,7 +35,7 @@ const corsHeaders = {
 };
 
 const DEFAULT_GEMINI_GROUNDED_MODEL = "gemini-3.5-flash";
-const GEMINI_TIMEOUT_MS = 12_000;
+const GEMINI_TIMEOUT_MS = Number(Deno.env.get("GEMINI_TIMEOUT_MS")) || 30_000;
 const HOURLY_LIMIT = 20;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 200;
@@ -269,8 +269,9 @@ async function callGemini(
   renderedContentLength: number;
   renderedContentHash: string | null;
   rawRenderedContent: string | null;
-  errorCode: null | "grounding_unavailable" | "parse_failed";
+  errorCode: null | "grounding_unavailable" | "parse_failed" | "timeout";
 }> {
+  const geminiStart = Date.now();
   const prompt = [
     `User query: "${query}"`,
     `Type hint: "${typeHint ?? "unknown"}"`,
@@ -332,11 +333,16 @@ async function callGemini(
     raw = await resp.json();
   } catch (e) {
     clearTimeout(timer);
-    console.warn("[search-entity-candidates] Gemini call failed:", (e as Error).message);
+    const isAbort = e instanceof Error && (e.name === "AbortError" || e.message?.includes("aborted"));
+    const errorCode: "timeout" | "grounding_unavailable" = isAbort ? "timeout" : "grounding_unavailable";
+    console.warn(
+      `[search-entity-candidates] Gemini call failed:`,
+      JSON.stringify({ errorCode, isAbort, message: (e as Error).message, latencyMs: Date.now() - geminiStart }),
+    );
     return {
       candidates: [], groundingSources: [], hasSearchEntryPoint: false,
       renderedContentLength: 0, renderedContentHash: null,
-      rawRenderedContent: null, errorCode: "grounding_unavailable",
+      rawRenderedContent: null, errorCode,
     };
   }
 
