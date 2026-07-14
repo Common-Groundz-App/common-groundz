@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useRecentSearches } from '@/hooks/useRecentSearches';
 import { formatSlugAsName } from '@/utils/formatSlug';

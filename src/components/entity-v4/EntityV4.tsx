@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useLocation, useSearchParams } from 'react-router-dom';
 import NavBarComponent from '@/components/NavBarComponent';
 import GuestNavBar from '@/components/profile/GuestNavBar';
 import { useEntityDetailCached } from '@/hooks/use-entity-detail-cached';
