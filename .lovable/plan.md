@@ -1,306 +1,242 @@
-# Phase 3.5a — Search-to-Draft (final, v5)
 
-Purely additive. The URL pipeline (`analyze-entity-url-v2`, its prompt, resilience, URL body in `CreateEntityDialog`, `EntityModerationBanner`, review body, `PostCreateContinuation`) is not touched. A new **Search** tab sits next to "Paste URL".
+# Phase 3.5b — Final Plan (v2)
 
-## Model
+Purely additive. URL flow, 3.5a edge function, feature flags, admin panel, and contract types stay untouched.
 
-- **Default:** `gemini-3.5-flash`.
-- **Env override:** `GEMINI_GROUNDED_MODEL`.
-- Constant `DEFAULT_GEMINI_GROUNDED_MODEL` lives in the edge function; echoed in `diagnostics.model`.
+Two focused improvements to the Search tab:
+1. **Selected-candidate image enrichment** — SSRF-safe, deterministic, cache-first, separately rate-limited.
+2. **Existing-match shortcuts** — `Write review` + `Open` only. No `Recommend`.
 
-## Changes since v4
+## Verified before planning
 
-| # | Concern | Decision |
-|---|---|---|
-| 1 | `set_app_flag` allowlist must accept the new key or the admin toggle silently fails | **Adopted.** Migration updates `public.set_app_flag` to accept `search_to_draft.non_admin_enabled` with exact shape `{ "enabled": boolean }`, matching how `entity_creation.non_admin_enabled` is validated today. |
-| 2 | Prefer Interactions API over `generateContent` | **Adopted as strong preference in build-step 0.** During verification, if the Interactions API supports `google_search` + JSON output + `groundingMetadata` cleanly, use it. Otherwise fall back to `generateContent` (still documented for `gemini-3.5-flash` + grounding). Decision recorded in the function header comment. |
-| 3 | Don't log raw `searchEntryPoint.renderedContent` HTML | **Adopted.** Log only safe metadata: `hasSearchEntryPoint`, `renderedContentLength`, `renderedContentHash` (short SHA-256 hex). Raw HTML returned only to admin callers under `diagnostics.groundingAttribution`. Never rendered in 3.5a. |
+- `/entity/:slug` routes to `src/pages/EntityDetail.tsx`, which conditionally renders one of: `EntityV4` (default for products/most types), `EntityV3`, or `EntityDetailV2` (fallback). Each of those three owns its own `isReviewFormOpen` state and its own `ReviewForm`. → The `?compose=review` auto-open effect must be added to **all three** (small, identical, ~4 lines each).
+- `CandidateSource` union already includes `"page_metadata"` in both `src/types/entityDraft.ts` and `supabase/functions/_shared/contracts/entityDraft.types.ts`. No contract change.
+- `analyze-entity-url-v2/fetcher.ts` + `ssrf.ts` already implement a DNS-preflight + private-IP rejection + redirect-revalidation pattern (see `assertSafeUrl`, `validateAndFetchUrl`). The new function will **reuse this exact SSRF helper** rather than reinvent it.
 
-Everything else from v4 stands.
+## Changes vs previous draft (codex + chatgpt feedback applied)
 
-## Access-control matrix (unchanged)
+| Fix | Change |
+|---|---|
+| Cache must be checked before rate limit | Gate order is now: auth → flags → validate → normalize cache key → **cache lookup** → (miss only) increment quota → fetch. Cache hits never consume quota. |
+| SSRF also for extracted image URL | Extracted `og:image` / `twitter:image` / JSON-LD image URL runs through `assertSafeUrl` before HEAD probe or return. Blocks `og:image = http://169.254.169.254/…`. |
+| Timeout budget must be self-consistent | Total server budget **6s**. Page fetch **4s**, image HEAD probe **1.5s**, 0.5s buffer. Frontend cap **6.5s**. |
+| `searchParams.delete('compose')` won't clean URL | Effect uses `setSearchParams(next, { replace: true })` and `useRef` one-shot guard so closing the modal doesn't reopen it. |
+| Cache negative results too | Positive: 60 min. `no_image`: 20 min. `unsafe_url` / `invalid_content_type`: 60 min. `timeout` / `blocked`: NOT cached (transient). |
+| Which entity route? | Effect added in all three: `EntityDetail.tsx`, `EntityV4.tsx`, `EntityDetailV2.tsx`. |
+| Recommend shortcut | Dropped. |
 
-| User | `entity_creation.non_admin_enabled` | `search_to_draft.non_admin_enabled` | Search tab | URL tab |
-|---|---|---|---|---|
-| Admin | any | any | ✅ | ✅ |
-| Regular | ON | ON | ✅ | ✅ |
-| Regular | ON | OFF | ❌ | ✅ |
-| Regular | OFF | any | ❌ dialog gated | ❌ |
+## Access control
 
-Edge function enforces both flags server-side (403 `search_disabled`). Rollout ships with `search_to_draft.non_admin_enabled = false`; admin flips it ON from the Feature Flags tab whenever ready.
+Unchanged. `useSearchToDraftEnabled()` still gates the Search tab. New endpoint uses the same admin-OR-(both-flags-ON) gate as `search-entity-candidates`.
 
-## Flow
+## Flow (delta)
 
 ```text
-CreateEntityDialog
-  [ Paste URL ]  [ Search ]  ← NEW
-   ├─ URL tab: existing JSX, untouched
-   └─ Search tab:
-       [ "cetaphil cleanser" ]  [ Search ]
-       ─ Already on CommonGroundz
-          • Cetaphil Gentle Skin Cleanser  [Open]
-       ─ Suggested from the web
-          • Cetaphil Gentle Skin Cleanser
-            Product · Cetaphil · High
-            cetaphil.com · Google Search  [Review & create]
-          • ... up to 5
-             │ Review & create
-             ▼
-    brand pre-match (client) → applyEntityDraft → existing review body
-             │ Save
-             ▼
-    existing duplicate check → create → existing continuation
+Search results
+├─ Already on CommonGroundz
+│   • Cetaphil Gentle Skin Cleanser
+│     [Write review]  [Open]                     ← NEW inline actions
+└─ Suggested from the web
+    • Cetaphil Gentle Skin Cleanser              ← image UNCHANGED at render time
+      Product · Cetaphil · High
+      cetaphil.com · Google Search  [Review & create]
+                                        │
+                                        ▼
+              (spinner, up to 6.5s)  invoke enrich-candidate-image
+                                        │
+                                        ▼
+              open AutoFillPreviewModal with imageCandidates
+              (page_metadata image prepended if fetch succeeded;
+               else Gemini image / placeholder — no toast on failure)
 ```
 
 ## Backend
 
-### Build step 0 (verification, before writing function code)
+### New: `supabase/functions/enrich-candidate-image/index.ts`
 
-1. `fetch_website` on `https://ai.google.dev/gemini-api/docs/generate-content/google-search`. Confirm:
-   - Does the **Interactions API** support `google_search` tool + JSON output + `groundingMetadata`? If yes → use it.
-   - Otherwise confirm current `generateContent` REST payload for `gemini-3.5-flash` + `"tools": [{ "google_search": {} }]` + `responseMimeType: "application/json"` + `groundingMetadata` shape.
-2. `code--view supabase/functions/check-entity-duplicates/index.ts` — mirror `is_deleted` / `approval_status` filters exactly.
-3. `supabase--read_query` on `entities` for column names.
+**Request:** `POST { sourceUrl: string, name: string }`
 
-Record the chosen API path in a header comment in the edge function so future maintainers know why.
-
-### New: `supabase/functions/search-entity-candidates/index.ts`
-
-**Request:** `POST { query: string, typeHint?: EntityType }`
-
-**Gates (in order):**
-1. CORS preflight.
-2. JWT required → 401. `has_role` RPC (service-role client) → `isAdmin`.
-3. If not admin: require BOTH `isNonAdminEntityCreationEnabled()` AND `isNonAdminSearchToDraftEnabled()` → 403 `{ error: "search_disabled" }`.
-4. `GEMINI_API_KEY` missing → 500 `{ error: "search_not_configured" }`. No silent fallback.
-5. Normalize query (`trim().toLocaleLowerCase().replace(/\s+/g,' ')`); length 3–160 → 400.
-6. Atomic rate limit via `increment_search_rate_limit(user_id)` → 429 `{ retryAfterSeconds }` when count > 20.
-7. Opportunistic cleanup: `if (Math.random() < 0.01) delete from search_rate_limits where window_start < now() - interval '48 hours'`.
-
-**Cache:** in-memory `Map<key, entry>`; key = `${model}|${typeHint ?? ''}|${normalizedQuery}`; TTL 15 min; LRU cap 200. On cache hit still refetch `existingMatches` fresh from DB.
-
-**Parallel work:**
-- **Internal:** `match_entities_by_name` RPC (threshold 0.55, limit 5), filtered like `check-entity-duplicates`.
-- **External (cache miss only):** Gemini native REST (Interactions API preferred per step 0), 12s timeout, temperature 0.2, JSON response.
-
-**Prompt (strict JSON):**
-```
-User query: "<query>"
-Type hint: "<typeHint or 'unknown'>"
-
-Return 4–5 distinct real-world entity candidates the user likely means.
-Rules:
-- JSON only. No prose. No markdown fences.
-- Prefer specific products/items over category/brand landing pages.
-- Distinct variants are distinct candidates.
-- Do not invent. If unsure, lower confidence rather than guess.
-- Cite the primary source URL for each candidate.
-
-Schema:
-{ "candidates": [{
-    "name": string, "type": "product|brand|place|book|movie|food|app|tv",
-    "brand": string|null, "variant": string|null, "category": string|null,
-    "description": string, "imageUrl": string|null,
-    "sourceUrl": string, "sourceTitle": string|null, "confidence": number
-}] }
-```
-
-Tolerant JSON parse (balanced-brace recovery). Parse failure → empty candidates + `errorCode: "parse_failed"`.
-
-**Attribution handling (compliance + safety):**
-- Extract `groundingMetadata.searchEntryPoint.renderedContent`.
-- Log ONLY: `{ hasSearchEntryPoint, renderedContentLength, renderedContentHash }` (SHA-256 first 12 hex). No raw HTML in logs.
-- Response includes `diagnostics.groundingAttribution` (raw string) **only when `isAdmin === true`**.
-- Never rendered in 3.5a UI (admin or not).
-
-**Failure modes:**
-
-| Situation | `existingMatches` | `candidates` | `errorCode` |
-|---|---|---|---|
-| All good | DB rows | up to 5 | — |
-| Gemini timeout/5xx | DB rows | `[]` | `grounding_unavailable` |
-| Parse failure | DB rows | `[]` | `parse_failed` |
-
-**EntityDraft mapping per candidate:**
-- `schemaVersion: 1`, `inputMethod: "search"`, `inputRef: <original query>`.
-- `nameGuess`, `typeGuess`, `descriptionGuess`.
-- `structuredHints`: `{ variant, category, sourceTitle, sourceUrl, displayDomain }` — full untruncated `sourceUrl`.
-- `brandCandidates`: `[{ name: brand, source: "google_grounding", confidence, status: "suggested_new" }]` — client re-checks before review.
-- `imageCandidates`: `[{ url: imageUrl, source: "google_grounding", confidence }]` when present.
-- `sourceEvidence`: `[{ field: "name", value: displayDomain, source: "google_grounding", confidence }]`.
-
-**Response (client-safe):**
+**Response:**
 ```ts
 {
-  existingMatches: Array<{ id, name, slug, imageUrl, type }>,
-  candidates: EntityDraftCandidate[],
+  imageUrl: string | null,
+  source: "page_metadata" | null,
+  method: "og" | "twitter" | "image_src" | "json_ld" | null,
   diagnostics: {
-    model, groundingUsed, cached, latencyMs, warnings, errorCode?,
-    groundingSources: Array<{ title, domain }>,
-    hasSearchEntryPoint: boolean,
-    // admin-only:
-    groundingAttribution?: string
+    latencyMs: number,
+    fetched: boolean,      // true iff we hit the network this call
+    cached: boolean,
+    errorCode?:
+      | "timeout" | "blocked" | "no_image"
+      | "unsafe_url" | "invalid_content_type" | "rate_limited"
   }
 }
 ```
 
-### Contract additions (additive)
+**Gate order (STRICT):**
+1. CORS preflight.
+2. JWT → 401 on failure.
+3. `has_role` → `isAdmin`. If not admin: require BOTH `isNonAdminEntityCreationEnabled()` AND `isNonAdminSearchToDraftEnabled()` → 403 `{ error: "search_disabled" }`.
+4. Validate `sourceUrl` (`http(s)`, length 8–2048, parseable URL); `name` (length 1–200). Fail → 400 `invalid_input`.
+5. Normalize `sourceUrl` (lowercase host, strip fragment, strip UTM/gclid/fbclid/msclkid) → cache key.
+6. **Cache lookup.** Hit → return immediately with `cached: true`, `fetched: false`. Do NOT increment rate limit.
+7. Cache miss → `increment_image_enrich_rate_limit(user_id)` → if > 60 return 429 `rate_limited`.
+8. SSRF-safe fetch (see below). On any handled error, cache the terminal result per the negative-cache policy and return.
 
-Add `"google_grounding"` to `CandidateSource` in all three mirrors:
-- `supabase/functions/_shared/contracts/entityDraft.types.ts`
-- `supabase/functions/_shared/contracts/entityDraft.schema.ts` (Zod enum)
-- `src/types/entityDraft.ts`
+**SSRF-safe fetch (reuse `analyze-entity-url-v2/ssrf.ts` + `fetcher.ts` patterns):**
+- Reuse `assertSafeUrl` from `../analyze-entity-url-v2/ssrf.ts` for both the initial `sourceUrl` AND every redirect target AND the extracted image URL.
+- Timeouts: **total 6s budget** shared across preflight DNS, page fetch, HEAD probe.
+  - Page fetch: `redirect: "manual"`, ≤3 hops, body cap 512 KB, `Accept: text/html`, generic UA, no cookies/auth. ~4s cap.
+  - Image HEAD probe (only when extracted URL extension is ambiguous): ~1.5s cap.
+- Reject non-`text/html` on page fetch → `errorCode: "no_image"`.
+- Reject non-`image/*` on image HEAD → `errorCode: "invalid_content_type"`.
+- Reject SSRF violation → `errorCode: "unsafe_url"`.
+- Reject abort → `errorCode: "timeout"`.
 
-### New helper: `isNonAdminSearchToDraftEnabled` in `supabase/functions/_shared/feature_flags.ts`
+**Extraction:** parse `<head>` for, in order: `og:image`, `og:image:secure_url`, `twitter:image`, `link[rel="image_src"]`, first JSON-LD `image` (string or `{url}`). Resolve to absolute URL against final page URL. Run through existing `isValidPageImageUrl` (from `supabase/functions/fetch-url-metadata-lite/image_validation.ts` — import directly if Deno allows cross-function import; otherwise copy the small pure function into this function's folder).
 
-Mirrors the existing `isNonAdminEntityCreationEnabled` (30s in-memory cache). Reads `search_to_draft.non_admin_enabled` from `app_config` via a new SQL helper `is_non_admin_search_to_draft_enabled()` (same pattern as its counterpart).
+**Cache:** in-memory `Map<cacheKey, { result, expiresAt }>`, LRU cap 300.
+- Positive (image found): 60 min TTL.
+- `no_image`: 20 min TTL.
+- `unsafe_url` / `invalid_content_type`: 60 min TTL.
+- `timeout` / `blocked` / `rate_limited`: NOT cached.
 
-### DB migration (single migration, all pieces together)
+**Logging:** `{ host, method, latencyMs, errorCode, cached }` only. Never log full URL, page HTML, query strings, tokens.
+
+### DB migration
 
 ```sql
--- 1. rate limit table
-CREATE TABLE public.search_rate_limits (
+CREATE TABLE public.image_enrich_rate_limits (
   user_id uuid NOT NULL,
   window_start timestamptz NOT NULL,
   count int NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, window_start)
 );
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.search_rate_limits TO service_role;
-ALTER TABLE public.search_rate_limits ENABLE ROW LEVEL SECURITY;
--- service-role only, no policies.
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.image_enrich_rate_limits TO service_role;
+ALTER TABLE public.image_enrich_rate_limits ENABLE ROW LEVEL SECURITY;
+-- service-role only; no user-facing policies.
 
--- 2. atomic increment RPC
-CREATE OR REPLACE FUNCTION public.increment_search_rate_limit(_user_id uuid)
+CREATE OR REPLACE FUNCTION public.increment_image_enrich_rate_limit(_user_id uuid)
 RETURNS int LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
 AS $$
 DECLARE new_count int;
 BEGIN
-  INSERT INTO public.search_rate_limits (user_id, window_start, count)
+  INSERT INTO public.image_enrich_rate_limits (user_id, window_start, count)
   VALUES (_user_id, date_trunc('hour', now()), 1)
   ON CONFLICT (user_id, window_start)
-  DO UPDATE SET count = search_rate_limits.count + 1
+  DO UPDATE SET count = image_enrich_rate_limits.count + 1
   RETURNING count INTO new_count;
   RETURN new_count;
 END;
 $$;
-REVOKE ALL ON FUNCTION public.increment_search_rate_limit(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.increment_search_rate_limit(uuid) TO service_role;
-
--- 3. seed the new feature flag (OFF by default)
-INSERT INTO public.app_config (key, value, description)
-VALUES (
-  'search_to_draft.non_admin_enabled',
-  '{"enabled": false}'::jsonb,
-  'When true, non-admin users see the Search tab in Create Entity (Gemini grounded search).'
-)
-ON CONFLICT (key) DO NOTHING;
-
--- 4. read helper mirroring is_non_admin_entity_creation_enabled
-CREATE OR REPLACE FUNCTION public.is_non_admin_search_to_draft_enabled()
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$
-  SELECT COALESCE(
-    (SELECT (value->>'enabled')::boolean
-     FROM public.app_config
-     WHERE key = 'search_to_draft.non_admin_enabled'),
-    false
-  );
-$$;
-GRANT EXECUTE ON FUNCTION public.is_non_admin_search_to_draft_enabled() TO anon, authenticated, service_role;
-
--- 5. CRITICAL: extend set_app_flag allowlist so the admin toggle works.
---    Recreate the function preserving current behavior; add the new key
---    with { "enabled": boolean } shape validation (matching how
---    entity_creation.non_admin_enabled is validated today).
---    Exact CREATE OR REPLACE is derived from the current definition read
---    via supabase--read_query on pg_proc during build; only additive
---    branches are added — no existing key handling is changed.
+REVOKE ALL ON FUNCTION public.increment_image_enrich_rate_limit(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.increment_image_enrich_rate_limit(uuid) TO service_role;
 ```
 
-Build-time step: before writing this migration, `supabase--read_query` the current `set_app_flag` definition and patch it minimally — add a new branch for `search_to_draft.non_admin_enabled` validating `{ "enabled": boolean }`. Do not rewrite any other branch.
+No change to `set_app_flag`, existing flags, or `CandidateSource`.
 
 ## Frontend
 
-### New: `src/hooks/useSearchToDraftEnabled.ts`
-Returns true for **admin OR (non-admin with flag ON)**. Reads `app_config['search_to_draft.non_admin_enabled']` (or a public flag RPC path if that's the pattern for the sibling flag — mirror it).
+### Edit: `src/components/admin/entity-create/SearchEntryPanel.tsx` (additive)
 
-### Edit: `src/hooks/admin/useAppFlagsAdmin.ts`
-Add `'search_to_draft.non_admin_enabled'` to `ALLOWED_KEYS`. Verified: the toggle backend (`set_app_flag`) is updated in the migration above, so the admin flip actually persists.
+**Selected-candidate enrichment (deterministic, one-shot per click):**
+1. On `Review & create`:
+   - If `candidate.imageUrl` already present → call `onPick(payload)` immediately.
+   - Else set per-card `isEnriching` state, disable other candidates' buttons.
+2. `supabase.functions.invoke('enrich-candidate-image', { body: { sourceUrl, name } })` wrapped in a `Promise.race` with a **6.5s client timeout**.
+3. On success with `imageUrl`: `payload = { ...payload, draft: mergeEnrichedImage(payload.draft, imageUrl, method) }`.
+4. On any outcome (success / null / failure / timeout / 429): call `onPick(payload)` exactly once, clear `isEnriching`. No toast.
+5. No auto-enrichment on card render. No background prefetch.
 
-### New: `src/components/admin/entity-create/SearchEntryPanel.tsx`
-- Input + **Search button** (Enter submits; disabled < 3 chars).
-- Loading: skeleton rows (per Core rule: skeletons, not spinners).
-- **Section 1** "Already on CommonGroundz": image, name, type badge, **Open** → `navigate('/entity/:slug')` + close dialog.
-- **Section 2** "Suggested from the web": up to 5 cards — image/placeholder, name, brand, type badge, confidence chip (High ≥0.8 / Medium ≥0.5 / Lower), domain chip "Google Search", **Review & create**.
-- **Error copy:**
-  - 429 → "You've made a lot of searches. Try again in a few minutes."
-  - 403 `search_disabled` → tab hidden at parent; defensive hide.
-  - 500 `search_not_configured` → "Search is temporarily unavailable. Try Paste URL instead."
-  - `errorCode` + existing matches → matches + banner "We could only check CommonGroundz. Web suggestions are temporarily unavailable."
-  - `errorCode` + no matches → "Search is temporarily unavailable. Try again in a moment or use Paste URL."
-  - Success + 0 results → "No matches. Try a more specific name."
+**Existing-match shortcuts:**
+- Replace single `Open` with `[Write review]` (default variant) + `[Open]` (secondary).
+- `Write review` → `navigate('/entity/' + slug + '?compose=review')` then close dialog.
+- `Open` → `navigate('/entity/' + slug)` then close dialog (unchanged behavior).
+- If unauthenticated: hide `Write review`; keep `Open`.
 
-### New: `src/components/admin/entity-create/applyEntityDraft.ts`
-- `applyEntityDraft(draft, setters)` — populates existing review-body state.
-- `enrichBrandCandidatesWithExistingMatch(candidates)` — runs `brandDuplicateCheck` per `suggested_new` brand; upgrades to `matched_existing` on exact-normalized hit. Runs before opening review.
+### Edit: `src/components/admin/entity-create/applyEntityDraft.ts`
 
-### Edit: `src/components/admin/CreateEntityDialog.tsx` (additive only)
-- Wrap current body in `<Tabs defaultValue="url">`.
-- Move existing JSX into `<TabsContent value="url">` unchanged.
-- Add `<TabsContent value="search">` with `<SearchEntryPanel onPick={handlePickFromSearch} />`.
-- `handlePickFromSearch`: enrich brand → `applyEntityDraft` → flip to review step via URL flow's existing mechanism.
-- Search tab hidden when `useSearchToDraftEnabled()` returns false.
+Add pure helper:
+```ts
+export function mergeEnrichedImage(
+  draft: EntityDraft,
+  imageUrl: string,
+  method: "og" | "twitter" | "image_src" | "json_ld",
+): EntityDraft
+```
+Prepends an `ImageCandidate` with `source: "page_metadata"`, `confidence: 0.75`, `reason: "og:image from source page"` (or matching label for method). Idempotent — no-op if same URL already present.
 
-### Source-chip label
-`"google_grounding" → "Google Search"` wherever `CandidateSource` renders as a UI chip.
+### Edit: `src/pages/EntityDetail.tsx`, `src/components/entity-v4/EntityV4.tsx`, `src/pages/EntityDetailV2.tsx`
+
+Same tiny `useEffect` added to each (they each own their own `isReviewFormOpen` + `ReviewForm`):
+
+```tsx
+const [searchParams, setSearchParams] = useSearchParams();
+const composeHandledRef = useRef(false);
+
+useEffect(() => {
+  if (composeHandledRef.current) return;
+  if (searchParams.get('compose') !== 'review') return;
+  if (!user || !entity) return;               // wait for auth + entity load
+  composeHandledRef.current = true;
+  setIsReviewFormOpen(true);
+  const next = new URLSearchParams(searchParams);
+  next.delete('compose');
+  setSearchParams(next, { replace: true });
+}, [searchParams, user, entity, setSearchParams]);
+```
+
+The `composeHandledRef` guard guarantees closing the modal doesn't reopen it.
+
+### No changes to
+
+`CreateEntityDialog.tsx`, feature-flag hooks, `useAppFlagsAdmin.ts`, contract files, URL flow, `analyze-entity-url*`, admin panel, `EntityV3` (only add effect if it also owns its own `ReviewForm` — verify in build step 0; if it delegates to V4/V2 it's covered).
 
 ## Files
 
-**New (5)**
-- `supabase/functions/search-entity-candidates/index.ts`
+**New (2)**
+- `supabase/functions/enrich-candidate-image/index.ts`
+- 1 DB migration (rate-limit table + RPC)
+
+**Edited (5, all additive)**
 - `src/components/admin/entity-create/SearchEntryPanel.tsx`
 - `src/components/admin/entity-create/applyEntityDraft.ts`
-- `src/hooks/useSearchToDraftEnabled.ts`
-- One migration file (rate-limit table + RPC + flag seed + read helper + `set_app_flag` patch)
+- `src/pages/EntityDetail.tsx`
+- `src/components/entity-v4/EntityV4.tsx`
+- `src/pages/EntityDetailV2.tsx`
 
-**Edited (6, additive only)**
-- `src/components/admin/CreateEntityDialog.tsx`
-- `src/hooks/admin/useAppFlagsAdmin.ts`
-- `supabase/functions/_shared/contracts/entityDraft.types.ts`
-- `supabase/functions/_shared/contracts/entityDraft.schema.ts`
-- `src/types/entityDraft.ts`
-- `supabase/functions/_shared/feature_flags.ts`
-
-**Untouched:** all URL-flow files, `analyze-entity-url*`, `EntityModerationBanner`, `PostCreateContinuation`, duplicate dialogs, other feature flags.
+**Untouched:** everything else.
 
 ## Secrets
+None.
 
-- `GEMINI_API_KEY` — requested via `add_secret` at build start.
-- `GEMINI_GROUNDED_MODEL` — optional; default `gemini-3.5-flash`.
+## Build step 0 (before writing code)
+1. `code--view supabase/functions/analyze-entity-url-v2/ssrf.ts` — confirm `assertSafeUrl` signature; confirm cross-function relative import works in Deno (Lovable deploys each function independently; if not, copy the pure module into the new function folder).
+2. `code--view supabase/functions/fetch-url-metadata-lite/image_validation.ts` — same reuse check for `isValidPageImageUrl`.
+3. `code--view src/components/entity-v4/EntityV4.tsx` — confirm `useSearchParams`, `user`, `entity`, and `setIsReviewFormOpen` are all available in scope where the effect will live; adjust otherwise.
+4. Confirm `EntityV3` presence and whether it owns its own `ReviewForm` — if so, add the same effect there; if it delegates, skip.
 
 ## Success criteria
+1. Web candidate WITHOUT image: clicking `Review & create` shows a spinner on that button; within ≤6.5s the AutoFillPreviewModal opens. If enrichment succeeded, the review image grid shows the fetched image first with `source = page_metadata`; otherwise it opens with Gemini/placeholder.
+2. Web candidate WITH image: skips enrichment, opens instantly, no network call.
+3. Enrichment failure / timeout / 429 / SSRF-block never blocks review from opening and shows no error toast.
+4. Second click on the same normalized `sourceUrl` within TTL returns `diagnostics.cached: true` AND does not consume rate-limit quota (verified by unchanged `count` in `image_enrich_rate_limits`).
+5. `search-entity-candidates` (20/hr) and `enrich-candidate-image` (60/hr) are fully independent buckets.
+6. SSRF: endpoint rejects `sourceUrl` values of `http://127.0.0.1/…`, `http://localhost/…`, `http://169.254.169.254/…`, private-range IPv4 (10/8, 172.16/12, 192.168/16), IPv6 `::1` / `fc00::/7` / `fe80::/10`, and non-`http(s)` schemes with `errorCode: "unsafe_url"`.
+7. SSRF also blocks the same values when they appear as the EXTRACTED `og:image` — endpoint returns `errorCode: "unsafe_url"` and does NOT return the image URL.
+8. Non-image HEAD response → `errorCode: "invalid_content_type"`; non-`text/html` page response → `errorCode: "no_image"`.
+9. Edge logs contain only `{ host, method, latencyMs, errorCode, cached }` — no full URLs, no HTML.
+10. Existing-match card shows `[Write review] [Open]`. Clicking `Write review` navigates to `/entity/:slug?compose=review`, dialog closes, `ReviewForm` auto-opens on the entity page (regardless of whether V4/V3/V2 renders), and the URL updates to `/entity/:slug` (compose param removed) via `replace`.
+11. Closing the `ReviewForm` on the entity page does NOT reopen it (one-shot guard works).
+12. `Open` behavior unchanged.
+13. Unauthenticated user does not see `Write review` on existing-match cards.
+14. URL tab, admin flags panel, `analyze-entity-url*` behavior unchanged.
 
-1. "cetaphil cleanser" → ≤3s typical (3–8s acceptable) → up to 5 distinct variant candidates with citations.
-2. Review & create → same review modal as URL path, pre-filled → Save → same continuation.
-3. Cetaphil brand in DB → BrandPicker shows `matched_existing` before review opens.
-4. Existing entity query → "Already on CommonGroundz" first; Open navigates.
-5. URL tab identical to today.
-6. Non-admin + flag OFF → Search tab hidden; direct edge call → 403.
-7. **Admin flips flag ON in Feature Flags tab → toggle persists (not silently rejected by `set_app_flag`)**; non-admin sees tab within 30s.
-8. 21st call/hour → 429; concurrent calls at count=20 → only one succeeds (atomic).
-9. Second identical search within 15 min → `diagnostics.cached: true`, no Gemini call in logs.
-10. Gemini timeout → existing matches + partial-fail banner.
-11. No `analyze-entity-url-v2` call in Search path.
-12. `structuredHints.sourceUrl` = full URL; `sourceEvidence.value` = display domain.
-13. **Edge logs contain only `hasSearchEntryPoint`/length/hash — never raw HTML.**
-14. `diagnostics.groundingAttribution` present only for admin callers; never rendered.
-15. `search_rate_limits` rows older than 48h get pruned.
-
-## Out of scope for 3.5a
-
-- Lazy per-candidate image enrichment (→ 3.5b)
-- Review/Post shortcuts on existing matches (→ 3.5b)
-- Rendering `searchEntryPoint` widget (compliance review gates rollout of rendering)
-- Type-specific boosters (Books/OMDb/Places/OFF)
-- Barcode (3.7), image upload (3.6)
-- Any URL-flow change
+## Out of scope for 3.5b
+- `Recommend` shortcut.
+- Any auto-enrichment of visible candidate cards.
+- Rendering Google `searchEntryPoint` widget (compliance-gated).
+- Type-specific boosters (Books/OMDb/Places/OFF).
+- Candidate ranking/dedupe polish (defer to 3.5c if needed).
+- Barcode (3.7), image upload (3.6).
+- Any URL-flow change.
