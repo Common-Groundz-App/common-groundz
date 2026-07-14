@@ -237,9 +237,25 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                       <p className="truncate text-sm font-medium text-foreground">{m.name}</p>
                       <p className="text-xs text-muted-foreground">{getEntityTypeLabel(m.type as any)}</p>
                     </div>
-                    <Button size="sm" variant="secondary" onClick={() => onOpenExisting(m)}>
-                      Open
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {user && (
+                        <Button
+                          size="sm"
+                          onClick={() => onOpenExisting(m, 'review')}
+                          className="gap-1"
+                        >
+                          <PenSquare className="h-3.5 w-3.5" />
+                          Write review
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => onOpenExisting(m, 'view')}
+                      >
+                        Open
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
