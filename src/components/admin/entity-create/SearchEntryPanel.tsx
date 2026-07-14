@@ -301,8 +301,20 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                           <ExternalLink className="h-3 w-3" />
                         </a>
                       </div>
-                      <Button size="sm" onClick={() => onPick(p)}>
-                        Review &amp; create
+                      <Button
+                        size="sm"
+                        onClick={() => handleReviewCreate(p, idx)}
+                        disabled={enrichingIndex !== null}
+                        className="gap-1 min-w-[128px]"
+                      >
+                        {enrichingIndex === idx ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Preparing…
+                          </>
+                        ) : (
+                          <>Review &amp; create</>
+                        )}
                       </Button>
                     </div>
                   );
