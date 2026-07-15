@@ -6,7 +6,7 @@
 //
 // API choice: Google's `generateContent` REST endpoint with
 // `tools: [{ google_search: {} }]`. Their current docs still document
-// generateContent + google_search for `gemini-3.5-flash` and it is the
+// generateContent + google_search for `gemini-1.5-flash` and it is the
 // simplest supported combination for JSON output + groundingMetadata.
 // If Google's Interactions API ever exposes google_search + JSON + grounding
 // cleanly, swap the transport here.
@@ -35,7 +35,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DEFAULT_GEMINI_GROUNDED_MODEL = "gemini-3.5-flash";
+const DEFAULT_GEMINI_GROUNDED_MODEL = "gemini-1.5-flash";
 const GEMINI_TIMEOUT_MS = Number(Deno.env.get("GEMINI_TIMEOUT_MS")) || 30_000;
 const HOURLY_LIMIT = 20;
 const CACHE_TTL_MS = 15 * 60 * 1000;

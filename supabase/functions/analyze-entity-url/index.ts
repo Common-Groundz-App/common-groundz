@@ -80,7 +80,7 @@ serve(async (req) => {
 
     // Call Gemini with URL grounding + search fallback
     const geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -122,7 +122,7 @@ serve(async (req) => {
         JSON.stringify({
           success: false, predictions: null, raw_text: '',
           message: 'Gemini returned empty text. Please apply metadata manually or try again.',
-          metadata: { analyzed_url: url, model: 'gemini-2.5-flash', timestamp: new Date().toISOString(), method: 'url_context_grounding', gemini_empty: true }
+          metadata: { analyzed_url: url, model: 'gemini-1.5-flash', timestamp: new Date().toISOString(), method: 'url_context_grounding', gemini_empty: true }
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -155,7 +155,7 @@ serve(async (req) => {
           JSON.stringify({
             success: false, predictions: null, raw_text: aiText,
             message: 'Failed to parse AI response. Please apply metadata manually.',
-            metadata: { analyzed_url: url, model: 'gemini-2.5-flash', timestamp: new Date().toISOString(), method: 'url_context_grounding', parse_error: true }
+            metadata: { analyzed_url: url, model: 'gemini-1.5-flash', timestamp: new Date().toISOString(), method: 'url_context_grounding', parse_error: true }
           }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -226,7 +226,7 @@ serve(async (req) => {
         additional_data: aiPredictions.additional_data || {},
         image_url: aiPredictions.image_url || null, images: extractedImages
       },
-      metadata: { analyzed_url: url, model: 'gemini-2.5-flash', timestamp: new Date().toISOString(), method: 'url_context_grounding' }
+      metadata: { analyzed_url: url, model: 'gemini-1.5-flash', timestamp: new Date().toISOString(), method: 'url_context_grounding' }
     };
 
     console.log('✅ Final Result:', JSON.stringify(result, null, 2));

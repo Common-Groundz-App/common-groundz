@@ -331,8 +331,8 @@ Deno.test("chooseEvidenceBaseUrl prefers firecrawl > fetch > safe", () => {
   assertEquals(chooseEvidenceBaseUrl({ firecrawlFinalUrl: null, fetchFinalUrl: null, safeUrl: "https://safe.example/x" }), "https://safe.example/x");
 });
 
-Deno.test("GEMINI_MODEL is gemini-2.5-flash", () => {
-  assertEquals(GEMINI_MODEL, "gemini-2.5-flash");
+Deno.test("GEMINI_MODEL is gemini-1.5-flash", () => {
+  assertEquals(GEMINI_MODEL, "gemini-1.5-flash");
   assertExists(GEMINI_MODEL);
 });
 

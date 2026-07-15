@@ -323,7 +323,7 @@ function makeGeminiSuccess(): GeminiResult {
     ok: true,
     configured: true,
     durationMs: 100,
-    model: "gemini-2.5-flash",
+    model: "gemini-1.5-flash",
     grounding: {
       used_url_context: false,
       used_google_search: true,
@@ -343,7 +343,7 @@ function makeGeminiFailure(code = "GEMINI_BAD_RESPONSE"): GeminiResult {
     configured: true,
     code: code as never,
     durationMs: 50,
-    model: "gemini-2.5-flash",
+    model: "gemini-1.5-flash",
   };
 }
 
