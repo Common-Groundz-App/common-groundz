@@ -48,6 +48,7 @@ import { PostCreateContinuation, type CreatedEntitySummary } from './entity-crea
 import { SearchEntryPanel, type ExistingMatch as SearchExistingMatch } from './entity-create/SearchEntryPanel';
 import { buildSearchPredictions, enrichBrandCandidatesWithExistingMatch, type SearchCandidatePayload } from './entity-create/applyEntityDraft';
 import { useSearchToDraftEnabled } from '@/hooks/useSearchToDraftEnabled';
+import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 import { Search as SearchIcon, Link2 } from 'lucide-react';
 
 interface CreateEntityDialogProps {
@@ -162,6 +163,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [dupDialogOpen, setDupDialogOpen] = useState(false);
   const pendingSubmitOverridesRef = useRef<any>(undefined);
   const prefilledFromDraftRef = useRef<boolean>(false);
+  // Phase 3.5c — search-origin flag scoped to the currently open duplicate dialog.
+  // Captured at the moment the dialog opens so "Use this" can route
+  // search-origin duplicates to /entity/:slug?compose=review while leaving
+  // URL/manual duplicate behavior untouched. Reset on dialog close.
+  const pendingDuplicateOriginRef = useRef<'search' | 'other'>('other');
   // Exact-URL preflight (fires before Analyze spends AI/scrape credits).
   const [preflightDupCandidates, setPreflightDupCandidates] = useState<DuplicateCandidate[]>([]);
   const [preflightDupOpen, setPreflightDupOpen] = useState(false);
