@@ -1058,6 +1058,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     // must NOT flow into website_url via buildEntityFormPatchFromPredictions.
     setPredictionUrlSnapshot(null);
     setShowPreviewModal(true);
+    // Phase 3.5c — funnel: draft review opened from a search pick.
+    void logFunnel({
+      event: 'review_opened',
+      source: 'search',
+      entityType: payload.candidate.type,
+      diagnostics: { hasImage: Boolean(draft.imageCandidates?.length) },
+    });
   };
 
   // Call edge function to analyze URL
