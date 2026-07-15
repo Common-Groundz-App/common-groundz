@@ -1932,6 +1932,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           if (!dupErr && dupData?.candidates?.length > 0) {
             console.log('🔎 Duplicate candidates found:', dupData.candidates.length);
             pendingSubmitOverridesRef.current = overrides;
+            // Phase 3.5c — capture origin so "Use this" can route search-origin
+            // duplicates into ?compose=review while keeping URL/manual behavior.
+            pendingDuplicateOriginRef.current =
+              aiPredictions?.__fromSearch ? 'search' : 'other';
             setDupCandidates(dupData.candidates as DuplicateCandidate[]);
             setDupDialogOpen(true);
             setLoading(false);
