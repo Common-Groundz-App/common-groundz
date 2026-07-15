@@ -1918,6 +1918,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
       // Read-only fuzzy-name/website/slug match; only runs once per submit.
       if (!overrides?._duplicateConfirmed) {
         try {
+          const fromSearch = Boolean(aiPredictions?.__fromSearch);
+          const searchSourceUrl = fromSearch
+            ? ((aiPredictions as any)?.searchSourceUrl
+                ?? (aiPredictions as any)?.metadata?.search_source_url
+                ?? null)
+            : null;
           const { data: dupData, error: dupErr } = await supabase.functions.invoke(
             'check-entity-duplicates',
             {
@@ -1926,6 +1932,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 type: eff.type,
                 parentId: resolvedParent?.id ?? null,
                 websiteUrl: eff.website_url.trim() || null,
+                sourceUrl: searchSourceUrl,
               },
             }
           );
