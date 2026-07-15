@@ -130,6 +130,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   // Phase 3.5a — Search-to-Draft tab visibility + active-tab state.
   const searchToDraftEnabled = useSearchToDraftEnabled();
   const [createEntityTab, setCreateEntityTab] = useState<'url' | 'search'>('url');
+  // Phase 3.5c — funnel telemetry (fire-and-forget, hashed query only).
+  const { log: logFunnel, consumePickLatency } = useSearchFunnel();
   const useDraftReviewFlagRaw = useEntityReviewUsesDraft();
   // Phase 3.4C — non-admins (variant === 'user') are always forced onto the
   // V2 Draft Review path; the admin-only useEntityReviewUsesDraft flag never
