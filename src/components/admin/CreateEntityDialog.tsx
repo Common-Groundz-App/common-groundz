@@ -3132,18 +3132,25 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onCancel={() => {
           setDupDialogOpen(false);
           pendingSubmitOverridesRef.current = undefined;
+          pendingDuplicateOriginRef.current = 'other';
         }}
         onUseExisting={(c) => {
+          // Phase 3.5c — search-origin duplicates route into the deep-link
+          // review composer. URL/manual origins keep their previous behavior.
+          const isSearchOrigin = pendingDuplicateOriginRef.current === 'search';
           setDupDialogOpen(false);
           pendingSubmitOverridesRef.current = undefined;
+          pendingDuplicateOriginRef.current = 'other';
           resetForm();
           onOpenChange(false);
-          navigate(`/entity/${c.slug || c.id}`);
+          const base = `/entity/${c.slug || c.id}`;
+          navigate(isSearchOrigin ? `${base}?compose=review` : base);
         }}
         onContinueNew={() => {
           setDupDialogOpen(false);
           const prev = pendingSubmitOverridesRef.current || {};
           pendingSubmitOverridesRef.current = undefined;
+          pendingDuplicateOriginRef.current = 'other';
           // Re-submit, skipping the duplicate check this time.
           void handleSubmit({ ...prev, _duplicateConfirmed: true, _fromDraftFlow: prefilledFromDraftRef.current });
         }}
