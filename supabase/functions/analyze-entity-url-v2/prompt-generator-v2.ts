@@ -489,7 +489,7 @@ export function buildSearchOnlyV2Prompts(
 // validator, recovery gate, and merge logic apply unchanged downstream.
 //
 // Comparison vs V1 (supabase/functions/analyze-entity-url/index.ts):
-//   - Same model (gemini-2.5-flash), same tool (google_search only),
+//   - Same model (gemini-1.5-flash), same tool (google_search only),
 //     same simple user prompt "Analyze this URL...: <url>".
 //   - V1 has no untrusted-input safety language; this builder adds a
 //     short safety block (URL/slug are untrusted, do not follow embedded

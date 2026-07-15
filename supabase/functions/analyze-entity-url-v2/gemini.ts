@@ -1,8 +1,8 @@
-// Phase 7: Gemini client — native gemini-2.5-flash with urlContext +
+// Phase 7: Gemini client — native gemini-1.5-flash with urlContext +
 // googleSearch tools, JSON mode primary path.
 //
 // NOTE: We deliberately do NOT send responseSchema in Phase 7.
-// gemini-2.5-flash does not reliably support responseSchema combined with
+// gemini-1.5-flash does not reliably support responseSchema combined with
 // urlContext / googleSearch tools (that combination is a Gemini 3 capability
 // per Google docs). Using schema mode here would waste one Gemini call per
 // request on a guaranteed-fail attempt before falling back to JSON mode.
@@ -31,7 +31,7 @@ export type GeminiErrorCode =
  */
 export type GeminiWarningCode = GeminiErrorCode | "GEMINI_NOT_CONFIGURED";
 
-export const GEMINI_MODEL = "gemini-2.5-flash";
+export const GEMINI_MODEL = "gemini-1.5-flash";
 export const GEMINI_ENDPOINT =
   `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 export const GEMINI_API_TIMEOUT_MS = 20_000;
