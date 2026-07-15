@@ -1989,12 +1989,23 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         ? resolvePrimary(overridePrimaryImage as string | null)
         : undefined;
 
-    // Phase 3.3A telemetry: stamp creation_source only when invoked from the
-    // URL/draft flow. Manual creations stay 'manual'.
-    const creationSource = overrides?._fromDraftFlow ? 'url' : 'manual';
+    // Phase 3.3A / 3.5c telemetry: stamp creation_source.
+    // Search-to-Draft creations are stamped as 'search' (not 'url').
+    // The URL analyze flow stays 'url'. Manual creations stay 'manual'.
+    const fromSearch = Boolean(aiPredictions?.__fromSearch);
+    const creationSource = fromSearch
+      ? 'search'
+      : overrides?._fromDraftFlow ? 'url' : 'manual';
     const telemetryStamp: Record<string, unknown> = { creation_source: creationSource };
-    if (overrides?._fromDraftFlow && (analyzeUrl || lastAppliedUrl)) {
+    if (!fromSearch && overrides?._fromDraftFlow && (analyzeUrl || lastAppliedUrl)) {
       telemetryStamp.created_from_url = analyzeUrl || lastAppliedUrl;
+    }
+    if (fromSearch) {
+      const searchSourceUrl = (aiPredictions as any)?.searchSourceUrl;
+      if (typeof searchSourceUrl === 'string' && searchSourceUrl.length > 0) {
+        // Never overwrites website_url or created_from_url — separate key.
+        telemetryStamp.search_source_url = searchSourceUrl;
+      }
     }
 
     const metadata = {
