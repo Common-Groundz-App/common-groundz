@@ -28,6 +28,7 @@ import {
   type EntityDraft,
 } from "../_shared/contracts/entityDraft.types.ts";
 import { validateEntityDraft } from "../_shared/contracts/entityDraft.schema.ts";
+import { normalizeBrandName } from "../_shared/brand_normalize.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
