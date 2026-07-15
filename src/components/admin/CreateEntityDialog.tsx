@@ -2330,6 +2330,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         description: 'Entity created successfully',
       });
 
+      // Phase 3.5c — funnel: entity_created (search-origin only).
+      if (fromSearch && newEntity) {
+        void logFunnel({
+          event: 'entity_created',
+          source: 'search',
+          entityType: newEntity.type,
+          diagnostics: { latencyMs: consumePickLatency() },
+        });
+      }
+
       resetForm();
       onOpenChange(false);
       onEntityCreated(newEntity ? {
