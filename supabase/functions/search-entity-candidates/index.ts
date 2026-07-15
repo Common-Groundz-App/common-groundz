@@ -5,9 +5,10 @@
 // analyze pipeline (analyze-entity-url-v2 etc).
 //
 // API choice: Google's `generateContent` REST endpoint with
-// `tools: [{ google_search: {} }]`. Their current docs still document
-// generateContent + google_search for `gemini-1.5-flash` and it is the
+// `tools: [{ google_search: {} }]`. Google's current docs document
+// generateContent + google_search for `gemini-3.5-flash` and it is the
 // simplest supported combination for JSON output + groundingMetadata.
+// Older models used `google_search_retrieval`; current models use `google_search`.
 // If Google's Interactions API ever exposes google_search + JSON + grounding
 // cleanly, swap the transport here.
 //
