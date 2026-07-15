@@ -476,12 +476,15 @@ async function callGemini(
     };
   }
 
-  const coerced: NonNullable<ReturnType<typeof coerceCandidate>>[] = [];
+  // Phase 3.5c — coerce up to 8 raw candidates, then conservatively dedup,
+  // then cap at 5. Dedup gets the wider pool so obvious duplicates from
+  // multiple domains collapse before hitting the 5-candidate ceiling.
+  const rawCoerced: NonNullable<ReturnType<typeof coerceCandidate>>[] = [];
   for (const c of (parsed as any).candidates.slice(0, 8)) {
     const ok = coerceCandidate(c);
-    if (ok) coerced.push(ok);
-    if (coerced.length >= 5) break;
+    if (ok) rawCoerced.push(ok);
   }
+  const coerced = conservativeDedup(rawCoerced).slice(0, 5);
 
   return {
     candidates: coerced,
