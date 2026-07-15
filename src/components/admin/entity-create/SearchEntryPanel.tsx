@@ -457,7 +457,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
 
           {!hasExisting && !hasCandidates && errorCode && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              Search is temporarily unavailable. Try again in a moment or use Paste URL.
+              Web suggestions are temporarily unavailable. Try again.
             </div>
           )}
         </>
