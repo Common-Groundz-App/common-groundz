@@ -4,17 +4,19 @@
 // web candidate, or `onOpenExisting(match)` when they click Open on a
 // CommonGroundz match.
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, ExternalLink, Loader2, PenSquare } from 'lucide-react';
+import { Search, ExternalLink, Loader2, PenSquare, X, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRecentSearches } from '@/hooks/useRecentSearches';
+import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 import { mergeEnrichedImage, type EnrichedImageMethod, type SearchCandidatePayload } from './applyEntityDraft';
 
 export interface ExistingMatch {
@@ -67,12 +69,28 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [enrichingIndex, setEnrichingIndex] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Phase 3.5c — recent-search chips (surface-scoped, existing hook).
+  const { recents, addRecent, removeRecent, clearRecents } =
+    useRecentSearches('entity-create-search');
+
+  // Phase 3.5c — privacy-safe funnel telemetry.
+  const { log: logFunnel, markPick } = useSearchFunnel();
 
   const canSearch = query.trim().length >= 3 && !loading;
 
-  const runSearch = async () => {
-    const q = query.trim();
+  // Auto-focus on mount (tab activation).
+  useEffect(() => {
+    // Delay one tick so Radix Tab focus mgmt doesn't fight us.
+    const t = setTimeout(() => inputRef.current?.focus(), 0);
+    return () => clearTimeout(t);
+  }, []);
+
+  const runSearch = async (rawQuery?: string) => {
+    const q = (rawQuery ?? query).trim();
     if (q.length < 3) return;
+    if (rawQuery !== undefined) setQuery(rawQuery);
     setLoading(true);
     setError(null);
     setResult(null);
@@ -87,7 +105,8 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
           const ctxAny = (fnErr as any).context;
           if (ctxAny?.text) detail = await ctxAny.text();
         } catch { /* noop */ }
-        console.error('[SearchEntryPanel] invoke failed:', detail);
+        // Phase 3.5c — do NOT log the raw query. Log only failure detail.
+        console.error('[SearchEntryPanel] invoke failed');
         if (detail?.includes('rate_limited')) {
           setError("You've made a lot of searches. Try again in a few minutes.");
         } else if (detail?.includes('search_disabled')) {
@@ -101,9 +120,30 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
         }
         return;
       }
-      setResult(data as SearchResponse);
+      const resp = data as SearchResponse;
+      setResult(resp);
+
+      // Persist as a "recent" only on a successful (non-error) response.
+      // Chip text stays client-side; never enters telemetry.
+      addRecent(q, 'query');
+
+      // Fire funnel event — hashed only.
+      const hasResults =
+        (resp?.existingMatches?.length ?? 0) > 0 ||
+        (resp?.candidates?.length ?? 0) > 0;
+      void logFunnel({
+        event: 'search_run',
+        source: 'search',
+        query: q,
+        diagnostics: {
+          latencyMs: resp?.diagnostics?.latencyMs,
+          cached: resp?.diagnostics?.cached,
+          hasImage: hasResults,
+        },
+      });
     } catch (e: any) {
-      console.error('[SearchEntryPanel] threw:', e);
+      // Do NOT include the raw query in the log.
+      console.error('[SearchEntryPanel] threw');
       setError('Search failed. Please try again.');
     } finally {
       setLoading(false);
@@ -113,7 +153,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && canSearch) {
       e.preventDefault();
-      runSearch();
+      void runSearch();
     }
   };
 
@@ -124,6 +164,17 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
   const handleReviewCreate = async (payload: SearchCandidatePayload, idx: number) => {
     if (enrichingIndex !== null) return;
     const { candidate } = payload;
+
+    // Phase 3.5c — funnel: candidate_pick from search results.
+    markPick();
+    void logFunnel({
+      event: 'candidate_pick',
+      source: 'search',
+      candidateIndex: idx,
+      entityType: candidate.type,
+      diagnostics: { hasImage: Boolean(candidate.imageUrl) },
+    });
+
     if (candidate.imageUrl) {
       onPick(payload);
       return;
@@ -155,11 +206,23 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
       onPick(enrichedPayload);
     }
   };
-  
+
+  // Phase 3.5c — instrumented "Write review" / "Open" for existing matches.
+  const handleOpenExisting = (m: ExistingMatch, intent: 'view' | 'review') => {
+    markPick();
+    void logFunnel({
+      event: 'candidate_pick',
+      source: 'existing_match',
+      entityType: m.type,
+      diagnostics: { hasImage: Boolean(m.imageUrl) },
+    });
+    onOpenExisting(m, intent);
+  };
 
   const errorCode = result?.diagnostics?.errorCode;
   const hasCandidates = (result?.candidates.length ?? 0) > 0;
   const hasExisting = (result?.existingMatches.length ?? 0) > 0;
+  const showRecents = !result && !loading && !error && query.trim().length === 0 && recents.length > 0;
 
   return (
     <div className="space-y-4">
@@ -180,6 +243,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
 
         <div className="flex gap-2">
           <Input
+            ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onKey}
@@ -189,7 +253,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
             aria-label="Search entity name"
           />
           <Button
-            onClick={runSearch}
+            onClick={() => runSearch()}
             disabled={!canSearch}
             className="gap-2 min-w-[100px]"
           >
@@ -198,6 +262,50 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
           </Button>
         </div>
       </div>
+
+      {showRecents && (
+        <section aria-label="Recent searches" className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              Recent searches
+            </h4>
+            <button
+              type="button"
+              onClick={clearRecents}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {recents
+              .filter((r) => !r.kind || r.kind === 'query')
+              .map((r) => (
+                <div
+                  key={r.query}
+                  className="group inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-1 text-xs text-foreground shadow-sm hover:border-brand-orange/50"
+                >
+                  <button
+                    type="button"
+                    onClick={() => void runSearch(r.query)}
+                    className="max-w-[220px] truncate"
+                  >
+                    {r.query}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Remove ${r.query}`}
+                    onClick={() => removeRecent(r.query)}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
 
       {loading && (
         <div className="space-y-3" aria-live="polite" aria-busy="true">
@@ -241,7 +349,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                       {user && (
                         <Button
                           size="sm"
-                          onClick={() => onOpenExisting(m, 'review')}
+                          onClick={() => handleOpenExisting(m, 'review')}
                           className="gap-1"
                         >
                           <PenSquare className="h-3.5 w-3.5" />
@@ -251,7 +359,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                       <Button
                         size="sm"
                         variant="secondary"
-                        onClick={() => onOpenExisting(m, 'view')}
+                        onClick={() => handleOpenExisting(m, 'view')}
                       >
                         Open
                       </Button>
@@ -274,10 +382,24 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
               <div className="space-y-2">
                 {result.candidates.map((p, idx) => {
                   const c = p.candidate;
+                  const enriching = enrichingIndex === idx;
                   return (
-                    <div key={`${c.sourceUrl}-${idx}`} className="flex items-start gap-3 rounded-lg border bg-card p-3">
+                    <div
+                      key={`${c.sourceUrl}-${idx}`}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if ((e.key === 'Enter' || e.key === ' ') && enrichingIndex === null) {
+                          e.preventDefault();
+                          void handleReviewCreate(p, idx);
+                        }
+                      }}
+                      className="flex items-start gap-3 rounded-lg border bg-card p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/60"
+                    >
                       <div className="h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
-                        {c.imageUrl ? (
+                        {enriching ? (
+                          <Skeleton className="h-full w-full" />
+                        ) : c.imageUrl ? (
                           <ImageWithFallback src={c.imageUrl} alt={c.name} className="h-full w-full object-cover" />
                         ) : null}
                       </div>
@@ -295,6 +417,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                           href={c.sourceUrl}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
                           className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
                         >
                           {c.displayDomain || 'source'} · Google Search
@@ -303,11 +426,14 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                       </div>
                       <Button
                         size="sm"
-                        onClick={() => handleReviewCreate(p, idx)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleReviewCreate(p, idx);
+                        }}
                         disabled={enrichingIndex !== null}
                         className="gap-1 min-w-[128px]"
                       >
-                        {enrichingIndex === idx ? (
+                        {enriching ? (
                           <>
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             Preparing…
@@ -325,7 +451,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
 
           {!hasExisting && !hasCandidates && !errorCode && (
             <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No matches. Try a more specific name.
+              No matches yet. Try adding the brand name, e.g. "cetaphil gentle cleanser".
             </div>
           )}
 

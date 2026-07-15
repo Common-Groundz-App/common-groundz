@@ -3354,6 +3354,42 @@ export type Database = {
           },
         ]
       }
+      search_funnel_events: {
+        Row: {
+          candidate_index: number | null
+          created_at: string
+          diagnostics: Json
+          entity_type: string | null
+          event: string
+          id: string
+          query_hash: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          candidate_index?: number | null
+          created_at?: string
+          diagnostics?: Json
+          entity_type?: string | null
+          event: string
+          id?: string
+          query_hash?: string | null
+          source: string
+          user_id: string
+        }
+        Update: {
+          candidate_index?: number | null
+          created_at?: string
+          diagnostics?: Json
+          entity_type?: string | null
+          event?: string
+          id?: string
+          query_hash?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       search_rate_limits: {
         Row: {
           count: number

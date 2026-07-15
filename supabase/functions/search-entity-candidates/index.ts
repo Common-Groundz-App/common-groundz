@@ -28,6 +28,7 @@ import {
   type EntityDraft,
 } from "../_shared/contracts/entityDraft.types.ts";
 import { validateEntityDraft } from "../_shared/contracts/entityDraft.schema.ts";
+import { normalizeBrandName } from "../_shared/brand_normalize.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -224,7 +225,99 @@ function buildDraft(
   }
 }
 
+// ---------- Phase 3.5c — conservative candidate dedup ----------
+//
+// Collapse only STRONG duplicates. Never collapse legitimate variants
+// (size, formulation, edition, product line).
+//
+// Rules (any one triggers a collapse):
+//   1) Same normalized full URL (host + pathname, query/fragment stripped).
+//   2) Same normalized brand + name + variant.
+//   3) Same normalized brand + exact-equal normalized name, ONLY when both
+//      sides have no variant. If either has a variant, do NOT collapse.
+//
+// Merge behavior: keep the highest-confidence winner; if tied, keep the
+// earlier one (Gemini order). Merge groundingSources domains (dedup by
+// hostname). Keep winner's imageUrl.
+
+type Coerced = NonNullable<ReturnType<typeof coerceCandidate>>;
+
+function normalizeName(s: string): string {
+  return s.toLowerCase().normalize("NFKD")
+    .replace(/[\u2018\u2019\u201C\u201D]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function normalizeFullUrl(u: string): string {
+  try {
+    const url = new URL(u);
+    const host = url.hostname.replace(/^www\./, "").toLowerCase();
+    const path = url.pathname.replace(/\/+$/, "").toLowerCase();
+    return `${host}${path}`;
+  } catch { return u.toLowerCase(); }
+}
+
+function dedupKeysFor(c: Coerced): string[] {
+  const keys: string[] = [`url:${normalizeFullUrl(c.sourceUrl)}`];
+  const brand = c.brand ? normalizeBrandName(c.brand) : "";
+  const name = normalizeName(c.name);
+  const variant = c.variant ? normalizeName(c.variant) : "";
+  if (brand && name && variant) {
+    keys.push(`bnv:${brand}|${name}|${variant}`);
+  }
+  if (brand && name && !variant) {
+    // Only when BOTH sides have no variant. Encoded so the same-brand+name
+    // pair with a variant on either side cannot collide with this key.
+    keys.push(`bn0:${brand}|${name}`);
+  }
+  return keys;
+}
+
+function conservativeDedup(list: Coerced[]): Coerced[] {
+  if (list.length <= 1) return list;
+  // Preserve original index for stable ordering on ties.
+  const withIndex = list.map((c, i) => ({ c, i }));
+
+  const keyToGroup = new Map<string, number>();
+  const groups: { winner: Coerced; winnerIdx: number; keys: Set<string> }[] = [];
+
+  for (const { c, i } of withIndex) {
+    const keys = dedupKeysFor(c);
+    let target = -1;
+    for (const k of keys) {
+      const g = keyToGroup.get(k);
+      if (g !== undefined) { target = g; break; }
+    }
+    if (target === -1) {
+      const g = { winner: c, winnerIdx: i, keys: new Set(keys) };
+      const gid = groups.push(g) - 1;
+      for (const k of keys) keyToGroup.set(k, gid);
+    } else {
+      const g = groups[target];
+      // Higher confidence wins; tie → earlier index (already the current winner).
+      if (c.confidence > g.winner.confidence) {
+        g.winner = c;
+        g.winnerIdx = i;
+      }
+      for (const k of keys) {
+        if (!g.keys.has(k)) {
+          g.keys.add(k);
+          keyToGroup.set(k, target);
+        }
+      }
+    }
+  }
+
+  // Return winners in their original (Gemini) order.
+  return groups
+    .slice()
+    .sort((a, b) => a.winnerIdx - b.winnerIdx)
+    .map((g) => g.winner);
+}
+
 // ---------- in-memory cache ----------
+
 
 interface CacheEntry {
   candidates: unknown[];        // client-safe draft candidates
@@ -383,12 +476,15 @@ async function callGemini(
     };
   }
 
-  const coerced: NonNullable<ReturnType<typeof coerceCandidate>>[] = [];
+  // Phase 3.5c — coerce up to 8 raw candidates, then conservatively dedup,
+  // then cap at 5. Dedup gets the wider pool so obvious duplicates from
+  // multiple domains collapse before hitting the 5-candidate ceiling.
+  const rawCoerced: NonNullable<ReturnType<typeof coerceCandidate>>[] = [];
   for (const c of (parsed as any).candidates.slice(0, 8)) {
     const ok = coerceCandidate(c);
-    if (ok) coerced.push(ok);
-    if (coerced.length >= 5) break;
+    if (ok) rawCoerced.push(ok);
   }
+  const coerced = conservativeDedup(rawCoerced).slice(0, 5);
 
   return {
     candidates: coerced,

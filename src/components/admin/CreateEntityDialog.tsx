@@ -48,6 +48,7 @@ import { PostCreateContinuation, type CreatedEntitySummary } from './entity-crea
 import { SearchEntryPanel, type ExistingMatch as SearchExistingMatch } from './entity-create/SearchEntryPanel';
 import { buildSearchPredictions, enrichBrandCandidatesWithExistingMatch, type SearchCandidatePayload } from './entity-create/applyEntityDraft';
 import { useSearchToDraftEnabled } from '@/hooks/useSearchToDraftEnabled';
+import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 import { Search as SearchIcon, Link2 } from 'lucide-react';
 
 interface CreateEntityDialogProps {
@@ -129,6 +130,8 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   // Phase 3.5a — Search-to-Draft tab visibility + active-tab state.
   const searchToDraftEnabled = useSearchToDraftEnabled();
   const [createEntityTab, setCreateEntityTab] = useState<'url' | 'search'>('url');
+  // Phase 3.5c — funnel telemetry (fire-and-forget, hashed query only).
+  const { log: logFunnel, consumePickLatency } = useSearchFunnel();
   const useDraftReviewFlagRaw = useEntityReviewUsesDraft();
   // Phase 3.4C — non-admins (variant === 'user') are always forced onto the
   // V2 Draft Review path; the admin-only useEntityReviewUsesDraft flag never
@@ -162,6 +165,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [dupDialogOpen, setDupDialogOpen] = useState(false);
   const pendingSubmitOverridesRef = useRef<any>(undefined);
   const prefilledFromDraftRef = useRef<boolean>(false);
+  // Phase 3.5c — search-origin flag scoped to the currently open duplicate dialog.
+  // Captured at the moment the dialog opens so "Use this" can route
+  // search-origin duplicates to /entity/:slug?compose=review while leaving
+  // URL/manual duplicate behavior untouched. Reset on dialog close.
+  const pendingDuplicateOriginRef = useRef<'search' | 'other'>('other');
   // Exact-URL preflight (fires before Analyze spends AI/scrape credits).
   const [preflightDupCandidates, setPreflightDupCandidates] = useState<DuplicateCandidate[]>([]);
   const [preflightDupOpen, setPreflightDupOpen] = useState(false);
@@ -1050,6 +1058,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     // must NOT flow into website_url via buildEntityFormPatchFromPredictions.
     setPredictionUrlSnapshot(null);
     setShowPreviewModal(true);
+    // Phase 3.5c — funnel: draft review opened from a search pick.
+    void logFunnel({
+      event: 'review_opened',
+      source: 'search',
+      entityType: payload.candidate.type,
+      diagnostics: { hasImage: Boolean(draft.imageCandidates?.length) },
+    });
   };
 
   // Call edge function to analyze URL
@@ -1917,6 +1932,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           if (!dupErr && dupData?.candidates?.length > 0) {
             console.log('🔎 Duplicate candidates found:', dupData.candidates.length);
             pendingSubmitOverridesRef.current = overrides;
+            // Phase 3.5c — capture origin so "Use this" can route search-origin
+            // duplicates into ?compose=review while keeping URL/manual behavior.
+            pendingDuplicateOriginRef.current =
+              aiPredictions?.__fromSearch ? 'search' : 'other';
             setDupCandidates(dupData.candidates as DuplicateCandidate[]);
             setDupDialogOpen(true);
             setLoading(false);
@@ -1970,12 +1989,23 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         ? resolvePrimary(overridePrimaryImage as string | null)
         : undefined;
 
-    // Phase 3.3A telemetry: stamp creation_source only when invoked from the
-    // URL/draft flow. Manual creations stay 'manual'.
-    const creationSource = overrides?._fromDraftFlow ? 'url' : 'manual';
+    // Phase 3.3A / 3.5c telemetry: stamp creation_source.
+    // Search-to-Draft creations are stamped as 'search' (not 'url').
+    // The URL analyze flow stays 'url'. Manual creations stay 'manual'.
+    const fromSearch = Boolean(aiPredictions?.__fromSearch);
+    const creationSource = fromSearch
+      ? 'search'
+      : overrides?._fromDraftFlow ? 'url' : 'manual';
     const telemetryStamp: Record<string, unknown> = { creation_source: creationSource };
-    if (overrides?._fromDraftFlow && (analyzeUrl || lastAppliedUrl)) {
+    if (!fromSearch && overrides?._fromDraftFlow && (analyzeUrl || lastAppliedUrl)) {
       telemetryStamp.created_from_url = analyzeUrl || lastAppliedUrl;
+    }
+    if (fromSearch) {
+      const searchSourceUrl = (aiPredictions as any)?.searchSourceUrl;
+      if (typeof searchSourceUrl === 'string' && searchSourceUrl.length > 0) {
+        // Never overwrites website_url or created_from_url — separate key.
+        telemetryStamp.search_source_url = searchSourceUrl;
+      }
     }
 
     const metadata = {
@@ -2299,6 +2329,16 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         title: 'Success',
         description: 'Entity created successfully',
       });
+
+      // Phase 3.5c — funnel: entity_created (search-origin only).
+      if (fromSearch && newEntity) {
+        void logFunnel({
+          event: 'entity_created',
+          source: 'search',
+          entityType: newEntity.type,
+          diagnostics: { latencyMs: consumePickLatency() },
+        });
+      }
 
       resetForm();
       onOpenChange(false);
@@ -3092,18 +3132,25 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onCancel={() => {
           setDupDialogOpen(false);
           pendingSubmitOverridesRef.current = undefined;
+          pendingDuplicateOriginRef.current = 'other';
         }}
         onUseExisting={(c) => {
+          // Phase 3.5c — search-origin duplicates route into the deep-link
+          // review composer. URL/manual origins keep their previous behavior.
+          const isSearchOrigin = pendingDuplicateOriginRef.current === 'search';
           setDupDialogOpen(false);
           pendingSubmitOverridesRef.current = undefined;
+          pendingDuplicateOriginRef.current = 'other';
           resetForm();
           onOpenChange(false);
-          navigate(`/entity/${c.slug || c.id}`);
+          const base = `/entity/${c.slug || c.id}`;
+          navigate(isSearchOrigin ? `${base}?compose=review` : base);
         }}
         onContinueNew={() => {
           setDupDialogOpen(false);
           const prev = pendingSubmitOverridesRef.current || {};
           pendingSubmitOverridesRef.current = undefined;
+          pendingDuplicateOriginRef.current = 'other';
           // Re-submit, skipping the duplicate check this time.
           void handleSubmit({ ...prev, _duplicateConfirmed: true, _fromDraftFlow: prefilledFromDraftRef.current });
         }}
