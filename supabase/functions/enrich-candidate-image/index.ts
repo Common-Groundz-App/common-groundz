@@ -616,8 +616,9 @@ serve(async (req) => {
     console.log(JSON.stringify({
       fn: "enrich-candidate-image",
       host, method: result.method ?? method, latencyMs, cached: false,
-      errorCode: result.errorCode ?? null,
+      errorCode: result.errorCode ?? null, retried,
     }));
+
 
     return jsonResp({
       imageUrl: result.imageUrl,
