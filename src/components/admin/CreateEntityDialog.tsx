@@ -3011,8 +3011,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           // Phase 3.2 bugfix — merge urlMetadata.images into the draft's
           // imageCandidates so the picker shows the lite-metadata images
           // that the AI/V2 path may have missed.
+          //
+          // v3 fix — for search-origin drafts, skip this merge entirely.
+          // Stale urlMetadata from a prior URL analyze would otherwise
+          // bleed images from another entity into the search draft.
           const baseDraft = aiPredictions?.entityDraft ?? null;
           if (!baseDraft) return null;
+          if ((aiPredictions as any)?.__fromSearch) return baseDraft;
           const metaImgs = pickValidImages(urlMetadata);
           if (metaImgs.length === 0) return baseDraft;
           const existing = new Set(
@@ -3023,7 +3028,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             .map((u) => ({ url: u, source: 'page_metadata' as const, confidence: 0.55 }));
           return { ...baseDraft, imageCandidates: [...(baseDraft.imageCandidates ?? []), ...extras] };
         })()}
-        urlMetadata={urlMetadata}
+        urlMetadata={(aiPredictions as any)?.__fromSearch ? null : urlMetadata}
         analyzedUrlSnapshot={predictionUrlSnapshot}
         deferBrandCreationForAtomic={!isAdmin}
         onDeferBrandCreation={setPendingBrandForAtomic}
