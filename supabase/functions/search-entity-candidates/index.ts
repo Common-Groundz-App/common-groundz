@@ -484,7 +484,7 @@ async function callGemini(
       return {
         candidates: [], groundingSources: [], hasSearchEntryPoint: false,
         renderedContentLength: 0, renderedContentHash: null,
-        rawRenderedContent: null, errorCode: "grounding_unavailable",
+        rawRenderedContent: null, errorCode: "grounding_unavailable", finishReason: null,
       };
     }
     raw = await resp.json();
@@ -506,7 +506,7 @@ async function callGemini(
     return {
       candidates: [], groundingSources: [], hasSearchEntryPoint: false,
       renderedContentLength: 0, renderedContentHash: null,
-      rawRenderedContent: null, errorCode,
+      rawRenderedContent: null, errorCode, finishReason: null,
     };
   }
 
