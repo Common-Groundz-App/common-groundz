@@ -418,6 +418,7 @@ async function callGemini(
   renderedContentHash: string | null;
   rawRenderedContent: string | null;
   errorCode: null | "grounding_unavailable" | "parse_failed" | "timeout";
+  finishReason: string | null;
 }> {
   const geminiStart = Date.now();
   const prompt = [
