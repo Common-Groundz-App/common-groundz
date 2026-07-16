@@ -530,84 +530,83 @@ serve(async (req) => {
       supabaseAdmin.rpc("prune_image_enrich_rate_limits").catch(() => {});
     }
 
-    // 6. SSRF-safe fetch + extract.
-    let result: CachedResult;
-    try {
-      const { finalUrl, html } = await safeFetchHtml(cacheKey, deadline);
-      const found = extractImage(html);
-      if (!found) {
-        result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-      } else {
-        // Resolve relative to final URL.
+    // 6. SSRF-safe fetch + extract, with an optional server-side clean-URL
+    //    retry when the primary attempt returns no_image / invalid_content_type
+    //    and the original URL had a query string. Runs in the same request,
+    //    same quota unit, same rate-limit increment.
+    const runAttempt = async (url: string): Promise<CachedResult> => {
+      try {
+        const { finalUrl, html } = await safeFetchHtml(url, deadline);
+        const found = extractImage(html);
+        if (!found) {
+          return { imageUrl: null, source: null, method: null, errorCode: "no_image" };
+        }
         let absImg: string;
         try { absImg = new URL(found.url, finalUrl).toString(); }
         catch {
-          result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-          const ttl = ttlFor(result);
-          if (ttl) cachePut(cacheKey, result, ttl);
-          const latencyMs = Date.now() - started;
-          console.log(JSON.stringify({
-            fn: "enrich-candidate-image",
-            host, method: found.method, latencyMs, cached: false, errorCode: "no_image",
-          }));
-          return jsonResp({
-            imageUrl: null, source: null, method: null,
-            diagnostics: { latencyMs, fetched: true, cached: false, errorCode: "no_image" },
-          });
+          return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
         }
-
-        // Basic validity (tracking pixel/favicon/data:/non-http filter).
-        if (!isValidPageImageUrl(absImg)) {
-          result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-        } else {
-          // SSRF-check the extracted image URL too.
-          try {
-            await assertSafeUrl(absImg);
-          } catch (e) {
-            if (e instanceof SsrfError) {
-              result = { imageUrl: null, source: null, method: null, errorCode: "unsafe_url" };
-            } else {
-              result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-            }
-            method = found.method;
-            const ttl = ttlFor(result);
-            if (ttl) cachePut(cacheKey, result, ttl);
-            const latencyMs = Date.now() - started;
-            console.log(JSON.stringify({
-              fn: "enrich-candidate-image",
-              host, method, latencyMs, cached: false, errorCode: result.errorCode,
-            }));
-            return jsonResp({
-              imageUrl: null, source: null, method: null,
-              diagnostics: { latencyMs, fetched: true, cached: false, errorCode: result.errorCode },
-            });
-          }
-
-          // Optional HEAD probe.
-          const okType = await probeImageContentType(absImg, deadline);
-          if (!okType) {
-            result = {
-              imageUrl: null, source: null, method: null,
-              errorCode: "invalid_content_type",
-            };
-          } else {
-            result = {
-              imageUrl: absImg, source: "page_metadata", method: found.method,
-            };
-          }
-          method = found.method;
+        // v7 — reject logos/banners resolved against the final URL too
+        // (catches JSON-LD relative /assets/brand-logo.png cases).
+        if (!isValidPageImageUrl(absImg) || looksLikeLogoOrBanner(absImg)) {
+          return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
         }
+        try {
+          await assertSafeUrl(absImg);
+        } catch (e) {
+          if (e instanceof SsrfError) {
+            return { imageUrl: null, source: null, method: found.method, errorCode: "unsafe_url" };
+          }
+          return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
+        }
+        const okType = await probeImageContentType(absImg, deadline);
+        if (!okType) {
+          return {
+            imageUrl: null, source: null, method: found.method,
+            errorCode: "invalid_content_type",
+          };
+        }
+        return { imageUrl: absImg, source: "page_metadata", method: found.method };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        let errorCode: ErrorCode;
+        if (e instanceof SsrfError) errorCode = "unsafe_url";
+        else if (msg === "timeout") errorCode = "timeout";
+        else if (msg === "no_image") errorCode = "no_image";
+        else if (msg === "unsafe_url") errorCode = "unsafe_url";
+        else errorCode = "blocked";
+        return { imageUrl: null, source: null, method: null, errorCode };
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "";
-      let errorCode: ErrorCode;
-      if (e instanceof SsrfError) errorCode = "unsafe_url";
-      else if (msg === "timeout") errorCode = "timeout";
-      else if (msg === "no_image") errorCode = "no_image";
-      else if (msg === "unsafe_url") errorCode = "unsafe_url";
-      else errorCode = "blocked";
-      result = { imageUrl: null, source: null, method: null, errorCode };
+    };
+
+    let result = await runAttempt(cacheKey);
+    let retried = false;
+
+    // v7 — bounded server-side clean-URL retry.
+    const shouldRetry =
+      (result.errorCode === "no_image" || result.errorCode === "invalid_content_type") &&
+      (() => {
+        try { return new URL(cacheKey).search.length > 0; } catch { return false; }
+      })() &&
+      (deadline - Date.now()) >= 1500;
+    if (shouldRetry) {
+      let stripped: string | null = null;
+      try {
+        const u = new URL(cacheKey);
+        u.search = "";
+        stripped = u.toString();
+      } catch { stripped = null; }
+      if (stripped && stripped !== cacheKey) {
+        retried = true;
+        const retryResult = await runAttempt(stripped);
+        // Prefer a real image; otherwise keep the original result so we cache
+        // the correct error code.
+        if (retryResult.imageUrl) result = retryResult;
+      }
     }
+
+    method = result.method ?? method;
+
 
     // 7. Cache per policy.
     const ttl = ttlFor(result);
