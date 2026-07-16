@@ -325,17 +325,63 @@ function pickJsonLdImage(node: unknown): string | null {
   return null;
 }
 
+// v7 — narrow logo/banner/icon filter. Rejects only when a pathname
+// segment or filename matches (case-insensitive) — NOT arbitrary substrings.
+// `/brands/cetaphil/cleanser.jpg` passes; `/assets/brand-logo.png` rejected.
+const LOGO_SEGMENTS = new Set([
+  "logo", "logos", "site-logo", "brand-logo", "brand_logo", "brand-banner",
+  "header", "banner", "sprite", "placeholder", "favicon", "icon",
+  "default", "avatar",
+]);
+function looksLikeLogoOrBanner(imgUrl: string): boolean {
+  try {
+    const u = new URL(imgUrl);
+    const segs = u.pathname.split("/").filter(Boolean).map((s) => s.toLowerCase());
+    if (segs.length === 0) return false;
+    const last = segs[segs.length - 1];
+    // Reject .svg on the file (usually vector logos/icons).
+    if (/\.svg(\?|$)/i.test(last)) return true;
+    // Filename stem match (strip extension + query).
+    const stem = last.replace(/\.[a-z0-9]+$/i, "");
+    for (const bad of LOGO_SEGMENTS) {
+      if (stem === bad || stem.includes(bad)) return true;
+    }
+    // Any earlier segment exact-match (e.g. `/img/logo/foo.png`).
+    for (let i = 0; i < segs.length - 1; i++) {
+      if (LOGO_SEGMENTS.has(segs[i])) return true;
+    }
+    // Special `brand/header` two-segment pattern.
+    for (let i = 0; i < segs.length - 1; i++) {
+      if (segs[i] === "brand" && (segs[i + 1] === "header" || segs[i + 1] === "banner")) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// v7 — JSON-LD-first candidate ladder. Collect all four candidates, drop
+// those failing basic validity or the logo/banner filter, return the first
+// survivor. Order: JSON-LD → OG → Twitter → image_src.
 function extractImage(html: string): { url: string; method: ExtractMethod } | null {
+  const candidates: Array<{ url: string; method: ExtractMethod }> = [];
+  const ld = findJsonLdImage(html);
+  if (ld) candidates.push({ url: ld, method: "json_ld" });
   const og = findMetaContent(html, "og:image:secure_url") ??
     findMetaContent(html, "og:image");
-  if (og) return { url: og, method: "og" };
+  if (og) candidates.push({ url: og, method: "og" });
   const tw = findMetaContent(html, "twitter:image") ??
     findMetaContent(html, "twitter:image:src");
-  if (tw) return { url: tw, method: "twitter" };
+  if (tw) candidates.push({ url: tw, method: "twitter" });
   const linkSrc = findLinkImageSrc(html);
-  if (linkSrc) return { url: linkSrc, method: "image_src" };
-  const ld = findJsonLdImage(html);
-  if (ld) return { url: ld, method: "json_ld" };
+  if (linkSrc) candidates.push({ url: linkSrc, method: "image_src" });
+  for (const c of candidates) {
+    if (!isValidPageImageUrl(c.url)) continue;
+    if (looksLikeLogoOrBanner(c.url)) continue;
+    return c;
+  }
   return null;
 }
 
