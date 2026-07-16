@@ -486,6 +486,16 @@ async function callGemini(
 
   const parsed = extractJsonObject(textOut);
   if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as any).candidates)) {
+    console.warn(
+      `[search-entity-candidates] parse_failed:`,
+      JSON.stringify({
+        model,
+        latencyMs: Date.now() - geminiStart,
+        textOutLength: textOut.length,
+        hasSearchEntryPoint: !!renderedContent,
+        errorCode: "parse_failed",
+      }),
+    );
     return {
       candidates: [], groundingSources,
       hasSearchEntryPoint: !!renderedContent,
