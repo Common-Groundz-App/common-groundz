@@ -547,8 +547,11 @@ async function callGemini(
       JSON.stringify({
         model,
         latencyMs: Date.now() - geminiStart,
+        finishReason,
         textOutLength: textOut.length,
         hasSearchEntryPoint: !!renderedContent,
+        groundingSourcesCount: groundingSources.length,
+        maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
         errorCode: "parse_failed",
       }),
     );
@@ -559,6 +562,7 @@ async function callGemini(
       renderedContentHash: renderedContent ? await sha256Hex12(renderedContent) : null,
       rawRenderedContent: renderedContent,
       errorCode: "parse_failed",
+      finishReason,
     };
   }
 
@@ -580,6 +584,7 @@ async function callGemini(
     renderedContentHash: renderedContent ? await sha256Hex12(renderedContent) : null,
     rawRenderedContent: renderedContent,
     errorCode: null,
+    finishReason,
   };
 }
 
