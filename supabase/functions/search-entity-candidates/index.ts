@@ -717,6 +717,8 @@ serve(async (req) => {
         renderedContentLength: gemini.renderedContentLength,
         renderedContentHash: gemini.renderedContentHash,
         errorCode: gemini.errorCode,
+        finishReason: gemini.finishReason,
+        maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
         latencyMs: Date.now() - started,
       }),
     );
