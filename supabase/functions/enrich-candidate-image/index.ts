@@ -325,17 +325,63 @@ function pickJsonLdImage(node: unknown): string | null {
   return null;
 }
 
+// v7 — narrow logo/banner/icon filter. Rejects only when a pathname
+// segment or filename matches (case-insensitive) — NOT arbitrary substrings.
+// `/brands/cetaphil/cleanser.jpg` passes; `/assets/brand-logo.png` rejected.
+const LOGO_SEGMENTS = new Set([
+  "logo", "logos", "site-logo", "brand-logo", "brand_logo", "brand-banner",
+  "header", "banner", "sprite", "placeholder", "favicon", "icon",
+  "default", "avatar",
+]);
+function looksLikeLogoOrBanner(imgUrl: string): boolean {
+  try {
+    const u = new URL(imgUrl);
+    const segs = u.pathname.split("/").filter(Boolean).map((s) => s.toLowerCase());
+    if (segs.length === 0) return false;
+    const last = segs[segs.length - 1];
+    // Reject .svg on the file (usually vector logos/icons).
+    if (/\.svg(\?|$)/i.test(last)) return true;
+    // Filename stem match (strip extension + query).
+    const stem = last.replace(/\.[a-z0-9]+$/i, "");
+    for (const bad of LOGO_SEGMENTS) {
+      if (stem === bad || stem.includes(bad)) return true;
+    }
+    // Any earlier segment exact-match (e.g. `/img/logo/foo.png`).
+    for (let i = 0; i < segs.length - 1; i++) {
+      if (LOGO_SEGMENTS.has(segs[i])) return true;
+    }
+    // Special `brand/header` two-segment pattern.
+    for (let i = 0; i < segs.length - 1; i++) {
+      if (segs[i] === "brand" && (segs[i + 1] === "header" || segs[i + 1] === "banner")) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// v7 — JSON-LD-first candidate ladder. Collect all four candidates, drop
+// those failing basic validity or the logo/banner filter, return the first
+// survivor. Order: JSON-LD → OG → Twitter → image_src.
 function extractImage(html: string): { url: string; method: ExtractMethod } | null {
+  const candidates: Array<{ url: string; method: ExtractMethod }> = [];
+  const ld = findJsonLdImage(html);
+  if (ld) candidates.push({ url: ld, method: "json_ld" });
   const og = findMetaContent(html, "og:image:secure_url") ??
     findMetaContent(html, "og:image");
-  if (og) return { url: og, method: "og" };
+  if (og) candidates.push({ url: og, method: "og" });
   const tw = findMetaContent(html, "twitter:image") ??
     findMetaContent(html, "twitter:image:src");
-  if (tw) return { url: tw, method: "twitter" };
+  if (tw) candidates.push({ url: tw, method: "twitter" });
   const linkSrc = findLinkImageSrc(html);
-  if (linkSrc) return { url: linkSrc, method: "image_src" };
-  const ld = findJsonLdImage(html);
-  if (ld) return { url: ld, method: "json_ld" };
+  if (linkSrc) candidates.push({ url: linkSrc, method: "image_src" });
+  for (const c of candidates) {
+    if (!isValidPageImageUrl(c.url)) continue;
+    if (looksLikeLogoOrBanner(c.url)) continue;
+    return c;
+  }
   return null;
 }
 
@@ -484,84 +530,83 @@ serve(async (req) => {
       supabaseAdmin.rpc("prune_image_enrich_rate_limits").catch(() => {});
     }
 
-    // 6. SSRF-safe fetch + extract.
-    let result: CachedResult;
-    try {
-      const { finalUrl, html } = await safeFetchHtml(cacheKey, deadline);
-      const found = extractImage(html);
-      if (!found) {
-        result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-      } else {
-        // Resolve relative to final URL.
+    // 6. SSRF-safe fetch + extract, with an optional server-side clean-URL
+    //    retry when the primary attempt returns no_image / invalid_content_type
+    //    and the original URL had a query string. Runs in the same request,
+    //    same quota unit, same rate-limit increment.
+    const runAttempt = async (url: string): Promise<CachedResult> => {
+      try {
+        const { finalUrl, html } = await safeFetchHtml(url, deadline);
+        const found = extractImage(html);
+        if (!found) {
+          return { imageUrl: null, source: null, method: null, errorCode: "no_image" };
+        }
         let absImg: string;
         try { absImg = new URL(found.url, finalUrl).toString(); }
         catch {
-          result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-          const ttl = ttlFor(result);
-          if (ttl) cachePut(cacheKey, result, ttl);
-          const latencyMs = Date.now() - started;
-          console.log(JSON.stringify({
-            fn: "enrich-candidate-image",
-            host, method: found.method, latencyMs, cached: false, errorCode: "no_image",
-          }));
-          return jsonResp({
-            imageUrl: null, source: null, method: null,
-            diagnostics: { latencyMs, fetched: true, cached: false, errorCode: "no_image" },
-          });
+          return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
         }
-
-        // Basic validity (tracking pixel/favicon/data:/non-http filter).
-        if (!isValidPageImageUrl(absImg)) {
-          result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-        } else {
-          // SSRF-check the extracted image URL too.
-          try {
-            await assertSafeUrl(absImg);
-          } catch (e) {
-            if (e instanceof SsrfError) {
-              result = { imageUrl: null, source: null, method: null, errorCode: "unsafe_url" };
-            } else {
-              result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-            }
-            method = found.method;
-            const ttl = ttlFor(result);
-            if (ttl) cachePut(cacheKey, result, ttl);
-            const latencyMs = Date.now() - started;
-            console.log(JSON.stringify({
-              fn: "enrich-candidate-image",
-              host, method, latencyMs, cached: false, errorCode: result.errorCode,
-            }));
-            return jsonResp({
-              imageUrl: null, source: null, method: null,
-              diagnostics: { latencyMs, fetched: true, cached: false, errorCode: result.errorCode },
-            });
-          }
-
-          // Optional HEAD probe.
-          const okType = await probeImageContentType(absImg, deadline);
-          if (!okType) {
-            result = {
-              imageUrl: null, source: null, method: null,
-              errorCode: "invalid_content_type",
-            };
-          } else {
-            result = {
-              imageUrl: absImg, source: "page_metadata", method: found.method,
-            };
-          }
-          method = found.method;
+        // v7 — reject logos/banners resolved against the final URL too
+        // (catches JSON-LD relative /assets/brand-logo.png cases).
+        if (!isValidPageImageUrl(absImg) || looksLikeLogoOrBanner(absImg)) {
+          return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
         }
+        try {
+          await assertSafeUrl(absImg);
+        } catch (e) {
+          if (e instanceof SsrfError) {
+            return { imageUrl: null, source: null, method: found.method, errorCode: "unsafe_url" };
+          }
+          return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
+        }
+        const okType = await probeImageContentType(absImg, deadline);
+        if (!okType) {
+          return {
+            imageUrl: null, source: null, method: found.method,
+            errorCode: "invalid_content_type",
+          };
+        }
+        return { imageUrl: absImg, source: "page_metadata", method: found.method };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "";
+        let errorCode: ErrorCode;
+        if (e instanceof SsrfError) errorCode = "unsafe_url";
+        else if (msg === "timeout") errorCode = "timeout";
+        else if (msg === "no_image") errorCode = "no_image";
+        else if (msg === "unsafe_url") errorCode = "unsafe_url";
+        else errorCode = "blocked";
+        return { imageUrl: null, source: null, method: null, errorCode };
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "";
-      let errorCode: ErrorCode;
-      if (e instanceof SsrfError) errorCode = "unsafe_url";
-      else if (msg === "timeout") errorCode = "timeout";
-      else if (msg === "no_image") errorCode = "no_image";
-      else if (msg === "unsafe_url") errorCode = "unsafe_url";
-      else errorCode = "blocked";
-      result = { imageUrl: null, source: null, method: null, errorCode };
+    };
+
+    let result = await runAttempt(cacheKey);
+    let retried = false;
+
+    // v7 — bounded server-side clean-URL retry.
+    const shouldRetry =
+      (result.errorCode === "no_image" || result.errorCode === "invalid_content_type") &&
+      (() => {
+        try { return new URL(cacheKey).search.length > 0; } catch { return false; }
+      })() &&
+      (deadline - Date.now()) >= 1500;
+    if (shouldRetry) {
+      let stripped: string | null = null;
+      try {
+        const u = new URL(cacheKey);
+        u.search = "";
+        stripped = u.toString();
+      } catch { stripped = null; }
+      if (stripped && stripped !== cacheKey) {
+        retried = true;
+        const retryResult = await runAttempt(stripped);
+        // Prefer a real image; otherwise keep the original result so we cache
+        // the correct error code.
+        if (retryResult.imageUrl) result = retryResult;
+      }
     }
+
+    method = result.method ?? method;
+
 
     // 7. Cache per policy.
     const ttl = ttlFor(result);
@@ -571,8 +616,9 @@ serve(async (req) => {
     console.log(JSON.stringify({
       fn: "enrich-candidate-image",
       host, method: result.method ?? method, latencyMs, cached: false,
-      errorCode: result.errorCode ?? null,
+      errorCode: result.errorCode ?? null, retried,
     }));
+
 
     return jsonResp({
       imageUrl: result.imageUrl,

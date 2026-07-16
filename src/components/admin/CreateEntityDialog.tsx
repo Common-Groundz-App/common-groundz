@@ -3034,6 +3034,12 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onDeferBrandCreation={setPendingBrandForAtomic}
         onPrefillForm={async (overrides) => {
           prefilledFromDraftRef.current = true;
+          // v7 — Search Apply must clear previous form/media (URL Analyze
+          // already does this inside commitApply). Prevents old images from
+          // a prior search/URL analysis leaking into the next entity.
+          if ((aiPredictions as any)?.__fromSearch) {
+            resetEntityFormForNewAppliedUrl();
+          }
           // Phase 3.2 v6 — Stage 2 "Apply to Form": prefill host form state,
           // do NOT create the entity. The host form's Save button is the
           // only entity write path.
