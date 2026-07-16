@@ -76,17 +76,43 @@ export const ImageCandidateGrid: React.FC<Props> = ({
     setBrokenUrls((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
   }, []);
 
+  // v3 — Prefer high-quality sources when picking an initial or replacement
+  // primary. `google_grounding` images are frequently broken/unreliable, so
+  // page_metadata / enriched / user_upload are chosen first when present.
+  const HIGH_QUALITY_SOURCES = new Set([
+    'page_metadata',
+    'enriched',
+    'official_site',
+    'firecrawl',
+    'user_upload',
+  ]);
+  const pickBestCandidateUrl = useCallback(
+    (excludeUrl?: string | null): string | null => {
+      const eligible = candidates.filter(
+        (c) => c.url && !brokenUrls.has(c.url) && c.url !== excludeUrl,
+      );
+      if (eligible.length === 0) return null;
+      const highQuality = eligible.find((c) => HIGH_QUALITY_SOURCES.has((c as any).source));
+      return (highQuality ?? eligible[0]).url;
+    },
+    [candidates, brokenUrls],
+  );
+
   // Seed default primary on first mount only.
   useEffect(() => {
     if (
-      value.primaryUrl == null && !value.primaryPending && !value.noImageChosen &&
-      typeof recommendedIndex === 'number' && candidates[recommendedIndex]
+      value.primaryUrl == null && !value.primaryPending && !value.noImageChosen
     ) {
-      onChange({
-        ...value,
-        primaryUrl: candidates[recommendedIndex].url,
-        primaryPending: null,
-      });
+      // Prefer page_metadata / enriched over the raw recommendedIndex, which
+      // may point at a google_grounding tile that hasn't tried to load yet.
+      const best = pickBestCandidateUrl();
+      const fallback = typeof recommendedIndex === 'number'
+        ? candidates[recommendedIndex]?.url ?? null
+        : null;
+      const seed = best ?? fallback;
+      if (seed) {
+        onChange({ ...value, primaryUrl: seed, primaryPending: null });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -101,6 +127,8 @@ export const ImageCandidateGrid: React.FC<Props> = ({
 
   // Plan v10 — when a broken URL is currently primary or in gallery, fire
   // one idempotent onChange to remove it. Guarded by a ref so we never loop.
+  // v3 — additionally auto-shift primary to the next valid candidate,
+  // preferring page_metadata / enriched sources.
   const cleanedBrokenRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (brokenUrls.size === 0) return;
@@ -108,7 +136,8 @@ export const ImageCandidateGrid: React.FC<Props> = ({
     let dirty = false;
     if (next.primaryUrl && brokenUrls.has(next.primaryUrl) && !cleanedBrokenRef.current.has(next.primaryUrl)) {
       cleanedBrokenRef.current.add(next.primaryUrl);
-      next = { ...next, primaryUrl: null };
+      const replacement = pickBestCandidateUrl(next.primaryUrl);
+      next = { ...next, primaryUrl: replacement };
       dirty = true;
     }
     const beforeLen = next.galleryUrls.length;
@@ -121,7 +150,7 @@ export const ImageCandidateGrid: React.FC<Props> = ({
       dirty = true;
     }
     if (dirty) onChange(next);
-  }, [brokenUrls, value, onChange]);
+  }, [brokenUrls, value, onChange, pickBestCandidateUrl]);
 
   const tiles: Tile[] = [
     ...candidates.map((c, i) => ({
