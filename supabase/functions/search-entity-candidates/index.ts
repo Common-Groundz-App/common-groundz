@@ -4,14 +4,11 @@
 // → up to 5 EntityDraft candidates. Never writes. Never touches the URL
 // analyze pipeline (analyze-entity-url-v2 etc).
 //
-// This function mirrors the proven-working grounded-search pattern used by
-// `smart-assistant/index.ts` (webFallbackSearch) and
-// `analyze-entity-url-v2/gemini.ts`. It calls Google's public REST
-// `generateContent` endpoint with `tools: [{ google_search: {} }]` on
-// `gemini-1.5-flash`. Newer models (`gemini-2.5-flash`, `gemini-3.5-flash`)
-// are documented for grounding but consistently timed out on this path in
-// our deployment — they can be A/B tested via the `GEMINI_GROUNDED_MODEL`
-// env override without a redeploy.
+// Calls Google's public REST `generateContent` endpoint on
+// `v1beta/models/gemini-2.5-flash` with `tools: [{ google_search: {} }]`.
+// `gemini-1.5-flash` was removed from the public v1beta endpoint (HTTP 404
+// "model not found") — do not revert. Swap via the `GEMINI_GROUNDED_MODEL`
+// env override if Google publishes a newer grounded-search model id.
 //
 // `responseMimeType` / `responseSchema` are intentionally NOT set: Google
 // REST returns 400 "Search Grounding can't be used with JSON/YAML/XML mode"
