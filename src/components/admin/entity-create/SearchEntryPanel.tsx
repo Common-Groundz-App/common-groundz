@@ -68,8 +68,34 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [enrichingIndex, setEnrichingIndex] = useState<number | null>(null);
+  // v3 — a row is "enriching" if either the click-time or the top-3
+  // auto-enrichment is still in-flight for it. Tracked as a Set so
+  // parallel top-3 fan-out doesn't block other rows.
+  const [enrichingIndexes, setEnrichingIndexes] = useState<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // v3 — bumped on every new search; used to key in-flight enrichment
+  // work and drop stale responses when the user searches again or unmounts.
+  const runIdRef = useRef(0);
+  // v3 — in-flight auto-enrichment tracked by `${runId}:${idx}:${sourceUrl}`.
+  // The stored promise resolves with the (possibly-enriched) payload so
+  // Review & create can await it instead of firing a duplicate call.
+  const inFlightRef = useRef<Map<string, Promise<SearchCandidatePayload>>>(new Map());
+
+  const addEnriching = (idx: number) =>
+    setEnrichingIndexes((prev) => {
+      if (prev.has(idx)) return prev;
+      const next = new Set(prev);
+      next.add(idx);
+      return next;
+    });
+  const removeEnriching = (idx: number) =>
+    setEnrichingIndexes((prev) => {
+      if (!prev.has(idx)) return prev;
+      const next = new Set(prev);
+      next.delete(idx);
+      return next;
+    });
 
   // Phase 3.5c — recent-search chips (surface-scoped, existing hook).
   const { recents, addRecent, removeRecent, clearRecents } =
