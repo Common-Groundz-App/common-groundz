@@ -474,7 +474,7 @@ async function callGemini(
   const groundingSources: GroundingSource[] = Array.isArray(groundingMetadata?.groundingChunks)
     ? groundingMetadata.groundingChunks
         .map((c: any) => {
-          const uri = c?.web?.uri || c?.web?.url || "";
+          const uri = c?.web?.uri || "";
           return {
             title: typeof c?.web?.title === "string" ? c.web.title : "",
             domain: safeDomain(uri),
