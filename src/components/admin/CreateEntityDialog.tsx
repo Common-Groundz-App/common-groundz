@@ -3104,6 +3104,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             setLastAppliedUrl(normalizeUrlForCompare(predictionUrlSnapshot));
           }
 
+          // v3 — auto-expand the form for non-admin users, matching URL
+          // Analysis "Apply to Form" behavior. Admin variant is always
+          // expanded, so this is a no-op there.
+          if (variant === 'user') {
+            setUrlAnalysisComplete(true);
+            setIsFormExpanded(true);
+          }
+
           toast({
             title: 'Draft applied',
             description: 'Review the form and click Save to create the entity.',
