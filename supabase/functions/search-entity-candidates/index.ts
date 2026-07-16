@@ -509,6 +509,11 @@ async function callGemini(
     };
   }
 
+  const finishReason: string | null =
+    typeof raw?.candidates?.[0]?.finishReason === "string"
+      ? raw.candidates[0].finishReason
+      : null;
+
   const parts: any[] = raw?.candidates?.[0]?.content?.parts ?? [];
   const textOut = parts
     .map((p) => (typeof p?.text === "string" ? p.text : ""))
