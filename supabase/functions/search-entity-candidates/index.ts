@@ -443,7 +443,14 @@ async function callGemini(
     const errorCode: "timeout" | "grounding_unavailable" = isAbort ? "timeout" : "grounding_unavailable";
     console.warn(
       `[search-entity-candidates] Gemini call failed:`,
-      JSON.stringify({ errorCode, isAbort, message: (e as Error).message, latencyMs: Date.now() - geminiStart }),
+      JSON.stringify({
+        model,
+        timeoutMs: GEMINI_TIMEOUT_MS,
+        errorCode,
+        isAbort,
+        message: (e as Error).message,
+        latencyMs: Date.now() - geminiStart,
+      }),
     );
     return {
       candidates: [], groundingSources: [], hasSearchEntryPoint: false,
