@@ -1045,6 +1045,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   // the existing AutoFillPreviewModal draft-review path by shaping
   // aiPredictions to the same shape the URL flow uses.
   const handleSearchPick = async (payload: SearchCandidatePayload) => {
+    // Search-origin drafts must not inherit URL-analysis metadata from a
+    // previous run (e.g. a prior WishCare analyze leaking images into a
+    // fresh Cetaphil search). Clear it before the preview modal opens.
+    setUrlMetadata(null);
     let draft = payload.draft;
     try {
       const enriched = await enrichBrandCandidatesWithExistingMatch(draft.brandCandidates);
