@@ -4,13 +4,19 @@
 // → up to 5 EntityDraft candidates. Never writes. Never touches the URL
 // analyze pipeline (analyze-entity-url-v2 etc).
 //
-// API choice: Google's `generateContent` REST endpoint with
-// `tools: [{ google_search: {} }]`. Google's current docs document
-// generateContent + google_search for `gemini-3.5-flash` and it is the
-// simplest supported combination for JSON output + groundingMetadata.
-// Older models used `google_search_retrieval`; current models use `google_search`.
-// If Google's Interactions API ever exposes google_search + JSON + grounding
-// cleanly, swap the transport here.
+// This function mirrors the proven-working grounded-search pattern used by
+// `smart-assistant/index.ts` (webFallbackSearch) and
+// `analyze-entity-url-v2/gemini.ts`. It calls Google's public REST
+// `generateContent` endpoint with `tools: [{ google_search: {} }]` on
+// `gemini-1.5-flash`. Newer models (`gemini-2.5-flash`, `gemini-3.5-flash`)
+// are documented for grounding but consistently timed out on this path in
+// our deployment — they can be A/B tested via the `GEMINI_GROUNDED_MODEL`
+// env override without a redeploy.
+//
+// `responseMimeType` / `responseSchema` are intentionally NOT set: Google
+// REST returns 400 "Search Grounding can't be used with JSON/YAML/XML mode"
+// when either is combined with the `google_search` tool. We rely on prompt
+// discipline + tolerant JSON extraction (extractJsonObject).
 //
 // Compliance / safety:
 //   - `searchEntryPoint.renderedContent` is NEVER logged raw. Only
@@ -36,8 +42,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const DEFAULT_GEMINI_GROUNDED_MODEL = "gemini-3.5-flash";
-const GEMINI_TIMEOUT_MS = Number(Deno.env.get("GEMINI_TIMEOUT_MS")) || 12_000;
+const DEFAULT_GEMINI_GROUNDED_MODEL = "gemini-1.5-flash";
+const GEMINI_TIMEOUT_MS = Number(Deno.env.get("GEMINI_TIMEOUT_MS")) || 20_000;
 const HOURLY_LIMIT = 20;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 200;
@@ -370,7 +376,9 @@ async function callGemini(
     `User query: "${query}"`,
     `Type hint: "${typeHint ?? "unknown"}"`,
     "",
-    "Return 4–5 distinct real-world entity candidates the user likely means.",
+    "Return up to 5 distinct real-world entity candidates the user likely means.",
+    "Return fewer if only fewer are strongly supported by grounded results.",
+    "Do not invent extra variants just to fill the list.",
     "Rules:",
     "- JSON only. No prose. No markdown fences.",
     "- Prefer specific products/items over category/brand landing pages.",
@@ -381,9 +389,9 @@ async function callGemini(
     "Schema:",
     `{ "candidates": [{`,
     `  "name": string, "type": "product|brand|place|book|movie|food|app|tv",`,
-    `  "brand": string|null, "variant": string|null, "category": string|null,`,
+    `  "brand": string|null, "variant": string|null,`,
     `  "description": string, "imageUrl": string|null,`,
-    `  "sourceUrl": string, "sourceTitle": string|null, "confidence": number`,
+    `  "sourceUrl": string, "confidence": number`,
     `}] }`,
   ].join("\n");
 
@@ -392,9 +400,13 @@ async function callGemini(
     tools: [{ google_search: {} }],
     generationConfig: {
       temperature: 0.2,
-      // NOTE: responseMimeType application/json cannot be combined with
-      // the google_search tool on generateContent — Google's API rejects it.
-      // We ask for JSON in the prompt and parse tolerantly.
+      maxOutputTokens: 1200,
+      candidateCount: 1,
+      // responseMimeType / responseSchema INTENTIONALLY OMITTED — Google REST
+      // returns 400 "Search Grounding can't be used with JSON/YAML/XML mode"
+      // when either is combined with tools: [{ google_search: {} }]. We rely
+      // on prompt discipline + extractJsonObject() for tolerant parsing (same
+      // pattern as smart-assistant webFallbackSearch and analyze-entity-url-v2).
     },
   };
 
@@ -431,7 +443,14 @@ async function callGemini(
     const errorCode: "timeout" | "grounding_unavailable" = isAbort ? "timeout" : "grounding_unavailable";
     console.warn(
       `[search-entity-candidates] Gemini call failed:`,
-      JSON.stringify({ errorCode, isAbort, message: (e as Error).message, latencyMs: Date.now() - geminiStart }),
+      JSON.stringify({
+        model,
+        timeoutMs: GEMINI_TIMEOUT_MS,
+        errorCode,
+        isAbort,
+        message: (e as Error).message,
+        latencyMs: Date.now() - geminiStart,
+      }),
     );
     return {
       candidates: [], groundingSources: [], hasSearchEntryPoint: false,
@@ -455,7 +474,7 @@ async function callGemini(
   const groundingSources: GroundingSource[] = Array.isArray(groundingMetadata?.groundingChunks)
     ? groundingMetadata.groundingChunks
         .map((c: any) => {
-          const uri = c?.web?.uri || c?.web?.url || "";
+          const uri = c?.web?.uri || "";
           return {
             title: typeof c?.web?.title === "string" ? c.web.title : "",
             domain: safeDomain(uri),
@@ -467,6 +486,16 @@ async function callGemini(
 
   const parsed = extractJsonObject(textOut);
   if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as any).candidates)) {
+    console.warn(
+      `[search-entity-candidates] parse_failed:`,
+      JSON.stringify({
+        model,
+        latencyMs: Date.now() - geminiStart,
+        textOutLength: textOut.length,
+        hasSearchEntryPoint: !!renderedContent,
+        errorCode: "parse_failed",
+      }),
+    );
     return {
       candidates: [], groundingSources,
       hasSearchEntryPoint: !!renderedContent,
