@@ -4,13 +4,19 @@
 // → up to 5 EntityDraft candidates. Never writes. Never touches the URL
 // analyze pipeline (analyze-entity-url-v2 etc).
 //
-// API choice: Google's `generateContent` REST endpoint with
-// `tools: [{ google_search: {} }]`. Google's current docs document
-// generateContent + google_search for `gemini-3.5-flash` and it is the
-// simplest supported combination for JSON output + groundingMetadata.
-// Older models used `google_search_retrieval`; current models use `google_search`.
-// If Google's Interactions API ever exposes google_search + JSON + grounding
-// cleanly, swap the transport here.
+// This function mirrors the proven-working grounded-search pattern used by
+// `smart-assistant/index.ts` (webFallbackSearch) and
+// `analyze-entity-url-v2/gemini.ts`. It calls Google's public REST
+// `generateContent` endpoint with `tools: [{ google_search: {} }]` on
+// `gemini-1.5-flash`. Newer models (`gemini-2.5-flash`, `gemini-3.5-flash`)
+// are documented for grounding but consistently timed out on this path in
+// our deployment — they can be A/B tested via the `GEMINI_GROUNDED_MODEL`
+// env override without a redeploy.
+//
+// `responseMimeType` / `responseSchema` are intentionally NOT set: Google
+// REST returns 400 "Search Grounding can't be used with JSON/YAML/XML mode"
+// when either is combined with the `google_search` tool. We rely on prompt
+// discipline + tolerant JSON extraction (extractJsonObject).
 //
 // Compliance / safety:
 //   - `searchEntryPoint.renderedContent` is NEVER logged raw. Only
