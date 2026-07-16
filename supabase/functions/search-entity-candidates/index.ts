@@ -44,6 +44,11 @@ const GEMINI_TIMEOUT_MS = Number(Deno.env.get("GEMINI_TIMEOUT_MS")) || 20_000;
 const HOURLY_LIMIT = 20;
 const CACHE_TTL_MS = 15 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 200;
+// Output budget for grounded Gemini call. Default 4096 — enough for 1–5
+// compact candidates. If logs show finishReason: "MAX_TOKENS", raise via env
+// (e.g. GEMINI_MAX_OUTPUT_TOKENS=8192) without touching the code default.
+const GEMINI_MAX_OUTPUT_TOKENS =
+  Number(Deno.env.get("GEMINI_MAX_OUTPUT_TOKENS")) || 4096;
 
 // ---------- helpers ----------
 
@@ -107,36 +112,82 @@ async function sha256Hex12(input: string): Promise<string> {
     .slice(0, 12);
 }
 
-// Balanced-brace tolerant JSON extractor. Strips markdown fences, finds
-// the first top-level {...} block, tries JSON.parse. Returns null on failure.
+// Tolerant JSON extractor for grounded Gemini output.
+// Strategy (in order):
+//   1) Strip markdown fences, trim.
+//   2) Try JSON.parse on the whole string.
+//        - array   → wrap as { candidates: array }
+//        - object with Array.isArray(candidates) → return
+//   3) Scan every balanced {...} block; return the first parsed object
+//      whose `candidates` field is an array.
+//   4) Scan every balanced [...] block; wrap the first parsed array as
+//      { candidates: array }.
+// Never logs raw model text.
+function scanBalanced(
+  stripped: string,
+  open: "{" | "[",
+  close: "}" | "]",
+): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let inStr = false;
+  let escape = false;
+  for (let i = 0; i < stripped.length; i++) {
+    const ch = stripped[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === open) {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === close) {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        out.push(stripped.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  return out;
+}
+
 function extractJsonObject(raw: string): unknown | null {
   if (!raw) return null;
   const stripped = raw
     .replace(/^\s*```(?:json)?\s*/i, "")
     .replace(/```\s*$/i, "")
     .trim();
+  if (!stripped) return null;
 
-  const first = stripped.indexOf("{");
-  if (first === -1) return null;
-
-  let depth = 0;
-  let inStr = false;
-  let escape = false;
-  for (let i = first; i < stripped.length; i++) {
-    const ch = stripped[i];
-    if (escape) { escape = false; continue; }
-    if (ch === "\\") { escape = true; continue; }
-    if (ch === '"') { inStr = !inStr; continue; }
-    if (inStr) continue;
-    if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) {
-        const slice = stripped.slice(first, i + 1);
-        try { return JSON.parse(slice); } catch { return null; }
-      }
+  // 1) Whole-string parse.
+  try {
+    const whole = JSON.parse(stripped);
+    if (Array.isArray(whole)) return { candidates: whole };
+    if (whole && typeof whole === "object" && Array.isArray((whole as any).candidates)) {
+      return whole;
     }
+  } catch { /* fall through */ }
+
+  // 2) Scan balanced { ... } blocks, prefer the first with a candidates array.
+  for (const block of scanBalanced(stripped, "{", "}")) {
+    try {
+      const obj = JSON.parse(block);
+      if (obj && typeof obj === "object" && Array.isArray((obj as any).candidates)) {
+        return obj;
+      }
+    } catch { /* keep scanning */ }
   }
+
+  // 3) Scan balanced [ ... ] blocks and wrap.
+  for (const block of scanBalanced(stripped, "[", "]")) {
+    try {
+      const arr = JSON.parse(block);
+      if (Array.isArray(arr)) return { candidates: arr };
+    } catch { /* keep scanning */ }
+  }
+
   return null;
 }
 
