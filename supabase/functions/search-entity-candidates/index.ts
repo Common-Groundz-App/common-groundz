@@ -424,11 +424,13 @@ async function callGemini(
     `User query: "${query}"`,
     `Type hint: "${typeHint ?? "unknown"}"`,
     "",
+    "Return exactly one compact JSON object. No markdown, no prose, no source",
+    'list outside JSON. If nothing is strongly supported, return {"candidates":[]}.',
+    "",
     "Return up to 5 distinct real-world entity candidates the user likely means.",
     "Return fewer if only fewer are strongly supported by grounded results.",
     "Do not invent extra variants just to fill the list.",
     "Rules:",
-    "- JSON only. No prose. No markdown fences.",
     "- Prefer specific products/items over category/brand landing pages.",
     "- Distinct variants (size, formulation, edition) are distinct candidates.",
     "- Do not invent. If unsure, lower the confidence rather than guess.",
@@ -448,7 +450,7 @@ async function callGemini(
     tools: [{ google_search: {} }],
     generationConfig: {
       temperature: 0.2,
-      maxOutputTokens: 1200,
+      maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
       candidateCount: 1,
       // responseMimeType / responseSchema INTENTIONALLY OMITTED — Google REST
       // returns 400 "Search Grounding can't be used with JSON/YAML/XML mode"
