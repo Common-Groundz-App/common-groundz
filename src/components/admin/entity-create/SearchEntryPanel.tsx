@@ -489,26 +489,37 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
               <div className="space-y-2">
                 {result.candidates.map((p, idx) => {
                   const c = p.candidate;
-                  const enriching = enrichingIndex === idx;
+                  const enriching = enrichingIndexes.has(idx);
+                  // v3 — non-destructive loading: if the row already has an
+                  // image (e.g. google_grounding), keep it visible with a
+                  // shimmer overlay while enrichment runs. Only rows with no
+                  // image get the full skeleton.
+                  const showSkeleton = enriching && !c.imageUrl;
+                  const showOverlay = enriching && !!c.imageUrl;
                   return (
                     <div
                       key={`${c.sourceUrl}-${idx}`}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
-                        if ((e.key === 'Enter' || e.key === ' ') && enrichingIndex === null) {
+                        if ((e.key === 'Enter' || e.key === ' ')) {
                           e.preventDefault();
                           void handleReviewCreate(p, idx);
                         }
                       }}
                       className="flex items-start gap-3 rounded-lg border bg-card p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/60"
                     >
-                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
-                        {enriching ? (
+                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
+                        {showSkeleton ? (
                           <Skeleton className="h-full w-full" />
                         ) : c.imageUrl ? (
                           <ImageWithFallback src={c.imageUrl} alt={c.name} className="h-full w-full object-cover" />
                         ) : null}
+                        {showOverlay && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">{c.name}</p>
@@ -537,12 +548,12 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                           e.stopPropagation();
                           void handleReviewCreate(p, idx);
                         }}
-                        disabled={enrichingIndex !== null}
                         className="gap-1 min-w-[128px]"
                       >
                         {enriching ? (
                           <>
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
+
                             Preparing…
                           </>
                         ) : (
