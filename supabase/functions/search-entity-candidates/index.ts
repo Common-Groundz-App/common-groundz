@@ -376,7 +376,9 @@ async function callGemini(
     `User query: "${query}"`,
     `Type hint: "${typeHint ?? "unknown"}"`,
     "",
-    "Return 4–5 distinct real-world entity candidates the user likely means.",
+    "Return up to 5 distinct real-world entity candidates the user likely means.",
+    "Return fewer if only fewer are strongly supported by grounded results.",
+    "Do not invent extra variants just to fill the list.",
     "Rules:",
     "- JSON only. No prose. No markdown fences.",
     "- Prefer specific products/items over category/brand landing pages.",
@@ -387,9 +389,9 @@ async function callGemini(
     "Schema:",
     `{ "candidates": [{`,
     `  "name": string, "type": "product|brand|place|book|movie|food|app|tv",`,
-    `  "brand": string|null, "variant": string|null, "category": string|null,`,
+    `  "brand": string|null, "variant": string|null,`,
     `  "description": string, "imageUrl": string|null,`,
-    `  "sourceUrl": string, "sourceTitle": string|null, "confidence": number`,
+    `  "sourceUrl": string, "confidence": number`,
     `}] }`,
   ].join("\n");
 
@@ -398,9 +400,13 @@ async function callGemini(
     tools: [{ google_search: {} }],
     generationConfig: {
       temperature: 0.2,
-      // NOTE: responseMimeType application/json cannot be combined with
-      // the google_search tool on generateContent — Google's API rejects it.
-      // We ask for JSON in the prompt and parse tolerantly.
+      maxOutputTokens: 1200,
+      candidateCount: 1,
+      // responseMimeType / responseSchema INTENTIONALLY OMITTED — Google REST
+      // returns 400 "Search Grounding can't be used with JSON/YAML/XML mode"
+      // when either is combined with tools: [{ google_search: {} }]. We rely
+      // on prompt discipline + extractJsonObject() for tolerant parsing (same
+      // pattern as smart-assistant webFallbackSearch and analyze-entity-url-v2).
     },
   };
 
