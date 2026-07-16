@@ -1,119 +1,91 @@
-## What the logs show
+# Search-to-Draft Refinements (v3 — final)
 
-`search-entity-candidates` is no longer failing at the Gemini API layer. Recent calls show:
+Same five fixes as v2, with reviewer refinements folded in.
 
-- `model: "gemini-2.5-flash"`
-- `hasSearchEntryPoint: true`
-- `groundingSources: 4` on one call
-- `renderedContentLength: ~5.3k`
-- `errorCode: "parse_failed"`
-- `candidates: 0`
+## Priority order (correctness first, polish last)
+1. Stale URL-metadata leak into Search Step 2
+2. Auto-expand form after Apply to Form
+3. Remove "in database" chip
+4. Top-3 page-metadata auto-enrichment for search rows
+5. Enhance `ImageCandidateGrid` primary selection (prefer valid `page_metadata`, auto-shift on failure)
 
-So Gemini is returning grounded content, but our function can't extract a valid `{ candidates: [...] }` JSON object from the response text. The UI receives zero candidates, which looks like "nothing is working."
+---
 
-## Root cause
+## 1. Stale URL-analysis images leaking into Search Step 2
 
-Two stacked issues, in likely order of impact:
+**Root cause:** `src/components/admin/CreateEntityDialog.tsx` (~L3006–3021) unconditionally merges `pickValidImages(urlMetadata)` into `imageCandidates` and passes `urlMetadata={urlMetadata}` into `AutoFillPreviewModal`. After a prior URL analysis (WishCare), that state persists into the Search flow (Cetaphil) → bleed-through.
 
-1. **Output budget too small.** `maxOutputTokens: 1200` is likely truncating grounded JSON mid-object. One failing call had `textOutLength: 4169` — consistent with a truncated response. Truncated output makes the balanced-brace parser return `null`.
-2. **Parser is too strict.** It only tries the *first* balanced `{ ... }` block. If Gemini emits any pre-JSON text, a small non-candidates object, or a top-level array, parsing fails permanently.
+**Three-layer fix:**
+1. In `handleSearchPick`, call `setUrlMetadata(null)` before opening the preview modal.
+2. In the `entityDraft={(() => { ... })()}` IIFE, if `aiPredictions?.__fromSearch` → return `baseDraft` without the `pickValidImages(urlMetadata)` merge.
+3. On `<AutoFillPreviewModal>`, pass `urlMetadata={aiPredictions?.__fromSearch ? null : urlMetadata}` so `DraftReviewBody` / `buildEntityFormPatchFromPredictions` also see it as absent for search-origin drafts.
 
-We currently have no `finishReason` in logs, so we can't confirm truncation vs. malformed shape. That's the biggest blind spot.
+URL Analysis path unchanged (still merges when `__fromSearch` is falsy).
 
-## Plan (search function only)
+## 2. Auto-expand form after "Apply to Form" (parity with URL Analysis)
 
-Single file: `supabase/functions/search-entity-candidates/index.ts`. No frontend, DB, or other-function changes.
+**Root cause:** URL Analysis sets `setUrlAnalysisComplete(true) + setIsFormExpanded(true)` on success (~L1286). Search's `onPrefillForm` (~L3026) never does; non-admin users still see the collapsed "Or Enter Details Manually" button.
 
-### 1. Bigger, tunable output budget
-
-Add a constant with env override, default `4096` (not `8192` — 8192 adds latency/cost and encourages verbose output; we only need 1–5 compact candidates):
-
+**Fix:** Inside the Search `onPrefillForm` callback in `CreateEntityDialog.tsx`, after prefill work and before the "Draft applied" toast:
 ```ts
-const GEMINI_MAX_OUTPUT_TOKENS =
-  Number(Deno.env.get("GEMINI_MAX_OUTPUT_TOKENS")) || 4096;
-```
-
-Update `generationConfig`:
-
-```ts
-generationConfig: {
-  temperature: 0.2,
-  maxOutputTokens: GEMINI_MAX_OUTPUT_TOKENS,
-  candidateCount: 1,
-  // responseMimeType / responseSchema INTENTIONALLY OMITTED — incompatible
-  // with tools: [{ google_search: {} }] (Google returns 400).
+if (variant === 'user') {
+  setUrlAnalysisComplete(true);
+  setIsFormExpanded(true);
 }
 ```
+Admin variant is already expanded. State name is awkward for search but it's the same collapse/expand switch — keep parity now, rename later if needed.
 
-If diagnostics later show `finishReason: "MAX_TOKENS"` at 4096, we raise `GEMINI_MAX_OUTPUT_TOKENS=8192` via env, no code change needed.
+## 3. Remove "in database" chip
 
-### 2. Add `finishReason` diagnostics (safe)
+In `src/components/admin/entity-create/BrandPicker.tsx` (~L358–360), remove the `<Badge>… in database</Badge>`. The section header `EXISTING BRANDS (n)` already conveys it. Keep the `recommended` badge.
 
-Read `raw?.candidates?.[0]?.finishReason` after the Gemini response. Include it in both the success log and the `parse_failed` warning log, alongside existing safe fields:
+Not touching `"Matched in database ✓"` in `AutoFillPreviewModal.tsx` — also appears in URL Analysis. Deferred as a follow-up copy pass.
 
-- `model`
-- `latencyMs`
-- `finishReason`
-- `textOutLength`
-- `hasSearchEntryPoint`
-- `groundingSources.length`
-- `errorCode`
+## 4. Top-3 page-metadata auto-enrichment for search rows
 
-Never log raw query, prompt, generated text, full URLs, or `renderedContent`.
+**Why top 3, client-side, in parallel, non-blocking:**
+- Top 1 → inconsistent list. All 5 → 5× fan-out, tail-latency dominated by the slowest, burns the `enrich-candidate-image` 60/hr quota, and rows 4–5 are rarely picked. Top 3 covers the visible fold with bounded parallelism.
+- Client-side reuses the exact `enrich-candidate-image` edge function used by the click-time path (shared cache/SSRF/rate limit) and lets the search response render instantly with per-row placeholders.
 
-### 3. Harden `extractJsonObject`
+Implementation in `src/components/admin/entity-create/SearchEntryPanel.tsx`:
 
-Behavior:
-1. Strip markdown fences.
-2. Try `JSON.parse` on the whole trimmed string first.
-3. If the parsed result is an **array**, return `{ candidates: parsed }`.
-4. If it's an **object with `candidates: []`**, return it.
-5. Otherwise, scan every balanced `{ ... }` block and return the first parsed object where `Array.isArray(obj.candidates)` — not just the first parseable block.
-6. As a last resort, scan every balanced `[ ... ]` block and wrap the first parsed array as `{ candidates: array }`.
-7. Never log raw model text.
+- **Trigger condition (Codex):** enrich when the candidate has a `sourceUrl` AND does **not already have a `page_metadata`-sourced image**. This intentionally *also* covers rows whose only image is a poor `google_grounding` one (matches your screenshot).
+- **On success:** call `mergeEnrichedImage(draft, imageUrl, method)` — already idempotent (dedupes by URL in `applyEntityDraft.ts`), so retries are safe. Patch the row's visible display image AND the candidate's `draft.imageCandidates` (so Step 2 sees the same image).
+- **On null/timeout/blocked:** keep existing image (Google or empty), no toast.
 
-### 4. Compact, stricter prompt
+**Safeguards (ChatGPT + Codex):**
+- `runIdRef` bumped on each new search.
+- In-flight map keyed by **`${runId}:${idx}:${candidate.sourceUrl}`** (Codex — index alone can collide when a new search reuses idx 0–2 with different candidates).
+- Map entry deleted in a `.finally()` after each promise settles so a failed row can be re-enriched on click.
+- If Review & create is clicked on a row whose auto-enrichment is still in-flight, await the existing promise instead of firing a duplicate.
+- On unmount / new search, `runIdRef` guard drops stale responses.
 
-Tighten the prompt to reduce truncation risk and stray prose:
+**Loading UI (Codex — non-destructive):**
+- Row with no image → skeleton in the image slot until enrichment settles.
+- Row that already has a `google_grounding` image → keep the current image visible, overlay a subtle shimmer/spinner. Swap only on success. Avoids flicker.
 
-- "Return exactly one compact JSON object. No markdown, no prose, no source list outside JSON."
-- "If nothing is strongly supported, return `{\"candidates\":[]}`."
+**Click-time enrichment stays** as fallback for rows 4–5 and any row where auto-enrichment returned null. Its skip condition is updated to the same "already has `page_metadata`" rule so it doesn't skip Google-only rows.
 
-Requested schema stays the same 8 fields (`name, type, brand, variant, description, imageUrl, sourceUrl, confidence`). `coerceCandidate` remains tolerant of optional `category` / `sourceTitle` if Gemini returns them.
+## 5. Enhance `ImageCandidateGrid` primary selection
 
-### 5. Keep everything else as-is
+`ImageCandidateGrid.tsx` already tracks `brokenUrls`, disables failed tiles, and clears primary when it becomes broken. Two gaps remain:
 
-- Model: `gemini-2.5-flash` (env override remains).
-- Timeout: `20_000ms`.
-- No `responseMimeType` / `responseSchema` (grounding + JSON mode = 400).
-- Existing `coerceCandidate`, `conservativeDedup`, cache, rate limit, admin gating: unchanged.
+- **Initial recommended index:** parent (`AutoFillPreviewModal` / `DraftReviewBody`) currently trusts `recommendedImageIndex` from the draft, which can point at a Google-grounding tile that hasn't tried to load yet. Change the recommended-index computation to prefer the first `page_metadata` (or `enriched`/`user_upload`) candidate over `google_grounding` when choosing the default primary. If no `page_metadata` exists yet, fall back to existing behavior.
+- **Auto-shift on primary failure:** in `ImageCandidateGrid`, the effect at L102–120 clears a broken primary but doesn't pick a replacement. Extend it to select the next non-broken candidate — preferring `page_metadata`/`enriched`/`user_upload` sources, then falling back to any non-broken tile — instead of leaving primary null.
 
-### 6. Deploy and verify
+## Out of scope
+- `search-entity-candidates` edge function (no server changes).
+- `enrich-candidate-image` internals (SSRF/cache/rate limit unchanged).
+- URL Analysis pipeline and brand enrichment.
+- `AutoFillPreviewModal.tsx` "Matched in database ✓" copy (URL Analysis flow too).
+- `mergeEnrichedImage` dedupe logic — already idempotent.
+- Any styling beyond removing the chip.
 
-Deploy only `search-entity-candidates`. Test:
-- `cetaphil gentle cleanser`
-- `loreal absolut repair shampoo`
-- `cosrx snail mucin`
-
-Expected in logs:
-- `model: "gemini-2.5-flash"`
-- `finishReason: "STOP"` (ideal)
-- `candidates`: 1–5
-- `groundingSources > 0`
-- No `parse_failed`
-- `latencyMs`: 3–15s
-
-Decision tree if still failing:
-- `finishReason: "MAX_TOKENS"` → set `GEMINI_MAX_OUTPUT_TOKENS=8192` in env, retest.
-- `finishReason: "STOP"` + `parse_failed` → parser/prompt still need tightening (log `textOutLength` and inspect prompt).
-- HTTP 400 → someone re-added JSON mode; revert.
-- HTTP 404 → model id changed.
-- Timeout at ~20s across all 3 → escalate transport (out of scope).
-
-## Not changing
-
-- No frontend changes (`SearchEntryPanel.tsx`, `CreateEntityDialog.tsx`).
-- No DB / migration changes.
-- No changes to `smart-assistant`, `analyze-entity-url-v2`, or any other function.
-- No API key / transport swap.
-- No reversion to `gemini-1.5-flash` (retired on v1beta).
+## Verification
+1. Search `cetaphil gentle cleanser` → top 3 rows: rows with no image show skeleton→real image; rows with a Google image keep it with a shimmer overlay and swap only if `page_metadata` returns.
+2. Fire a second search (`loreal absolut repair shampoo`) while first is still enriching → no stale responses patch the wrong candidate (runId guard).
+3. Review & create → Step 1 no `in database` chip; header still `EXISTING BRANDS (n)`.
+4. URL-analyze WishCare, close, then Search Cetaphil → Step 2 shows only Cetaphil-related images.
+5. Step 2 with a broken google_grounding tile → not preselected as primary; primary defaults to first valid `page_metadata`/enriched candidate. If a working primary later fails to load, primary auto-shifts to the next valid candidate.
+6. Non-admin: click Apply to Form → form auto-expands without manual click.
+7. Full URL Analysis flow (analyze → preview → apply) → identical to today.

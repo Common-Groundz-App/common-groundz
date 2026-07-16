@@ -68,8 +68,34 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [enrichingIndex, setEnrichingIndex] = useState<number | null>(null);
+  // v3 — a row is "enriching" if either the click-time or the top-3
+  // auto-enrichment is still in-flight for it. Tracked as a Set so
+  // parallel top-3 fan-out doesn't block other rows.
+  const [enrichingIndexes, setEnrichingIndexes] = useState<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // v3 — bumped on every new search; used to key in-flight enrichment
+  // work and drop stale responses when the user searches again or unmounts.
+  const runIdRef = useRef(0);
+  // v3 — in-flight auto-enrichment tracked by `${runId}:${idx}:${sourceUrl}`.
+  // The stored promise resolves with the (possibly-enriched) payload so
+  // Review & create can await it instead of firing a duplicate call.
+  const inFlightRef = useRef<Map<string, Promise<SearchCandidatePayload>>>(new Map());
+
+  const addEnriching = (idx: number) =>
+    setEnrichingIndexes((prev) => {
+      if (prev.has(idx)) return prev;
+      const next = new Set(prev);
+      next.add(idx);
+      return next;
+    });
+  const removeEnriching = (idx: number) =>
+    setEnrichingIndexes((prev) => {
+      if (!prev.has(idx)) return prev;
+      const next = new Set(prev);
+      next.delete(idx);
+      return next;
+    });
 
   // Phase 3.5c — recent-search chips (surface-scoped, existing hook).
   const { recents, addRecent, removeRecent, clearRecents } =
@@ -87,10 +113,71 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
     return () => clearTimeout(t);
   }, []);
 
+  // v3 helpers ─────────────────────────────────────────────────────────
+  const hasPageMetadataImage = (payload: SearchCandidatePayload): boolean =>
+    (payload.draft?.imageCandidates ?? []).some((c: any) => c?.source === 'page_metadata');
+
+  const inflightKey = (runId: number, idx: number, sourceUrl: string) =>
+    `${runId}:${idx}:${sourceUrl}`;
+
+  /** Kick a single enrichment call. Returns the (possibly enriched) payload.
+   *  Safe to call twice for the same (runId,idx,url): the second caller
+   *  awaits the first via the in-flight map. */
+  const enrichSingle = (
+    runId: number,
+    idx: number,
+    payload: SearchCandidatePayload,
+  ): Promise<SearchCandidatePayload> => {
+    const { candidate } = payload;
+    const key = inflightKey(runId, idx, candidate.sourceUrl);
+    const existing = inFlightRef.current.get(key);
+    if (existing) return existing;
+
+    addEnriching(idx);
+    const promise = (async () => {
+      let enriched = payload;
+      try {
+        const enrichPromise = supabase.functions.invoke('enrich-candidate-image', {
+          body: { sourceUrl: candidate.sourceUrl, name: candidate.name },
+        });
+        const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+          setTimeout(
+            () => resolve({ data: null, error: new Error('client_timeout') }),
+            ENRICH_CLIENT_TIMEOUT_MS,
+          ),
+        );
+        const raced = await Promise.race([enrichPromise, timeoutPromise]);
+        const data = (raced as any).data as EnrichResponse | null;
+        if (data?.imageUrl && data.method) {
+          enriched = {
+            ...payload,
+            // Update visible display image on the row.
+            candidate: { ...payload.candidate, imageUrl: data.imageUrl },
+            // mergeEnrichedImage is idempotent (dedupes by URL) — safe to
+            // call from either auto-enrich or click-time fallback.
+            draft: mergeEnrichedImage(payload.draft, data.imageUrl, data.method),
+          };
+        }
+      } catch (e) {
+        console.warn('[SearchEntryPanel] image enrichment failed:', (e as Error).message);
+      } finally {
+        inFlightRef.current.delete(key);
+        removeEnriching(idx);
+      }
+      return enriched;
+    })();
+    inFlightRef.current.set(key, promise);
+    return promise;
+  };
+
   const runSearch = async (rawQuery?: string) => {
     const q = (rawQuery ?? query).trim();
     if (q.length < 3) return;
     if (rawQuery !== undefined) setQuery(rawQuery);
+    // Bump runId and drop stale in-flight work.
+    const runId = ++runIdRef.current;
+    inFlightRef.current.clear();
+    setEnrichingIndexes(new Set());
     setLoading(true);
     setError(null);
     setResult(null);
@@ -98,6 +185,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
       const { data, error: fnErr } = await supabase.functions.invoke('search-entity-candidates', {
         body: { query: q },
       });
+      if (runId !== runIdRef.current) return; // stale
       if (fnErr) {
         // supabase-js loses status; try to read context body.
         let detail = fnErr.message;
@@ -122,6 +210,28 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
       }
       const resp = data as SearchResponse;
       setResult(resp);
+
+      // v3 — auto-enrich the top 3 candidates in parallel. Trigger when the
+      // candidate has a sourceUrl AND the draft does not already carry a
+      // page_metadata image (google_grounding-only rows are enriched too).
+      const topN = Math.min(3, resp?.candidates?.length ?? 0);
+      for (let i = 0; i < topN; i++) {
+        const payload = resp.candidates[i];
+        if (!payload?.candidate?.sourceUrl) continue;
+        if (hasPageMetadataImage(payload)) continue;
+        void enrichSingle(runId, i, payload).then((enrichedPayload) => {
+          if (runId !== runIdRef.current) return;
+          if (enrichedPayload === payload) return; // no change
+          setResult((prev) => {
+            if (!prev) return prev;
+            const nextCandidates = prev.candidates.slice();
+            // Only patch if idx still points at the same source URL.
+            if (nextCandidates[i]?.candidate?.sourceUrl !== payload.candidate.sourceUrl) return prev;
+            nextCandidates[i] = enrichedPayload;
+            return { ...prev, candidates: nextCandidates };
+          });
+        });
+      }
 
       // Persist as a "recent" only on a successful (non-error) response.
       // Chip text stays client-side; never enters telemetry.
@@ -150,6 +260,14 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
     }
   };
 
+  // v3 — drop stale in-flight work on unmount.
+  useEffect(() => {
+    return () => {
+      runIdRef.current++;
+      inFlightRef.current.clear();
+    };
+  }, []);
+
   const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && canSearch) {
       e.preventDefault();
@@ -157,12 +275,11 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
     }
   };
 
-  /** Phase 3.5b — on Review & create: for web candidates without an image,
-   *  request one page-metadata image enrichment. Regardless of outcome
-   *  (success, null, timeout, 429, SSRF-block), call onPick exactly once so
-   *  Draft Review still opens. No error toast. */
+  /** Phase 3.5b — on Review & create: if the candidate does not yet have a
+   *  page_metadata image, request one. Falls back to the in-flight top-3
+   *  promise when available so we never fire duplicate calls. Regardless
+   *  of outcome, call onPick exactly once so Draft Review still opens. */
   const handleReviewCreate = async (payload: SearchCandidatePayload, idx: number) => {
-    if (enrichingIndex !== null) return;
     const { candidate } = payload;
 
     // Phase 3.5c — funnel: candidate_pick from search results.
@@ -175,37 +292,27 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
       diagnostics: { hasImage: Boolean(candidate.imageUrl) },
     });
 
-    if (candidate.imageUrl) {
+    // Already carries a strong page_metadata image → skip enrichment.
+    if (hasPageMetadataImage(payload)) {
       onPick(payload);
       return;
     }
-    setEnrichingIndex(idx);
-    let enrichedPayload = payload;
-    try {
-      const enrichPromise = supabase.functions.invoke('enrich-candidate-image', {
-        body: { sourceUrl: candidate.sourceUrl, name: candidate.name },
-      });
-      const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
-        setTimeout(
-          () => resolve({ data: null, error: new Error('client_timeout') }),
-          ENRICH_CLIENT_TIMEOUT_MS,
-        ),
-      );
-      const raced = await Promise.race([enrichPromise, timeoutPromise]);
-      const data = (raced as any).data as EnrichResponse | null;
-      if (data?.imageUrl && data.method) {
-        enrichedPayload = {
-          ...payload,
-          draft: mergeEnrichedImage(payload.draft, data.imageUrl, data.method),
-        };
-      }
-    } catch (e) {
-      console.warn('[SearchEntryPanel] image enrichment failed:', (e as Error).message);
-    } finally {
-      setEnrichingIndex(null);
-      onPick(enrichedPayload);
+    // If auto-enrichment is still in-flight for this row, await it instead
+    // of firing a duplicate call.
+    const runId = runIdRef.current;
+    const key = inflightKey(runId, idx, candidate.sourceUrl);
+    const inflight = inFlightRef.current.get(key);
+    if (inflight) {
+      const enriched = await inflight;
+      onPick(enriched);
+      return;
     }
+    // Otherwise fire a fresh single call (rows 4–5 or auto-enrich already
+    // resolved to null).
+    const enriched = await enrichSingle(runId, idx, payload);
+    onPick(enriched);
   };
+
 
   // Phase 3.5c — instrumented "Write review" / "Open" for existing matches.
   const handleOpenExisting = (m: ExistingMatch, intent: 'view' | 'review') => {
@@ -382,26 +489,37 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
               <div className="space-y-2">
                 {result.candidates.map((p, idx) => {
                   const c = p.candidate;
-                  const enriching = enrichingIndex === idx;
+                  const enriching = enrichingIndexes.has(idx);
+                  // v3 — non-destructive loading: if the row already has an
+                  // image (e.g. google_grounding), keep it visible with a
+                  // shimmer overlay while enrichment runs. Only rows with no
+                  // image get the full skeleton.
+                  const showSkeleton = enriching && !c.imageUrl;
+                  const showOverlay = enriching && !!c.imageUrl;
                   return (
                     <div
                       key={`${c.sourceUrl}-${idx}`}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
-                        if ((e.key === 'Enter' || e.key === ' ') && enrichingIndex === null) {
+                        if ((e.key === 'Enter' || e.key === ' ')) {
                           e.preventDefault();
                           void handleReviewCreate(p, idx);
                         }
                       }}
                       className="flex items-start gap-3 rounded-lg border bg-card p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/60"
                     >
-                      <div className="h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
-                        {enriching ? (
+                      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
+                        {showSkeleton ? (
                           <Skeleton className="h-full w-full" />
                         ) : c.imageUrl ? (
                           <ImageWithFallback src={c.imageUrl} alt={c.name} className="h-full w-full object-cover" />
                         ) : null}
+                        {showOverlay && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">{c.name}</p>
@@ -430,12 +548,12 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                           e.stopPropagation();
                           void handleReviewCreate(p, idx);
                         }}
-                        disabled={enrichingIndex !== null}
                         className="gap-1 min-w-[128px]"
                       >
                         {enriching ? (
                           <>
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
+
                             Preparing…
                           </>
                         ) : (

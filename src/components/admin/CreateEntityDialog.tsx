@@ -1045,6 +1045,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   // the existing AutoFillPreviewModal draft-review path by shaping
   // aiPredictions to the same shape the URL flow uses.
   const handleSearchPick = async (payload: SearchCandidatePayload) => {
+    // Search-origin drafts must not inherit URL-analysis metadata from a
+    // previous run (e.g. a prior WishCare analyze leaking images into a
+    // fresh Cetaphil search). Clear it before the preview modal opens.
+    setUrlMetadata(null);
     let draft = payload.draft;
     try {
       const enriched = await enrichBrandCandidatesWithExistingMatch(draft.brandCandidates);
@@ -3007,8 +3011,13 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           // Phase 3.2 bugfix — merge urlMetadata.images into the draft's
           // imageCandidates so the picker shows the lite-metadata images
           // that the AI/V2 path may have missed.
+          //
+          // v3 fix — for search-origin drafts, skip this merge entirely.
+          // Stale urlMetadata from a prior URL analyze would otherwise
+          // bleed images from another entity into the search draft.
           const baseDraft = aiPredictions?.entityDraft ?? null;
           if (!baseDraft) return null;
+          if ((aiPredictions as any)?.__fromSearch) return baseDraft;
           const metaImgs = pickValidImages(urlMetadata);
           if (metaImgs.length === 0) return baseDraft;
           const existing = new Set(
@@ -3019,7 +3028,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             .map((u) => ({ url: u, source: 'page_metadata' as const, confidence: 0.55 }));
           return { ...baseDraft, imageCandidates: [...(baseDraft.imageCandidates ?? []), ...extras] };
         })()}
-        urlMetadata={urlMetadata}
+        urlMetadata={(aiPredictions as any)?.__fromSearch ? null : urlMetadata}
         analyzedUrlSnapshot={predictionUrlSnapshot}
         deferBrandCreationForAtomic={!isAdmin}
         onDeferBrandCreation={setPendingBrandForAtomic}
@@ -3093,6 +3102,14 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
           // doesn't wipe the prefill if the user re-analyzes the same URL.
           if (predictionUrlSnapshot) {
             setLastAppliedUrl(normalizeUrlForCompare(predictionUrlSnapshot));
+          }
+
+          // v3 — auto-expand the form for non-admin users, matching URL
+          // Analysis "Apply to Form" behavior. Admin variant is always
+          // expanded, so this is a no-op there.
+          if (variant === 'user') {
+            setUrlAnalysisComplete(true);
+            setIsFormExpanded(true);
           }
 
           toast({

@@ -355,9 +355,6 @@ export const BrandPicker = forwardRef<BrandPickerHandle, BrandPickerProps>(funct
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-sm font-medium truncate">{cand.name}</p>
-                        <Badge variant="secondary" className="text-xs gap-1">
-                          <Check className="h-3 w-3" /> in database
-                        </Badge>
                         {isRecommended && <Badge className="text-xs">recommended</Badge>}
                       </div>
                       {cand.websiteUrl && (
