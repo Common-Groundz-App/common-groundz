@@ -280,20 +280,25 @@ function buildDraft(
   }
 }
 
-// ---------- Phase 3.5c — conservative candidate dedup ----------
+// ---------- Phase 3.5c v7 — variant-safe candidate dedup ----------
 //
-// Collapse only STRONG duplicates. Never collapse legitimate variants
-// (size, formulation, edition, product line).
+// Collapse STRONG duplicates and retailer duplicates of the same product;
+// never collapse legitimate variants (size, SPF, format, formula terms) or
+// distinct product names.
 //
 // Rules (any one triggers a collapse):
-//   1) Same normalized full URL (host + pathname, query/fragment stripped).
-//   2) Same normalized brand + name + variant.
-//   3) Same normalized brand + exact-equal normalized name, ONLY when both
-//      sides have no variant. If either has a variant, do NOT collapse.
+//   1) `url:` — same normalized full URL (host + pathname, query/fragment stripped).
+//   2) `bnv:` — same normalized brand + name + variant.
+//   3) `bn0:` — same normalized brand + exact-equal normalized name, ONLY when
+//      both sides have no variant.
+//   4) `bnv_soft:` — same normalized brand + name, when the variant is "noisy"
+//      (empty, retailer name, generic filler, or a duplicate of brand/name
+//      tokens). Real variants (size, SPF, shade, format, formula terms) and
+//      unknown substantive variants NEVER trigger this key.
 //
-// Merge behavior: keep the highest-confidence winner; if tied, keep the
-// earlier one (Gemini order). Merge groundingSources domains (dedup by
-// hostname). Keep winner's imageUrl.
+// Merge behavior: keep the highest-confidence winner. On tie, prefer a
+// non-`vertexaisearch.cloud.google.com` sourceUrl (real retailer → better
+// enrichment target); otherwise earlier Gemini order.
 
 type Coerced = NonNullable<ReturnType<typeof coerceCandidate>>;
 
@@ -313,25 +318,93 @@ function normalizeFullUrl(u: string): string {
   } catch { return u.toLowerCase(); }
 }
 
+// v7 — noise vs. real variant classification. Default is REAL (safe) — only
+// return true when the variant is clearly retailer noise, generic filler, or
+// a duplicate of brand/name tokens.
+const RETAILER_NAMES = new Set([
+  "target", "ulta", "cvs", "walgreens", "walmart", "amazon", "amzn",
+  "sephora", "nykaa", "nyka", "flipkart", "myntra", "boots", "shoppers",
+  "costco", "kroger", "riteaid", "meijer", "bestbuy",
+]);
+const GENERIC_FILLER = new Set([
+  "daily", "standard", "regular", "original", "official", "online",
+  "product", "item", "value", "new", "best", "buy", "shop", "store",
+  "retailer", "brand",
+]);
+// Strong real-variant signals — presence forces REAL classification. Broad
+// keep-list; we only need to catch obvious cases so `variantIsNoisy` returns
+// false quickly for them (default is already false).
+const REAL_VARIANT_RE = new RegExp(
+  [
+    "\\b\\d+\\s*(ml|l|oz|fl\\s*oz|g|kg|lb|ct|count|pack|pcs)\\b",
+    "\\b\\d+[- ]?pack\\b",
+    "\\btravel\\s*size\\b", "\\bmini\\b", "\\brefill\\b",
+    "\\bvalue\\s*(size|pack)\\b",
+    "\\bspf\\s*\\d+\\b",
+    "\\bshade\\b", "\\bcolou?r\\b",
+    "\\bscent\\b", "\\bfragrance\\b", "\\bflavou?r\\b",
+    "\\bunscented\\b", "\\bfragrance[- ]?free\\b",
+    "\\broll[- ]?on\\b", "\\bspray\\b", "\\bstick\\b", "\\bbar\\b",
+    "\\bfoam\\b", "\\bgel\\b", "\\bcream\\b", "\\blotion\\b",
+    "\\bwipes\\b", "\\bserum\\b", "\\bmist\\b", "\\bpowder\\b",
+    "salicylic acid", "hyaluronic", "retinol", "niacinamide",
+    "hydrating", "foaming", "sensitive", "clear[- ]?pore",
+    "oil[- ]?free", "non[- ]?comedogenic",
+  ].join("|"),
+  "i",
+);
+
+function variantIsNoisy(variantRaw: string, brand: string, name: string): boolean {
+  const v = normalizeName(variantRaw);
+  if (!v || v.length < 2) return true;
+  const tokens = v.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  // Every token is a retailer/generic-filler word?
+  const allNoise = tokens.every(
+    (t) => RETAILER_NAMES.has(t) || GENERIC_FILLER.has(t),
+  );
+  if (allNoise) return true;
+  // Every token duplicates a brand or name token?
+  const brandTokens = new Set(brand.split(/\s+/).filter(Boolean));
+  const nameTokens = new Set(name.split(/\s+/).filter(Boolean));
+  const allDup = tokens.every(
+    (t) => brandTokens.has(t) || nameTokens.has(t),
+  );
+  if (allDup) return true;
+  // Strong real-variant signal → definitely REAL.
+  if (REAL_VARIANT_RE.test(v)) return false;
+  // Unknown substantive → REAL (safe default; keep separate).
+  return false;
+}
+
+function isVertexRedirect(u: string): boolean {
+  try {
+    return new URL(u).hostname.toLowerCase().endsWith("vertexaisearch.cloud.google.com");
+  } catch { return false; }
+}
+
 function dedupKeysFor(c: Coerced): string[] {
   const keys: string[] = [`url:${normalizeFullUrl(c.sourceUrl)}`];
   const brand = c.brand ? normalizeBrandName(c.brand) : "";
   const name = normalizeName(c.name);
-  const variant = c.variant ? normalizeName(c.variant) : "";
+  const variantRaw = c.variant ?? "";
+  const variant = normalizeName(variantRaw);
   if (brand && name && variant) {
     keys.push(`bnv:${brand}|${name}|${variant}`);
   }
   if (brand && name && !variant) {
-    // Only when BOTH sides have no variant. Encoded so the same-brand+name
-    // pair with a variant on either side cannot collide with this key.
     keys.push(`bn0:${brand}|${name}`);
+  }
+  // v7 — soft key: collapse retailer duplicates whose variant is noise while
+  // preserving real product variants.
+  if (brand && name && variantIsNoisy(variantRaw, brand, name)) {
+    keys.push(`bnv_soft:${brand}|${name}`);
   }
   return keys;
 }
 
 function conservativeDedup(list: Coerced[]): Coerced[] {
   if (list.length <= 1) return list;
-  // Preserve original index for stable ordering on ties.
   const withIndex = list.map((c, i) => ({ c, i }));
 
   const keyToGroup = new Map<string, number>();
@@ -350,8 +423,20 @@ function conservativeDedup(list: Coerced[]): Coerced[] {
       for (const k of keys) keyToGroup.set(k, gid);
     } else {
       const g = groups[target];
-      // Higher confidence wins; tie → earlier index (already the current winner).
-      if (c.confidence > g.winner.confidence) {
+      // Higher confidence wins; on tie prefer non-vertexaisearch sourceUrl;
+      // otherwise keep earlier index (current winner).
+      const cur = g.winner;
+      let replace = false;
+      if (c.confidence > cur.confidence) {
+        replace = true;
+      } else if (
+        c.confidence === cur.confidence &&
+        isVertexRedirect(cur.sourceUrl) &&
+        !isVertexRedirect(c.sourceUrl)
+      ) {
+        replace = true;
+      }
+      if (replace) {
         g.winner = c;
         g.winnerIdx = i;
       }
@@ -364,7 +449,6 @@ function conservativeDedup(list: Coerced[]): Coerced[] {
     }
   }
 
-  // Return winners in their original (Gemini) order.
   return groups
     .slice()
     .sort((a, b) => a.winnerIdx - b.winnerIdx)
