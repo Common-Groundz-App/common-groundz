@@ -43,6 +43,8 @@ function chipForSource(source?: string): string {
     case 'firecrawl': return 'Firecrawl';
     case 'page_metadata': return 'Page metadata';
     case 'user_upload': return 'User upload';
+    // v7 — surface unreliability of google_grounding in the picker.
+    case 'google_grounding': return 'From Google Search — may not be exact';
     default: return source ?? 'Source';
   }
 }
@@ -69,34 +71,28 @@ export const ImageCandidateGrid: React.FC<Props> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Track all blob URLs we create so we can revoke on unmount.
   const blobsRef = useRef<Set<string>>(new Set());
-  // Plan v10 — broken-image tracker. Tiles whose <img onError> fires are
-  // greyed, disabled, and excluded from totalSelected.
+  // Plan v10 — broken-image tracker.
   const [brokenUrls, setBrokenUrls] = useState<Set<string>>(new Set());
   const markBroken = useCallback((url: string) => {
     setBrokenUrls((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
   }, []);
 
-  // v3 — Prefer high-quality sources when picking an initial or replacement
-  // primary. `google_grounding` images are frequently broken/unreliable, so
-  // page_metadata / enriched / user_upload are chosen first when present.
-  const HIGH_QUALITY_SOURCES = new Set([
-    'page_metadata',
-    'enriched',
-    'official_site',
-    'firecrawl',
-    'user_upload',
-  ]);
+  // v7 — `google_grounding` is always the last resort. Any other source
+  // (page_metadata, official_site, firecrawl, user_upload, ai_inference,
+  // book_cover, movie_poster, places_photo, open_food_facts, google_images,
+  // google_cse, existing_entity, admin_manual) ranks above it.
   const pickBestCandidateUrl = useCallback(
     (excludeUrl?: string | null): string | null => {
       const eligible = candidates.filter(
         (c) => c.url && !brokenUrls.has(c.url) && c.url !== excludeUrl,
       );
       if (eligible.length === 0) return null;
-      const highQuality = eligible.find((c) => HIGH_QUALITY_SOURCES.has((c as any).source));
-      return (highQuality ?? eligible[0]).url;
+      const nonGoogle = eligible.find((c) => (c as any).source !== 'google_grounding');
+      return (nonGoogle ?? eligible[0]).url;
     },
     [candidates, brokenUrls],
   );
+
 
   // Seed default primary on first mount only.
   useEffect(() => {
