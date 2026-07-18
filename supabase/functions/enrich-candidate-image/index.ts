@@ -778,11 +778,102 @@ serve(async (req) => {
       }
     }
 
+    // Step 5 — v8b Firecrawl fallback (flag-gated). Last resort for pages
+    // that need JS rendering (e.g. Google/Vertex interstitials). URL parsing
+    // and fetching still use the original cacheKey; only the cache map key
+    // is versioned so we don't reuse pre-v8b negative entries.
+    if (
+      !winningAttempt &&
+      firecrawlEnabled &&
+      (result.errorCode === "no_image" ||
+       result.errorCode === "blocked" ||
+       result.errorCode === "timeout" ||
+       result.errorCode === "invalid_content_type") &&
+      (deadline - Date.now()) >= 1500
+    ) {
+      const t0 = Date.now();
+      let fcErrorCode: ErrorCode | null = null;
+      let fcMethod: ExtractMethod | null = null;
+      try {
+        const remaining = deadline - Date.now();
+        const apiTimeoutMs = Math.min(
+          NORMAL_FIRECRAWL_API_TIMEOUT_MS,
+          Math.max(1_500, remaining - 500),
+        );
+        const localTimeoutMs = Math.min(
+          NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS,
+          Math.max(1_800, remaining - 200),
+        );
+        const fc = await runFirecrawlScrape(cacheKey, {
+          apiTimeoutMs,
+          timeoutMs: localTimeoutMs,
+          fallbackBaseUrl: cacheKey,
+        });
+        if (!fc.ok) {
+          fcErrorCode = fc.code === "FIRECRAWL_TIMEOUT" ? "timeout" : "blocked";
+        } else {
+          // Try HTML extraction first.
+          let extractedFc: CachedResult | null = null;
+          if (fc.html) {
+            const ex = await extractImageFromHtml(fc.finalUrl, fc.html);
+            if (ex.imageUrl) {
+              extractedFc = { ...ex, source: "firecrawl" };
+              fcMethod = ex.method;
+            }
+          }
+          // Fallback to Firecrawl metadata (og:image / image fields).
+          if (!extractedFc && fc.metadata) {
+            const md = fc.metadata as Record<string, unknown>;
+            const raw =
+              (typeof md.ogImage === "string" && md.ogImage) ||
+              (typeof md["og:image"] === "string" && md["og:image"] as string) ||
+              (typeof md.image === "string" && md.image) ||
+              null;
+            if (raw) {
+              let absImg: string | null = null;
+              try { absImg = new URL(raw, fc.finalUrl).toString(); } catch { absImg = null; }
+              if (absImg && isValidPageImageUrl(absImg) && !looksLikeLogoOrBanner(absImg)) {
+                try {
+                  await assertSafeUrl(absImg);
+                  const okType = await probeImageContentType(absImg, deadline);
+                  if (okType) {
+                    extractedFc = {
+                      imageUrl: absImg,
+                      source: "firecrawl",
+                      method: "firecrawl_metadata",
+                    };
+                    fcMethod = "firecrawl_metadata";
+                  }
+                } catch { /* ssrf → skip */ }
+              }
+            }
+          }
+          if (extractedFc?.imageUrl) {
+            result = extractedFc;
+            winningAttempt = "firecrawl";
+          } else {
+            fcErrorCode = "no_image";
+          }
+        }
+      } catch (e) {
+        // Firecrawl-specific errors stay in telemetry only.
+        fcErrorCode = "blocked";
+        console.warn("[enrich-candidate-image] firecrawl threw:", (e as Error).message);
+      }
+      attempts.push({
+        kind: "firecrawl",
+        errorCode: winningAttempt === "firecrawl" ? null : fcErrorCode,
+        method: fcMethod,
+        latencyMs: Date.now() - t0,
+        softRedirectKind: null,
+      });
+    }
+
     method = result.method ?? method;
 
     // 7. Cache per policy.
     const ttl = ttlFor(result);
-    if (ttl) cachePut(cacheKey, result, ttl);
+    if (ttl) cachePut(cacheMapKey, result, ttl);
 
     const latencyMs = Date.now() - started;
     const finalOutcome: string = result.imageUrl
