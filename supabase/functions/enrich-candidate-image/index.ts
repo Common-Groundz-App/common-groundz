@@ -590,7 +590,7 @@ serve(async (req) => {
     //      4. clean-URL retry (existing v7 rule) → success (winningAttempt="clean_url_retry")
     //      5. return no_image (or worst error).
 
-    type AttemptKind = "direct" | "soft_redirect" | "clean_url_retry";
+    type AttemptKind = "direct" | "soft_redirect" | "clean_url_retry" | "firecrawl";
     interface AttemptTelemetry {
       kind: AttemptKind;
       errorCode: ErrorCode | null;
