@@ -151,13 +151,18 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
     const promise = (async () => {
       let enriched = payload;
       try {
+        // v8b.1 — host-aware timeout: Firecrawl-only hosts (Vertex
+        // interstitials) get up to 12s; everything else keeps the 8.5s cap.
+        const timeoutMs = isFirecrawlOnlyHost(candidate.sourceUrl)
+          ? ENRICH_CLIENT_TIMEOUT_MS_FIRECRAWL_ONLY
+          : ENRICH_CLIENT_TIMEOUT_MS;
         const enrichPromise = supabase.functions.invoke('enrich-candidate-image', {
           body: { sourceUrl: candidate.sourceUrl, name: candidate.name },
         });
         const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
           setTimeout(
             () => resolve({ data: null, error: new Error('client_timeout') }),
-            ENRICH_CLIENT_TIMEOUT_MS,
+            timeoutMs,
           ),
         );
         const raced = await Promise.race([enrichPromise, timeoutPromise]);
