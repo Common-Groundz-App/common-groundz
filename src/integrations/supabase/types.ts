@@ -4788,6 +4788,7 @@ export type Database = {
         Args: { query_text: string; ttl_hours?: number }
         Returns: boolean
       }
+      is_search_image_firecrawl_enabled: { Args: never; Returns: boolean }
       log_admin_action: {
         Args: {
           p_action_type: string
