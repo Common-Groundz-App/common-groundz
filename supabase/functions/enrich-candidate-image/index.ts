@@ -511,9 +511,13 @@ serve(async (req) => {
     const cacheKey = normalizeCacheKey(sourceUrlRaw);
     if (!cacheKey) return jsonResp({ error: "invalid_input" }, 400);
     host = safeHost(cacheKey);
+    // v8b — versioned cache key when Firecrawl is enabled so we don't reuse
+    // pre-v8b negative "no_image" entries that would block the fallback.
+    // The original cacheKey is preserved for URL parsing/fetching.
+    const cacheMapKey = firecrawlEnabled ? `v8b|${cacheKey}` : cacheKey;
 
     // 4. Cache lookup BEFORE rate limit.
-    const cachedResult = cacheGet(cacheKey);
+    const cachedResult = cacheGet(cacheMapKey);
     if (cachedResult) {
       cached = true;
       method = cachedResult.method;
