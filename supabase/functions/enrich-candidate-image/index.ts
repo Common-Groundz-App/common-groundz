@@ -23,6 +23,11 @@ import {
 } from "../_shared/feature_flags.ts";
 import { assertSafeUrl, SsrfError } from "./ssrf.ts";
 import { isValidPageImageUrl } from "./image_validation.ts";
+import {
+  extractSoftRedirectTarget,
+  normalizeForCompare,
+  type SoftRedirectKind,
+} from "./soft_redirect.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
