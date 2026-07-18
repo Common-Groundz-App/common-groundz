@@ -52,7 +52,7 @@ const MAX_BODY_BYTES = 512 * 1024;
 const HOURLY_LIMIT = 60;
 
 // ---- cache ----
-type ExtractMethod = "og" | "twitter" | "image_src" | "json_ld";
+type ExtractMethod = "og" | "twitter" | "image_src" | "json_ld" | "firecrawl_metadata";
 type ErrorCode =
   | "timeout"
   | "blocked"
@@ -63,7 +63,7 @@ type ErrorCode =
 
 interface CachedResult {
   imageUrl: string | null;
-  source: "page_metadata" | null;
+  source: "page_metadata" | "firecrawl" | null;
   method: ExtractMethod | null;
   errorCode?: ErrorCode;
 }
