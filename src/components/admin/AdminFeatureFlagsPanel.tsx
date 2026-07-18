@@ -214,9 +214,15 @@ export function AdminFeatureFlagsPanel() {
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'search_to_draft.non_admin_enabled') {
         await setFlag.mutateAsync({
           key: 'search_to_draft.non_admin_enabled',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_extraction.search_image_firecrawl_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
