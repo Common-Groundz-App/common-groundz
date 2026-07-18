@@ -809,18 +809,18 @@ serve(async (req) => {
     // that need JS rendering (e.g. Google/Vertex interstitials). URL parsing
     // and fetching still use the original cacheKey; only the cache map key
     // is versioned so we don't reuse pre-v8b negative entries.
+    // v8b.1 — eligibility tightened to no_image / invalid_content_type only.
     if (
       !winningAttempt &&
       firecrawlEnabled &&
       (result.errorCode === "no_image" ||
-       result.errorCode === "blocked" ||
-       result.errorCode === "timeout" ||
        result.errorCode === "invalid_content_type") &&
       (deadline - Date.now()) >= 1500
     ) {
       const t0 = Date.now();
       let fcErrorCode: ErrorCode | null = null;
       let fcMethod: ExtractMethod | null = null;
+      let firecrawlReason: FirecrawlReason | undefined = undefined;
       try {
         const remaining = deadline - Date.now();
         const apiTimeoutMs = Math.min(
@@ -835,6 +835,8 @@ serve(async (req) => {
           apiTimeoutMs,
           timeoutMs: localTimeoutMs,
           fallbackBaseUrl: cacheKey,
+          // v8b.1 — extend Firecrawl's own JS-render wait for interstitial hosts.
+          waitFor: isFirecrawlOnlyHost ? 4_000 : 1_500,
         });
         if (!fc.ok) {
           fcErrorCode = fc.code === "FIRECRAWL_TIMEOUT" ? "timeout" : "blocked";
@@ -878,8 +880,15 @@ serve(async (req) => {
           if (extractedFc?.imageUrl) {
             result = extractedFc;
             winningAttempt = "firecrawl";
+            firecrawlReason = "resolved_ok";
           } else {
             fcErrorCode = "no_image";
+            // v8b.1 — distinguish "still on Vertex interstitial" from "resolved
+            // to a real page but no usable image".
+            const fcHost = safeHost(fc.finalUrl);
+            firecrawlReason = FIRECRAWL_ONLY_HOSTS.has(fcHost)
+              ? "unresolved_interstitial"
+              : "resolved_no_image";
           }
         }
       } catch (e) {
@@ -893,6 +902,7 @@ serve(async (req) => {
         method: fcMethod,
         latencyMs: Date.now() - t0,
         softRedirectKind: null,
+        ...(firecrawlReason ? { firecrawlReason } : {}),
       });
     }
 
