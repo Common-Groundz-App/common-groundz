@@ -883,6 +883,7 @@ serve(async (req) => {
       event: "enrich_candidate_image",
       host,
       cached: false,
+      firecrawlEnabled,
       finalOutcome,
       winningAttempt,
       winningMethod: result.method,
