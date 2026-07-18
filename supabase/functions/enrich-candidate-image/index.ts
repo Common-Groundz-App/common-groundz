@@ -493,10 +493,19 @@ serve(async (req) => {
       cached = true;
       method = cachedResult.method;
       const latencyMs = Date.now() - started;
+      // v8a — cache-hit telemetry reflects cached outcome (positive OR negative).
+      const finalOutcome: string = cachedResult.imageUrl
+        ? "success"
+        : (cachedResult.errorCode ?? "no_image");
       console.log(JSON.stringify({
-        fn: "enrich-candidate-image",
-        host, method, latencyMs, cached: true,
-        errorCode: cachedResult.errorCode ?? null,
+        event: "enrich_candidate_image",
+        host,
+        cached: true,
+        finalOutcome,
+        winningAttempt: "cache",
+        winningMethod: cachedResult.method,
+        totalLatencyMs: latencyMs,
+        attempts: [],
       }));
       return jsonResp({
         imageUrl: cachedResult.imageUrl,
@@ -510,6 +519,7 @@ serve(async (req) => {
         },
       });
     }
+
 
     // 5. Rate limit (only on cache miss).
     const { data: rateCount, error: rateErr } = await supabaseAdmin.rpc(
