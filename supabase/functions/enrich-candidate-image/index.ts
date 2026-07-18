@@ -764,8 +764,8 @@ serve(async (req) => {
       }
     }
 
-    // Step 4 — clean-URL retry (v7 rule, unchanged).
-    if (!winningAttempt) {
+    // Step 4 — clean-URL retry (v7 rule). Skipped for Firecrawl-only hosts.
+    if (!winningAttempt && !isFirecrawlOnlyHost) {
       const shouldRetry =
         (result.errorCode === "no_image" || result.errorCode === "invalid_content_type") &&
         (() => {
