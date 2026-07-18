@@ -489,11 +489,9 @@ serve(async (req) => {
       }
     }
 
-    // v8b — read Firecrawl flag. Extend budget only when enabled.
+    // v8b.1 — read Firecrawl flag here; deadline is extended below only
+    // when the source URL is on a Firecrawl-only host.
     firecrawlEnabled = await isSearchImageFirecrawlEnabled(supabaseAdmin);
-    if (firecrawlEnabled) {
-      deadline = started + TOTAL_BUDGET_MS + FIRECRAWL_EXTRA_BUDGET_MS;
-    }
 
 
     // 3. Validate input.
@@ -512,10 +510,16 @@ serve(async (req) => {
     const cacheKey = normalizeCacheKey(sourceUrlRaw);
     if (!cacheKey) return jsonResp({ error: "invalid_input" }, 400);
     host = safeHost(cacheKey);
-    // v8b — versioned cache key when Firecrawl is enabled so we don't reuse
-    // pre-v8b negative "no_image" entries that would block the fallback.
-    // The original cacheKey is preserved for URL parsing/fetching.
-    const cacheMapKey = firecrawlEnabled ? `v8b|${cacheKey}` : cacheKey;
+    // v8b.1 — fast-path flag: only extend deadline & skip direct fetch when
+    // both the Firecrawl flag is ON and the host is Firecrawl-only.
+    const isFirecrawlOnlyHost = firecrawlEnabled && FIRECRAWL_ONLY_HOSTS.has(host);
+    if (isFirecrawlOnlyHost) {
+      deadline = started + TOTAL_BUDGET_MS + FIRECRAWL_EXTRA_BUDGET_MS;
+    }
+    // v8b.1 — bump cache prefix so v8b negative entries don't shadow the
+    // new eligibility/skip behavior. Original cacheKey is preserved for
+    // URL parsing/fetching.
+    const cacheMapKey = firecrawlEnabled ? `v8b1|${cacheKey}` : cacheKey;
 
     // 4. Cache lookup BEFORE rate limit.
     const cachedResult = cacheGet(cacheMapKey);
