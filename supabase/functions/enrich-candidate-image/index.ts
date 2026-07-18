@@ -670,11 +670,27 @@ serve(async (req) => {
       imageUrl: null, source: null, method: null, errorCode: "no_image",
     };
 
-    // Step 1 + 2 — direct fetch.
+    // v8b.1 — For Firecrawl-only hosts (e.g. Vertex interstitials), skip
+    // Steps 1–4 (direct fetch, soft-redirect, clean-URL retry) and seed a
+    // synthetic no_image result so the Firecrawl eligibility gate passes.
+    // Push exactly one telemetry entry so the ladder is visible in logs.
     const originalNormForCompare = normalizeForCompare(cacheKey);
     let originalFinalUrl: string | null = null;
     let originalHtml: string | null = null;
-    {
+    if (isFirecrawlOnlyHost) {
+      attempts.push({
+        kind: "direct",
+        errorCode: null,
+        method: null,
+        latencyMs: 0,
+        softRedirectKind: null,
+        skipped: true,
+        skipReason: "firecrawl_only_host",
+      });
+      // Seed pre-Firecrawl result explicitly so the eligibility gate passes.
+      result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
+    } else {
+      // Step 1 + 2 — direct fetch.
       const t0 = Date.now();
       const fetched = await fetchHtmlAttempt(cacheKey);
       if ("errorCode" in fetched) {
