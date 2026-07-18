@@ -45,6 +45,14 @@ const corsHeaders = {
 
 // ---- budgets ----
 const TOTAL_BUDGET_MS = 6_000;
+// v8b — extra budget headroom when Firecrawl fallback is enabled (~8 s).
+const FIRECRAWL_EXTRA_BUDGET_MS = 2_000;
+// Firecrawl-only hosts (Google/Vertex interstitials that need JS rendering).
+const FIRECRAWL_ONLY_HOSTS = new Set([
+  "vertexaisearch.cloud.google.com",
+  "www.google.com",
+  "google.com",
+]);
 const PAGE_FETCH_TIMEOUT_MS = 4_000;
 const IMAGE_PROBE_TIMEOUT_MS = 1_500;
 const MAX_REDIRECTS = 3;
