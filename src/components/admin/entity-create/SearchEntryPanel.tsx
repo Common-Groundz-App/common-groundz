@@ -52,12 +52,13 @@ function confidenceLabel(c: number): string {
 }
 
 // Phase 3.5b — client-side cap for on-click image enrichment. Server budget
-// is 6s; add 500ms for network + serialization.
-const ENRICH_CLIENT_TIMEOUT_MS = 6_500;
+// is 6s (or ~8s when the v8b Firecrawl fallback is enabled server-side);
+// add 500ms for network + serialization.
+const ENRICH_CLIENT_TIMEOUT_MS = 8_500;
 
 interface EnrichResponse {
   imageUrl: string | null;
-  source: 'page_metadata' | null;
+  source: 'page_metadata' | 'firecrawl' | null;
   method: EnrichedImageMethod | null;
   diagnostics?: { latencyMs: number; fetched: boolean; cached: boolean; errorCode?: string };
 }
@@ -155,7 +156,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
             candidate: { ...payload.candidate, imageUrl: data.imageUrl },
             // mergeEnrichedImage is idempotent (dedupes by URL) — safe to
             // call from either auto-enrich or click-time fallback.
-            draft: mergeEnrichedImage(payload.draft, data.imageUrl, data.method),
+            draft: mergeEnrichedImage(payload.draft, data.imageUrl, data.method, data.source ?? 'page_metadata'),
           };
         }
       } catch (e) {

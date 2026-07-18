@@ -19,6 +19,7 @@ const ALLOWED_KEYS = [
   'entity_extraction.review_uses_draft',
   'entity_creation.non_admin_enabled',
   'search_to_draft.non_admin_enabled',
+  'entity_extraction.search_image_firecrawl_enabled',
 ] as const;
 
 type AllowedKey = (typeof ALLOWED_KEYS)[number];

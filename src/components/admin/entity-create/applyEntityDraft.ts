@@ -9,14 +9,23 @@
 import type { EntityDraft, BrandCandidate, ImageCandidate } from '@/types/entityDraft';
 import { supabase } from '@/integrations/supabase/client';
 
-export type EnrichedImageMethod = 'og' | 'twitter' | 'image_src' | 'json_ld';
+export type EnrichedImageMethod =
+  | 'og'
+  | 'twitter'
+  | 'image_src'
+  | 'json_ld'
+  | 'firecrawl_metadata';
 
-/** Phase 3.5b — Prepend a page-metadata image to an EntityDraft's imageCandidates.
+/** Phase 3.5b — Prepend an enriched image to an EntityDraft's imageCandidates.
+ *  v8b — accepts an optional `source` so Firecrawl-rendered images can be
+ *  labeled distinctly in the picker ("Rendered page"). Defaults to
+ *  'page_metadata' for backward compatibility.
  *  Idempotent: no-op if the same URL is already present. Never mutates input. */
 export function mergeEnrichedImage(
   draft: EntityDraft,
   imageUrl: string,
   method: EnrichedImageMethod,
+  source: 'page_metadata' | 'firecrawl' = 'page_metadata',
 ): EntityDraft {
   if (!imageUrl) return draft;
   const existing = draft.imageCandidates ?? [];
@@ -26,11 +35,12 @@ export function mergeEnrichedImage(
     twitter: 'twitter:image from source page',
     image_src: 'link rel=image_src from source page',
     json_ld: 'JSON-LD image from source page',
+    firecrawl_metadata: 'og:image from Firecrawl-rendered page',
   };
   const enriched: ImageCandidate = {
     url: imageUrl,
-    source: 'page_metadata',
-    confidence: 0.75,
+    source,
+    confidence: source === 'firecrawl' ? 0.7 : 0.75,
     reason: reasonByMethod[method],
   };
   return {

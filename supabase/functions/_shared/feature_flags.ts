@@ -52,3 +52,10 @@ export async function isNonAdminSearchToDraftEnabled(
 ): Promise<boolean> {
   return readBooleanFlag("is_non_admin_search_to_draft_enabled", supabaseAdmin);
 }
+
+// v8b — Firecrawl fallback for enrich-candidate-image. Default OFF.
+export async function isSearchImageFirecrawlEnabled(
+  supabaseAdmin?: ReturnType<typeof createClient>,
+): Promise<boolean> {
+  return readBooleanFlag("is_search_image_firecrawl_enabled", supabaseAdmin);
+}

@@ -37,6 +37,7 @@ type PendingChange =
   | { key: 'entity_extraction.review_uses_draft'; nextEnabled: boolean }
   | { key: 'entity_creation.non_admin_enabled'; nextEnabled: boolean }
   | { key: 'search_to_draft.non_admin_enabled'; nextEnabled: boolean }
+  | { key: 'entity_extraction.search_image_firecrawl_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -98,6 +99,12 @@ export function AdminFeatureFlagsPanel() {
   const searchToDraftRow = rows.data?.find((r) => r.key === 'search_to_draft.non_admin_enabled');
   const searchToDraftEnabled: boolean = searchToDraftRow?.value?.enabled === true;
 
+  // v8b — Firecrawl fallback for search-image enrichment. Default OFF.
+  const firecrawlImgRow = rows.data?.find(
+    (r) => r.key === 'entity_extraction.search_image_firecrawl_enabled',
+  );
+  const firecrawlImgEnabled: boolean = firecrawlImgRow?.value?.enabled === true;
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
@@ -127,7 +134,11 @@ export function AdminFeatureFlagsPanel() {
                   ? pending.nextEnabled
                     ? 'Enable Search-to-draft for non-admins?'
                     : 'Disable Search-to-draft for non-admins?'
-                  : '';
+                  : pending?.key === 'entity_extraction.search_image_firecrawl_enabled'
+                    ? pending.nextEnabled
+                      ? 'Enable Firecrawl fallback for search-result images?'
+                      : 'Disable Firecrawl fallback for search-result images?'
+                    : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -158,7 +169,11 @@ export function AdminFeatureFlagsPanel() {
                   ? pending.nextEnabled
                     ? 'Non-admin users will see the Search tab in Create Entity, powered by Gemini grounded search. Requires non-admin entity creation to also be enabled.'
                     : 'Only admins will see the Search tab in Create Entity. The search-entity-candidates edge function will reject non-admin calls.'
-                  : '';
+                  : pending?.key === 'entity_extraction.search_image_firecrawl_enabled'
+                    ? pending.nextEnabled
+                      ? 'When a search result has no image after direct fetch and soft-redirect, enrich-candidate-image will use Firecrawl as a last-resort fallback (extra ~2 s budget). Search-to-Draft only — URL Analysis is unaffected. May consume Firecrawl credits.'
+                      : 'Disables the Firecrawl fallback in enrich-candidate-image. Results missing an image after direct fetch/soft-redirect will show no image, as before.'
+                    : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -199,9 +214,15 @@ export function AdminFeatureFlagsPanel() {
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'search_to_draft.non_admin_enabled') {
         await setFlag.mutateAsync({
           key: 'search_to_draft.non_admin_enabled',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_extraction.search_image_firecrawl_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
@@ -588,6 +609,54 @@ export function AdminFeatureFlagsPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* v8b — Firecrawl fallback for search-result images */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Firecrawl fallback for search images
+          </CardTitle>
+          <CardDescription>
+            Last-resort image enrichment for search results that need JS rendering
+            (e.g. Google/Vertex interstitial pages). Search-to-Draft only; URL Analysis is unaffected.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="firecrawl-search-image" className="text-base">
+                Use Firecrawl as a fallback in enrich-candidate-image
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, if direct fetch and soft-redirect both fail to produce a page image,
+                <code> enrich-candidate-image</code> calls Firecrawl once (extra ~2 s budget) to
+                render the page and extract og:image / JSON-LD. Firecrawl-sourced images are labeled
+                <em> Rendered page</em> in the picker. May consume Firecrawl credits.
+              </p>
+              {firecrawlImgRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(firecrawlImgRow.updated_at), { addSuffix: true })}
+                  {firecrawlImgRow.updated_reason ? ` — “${firecrawlImgRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="firecrawl-search-image"
+              checked={firecrawlImgEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({
+                  key: 'entity_extraction.search_image_firecrawl_enabled',
+                  nextEnabled: checked,
+                })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+
 
 
 

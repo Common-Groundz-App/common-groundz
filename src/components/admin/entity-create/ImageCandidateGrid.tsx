@@ -40,7 +40,7 @@ function chipForSource(source?: string): string {
   switch (source) {
     case 'official_site': return 'Official site';
     case 'google_images': return 'Google Images';
-    case 'firecrawl': return 'Firecrawl';
+    case 'firecrawl': return 'Rendered page';
     case 'page_metadata': return 'Page metadata';
     case 'user_upload': return 'User upload';
     // v7 — surface unreliability of google_grounding in the picker.
