@@ -99,6 +99,12 @@ export function AdminFeatureFlagsPanel() {
   const searchToDraftRow = rows.data?.find((r) => r.key === 'search_to_draft.non_admin_enabled');
   const searchToDraftEnabled: boolean = searchToDraftRow?.value?.enabled === true;
 
+  // v8b — Firecrawl fallback for search-image enrichment. Default OFF.
+  const firecrawlImgRow = rows.data?.find(
+    (r) => r.key === 'entity_extraction.search_image_firecrawl_enabled',
+  );
+  const firecrawlImgEnabled: boolean = firecrawlImgRow?.value?.enabled === true;
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
