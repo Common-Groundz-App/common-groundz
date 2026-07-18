@@ -610,6 +610,54 @@ export function AdminFeatureFlagsPanel() {
         </CardContent>
       </Card>
 
+      {/* v8b — Firecrawl fallback for search-result images */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Firecrawl fallback for search images
+          </CardTitle>
+          <CardDescription>
+            Last-resort image enrichment for search results that need JS rendering
+            (e.g. Google/Vertex interstitial pages). Search-to-Draft only; URL Analysis is unaffected.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="firecrawl-search-image" className="text-base">
+                Use Firecrawl as a fallback in enrich-candidate-image
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, if direct fetch and soft-redirect both fail to produce a page image,
+                <code> enrich-candidate-image</code> calls Firecrawl once (extra ~2 s budget) to
+                render the page and extract og:image / JSON-LD. Firecrawl-sourced images are labeled
+                <em> Rendered page</em> in the picker. May consume Firecrawl credits.
+              </p>
+              {firecrawlImgRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(firecrawlImgRow.updated_at), { addSuffix: true })}
+                  {firecrawlImgRow.updated_reason ? ` — “${firecrawlImgRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="firecrawl-search-image"
+              checked={firecrawlImgEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({
+                  key: 'entity_extraction.search_image_firecrawl_enabled',
+                  nextEnabled: checked,
+                })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+
+
 
 
 
