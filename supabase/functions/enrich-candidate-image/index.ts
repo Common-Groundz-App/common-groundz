@@ -531,9 +531,16 @@ serve(async (req) => {
     } else if (typeof rateCount === "number" && rateCount > HOURLY_LIMIT) {
       const latencyMs = Date.now() - started;
       console.log(JSON.stringify({
-        fn: "enrich-candidate-image",
-        host, latencyMs, cached: false, errorCode: "rate_limited",
+        event: "enrich_candidate_image",
+        host,
+        cached: false,
+        finalOutcome: "rate_limited",
+        winningAttempt: null,
+        winningMethod: null,
+        totalLatencyMs: latencyMs,
+        attempts: [],
       }));
+
       return jsonResp({
         imageUrl: null, source: null, method: null,
         diagnostics: { latencyMs, fetched: false, cached: false, errorCode: "rate_limited" },
