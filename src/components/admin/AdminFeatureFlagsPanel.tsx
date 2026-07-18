@@ -169,7 +169,11 @@ export function AdminFeatureFlagsPanel() {
                   ? pending.nextEnabled
                     ? 'Non-admin users will see the Search tab in Create Entity, powered by Gemini grounded search. Requires non-admin entity creation to also be enabled.'
                     : 'Only admins will see the Search tab in Create Entity. The search-entity-candidates edge function will reject non-admin calls.'
-                  : '';
+                  : pending?.key === 'entity_extraction.search_image_firecrawl_enabled'
+                    ? pending.nextEnabled
+                      ? 'When a search result has no image after direct fetch and soft-redirect, enrich-candidate-image will use Firecrawl as a last-resort fallback (extra ~2 s budget). Search-to-Draft only — URL Analysis is unaffected. May consume Firecrawl credits.'
+                      : 'Disables the Firecrawl fallback in enrich-candidate-image. Results missing an image after direct fetch/soft-redirect will show no image, as before.'
+                    : '';
 
   const applyPending = async () => {
     if (!pending) return;
