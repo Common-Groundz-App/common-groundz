@@ -488,6 +488,13 @@ serve(async (req) => {
       }
     }
 
+    // v8b — read Firecrawl flag. Extend budget only when enabled.
+    firecrawlEnabled = await isSearchImageFirecrawlEnabled(supabaseAdmin);
+    if (firecrawlEnabled) {
+      deadline = started + TOTAL_BUDGET_MS + FIRECRAWL_EXTRA_BUDGET_MS;
+    }
+
+
     // 3. Validate input.
     const body = (await req.json().catch(() => ({}))) as {
       sourceUrl?: string;
