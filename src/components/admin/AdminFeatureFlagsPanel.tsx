@@ -37,6 +37,7 @@ type PendingChange =
   | { key: 'entity_extraction.review_uses_draft'; nextEnabled: boolean }
   | { key: 'entity_creation.non_admin_enabled'; nextEnabled: boolean }
   | { key: 'search_to_draft.non_admin_enabled'; nextEnabled: boolean }
+  | { key: 'entity_extraction.search_image_firecrawl_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
