@@ -70,6 +70,8 @@ export interface FirecrawlOpts {
   maxHtmlBytes?: number;
   /** Phase 1.8c.5: correlation context for the shape diagnostic log. */
   diagContext?: FirecrawlDiagContext;
+  /** v8b.1: override the `waitFor` value sent to Firecrawl. Defaults to 1500ms. */
+  waitFor?: number;
 }
 
 export const NORMAL_FIRECRAWL_API_TIMEOUT_MS = 25_000;
@@ -350,7 +352,7 @@ export async function runFirecrawlScrape(
     url,
     formats: ["html", "markdown"],
     onlyMainContent: false,
-    waitFor: 1500,
+    waitFor: opts.waitFor ?? 1500,
     timeout: apiTimeoutMs,
   };
   const requestArgs = {

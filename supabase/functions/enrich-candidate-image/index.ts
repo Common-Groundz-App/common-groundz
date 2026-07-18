@@ -45,13 +45,14 @@ const corsHeaders = {
 
 // ---- budgets ----
 const TOTAL_BUDGET_MS = 6_000;
-// v8b — extra budget headroom when Firecrawl fallback is enabled (~8 s).
-const FIRECRAWL_EXTRA_BUDGET_MS = 2_000;
-// Firecrawl-only hosts (Google/Vertex interstitials that need JS rendering).
+// v8b.1 — extra budget headroom when Firecrawl fallback is enabled for a
+// Firecrawl-only host (~11s total: 6s base + 5s extra).
+const FIRECRAWL_EXTRA_BUDGET_MS = 5_000;
+// v8b.1 — Firecrawl-only hosts (Google/Vertex interstitials that need JS
+// rendering). Keep in EXACT sync with FIRECRAWL_ONLY_HOSTS_FE in
+// src/components/admin/entity-create/SearchEntryPanel.tsx.
 const FIRECRAWL_ONLY_HOSTS = new Set([
   "vertexaisearch.cloud.google.com",
-  "www.google.com",
-  "google.com",
 ]);
 const PAGE_FETCH_TIMEOUT_MS = 4_000;
 const IMAGE_PROBE_TIMEOUT_MS = 1_500;
@@ -124,7 +125,7 @@ function jsonResp(body: unknown, status = 200) {
 
 function safeHost(url: string): string {
   try {
-    return new URL(url).hostname.replace(/^www\./, "");
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
   } catch {
     return "";
   }
@@ -488,11 +489,9 @@ serve(async (req) => {
       }
     }
 
-    // v8b — read Firecrawl flag. Extend budget only when enabled.
+    // v8b.1 — read Firecrawl flag here; deadline is extended below only
+    // when the source URL is on a Firecrawl-only host.
     firecrawlEnabled = await isSearchImageFirecrawlEnabled(supabaseAdmin);
-    if (firecrawlEnabled) {
-      deadline = started + TOTAL_BUDGET_MS + FIRECRAWL_EXTRA_BUDGET_MS;
-    }
 
 
     // 3. Validate input.
@@ -511,10 +510,16 @@ serve(async (req) => {
     const cacheKey = normalizeCacheKey(sourceUrlRaw);
     if (!cacheKey) return jsonResp({ error: "invalid_input" }, 400);
     host = safeHost(cacheKey);
-    // v8b — versioned cache key when Firecrawl is enabled so we don't reuse
-    // pre-v8b negative "no_image" entries that would block the fallback.
-    // The original cacheKey is preserved for URL parsing/fetching.
-    const cacheMapKey = firecrawlEnabled ? `v8b|${cacheKey}` : cacheKey;
+    // v8b.1 — fast-path flag: only extend deadline & skip direct fetch when
+    // both the Firecrawl flag is ON and the host is Firecrawl-only.
+    const isFirecrawlOnlyHost = firecrawlEnabled && FIRECRAWL_ONLY_HOSTS.has(host);
+    if (isFirecrawlOnlyHost) {
+      deadline = started + TOTAL_BUDGET_MS + FIRECRAWL_EXTRA_BUDGET_MS;
+    }
+    // v8b.1 — bump cache prefix so v8b negative entries don't shadow the
+    // new eligibility/skip behavior. Original cacheKey is preserved for
+    // URL parsing/fetching.
+    const cacheMapKey = firecrawlEnabled ? `v8b1|${cacheKey}` : cacheKey;
 
     // 4. Cache lookup BEFORE rate limit.
     const cachedResult = cacheGet(cacheMapKey);
@@ -591,12 +596,18 @@ serve(async (req) => {
     //      5. return no_image (or worst error).
 
     type AttemptKind = "direct" | "soft_redirect" | "clean_url_retry" | "firecrawl";
+    type FirecrawlReason = "resolved_ok" | "resolved_no_image" | "unresolved_interstitial";
     interface AttemptTelemetry {
       kind: AttemptKind;
       errorCode: ErrorCode | null;
       method: ExtractMethod | null;
       latencyMs: number;
       softRedirectKind: SoftRedirectKind | null;
+      /** v8b.1 — set on the synthetic "direct" entry for Firecrawl-only hosts. */
+      skipped?: boolean;
+      skipReason?: string;
+      /** v8b.1 — set on Firecrawl attempts. */
+      firecrawlReason?: FirecrawlReason;
     }
     interface FetchOk { finalUrl: string; html: string; }
     interface FetchErr { errorCode: ErrorCode; }
@@ -659,11 +670,27 @@ serve(async (req) => {
       imageUrl: null, source: null, method: null, errorCode: "no_image",
     };
 
-    // Step 1 + 2 — direct fetch.
+    // v8b.1 — For Firecrawl-only hosts (e.g. Vertex interstitials), skip
+    // Steps 1–4 (direct fetch, soft-redirect, clean-URL retry) and seed a
+    // synthetic no_image result so the Firecrawl eligibility gate passes.
+    // Push exactly one telemetry entry so the ladder is visible in logs.
     const originalNormForCompare = normalizeForCompare(cacheKey);
     let originalFinalUrl: string | null = null;
     let originalHtml: string | null = null;
-    {
+    if (isFirecrawlOnlyHost) {
+      attempts.push({
+        kind: "direct",
+        errorCode: null,
+        method: null,
+        latencyMs: 0,
+        softRedirectKind: null,
+        skipped: true,
+        skipReason: "firecrawl_only_host",
+      });
+      // Seed pre-Firecrawl result explicitly so the eligibility gate passes.
+      result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
+    } else {
+      // Step 1 + 2 — direct fetch.
       const t0 = Date.now();
       const fetched = await fetchHtmlAttempt(cacheKey);
       if ("errorCode" in fetched) {
@@ -737,8 +764,8 @@ serve(async (req) => {
       }
     }
 
-    // Step 4 — clean-URL retry (v7 rule, unchanged).
-    if (!winningAttempt) {
+    // Step 4 — clean-URL retry (v7 rule). Skipped for Firecrawl-only hosts.
+    if (!winningAttempt && !isFirecrawlOnlyHost) {
       const shouldRetry =
         (result.errorCode === "no_image" || result.errorCode === "invalid_content_type") &&
         (() => {
@@ -782,18 +809,18 @@ serve(async (req) => {
     // that need JS rendering (e.g. Google/Vertex interstitials). URL parsing
     // and fetching still use the original cacheKey; only the cache map key
     // is versioned so we don't reuse pre-v8b negative entries.
+    // v8b.1 — eligibility tightened to no_image / invalid_content_type only.
     if (
       !winningAttempt &&
       firecrawlEnabled &&
       (result.errorCode === "no_image" ||
-       result.errorCode === "blocked" ||
-       result.errorCode === "timeout" ||
        result.errorCode === "invalid_content_type") &&
       (deadline - Date.now()) >= 1500
     ) {
       const t0 = Date.now();
       let fcErrorCode: ErrorCode | null = null;
       let fcMethod: ExtractMethod | null = null;
+      let firecrawlReason: FirecrawlReason | undefined = undefined;
       try {
         const remaining = deadline - Date.now();
         const apiTimeoutMs = Math.min(
@@ -808,6 +835,8 @@ serve(async (req) => {
           apiTimeoutMs,
           timeoutMs: localTimeoutMs,
           fallbackBaseUrl: cacheKey,
+          // v8b.1 — extend Firecrawl's own JS-render wait for interstitial hosts.
+          waitFor: isFirecrawlOnlyHost ? 4_000 : 1_500,
         });
         if (!fc.ok) {
           fcErrorCode = fc.code === "FIRECRAWL_TIMEOUT" ? "timeout" : "blocked";
@@ -851,8 +880,15 @@ serve(async (req) => {
           if (extractedFc?.imageUrl) {
             result = extractedFc;
             winningAttempt = "firecrawl";
+            firecrawlReason = "resolved_ok";
           } else {
             fcErrorCode = "no_image";
+            // v8b.1 — distinguish "still on Vertex interstitial" from "resolved
+            // to a real page but no usable image".
+            const fcHost = safeHost(fc.finalUrl);
+            firecrawlReason = FIRECRAWL_ONLY_HOSTS.has(fcHost)
+              ? "unresolved_interstitial"
+              : "resolved_no_image";
           }
         }
       } catch (e) {
@@ -866,6 +902,7 @@ serve(async (req) => {
         method: fcMethod,
         latencyMs: Date.now() - t0,
         softRedirectKind: null,
+        ...(firecrawlReason ? { firecrawlReason } : {}),
       });
     }
 
@@ -884,6 +921,7 @@ serve(async (req) => {
       host,
       cached: false,
       firecrawlEnabled,
+      skippedDirect: isFirecrawlOnlyHost,
       finalOutcome,
       winningAttempt,
       winningMethod: result.method,

@@ -52,9 +52,22 @@ function confidenceLabel(c: number): string {
 }
 
 // Phase 3.5b — client-side cap for on-click image enrichment. Server budget
-// is 6s (or ~8s when the v8b Firecrawl fallback is enabled server-side);
-// add 500ms for network + serialization.
+// is 6s (or ~11s when the v8b.1 Firecrawl fallback runs for a Firecrawl-only
+// host); add 500ms for network + serialization.
 const ENRICH_CLIENT_TIMEOUT_MS = 8_500;
+const ENRICH_CLIENT_TIMEOUT_MS_FIRECRAWL_ONLY = 12_000;
+
+// v8b.1 — Firecrawl-only hosts. Keep in EXACT sync with FIRECRAWL_ONLY_HOSTS
+// in supabase/functions/enrich-candidate-image/index.ts.
+const FIRECRAWL_ONLY_HOSTS_FE = new Set(["vertexaisearch.cloud.google.com"]);
+function isFirecrawlOnlyHost(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    return FIRECRAWL_ONLY_HOSTS_FE.has(new URL(url).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
 
 interface EnrichResponse {
   imageUrl: string | null;
@@ -138,13 +151,18 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
     const promise = (async () => {
       let enriched = payload;
       try {
+        // v8b.1 — host-aware timeout: Firecrawl-only hosts (Vertex
+        // interstitials) get up to 12s; everything else keeps the 8.5s cap.
+        const timeoutMs = isFirecrawlOnlyHost(candidate.sourceUrl)
+          ? ENRICH_CLIENT_TIMEOUT_MS_FIRECRAWL_ONLY
+          : ENRICH_CLIENT_TIMEOUT_MS;
         const enrichPromise = supabase.functions.invoke('enrich-candidate-image', {
           body: { sourceUrl: candidate.sourceUrl, name: candidate.name },
         });
         const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
           setTimeout(
             () => resolve({ data: null, error: new Error('client_timeout') }),
-            ENRICH_CLIENT_TIMEOUT_MS,
+            timeoutMs,
           ),
         );
         const raced = await Promise.race([enrichPromise, timeoutPromise]);
