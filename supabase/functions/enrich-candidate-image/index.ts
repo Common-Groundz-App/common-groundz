@@ -45,13 +45,14 @@ const corsHeaders = {
 
 // ---- budgets ----
 const TOTAL_BUDGET_MS = 6_000;
-// v8b — extra budget headroom when Firecrawl fallback is enabled (~8 s).
-const FIRECRAWL_EXTRA_BUDGET_MS = 2_000;
-// Firecrawl-only hosts (Google/Vertex interstitials that need JS rendering).
+// v8b.1 — extra budget headroom when Firecrawl fallback is enabled for a
+// Firecrawl-only host (~11s total: 6s base + 5s extra).
+const FIRECRAWL_EXTRA_BUDGET_MS = 5_000;
+// v8b.1 — Firecrawl-only hosts (Google/Vertex interstitials that need JS
+// rendering). Keep in EXACT sync with FIRECRAWL_ONLY_HOSTS_FE in
+// src/components/admin/entity-create/SearchEntryPanel.tsx.
 const FIRECRAWL_ONLY_HOSTS = new Set([
   "vertexaisearch.cloud.google.com",
-  "www.google.com",
-  "google.com",
 ]);
 const PAGE_FETCH_TIMEOUT_MS = 4_000;
 const IMAGE_PROBE_TIMEOUT_MS = 1_500;
@@ -124,7 +125,7 @@ function jsonResp(body: unknown, status = 200) {
 
 function safeHost(url: string): string {
   try {
-    return new URL(url).hostname.replace(/^www\./, "");
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
   } catch {
     return "";
   }
