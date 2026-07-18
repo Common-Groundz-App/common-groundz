@@ -20,6 +20,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   isNonAdminEntityCreationEnabled,
   isNonAdminSearchToDraftEnabled,
+  isSearchImageFirecrawlEnabled,
 } from "../_shared/feature_flags.ts";
 import { assertSafeUrl, SsrfError } from "./ssrf.ts";
 import { isValidPageImageUrl } from "./image_validation.ts";
@@ -28,6 +29,13 @@ import {
   normalizeForCompare,
   type SoftRedirectKind,
 } from "./soft_redirect.ts";
+// v8b — Firecrawl fallback. Imported in-place from analyze-entity-url-v2 to
+// keep that pipeline's helper untouched.
+import {
+  runFirecrawlScrape,
+  NORMAL_FIRECRAWL_API_TIMEOUT_MS,
+  NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS,
+} from "../analyze-entity-url-v2/firecrawl.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
