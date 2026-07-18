@@ -35,7 +35,7 @@ import {
   runFirecrawlScrape,
   NORMAL_FIRECRAWL_API_TIMEOUT_MS,
   NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS,
-} from "../analyze-entity-url-v2/firecrawl.ts";
+} from "./firecrawl.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
