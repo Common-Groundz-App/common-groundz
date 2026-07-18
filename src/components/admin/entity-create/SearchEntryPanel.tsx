@@ -156,7 +156,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
             candidate: { ...payload.candidate, imageUrl: data.imageUrl },
             // mergeEnrichedImage is idempotent (dedupes by URL) — safe to
             // call from either auto-enrich or click-time fallback.
-            draft: mergeEnrichedImage(payload.draft, data.imageUrl, data.method),
+            draft: mergeEnrichedImage(payload.draft, data.imageUrl, data.method, data.source ?? 'page_metadata'),
           };
         }
       } catch (e) {
