@@ -921,6 +921,7 @@ serve(async (req) => {
       host,
       cached: false,
       firecrawlEnabled,
+      skippedDirect: isFirecrawlOnlyHost,
       finalOutcome,
       winningAttempt,
       winningMethod: result.method,
