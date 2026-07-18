@@ -552,43 +552,31 @@ serve(async (req) => {
       supabaseAdmin.rpc("prune_image_enrich_rate_limits").catch(() => {});
     }
 
-    // 6. SSRF-safe fetch + extract, with an optional server-side clean-URL
-    //    retry when the primary attempt returns no_image / invalid_content_type
-    //    and the original URL had a query string. Runs in the same request,
-    //    same quota unit, same rate-limit increment.
-    const runAttempt = async (url: string): Promise<CachedResult> => {
+    // 6. v8a — split attempt flow so soft-redirect can see the HTML.
+    //    Ladder (all share the 6 s deadline + same rate-limit unit):
+    //      1. fetch original URL
+    //      2. extract image from HTML          → success (winningAttempt="direct")
+    //      3. extract soft-redirect target,
+    //         SSRF-check, one hop, extract     → success (winningAttempt="soft_redirect")
+    //      4. clean-URL retry (existing v7 rule) → success (winningAttempt="clean_url_retry")
+    //      5. return no_image (or worst error).
+
+    type AttemptKind = "direct" | "soft_redirect" | "clean_url_retry";
+    interface AttemptTelemetry {
+      kind: AttemptKind;
+      errorCode: ErrorCode | null;
+      method: ExtractMethod | null;
+      latencyMs: number;
+      softRedirectKind: SoftRedirectKind | null;
+    }
+    interface FetchOk { finalUrl: string; html: string; }
+    interface FetchErr { errorCode: ErrorCode; }
+
+    const fetchHtmlAttempt = async (
+      url: string,
+    ): Promise<FetchOk | FetchErr> => {
       try {
-        const { finalUrl, html } = await safeFetchHtml(url, deadline);
-        const found = extractImage(html);
-        if (!found) {
-          return { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-        }
-        let absImg: string;
-        try { absImg = new URL(found.url, finalUrl).toString(); }
-        catch {
-          return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
-        }
-        // v7 — reject logos/banners resolved against the final URL too
-        // (catches JSON-LD relative /assets/brand-logo.png cases).
-        if (!isValidPageImageUrl(absImg) || looksLikeLogoOrBanner(absImg)) {
-          return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
-        }
-        try {
-          await assertSafeUrl(absImg);
-        } catch (e) {
-          if (e instanceof SsrfError) {
-            return { imageUrl: null, source: null, method: found.method, errorCode: "unsafe_url" };
-          }
-          return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
-        }
-        const okType = await probeImageContentType(absImg, deadline);
-        if (!okType) {
-          return {
-            imageUrl: null, source: null, method: found.method,
-            errorCode: "invalid_content_type",
-          };
-        }
-        return { imageUrl: absImg, source: "page_metadata", method: found.method };
+        return await safeFetchHtml(url, deadline);
       } catch (e) {
         const msg = e instanceof Error ? e.message : "";
         let errorCode: ErrorCode;
@@ -597,50 +585,190 @@ serve(async (req) => {
         else if (msg === "no_image") errorCode = "no_image";
         else if (msg === "unsafe_url") errorCode = "unsafe_url";
         else errorCode = "blocked";
-        return { imageUrl: null, source: null, method: null, errorCode };
+        return { errorCode };
       }
     };
 
-    let result = await runAttempt(cacheKey);
-    let retried = false;
-
-    // v7 — bounded server-side clean-URL retry.
-    const shouldRetry =
-      (result.errorCode === "no_image" || result.errorCode === "invalid_content_type") &&
-      (() => {
-        try { return new URL(cacheKey).search.length > 0; } catch { return false; }
-      })() &&
-      (deadline - Date.now()) >= 1500;
-    if (shouldRetry) {
-      let stripped: string | null = null;
+    /** Given already-fetched HTML, extract → resolve → SSRF-check → probe. */
+    const extractImageFromHtml = async (
+      finalUrl: string,
+      html: string,
+    ): Promise<CachedResult> => {
+      const found = extractImage(html);
+      if (!found) {
+        return { imageUrl: null, source: null, method: null, errorCode: "no_image" };
+      }
+      let absImg: string;
+      try { absImg = new URL(found.url, finalUrl).toString(); }
+      catch {
+        return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
+      }
+      if (!isValidPageImageUrl(absImg) || looksLikeLogoOrBanner(absImg)) {
+        return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
+      }
       try {
-        const u = new URL(cacheKey);
-        u.search = "";
-        stripped = u.toString();
-      } catch { stripped = null; }
-      if (stripped && stripped !== cacheKey) {
-        retried = true;
-        const retryResult = await runAttempt(stripped);
-        // Prefer a real image; otherwise keep the original result so we cache
-        // the correct error code.
-        if (retryResult.imageUrl) result = retryResult;
+        await assertSafeUrl(absImg);
+      } catch (e) {
+        if (e instanceof SsrfError) {
+          return { imageUrl: null, source: null, method: found.method, errorCode: "unsafe_url" };
+        }
+        return { imageUrl: null, source: null, method: found.method, errorCode: "no_image" };
+      }
+      const okType = await probeImageContentType(absImg, deadline);
+      if (!okType) {
+        return {
+          imageUrl: null, source: null, method: found.method,
+          errorCode: "invalid_content_type",
+        };
+      }
+      return { imageUrl: absImg, source: "page_metadata", method: found.method };
+    };
+
+    const attempts: AttemptTelemetry[] = [];
+    let winningAttempt: AttemptKind | null = null;
+    let result: CachedResult = {
+      imageUrl: null, source: null, method: null, errorCode: "no_image",
+    };
+
+    // Step 1 + 2 — direct fetch.
+    const originalNormForCompare = normalizeForCompare(cacheKey);
+    let originalFinalUrl: string | null = null;
+    let originalHtml: string | null = null;
+    {
+      const t0 = Date.now();
+      const fetched = await fetchHtmlAttempt(cacheKey);
+      if ("errorCode" in fetched) {
+        attempts.push({
+          kind: "direct", errorCode: fetched.errorCode, method: null,
+          latencyMs: Date.now() - t0, softRedirectKind: null,
+        });
+        result = { imageUrl: null, source: null, method: null, errorCode: fetched.errorCode };
+      } else {
+        originalFinalUrl = fetched.finalUrl;
+        originalHtml = fetched.html;
+        const extracted = await extractImageFromHtml(fetched.finalUrl, fetched.html);
+        attempts.push({
+          kind: "direct",
+          errorCode: extracted.errorCode ?? null,
+          method: extracted.method,
+          latencyMs: Date.now() - t0,
+          softRedirectKind: null,
+        });
+        result = extracted;
+        if (extracted.imageUrl) winningAttempt = "direct";
+      }
+    }
+
+    // Step 3 — soft-redirect fallback (only if we have HTML from step 1 and no image yet).
+    if (!winningAttempt && originalHtml && originalFinalUrl && (deadline - Date.now()) >= 1500) {
+      const target = extractSoftRedirectTarget(originalFinalUrl, originalHtml);
+      if (target) {
+        const targetNorm = normalizeForCompare(target.target);
+        const finalUrlNorm = normalizeForCompare(originalFinalUrl);
+        const selfRef =
+          !targetNorm ||
+          targetNorm === originalNormForCompare ||
+          targetNorm === finalUrlNorm;
+        if (!selfRef) {
+          const t0 = Date.now();
+          let softErr: ErrorCode | null = null;
+          try {
+            await assertSafeUrl(target.target);
+          } catch {
+            softErr = "unsafe_url";
+          }
+          if (softErr) {
+            attempts.push({
+              kind: "soft_redirect", errorCode: softErr, method: null,
+              latencyMs: Date.now() - t0, softRedirectKind: target.kind,
+            });
+          } else {
+            const fetched2 = await fetchHtmlAttempt(target.target);
+            if ("errorCode" in fetched2) {
+              attempts.push({
+                kind: "soft_redirect", errorCode: fetched2.errorCode, method: null,
+                latencyMs: Date.now() - t0, softRedirectKind: target.kind,
+              });
+            } else {
+              const extracted2 = await extractImageFromHtml(fetched2.finalUrl, fetched2.html);
+              attempts.push({
+                kind: "soft_redirect",
+                errorCode: extracted2.errorCode ?? null,
+                method: extracted2.method,
+                latencyMs: Date.now() - t0,
+                softRedirectKind: target.kind,
+              });
+              if (extracted2.imageUrl) {
+                result = extracted2;
+                winningAttempt = "soft_redirect";
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Step 4 — clean-URL retry (v7 rule, unchanged).
+    if (!winningAttempt) {
+      const shouldRetry =
+        (result.errorCode === "no_image" || result.errorCode === "invalid_content_type") &&
+        (() => {
+          try { return new URL(cacheKey).search.length > 0; } catch { return false; }
+        })() &&
+        (deadline - Date.now()) >= 1500;
+      if (shouldRetry) {
+        let stripped: string | null = null;
+        try {
+          const u = new URL(cacheKey);
+          u.search = "";
+          stripped = u.toString();
+        } catch { stripped = null; }
+        if (stripped && stripped !== cacheKey) {
+          const t0 = Date.now();
+          const fetched3 = await fetchHtmlAttempt(stripped);
+          if ("errorCode" in fetched3) {
+            attempts.push({
+              kind: "clean_url_retry", errorCode: fetched3.errorCode, method: null,
+              latencyMs: Date.now() - t0, softRedirectKind: null,
+            });
+          } else {
+            const extracted3 = await extractImageFromHtml(fetched3.finalUrl, fetched3.html);
+            attempts.push({
+              kind: "clean_url_retry",
+              errorCode: extracted3.errorCode ?? null,
+              method: extracted3.method,
+              latencyMs: Date.now() - t0,
+              softRedirectKind: null,
+            });
+            if (extracted3.imageUrl) {
+              result = extracted3;
+              winningAttempt = "clean_url_retry";
+            }
+          }
+        }
       }
     }
 
     method = result.method ?? method;
-
 
     // 7. Cache per policy.
     const ttl = ttlFor(result);
     if (ttl) cachePut(cacheKey, result, ttl);
 
     const latencyMs = Date.now() - started;
+    const finalOutcome: string = result.imageUrl
+      ? "success"
+      : (result.errorCode ?? "no_image");
     console.log(JSON.stringify({
-      fn: "enrich-candidate-image",
-      host, method: result.method ?? method, latencyMs, cached: false,
-      errorCode: result.errorCode ?? null, retried,
+      event: "enrich_candidate_image",
+      host,
+      cached: false,
+      finalOutcome,
+      winningAttempt,
+      winningMethod: result.method,
+      totalLatencyMs: latencyMs,
+      attempts,
     }));
-
 
     return jsonResp({
       imageUrl: result.imageUrl,
@@ -653,6 +781,7 @@ serve(async (req) => {
         ...(result.errorCode ? { errorCode: result.errorCode } : {}),
       },
     });
+
   } catch (err) {
     const latencyMs = Date.now() - started;
     console.error("[enrich-candidate-image] unhandled:", (err as Error).message);
