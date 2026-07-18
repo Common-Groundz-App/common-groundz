@@ -134,7 +134,11 @@ export function AdminFeatureFlagsPanel() {
                   ? pending.nextEnabled
                     ? 'Enable Search-to-draft for non-admins?'
                     : 'Disable Search-to-draft for non-admins?'
-                  : '';
+                  : pending?.key === 'entity_extraction.search_image_firecrawl_enabled'
+                    ? pending.nextEnabled
+                      ? 'Enable Firecrawl fallback for search-result images?'
+                      : 'Disable Firecrawl fallback for search-result images?'
+                    : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
