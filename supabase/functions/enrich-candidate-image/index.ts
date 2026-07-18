@@ -440,10 +440,12 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const started = Date.now();
-  const deadline = started + TOTAL_BUDGET_MS;
+  // v8b — deadline is computed after we know the firecrawl flag (below).
+  let deadline = started + TOTAL_BUDGET_MS;
   let host = "";
   let method: ExtractMethod | null = null;
   let cached = false;
+  let firecrawlEnabled = false;
 
   try {
     // 1. Auth.
