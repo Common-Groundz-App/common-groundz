@@ -596,12 +596,18 @@ serve(async (req) => {
     //      5. return no_image (or worst error).
 
     type AttemptKind = "direct" | "soft_redirect" | "clean_url_retry" | "firecrawl";
+    type FirecrawlReason = "resolved_ok" | "resolved_no_image" | "unresolved_interstitial";
     interface AttemptTelemetry {
       kind: AttemptKind;
       errorCode: ErrorCode | null;
       method: ExtractMethod | null;
       latencyMs: number;
       softRedirectKind: SoftRedirectKind | null;
+      /** v8b.1 — set on the synthetic "direct" entry for Firecrawl-only hosts. */
+      skipped?: boolean;
+      skipReason?: string;
+      /** v8b.1 — set on Firecrawl attempts. */
+      firecrawlReason?: FirecrawlReason;
     }
     interface FetchOk { finalUrl: string; html: string; }
     interface FetchErr { errorCode: ErrorCode; }
