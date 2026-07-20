@@ -14,18 +14,22 @@ export type EnrichedImageMethod =
   | 'twitter'
   | 'image_src'
   | 'json_ld'
-  | 'firecrawl_metadata';
+  | 'firecrawl_metadata'
+  | 'google_cse';
+
+export type EnrichedImageSource = 'page_metadata' | 'firecrawl' | 'google_images';
 
 /** Phase 3.5b — Prepend an enriched image to an EntityDraft's imageCandidates.
  *  v8b — accepts an optional `source` so Firecrawl-rendered images can be
- *  labeled distinctly in the picker ("Rendered page"). Defaults to
- *  'page_metadata' for backward compatibility.
+ *  labeled distinctly in the picker ("Rendered page").
+ *  v8c — extended with `google_images` for Google CSE fallback thumbnails
+ *  ("From image search — verify"). Defaults to 'page_metadata' for BC.
  *  Idempotent: no-op if the same URL is already present. Never mutates input. */
 export function mergeEnrichedImage(
   draft: EntityDraft,
   imageUrl: string,
   method: EnrichedImageMethod,
-  source: 'page_metadata' | 'firecrawl' = 'page_metadata',
+  source: EnrichedImageSource = 'page_metadata',
 ): EntityDraft {
   if (!imageUrl) return draft;
   const existing = draft.imageCandidates ?? [];
@@ -36,11 +40,17 @@ export function mergeEnrichedImage(
     image_src: 'link rel=image_src from source page',
     json_ld: 'JSON-LD image from source page',
     firecrawl_metadata: 'og:image from Firecrawl-rendered page',
+    google_cse: 'Google image search result — verify',
+  };
+  const confidenceBySource: Record<EnrichedImageSource, number> = {
+    page_metadata: 0.75,
+    firecrawl: 0.7,
+    google_images: 0.55,
   };
   const enriched: ImageCandidate = {
     url: imageUrl,
     source,
-    confidence: source === 'firecrawl' ? 0.7 : 0.75,
+    confidence: confidenceBySource[source],
     reason: reasonByMethod[method],
   };
   return {
