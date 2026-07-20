@@ -534,16 +534,24 @@ serve(async (req) => {
     const cacheKey = normalizeCacheKey(sourceUrlRaw);
     if (!cacheKey) return jsonResp({ error: "invalid_input" }, 400);
     host = safeHost(cacheKey);
-    // v8b.1 — fast-path flag: only extend deadline & skip direct fetch when
-    // both the Firecrawl flag is ON and the host is Firecrawl-only.
-    const isFirecrawlOnlyHost = firecrawlEnabled && FIRECRAWL_ONLY_HOSTS.has(host);
+    // v8b.1 + v8c — Vertex-interstitial hosts require special handling: skip
+    // direct fetch, extend the deadline, and version the cache key. Entered
+    // when EITHER the Firecrawl flag OR the CSE flag is ON.
+    const isFirecrawlOnlyHost =
+      (firecrawlEnabled || cseEnabled) && FIRECRAWL_ONLY_HOSTS.has(host);
     if (isFirecrawlOnlyHost) {
-      deadline = started + TOTAL_BUDGET_MS + FIRECRAWL_EXTRA_BUDGET_MS;
+      // Firecrawl needs a bigger budget (~5s extra). CSE-only path needs less
+      // (~2.5s extra: single Google CSE call + content-type probe).
+      const extra = firecrawlEnabled ? FIRECRAWL_EXTRA_BUDGET_MS : 2_500;
+      deadline = started + TOTAL_BUDGET_MS + extra;
     }
     // v8b.1 — bump cache prefix so v8b negative entries don't shadow the
-    // new eligibility/skip behavior. Original cacheKey is preserved for
-    // URL parsing/fetching.
-    const cacheMapKey = firecrawlEnabled ? `v8b1|${cacheKey}` : cacheKey;
+    // new eligibility/skip behavior. v8c adds `+cse` when the CSE fallback
+    // is enabled so its negative results are keyed separately.
+    const cacheMapKey =
+      firecrawlEnabled || cseEnabled
+        ? `v8b1${cseEnabled ? "+cse" : ""}|${cacheKey}`
+        : cacheKey;
 
     // 4. Cache lookup BEFORE rate limit.
     const cachedResult = cacheGet(cacheMapKey);
