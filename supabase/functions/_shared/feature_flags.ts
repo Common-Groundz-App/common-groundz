@@ -59,3 +59,11 @@ export async function isSearchImageFirecrawlEnabled(
 ): Promise<boolean> {
   return readBooleanFlag("is_search_image_firecrawl_enabled", supabaseAdmin);
 }
+
+// v8c — Google CSE image fallback for Vertex rows in enrich-candidate-image.
+// Default OFF.
+export async function isSearchImageCseFallbackEnabled(
+  supabaseAdmin?: ReturnType<typeof createClient>,
+): Promise<boolean> {
+  return readBooleanFlag("is_search_image_cse_fallback_enabled", supabaseAdmin);
+}
