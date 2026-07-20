@@ -73,16 +73,29 @@ function isAllowedDomain(url: string): boolean {
   }
 }
 
-function logPerformanceMetric(url: string, metric: RequestMetric) {
-  const status = metric.success ? '✓' : '✗'
-  const cache = metric.cacheHit ? '[CACHED]' : '[FRESH]'
-  const sizeMB = (metric.responseSize / (1024 * 1024)).toFixed(2)
-  
-  console.log(`🖼️  ${status} ${cache} ${metric.duration}ms ${sizeMB}MB - ${url}`)
-  
-  if (!metric.success) {
-    console.error(`❌ Proxy failed for: ${url}`)
-  }
+function hostOf(url: string): string {
+  try { return new URL(url).hostname.toLowerCase(); } catch { return 'unknown'; }
+}
+
+function logProxy(url: string, fields: {
+  status: number;
+  reason: string;
+  cacheHit?: boolean;
+  duration: number;
+  contentType?: string;
+  bytes?: number;
+}) {
+  // Host-only structured log. No query strings, no full URLs.
+  console.log(JSON.stringify({
+    source: 'image_proxy',
+    host: hostOf(url),
+    status: fields.status,
+    reason: fields.reason,
+    cacheHit: !!fields.cacheHit,
+    duration: fields.duration,
+    contentType: fields.contentType,
+    bytes: fields.bytes,
+  }));
 }
 
 serve(async (req) => {
