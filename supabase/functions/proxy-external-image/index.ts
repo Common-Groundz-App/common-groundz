@@ -56,7 +56,10 @@ const ALLOWED_DOMAINS = [
   'wikimedia.org', 'wikipedia.org',
   'cloudinary.com',
   'amazonaws.com',
-  'googleusercontent.com'
+  'googleusercontent.com',
+
+  // Observed valid product-image CDNs (added narrowly from proxy logs)
+  'nykaa.com', 'images-static.nykaa.com'
 ]
 
 function isAllowedDomain(url: string): boolean {
