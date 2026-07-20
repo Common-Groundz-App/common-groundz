@@ -184,7 +184,11 @@ export function AdminFeatureFlagsPanel() {
                     ? pending.nextEnabled
                       ? 'When a search result has no image after direct fetch and soft-redirect, enrich-candidate-image will use Firecrawl as a last-resort fallback (extra ~2 s budget). Search-to-Draft only — URL Analysis is unaffected. May consume Firecrawl credits.'
                       : 'Disables the Firecrawl fallback in enrich-candidate-image. Results missing an image after direct fetch/soft-redirect will show no image, as before.'
-                    : '';
+                    : pending?.key === 'entity_extraction.search_image_cse_fallback_enabled'
+                      ? pending.nextEnabled
+                        ? 'For Vertex-interstitial search results only, enrich-candidate-image will run one Google Custom Search image query (brand + name) as a last-resort fallback. Skips Firecrawl for these rows to save quota. Results appear with a "From image search — verify" chip. Uses your existing Google CSE key/CX.'
+                        : 'Disables the Google image search fallback for Vertex rows. Those results will show no image if direct fetch/soft-redirect finds none.'
+                      : '';
 
   const applyPending = async () => {
     if (!pending) return;
