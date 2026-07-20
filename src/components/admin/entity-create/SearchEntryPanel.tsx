@@ -577,6 +577,15 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                           <Badge variant="secondary" className="text-[10px]">{getEntityTypeLabel(c.type as any)}</Badge>
                           {c.brand && <span>· {c.brand}</span>}
                           <span>· {confidenceLabel(c.confidence)}</span>
+                          {isImageSearchSource && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] border-amber-400/60 text-amber-700 dark:text-amber-300"
+                              title="Image from Google image search — please verify before saving"
+                            >
+                              From image search — verify
+                            </Badge>
+                          )}
                         </div>
                         {c.description && (
                           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{c.description}</p>
