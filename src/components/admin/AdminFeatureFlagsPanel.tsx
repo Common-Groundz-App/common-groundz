@@ -106,6 +106,12 @@ export function AdminFeatureFlagsPanel() {
   );
   const firecrawlImgEnabled: boolean = firecrawlImgRow?.value?.enabled === true;
 
+  // v8c — Google CSE image fallback for Vertex rows. Default OFF.
+  const cseImgRow = rows.data?.find(
+    (r) => r.key === 'entity_extraction.search_image_cse_fallback_enabled',
+  );
+  const cseImgEnabled: boolean = cseImgRow?.value?.enabled === true;
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
