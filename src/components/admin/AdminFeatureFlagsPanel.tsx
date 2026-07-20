@@ -145,7 +145,11 @@ export function AdminFeatureFlagsPanel() {
                     ? pending.nextEnabled
                       ? 'Enable Firecrawl fallback for search-result images?'
                       : 'Disable Firecrawl fallback for search-result images?'
-                    : '';
+                    : pending?.key === 'entity_extraction.search_image_cse_fallback_enabled'
+                      ? pending.nextEnabled
+                        ? 'Enable Google image search fallback for Vertex rows?'
+                        : 'Disable Google image search fallback for Vertex rows?'
+                      : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
