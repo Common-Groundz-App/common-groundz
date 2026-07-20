@@ -677,6 +677,56 @@ export function AdminFeatureFlagsPanel() {
         </CardContent>
       </Card>
 
+      {/* v8c — Google CSE image fallback for Vertex rows */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Google image search fallback (Vertex rows)
+          </CardTitle>
+          <CardDescription>
+            Uses one Google Custom Search image query as a last-resort
+            image source for Vertex interstitial search results. Skips
+            Firecrawl for those rows to save quota.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="cse-search-image" className="text-base">
+                Use Google Images as a fallback for Vertex rows
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, if a Vertex-interstitial search result has no image after
+                direct fetch and soft-redirect, <code>enrich-candidate-image</code> runs one
+                Google Custom Search image query (brand + name) with a ~2.5 s budget.
+                Chosen results are labeled <em>From image search — verify</em> in the picker.
+                Uses your existing <code>GOOGLE_CUSTOM_SEARCH_API_KEY</code> and
+                <code> GOOGLE_CUSTOM_SEARCH_CX</code>.
+              </p>
+              {cseImgRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(cseImgRow.updated_at), { addSuffix: true })}
+                  {cseImgRow.updated_reason ? ` — “${cseImgRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="cse-search-image"
+              checked={cseImgEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({
+                  key: 'entity_extraction.search_image_cse_fallback_enabled',
+                  nextEnabled: checked,
+                })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+
 
 
 
