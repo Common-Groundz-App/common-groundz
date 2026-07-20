@@ -518,16 +518,24 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                 {result.candidates.map((p, idx) => {
                   const c = p.candidate;
                   const enriching = enrichingIndexes.has(idx);
-                  // v7 — Row thumbnail = page_metadata only. `google_grounding`
-                  // images are unreliable (brand banners, wrong redirects) and
-                  // are hidden from the row. An empty tile with monogram
-                  // initials is better than a misleading first-row banner.
-                  const pageMetaUrl =
-                    (p.draft?.imageCandidates ?? []).find(
-                      (ic: any) => ic?.source === 'page_metadata' && typeof ic.url === 'string',
-                    )?.url ?? null;
-                  const showSkeleton = enriching && !pageMetaUrl;
-                  const showOverlay = enriching && !!pageMetaUrl;
+                  // v8c — Row thumbnail priority:
+                  //   page_metadata > firecrawl > google_images/google_cse.
+                  // `google_grounding` stays excluded (unreliable brand banners).
+                  const candidates = (p.draft?.imageCandidates ?? []) as Array<any>;
+                  const pickBySource = (src: string) =>
+                    candidates.find((ic) => ic?.source === src && typeof ic.url === 'string') ?? null;
+                  const rowImage =
+                    pickBySource('page_metadata') ??
+                    pickBySource('firecrawl') ??
+                    pickBySource('google_images') ??
+                    pickBySource('google_cse') ??
+                    null;
+                  const rowImageUrl: string | null = rowImage?.url ?? null;
+                  const rowImageSource: string | null = rowImage?.source ?? null;
+                  const isImageSearchSource =
+                    rowImageSource === 'google_images' || rowImageSource === 'google_cse';
+                  const showSkeleton = enriching && !rowImageUrl;
+                  const showOverlay = enriching && !!rowImageUrl;
                   const initials = (c.name || '?')
                     .split(/\s+/)
                     .filter(Boolean)
@@ -550,8 +558,8 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
                         {showSkeleton ? (
                           <Skeleton className="h-full w-full" />
-                        ) : pageMetaUrl ? (
-                          <ImageWithFallback src={pageMetaUrl} alt={c.name} className="h-full w-full object-cover" />
+                        ) : rowImageUrl ? (
+                          <ImageWithFallback src={rowImageUrl} alt={c.name} className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
                             {initials}
@@ -569,6 +577,15 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                           <Badge variant="secondary" className="text-[10px]">{getEntityTypeLabel(c.type as any)}</Badge>
                           {c.brand && <span>· {c.brand}</span>}
                           <span>· {confidenceLabel(c.confidence)}</span>
+                          {isImageSearchSource && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] border-amber-400/60 text-amber-700 dark:text-amber-300"
+                              title="Image from Google image search — please verify before saving"
+                            >
+                              From image search — verify
+                            </Badge>
+                          )}
                         </div>
                         {c.description && (
                           <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{c.description}</p>

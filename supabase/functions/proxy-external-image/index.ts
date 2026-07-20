@@ -56,7 +56,10 @@ const ALLOWED_DOMAINS = [
   'wikimedia.org', 'wikipedia.org',
   'cloudinary.com',
   'amazonaws.com',
-  'googleusercontent.com'
+  'googleusercontent.com',
+
+  // Observed valid product-image CDNs (added narrowly from proxy logs)
+  'nykaa.com', 'images-static.nykaa.com'
 ]
 
 function isAllowedDomain(url: string): boolean {
@@ -70,16 +73,29 @@ function isAllowedDomain(url: string): boolean {
   }
 }
 
-function logPerformanceMetric(url: string, metric: RequestMetric) {
-  const status = metric.success ? '✓' : '✗'
-  const cache = metric.cacheHit ? '[CACHED]' : '[FRESH]'
-  const sizeMB = (metric.responseSize / (1024 * 1024)).toFixed(2)
-  
-  console.log(`🖼️  ${status} ${cache} ${metric.duration}ms ${sizeMB}MB - ${url}`)
-  
-  if (!metric.success) {
-    console.error(`❌ Proxy failed for: ${url}`)
-  }
+function hostOf(url: string): string {
+  try { return new URL(url).hostname.toLowerCase(); } catch { return 'unknown'; }
+}
+
+function logProxy(url: string, fields: {
+  status: number;
+  reason: string;
+  cacheHit?: boolean;
+  duration: number;
+  contentType?: string;
+  bytes?: number;
+}) {
+  // Host-only structured log. No query strings, no full URLs.
+  console.log(JSON.stringify({
+    source: 'image_proxy',
+    host: hostOf(url),
+    status: fields.status,
+    reason: fields.reason,
+    cacheHit: !!fields.cacheHit,
+    duration: fields.duration,
+    contentType: fields.contentType,
+    bytes: fields.bytes,
+  }));
 }
 
 serve(async (req) => {
@@ -97,37 +113,29 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let imageUrl = ''
   try {
     const url = new URL(req.url)
-    const imageUrl = url.searchParams.get('url')
-    
+    imageUrl = url.searchParams.get('url') || ''
+
     if (!imageUrl) {
       metric.duration = Date.now() - startTime
-      logPerformanceMetric('', metric)
+      logProxy('', { status: 400, reason: 'missing_url', duration: metric.duration })
       return new Response(
-        JSON.stringify({ error: 'Missing url parameter' }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Missing url parameter' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     // Security check: only allow whitelisted domains
     if (!isAllowedDomain(imageUrl)) {
-      console.warn('Blocked non-whitelisted domain:', imageUrl)
       metric.duration = Date.now() - startTime
-      logPerformanceMetric(imageUrl, metric)
+      logProxy(imageUrl, { status: 403, reason: 'domain_not_allowed', duration: metric.duration })
       return new Response(
-        JSON.stringify({ error: 'Domain not allowed' }), 
-        { 
-          status: 403, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Domain not allowed' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-
-    console.log('🔍 Proxying external image:', imageUrl)
 
     // Check cache first with enhanced tracking
     const cacheKey = imageUrl
@@ -138,9 +146,15 @@ serve(async (req) => {
       metric.success = true
       metric.responseSize = cached.data.length
       metric.duration = Date.now() - startTime
-      
-      logPerformanceMetric(imageUrl, metric)
-      
+      logProxy(imageUrl, {
+        status: 200,
+        reason: 'cache_hit',
+        cacheHit: true,
+        duration: metric.duration,
+        contentType: cached.contentType,
+        bytes: cached.data.length,
+      })
+
       return new Response(cached.data, {
         headers: {
           ...corsHeaders,
@@ -171,15 +185,16 @@ serve(async (req) => {
     clearTimeout(timeoutId)
 
     if (!response.ok) {
-      console.error('External image fetch failed:', response.status, response.statusText)
       metric.duration = Date.now() - startTime
-      logPerformanceMetric(imageUrl, metric)
+      logProxy(imageUrl, {
+        status: response.status,
+        reason: 'fetch_failed',
+        duration: metric.duration,
+        contentType: response.headers.get('content-type') || undefined,
+      })
       return new Response(
-        JSON.stringify({ error: `Failed to fetch image: ${response.status}` }), 
-        { 
-          status: response.status, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: `Failed to fetch image: ${response.status}` }),
+        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -189,22 +204,23 @@ serve(async (req) => {
 
     // Validate it's actually an image
     if (!contentType.startsWith('image/')) {
-      console.error('Invalid content type:', contentType)
       metric.duration = Date.now() - startTime
-      logPerformanceMetric(imageUrl, metric)
+      logProxy(imageUrl, {
+        status: 400,
+        reason: 'non_image_content_type',
+        duration: metric.duration,
+        contentType,
+      })
       return new Response(
-        JSON.stringify({ error: 'Invalid image content type' }), 
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Invalid image content type' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     // Cache the image with enhanced metadata
     const etag = response.headers.get('etag')
     const lastModified = response.headers.get('last-modified')
-    
+
     imageCache.set(cacheKey, {
       data: uint8Array,
       contentType,
@@ -227,9 +243,14 @@ serve(async (req) => {
     metric.success = true
     metric.responseSize = uint8Array.length
     metric.duration = Date.now() - startTime
-    logPerformanceMetric(imageUrl, metric)
+    logProxy(imageUrl, {
+      status: 200,
+      reason: 'ok',
+      duration: metric.duration,
+      contentType,
+      bytes: uint8Array.length,
+    })
 
-    // Return the image with enhanced cache headers
     return new Response(uint8Array, {
       headers: {
         ...corsHeaders,
@@ -244,26 +265,24 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    console.error('Error proxying external image:', error)
     metric.duration = Date.now() - startTime
-    logPerformanceMetric(imageUrl || 'unknown', metric)
-    
-    if (error.name === 'AbortError') {
+    const isAbort = (error as any)?.name === 'AbortError'
+    logProxy(imageUrl || '', {
+      status: isAbort ? 408 : 500,
+      reason: isAbort ? 'timeout' : 'unhandled',
+      duration: metric.duration,
+    })
+
+    if (isAbort) {
       return new Response(
-        JSON.stringify({ error: 'Request timeout' }), 
-        { 
-          status: 408, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
+        JSON.stringify({ error: 'Request timeout' }),
+        { status: 408, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     return new Response(
-      JSON.stringify({ error: 'Failed to proxy image' }), 
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      JSON.stringify({ error: 'Failed to proxy image' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
