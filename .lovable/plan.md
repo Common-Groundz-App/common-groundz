@@ -1,98 +1,144 @@
+## v8c — Google CSE image fallback for Vertex rows (FINAL)
 
-## Phase v8b.1 — Firecrawl cleanup (FINAL)
+Firecrawl on `vertexaisearch.cloud.google.com` interstitials is proven dead. For Vertex rows only, replace it with a Google Custom Search Images fallback, admin-toggleable, default OFF. Non-Vertex flow unchanged.
 
-Scope is tight and frozen. Two reviewer corrections folded in:
-1. Seed a synthetic `no_image` result before the Firecrawl gate on Firecrawl-only hosts, so the gate can't accidentally skip Firecrawl.
-2. Use whatever timeout mechanism the client already has (Promise.race or AbortController) — don't rewrite it.
+All reviewer corrections from both rounds are folded in — no more revisions.
 
-### Files touched (exactly 3)
-- `supabase/functions/enrich-candidate-image/index.ts`
-- `supabase/functions/enrich-candidate-image/firecrawl.ts`
-- `src/components/admin/entity-create/SearchEntryPanel.tsx` (timeout line only)
+## Locked scope
 
-### Not touched
-`analyze-entity-url-v2/*`, `search-entity-candidates/*`, admin UI, schema, secrets, `ImageCandidateGrid.tsx`, `applyEntityDraft.ts`, `useAppFlagsAdmin.ts`, `_shared/feature_flags.ts`.
+- **Vertex-only.** Only rows whose `sourceUrl` host is `vertexaisearch.cloud.google.com` use CSE.
+- Vertex row + CSE flag ON → skip direct/soft/clean **and** Firecrawl → go straight to CSE.
+- Firecrawl code + admin flag stay wired (useful later for real JS-rendered retailer pages).
+- Reuse existing secrets `GOOGLE_CUSTOM_SEARCH_API_KEY` + `GOOGLE_CUSTOM_SEARCH_CX`.
+- Naming: `source: "google_images"`, `method: "google_cse"`. Response field stays **`imageUrl`**.
+- Ranking (list + Draft Review): `page_metadata > firecrawl > google_images > google_grounding`.
+- Draft Review preselects `google_images` **only** when no `page_metadata`/`firecrawl` image exists.
+- Chip on row + review: **"From image search — verify"**.
+- Never log raw query text — only `queryHashPrefix` (first 8 chars of sha256).
 
----
+## Backend
 
-### Backend: `enrich-candidate-image/index.ts`
+### Migration (single file)
+1. Insert `entity_extraction.search_image_cse_fallback_enabled = { "enabled": false }` into `app_config`.
+2. Create `is_search_image_cse_fallback_enabled()` SECURITY DEFINER RPC (mirrors existing `is_search_image_firecrawl_enabled`).
+3. **Extend `set_app_flag`**: preserve every existing branch verbatim; add the new key to the `IF _key NOT IN (...)` allowlist and add one `ELSIF _key = 'entity_extraction.search_image_cse_fallback_enabled' THEN` branch validating exact `{ "enabled": boolean }` shape.
+4. `GRANT EXECUTE` on the new RPC to `anon, authenticated, service_role`.
 
-1. **Single source of truth for host set.** Keep `FIRECRAWL_ONLY_HOSTS` as the canonical set. Currently: `{"vertexaisearch.cloud.google.com"}`. Export it so the client helper mirrors the exact same list (via a small const duplication with a comment reminding to keep in sync — no cross-boundary import).
+### `supabase/functions/_shared/feature_flags.ts`
+- Add `isSearchImageCseFallbackEnabled(supabaseAdmin?)` — same 30s cache pattern as `isSearchImageFirecrawlEnabled`.
 
-2. **Compute the fast-path flag once, from the normalized URL host:**
-   ```
-   const host = safeHost(normalizedSourceUrl);
-   const isFirecrawlOnlyHost = firecrawlEnabled && FIRECRAWL_ONLY_HOSTS.has(host);
-   ```
-   Use `safeHost(normalizedSourceUrl)` — never the versioned cache key.
+### `supabase/functions/enrich-candidate-image/google_cse.ts` (new file)
+- `buildCseQuery({ name, brand, variant })`:
+  - Prefer `${name} ${brand ?? ""} ${variant ?? ""} product`.
+  - If brand missing, use `${name} ${variant ?? ""} product`.
+  - Case-insensitive dedupe removes brand tokens already in name.
+  - Collapsed whitespace, capped 128 chars.
+  - If sanitized query has fewer than 2 alphanumeric tokens → return `{ query: null, reason: "no_usable_query" }`.
+- `runGoogleCseImageSearch({ query, timeoutMs: 2500, fetchImpl })`: single GET to `https://www.googleapis.com/customsearch/v1?searchType=image&num=5&safe=active&imgSize=large`. No retry.
+- Module-level state: `cseDailyCount`, `cseDailyResetAt`, `cseDisabledUntil`. Daily cap 90/instance. On HTTP 429 or `error.errors[].reason === "quotaExceeded"`: set `cseDisabledUntil = now + 10min`, return `{ items: [], quotaThrottled: true }`.
+- **In-memory LRU cache** (Map, cap ~500, TTL 7 days) keyed by `v8c-cse|<sha256(normalizedQuery).slice(0,32)>`.
+- Export `GENERIC_NAME_STOPWORDS`: `["product","products","serum","cream","lotion","cleanser","gel","toner","mask","spray","roll","on","kit","set","pack","bundle","for","with","the","and","de","la","el","new","original","refill"]`.
+- Export `LOW_TRUST_CONTEXT_HOSTS`: `["pinterest.com","www.pinterest.com","in.pinterest.com","aliexpress.com","dhgate.com","alibaba.com","ebay.com","poshmark.com","mercari.com","etsy.com"]` (image-mirror / marketplace-spam hosts).
 
-3. **Fast path when `isFirecrawlOnlyHost` is true:**
-   - Skip Step 1 (direct fetch), Step 2 (soft redirect), Step 3 (clean-URL retry).
-   - Push one synthetic telemetry attempt: `{ kind: "direct", skipped: true, skipReason: "firecrawl_only_host", latencyMs: 0 }`. Extend the `AttemptEntry` type with optional `skipped?: boolean` and `skipReason?: string`. Do NOT add an `errorCode` here — public error-code union stays clean.
-   - **Seed the pre-Firecrawl result explicitly** so the eligibility gate passes:
-     ```
-     result = { imageUrl: null, source: null, method: null, errorCode: "no_image" };
-     ```
-   - Then fall through to Step 4 (Firecrawl).
-   - Flag-OFF path is byte-identical to today.
+### `supabase/functions/enrich-candidate-image/index.ts`
+- Accept optional body fields `brand?`, `variant?`, `type?` (backward-compatible).
+- New telemetry attempt kind `google_cse`: `{ kind: "google_cse", errorCode, latencyMs, resultCount, cached, quotaThrottled, queryHashPrefix, selectedImageHost, scoreBreakdown?, scoreable, relevanceMatched }`.
+- Top-level result adds `cseUsed: boolean`, `cseAdopted: boolean`, optional `diagnostics.cseSkipReason: "quota_throttled" | "cse_disabled" | "no_usable_query"`.
+- **`diagnostics.errorCode` stays within existing union — always `"no_image"` on CSE miss.** CSE-specific state lives only in `attempts[].errorCode` and `diagnostics.cseSkipReason`.
 
-4. **Budget.** Keep base `TOTAL_BUDGET_MS = 6_000`. For `isFirecrawlOnlyHost`, extend deadline by `FIRECRAWL_EXTRA_BUDGET_MS = 5_000` (was 2_000). Total ~11s. Non-Firecrawl-only hosts unchanged.
+**Vertex-only flow** when `isSearchImageCseFallbackEnabled()` returns true AND `safeHost(normalizedSourceUrl) === "vertexaisearch.cloud.google.com"`:
+1. Skip direct/soft/clean (v8b.1 already does).
+2. **Skip Firecrawl entirely** (override existing eligibility).
+3. Disabled window / quota throttled → push `{ kind: "google_cse", errorCode: "cse_disabled" | "quota_throttled", ... }` (attach `scoreable: false` to **this** attempt, never `attempts[0]`), return `imageUrl: null, errorCode: "no_image", diagnostics.cseSkipReason: <reason>`.
+4. `buildCseQuery(...)` → if `no_usable_query`, push equivalent attempt and short-circuit with `diagnostics.cseSkipReason: "no_usable_query"`.
+5. Check in-memory cache.
+6. Call CSE.
+7. Score + validate; adopt best passing image.
 
-5. **Firecrawl eligibility tightening.** Allow Firecrawl only when the current `result.errorCode` is `"no_image"` or `"invalid_content_type"`. Remove `"blocked"` and `"timeout"` from the eligible set. (The fast-path seed above ensures Vertex rows always qualify.)
+**Hard validation rejects (no score):**
+- `assertSafeUrl(url)` fails
+- `isValidPageImageUrl(url)` fails
+- `looksLikeLogoOrBanner(url)` true
+- CSE-provided `mime` present and not `image/*`
+- CSE-provided `width`/`height` present and either `< 200`
+- **`probeImageContentType(url, deadline)` must return `image/*`** (never trust CSE mime alone)
 
-6. **`waitFor: 4000` only for Firecrawl-only hosts.** When invoking `runFirecrawlScrape`, pass `waitFor: isFirecrawlOnlyHost ? 4000 : 1500`. See firecrawl.ts change below.
+**Scoring (only over validated results):**
+- Build token sets from body fields (not query string):
+  - `brandTokens` from `body.brand`
+  - `nameTokens` from `body.name`, filtered against `GENERIC_NAME_STOPWORDS`
+- `scoreable = brandTokens.length > 0 || nameTokens.length > 0`
+- If `!scoreable`: adopt first passing result; that attempt entry gets `scoreable: false, relevanceMatched: null`.
+- Otherwise for each valid result:
+  - `+2` if brandTokens non-empty AND `contextLink` host contains any brand token
+  - `+2` if brandTokens non-empty AND `title`/`snippet` (lowercased) contains any brand token
+  - `+2` if nameTokens non-empty AND `title`/`snippet` contains any name token
+  - `+1` per 500px of the smaller CSE-reported dimension (cap `+3`)
+  - `−2` if `contextLink` host is in `LOW_TRUST_CONTEXT_HOSTS`
+- **Relevance gate for auto-adopt** (when `scoreable === true`):
+  - Adopt only if the chosen result has at least one brand-token OR filtered-name-token match in `contextLink` host, `title`, or `snippet`.
+  - If no scored result meets this bar → `cseAdopted: false`, top-level `errorCode: "no_image"`, telemetry `relevanceMatched: false`.
+- Adopt highest score; ties broken by CSE result order. Record `relevanceMatched: true|false` on the attempt.
 
-7. **Cache prefix bump `v8b|` → `v8b1|`** so old negative hits from v8b don't shadow the new eligibility/skip behavior.
+Return shape (unchanged contract):
+```
+{ imageUrl, source: "google_images", method: "google_cse", confidence: 0.55 }
+```
 
-8. **Telemetry (log-only, contract unchanged):**
-   - Top-level: `skippedDirect: boolean`.
-   - Each Firecrawl attempt: `firecrawlReason: "resolved_ok" | "resolved_no_image" | "unresolved_interstitial"`, computed as:
-     - `resolved_ok` — an image was extracted from the Firecrawl HTML/metadata.
-     - `unresolved_interstitial` — `fc.ok === true` but `safeHost(fc.finalUrl)` is still in `FIRECRAWL_ONLY_HOSTS`.
-     - `resolved_no_image` — otherwise.
-   - `finalOutcome` values stay exactly as today. No new public values.
+## Frontend
 
----
+### `src/components/admin/entity-create/SearchEntryPanel.tsx`
+- Pass `brand`, `variant`, `type` into the enrichment body.
+- Vertex client timeout stays at 12s (v8b.1). Non-Vertex stays 8.5s.
 
-### Backend: `enrich-candidate-image/firecrawl.ts`
+### `src/components/admin/entity-create/ImageCandidateGrid.tsx`
+- Ranking: `page_metadata > firecrawl > google_images > google_grounding`.
+- Chip **"From image search — verify"** on `google_images` candidates.
+- Preselect `google_images` only when no `page_metadata`/`firecrawl` image exists.
 
-9. Add optional `waitFor?: number` to `FirecrawlOpts`. In `runFirecrawlScrape`, use `opts.waitFor ?? 1500` in the request body `waitFor`. Default preserved. Do NOT touch `analyze-entity-url-v2/firecrawl.ts`.
+### `src/components/admin/entity-create/applyEntityDraft.ts`
+- Extend `mergeEnrichedImage` `source` union with `'google_images'`.
+- Confidence map: `page_metadata = 0.75`, `firecrawl = 0.7`, `google_images = 0.55`.
+- `reason` string for `google_images`: `"Google image search result — verify"`.
 
----
+### `src/hooks/admin/useAppFlagsAdmin.ts`
+- Add `'entity_extraction.search_image_cse_fallback_enabled'` to `ALLOWED_KEYS`.
 
-### Client: `SearchEntryPanel.tsx`
+### `src/components/admin/AdminFeatureFlagsPanel.tsx`
+- New toggle row: **"Google image search fallback (Vertex rows)"**
+- Description: *"When ON, search-result rows sourced from Google Vertex interstitials that have no page-owned image fall back to Google Custom Search Images. Auto-applied with a 'verify' chip. Uses existing Google CSE quota."*
+- Default OFF.
 
-10. **Host-aware timeout using the existing mechanism.** Don't refactor the client's timeout — read what's there (Promise.race vs AbortController) and reuse it. Add a tiny helper mirroring the backend set:
-    ```
-    const FIRECRAWL_ONLY_HOSTS_FE = new Set(["vertexaisearch.cloud.google.com"]);
-    // Keep in sync with enrich-candidate-image/index.ts FIRECRAWL_ONLY_HOSTS.
-    function isFirecrawlOnlyHost(url: string | null | undefined): boolean {
-      if (!url) return false;
-      try { return FIRECRAWL_ONLY_HOSTS_FE.has(new URL(url).host.toLowerCase()); }
-      catch { return false; }
-    }
-    ```
-    Per-row before invoking enrichment:
-    ```
-    const timeoutMs = isFirecrawlOnlyHost(candidate.sourceUrl) ? 12_000 : ENRICH_CLIENT_TIMEOUT_MS; // 8_500
-    ```
-    Pass `timeoutMs` into whatever the current timeout wrapper accepts. Keep `ENRICH_CLIENT_TIMEOUT_MS = 8_500` unchanged.
+## Out of scope for v8c
+- CSE for non-Vertex misses (revisit as v8d once quality data is in).
+- Persistent cross-instance CSE cache.
+- Removing Firecrawl code or flipping its default.
+- Resolving Vertex → real destination redirect.
 
----
+## Manual verification
 
-### Manual verification (you)
+**Prep:** `/admin → Feature Flags` → enable **"Google image search fallback (Vertex rows)"**. Keep Firecrawl flag OFF.
 
-- **Flag OFF, 3 recent searches:** identical behavior to today. Latencies, images, initials all match.
-- **Flag ON, same 3 searches:** in edge logs check
-  - `skippedDirect: true` on every Vertex row,
-  - `attempts[]` contains the synthetic skip entry with `skipReason: "firecrawl_only_host"`,
-  - `firecrawlReason` distribution across rows (mostly `unresolved_interstitial` is the expected/known limit),
-  - `finalOutcome` values are still the ones you see today (no new labels).
-- **Row UX:** normal (non-Vertex) rows load in ~1–2s; Vertex rows may now wait up to ~11s before showing image or initials.
+Run: `babe laboratorios healthy aging serum`, `cetaphil gentle cleanser`, `chemist at play roll on`.
 
-### Decision gate (post-v8b.1)
+**Expected in `enrich-candidate-image` logs (Vertex rows):**
+- `attempts[]` contains a `google_cse` entry with `scoreable: true` (name tokens exist), `relevanceMatched: true` on most rows.
+- Top-level `cseUsed: true`. `cseAdopted: true` on most rows with recognizable brand + product name.
+- `cseAdopted: false, diagnostics.errorCode: "no_image", attempts[...].relevanceMatched: false` acceptable when no CSE result matches brand/name tokens.
+- `totalLatencyMs` on Vertex rows typically < 4s.
+- Only `queryHashPrefix` in logs — never raw query text.
+- Repeat run: `attempts[...].cached: true`, no CSE HTTP call.
 
-- `unresolved_interstitial` dominates → ship v8b.2 (conservative citation-URL promotion in `search-entity-candidates`) and v8c (Google CSE image fallback, auto-applied to row thumbnail with "From image search — verify" chip per your override).
-- Firecrawl surprises us and resolves most Vertex rows → skip v8c, ship only v8b.2.
+**Expected in UI:**
+- Most Vertex rows show a thumbnail with **"From image search — verify"** chip.
+- Rows where CSE returned no safe/relevant image still show initials.
+- Draft Review preselects CSE image only when no page/Firecrawl image exists.
 
-I'll write v8b.2 and v8c as separate plans once you've run the manual verification and shared the log excerpt.
+**Flag OFF:** Vertex rows fall back to initials (current v8b.1 behavior).
+
+**Quota simulation (optional):** trigger 429 once → subsequent Vertex rows within 10 min show `diagnostics.cseSkipReason: "quota_throttled"`, fall back to initials without hitting CSE.
+
+## Decision gate after v8c
+- Consistently good on-brand images → expand to non-Vertex misses (v8d).
+- Frequent throttling → tighten daily cap or move to persisted counter.
+- Wrong images slipping through → strengthen relevance gate (require both brand AND name token match, or require `contextLink` host to contain a brand token).
