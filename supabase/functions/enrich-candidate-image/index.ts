@@ -627,8 +627,28 @@ serve(async (req) => {
     //      4. clean-URL retry (existing v7 rule) → success (winningAttempt="clean_url_retry")
     //      5. return no_image (or worst error).
 
-    type AttemptKind = "direct" | "soft_redirect" | "clean_url_retry" | "firecrawl";
+    type AttemptKind =
+      | "direct" | "soft_redirect" | "clean_url_retry"
+      | "firecrawl" | "google_cse";
     type FirecrawlReason = "resolved_ok" | "resolved_no_image" | "unresolved_interstitial";
+    type CseSkipReason =
+      | "no_usable_query"
+      | "quota_throttled"
+      | "cse_disabled"
+      | "not_vertex_host"
+      | "flag_off"
+      | "budget_exhausted";
+    interface CseAttemptDetail {
+      queryHashPrefix: string;
+      resultCount: number;
+      cached: boolean;
+      quotaThrottled: boolean;
+      skipReason?: CseSkipReason;
+      /** Score of the picked item, 0..1. Null when none picked. */
+      chosenScore?: number | null;
+      /** Score of the best-scored item examined (may be below threshold). */
+      topScore?: number | null;
+    }
     interface AttemptTelemetry {
       kind: AttemptKind;
       errorCode: ErrorCode | null;
@@ -640,6 +660,8 @@ serve(async (req) => {
       skipReason?: string;
       /** v8b.1 — set on Firecrawl attempts. */
       firecrawlReason?: FirecrawlReason;
+      /** v8c — set on google_cse attempts. */
+      cseAttempt?: CseAttemptDetail;
     }
     interface FetchOk { finalUrl: string; html: string; }
     interface FetchErr { errorCode: ErrorCode; }
