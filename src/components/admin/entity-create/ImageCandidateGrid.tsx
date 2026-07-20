@@ -39,7 +39,10 @@ interface Props {
 function chipForSource(source?: string): string {
   switch (source) {
     case 'official_site': return 'Official site';
-    case 'google_images': return 'Google Images';
+    // v8c — Google Images / Google CSE fallback results carry a "verify" chip
+    // to signal they came from image search rather than the entity's own page.
+    case 'google_images': return 'From image search — verify';
+    case 'google_cse': return 'From image search — verify';
     case 'firecrawl': return 'Rendered page';
     case 'page_metadata': return 'Page metadata';
     case 'user_upload': return 'User upload';
@@ -53,6 +56,21 @@ function confidenceColor(c?: number): string {
   if (c >= 0.7) return 'bg-green-500';
   if (c >= 0.4) return 'bg-amber-500';
   return 'bg-muted-foreground/40';
+}
+
+// v8c — Picker ranking priority (lower index = better).
+// page_metadata > firecrawl > google_images > google_grounding > others.
+const SOURCE_PRIORITY: Record<string, number> = {
+  page_metadata: 0,
+  official_site: 0,
+  firecrawl: 1,
+  google_images: 2,
+  google_cse: 2,
+  google_grounding: 4,
+};
+function sourceRank(source?: string): number {
+  if (!source) return 3;
+  return SOURCE_PRIORITY[source] ?? 3;
 }
 
 interface Tile {
