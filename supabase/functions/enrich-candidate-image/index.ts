@@ -21,6 +21,7 @@ import {
   isNonAdminEntityCreationEnabled,
   isNonAdminSearchToDraftEnabled,
   isSearchImageFirecrawlEnabled,
+  isSearchImageCseFallbackEnabled,
 } from "../_shared/feature_flags.ts";
 import { assertSafeUrl, SsrfError } from "./ssrf.ts";
 import { isValidPageImageUrl } from "./image_validation.ts";
@@ -36,6 +37,16 @@ import {
   NORMAL_FIRECRAWL_API_TIMEOUT_MS,
   NORMAL_FIRECRAWL_LOCAL_TIMEOUT_MS,
 } from "./firecrawl.ts";
+// v8c — Google CSE image fallback, used ONLY for Vertex-interstitial rows.
+import {
+  runGoogleCseImageSearch,
+  buildCseQuery,
+  computeQueryHashPrefix,
+  isCseDisabled,
+  GENERIC_NAME_STOPWORDS,
+  LOW_TRUST_CONTEXT_HOSTS,
+  type CseImageItem,
+} from "./google_cse.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
