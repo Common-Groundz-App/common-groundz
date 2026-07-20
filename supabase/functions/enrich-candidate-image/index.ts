@@ -461,6 +461,7 @@ serve(async (req) => {
   let method: ExtractMethod | null = null;
   let cached = false;
   let firecrawlEnabled = false;
+  let cseEnabled = false;
 
   try {
     // 1. Auth.
