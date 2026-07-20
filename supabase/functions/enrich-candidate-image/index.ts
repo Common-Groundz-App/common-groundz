@@ -966,7 +966,150 @@ serve(async (req) => {
       });
     }
 
+    // Step 6 — v8c Google CSE image fallback (flag-gated, Vertex-only).
+    // Runs when: CSE flag ON, host is Firecrawl-only (Vertex interstitial),
+    // and no image has been found yet. One CSE image search + one
+    // content-type probe. Budget-aware; skipped if <800ms remain.
+    if (
+      !winningAttempt &&
+      cseEnabled &&
+      isFirecrawlOnlyHost &&
+      (result.errorCode === "no_image" ||
+       result.errorCode === "invalid_content_type")
+    ) {
+      const t0 = Date.now();
+      const remainingMs = deadline - Date.now();
+      // Base skip diagnostics; overridden below when we actually call CSE.
+      let skipReason: CseSkipReason | undefined;
+      let cseDetail: CseAttemptDetail = {
+        queryHashPrefix: "",
+        resultCount: 0,
+        cached: false,
+        quotaThrottled: false,
+      };
+      let cseErrorCode: ErrorCode | null = "no_image";
+      let cseMethod: ExtractMethod | null = null;
+
+      const built = buildCseQuery({ name, brand, variant });
+      if (built.reason === "no_usable_query" || !built.query) {
+        skipReason = "no_usable_query";
+      } else if (isCseDisabled()) {
+        skipReason = "cse_disabled";
+      } else if (remainingMs < 800) {
+        skipReason = "budget_exhausted";
+      }
+
+      if (skipReason) {
+        // Compute hash prefix for correlation even when we short-circuit.
+        cseDetail.queryHashPrefix = built.query
+          ? await computeQueryHashPrefix(built.query)
+          : "";
+        cseDetail.skipReason = skipReason;
+      } else if (built.query) {
+        const timeoutMs = Math.min(2_500, Math.max(800, remainingMs - 300));
+        const search = await runGoogleCseImageSearch({
+          query: built.query,
+          timeoutMs,
+        });
+        cseDetail.queryHashPrefix = search.queryHashPrefix;
+        cseDetail.resultCount = search.resultCount;
+        cseDetail.cached = search.cached;
+        cseDetail.quotaThrottled = search.quotaThrottled;
+        if (search.quotaThrottled && search.items.length === 0) {
+          cseDetail.skipReason = "quota_throttled";
+        }
+
+        // ---- Score items and pick the best one that clears validation. ----
+        const nameTokensAll = name
+          .toLowerCase()
+          .split(/[^a-z0-9]+/i)
+          .filter((t) => t.length > 0);
+        const nameTokens = nameTokensAll.filter(
+          (t) => !GENERIC_NAME_STOPWORDS.has(t),
+        );
+        const brandTokens = brand
+          .toLowerCase()
+          .split(/[^a-z0-9]+/i)
+          .filter((t) => t.length > 0);
+
+        const scored = search.items.map((it: CseImageItem) => {
+          const ctxHost = (() => {
+            try {
+              return it.contextLink ? new URL(it.contextLink).hostname : "";
+            } catch {
+              return "";
+            }
+          })();
+          const haystack = [
+            it.title,
+            it.snippet,
+            ctxHost,
+            it.contextLink ?? "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          const brandHit = brandTokens.length > 0
+            ? (brandTokens.every((t) => haystack.includes(t)) ? 1 : 0)
+            : 0;
+          const nameMatches = nameTokens.length > 0
+            ? nameTokens.filter((t) => haystack.includes(t)).length
+            : 0;
+          const nameRatio = nameTokens.length > 0
+            ? nameMatches / nameTokens.length
+            : 0;
+          let score =
+            (brandTokens.length > 0 ? brandHit * 0.5 : 0) + nameRatio * 0.5;
+          // When there is no usable brand, weight name-only fully.
+          if (brandTokens.length === 0) score = nameRatio;
+          if (ctxHost && LOW_TRUST_CONTEXT_HOSTS.has(ctxHost)) score -= 0.25;
+          return { item: it, score };
+        });
+        scored.sort((a, b) => b.score - a.score);
+        cseDetail.topScore = scored.length > 0 ? scored[0].score : null;
+
+        // Only consider candidates that clear the threshold.
+        const MIN_SCORE = 0.3;
+        let pickedScore: number | null = null;
+        for (const { item, score } of scored) {
+          if (score < MIN_SCORE) break;
+          if (deadline - Date.now() < 500) break;
+          const url = item.imageUrl;
+          if (!url || !isValidPageImageUrl(url) || looksLikeLogoOrBanner(url)) {
+            continue;
+          }
+          try {
+            await assertSafeUrl(url);
+          } catch {
+            continue;
+          }
+          const okType = await probeImageContentType(url, deadline);
+          if (!okType) continue;
+          result = {
+            imageUrl: url,
+            source: "google_images",
+            method: "google_cse",
+          };
+          winningAttempt = "google_cse";
+          cseMethod = "google_cse";
+          cseErrorCode = null;
+          pickedScore = score;
+          break;
+        }
+        cseDetail.chosenScore = pickedScore;
+      }
+
+      attempts.push({
+        kind: "google_cse",
+        errorCode: cseErrorCode,
+        method: cseMethod,
+        latencyMs: Date.now() - t0,
+        softRedirectKind: null,
+        cseAttempt: cseDetail,
+      });
+    }
+
     method = result.method ?? method;
+
 
     // 7. Cache per policy.
     const ttl = ttlFor(result);
