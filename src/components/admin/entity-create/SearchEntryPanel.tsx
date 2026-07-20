@@ -558,8 +558,8 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded bg-muted">
                         {showSkeleton ? (
                           <Skeleton className="h-full w-full" />
-                        ) : pageMetaUrl ? (
-                          <ImageWithFallback src={pageMetaUrl} alt={c.name} className="h-full w-full object-cover" />
+                        ) : rowImageUrl ? (
+                          <ImageWithFallback src={rowImageUrl} alt={c.name} className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-muted-foreground">
                             {initials}
