@@ -71,7 +71,7 @@ function isFirecrawlOnlyHost(url: string | null | undefined): boolean {
 
 interface EnrichResponse {
   imageUrl: string | null;
-  source: 'page_metadata' | 'firecrawl' | null;
+  source: 'page_metadata' | 'firecrawl' | 'google_images' | null;
   method: EnrichedImageMethod | null;
   diagnostics?: { latencyMs: number; fetched: boolean; cached: boolean; errorCode?: string };
 }
