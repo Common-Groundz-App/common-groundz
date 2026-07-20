@@ -540,8 +540,9 @@ serve(async (req) => {
     // v8b.1 + v8c — Vertex-interstitial hosts require special handling: skip
     // direct fetch, extend the deadline, and version the cache key. Entered
     // when EITHER the Firecrawl flag OR the CSE flag is ON.
+    const isVertexHost = FIRECRAWL_ONLY_HOSTS.has(host);
     const isFirecrawlOnlyHost =
-      (firecrawlEnabled || cseEnabled) && FIRECRAWL_ONLY_HOSTS.has(host);
+      (firecrawlEnabled || cseEnabled) && isVertexHost;
     if (isFirecrawlOnlyHost) {
       // Firecrawl needs a bigger budget (~5s extra). CSE-only path needs less
       // (~2.5s extra: single Google CSE call + content-type probe).
@@ -570,6 +571,9 @@ serve(async (req) => {
         event: "enrich_candidate_image",
         host,
         cached: true,
+        firecrawlEnabled,
+        cseEnabled,
+        skippedDirect: isFirecrawlOnlyHost,
         finalOutcome,
         winningAttempt: "cache",
         winningMethod: cachedResult.method,
@@ -603,6 +607,9 @@ serve(async (req) => {
         event: "enrich_candidate_image",
         host,
         cached: false,
+        firecrawlEnabled,
+        cseEnabled,
+        skippedDirect: isFirecrawlOnlyHost,
         finalOutcome: "rate_limited",
         winningAttempt: null,
         winningMethod: null,
@@ -651,6 +658,10 @@ serve(async (req) => {
       chosenScore?: number | null;
       /** Score of the best-scored item examined (may be below threshold). */
       topScore?: number | null;
+      /** Google CSE HTTP status, when a provider request was made. */
+      httpStatus?: number | null;
+      /** Provider/guard failure reason, never raw query text. */
+      errorReason?: string | null;
     }
     interface AttemptTelemetry {
       kind: AttemptKind;
@@ -967,13 +978,12 @@ serve(async (req) => {
     }
 
     // Step 6 — v8c Google CSE image fallback (flag-gated, Vertex-only).
-    // Runs when: CSE flag ON, host is Firecrawl-only (Vertex interstitial),
-    // and no image has been found yet. One CSE image search + one
-    // content-type probe. Budget-aware; skipped if <800ms remain.
+    // Runs when: CSE flag ON, host is Vertex interstitial, and no image has
+    // been found yet. Also records explicit skip telemetry for Vertex rows
+    // when the flag is off and for non-Vertex misses when the flag is on.
     if (
       !winningAttempt &&
-      cseEnabled &&
-      isFirecrawlOnlyHost &&
+      (isVertexHost || cseEnabled) &&
       (result.errorCode === "no_image" ||
        result.errorCode === "invalid_content_type")
     ) {
@@ -991,7 +1001,11 @@ serve(async (req) => {
       let cseMethod: ExtractMethod | null = null;
 
       const built = buildCseQuery({ name, brand, variant });
-      if (built.reason === "no_usable_query" || !built.query) {
+      if (!isVertexHost) {
+        skipReason = "not_vertex_host";
+      } else if (!cseEnabled) {
+        skipReason = "flag_off";
+      } else if (built.reason === "no_usable_query" || !built.query) {
         skipReason = "no_usable_query";
       } else if (isCseDisabled()) {
         skipReason = "cse_disabled";
@@ -1015,8 +1029,22 @@ serve(async (req) => {
         cseDetail.resultCount = search.resultCount;
         cseDetail.cached = search.cached;
         cseDetail.quotaThrottled = search.quotaThrottled;
+        cseDetail.httpStatus = search.httpStatus;
+        cseDetail.errorReason = search.errorReason;
         if (search.quotaThrottled && search.items.length === 0) {
           cseDetail.skipReason = "quota_throttled";
+        }
+        if (search.errorReason && search.items.length === 0) {
+          console.warn(JSON.stringify({
+            event: "google_cse_image_search",
+            queryHashPrefix: search.queryHashPrefix,
+            httpStatus: search.httpStatus,
+            errorReason: search.errorReason,
+            resultCount: search.resultCount,
+            cached: search.cached,
+            quotaThrottled: search.quotaThrottled,
+            latencyMs: search.latencyMs,
+          }));
         }
 
         // ---- Score items and pick the best one that clears validation. ----

@@ -59,6 +59,8 @@ export const LOW_TRUST_CONTEXT_HOSTS = new Set<string>([
 interface CseCacheEntry {
   items: CseImageItem[];
   quotaThrottled: boolean;
+  httpStatus: number | null;
+  errorReason: string | null;
   expiresAt: number;
 }
 
@@ -103,6 +105,8 @@ export interface CseSearchResult {
   queryHashPrefix: string;
   latencyMs: number;
   resultCount: number;
+  httpStatus: number | null;
+  errorReason: string | null;
 }
 
 export interface BuildCseQueryInput {
@@ -242,6 +246,8 @@ export async function runGoogleCseImageSearch(
       queryHashPrefix,
       latencyMs: nowMs() - t0,
       resultCount: hit.items.length,
+      httpStatus: hit.httpStatus,
+      errorReason: hit.errorReason,
     };
   }
 
@@ -254,6 +260,8 @@ export async function runGoogleCseImageSearch(
       queryHashPrefix,
       latencyMs: nowMs() - t0,
       resultCount: 0,
+      httpStatus: null,
+      errorReason: "cse_disabled",
     };
   }
   tickDailyBucket();
@@ -265,6 +273,8 @@ export async function runGoogleCseImageSearch(
       queryHashPrefix,
       latencyMs: nowMs() - t0,
       resultCount: 0,
+      httpStatus: null,
+      errorReason: "daily_limit_guard",
     };
   }
 
@@ -280,6 +290,8 @@ export async function runGoogleCseImageSearch(
       queryHashPrefix,
       latencyMs: nowMs() - t0,
       resultCount: 0,
+      httpStatus: null,
+      errorReason: "missing_config",
     };
   }
 
@@ -298,29 +310,38 @@ export async function runGoogleCseImageSearch(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let items: CseImageItem[] = [];
   let quotaThrottled = false;
+  let httpStatus: number | null = null;
+  let errorReason: string | null = null;
+  let shouldCache = false;
   try {
     const resp = await fetchImpl(url.toString(), {
       method: "GET",
       signal: controller.signal,
     });
+    httpStatus = resp.status;
 
     if (resp.status === 429) {
       cseDisabledUntil = nowMs() + 10 * 60 * 1000;
       quotaThrottled = true;
+      errorReason = "rate_limited";
+      shouldCache = true;
     } else if (!resp.ok) {
       // Try to detect quotaExceeded per Google's error contract.
       try {
         const err = await resp.json();
         const reasons: string[] =
           (err?.error?.errors ?? []).map((e: any) => e?.reason).filter(Boolean);
+        errorReason = reasons[0] ?? err?.error?.status ?? `http_${resp.status}`;
         if (reasons.includes("quotaExceeded") || reasons.includes("dailyLimitExceeded")) {
           cseDisabledUntil = nowMs() + 10 * 60 * 1000;
           quotaThrottled = true;
         }
       } catch {
-        /* ignore body parse errors */
+        errorReason = `http_${resp.status}`;
       }
+      shouldCache = quotaThrottled;
     } else {
+      shouldCache = true;
       const body = await resp.json();
       const raw = Array.isArray(body?.items) ? body.items : [];
       items = raw
@@ -343,17 +364,24 @@ export async function runGoogleCseImageSearch(
         })
         .filter((x: CseImageItem | null): x is CseImageItem => x !== null);
     }
-  } catch {
-    // Timeout / network / abort — leave items empty.
+  } catch (e) {
+    // Timeout / network / abort — leave items empty and do not cache.
+    errorReason = e instanceof DOMException && e.name === "AbortError"
+      ? "timeout"
+      : "network_error";
   } finally {
     clearTimeout(timer);
   }
 
-  cachePut(key, {
-    items,
-    quotaThrottled,
-    expiresAt: nowMs() + CACHE_TTL_MS,
-  });
+  if (shouldCache) {
+    cachePut(key, {
+      items,
+      quotaThrottled,
+      httpStatus,
+      errorReason,
+      expiresAt: nowMs() + CACHE_TTL_MS,
+    });
+  }
 
   return {
     items,
@@ -362,6 +390,8 @@ export async function runGoogleCseImageSearch(
     queryHashPrefix,
     latencyMs: nowMs() - t0,
     resultCount: items.length,
+    httpStatus,
+    errorReason,
   };
 }
 
