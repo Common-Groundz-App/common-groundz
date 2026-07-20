@@ -509,10 +509,22 @@ serve(async (req) => {
     firecrawlEnabled = await isSearchImageFirecrawlEnabled(supabaseAdmin);
 
 
+    // v8b.1 + v8c — read Firecrawl and CSE flags in parallel.
+    [firecrawlEnabled, cseEnabled] = await Promise.all([
+      isSearchImageFirecrawlEnabled(supabaseAdmin),
+      isSearchImageCseFallbackEnabled(supabaseAdmin),
+    ]);
+
+
     // 3. Validate input.
     const body = (await req.json().catch(() => ({}))) as {
       sourceUrl?: string;
       name?: string;
+      // v8c — brand / variant / type improve CSE fallback query relevance
+      // for Vertex rows. Ignored elsewhere. All optional; backwards compat.
+      brand?: string | null;
+      variant?: string | null;
+      type?: string | null;
     };
     const sourceUrlRaw = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : "";
     const name = typeof body.name === "string" ? body.name.trim() : "";
