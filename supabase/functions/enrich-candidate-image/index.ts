@@ -1124,6 +1124,7 @@ serve(async (req) => {
       host,
       cached: false,
       firecrawlEnabled,
+      cseEnabled,
       skippedDirect: isFirecrawlOnlyHost,
       finalOutcome,
       winningAttempt,
