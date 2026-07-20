@@ -504,12 +504,9 @@ serve(async (req) => {
       }
     }
 
-    // v8b.1 — read Firecrawl flag here; deadline is extended below only
-    // when the source URL is on a Firecrawl-only host.
-    firecrawlEnabled = await isSearchImageFirecrawlEnabled(supabaseAdmin);
-
-
-    // v8b.1 + v8c — read Firecrawl and CSE flags in parallel.
+    // v8b.1 + v8c — read Firecrawl and CSE flags in parallel. Firecrawl-only
+    // host handling still uses `firecrawlEnabled` to extend the deadline;
+    // `cseEnabled` gates the Vertex-only CSE fallback below.
     [firecrawlEnabled, cseEnabled] = await Promise.all([
       isSearchImageFirecrawlEnabled(supabaseAdmin),
       isSearchImageCseFallbackEnabled(supabaseAdmin),
