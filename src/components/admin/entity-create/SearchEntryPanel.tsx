@@ -518,16 +518,24 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
                 {result.candidates.map((p, idx) => {
                   const c = p.candidate;
                   const enriching = enrichingIndexes.has(idx);
-                  // v7 — Row thumbnail = page_metadata only. `google_grounding`
-                  // images are unreliable (brand banners, wrong redirects) and
-                  // are hidden from the row. An empty tile with monogram
-                  // initials is better than a misleading first-row banner.
-                  const pageMetaUrl =
-                    (p.draft?.imageCandidates ?? []).find(
-                      (ic: any) => ic?.source === 'page_metadata' && typeof ic.url === 'string',
-                    )?.url ?? null;
-                  const showSkeleton = enriching && !pageMetaUrl;
-                  const showOverlay = enriching && !!pageMetaUrl;
+                  // v8c — Row thumbnail priority:
+                  //   page_metadata > firecrawl > google_images/google_cse.
+                  // `google_grounding` stays excluded (unreliable brand banners).
+                  const candidates = (p.draft?.imageCandidates ?? []) as Array<any>;
+                  const pickBySource = (src: string) =>
+                    candidates.find((ic) => ic?.source === src && typeof ic.url === 'string') ?? null;
+                  const rowImage =
+                    pickBySource('page_metadata') ??
+                    pickBySource('firecrawl') ??
+                    pickBySource('google_images') ??
+                    pickBySource('google_cse') ??
+                    null;
+                  const rowImageUrl: string | null = rowImage?.url ?? null;
+                  const rowImageSource: string | null = rowImage?.source ?? null;
+                  const isImageSearchSource =
+                    rowImageSource === 'google_images' || rowImageSource === 'google_cse';
+                  const showSkeleton = enriching && !rowImageUrl;
+                  const showOverlay = enriching && !!rowImageUrl;
                   const initials = (c.name || '?')
                     .split(/\s+/)
                     .filter(Boolean)
