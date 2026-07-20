@@ -38,6 +38,7 @@ type PendingChange =
   | { key: 'entity_creation.non_admin_enabled'; nextEnabled: boolean }
   | { key: 'search_to_draft.non_admin_enabled'; nextEnabled: boolean }
   | { key: 'entity_extraction.search_image_firecrawl_enabled'; nextEnabled: boolean }
+  | { key: 'entity_extraction.search_image_cse_fallback_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -105,6 +106,12 @@ export function AdminFeatureFlagsPanel() {
   );
   const firecrawlImgEnabled: boolean = firecrawlImgRow?.value?.enabled === true;
 
+  // v8c — Google CSE image fallback for Vertex rows. Default OFF.
+  const cseImgRow = rows.data?.find(
+    (r) => r.key === 'entity_extraction.search_image_cse_fallback_enabled',
+  );
+  const cseImgEnabled: boolean = cseImgRow?.value?.enabled === true;
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
@@ -138,7 +145,11 @@ export function AdminFeatureFlagsPanel() {
                     ? pending.nextEnabled
                       ? 'Enable Firecrawl fallback for search-result images?'
                       : 'Disable Firecrawl fallback for search-result images?'
-                    : '';
+                    : pending?.key === 'entity_extraction.search_image_cse_fallback_enabled'
+                      ? pending.nextEnabled
+                        ? 'Enable Google image search fallback for Vertex rows?'
+                        : 'Disable Google image search fallback for Vertex rows?'
+                      : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -173,7 +184,11 @@ export function AdminFeatureFlagsPanel() {
                     ? pending.nextEnabled
                       ? 'When a search result has no image after direct fetch and soft-redirect, enrich-candidate-image will use Firecrawl as a last-resort fallback (extra ~2 s budget). Search-to-Draft only — URL Analysis is unaffected. May consume Firecrawl credits.'
                       : 'Disables the Firecrawl fallback in enrich-candidate-image. Results missing an image after direct fetch/soft-redirect will show no image, as before.'
-                    : '';
+                    : pending?.key === 'entity_extraction.search_image_cse_fallback_enabled'
+                      ? pending.nextEnabled
+                        ? 'For Vertex-interstitial search results only, enrich-candidate-image will run one Google Custom Search image query (brand + name) as a last-resort fallback. Skips Firecrawl for these rows to save quota. Results appear with a "From image search — verify" chip. Uses your existing Google CSE key/CX.'
+                        : 'Disables the Google image search fallback for Vertex rows. Those results will show no image if direct fetch/soft-redirect finds none.'
+                      : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -220,9 +235,15 @@ export function AdminFeatureFlagsPanel() {
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'entity_extraction.search_image_firecrawl_enabled') {
         await setFlag.mutateAsync({
           key: 'entity_extraction.search_image_firecrawl_enabled',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_extraction.search_image_cse_fallback_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
@@ -655,6 +676,56 @@ export function AdminFeatureFlagsPanel() {
           </div>
         </CardContent>
       </Card>
+
+      {/* v8c — Google CSE image fallback for Vertex rows */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Google image search fallback (Vertex rows)
+          </CardTitle>
+          <CardDescription>
+            Uses one Google Custom Search image query as a last-resort
+            image source for Vertex interstitial search results. Skips
+            Firecrawl for those rows to save quota.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="cse-search-image" className="text-base">
+                Use Google Images as a fallback for Vertex rows
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, if a Vertex-interstitial search result has no image after
+                direct fetch and soft-redirect, <code>enrich-candidate-image</code> runs one
+                Google Custom Search image query (brand + name) with a ~2.5 s budget.
+                Chosen results are labeled <em>From image search — verify</em> in the picker.
+                Uses your existing <code>GOOGLE_CUSTOM_SEARCH_API_KEY</code> and
+                <code> GOOGLE_CUSTOM_SEARCH_CX</code>.
+              </p>
+              {cseImgRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(cseImgRow.updated_at), { addSuffix: true })}
+                  {cseImgRow.updated_reason ? ` — “${cseImgRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="cse-search-image"
+              checked={cseImgEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({
+                  key: 'entity_extraction.search_image_cse_fallback_enabled',
+                  nextEnabled: checked,
+                })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
 
 
 

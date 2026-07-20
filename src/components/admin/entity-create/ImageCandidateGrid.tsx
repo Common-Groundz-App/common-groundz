@@ -39,7 +39,10 @@ interface Props {
 function chipForSource(source?: string): string {
   switch (source) {
     case 'official_site': return 'Official site';
-    case 'google_images': return 'Google Images';
+    // v8c — Google Images / Google CSE fallback results carry a "verify" chip
+    // to signal they came from image search rather than the entity's own page.
+    case 'google_images': return 'From image search — verify';
+    case 'google_cse': return 'From image search — verify';
     case 'firecrawl': return 'Rendered page';
     case 'page_metadata': return 'Page metadata';
     case 'user_upload': return 'User upload';
@@ -53,6 +56,21 @@ function confidenceColor(c?: number): string {
   if (c >= 0.7) return 'bg-green-500';
   if (c >= 0.4) return 'bg-amber-500';
   return 'bg-muted-foreground/40';
+}
+
+// v8c — Picker ranking priority (lower index = better).
+// page_metadata > firecrawl > google_images > google_grounding > others.
+const SOURCE_PRIORITY: Record<string, number> = {
+  page_metadata: 0,
+  official_site: 0,
+  firecrawl: 1,
+  google_images: 2,
+  google_cse: 2,
+  google_grounding: 4,
+};
+function sourceRank(source?: string): number {
+  if (!source) return 3;
+  return SOURCE_PRIORITY[source] ?? 3;
 }
 
 interface Tile {
@@ -77,18 +95,24 @@ export const ImageCandidateGrid: React.FC<Props> = ({
     setBrokenUrls((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
   }, []);
 
-  // v7 — `google_grounding` is always the last resort. Any other source
-  // (page_metadata, official_site, firecrawl, user_upload, ai_inference,
-  // book_cover, movie_poster, places_photo, open_food_facts, google_images,
-  // google_cse, existing_entity, admin_manual) ranks above it.
+  // v8c — Prefer sources by priority:
+  //   page_metadata / official_site > firecrawl > google_images / google_cse
+  //   > (unknown) > google_grounding.
+  // Broken URLs and an optional exclude URL are filtered out. Ties fall back
+  // to the original candidate order.
   const pickBestCandidateUrl = useCallback(
     (excludeUrl?: string | null): string | null => {
-      const eligible = candidates.filter(
-        (c) => c.url && !brokenUrls.has(c.url) && c.url !== excludeUrl,
-      );
+      const eligible = candidates
+        .map((c, i) => ({ c, i }))
+        .filter(({ c }) => c.url && !brokenUrls.has(c.url) && c.url !== excludeUrl);
       if (eligible.length === 0) return null;
-      const nonGoogle = eligible.find((c) => (c as any).source !== 'google_grounding');
-      return (nonGoogle ?? eligible[0]).url;
+      eligible.sort((a, b) => {
+        const ra = sourceRank((a.c as any).source);
+        const rb = sourceRank((b.c as any).source);
+        if (ra !== rb) return ra - rb;
+        return a.i - b.i;
+      });
+      return eligible[0].c.url;
     },
     [candidates, brokenUrls],
   );

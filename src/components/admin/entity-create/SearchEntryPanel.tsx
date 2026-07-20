@@ -71,7 +71,7 @@ function isFirecrawlOnlyHost(url: string | null | undefined): boolean {
 
 interface EnrichResponse {
   imageUrl: string | null;
-  source: 'page_metadata' | 'firecrawl' | null;
+  source: 'page_metadata' | 'firecrawl' | 'google_images' | null;
   method: EnrichedImageMethod | null;
   diagnostics?: { latencyMs: number; fetched: boolean; cached: boolean; errorCode?: string };
 }
@@ -157,7 +157,16 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
           ? ENRICH_CLIENT_TIMEOUT_MS_FIRECRAWL_ONLY
           : ENRICH_CLIENT_TIMEOUT_MS;
         const enrichPromise = supabase.functions.invoke('enrich-candidate-image', {
-          body: { sourceUrl: candidate.sourceUrl, name: candidate.name },
+          body: {
+            sourceUrl: candidate.sourceUrl,
+            name: candidate.name,
+            // v8c — brand/variant/type let the CSE fallback build a better
+            // query when the source is a Vertex interstitial. Backward-
+            // compatible: the backend ignores them for non-Vertex flows.
+            brand: candidate.brand ?? null,
+            variant: candidate.variant ?? null,
+            type: candidate.type ?? null,
+          },
         });
         const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
           setTimeout(
