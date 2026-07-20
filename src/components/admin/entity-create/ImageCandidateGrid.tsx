@@ -95,18 +95,24 @@ export const ImageCandidateGrid: React.FC<Props> = ({
     setBrokenUrls((prev) => (prev.has(url) ? prev : new Set(prev).add(url)));
   }, []);
 
-  // v7 — `google_grounding` is always the last resort. Any other source
-  // (page_metadata, official_site, firecrawl, user_upload, ai_inference,
-  // book_cover, movie_poster, places_photo, open_food_facts, google_images,
-  // google_cse, existing_entity, admin_manual) ranks above it.
+  // v8c — Prefer sources by priority:
+  //   page_metadata / official_site > firecrawl > google_images / google_cse
+  //   > (unknown) > google_grounding.
+  // Broken URLs and an optional exclude URL are filtered out. Ties fall back
+  // to the original candidate order.
   const pickBestCandidateUrl = useCallback(
     (excludeUrl?: string | null): string | null => {
-      const eligible = candidates.filter(
-        (c) => c.url && !brokenUrls.has(c.url) && c.url !== excludeUrl,
-      );
+      const eligible = candidates
+        .map((c, i) => ({ c, i }))
+        .filter(({ c }) => c.url && !brokenUrls.has(c.url) && c.url !== excludeUrl);
       if (eligible.length === 0) return null;
-      const nonGoogle = eligible.find((c) => (c as any).source !== 'google_grounding');
-      return (nonGoogle ?? eligible[0]).url;
+      eligible.sort((a, b) => {
+        const ra = sourceRank((a.c as any).source);
+        const rb = sourceRank((b.c as any).source);
+        if (ra !== rb) return ra - rb;
+        return a.i - b.i;
+      });
+      return eligible[0].c.url;
     },
     [candidates, brokenUrls],
   );
