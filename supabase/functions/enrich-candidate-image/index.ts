@@ -870,6 +870,9 @@ serve(async (req) => {
     if (
       !winningAttempt &&
       firecrawlEnabled &&
+      // v8c — when CSE fallback is ON for a Vertex-interstitial host, skip
+      // Firecrawl entirely; CSE is the last resort for that host.
+      !(isFirecrawlOnlyHost && cseEnabled) &&
       (result.errorCode === "no_image" ||
        result.errorCode === "invalid_content_type") &&
       (deadline - Date.now()) >= 1500
