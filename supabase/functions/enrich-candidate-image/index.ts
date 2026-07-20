@@ -525,6 +525,9 @@ serve(async (req) => {
     };
     const sourceUrlRaw = typeof body.sourceUrl === "string" ? body.sourceUrl.trim() : "";
     const name = typeof body.name === "string" ? body.name.trim() : "";
+    // v8c — optional brand/variant/type context for CSE fallback.
+    const brand = typeof body.brand === "string" ? body.brand.trim().slice(0, 120) : "";
+    const variant = typeof body.variant === "string" ? body.variant.trim().slice(0, 120) : "";
     if (sourceUrlRaw.length < 8 || sourceUrlRaw.length > 2048) {
       return jsonResp({ error: "invalid_input" }, 400);
     }
