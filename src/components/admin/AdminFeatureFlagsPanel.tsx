@@ -746,6 +746,51 @@ export function AdminFeatureFlagsPanel() {
           </div>
         </CardContent>
       </Card>
+      {/* v8e — Brand logo lookup for Search-to-Draft rows */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Brand logo lookup (Search)
+          </CardTitle>
+          <CardDescription>
+            When ON, Search rows fetch brand logos in the background using the
+            same lookup URL Analysis uses. Admins can test even when OFF. Uses
+            the existing Google CSE daily quota.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="brand-logo-lookup" className="text-base">
+                Fetch brand logos for Search results
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Populates the brand chip logo on the Review draft dialog for
+                Search-to-Draft picks. Never used as a product row thumbnail.
+              </p>
+              {brandLogoLookupRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(brandLogoLookupRow.updated_at), { addSuffix: true })}
+                  {brandLogoLookupRow.updated_reason ? ` — “${brandLogoLookupRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="brand-logo-lookup"
+              checked={brandLogoLookupEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({
+                  key: 'entity_extraction.search_brand_logo_lookup_enabled',
+                  nextEnabled: checked,
+                })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
 
 
 
