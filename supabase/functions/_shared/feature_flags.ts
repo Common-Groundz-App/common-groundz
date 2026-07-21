@@ -67,3 +67,10 @@ export async function isSearchImageCseFallbackEnabled(
 ): Promise<boolean> {
   return readBooleanFlag("is_search_image_cse_fallback_enabled", supabaseAdmin);
 }
+
+// v8e — Brand logo lookup for Search-to-Draft rows. Default OFF.
+export async function isSearchBrandLogoLookupEnabled(
+  supabaseAdmin?: ReturnType<typeof createClient>,
+): Promise<boolean> {
+  return readBooleanFlag("is_search_brand_logo_lookup_enabled", supabaseAdmin);
+}

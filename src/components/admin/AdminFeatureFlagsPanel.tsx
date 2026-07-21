@@ -39,6 +39,7 @@ type PendingChange =
   | { key: 'search_to_draft.non_admin_enabled'; nextEnabled: boolean }
   | { key: 'entity_extraction.search_image_firecrawl_enabled'; nextEnabled: boolean }
   | { key: 'entity_extraction.search_image_cse_fallback_enabled'; nextEnabled: boolean }
+  | { key: 'entity_extraction.search_brand_logo_lookup_enabled'; nextEnabled: boolean }
   | null;
 
 export function AdminFeatureFlagsPanel() {
@@ -112,6 +113,12 @@ export function AdminFeatureFlagsPanel() {
   );
   const cseImgEnabled: boolean = cseImgRow?.value?.enabled === true;
 
+  // v8e — Brand logo lookup for Search-to-Draft rows. Default OFF.
+  const brandLogoLookupRow = rows.data?.find(
+    (r) => r.key === 'entity_extraction.search_brand_logo_lookup_enabled',
+  );
+  const brandLogoLookupEnabled: boolean = brandLogoLookupRow?.value?.enabled === true;
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
@@ -149,7 +156,11 @@ export function AdminFeatureFlagsPanel() {
                       ? pending.nextEnabled
                         ? 'Enable Google image search fallback?'
                         : 'Disable Google image search fallback?'
-                      : '';
+                      : pending?.key === 'entity_extraction.search_brand_logo_lookup_enabled'
+                        ? pending.nextEnabled
+                          ? 'Enable brand logo lookup for Search?'
+                          : 'Disable brand logo lookup for Search?'
+                        : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
@@ -188,7 +199,11 @@ export function AdminFeatureFlagsPanel() {
                         ? pending.nextEnabled
                           ? 'When ON, Search-to-Draft rows with no page-owned image may fall back to Google Custom Search Images. Auto-applied with a "From image search — verify" chip. Uses the existing Google CSE daily quota.'
                           : 'Disables the Google image search fallback. Rows missing an image after direct fetch/soft-redirect (and Firecrawl, if enabled) will show no image.'
-                      : '';
+                        : pending?.key === 'entity_extraction.search_brand_logo_lookup_enabled'
+                          ? pending.nextEnabled
+                            ? 'When ON, Search-to-Draft results fetch brand logos in the background using the same Google CSE lookup URL Analysis uses. Admins can test even when OFF. Uses the existing Google CSE daily quota.'
+                            : 'Disables background brand logo lookup for Search-to-Draft. Brand chips will show initials instead of logos.'
+                        : '';
 
   const applyPending = async () => {
     if (!pending) return;
@@ -241,9 +256,15 @@ export function AdminFeatureFlagsPanel() {
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'entity_extraction.search_image_cse_fallback_enabled') {
         await setFlag.mutateAsync({
           key: 'entity_extraction.search_image_cse_fallback_enabled',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_extraction.search_brand_logo_lookup_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
@@ -725,6 +746,51 @@ export function AdminFeatureFlagsPanel() {
           </div>
         </CardContent>
       </Card>
+      {/* v8e — Brand logo lookup for Search-to-Draft rows */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ToggleRight className="h-5 w-5 text-primary" />
+            Brand logo lookup (Search)
+          </CardTitle>
+          <CardDescription>
+            When ON, Search rows fetch brand logos in the background using the
+            same lookup URL Analysis uses. Admins can test even when OFF. Uses
+            the existing Google CSE daily quota.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="brand-logo-lookup" className="text-base">
+                Fetch brand logos for Search results
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Populates the brand chip logo on the Review draft dialog for
+                Search-to-Draft picks. Never used as a product row thumbnail.
+              </p>
+              {brandLogoLookupRow?.updated_at && (
+                <p className="text-xs text-muted-foreground">
+                  Updated {formatDistanceToNow(new Date(brandLogoLookupRow.updated_at), { addSuffix: true })}
+                  {brandLogoLookupRow.updated_reason ? ` — “${brandLogoLookupRow.updated_reason}”` : ''}
+                </p>
+              )}
+            </div>
+            <Switch
+              id="brand-logo-lookup"
+              checked={brandLogoLookupEnabled}
+              disabled={rows.isLoading || setFlag.isPending}
+              onCheckedChange={(checked) =>
+                setPending({
+                  key: 'entity_extraction.search_brand_logo_lookup_enabled',
+                  nextEnabled: checked,
+                })
+              }
+            />
+          </div>
+        </CardContent>
+      </Card>
+
 
 
 

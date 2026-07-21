@@ -76,6 +76,23 @@ interface EnrichResponse {
   diagnostics?: { latencyMs: number; fetched: boolean; cached: boolean; errorCode?: string };
 }
 
+// v8e — Response shape from resolve-brand-logo edge function.
+interface ResolveBrandLogoResponse {
+  logoUrl: string | null;
+  source: 'google_images' | 'favicon' | 'none';
+  cached: boolean;
+  skipReason?: string;
+}
+
+// v8e — Cap on unique brand lookups per search render.
+const BRAND_LOGO_LOOKUP_CAP = 6;
+// v8e — Client-side timeout for brand logo lookup (server budget is 4s).
+const BRAND_LOGO_CLIENT_TIMEOUT_MS = 6_000;
+
+function normalizeBrandKey(raw: string | null | undefined): string {
+  return (raw ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOpenExisting }) => {
   const { user } = useAuth();
   const [query, setQuery] = useState('');
@@ -95,6 +112,10 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
   // The stored promise resolves with the (possibly-enriched) payload so
   // Review & create can await it instead of firing a duplicate call.
   const inFlightRef = useRef<Map<string, Promise<SearchCandidatePayload>>>(new Map());
+  // v8e — session-scoped set of brand keys we've already resolved (or given
+  // up on). Prevents refiring lookups across re-searches within a session
+  // and keeps a 401/etc from spamming the function.
+  const resolvedBrandsRef = useRef<Set<string>>(new Set());
 
   const addEnriching = (idx: number) =>
     setEnrichingIndexes((prev) => {
@@ -198,6 +219,99 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
     return promise;
   };
 
+  // v8e — resolve brand logos for the current search result in the background.
+  // Batched by unique brand name (max BRAND_LOGO_LOOKUP_CAP). Patches the
+  // draft.brandCandidates[0].logoUrl and the top-level draft.brand.logoUrl
+  // shape URL Analysis produces. Bails on 401 / feature-off responses.
+  const resolveBrandLogos = async (runId: number, resp: SearchResponse) => {
+    if (!resp?.candidates?.length) return;
+    const seen = new Set<string>();
+    const jobs: Array<{ brand: string; homepage: string | null; hostname: string | null; key: string }> = [];
+    for (const payload of resp.candidates) {
+      const brand = (payload?.candidate?.brand ?? '').trim();
+      if (!brand) continue;
+      const key = normalizeBrandKey(brand);
+      if (!key || seen.has(key) || resolvedBrandsRef.current.has(key)) continue;
+      // Skip if the draft already carries a brand logo (e.g., URL Analysis path).
+      const existing = payload?.draft?.brandCandidates?.[0]?.logoUrl;
+      if (existing) {
+        resolvedBrandsRef.current.add(key);
+        continue;
+      }
+      seen.add(key);
+      const sourceUrl = payload?.candidate?.sourceUrl ?? null;
+      let hostname: string | null = null;
+      try { hostname = sourceUrl ? new URL(sourceUrl).hostname : null; } catch { hostname = null; }
+      jobs.push({
+        brand,
+        homepage: payload?.draft?.brandCandidates?.[0]?.websiteUrl ?? null,
+        hostname,
+        key,
+      });
+      if (jobs.length >= BRAND_LOGO_LOOKUP_CAP) break;
+    }
+    if (!jobs.length) return;
+
+    await Promise.all(jobs.map(async (job) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), BRAND_LOGO_CLIENT_TIMEOUT_MS);
+      try {
+        const { data, error } = await supabase.functions.invoke('resolve-brand-logo', {
+          body: { brand: job.brand, homepage: job.homepage, hostname: job.hostname },
+        });
+        clearTimeout(timer);
+        if (runId !== runIdRef.current) return;
+        if (error) {
+          // 401 / disabled / rate-limited — mark resolved so we don't loop.
+          resolvedBrandsRef.current.add(job.key);
+          return;
+        }
+        const out = data as ResolveBrandLogoResponse | null;
+        resolvedBrandsRef.current.add(job.key);
+        const logoUrl = out?.logoUrl ?? null;
+        if (!logoUrl) return;
+        // Patch every candidate whose normalized brand matches this key.
+        setResult((prev) => {
+          if (!prev) return prev;
+          let mutated = false;
+          const nextCandidates = prev.candidates.map((c) => {
+            const cKey = normalizeBrandKey(c?.candidate?.brand);
+            if (cKey !== job.key) return c;
+            const existing = c?.draft?.brandCandidates?.[0]?.logoUrl;
+            if (existing) return c;
+            mutated = true;
+            const nextBrandCandidates = (c.draft?.brandCandidates ?? []).slice();
+            if (nextBrandCandidates.length === 0) {
+              nextBrandCandidates.push({
+                name: job.brand,
+                logoUrl,
+                source: 'ai_search',
+                confidence: 0.6,
+                status: 'pending',
+              } as any);
+            } else {
+              nextBrandCandidates[0] = { ...nextBrandCandidates[0], logoUrl };
+            }
+            return {
+              ...c,
+              draft: {
+                ...c.draft,
+                brandCandidates: nextBrandCandidates,
+              },
+            };
+          });
+          return mutated ? { ...prev, candidates: nextCandidates } : prev;
+        });
+      } catch (e) {
+        clearTimeout(timer);
+        resolvedBrandsRef.current.add(job.key);
+        console.warn('[SearchEntryPanel] brand logo lookup failed:', (e as Error).message);
+      }
+    }));
+  };
+
+
+
   const runSearch = async (rawQuery?: string) => {
     const q = (rawQuery ?? query).trim();
     if (q.length < 3) return;
@@ -260,6 +374,11 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
           });
         });
       }
+
+      // v8e — brand logo fan-out. Populates draft.brandCandidates[0].logoUrl
+      // for Review draft dialog. Never touches product row thumbnails.
+      // Silently no-ops when the flag is off (server returns skipReason).
+      void resolveBrandLogos(runId, resp);
 
       // Persist as a "recent" only on a successful (non-error) response.
       // Chip text stays client-side; never enters telemetry.
