@@ -1,76 +1,86 @@
-# v8d (revised) — CSE fallback for non-Vertex rows, gated
 
-Both reviewers approved v8d with the same refinements: keep source naming as `google_images`, update the admin label, add stronger eligibility for non-Vertex rows, add `hostClass` telemetry, keep Firecrawl OFF. Merged below, plus two small guards I'd add.
+# v8e (final) — Brand logos for Search rows
 
-## Root cause (confirmed by logs)
+Both reviewers approved. All corrections and refinements folded in.
 
-Non-Vertex rows like `cetaphil.com` fail because:
-- `direct` fetch returns 200,
-- `extractImage` finds no `og:image` / `twitter:image` / JSON-LD image,
-- CSE step exits with `skipReason: "not_vertex_host"`.
+## Reviewer corrections adopted
 
-Firecrawl would not help this class — the tags aren't there. CSE with brand+name context is the right fallback.
+1. **Env vars:** use `GOOGLE_CUSTOM_SEARCH_API_KEY` and `GOOGLE_CUSTOM_SEARCH_CX` (confirmed used by both `analyze-entity-url-v2` and `enrich-candidate-image/google_cse.ts`).
+2. **Frontend path:** `src/components/admin/entity-create/SearchEntryPanel.tsx` (confirmed — no file exists at `src/components/search/SearchEntryPanel.tsx`).
+3. **Import fallback:** if the cross-function import from `../analyze-entity-url-v2/brand_logo_lookup.ts` fails at deploy/boot, copy the two helpers (`findOfficialBrandWebsite`, `searchBrandLogoV2`) locally into `resolve-brand-logo/` and keep URL Analyze untouched. URL Analyze files are **never** edited in this phase either way.
+4. **Logging:** never log full URLs or raw brand text. Log `brandHashPrefix` (first 8 hex chars of sha256(normalizedBrand)) instead of `brandNorm`. Keep `host`, `source`, `phase`, `ms`, `cached`, `skipReason`.
+5. **Duplicated helpers:** the four filter helpers (`normalizeLogoUrl`, `isRejectedLogoUrl`, `isAcceptableLogo`, `tryOwnOriginFavicon`) are copied from `analyze-entity-url-v2/entity_draft.ts` into `resolve-brand-logo/logo_filters.ts` with a header comment:
+   ```
+   // v8e temporary parity copy of URL Analysis logo filters.
+   // Do not change behavior here without syncing with analyze-entity-url-v2/entity_draft.ts.
+   // Consolidate into _shared/brand_logo in a later cleanup phase.
+   ```
 
-## Changes
+## Design (unchanged from previous draft, restated for approval)
 
-### 1. `supabase/functions/enrich-candidate-image/index.ts`
+### New edge function `resolve-brand-logo`
 
-- Remove the Vertex-only gate on CSE. New trigger — CSE runs when ALL are true:
-  - `cseEnabled` flag ON
-  - `winningAttempt` is still null after direct + soft-redirect + clean-URL retry (+ Firecrawl if it ran)
-  - `buildCseQuery` returns `{ reason: "ok" }` (already requires ≥2 alphanumeric tokens; for non-Vertex we additionally require **brand present OR name length ≥ 3 tokens** to avoid burning quota on vague rows)
-  - CSE not disabled / not quota-throttled
-- **Source naming stays as-is** — the existing code already emits `source: "google_images"`, `method: "google_cse"`, `winningAttempt: "google_cse"`. No rename. (`applyEntityDraft.ts` and `ImageCandidateGrid.tsx` are already aligned to `google_images`.)
-- Replace `skipReason: "not_vertex_host"` with the real reason (`no_usable_query`, `quota_throttled`, `budget_exhausted`, `flag_off`, `cse_disabled`, `already_have_image`).
-- Keep existing validation and ranking unchanged: `assertSafeUrl`, `isValidPageImageUrl`, logo/banner/favicon/SVG filter, MIME `image/*` probe, tiny-image reject, low-trust host penalty, brand+name relevance score.
+- `POST { brand: string }` → `{ logoUrl: string | null, source: "google_images" | "favicon" | "none", cached: boolean, skipReason?: string }`
+- **Auth in code** (mirrors `search-entity-candidates`): read bearer, `supabase.auth.getClaims(token)`, 401 on failure. No `config.toml` edit.
+- **Input validation:** Zod, `brand: z.string().min(1).max(120)`.
+- **Flag:** new `entity_extraction.search_brand_logo_lookup_enabled` in `app_config`; new `is_search_brand_logo_lookup_enabled()` RPC; new `isSearchBrandLogoLookupEnabled()` helper in `_shared/feature_flags.ts`. Default OFF. Admin (`has_role(userId, 'admin')`) bypasses.
+- **Rate limit:** in-memory per-instance, 30 lookups/user/rolling-hour. Breach → `{ logoUrl: null, source: "none", skipReason: "rate_limited" }` (HTTP 200).
+- **Cache:** in-memory `Map<normalizedBrand, {result, expiresAt}>`, 24 h TTL, positive + negative.
+- **Pipeline:** reuse `findOfficialBrandWebsite` + `searchBrandLogoV2` from `analyze-entity-url-v2/brand_logo_lookup.ts` (or local copy per fallback above). Same 4 s internal `AbortController`. Missing Google creds → `skipReason: "no_google_creds"`.
+- **Logging:** structured JSON `resolve_brand_logo` events with `{ brandHashPrefix, ok, source, phase, ms, cached, skipReason }`. No URLs, no raw brand text.
+- **Boot check:** after first deploy, `curl` the function with `{brand:"test"}` and confirm 401/200 (not 500/import-error). If import fails → apply local-copy fallback and redeploy.
 
-### 2. Telemetry (same log line, added fields)
+### Search UI — `src/components/admin/entity-create/SearchEntryPanel.tsx`
 
-Add to every `cseAttempt`:
-- `hostClass: "vertex" | "other"`
-- `cseUsed: boolean` (true when we actually called the API, false for cache/skip)
-- `cseAdopted: boolean` (true when `winningAttempt === "google_cse"`)
-- `selectedImageHost: string | null` (host only, no path/query)
+- After results render, collect `new Set(rows.map(r => r.brand?.name).filter(Boolean))`, cap at 6.
+- Session-scoped `useRef<Set<string>>` to skip already-resolved brands.
+- Fire `Promise.allSettled(brands.map(b => supabase.functions.invoke('resolve-brand-logo', { body: { brand: b } })))`.
+- On each resolution: patch every matching row's brand chip avatar, and patch `draft.brandCandidates[0].logoUrl`.
+- No spinner. Initials remain the fallback.
 
-Kept: `queryHashPrefix`, `resultCount`, `cached`, `quotaThrottled`, `skipReason`.
-Never logged: raw query text, full image URLs.
+### Admin toggle — `src/components/admin/AdminFeatureFlagsPanel.tsx`
 
-### 3. Admin UI — `AdminFeatureFlagsPanel.tsx`
+- Label: **Brand logo lookup (Search)**
+- Description: *When ON, Search rows fetch brand logos in the background using the same lookup URL Analysis uses. Admins can test even when OFF. Uses the existing Google CSE daily quota.*
 
-Update label + description for the CSE toggle only (no schema, no new flag):
-- Label: **Google image search fallback**
-- Description: *When ON, Search-to-Draft rows with no page-owned image may fall back to Google Custom Search Images. Auto-applied with a "From image search — verify" chip. Uses the existing Google CSE daily quota.*
+## Hard constraints
 
-### 4. Frontend
+- Brand logo **never** becomes a product-row thumbnail. Product policy stays `page_metadata > firecrawl > google_images > initials`.
+- URL Analyze is **not touched** — no moves, no deletes, no import rewrites. Regression check after deploy: run URL Analyze on one brand URL and confirm `v2_brand_website_evaluated` / `v2_brand_logo_phase` log sequence matches a pre-deploy run.
+- No changes to `search-entity-candidates`, `enrich-candidate-image`, dedup, media reset, or Gemini.
 
-No changes. `SearchEntryPanel.tsx` row thumbnail already picks `page_metadata > firecrawl > google_images` and shows the verify chip (v8c). `ImageCandidateGrid.tsx` ranking already includes `google_images`.
+## Additions beyond the reviews
 
-## Admin flag guidance for testing
+Three small things worth adding while we're here:
 
-- Firecrawl fallback: **OFF**
-- Google image search fallback: **ON**
+1. **Auth failure ≠ silent black hole.** If `resolve-brand-logo` returns 401 (e.g. token expired mid-session), the client should not keep retrying — mark the brand as "resolved: no-logo" in the session ref so the row stays on initials until next search. Prevents a broken session from spamming the function.
+2. **Skip resolve when a logo is already present.** If a row arrives from `search-entity-candidates` with a non-empty `brand.logoUrl` (rare today, but possible in future), skip the lookup for that brand. Cheap short-circuit.
+3. **Telemetry counter for adoption.** Log one summary event per Search render: `search_brand_logo_batch` with `{ unique: N, resolved: M, cached: K, rateLimited: R, ms }`. Gives a single line per search to judge hit-rate without grepping individual events.
 
 ## Verification
 
-Rerun with CSE ON, Firecrawl OFF:
-- `cetaphil gentle cleanser` → non-Vertex rows should render CSE thumbnails with verify chip. Logs: `hostClass:"other"`, `cseUsed:true`, `resultCount>0`, `winningAttempt:"google_cse"`.
-- `chemist at play roll on` → Vertex path unchanged, `hostClass:"vertex"`.
-- `babe laboratorios healthy aging serum` → Vertex path unchanged.
-- Real product pages with valid `og:image` → still win via `page_metadata`, no CSE call (`skipReason:"already_have_image"` never appears because we short-circuit before entering the CSE branch).
-
-Watch:
-- Daily CSE count in logs; if non-Vertex burns quota quickly, tighten the non-Vertex gate (e.g. require brand present) — no redeploy of flags needed, just code.
-- `cseAdopted` rate per `hostClass` — this tells us whether non-Vertex CSE is actually useful or mostly returning noise.
-
-## Out of scope
-
-- Firecrawl-for-all. Revisit only when logs show a specific JS-rendered non-Vertex host that Firecrawl demonstrably resolves.
-- New feature flag for non-Vertex CSE. One flag is enough; the code-level eligibility gate is the safety net.
-- Any change to page-metadata extraction, ranking, verify chip, proxy allowlist.
+1. Flag OFF, admin → `chemist at play roll on` → chips fill in on all "Chemist at Play" rows within ~1–2 s. Re-searching same session: `cached:true`.
+2. Flag OFF, non-admin → chips stay as initials. Logs: `skipReason:"flag_off"`. Zero CSE calls.
+3. Flag ON, any user → chips fill in.
+4. `cetaphil gentle cleanser` and `babe laboratorios healthy aging serum` → chips fill in; product thumbnails **unchanged**.
+5. URL Analyze regression: same brand URL pre/post deploy → identical log sequence.
+6. 40 different brands from one account → post-30, `skipReason:"rate_limited"`.
 
 ## Files touched
 
-- `supabase/functions/enrich-candidate-image/index.ts` — remove Vertex-only gate, add eligibility guard, add telemetry fields.
-- `src/components/admin/AdminFeatureFlagsPanel.tsx` — CSE toggle label + description.
+- **New:** `supabase/functions/resolve-brand-logo/index.ts`
+- **New:** `supabase/functions/resolve-brand-logo/logo_filters.ts` (four parity-copy helpers)
+- **Modify:** `supabase/functions/_shared/feature_flags.ts` — add `isSearchBrandLogoLookupEnabled()`
+- **Migration:** insert `entity_extraction.search_brand_logo_lookup_enabled` into `app_config` (default `false`) + `is_search_brand_logo_lookup_enabled()` RPC
+- **Modify:** `src/components/admin/AdminFeatureFlagsPanel.tsx` — new toggle row
+- **Modify:** `src/components/admin/entity-create/SearchEntryPanel.tsx` — post-render lookup + state patch
 
-Nothing else changes. No schema, no new flag, no frontend rendering edits.
+## Out of scope
+
+- Any refactor of `analyze-entity-url-v2/`.
+- Extracting shared brand-logo helpers into `_shared/` (separate cleanup after v8e proves out).
+- Any change to logo scoring, filters, or fallback order.
+- Persistent DB cache for brand logos.
+- Backend rate limiting beyond the per-user hourly cap.
+
+Approve and I'll implement.
