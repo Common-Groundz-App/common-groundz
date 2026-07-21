@@ -244,7 +244,7 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
       try { hostname = sourceUrl ? new URL(sourceUrl).hostname : null; } catch { hostname = null; }
       jobs.push({
         brand,
-        homepage: payload?.draft?.brandCandidates?.[0]?.homepageUrl ?? null,
+        homepage: payload?.draft?.brandCandidates?.[0]?.websiteUrl ?? null,
         hostname,
         key,
       });
