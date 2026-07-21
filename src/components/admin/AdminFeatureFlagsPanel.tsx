@@ -147,8 +147,8 @@ export function AdminFeatureFlagsPanel() {
                       : 'Disable Firecrawl fallback for search-result images?'
                     : pending?.key === 'entity_extraction.search_image_cse_fallback_enabled'
                       ? pending.nextEnabled
-                        ? 'Enable Google image search fallback for Vertex rows?'
-                        : 'Disable Google image search fallback for Vertex rows?'
+                        ? 'Enable Google image search fallback?'
+                        : 'Disable Google image search fallback?'
                       : '';
 
   const confirmDesc =
