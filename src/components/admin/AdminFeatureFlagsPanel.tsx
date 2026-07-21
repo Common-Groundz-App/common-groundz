@@ -147,8 +147,8 @@ export function AdminFeatureFlagsPanel() {
                       : 'Disable Firecrawl fallback for search-result images?'
                     : pending?.key === 'entity_extraction.search_image_cse_fallback_enabled'
                       ? pending.nextEnabled
-                        ? 'Enable Google image search fallback for Vertex rows?'
-                        : 'Disable Google image search fallback for Vertex rows?'
+                        ? 'Enable Google image search fallback?'
+                        : 'Disable Google image search fallback?'
                       : '';
 
   const confirmDesc =
@@ -184,10 +184,10 @@ export function AdminFeatureFlagsPanel() {
                     ? pending.nextEnabled
                       ? 'When a search result has no image after direct fetch and soft-redirect, enrich-candidate-image will use Firecrawl as a last-resort fallback (extra ~2 s budget). Search-to-Draft only — URL Analysis is unaffected. May consume Firecrawl credits.'
                       : 'Disables the Firecrawl fallback in enrich-candidate-image. Results missing an image after direct fetch/soft-redirect will show no image, as before.'
-                    : pending?.key === 'entity_extraction.search_image_cse_fallback_enabled'
-                      ? pending.nextEnabled
-                        ? 'For Vertex-interstitial search results only, enrich-candidate-image will run one Google Custom Search image query (brand + name) as a last-resort fallback. Skips Firecrawl for these rows to save quota. Results appear with a "From image search — verify" chip. Uses your existing Google CSE key/CX.'
-                        : 'Disables the Google image search fallback for Vertex rows. Those results will show no image if direct fetch/soft-redirect finds none.'
+                      : pending?.key === 'entity_extraction.search_image_cse_fallback_enabled'
+                        ? pending.nextEnabled
+                          ? 'When ON, Search-to-Draft rows with no page-owned image may fall back to Google Custom Search Images. Auto-applied with a "From image search — verify" chip. Uses the existing Google CSE daily quota.'
+                          : 'Disables the Google image search fallback. Rows missing an image after direct fetch/soft-redirect (and Firecrawl, if enabled) will show no image.'
                       : '';
 
   const applyPending = async () => {
@@ -677,30 +677,30 @@ export function AdminFeatureFlagsPanel() {
         </CardContent>
       </Card>
 
-      {/* v8c — Google CSE image fallback for Vertex rows */}
+      {/* v8d — Google CSE image fallback (Vertex + non-Vertex rows) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ToggleRight className="h-5 w-5 text-primary" />
-            Google image search fallback (Vertex rows)
+            Google image search fallback
           </CardTitle>
           <CardDescription>
-            Uses one Google Custom Search image query as a last-resort
-            image source for Vertex interstitial search results. Skips
-            Firecrawl for those rows to save quota.
+            Uses one Google Custom Search image query as a last-resort image
+            source when a Search-to-Draft row has no page-owned image. Applies
+            to both Vertex interstitials and regular URLs.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
             <div className="space-y-1">
               <Label htmlFor="cse-search-image" className="text-base">
-                Use Google Images as a fallback for Vertex rows
+                Use Google Images as a fallback
               </Label>
               <p className="text-sm text-muted-foreground">
-                When enabled, if a Vertex-interstitial search result has no image after
-                direct fetch and soft-redirect, <code>enrich-candidate-image</code> runs one
-                Google Custom Search image query (brand + name) with a ~2.5 s budget.
-                Chosen results are labeled <em>From image search — verify</em> in the picker.
+                When ON, Search-to-Draft rows with no page-owned image may fall back to
+                Google Custom Search Images. Auto-applied with a{' '}
+                <em>From image search — verify</em> chip. Non-Vertex rows additionally
+                require a brand or ≥3 usable name tokens to avoid quota waste.
                 Uses your existing <code>GOOGLE_CUSTOM_SEARCH_API_KEY</code> and
                 <code> GOOGLE_CUSTOM_SEARCH_CX</code>.
               </p>

@@ -645,9 +645,10 @@ serve(async (req) => {
       | "no_usable_query"
       | "quota_throttled"
       | "cse_disabled"
-      | "not_vertex_host"
       | "flag_off"
-      | "budget_exhausted";
+      | "budget_exhausted"
+      | "insufficient_context"
+      | "already_have_image";
     interface CseAttemptDetail {
       queryHashPrefix: string;
       resultCount: number;
@@ -662,6 +663,14 @@ serve(async (req) => {
       httpStatus?: number | null;
       /** Provider/guard failure reason, never raw query text. */
       errorReason?: string | null;
+      /** v8d — "vertex" for Vertex interstitials, "other" for regular URLs. */
+      hostClass?: "vertex" | "other";
+      /** v8d — true when the CSE API was actually called (not cache/skip). */
+      cseUsed?: boolean;
+      /** v8d — true when winningAttempt === "google_cse". */
+      cseAdopted?: boolean;
+      /** v8d — host of the chosen image URL (host only, no path/query). */
+      selectedImageHost?: string | null;
     }
     interface AttemptTelemetry {
       kind: AttemptKind;
@@ -977,18 +986,20 @@ serve(async (req) => {
       });
     }
 
-    // Step 6 — v8c Google CSE image fallback (flag-gated, Vertex-only).
-    // Runs when: CSE flag ON, host is Vertex interstitial, and no image has
-    // been found yet. Also records explicit skip telemetry for Vertex rows
-    // when the flag is off and for non-Vertex misses when the flag is on.
+    // Step 6 — v8d Google CSE image fallback (flag-gated, host-class aware).
+    // Runs when: CSE flag ON, no image found yet, and query has enough
+    // context. Vertex rows always eligible (they intentionally skipped
+    // direct/Firecrawl). Non-Vertex rows additionally require brand present
+    // OR ≥3 usable name tokens, to avoid burning quota on vague queries.
     if (
       !winningAttempt &&
-      (isVertexHost || cseEnabled) &&
+      cseEnabled &&
       (result.errorCode === "no_image" ||
        result.errorCode === "invalid_content_type")
     ) {
       const t0 = Date.now();
       const remainingMs = deadline - Date.now();
+      const hostClass: "vertex" | "other" = isVertexHost ? "vertex" : "other";
       // Base skip diagnostics; overridden below when we actually call CSE.
       let skipReason: CseSkipReason | undefined;
       let cseDetail: CseAttemptDetail = {
@@ -996,19 +1007,30 @@ serve(async (req) => {
         resultCount: 0,
         cached: false,
         quotaThrottled: false,
+        hostClass,
+        cseUsed: false,
+        cseAdopted: false,
+        selectedImageHost: null,
       };
       let cseErrorCode: ErrorCode | null = "no_image";
       let cseMethod: ExtractMethod | null = null;
 
       const built = buildCseQuery({ name, brand, variant });
-      if (!isVertexHost) {
-        skipReason = "not_vertex_host";
-      } else if (!cseEnabled) {
-        skipReason = "flag_off";
-      } else if (built.reason === "no_usable_query" || !built.query) {
+
+      // v8d — non-Vertex eligibility guard: require brand OR ≥3 name tokens.
+      const nameTokensForGate = (name ?? "")
+        .toLowerCase()
+        .split(/[^a-z0-9]+/i)
+        .filter((t) => t.length > 0 && !GENERIC_NAME_STOPWORDS.has(t));
+      const brandPresent = (brand ?? "").trim().length > 0;
+      const nonVertexEligible = brandPresent || nameTokensForGate.length >= 3;
+
+      if (built.reason === "no_usable_query" || !built.query) {
         skipReason = "no_usable_query";
       } else if (isCseDisabled()) {
         skipReason = "cse_disabled";
+      } else if (!isVertexHost && !nonVertexEligible) {
+        skipReason = "insufficient_context";
       } else if (remainingMs < 800) {
         skipReason = "budget_exhausted";
       }
@@ -1025,6 +1047,7 @@ serve(async (req) => {
           query: built.query,
           timeoutMs,
         });
+        cseDetail.cseUsed = !search.cached;
         cseDetail.queryHashPrefix = search.queryHashPrefix;
         cseDetail.resultCount = search.resultCount;
         cseDetail.cached = search.cached;
@@ -1121,6 +1144,12 @@ serve(async (req) => {
           cseMethod = "google_cse";
           cseErrorCode = null;
           pickedScore = score;
+          cseDetail.cseAdopted = true;
+          try {
+            cseDetail.selectedImageHost = new URL(url).hostname.toLowerCase();
+          } catch {
+            cseDetail.selectedImageHost = null;
+          }
           break;
         }
         cseDetail.chosenScore = pickedScore;
