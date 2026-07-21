@@ -199,7 +199,11 @@ export function AdminFeatureFlagsPanel() {
                         ? pending.nextEnabled
                           ? 'When ON, Search-to-Draft rows with no page-owned image may fall back to Google Custom Search Images. Auto-applied with a "From image search — verify" chip. Uses the existing Google CSE daily quota.'
                           : 'Disables the Google image search fallback. Rows missing an image after direct fetch/soft-redirect (and Firecrawl, if enabled) will show no image.'
-                      : '';
+                        : pending?.key === 'entity_extraction.search_brand_logo_lookup_enabled'
+                          ? pending.nextEnabled
+                            ? 'When ON, Search-to-Draft results fetch brand logos in the background using the same Google CSE lookup URL Analysis uses. Admins can test even when OFF. Uses the existing Google CSE daily quota.'
+                            : 'Disables background brand logo lookup for Search-to-Draft. Brand chips will show initials instead of logos.'
+                        : '';
 
   const applyPending = async () => {
     if (!pending) return;
