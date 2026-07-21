@@ -1144,6 +1144,12 @@ serve(async (req) => {
           cseMethod = "google_cse";
           cseErrorCode = null;
           pickedScore = score;
+          cseDetail.cseAdopted = true;
+          try {
+            cseDetail.selectedImageHost = new URL(url).hostname.toLowerCase();
+          } catch {
+            cseDetail.selectedImageHost = null;
+          }
           break;
         }
         cseDetail.chosenScore = pickedScore;
