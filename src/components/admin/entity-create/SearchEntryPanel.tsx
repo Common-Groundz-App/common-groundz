@@ -112,6 +112,10 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
   // The stored promise resolves with the (possibly-enriched) payload so
   // Review & create can await it instead of firing a duplicate call.
   const inFlightRef = useRef<Map<string, Promise<SearchCandidatePayload>>>(new Map());
+  // v8e — session-scoped set of brand keys we've already resolved (or given
+  // up on). Prevents refiring lookups across re-searches within a session
+  // and keeps a 401/etc from spamming the function.
+  const resolvedBrandsRef = useRef<Set<string>>(new Set());
 
   const addEnriching = (idx: number) =>
     setEnrichingIndexes((prev) => {
