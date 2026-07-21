@@ -219,6 +219,96 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
     return promise;
   };
 
+  // v8e — resolve brand logos for the current search result in the background.
+  // Batched by unique brand name (max BRAND_LOGO_LOOKUP_CAP). Patches the
+  // draft.brandCandidates[0].logoUrl and the top-level draft.brand.logoUrl
+  // shape URL Analysis produces. Bails on 401 / feature-off responses.
+  const resolveBrandLogos = async (runId: number, resp: SearchResponse) => {
+    if (!resp?.candidates?.length) return;
+    const seen = new Set<string>();
+    const jobs: Array<{ brand: string; homepage: string | null; hostname: string | null; key: string }> = [];
+    for (const payload of resp.candidates) {
+      const brand = (payload?.candidate?.brand ?? '').trim();
+      if (!brand) continue;
+      const key = normalizeBrandKey(brand);
+      if (!key || seen.has(key) || resolvedBrandsRef.current.has(key)) continue;
+      // Skip if the draft already carries a brand logo (e.g., URL Analysis path).
+      const existing = payload?.draft?.brandCandidates?.[0]?.logoUrl;
+      if (existing) {
+        resolvedBrandsRef.current.add(key);
+        continue;
+      }
+      seen.add(key);
+      const sourceUrl = payload?.candidate?.sourceUrl ?? null;
+      let hostname: string | null = null;
+      try { hostname = sourceUrl ? new URL(sourceUrl).hostname : null; } catch { hostname = null; }
+      jobs.push({
+        brand,
+        homepage: payload?.draft?.brandCandidates?.[0]?.homepageUrl ?? null,
+        hostname,
+        key,
+      });
+      if (jobs.length >= BRAND_LOGO_LOOKUP_CAP) break;
+    }
+    if (!jobs.length) return;
+
+    await Promise.all(jobs.map(async (job) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), BRAND_LOGO_CLIENT_TIMEOUT_MS);
+      try {
+        const { data, error } = await supabase.functions.invoke('resolve-brand-logo', {
+          body: { brand: job.brand, homepage: job.homepage, hostname: job.hostname },
+        });
+        clearTimeout(timer);
+        if (runId !== runIdRef.current) return;
+        if (error) {
+          // 401 / disabled / rate-limited — mark resolved so we don't loop.
+          resolvedBrandsRef.current.add(job.key);
+          return;
+        }
+        const out = data as ResolveBrandLogoResponse | null;
+        resolvedBrandsRef.current.add(job.key);
+        const logoUrl = out?.logoUrl ?? null;
+        if (!logoUrl) return;
+        // Patch every candidate whose normalized brand matches this key.
+        setResult((prev) => {
+          if (!prev) return prev;
+          let mutated = false;
+          const nextCandidates = prev.candidates.map((c) => {
+            const cKey = normalizeBrandKey(c?.candidate?.brand);
+            if (cKey !== job.key) return c;
+            const existing = c?.draft?.brandCandidates?.[0]?.logoUrl;
+            if (existing) return c;
+            mutated = true;
+            const nextBrandCandidates = (c.draft?.brandCandidates ?? []).slice();
+            if (nextBrandCandidates.length === 0) {
+              nextBrandCandidates.push({ name: job.brand, logoUrl } as any);
+            } else {
+              nextBrandCandidates[0] = { ...nextBrandCandidates[0], logoUrl };
+            }
+            return {
+              ...c,
+              draft: {
+                ...c.draft,
+                brandCandidates: nextBrandCandidates,
+                brand: c.draft?.brand
+                  ? { ...c.draft.brand, logoUrl: c.draft.brand.logoUrl ?? logoUrl }
+                  : c.draft?.brand,
+              },
+            };
+          });
+          return mutated ? { ...prev, candidates: nextCandidates } : prev;
+        });
+      } catch (e) {
+        clearTimeout(timer);
+        resolvedBrandsRef.current.add(job.key);
+        console.warn('[SearchEntryPanel] brand logo lookup failed:', (e as Error).message);
+      }
+    }));
+  };
+
+
+
   const runSearch = async (rawQuery?: string) => {
     const q = (rawQuery ?? query).trim();
     if (q.length < 3) return;
