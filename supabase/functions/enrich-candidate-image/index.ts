@@ -1047,6 +1047,7 @@ serve(async (req) => {
           query: built.query,
           timeoutMs,
         });
+        cseDetail.cseUsed = !search.cached;
         cseDetail.queryHashPrefix = search.queryHashPrefix;
         cseDetail.resultCount = search.resultCount;
         cseDetail.cached = search.cached;
