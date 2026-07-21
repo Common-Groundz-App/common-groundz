@@ -282,6 +282,11 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
         });
       }
 
+      // v8e — brand logo fan-out. Populates draft.brandCandidates[0].logoUrl
+      // for Review draft dialog. Never touches product row thumbnails.
+      // Silently no-ops when the flag is off (server returns skipReason).
+      void resolveBrandLogos(runId, resp);
+
       // Persist as a "recent" only on a successful (non-error) response.
       // Chip text stays client-side; never enters telemetry.
       addRecent(q, 'query');
