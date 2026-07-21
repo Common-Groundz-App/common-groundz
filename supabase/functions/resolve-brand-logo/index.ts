@@ -22,7 +22,7 @@ import { isSearchBrandLogoLookupEnabled } from "../_shared/feature_flags.ts";
 import {
   findOfficialBrandWebsite,
   searchBrandLogoV2,
-} from "../analyze-entity-url-v2/brand_logo_lookup.ts";
+} from "./brand_logo_lookup.ts";
 import {
   normalizeLogoUrl,
   isRejectedLogoUrl,
