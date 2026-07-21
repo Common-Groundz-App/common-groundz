@@ -645,9 +645,10 @@ serve(async (req) => {
       | "no_usable_query"
       | "quota_throttled"
       | "cse_disabled"
-      | "not_vertex_host"
       | "flag_off"
-      | "budget_exhausted";
+      | "budget_exhausted"
+      | "insufficient_context"
+      | "already_have_image";
     interface CseAttemptDetail {
       queryHashPrefix: string;
       resultCount: number;
@@ -662,6 +663,14 @@ serve(async (req) => {
       httpStatus?: number | null;
       /** Provider/guard failure reason, never raw query text. */
       errorReason?: string | null;
+      /** v8d — "vertex" for Vertex interstitials, "other" for regular URLs. */
+      hostClass?: "vertex" | "other";
+      /** v8d — true when the CSE API was actually called (not cache/skip). */
+      cseUsed?: boolean;
+      /** v8d — true when winningAttempt === "google_cse". */
+      cseAdopted?: boolean;
+      /** v8d — host of the chosen image URL (host only, no path/query). */
+      selectedImageHost?: string | null;
     }
     interface AttemptTelemetry {
       kind: AttemptKind;
