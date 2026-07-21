@@ -291,9 +291,6 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
               draft: {
                 ...c.draft,
                 brandCandidates: nextBrandCandidates,
-                brand: c.draft?.brand
-                  ? { ...c.draft.brand, logoUrl: c.draft.brand.logoUrl ?? logoUrl }
-                  : c.draft?.brand,
               },
             };
           });
