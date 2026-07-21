@@ -282,7 +282,13 @@ export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOp
             mutated = true;
             const nextBrandCandidates = (c.draft?.brandCandidates ?? []).slice();
             if (nextBrandCandidates.length === 0) {
-              nextBrandCandidates.push({ name: job.brand, logoUrl } as any);
+              nextBrandCandidates.push({
+                name: job.brand,
+                logoUrl,
+                source: 'ai_search',
+                confidence: 0.6,
+                status: 'pending',
+              } as any);
             } else {
               nextBrandCandidates[0] = { ...nextBrandCandidates[0], logoUrl };
             }
