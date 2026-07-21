@@ -1,58 +1,76 @@
-Both reviewers agree with the diagnosis and the direction. I'm folding in their two important refinements (host-only structured proxy logs; don't broaden the proxy allowlist) plus a couple of small hardening items I noticed while reading the code.
+# v8d (revised) — CSE fallback for non-Vertex rows, gated
 
-## Root cause (confirmed)
+Both reviewers approved v8d with the same refinements: keep source naming as `google_images`, update the admin label, add stronger eligibility for non-Vertex rows, add `hostClass` telemetry, keep Firecrawl OFF. Merged below, plus two small guards I'd add.
 
-- Backend v8c is working: `cseEnabled:true`, Vertex rows skip direct fetch, Google CSE returns 5 images, `google_cse` wins.
-- The row thumbnail in `SearchEntryPanel.tsx` still only accepts `source === 'page_metadata'`, so `google_images` results are dropped and the row shows initials.
-- Separately, `proxy-external-image` blocked a valid product CDN (`images-static.nykaa.com`) that appeared in logs, so even the auto-applied image after "Apply to form" can fail to render.
+## Root cause (confirmed by logs)
+
+Non-Vertex rows like `cetaphil.com` fail because:
+- `direct` fetch returns 200,
+- `extractImage` finds no `og:image` / `twitter:image` / JSON-LD image,
+- CSE step exits with `skipReason: "not_vertex_host"`.
+
+Firecrawl would not help this class — the tags aren't there. CSE with brand+name context is the right fallback.
 
 ## Changes
 
-1. **Row thumbnail priority in `SearchEntryPanel.tsx`**
-   - Select the row image using: `page_metadata` > `firecrawl` > `google_images` / `google_cse` > initials.
-   - Keep `google_grounding` excluded from the row thumbnail (unreliable).
-   - Preserves the existing enrichment loading skeleton + overlay behavior.
+### 1. `supabase/functions/enrich-candidate-image/index.ts`
 
-2. **"From image search — verify" chip on the row**
-   - Show a small chip next to the row metadata only when the chosen row image's source is `google_images` / `google_cse`.
-   - Matches the label already used in the Draft Review image picker.
+- Remove the Vertex-only gate on CSE. New trigger — CSE runs when ALL are true:
+  - `cseEnabled` flag ON
+  - `winningAttempt` is still null after direct + soft-redirect + clean-URL retry (+ Firecrawl if it ran)
+  - `buildCseQuery` returns `{ reason: "ok" }` (already requires ≥2 alphanumeric tokens; for non-Vertex we additionally require **brand present OR name length ≥ 3 tokens** to avoid burning quota on vague rows)
+  - CSE not disabled / not quota-throttled
+- **Source naming stays as-is** — the existing code already emits `source: "google_images"`, `method: "google_cse"`, `winningAttempt: "google_cse"`. No rename. (`applyEntityDraft.ts` and `ImageCandidateGrid.tsx` are already aligned to `google_images`.)
+- Replace `skipReason: "not_vertex_host"` with the real reason (`no_usable_query`, `quota_throttled`, `budget_exhausted`, `flag_off`, `cse_disabled`, `already_have_image`).
+- Keep existing validation and ranking unchanged: `assertSafeUrl`, `isValidPageImageUrl`, logo/banner/favicon/SVG filter, MIME `image/*` probe, tiny-image reject, low-trust host penalty, brand+name relevance score.
 
-3. **Draft Review picker (verify no regression)**
-   - `ImageCandidateGrid.tsx` already ranks `page_metadata` > `firecrawl` > `google_images` > `google_grounding` and shows the verify chip. No change needed; just confirm auto-selected primary still prefers page metadata when present.
+### 2. Telemetry (same log line, added fields)
 
-4. **Proxy allowlist — narrow addition only**
-   - Add `images-static.nykaa.com` to `ALLOWED_DOMAINS` in `proxy-external-image` (observed valid product CDN).
-   - Do NOT broaden the proxy or auto-trust CSE hosts. Future hosts get added deliberately after logs confirm.
+Add to every `cseAttempt`:
+- `hostClass: "vertex" | "other"`
+- `cseUsed: boolean` (true when we actually called the API, false for cache/skip)
+- `cseAdopted: boolean` (true when `winningAttempt === "google_cse"`)
+- `selectedImageHost: string | null` (host only, no path/query)
 
-5. **Structured, host-only proxy diagnostics**
-   - Replace the current full-URL log with a structured JSON line: `{ source: "image_proxy", host, status, reason, contentType? }`.
-   - `reason` values: `domain_not_allowed`, `fetch_failed`, `non_image_content_type`, `timeout`, `unhandled`.
-   - No query strings, no full URLs. Makes the next blocked CDN obvious without leaking data.
+Kept: `queryHashPrefix`, `resultCount`, `cached`, `quotaThrottled`, `skipReason`.
+Never logged: raw query text, full image URLs.
 
-6. **Small hardening in `ImageWithFallback.tsx` (row image resilience)**
-   - Keep current proxy-then-direct fallback behavior. No behavior change unless a broken image is seen — then it correctly falls back to initials via the existing `brokenUrls` tracker upstream in `ImageCandidateGrid`. For `SearchEntryPanel`, on image error we already have initials as the empty state; nothing to add.
+### 3. Admin UI — `AdminFeatureFlagsPanel.tsx`
 
-## Admin flag guidance during testing
+Update label + description for the CSE toggle only (no schema, no new flag):
+- Label: **Google image search fallback**
+- Description: *When ON, Search-to-Draft rows with no page-owned image may fall back to Google Custom Search Images. Auto-applied with a "From image search — verify" chip. Uses the existing Google CSE daily quota.*
 
-- Firecrawl fallback: OFF
-- Google CSE fallback (Vertex rows): ON
+### 4. Frontend
 
-Vertex rows will skip Firecrawl entirely and go straight to CSE. Firecrawl stays available for future JS-rendered retailer pages.
+No changes. `SearchEntryPanel.tsx` row thumbnail already picks `page_metadata > firecrawl > google_images` and shows the verify chip (v8c). `ImageCandidateGrid.tsx` ranking already includes `google_images`.
+
+## Admin flag guidance for testing
+
+- Firecrawl fallback: **OFF**
+- Google image search fallback: **ON**
+
+## Verification
+
+Rerun with CSE ON, Firecrawl OFF:
+- `cetaphil gentle cleanser` → non-Vertex rows should render CSE thumbnails with verify chip. Logs: `hostClass:"other"`, `cseUsed:true`, `resultCount>0`, `winningAttempt:"google_cse"`.
+- `chemist at play roll on` → Vertex path unchanged, `hostClass:"vertex"`.
+- `babe laboratorios healthy aging serum` → Vertex path unchanged.
+- Real product pages with valid `og:image` → still win via `page_metadata`, no CSE call (`skipReason:"already_have_image"` never appears because we short-circuit before entering the CSE branch).
+
+Watch:
+- Daily CSE count in logs; if non-Vertex burns quota quickly, tighten the non-Vertex gate (e.g. require brand present) — no redeploy of flags needed, just code.
+- `cseAdopted` rate per `hostClass` — this tells us whether non-Vertex CSE is actually useful or mostly returning noise.
+
+## Out of scope
+
+- Firecrawl-for-all. Revisit only when logs show a specific JS-rendered non-Vertex host that Firecrawl demonstrably resolves.
+- New feature flag for non-Vertex CSE. One flag is enough; the code-level eligibility gate is the safety net.
+- Any change to page-metadata extraction, ranking, verify chip, proxy allowlist.
 
 ## Files touched
 
-- `src/components/admin/entity-create/SearchEntryPanel.tsx` — row image selection + verify chip.
-- `supabase/functions/proxy-external-image/index.ts` — add one host + structured host-only logs.
+- `supabase/functions/enrich-candidate-image/index.ts` — remove Vertex-only gate, add eligibility guard, add telemetry fields.
+- `src/components/admin/AdminFeatureFlagsPanel.tsx` — CSE toggle label + description.
 
-Nothing else changes. No schema, no flag, no backend enrichment logic.
-
-## Verification after deploy
-
-Rerun the three searches:
-- `babe laboratorios healthy aging serum` — Vertex rows should render `google_images` thumbnails with the verify chip.
-- `chemist at play roll on` — same behavior; duplicated Vertex rows still show at most one CSE image per row.
-- `cetaphil gentle cleanser` — thumbnails only if `page_metadata` succeeds (non-Vertex path unchanged in this phase).
-
-Check logs:
-- `enrich-candidate-image`: `winningAttempt: "google_cse"` continues to succeed.
-- `proxy-external-image`: previously-failing hosts should either succeed or emit a structured `domain_not_allowed` line with `host: "..."` so we can decide next additions.
+Nothing else changes. No schema, no new flag, no frontend rendering edits.
