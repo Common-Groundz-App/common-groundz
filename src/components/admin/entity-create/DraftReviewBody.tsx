@@ -220,15 +220,70 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
           });
           return;
         }
+
+        // v8e follow-up — missing-logo backfill for existing brands.
+        // Guards: no existing image, matched_existing candidate, valid http(s)
+        // logo URL, source not in denylist. Any failure is soft — never blocks.
+        let effectiveBrandRow = brandRow;
+        const candidate = brandDecision.candidate;
+        const candidateLogo = candidate?.logoUrl;
+        const candidateSource = candidate?.source;
+        const isDenied = candidateSource === 'admin_manual' || candidateSource === 'user_upload';
+        let logoUrlIsValid = false;
+        if (typeof candidateLogo === 'string' && candidateLogo.length > 0) {
+          try {
+            const u = new URL(candidateLogo);
+            logoUrlIsValid = u.protocol === 'https:' || u.protocol === 'http:';
+          } catch {
+            logoUrlIsValid = false;
+          }
+        }
+        if (
+          !brandRow.image_url &&
+          candidate?.status === 'matched_existing' &&
+          logoUrlIsValid &&
+          !isDenied
+        ) {
+          try {
+            const { data: backfillData } = await supabase.functions.invoke('create-brand-entity', {
+              body: {
+                brandName: brandRow.name,
+                logo: candidateLogo,
+                website: brandRow.website_url ?? null,
+                confirmCreate: true,
+                creationContext: 'search_existing_backfill',
+              },
+            });
+            const backfilled =
+              backfillData?.status === 'backfilled_logo'
+                ? backfillData.brandEntity
+                : backfillData?.success && backfillData?.brandEntity?.image_url
+                  ? backfillData.brandEntity
+                  : null;
+            if (backfilled) {
+              effectiveBrandRow = { ...brandRow, ...backfilled };
+            }
+            console.log(JSON.stringify({
+              event: 'search_brand_logo_backfill',
+              ok: !!backfilled,
+              brandId: brandRow.id,
+              hadLogo: false,
+              source: 'search',
+            }));
+          } catch (backfillErr) {
+            console.warn('search_brand_logo_backfill_failed', backfillErr);
+          }
+        }
+
         parent = {
-          id: brandRow.id,
-          name: brandRow.name,
-          type: brandRow.type as EntityType,
-          image_url: brandRow.image_url ?? undefined,
-          slug: brandRow.slug ?? undefined,
-          description: brandRow.description ?? undefined,
-          website_url: brandRow.website_url ?? undefined,
-          metadata: (brandRow.metadata as Record<string, any>) ?? {},
+          id: effectiveBrandRow.id,
+          name: effectiveBrandRow.name,
+          type: effectiveBrandRow.type as EntityType,
+          image_url: effectiveBrandRow.image_url ?? undefined,
+          slug: effectiveBrandRow.slug ?? undefined,
+          description: effectiveBrandRow.description ?? undefined,
+          website_url: effectiveBrandRow.website_url ?? undefined,
+          metadata: (effectiveBrandRow.metadata as Record<string, any>) ?? {},
         } as unknown as Entity;
       } else if (brandDecision.kind === 'create_new') {
         if (deferBrandCreationForAtomic) {
