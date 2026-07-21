@@ -76,6 +76,23 @@ interface EnrichResponse {
   diagnostics?: { latencyMs: number; fetched: boolean; cached: boolean; errorCode?: string };
 }
 
+// v8e — Response shape from resolve-brand-logo edge function.
+interface ResolveBrandLogoResponse {
+  logoUrl: string | null;
+  source: 'google_images' | 'favicon' | 'none';
+  cached: boolean;
+  skipReason?: string;
+}
+
+// v8e — Cap on unique brand lookups per search render.
+const BRAND_LOGO_LOOKUP_CAP = 6;
+// v8e — Client-side timeout for brand logo lookup (server budget is 4s).
+const BRAND_LOGO_CLIENT_TIMEOUT_MS = 6_000;
+
+function normalizeBrandKey(raw: string | null | undefined): string {
+  return (raw ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 export const SearchEntryPanel: React.FC<SearchEntryPanelProps> = ({ onPick, onOpenExisting }) => {
   const { user } = useAuth();
   const [query, setQuery] = useState('');
