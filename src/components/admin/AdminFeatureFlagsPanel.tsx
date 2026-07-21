@@ -677,30 +677,30 @@ export function AdminFeatureFlagsPanel() {
         </CardContent>
       </Card>
 
-      {/* v8c — Google CSE image fallback for Vertex rows */}
+      {/* v8d — Google CSE image fallback (Vertex + non-Vertex rows) */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ToggleRight className="h-5 w-5 text-primary" />
-            Google image search fallback (Vertex rows)
+            Google image search fallback
           </CardTitle>
           <CardDescription>
-            Uses one Google Custom Search image query as a last-resort
-            image source for Vertex interstitial search results. Skips
-            Firecrawl for those rows to save quota.
+            Uses one Google Custom Search image query as a last-resort image
+            source when a Search-to-Draft row has no page-owned image. Applies
+            to both Vertex interstitials and regular URLs.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
             <div className="space-y-1">
               <Label htmlFor="cse-search-image" className="text-base">
-                Use Google Images as a fallback for Vertex rows
+                Use Google Images as a fallback
               </Label>
               <p className="text-sm text-muted-foreground">
-                When enabled, if a Vertex-interstitial search result has no image after
-                direct fetch and soft-redirect, <code>enrich-candidate-image</code> runs one
-                Google Custom Search image query (brand + name) with a ~2.5 s budget.
-                Chosen results are labeled <em>From image search — verify</em> in the picker.
+                When ON, Search-to-Draft rows with no page-owned image may fall back to
+                Google Custom Search Images. Auto-applied with a{' '}
+                <em>From image search — verify</em> chip. Non-Vertex rows additionally
+                require a brand or ≥3 usable name tokens to avoid quota waste.
                 Uses your existing <code>GOOGLE_CUSTOM_SEARCH_API_KEY</code> and
                 <code> GOOGLE_CUSTOM_SEARCH_CX</code>.
               </p>
