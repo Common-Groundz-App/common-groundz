@@ -130,6 +130,44 @@ serve(async (req) => {
 
     if (existingBrand) {
       console.log(`✅ Brand already exists: ${existingBrand.id}`);
+
+      // Missing-logo backfill (v8e follow-up). Race-safe: only updates when
+      // image_url is still NULL at update time. Never overwrites, never
+      // touches other columns. Soft-fails to existing_found.
+      if (shouldWrite && typeof logo === 'string' && logo.length > 0 && !existingBrand.image_url) {
+        const { data: backfilled, error: backfillErr } = await supabaseAdmin
+          .from('entities')
+          .update({
+            image_url: logo,
+            updated_at: new Date().toISOString(),
+            metadata: {
+              ...(existingBrand.metadata || {}),
+              enriched: true,
+              enrichment_date: new Date().toISOString(),
+              enrichment_source: 'backfill_missing_logo',
+            },
+          })
+          .eq('id', existingBrand.id)
+          .is('image_url', null)
+          .select()
+          .maybeSingle();
+
+        if (!backfillErr && backfilled) {
+          console.log(JSON.stringify({
+            event: 'brand_logo_backfill', ok: true, brandId: existingBrand.id,
+            source: creationContext ?? 'unknown', matchedBy: 'name',
+          }));
+          return new Response(JSON.stringify({
+            success: true, status: 'backfilled_logo', brandEntity: backfilled, alreadyExisted: true
+          }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
+        console.log(JSON.stringify({
+          event: 'brand_logo_backfill', ok: false, brandId: existingBrand.id,
+          source: creationContext ?? 'unknown', matchedBy: 'name',
+          reason: backfillErr?.message ?? 'race_or_no_row',
+        }));
+      }
+
       return new Response(JSON.stringify({
         success: true, status: 'existing_found', brandEntity: existingBrand, alreadyExisted: true
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
