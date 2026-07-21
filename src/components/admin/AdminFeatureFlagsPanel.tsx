@@ -256,9 +256,15 @@ export function AdminFeatureFlagsPanel() {
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
-      } else {
+      } else if (pending.key === 'entity_extraction.search_image_cse_fallback_enabled') {
         await setFlag.mutateAsync({
           key: 'entity_extraction.search_image_cse_fallback_enabled',
+          value: { enabled: pending.nextEnabled },
+          reason: reason.trim() || undefined,
+        });
+      } else {
+        await setFlag.mutateAsync({
+          key: 'entity_extraction.search_brand_logo_lookup_enabled',
           value: { enabled: pending.nextEnabled },
           reason: reason.trim() || undefined,
         });
