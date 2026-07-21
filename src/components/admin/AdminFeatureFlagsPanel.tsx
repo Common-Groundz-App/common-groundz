@@ -113,6 +113,12 @@ export function AdminFeatureFlagsPanel() {
   );
   const cseImgEnabled: boolean = cseImgRow?.value?.enabled === true;
 
+  // v8e — Brand logo lookup for Search-to-Draft rows. Default OFF.
+  const brandLogoLookupRow = rows.data?.find(
+    (r) => r.key === 'entity_extraction.search_brand_logo_lookup_enabled',
+  );
+  const brandLogoLookupEnabled: boolean = brandLogoLookupRow?.value?.enabled === true;
+
   const confirmTitle =
     pending?.key === 'mux.uploads_enabled'
       ? pending.nextEnabled
