@@ -156,7 +156,11 @@ export function AdminFeatureFlagsPanel() {
                       ? pending.nextEnabled
                         ? 'Enable Google image search fallback?'
                         : 'Disable Google image search fallback?'
-                      : '';
+                      : pending?.key === 'entity_extraction.search_brand_logo_lookup_enabled'
+                        ? pending.nextEnabled
+                          ? 'Enable brand logo lookup for Search?'
+                          : 'Disable brand logo lookup for Search?'
+                        : '';
 
   const confirmDesc =
     pending?.key === 'mux.uploads_enabled'
