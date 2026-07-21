@@ -259,6 +259,42 @@ serve(async (req) => {
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
         } else {
           console.log(`✅ Brand already exists (matched by website): ${brandByWebsite.id}`);
+
+          // Missing-logo backfill (v8e follow-up). Same race-safe rules.
+          if (shouldWrite && typeof logo === 'string' && logo.length > 0 && !brandByWebsite.image_url) {
+            const { data: backfilled, error: backfillErr } = await supabaseAdmin
+              .from('entities')
+              .update({
+                image_url: logo,
+                updated_at: new Date().toISOString(),
+                metadata: {
+                  ...(brandByWebsite.metadata || {}),
+                  enriched: true,
+                  enrichment_date: new Date().toISOString(),
+                  enrichment_source: 'backfill_missing_logo',
+                },
+              })
+              .eq('id', brandByWebsite.id)
+              .is('image_url', null)
+              .select()
+              .maybeSingle();
+
+            if (!backfillErr && backfilled) {
+              console.log(JSON.stringify({
+                event: 'brand_logo_backfill', ok: true, brandId: brandByWebsite.id,
+                source: creationContext ?? 'unknown', matchedBy: 'website',
+              }));
+              return new Response(JSON.stringify({
+                success: true, status: 'backfilled_logo', brandEntity: backfilled, alreadyExisted: true
+              }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+            }
+            console.log(JSON.stringify({
+              event: 'brand_logo_backfill', ok: false, brandId: brandByWebsite.id,
+              source: creationContext ?? 'unknown', matchedBy: 'website',
+              reason: backfillErr?.message ?? 'race_or_no_row',
+            }));
+          }
+
           return new Response(JSON.stringify({
             success: true, status: 'existing_found', brandEntity: brandByWebsite, alreadyExisted: true
           }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
