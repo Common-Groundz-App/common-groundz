@@ -436,6 +436,11 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
       }
       if (primary && !imageSelection.noImageChosen) finalPatch.image_url = primary;
 
+      // Phase 3.5c v2 — brandDecisionType for finalization telemetry.
+      // Falls back to 'not_applicable' when Stage 1 was skipped (no brand candidates).
+      const brandDecisionType: BrandDecisionType =
+        brandDecision?.kind ?? (noBrandCandidates ? 'not_applicable' : 'not_applicable');
+
       await onPrefillForm({
         parentOverride: resolvedParent,
         metadataOverride: resolvedBrandMetadata,
@@ -446,6 +451,7 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
         noImageChosen: imageSelection.noImageChosen,
         formPatch: finalPatch,
         tagsOverride: finalPatch.tags,
+        brandDecisionType,
       });
     } finally {
       setStage2Busy(false);
