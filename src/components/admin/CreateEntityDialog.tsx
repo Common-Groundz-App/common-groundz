@@ -186,6 +186,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [pendingAnalyzeUrl, setPendingAnalyzeUrl] = useState<string | null>(null);
   const skipEarlyDupCheckOnceRef = useRef<boolean>(false);
   const preflightInFlightRef = useRef<boolean>(false);
+  // Phase 3.5c v2 — Search-to-Draft finalization snapshot. Captured at Apply
+  // time; consumed once at successful entity_created; reset on close/reset.
+  const searchSnapshotRef = useRef<SearchDraftSnapshot | null>(null);
   // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
   // by the metadata-only modal as a freshness guard so URL A's metadata never
   // surfaces under URL B.
