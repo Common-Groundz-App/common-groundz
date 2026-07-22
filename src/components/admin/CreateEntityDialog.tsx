@@ -2357,11 +2357,57 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
       // Phase 3.5c — funnel: entity_created (search-origin only).
       if (fromSearch && newEntity) {
+        // Phase 3.5c v2 — compute finalization diff from immutable snapshot.
+        let diff: SearchFinalizationDiff | undefined;
+        const snap = searchSnapshotRef.current;
+        if (snap) {
+          const finalImageUrl = (newEntity.image_url as string | null | undefined) ?? null;
+          let finalImageSource: FinalImageSource;
+          if (!finalImageUrl) {
+            finalImageSource = 'none';
+          } else if (snap.imageCandidatesByUrl[finalImageUrl]) {
+            finalImageSource = snap.imageCandidatesByUrl[finalImageUrl] as FinalImageSource;
+          } else if (finalImageUrl === snap.imageUrlAtPrefill) {
+            // Same as prefill but not a candidate → treat as initial (or unknown).
+            finalImageSource = snap.initialImageSource as FinalImageSource;
+          } else {
+            finalImageSource = 'user_replaced';
+          }
+          const finalRawSource = snap.imageCandidatesByRawSource[finalImageUrl ?? ''];
+          const finalMethod =
+            finalImageSource === 'google_images'
+              ? mapCandidateSourceToMethod(finalRawSource) ?? 'unknown'
+              : undefined;
+          const imageMethod: ImageMethod | undefined =
+            finalMethod ??
+            (snap.initialImageSource === 'google_images' ? snap.initialImageMethod ?? 'unknown' : undefined);
+
+          const finalMeta = pickUserRelevantMetadata((newEntity as any).metadata ?? {});
+          diff = {
+            nameChanged: normalizeText(newEntity.name) !== normalizeText(snap.nameGuess),
+            categoryChanged:
+              ((newEntity as any).category_id ?? null) !== (snap.categoryIdGuess ?? null),
+            brandChanged: (resolvedParent?.id ?? null) !== snap.brandId,
+            imageChanged: (finalImageUrl ?? null) !== (snap.imageUrlAtPrefill ?? null),
+            descriptionChanged:
+              normalizeText((newEntity as any).description ?? '') !==
+              normalizeText(snap.descriptionGuess),
+            websiteChanged:
+              normalizeText((newEntity as any).website_url ?? '') !==
+              normalizeText(snap.websiteGuess),
+            metadataChanged: JSON.stringify(finalMeta) !== JSON.stringify(snap.metadataGuess),
+            imageUserReplaced: finalImageSource === 'user_replaced',
+            initialImageSource: snap.initialImageSource,
+            finalImageSource,
+            brandDecisionType: snap.brandDecisionType,
+            ...(imageMethod ? { imageMethod } : {}),
+          };
+        }
         void logFunnel({
           event: 'entity_created',
           source: 'search',
           entityType: newEntity.type,
-          diagnostics: { latencyMs: consumePickLatency() },
+          diagnostics: { latencyMs: consumePickLatency(), ...(diff ? { diff } : {}) },
         });
       }
 
