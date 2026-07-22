@@ -834,6 +834,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setFieldErrors({});
     setAiFilledFields(new Set());
     setPendingBrandForAtomic(null);
+    searchSnapshotRef.current = null;
     setActiveTab('basic');
     
     // Reset progressive disclosure state (user variant only)
