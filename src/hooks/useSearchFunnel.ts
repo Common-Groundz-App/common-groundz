@@ -18,6 +18,8 @@ export type FunnelEvent =
 
 export type FunnelSource = 'search' | 'existing_match';
 
+import type { SearchFinalizationDiff } from '@/components/admin/entity-create/searchTelemetryTypes';
+
 export interface FunnelPayload {
   event: FunnelEvent;
   source: FunnelSource;
@@ -29,6 +31,8 @@ export interface FunnelPayload {
     latencyMs?: number;
     cached?: boolean;
     hasImage?: boolean;
+    /** Phase 3.5c v2 — booleans + approved enums only. */
+    diff?: SearchFinalizationDiff;
   };
 }
 
