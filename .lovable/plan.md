@@ -1,110 +1,192 @@
-## Verdict on the two reviews
+## I agree with the corrections
 
-- **Both correct on the core:** server needs missing-logo backfill; client writes only on Stage 1 confirm; never overwrite; never write on preview.
-- **ChatGPT's race-safe `WHERE image_url IS NULL`** → adopted.
-- **ChatGPT's strict source allowlist** → **not adopted.** `BrandCandidate.source` is the *brand-match* provenance (e.g. `existing_entity`, `admin_manual`), not the *logo* provenance. The logo comes from `resolve-brand-logo`, which we already trust. Gating on `candidate.source` would drop legitimate backfills. **Codex's denylist guard is the right shape.**
-- **Both:** pass `creationContext` and add structured logs → adopted.
+The latest feedback makes the plan simpler and safer. I will adopt all of the corrections below.
 
-## Change 1 — Server: race-safe missing-logo backfill in `create-brand-entity`
+## What we will implement
 
-File: `supabase/functions/create-brand-entity/index.ts`.
+### Phase 1 — Finalization telemetry (do this first)
 
-Add backfill in **two** branches, before the current `return existing_found`:
+When an admin creates an entity from Search-to-Draft, log a privacy-safe diff to `search_funnel_events.diagnostics` via the existing `log-search-funnel` edge function.
 
-**A. Existing brand by name (lines 131–136):**
-- Guard: `shouldWrite === true` AND `logo` is a non-empty string AND `!existingBrand.image_url`.
-- UPDATE with race guard:
-  ```
-  .from('entities')
-  .update({
-    image_url: logo,
-    updated_at: new Date().toISOString(),
-    metadata: {
-      ...(existingBrand.metadata || {}),
-      enriched: true,
-      enrichment_date: new Date().toISOString(),
-      enrichment_source: 'backfill_missing_logo',
-    },
-  })
-  .eq('id', existingBrand.id)
-  .is('image_url', null)   // race guard
-  .select()
-  .maybeSingle()
-  ```
-- Do NOT touch `name`, `slug`, `website_url`, `description`, `approval_status`, `parent_id`, `created_by`, `user_created`.
-- If update returns a row → respond `status: 'backfilled_logo'`, `success: true`, `brandEntity: updatedRow`, HTTP 200.
-- If update returns null (row's `image_url` was populated between SELECT and UPDATE) OR errors → log, fall back to existing behavior: `status: 'existing_found'`, `brandEntity: existingBrand`. Never fail the request.
+#### Telemetry fields
 
-**B. Existing brand by website — active, no name conflict (lines 222–227):**
-- Same guard and same UPDATE, keyed on `brandByWebsite.id` with `.is('image_url', null)`.
-- Same fallback semantics.
+Only booleans and approved enum labels. No raw values, no URLs, no product names, no query text.
 
-**Structured log** (both branches, success or fallback):
-```
-console.log(JSON.stringify({
-  event: 'brand_logo_backfill',
-  ok, brandId, source: creationContext ?? 'unknown',
-}));
+```txt
+nameChanged: boolean
+categoryChanged: boolean
+brandChanged: boolean
+imageChanged: boolean
+descriptionChanged: boolean
+websiteChanged: boolean
+metadataChanged: boolean
+imageUserReplaced: boolean
+initialImageSource: InitialImageSource
+finalImageSource: FinalImageSource
+brandDecisionType: BrandDecisionType
+imageMethod?: "google_cse" | "unknown"  // only when source is google_images
 ```
 
-Do **not** modify the soft-deleted-restore branches (lines 195–221, 249–276) — they already set `image_url` correctly.
+`InitialImageSource` values:
 
-## Change 2 — Client: call from the existing-brand confirm path
-
-File: `src/components/admin/entity-create/DraftReviewBody.tsx`, inside `handleConfirmBrand` → `brandDecision.kind === 'existing'` branch, immediately after the current `brandRow` SELECT succeeds.
-
-**Guard (all must hold):**
-1. `!brandRow.image_url` (nothing to overwrite)
-2. `brandDecision.candidate.status === 'matched_existing'`
-3. `brandDecision.candidate.logoUrl` is a non-empty string that passes a basic URL check (`new URL(...)` in try/catch, protocol `https:` or `http:`)
-4. `brandDecision.candidate.source` is NOT in `{ 'admin_manual', 'user_upload' }` (denylist — trust the resolver for everything else)
-
-**On pass:**
-```
-await supabase.functions.invoke('create-brand-entity', {
-  body: {
-    brandName: brandRow.name,
-    logo: brandDecision.candidate.logoUrl,
-    website: brandRow.website_url ?? null,
-    confirmCreate: true,
-    creationContext: 'search_existing_backfill', // or 'url_analysis_existing_backfill' if a URL-analysis flag is present in draft/context
-  },
-});
-```
-- If `data.status === 'backfilled_logo'` or (`data.success && data.brandEntity?.image_url`), build `parent` from `data.brandEntity`.
-- Otherwise fall back to `brandRow` unchanged.
-- Wrap in try/catch. **Any failure is soft** — log a warning, continue with `brandRow`, never block Stage 2.
-
-**Client log:**
-```
-console.log(JSON.stringify({
-  event: 'search_brand_logo_backfill',
-  ok, brandId: brandRow.id, hadLogo: false, source: 'search',
-}));
+```txt
+page_metadata
+firecrawl
+google_images
+none
+unknown
 ```
 
-## Cross-flow behavior
+`FinalImageSource` values:
 
-- URL Analysis shares `DraftReviewBody.handleConfirmBrand`, so it gets the same backfill automatically. If a flag/field in `draft` distinguishes the two entry points, pass `creationContext: 'url_analysis_existing_backfill'` for URL Analysis; otherwise `'draft_existing_backfill'` is a fine unified value. Either way, the *server* fix benefits both callers.
+```txt
+page_metadata
+firecrawl
+google_images
+user_replaced
+none
+unknown
+```
 
-## Explicit non-goals
+`BrandDecisionType` values:
 
-- **No writes on preview.** Opening Review Draft, closing it, or seeing the logo chip never mutates the DB.
-- **No overwrite, ever.** Guarded on both client (`!brandRow.image_url`) and server (`.is('image_url', null)`).
-- **No schema changes.** `image_url`, `metadata`, `updated_at` already exist.
-- **No changes to** `resolve-brand-logo`, `SearchEntryPanel`, `applyEntityDraft`, `create_brand_and_entity_atomic`, `analyze-entity-url-v2`, or any migration.
-- **No new source enum values.**
+```txt
+existing
+create_new
+not_sure
+not_listed
+not_applicable
+```
 
-## Why the strict source allowlist is skipped
+`imageMethod` is limited to `google_cse` or `unknown` because it only applies when the source is `google_images`. Page metadata and Firecrawl images do not need a separate method field.
 
-The reviewer's list (`google_images`, `firecrawl`, `page_metadata`, `official_site`, `favicon`) describes *image* provenance. `BrandCandidate.source` in `src/types/entityDraft.ts` describes *brand-match* provenance (`existing_entity`, `admin_manual`, `google_grounding`, etc.). Matching those two enums against each other would reject almost every legitimate backfill — e.g. an existing brand matched via `existing_entity` with a logo resolved by `resolve-brand-logo` would fail the check. The logo itself is trusted because `resolve-brand-logo` already applies its own source filters (CSE / favicon / official site) with its own guardrails. The denylist above (`admin_manual`, `user_upload`) is the right layer — it blocks logos a human typed in the draft form without prior resolver validation.
+#### Snapshot rules
 
-## Manual verification
+- Capture an immutable snapshot of the Search draft at the moment it is applied to the host form.
+- Store the snapshot in a ref inside `CreateEntityDialog` so it does not change after prefill.
+- Reset the snapshot when:
+  - the dialog closes,
+  - a different Search row is picked,
+  - the user switches from Search to URL/manual entry,
+  - or the entity is successfully created.
+- Only emit this telemetry when the creation originated from Search (`creationSource === "search"` or a Search draft snapshot exists).
+- For URL/manual-created entities, do NOT send finalization diff in this phase.
 
-1. Flag `entity_extraction.search_brand_logo_lookup_enabled` = ON.
-2. Existing `BABE Laboratorios` with `image_url = null` → search a product → Review Draft shows logo chip → Confirm brand → row now has `image_url` and `metadata.enrichment_source = 'backfill_missing_logo'`. Server log `brand_logo_backfill ok:true`, client log `search_brand_logo_backfill ok:true`.
-3. Existing brand with `image_url` already set → confirm → no UPDATE (guard trips on client), or race guard drops it silently on server. No new `enrichment_source` in metadata.
-4. Cancel Review Draft before confirming → zero writes, zero logs.
-5. URL Analysis on an existing brand with no logo → same backfill fires through the shared client path.
-6. Flag OFF → no logo resolved → client guard fails on empty `logoUrl` → no invoke, no writes.
-7. Simulate race by manually setting `image_url` after opening the draft: server returns `existing_found`, no `enrichment_source` written, client falls back to the freshly-set logo from `brandRow`.
+#### What counts as "changed"
+
+- `nameChanged`: saved name differs from `draft.nameGuess` (case-insensitive trimmed comparison).
+- `categoryChanged`: saved `category_id` differs from `draft.categoryHint?.id`.
+  - If the draft has no category ID and the admin selects one, `categoryChanged: true`.
+  - If both are null/empty, `categoryChanged: false`.
+- `brandChanged`: saved parent differs from the draft's recommended brand, or from the existing brand the user chose in Stage 1.
+- `imageChanged`: saved `image_url` differs from the draft's recommended image.
+- `descriptionChanged`: saved description differs from `draft.descriptionGuess`.
+- `websiteChanged`: saved `website_url` differs from the draft's inferred website.
+- `metadataChanged`: saved metadata differs from `draft.structuredHints` only for user-relevant keys. Ignore trace/debug/enrichment timestamps, internal diagnostic IDs, or volatile enrichment metadata.
+- `imageUserReplaced`: the final image was a user upload/paste, not one of the draft candidates. `finalImageSource` must be `"user_replaced"` in this case.
+- `initialImageSource`: source of the image that was pre-selected when the draft was applied.
+- `finalImageSource`: source of the image that was saved.
+- `brandDecisionType`: the type of brand decision made in Stage 1.
+- `imageMethod`: optional. Only present when `initialImageSource` or `finalImageSource` is `"google_images"`. Value is `"google_cse"` or `"unknown"`.
+
+#### Validation in `log-search-funnel`
+
+Instead of a fuzzy "reject strings that look like raw text" rule, use an exact allow-list:
+
+- Accept only known keys in the diff object.
+- For each key, enforce the exact type.
+- `initialImageSource`, `finalImageSource`, and `brandDecisionType` must be in their allowed sets.
+- `imageMethod` must be `"google_cse"` or `"unknown"` if present.
+- Any unknown string key or any value that is not a boolean or approved enum string is dropped.
+- Reject the whole request if a raw `query`, `q`, `raw`, `text`, or `prompt` key appears at the top level or in `diagnostics`.
+
+#### Console logging
+
+- Store telemetry in the Supabase table always.
+- Console logging only in development/debug mode.
+- No production console output of telemetry events.
+
+### Phase 2 — Minimal helper tests (do this after telemetry)
+
+Do not add full handler tests with Supabase/auth mocking. Only export small pure helpers for offline testing.
+
+#### Priority order for tests
+
+Decision helpers matter more than response formatting. If a response-format helper requires extra refactoring, skip it.
+
+#### `create-brand-entity` helpers to test
+
+1. `shouldBackfillLogo(existingImageUrl, logoUrl, shouldWrite)` — returns true only when:
+   - `shouldWrite` is true,
+   - `logoUrl` is a non-empty string,
+   - `existingImageUrl` is null/empty.
+2. `normalizeBrandSlug(brandName)` — slug generation helper.
+
+Optional: `buildBrandResponse(status, brandEntity, alreadyExisted)` — only if it requires no extra refactoring.
+
+#### `resolve-brand-logo` helpers to test
+
+1. `normalizeBrand(raw)` — strips non-alphanumeric characters and lowercases.
+2. `checkRateLimit(userId, hits, now)` — returns false after 30 hits in the rolling hour.
+3. `buildFlagOffResponse()` — returns `{ logoUrl: null, source: "none", cached: false, skipReason: "flag_off" }`.
+4. `buildRateLimitedResponse()` — returns `{ logoUrl: null, source: "none", cached: false, skipReason: "rate_limited" }`.
+
+Optional: `buildCacheHitResponse(cached)` — only if it requires no extra refactoring.
+
+#### What to avoid exporting
+
+- Full handler functions.
+- Supabase client setup.
+- Auth internals.
+- External API pipeline pieces.
+- Large inline handler chunks.
+
+#### Test rules
+
+- Keep tests offline and credential-free.
+- No live Google CSE, Firecrawl, or Supabase integration calls.
+- Mock or test only pure logic.
+
+## What we will NOT do
+
+- No top-3 image enrichment cap.
+- No pricing prefill.
+- No category resolver parity work.
+- No Amazon ASIN guard for Search.
+- No weak-signal filtering.
+- No URL Analysis on the selected Search candidate.
+- No Gemini 1.5 → 2.5 migration for URL Analysis.
+- No URL Analysis changes.
+- No user-facing behavior changes.
+- No full edge-function handler tests in this phase.
+- No Vitest/React Testing Library setup in this phase.
+- No live external API calls in tests.
+- No `mem://` update.
+
+## Files likely to be touched
+
+- `src/components/admin/CreateEntityDialog.tsx` — add Search draft snapshot ref, compute diff on save, call `logFunnel` with `entity_created` + diff.
+- `src/components/admin/entity-create/DraftReviewBody.tsx` — pass `brandDecisionType` through the prefill payload so the host can log it.
+- `src/hooks/useSearchFunnel.ts` — extend `FunnelPayload` and `FunnelDiagnostics` types to include the diff object.
+- `supabase/functions/log-search-funnel/index.ts` — add the diff allow-list and enum validation.
+- `supabase/functions/create-brand-entity/index.ts` — export small pure helpers for testing.
+- `supabase/functions/resolve-brand-logo/index.ts` — export small pure helpers for testing.
+- `supabase/functions/create-brand-entity/index.test.ts` — helper tests only.
+- `supabase/functions/resolve-brand-logo/index.test.ts` — helper tests only.
+
+## Verification steps
+
+1. After telemetry changes, do a manual Search-to-Draft entity creation.
+2. In the Supabase SQL editor, check the most recent `search_funnel_events` row for `event = 'entity_created'`.
+3. Confirm `diagnostics.diff` contains only booleans and approved enum strings.
+4. Confirm no raw query text, names, descriptions, URLs, or metadata values are stored.
+5. Confirm `imageUserReplaced` is true when the admin manually replaces the image.
+6. Confirm `brandDecisionType` is present and is one of the allowed enum values.
+7. Confirm `initialImageSource` is never `"user_replaced"`.
+8. Run the Deno helper tests for `create-brand-entity` and `resolve-brand-logo`.
+9. Confirm no production console logs are emitted.
+10. Confirm URL Analysis and manual entity creation flows are unchanged.
+
+## Summary
+
+This is a stabilization phase: telemetry first, small helper tests second, and no behavior changes. It gives us the data to decide whether future work should focus on image quality, brand matching, category resolution, or something else entirely.
