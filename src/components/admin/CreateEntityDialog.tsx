@@ -3048,11 +3048,58 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onDeferBrandCreation={setPendingBrandForAtomic}
         onPrefillForm={async (overrides) => {
           prefilledFromDraftRef.current = true;
+          const isFromSearch = Boolean((aiPredictions as any)?.__fromSearch);
           // v7 — Search Apply must clear previous form/media (URL Analyze
           // already does this inside commitApply). Prevents old images from
           // a prior search/URL analysis leaking into the next entity.
-          if ((aiPredictions as any)?.__fromSearch) {
+          if (isFromSearch) {
             resetEntityFormForNewAppliedUrl();
+          }
+          // Phase 3.5c v2 — Capture immutable Search-draft snapshot for
+          // finalization diff. Only for Search-origin drafts.
+          if (isFromSearch) {
+            const draft = (aiPredictions as any)?.entityDraft;
+            const cand = draft?.imageCandidates ?? [];
+            const rec = cand[draft?.recommendedImageIndex ?? 0];
+            const patchLocal = overrides.formPatch ?? {};
+            const primaryAtPrefill = overrides.noImageChosen
+              ? null
+              : overrides.primaryPending
+                ? overrides.primaryPending.previewUrl
+                : (overrides.imageOverride ?? patchLocal.image_url ?? null);
+            const primaryWasUpload = !!overrides.primaryPending;
+            const byRaw: Record<string, string> = {};
+            const byInitial: Record<string, ReturnType<typeof mapCandidateSourceToInitial>> = {};
+            for (const c of cand) {
+              if (c?.url && c?.source) {
+                byRaw[c.url] = c.source;
+                byInitial[c.url] = mapCandidateSourceToInitial(c.source);
+              }
+            }
+            searchSnapshotRef.current = {
+              nameGuess: patchLocal.name ?? draft?.nameGuess ?? '',
+              descriptionGuess: patchLocal.description ?? draft?.descriptionGuess ?? '',
+              websiteGuess: patchLocal.website_url ?? '',
+              categoryIdGuess: (patchLocal.category_id !== undefined
+                ? patchLocal.category_id
+                : draft?.categoryHint?.id) ?? null,
+              metadataGuess: pickUserRelevantMetadata({
+                ...(draft?.structuredHints ?? {}),
+                ...(patchLocal.metadata ?? {}),
+                ...(overrides.metadataOverride ?? {}),
+              }),
+              brandId: overrides.parentOverride?.id ?? null,
+              brandDecisionType: overrides.brandDecisionType ?? 'not_applicable',
+              imageUrlAtPrefill: primaryAtPrefill,
+              initialImageSource: primaryWasUpload
+                ? 'unknown'
+                : mapCandidateSourceToInitial(rec?.source),
+              initialImageMethod: primaryWasUpload
+                ? undefined
+                : mapCandidateSourceToMethod(rec?.source),
+              imageCandidatesByUrl: byInitial,
+              imageCandidatesByRawSource: byRaw,
+            };
           }
           // Phase 3.2 v6 — Stage 2 "Apply to Form": prefill host form state,
           // do NOT create the entity. The host form's Save button is the
