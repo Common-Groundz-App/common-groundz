@@ -316,6 +316,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
     if (open) {
       setDraftCheckComplete(false); // Reset when dialog opens
+      searchSnapshotRef.current = null; // Phase 3.5c v2 — reset stale finalization snapshot
       loadDraft();
     }
   }, [open]);
