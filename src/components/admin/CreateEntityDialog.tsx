@@ -49,6 +49,16 @@ import { SearchEntryPanel, type ExistingMatch as SearchExistingMatch } from './e
 import { buildSearchPredictions, enrichBrandCandidatesWithExistingMatch, type SearchCandidatePayload } from './entity-create/applyEntityDraft';
 import { useSearchToDraftEnabled } from '@/hooks/useSearchToDraftEnabled';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
+import {
+  mapCandidateSourceToInitial,
+  mapCandidateSourceToMethod,
+  pickUserRelevantMetadata,
+  normalizeText,
+  type SearchDraftSnapshot,
+  type SearchFinalizationDiff,
+  type FinalImageSource,
+  type ImageMethod,
+} from './entity-create/searchTelemetryTypes';
 import { Search as SearchIcon, Link2 } from 'lucide-react';
 
 interface CreateEntityDialogProps {
