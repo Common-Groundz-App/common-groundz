@@ -22,6 +22,8 @@ import {
 } from './buildEntityFormPatch';
 
 
+import type { BrandDecisionType } from './searchTelemetryTypes';
+
 export interface DraftApplyOverrides {
   parentOverride: Entity | null;
   metadataOverride: Record<string, any>;
@@ -39,6 +41,8 @@ export interface DraftApplyOverrides {
   formPatch: EntityFormPatch;
   /** Tags live outside formData in the host dialog; shipped explicitly. */
   tagsOverride?: string[];
+  /** Phase 3.5c v2 — Stage-1 brand decision, forwarded to Search finalization telemetry. */
+  brandDecisionType?: BrandDecisionType;
 }
 
 interface DraftReviewBodyProps {
