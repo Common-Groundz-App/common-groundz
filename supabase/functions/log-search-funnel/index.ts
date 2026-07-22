@@ -43,6 +43,45 @@ function jsonResp(body: unknown, status = 200) {
   });
 }
 
+// Phase 3.5c v2 — allow-listed diff enums. Must mirror
+// src/components/admin/entity-create/searchTelemetryTypes.ts.
+const INITIAL_IMAGE_SOURCES = new Set([
+  "page_metadata", "firecrawl", "google_images", "none", "unknown",
+]);
+const FINAL_IMAGE_SOURCES = new Set([
+  "page_metadata", "firecrawl", "google_images", "user_replaced", "none", "unknown",
+]);
+const BRAND_DECISION_TYPES = new Set([
+  "existing", "create_new", "not_sure", "not_listed", "not_applicable",
+]);
+const IMAGE_METHODS = new Set(["google_cse", "unknown"]);
+const DIFF_BOOL_KEYS = [
+  "nameChanged", "categoryChanged", "brandChanged", "imageChanged",
+  "descriptionChanged", "websiteChanged", "metadataChanged", "imageUserReplaced",
+];
+
+function sanitizeDiff(input: unknown): Record<string, unknown> | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const src = input as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const k of DIFF_BOOL_KEYS) {
+    if (typeof src[k] === "boolean") out[k] = src[k];
+  }
+  if (typeof src.initialImageSource === "string" && INITIAL_IMAGE_SOURCES.has(src.initialImageSource)) {
+    out.initialImageSource = src.initialImageSource;
+  }
+  if (typeof src.finalImageSource === "string" && FINAL_IMAGE_SOURCES.has(src.finalImageSource)) {
+    out.finalImageSource = src.finalImageSource;
+  }
+  if (typeof src.brandDecisionType === "string" && BRAND_DECISION_TYPES.has(src.brandDecisionType)) {
+    out.brandDecisionType = src.brandDecisionType;
+  }
+  if (typeof src.imageMethod === "string" && IMAGE_METHODS.has(src.imageMethod)) {
+    out.imageMethod = src.imageMethod;
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 function sanitizeDiagnostics(input: unknown): Record<string, unknown> {
   if (!input || typeof input !== "object" || Array.isArray(input)) return {};
   const src = input as Record<string, unknown>;
@@ -52,6 +91,8 @@ function sanitizeDiagnostics(input: unknown): Record<string, unknown> {
   }
   if (typeof src.cached === "boolean") out.cached = src.cached;
   if (typeof src.hasImage === "boolean") out.hasImage = src.hasImage;
+  const diff = sanitizeDiff(src.diff);
+  if (diff) out.diff = diff;
   return out;
 }
 

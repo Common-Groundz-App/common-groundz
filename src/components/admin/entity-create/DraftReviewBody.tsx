@@ -22,6 +22,8 @@ import {
 } from './buildEntityFormPatch';
 
 
+import type { BrandDecisionType } from './searchTelemetryTypes';
+
 export interface DraftApplyOverrides {
   parentOverride: Entity | null;
   metadataOverride: Record<string, any>;
@@ -39,6 +41,8 @@ export interface DraftApplyOverrides {
   formPatch: EntityFormPatch;
   /** Tags live outside formData in the host dialog; shipped explicitly. */
   tagsOverride?: string[];
+  /** Phase 3.5c v2 — Stage-1 brand decision, forwarded to Search finalization telemetry. */
+  brandDecisionType?: BrandDecisionType;
 }
 
 interface DraftReviewBodyProps {
@@ -432,6 +436,11 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
       }
       if (primary && !imageSelection.noImageChosen) finalPatch.image_url = primary;
 
+      // Phase 3.5c v2 — brandDecisionType for finalization telemetry.
+      // Falls back to 'not_applicable' when Stage 1 was skipped (no brand candidates).
+      const brandDecisionType: BrandDecisionType =
+        brandDecision?.kind ?? (noBrandCandidates ? 'not_applicable' : 'not_applicable');
+
       await onPrefillForm({
         parentOverride: resolvedParent,
         metadataOverride: resolvedBrandMetadata,
@@ -442,6 +451,7 @@ export const DraftReviewBody: React.FC<DraftReviewBodyProps> = ({
         noImageChosen: imageSelection.noImageChosen,
         formPatch: finalPatch,
         tagsOverride: finalPatch.tags,
+        brandDecisionType,
       });
     } finally {
       setStage2Busy(false);

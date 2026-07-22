@@ -49,6 +49,16 @@ import { SearchEntryPanel, type ExistingMatch as SearchExistingMatch } from './e
 import { buildSearchPredictions, enrichBrandCandidatesWithExistingMatch, type SearchCandidatePayload } from './entity-create/applyEntityDraft';
 import { useSearchToDraftEnabled } from '@/hooks/useSearchToDraftEnabled';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
+import {
+  mapCandidateSourceToInitial,
+  mapCandidateSourceToMethod,
+  pickUserRelevantMetadata,
+  normalizeText,
+  type SearchDraftSnapshot,
+  type SearchFinalizationDiff,
+  type FinalImageSource,
+  type ImageMethod,
+} from './entity-create/searchTelemetryTypes';
 import { Search as SearchIcon, Link2 } from 'lucide-react';
 
 interface CreateEntityDialogProps {
@@ -176,6 +186,9 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const [pendingAnalyzeUrl, setPendingAnalyzeUrl] = useState<string | null>(null);
   const skipEarlyDupCheckOnceRef = useRef<boolean>(false);
   const preflightInFlightRef = useRef<boolean>(false);
+  // Phase 3.5c v2 — Search-to-Draft finalization snapshot. Captured at Apply
+  // time; consumed once at successful entity_created; reset on close/reset.
+  const searchSnapshotRef = useRef<SearchDraftSnapshot | null>(null);
   // Phase 2: normalized URL the currently held urlMetadata belongs to. Used
   // by the metadata-only modal as a freshness guard so URL A's metadata never
   // surfaces under URL B.
@@ -303,6 +316,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
     if (open) {
       setDraftCheckComplete(false); // Reset when dialog opens
+      searchSnapshotRef.current = null; // Phase 3.5c v2 — reset stale finalization snapshot
       loadDraft();
     }
   }, [open]);
@@ -821,6 +835,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setFieldErrors({});
     setAiFilledFields(new Set());
     setPendingBrandForAtomic(null);
+    searchSnapshotRef.current = null;
     setActiveTab('basic');
     
     // Reset progressive disclosure state (user variant only)
@@ -2343,11 +2358,57 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
       // Phase 3.5c — funnel: entity_created (search-origin only).
       if (fromSearch && newEntity) {
+        // Phase 3.5c v2 — compute finalization diff from immutable snapshot.
+        let diff: SearchFinalizationDiff | undefined;
+        const snap = searchSnapshotRef.current;
+        if (snap) {
+          const finalImageUrl = (newEntity.image_url as string | null | undefined) ?? null;
+          let finalImageSource: FinalImageSource;
+          if (!finalImageUrl) {
+            finalImageSource = 'none';
+          } else if (snap.imageCandidatesByUrl[finalImageUrl]) {
+            finalImageSource = snap.imageCandidatesByUrl[finalImageUrl] as FinalImageSource;
+          } else if (finalImageUrl === snap.imageUrlAtPrefill) {
+            // Same as prefill but not a candidate → treat as initial (or unknown).
+            finalImageSource = snap.initialImageSource as FinalImageSource;
+          } else {
+            finalImageSource = 'user_replaced';
+          }
+          const finalRawSource = snap.imageCandidatesByRawSource[finalImageUrl ?? ''];
+          const finalMethod =
+            finalImageSource === 'google_images'
+              ? mapCandidateSourceToMethod(finalRawSource) ?? 'unknown'
+              : undefined;
+          const imageMethod: ImageMethod | undefined =
+            finalMethod ??
+            (snap.initialImageSource === 'google_images' ? snap.initialImageMethod ?? 'unknown' : undefined);
+
+          const finalMeta = pickUserRelevantMetadata((newEntity as any).metadata ?? {});
+          diff = {
+            nameChanged: normalizeText(newEntity.name) !== normalizeText(snap.nameGuess),
+            categoryChanged:
+              ((newEntity as any).category_id ?? null) !== (snap.categoryIdGuess ?? null),
+            brandChanged: (resolvedParent?.id ?? null) !== snap.brandId,
+            imageChanged: (finalImageUrl ?? null) !== (snap.imageUrlAtPrefill ?? null),
+            descriptionChanged:
+              normalizeText((newEntity as any).description ?? '') !==
+              normalizeText(snap.descriptionGuess),
+            websiteChanged:
+              normalizeText((newEntity as any).website_url ?? '') !==
+              normalizeText(snap.websiteGuess),
+            metadataChanged: JSON.stringify(finalMeta) !== JSON.stringify(snap.metadataGuess),
+            imageUserReplaced: finalImageSource === 'user_replaced',
+            initialImageSource: snap.initialImageSource,
+            finalImageSource,
+            brandDecisionType: snap.brandDecisionType,
+            ...(imageMethod ? { imageMethod } : {}),
+          };
+        }
         void logFunnel({
           event: 'entity_created',
           source: 'search',
           entityType: newEntity.type,
-          diagnostics: { latencyMs: consumePickLatency() },
+          diagnostics: { latencyMs: consumePickLatency(), ...(diff ? { diff } : {}) },
         });
       }
 
@@ -3034,11 +3095,58 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
         onDeferBrandCreation={setPendingBrandForAtomic}
         onPrefillForm={async (overrides) => {
           prefilledFromDraftRef.current = true;
+          const isFromSearch = Boolean((aiPredictions as any)?.__fromSearch);
           // v7 — Search Apply must clear previous form/media (URL Analyze
           // already does this inside commitApply). Prevents old images from
           // a prior search/URL analysis leaking into the next entity.
-          if ((aiPredictions as any)?.__fromSearch) {
+          if (isFromSearch) {
             resetEntityFormForNewAppliedUrl();
+          }
+          // Phase 3.5c v2 — Capture immutable Search-draft snapshot for
+          // finalization diff. Only for Search-origin drafts.
+          if (isFromSearch) {
+            const draft = (aiPredictions as any)?.entityDraft;
+            const cand = draft?.imageCandidates ?? [];
+            const rec = cand[draft?.recommendedImageIndex ?? 0];
+            const patchLocal = overrides.formPatch ?? {};
+            const primaryAtPrefill = overrides.noImageChosen
+              ? null
+              : overrides.primaryPending
+                ? overrides.primaryPending.previewUrl
+                : (overrides.imageOverride ?? patchLocal.image_url ?? null);
+            const primaryWasUpload = !!overrides.primaryPending;
+            const byRaw: Record<string, string> = {};
+            const byInitial: Record<string, ReturnType<typeof mapCandidateSourceToInitial>> = {};
+            for (const c of cand) {
+              if (c?.url && c?.source) {
+                byRaw[c.url] = c.source;
+                byInitial[c.url] = mapCandidateSourceToInitial(c.source);
+              }
+            }
+            searchSnapshotRef.current = {
+              nameGuess: patchLocal.name ?? draft?.nameGuess ?? '',
+              descriptionGuess: patchLocal.description ?? draft?.descriptionGuess ?? '',
+              websiteGuess: patchLocal.website_url ?? '',
+              categoryIdGuess: (patchLocal.category_id !== undefined
+                ? patchLocal.category_id
+                : draft?.categoryHint?.id) ?? null,
+              metadataGuess: pickUserRelevantMetadata({
+                ...(draft?.structuredHints ?? {}),
+                ...(patchLocal.metadata ?? {}),
+                ...(overrides.metadataOverride ?? {}),
+              }),
+              brandId: overrides.parentOverride?.id ?? null,
+              brandDecisionType: overrides.brandDecisionType ?? 'not_applicable',
+              imageUrlAtPrefill: primaryAtPrefill,
+              initialImageSource: primaryWasUpload
+                ? 'unknown'
+                : mapCandidateSourceToInitial(rec?.source),
+              initialImageMethod: primaryWasUpload
+                ? undefined
+                : mapCandidateSourceToMethod(rec?.source),
+              imageCandidatesByUrl: byInitial,
+              imageCandidatesByRawSource: byRaw,
+            };
           }
           // Phase 3.2 v6 — Stage 2 "Apply to Form": prefill host form state,
           // do NOT create the entity. The host form's Save button is the
