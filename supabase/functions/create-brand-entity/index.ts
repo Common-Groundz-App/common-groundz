@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { normalizeBrandName } from '../_shared/brand_normalize.ts';
 import { isNonAdminEntityCreationEnabled } from '../_shared/feature_flags.ts';
+import { shouldBackfillLogo, normalizeBrandSlug } from './helpers.ts';
 
 
 const corsHeaders = {
@@ -134,7 +135,7 @@ serve(async (req) => {
       // Missing-logo backfill (v8e follow-up). Race-safe: only updates when
       // image_url is still NULL at update time. Never overwrites, never
       // touches other columns. Soft-fails to existing_found.
-      if (shouldWrite && typeof logo === 'string' && logo.length > 0 && !existingBrand.image_url) {
+      if (shouldBackfillLogo(existingBrand.image_url, logo, shouldWrite)) {
         const { data: backfilled, error: backfillErr } = await supabaseAdmin
           .from('entities')
           .update({
@@ -261,7 +262,7 @@ serve(async (req) => {
           console.log(`✅ Brand already exists (matched by website): ${brandByWebsite.id}`);
 
           // Missing-logo backfill (v8e follow-up). Same race-safe rules.
-          if (shouldWrite && typeof logo === 'string' && logo.length > 0 && !brandByWebsite.image_url) {
+          if (shouldBackfillLogo(brandByWebsite.image_url, logo, shouldWrite)) {
             const { data: backfilled, error: backfillErr } = await supabaseAdmin
               .from('entities')
               .update({
@@ -360,7 +361,7 @@ serve(async (req) => {
     }
 
     // Step 2: Generate slug
-    const baseSlug = brandName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const baseSlug = normalizeBrandSlug(brandName);
     let slug = baseSlug;
     let slugCounter = 1;
 
