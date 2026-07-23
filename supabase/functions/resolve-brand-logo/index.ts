@@ -29,6 +29,12 @@ import {
   isAcceptableLogo,
   tryOwnOriginFavicon,
 } from "./logo_filters.ts";
+import {
+  normalizeBrand,
+  checkRateLimit as pureCheckRateLimit,
+  buildFlagOffResponse,
+  buildRateLimitedResponse,
+} from "./helpers.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -36,7 +42,6 @@ const corsHeaders = {
 };
 
 const BUDGET_MS = 4_000;
-const RATE_LIMIT_PER_HOUR = 30;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const BodySchema = z.object({ brand: z.string().min(1).max(120) });
@@ -56,19 +61,16 @@ const logoCache = new Map<string, CacheEntry>();
 const rateBuckets = new Map<string, number[]>();
 function checkRateLimit(userId: string): boolean {
   const now = Date.now();
-  const cutoff = now - 60 * 60 * 1000;
-  const hits = (rateBuckets.get(userId) ?? []).filter((t) => t > cutoff);
-  if (hits.length >= RATE_LIMIT_PER_HOUR) {
-    rateBuckets.set(userId, hits);
+  const hits = rateBuckets.get(userId) ?? [];
+  if (!pureCheckRateLimit(userId, hits, now)) {
+    // Keep only recent hits so bucket doesn't grow unbounded.
+    rateBuckets.set(userId, hits.filter((t) => t > now - 60 * 60 * 1000));
     return false;
   }
-  hits.push(now);
-  rateBuckets.set(userId, hits);
+  const recent = hits.filter((t) => t > now - 60 * 60 * 1000);
+  recent.push(now);
+  rateBuckets.set(userId, recent);
   return true;
-}
-
-function normalizeBrand(raw: string): string {
-  return raw.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 async function brandHashPrefix(normalized: string): Promise<string> {
@@ -195,7 +197,7 @@ serve(async (req) => {
     if (!isAdmin) {
       const enabled = await isSearchBrandLogoLookupEnabled(supabaseAdmin);
       if (!enabled) {
-        return jsonResp({ logoUrl: null, source: "none", cached: false, skipReason: "flag_off" });
+        return jsonResp(buildFlagOffResponse());
       }
     }
 
@@ -232,7 +234,7 @@ serve(async (req) => {
         brandHashPrefix: hashPrefix, ok: false, source: "none",
         phase: "ratelimit", ms: 0, cached: false, skipReason: "rate_limited",
       });
-      return jsonResp({ logoUrl: null, source: "none", cached: false, skipReason: "rate_limited" });
+      return jsonResp(buildRateLimitedResponse());
     }
 
     // ─── Do the lookup ────────────────────────────────────────────────
