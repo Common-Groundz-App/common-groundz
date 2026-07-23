@@ -197,7 +197,7 @@ serve(async (req) => {
     if (!isAdmin) {
       const enabled = await isSearchBrandLogoLookupEnabled(supabaseAdmin);
       if (!enabled) {
-        return jsonResp({ logoUrl: null, source: "none", cached: false, skipReason: "flag_off" });
+        return jsonResp(buildFlagOffResponse());
       }
     }
 
@@ -234,7 +234,7 @@ serve(async (req) => {
         brandHashPrefix: hashPrefix, ok: false, source: "none",
         phase: "ratelimit", ms: 0, cached: false, skipReason: "rate_limited",
       });
-      return jsonResp({ logoUrl: null, source: "none", cached: false, skipReason: "rate_limited" });
+      return jsonResp(buildRateLimitedResponse());
     }
 
     // ─── Do the lookup ────────────────────────────────────────────────
