@@ -59,7 +59,7 @@ import {
   type FinalImageSource,
   type ImageMethod,
 } from './entity-create/searchTelemetryTypes';
-import { Search as SearchIcon, Link2 } from 'lucide-react';
+import { Link2 } from 'lucide-react';
 
 interface CreateEntityDialogProps {
   open: boolean;
