@@ -59,7 +59,7 @@ import {
   type FinalImageSource,
   type ImageMethod,
 } from './entity-create/searchTelemetryTypes';
-import { Search as SearchIcon, Link2 } from 'lucide-react';
+import { Link2 } from 'lucide-react';
 
 interface CreateEntityDialogProps {
   open: boolean;
@@ -139,7 +139,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
   // Phase 3.5a — Search-to-Draft tab visibility + active-tab state.
   const searchToDraftEnabled = useSearchToDraftEnabled();
-  const [createEntityTab, setCreateEntityTab] = useState<'url' | 'search'>('url');
+  const [createEntityTab, setCreateEntityTab] = useState<'url' | 'search'>('search');
   // Phase 3.5c — funnel telemetry (fire-and-forget, hashed query only).
   const { log: logFunnel, consumePickLatency } = useSearchFunnel();
   const useDraftReviewFlagRaw = useEntityReviewUsesDraft();
@@ -2482,28 +2482,160 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
             {draftRestored && <span className="text-sm text-muted-foreground ml-2">(Draft restored)</span>}
           </DialogTitle>
           <DialogDescription>
-            {variant === 'user' 
-              ? 'Share what you love with the community'
-              : 'Add a new entity with business hours and contact information'
-            }
+            Find something to review or add.
           </DialogDescription>
         </DialogHeader>
 
-        {/* URL Hero Section - Available for both variants */}
+        {/* Entry section — Search is the default primary path; URL is a secondary option. */}
         <div className="space-y-4 animate-fade-in">
-            <Tabs value={createEntityTab} onValueChange={(v) => setCreateEntityTab(v as 'url' | 'search')}>
-              {searchToDraftEnabled && (
-                <TabsList className="grid w-full grid-cols-2 mb-3">
-                  <TabsTrigger value="url" className="gap-2">
-                    <Link2 className="h-4 w-4" /> Paste URL
-                  </TabsTrigger>
-                  <TabsTrigger value="search" className="gap-2">
-                    <SearchIcon className="h-4 w-4" /> Search
-                  </TabsTrigger>
-                </TabsList>
-              )}
-              <TabsContent value="url" className="mt-0">
-            {/* URL Auto-Fill Hero Card */}
+          {searchToDraftEnabled ? (
+            <>
+              <SearchEntryPanel
+                onPick={handleSearchPick}
+                onOpenExisting={handleSearchOpenExisting}
+              />
+
+              <Collapsible
+                open={createEntityTab === 'url'}
+                onOpenChange={(open) => setCreateEntityTab(open ? 'url' : 'search')}
+              >
+                <div className="flex items-center justify-center">
+                  <CollapsibleTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+                    >
+                      {createEntityTab === 'url' ? 'Back to search' : 'Have a link? Paste URL instead'}
+                    </button>
+                  </CollapsibleTrigger>
+                </div>
+
+                <CollapsibleContent className="mt-3">
+                  {/* URL Auto-Fill Card */}
+                  <div className="relative overflow-hidden rounded-lg border border-border bg-card p-5 shadow-sm">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="flex-shrink-0 w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+                        <Link2 className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-sm font-medium text-foreground mb-0.5">
+                          Paste a link
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                          Paste a product, book, movie, place, or website link and we'll fill the details.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          id="analyze_url_hero"
+                          value={analyzeUrl}
+                          onChange={(e) => {
+                            const newUrl = e.target.value;
+                            setAnalyzeUrl(newUrl);
+                            setShowAnalyzeButton(isValidUrl(newUrl));
+                            if (urlMetadata && newUrl !== urlMetadata.url) {
+                              setUrlMetadata(null);
+                            }
+                          }}
+                          placeholder="https://www.goodreads.com/book/show/..."
+                          disabled={loading || analyzing}
+                          className="bg-background pr-10"
+                        />
+                        {analyzeUrl && (
+                          <button
+                            onClick={() => {
+                              setAnalyzeUrl('');
+                              setShowAnalyzeButton(false);
+                              setUrlMetadata(null);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors"
+                            type="button"
+                          >
+                            <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                          </button>
+                        )}
+                      </div>
+                      <Button
+                        onClick={handleAnalyzeUrl}
+                        disabled={!showAnalyzeButton || analyzing || loading || engineLoading}
+                        className="gap-2 min-w-[100px]"
+                      >
+                        {analyzing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4" />
+                            Analyze
+                          </>
+                        )}
+                      </Button>
+                    </div>
+
+                    {/* Rich URL Preview */}
+                    {urlMetadata && (
+                      <div className="mt-3 p-3 bg-background rounded-lg border border-border shadow-sm">
+                        <div className="flex items-center gap-3">
+                          {/* Favicon */}
+                          {urlMetadata.favicon && (
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                              <img
+                                src={urlMetadata.favicon}
+                                alt="Site icon"
+                                className="w-6 h-6 object-contain"
+                                onError={(e) => e.currentTarget.style.display = 'none'}
+                              />
+                            </div>
+                          )}
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            {/* Site Name with External Link */}
+                            <a
+                              href={urlMetadata.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 mb-1 hover:opacity-80 transition-opacity group"
+                            >
+                              <span className="text-xs text-muted-foreground truncate group-hover:text-foreground transition-colors">
+                                {urlMetadata.siteName || getSafeDomain(urlMetadata.url)}
+                              </span>
+                              <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />
+                            </a>
+
+                            {/* Product Title */}
+                            {urlMetadata.title && (
+                              <p className="text-sm font-medium text-foreground line-clamp-2">
+                                {urlMetadata.title}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Thumbnail Image */}
+                          {urlMetadata.image && (
+                            <div className="flex-shrink-0 w-12 h-12 rounded overflow-hidden bg-muted">
+                              <img
+                                src={urlMetadata.image}
+                                alt="Preview"
+                                className="w-full h-full object-cover"
+                                onError={(e) => e.currentTarget.style.display = 'none'}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            </>
+          ) : (
+            // Fallback when Search-to-Draft is disabled: show the legacy URL hero only.
             <div className="relative overflow-hidden rounded-lg border-2 border-brand-orange/30 bg-gradient-to-br from-brand-orange/5 to-transparent p-6 shadow-sm">
               <div className="flex items-start gap-3 mb-4">
                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-brand-orange/10 flex items-center justify-center">
@@ -2518,7 +2650,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <Input
@@ -2568,7 +2700,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   )}
                 </Button>
               </div>
-              
+
               {/* Rich URL Preview */}
               {urlMetadata && (
                 <div className="mt-3 p-3 bg-background/80 rounded-lg border border-border shadow-sm">
@@ -2576,19 +2708,19 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                     {/* Favicon */}
                     {urlMetadata.favicon && (
                       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                        <img 
-                          src={urlMetadata.favicon} 
+                        <img
+                          src={urlMetadata.favicon}
                           alt="Site icon"
                           className="w-6 h-6 object-contain"
                           onError={(e) => e.currentTarget.style.display = 'none'}
                         />
                       </div>
                     )}
-                    
+
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       {/* Site Name with External Link */}
-                      <a 
+                      <a
                         href={urlMetadata.url}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -2599,7 +2731,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                         </span>
                         <ExternalLink className="h-3 w-3 text-muted-foreground flex-shrink-0 group-hover:text-foreground transition-colors" />
                       </a>
-                      
+
                       {/* Product Title */}
                       {urlMetadata.title && (
                         <p className="text-sm font-medium text-foreground line-clamp-2">
@@ -2607,11 +2739,11 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                         </p>
                       )}
                     </div>
-                    
+
                     {/* Thumbnail Image */}
                     {urlMetadata.image && (
                       <div className="flex-shrink-0 w-12 h-12 rounded overflow-hidden bg-muted">
-                        <img 
+                        <img
                           src={urlMetadata.image}
                           alt="Preview"
                           className="w-full h-full object-cover"
@@ -2623,29 +2755,20 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                 </div>
               )}
             </div>
-              </TabsContent>
-              {searchToDraftEnabled && (
-                <TabsContent value="search" className="mt-0">
-                  <SearchEntryPanel
-                    onPick={handleSearchPick}
-                    onOpenExisting={handleSearchOpenExisting}
-                  />
-                </TabsContent>
-              )}
-            </Tabs>
-            
-            {/* Manual Entry Button - Only show for user variant when form is collapsed */}
-            {variant === 'user' && !isFormExpanded && !urlAnalysisComplete && (
-              <div className="flex items-center justify-center py-2">
-                <button
-                  onClick={() => setIsFormExpanded(true)}
-                  className="text-sm text-brand-orange hover:text-brand-orange/80 transition-colors relative after:content-[''] after:absolute after:left-0 after:right-0 after:-bottom-0.5 after:h-px after:bg-brand-orange after:scale-x-0 after:transition-transform after:duration-200 hover:after:scale-x-100"
-                  type="button"
-                >
-                  Or Enter Details Manually
-                </button>
-              </div>
-            )}
+          )}
+
+          {/* Manual Entry Button - Only show for user variant when form is collapsed */}
+          {variant === 'user' && !isFormExpanded && !urlAnalysisComplete && (
+            <div className="flex items-center justify-center py-2">
+              <button
+                onClick={() => setIsFormExpanded(true)}
+                className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors"
+                type="button"
+              >
+                Can't find it? Enter details manually
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Show tabs immediately for admin, or after expansion/analysis for users */}
