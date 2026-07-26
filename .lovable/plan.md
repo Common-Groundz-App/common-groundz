@@ -1,71 +1,80 @@
-## Goal
-Redesign only the entry-mode section of the `CreateEntityDialog` so Search is the default primary flow and Paste URL becomes a secondary expandable option. No backend, pipeline, telemetry, or feature-flag changes.
+## Current state
 
-## Why this direction
-The current "Paste URL | Search" segmented tabs feel admin-tool-ish and default to the higher-friction path. A single search-first hero input matches normal user behavior, looks more modern, and still leaves URL Analysis one click away for power users.
+**Phase 1 is complete and verified.** I checked the `search_funnel_events` table for your "Shiyaaka Sky Eau de Parfum" creation and found a clean `entity_created` row:
 
-## Files that will change
-- `src/components/admin/CreateEntityDialog.tsx` — only the entry-mode block (lines ~2494–2635) and the default tab state (line 142).
+- `event`: `entity_created`
+- `source`: `search`
+- `entity_type`: `product`
+- `diagnostics.diff`:
+  - `brandChanged: false`
+  - `brandDecisionType: "create_new"`
+  - `categoryChanged: true`
+  - `descriptionChanged: true`
+  - `finalImageSource: "google_images"`
+  - `imageChanged: false`
+  - `imageMethod: "unknown"`
+  - `imageUserReplaced: false`
+  - `initialImageSource: "google_images"`
+  - `metadataChanged: true`
+  - `nameChanged: false`
+  - `websiteChanged: true`
 
-## Detailed changes
+This is exactly the contract: only booleans and approved enum strings, no raw names, URLs, descriptions, or query text. Edge function logs also show no errors for `create-brand-entity` or `resolve-brand-logo`.
 
-### 1. Default state flips to Search
-- Change `const [createEntityTab, setCreateEntityTab] = useState<'url' | 'search'>('url')` to `('search')`.
+The `searchSnapshotRef` is captured at Apply time, reset on dialog close/success/new search, and consumed once at `entity_created`. URL/manual flows are not affected.
 
-### 2. Replace the tab switcher with a search-first layout
+## Next step: Phase 2 — Minimal helper tests
 
-**Header**
-- Title stays: "Add to CommonGroundz"
-- Subtitle changes to: "Find something to review or add."
+Phase 2 is the only remaining work from the agreed plan. We will export small, pure decision helpers from the two edge functions and write offline Deno tests. No full handler tests, no Supabase/auth mocks, no external API calls, no Vitest setup, no UI or behavior changes.
 
-**Primary search input**
-- One full-width input with placeholder: "Search products, places, movies, books, food..."
-- Search button to the right (icon + label or icon-only on small widths).
-- Helper examples below: "Try: "Cetaphil Gentle Cleanser", "The Alchemist", "Laughing Buddha Hampi""
-- Use existing `SearchEntryPanel` for results; keep its current behavior untouched.
+### What we will change
 
-**Secondary URL path**
-- A quiet text link below the search input: "Have a link? Paste URL instead"
-- Clicking it expands inline:
-  - URL input with placeholder: "Paste a product, book, movie, place, or website link"
-  - "Analyze" button
-  - A "Back to search" link to collapse
-- Keep the existing `useAnalyzeUrlEngine` flow and URL validation exactly as-is.
+1. **`supabase/functions/create-brand-entity/index.ts`**
+   - Extract `shouldBackfillLogo(existingImageUrl, logoUrl, shouldWrite)`.
+   - Extract `normalizeBrandSlug(brandName)`.
+   - Replace the inline backfill guard and slug generation with these helpers.
 
-**Manual fallback**
-- At the bottom of the entry section, change "Or Enter Details Manually" to "Can't find it? Enter details manually"
-- Keep its existing click behavior (opens the manual form).
+2. **`supabase/functions/create-brand-entity/index.test.ts`** (new)
+   - `shouldBackfillLogo(..., ..., true)` returns `true` only when `existingImageUrl` is null/empty and `logoUrl` is non-empty.
+   - `shouldBackfillLogo(..., ..., false)` returns `false`.
+   - `shouldBackfillLogo` with empty `logoUrl` returns `false`.
+   - `shouldBackfillLogo` with existing image returns `false`.
+   - `normalizeBrandSlug` returns a stable, lowercase, hyphenated, trimmed slug.
+   - `normalizeBrandSlug` handles special characters and multiple spaces/hyphens.
+   - We will **not** test DB collision handling here; collision logic stays in the handler's existing insert loop, not inside this pure helper.
 
-### 3. Remove old tab chrome
-- Remove the `Tabs`, `TabsList`, and `TabsTrigger` for URL/Search.
-- Remove the "✨ Quick Add from URL" heading and descriptive paragraph.
-- Remove the orange bordered card/section wrapper around the URL input if it exists.
+3. **`supabase/functions/resolve-brand-logo/index.ts`**
+   - Export `normalizeBrand(raw)` (already exists as a local function).
+   - Refactor `checkRateLimit(userId)` into `checkRateLimit(userId, hits, now)` so it can be tested with explicit inputs and no mutable module state.
+   - Extract `buildFlagOffResponse()` and `buildRateLimitedResponse()`.
+   - Replace inline `flag_off` and `rate_limited` responses with the helpers.
 
-### 4. Preserve everything else
-- The `SearchEntryPanel` component and its internals are untouched.
-- The URL analysis engine, validation, and results flow are untouched.
-- The draft review step and the tabbed entity form (Basic/Contact/Hours/Details/Preview) are untouched.
-- Telemetry (`useSearchFunnel`, `entity_created` diff logging) is untouched.
-- Cancel / Create Entity footer behavior is untouched.
+4. **`supabase/functions/resolve-brand-logo/index.test.ts`** (new)
+   - `normalizeBrand` strips non-alphanumeric characters and lowercases input.
+   - `checkRateLimit` returns `true` under the 30-hit rolling-hour limit and `false` at/after it.
+   - `checkRateLimit` ignores hits older than 1 hour.
+   - `buildFlagOffResponse` returns `{ logoUrl: null, source: "none", cached: false, skipReason: "flag_off" }`.
+   - `buildRateLimitedResponse` returns `{ logoUrl: null, source: "none", cached: false, skipReason: "rate_limited" }`.
 
-## Visual spec (uses existing tokens only)
-- Input: standard `Input` component, full width inside dialog padding.
-- Primary button: existing `Button` with brand primary styling.
-- Secondary links: `text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline`.
-- Examples text: `text-xs text-muted-foreground`.
-- No new colors, no new design tokens, no global style changes.
+### What we will NOT do
 
-## Acceptance criteria
-1. Dialog opens with Search input visible and focused-ready.
-2. URL input is hidden until "Have a link? Paste URL instead" is clicked.
-3. Clicking "Back to search" collapses URL and returns to Search view.
-4. Existing Search and URL Analysis flows continue to work exactly as before.
-5. Manual entry link still opens the full form.
-6. No regressions in telemetry, draft review, or entity creation.
+- No full handler/HTTP tests.
+- No Supabase client or auth mocking.
+- No live Google CSE, Firecrawl, or database calls.
+- No Vitest or React Testing Library setup.
+- No changes to URL Analysis, Search enrichment, image fetching, or user-facing behavior.
+- No `mem://` updates.
+- No collision handling inside `normalizeBrandSlug` unless it is already there.
 
-## What I will NOT do
-- No changes to `SearchEntryPanel.tsx`.
-- No changes to URL analysis edge functions or hooks.
-- No changes to feature flags or admin panels.
-- No changes to the tabbed entity form below the entry step.
-- No new dependencies.
+## Verification steps
+
+1. Run `supabase--test_edge_functions` for `create-brand-entity` and `resolve-brand-logo`.
+2. Confirm all helper tests pass.
+3. Confirm the edge functions still deploy without errors.
+4. Do one manual Search-to-Draft entity creation and confirm the `entity_created` telemetry row still contains only booleans and approved enums.
+5. Confirm no new production console logs are added; only the existing safe telemetry log remains.
+6. Confirm URL Analysis and manual entity creation flows are unchanged.
+
+## After Phase 2
+
+Once Phase 2 tests pass, the entire agreed-upon Phase 3.5 stabilization plan is complete. The recommended next move is to **feature-freeze Search-to-Draft** and let the new telemetry run for a few days before deciding what to improve next. Future candidates (in no particular order) include image quality, brand matching, category resolution, or something else entirely — but the telemetry should guide that decision, not speculation.
