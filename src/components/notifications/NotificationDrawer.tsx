@@ -107,13 +107,13 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
                   {markingAsRead ? (
                     <Loader2 className="h-3 w-3 animate-spin mr-1" />
                   ) : null}
-                  Mark all as read
+                  Mark these as read
                 </Button>
               )}
             </div>
           </SheetHeader>
 
-          {!isOnline && (
+          {!isOnline ? (
             <div className="shrink-0 px-4 pt-2">
               <OfflineInlineState
                 message={notifications.length > 0 ? "Showing recent notifications" : "Can't load notifications while offline"}
@@ -121,7 +121,25 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
                 lastRefresh={lastRefresh}
               />
             </div>
-          )}
+          ) : hasStaleData ? (
+            // Online server failure with cached rows: keep the rows, surface a
+            // compact non-blocking retry (distinct from the offline banner).
+            <div className="shrink-0 px-4 pt-2">
+              <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-1.5">
+                <span className="text-xs text-muted-foreground">Couldn't refresh</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={fetchAll}
+                  disabled={isRefreshing}
+                >
+                  {isRefreshing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           <Tabs
             defaultValue={activeTab}
