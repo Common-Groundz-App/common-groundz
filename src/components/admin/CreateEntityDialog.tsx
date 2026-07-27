@@ -139,7 +139,10 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
   const { engine: analyzeEngine, isLoading: engineLoading } = useAnalyzeUrlEngine();
   // Phase 3.5a — Search-to-Draft tab visibility + active-tab state.
   const searchToDraftEnabled = useSearchToDraftEnabled();
-  const [createEntityTab, setCreateEntityTab] = useState<'url' | 'search'>('url');
+  // Search-first: Search is the default mode; URL is the secondary option.
+  const [createEntityTab, setCreateEntityTab] = useState<'url' | 'search'>('search');
+  // When Search-to-Draft is disabled, always fall back to the URL panel.
+  const activeEntryMode: 'url' | 'search' = searchToDraftEnabled ? createEntityTab : 'url';
   // Phase 3.5c — funnel telemetry (fire-and-forget, hashed query only).
   const { log: logFunnel, consumePickLatency } = useSearchFunnel();
   const useDraftReviewFlagRaw = useEntityReviewUsesDraft();
