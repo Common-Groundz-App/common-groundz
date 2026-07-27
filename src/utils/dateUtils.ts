@@ -1,5 +1,5 @@
 
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, formatDistanceToNowStrict } from 'date-fns';
 
 /**
  * Format a date with relative time for recent dates:
@@ -32,4 +32,23 @@ export const formatRelativeDate = (dateString: string): string => {
   } else {
     return format(date, 'MMM d, yyyy');
   }
+};
+
+/**
+ * Compact timestamp for notification rows.
+ * - invalid date -> '' (render nothing rather than "Invalid Date")
+ * - future dates (clock skew) -> 'Just now'
+ * - < 60s -> 'Just now'
+ * - < 24h (rolling) -> '3 minutes ago', '2 hours ago'
+ * - >= 24h -> delegates to formatRelativeDate ('Yesterday', '5 days ago', 'Jun 28, 2026')
+ */
+export const formatNotificationTime = (dateString: string | Date): string => {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '';
+
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 60_000) return 'Just now';
+  if (diffMs < 86_400_000) return formatDistanceToNowStrict(date, { addSuffix: true });
+
+  return formatRelativeDate(typeof dateString === 'string' ? dateString : date.toISOString());
 };
