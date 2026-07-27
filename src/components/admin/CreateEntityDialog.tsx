@@ -2495,18 +2495,42 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
 
         {/* URL Hero Section - Available for both variants */}
         <div className="space-y-4 animate-fade-in">
-            <Tabs value={createEntityTab} onValueChange={(v) => setCreateEntityTab(v as 'url' | 'search')}>
+            <Tabs value={activeEntryMode} onValueChange={(v) => setCreateEntityTab(v as 'url' | 'search')}>
               {searchToDraftEnabled && (
-                <TabsList className="grid w-full grid-cols-2 mb-3">
-                  <TabsTrigger value="url" className="gap-2">
-                    <Link2 className="h-4 w-4" /> Paste URL
-                  </TabsTrigger>
-                  <TabsTrigger value="search" className="gap-2">
-                    <SearchIcon className="h-4 w-4" /> Search
-                  </TabsTrigger>
-                </TabsList>
+                <RadioGroup
+                  value={activeEntryMode}
+                  onValueChange={(v) => setCreateEntityTab(v as 'url' | 'search')}
+                  className="mb-4 grid grid-cols-2 gap-1 rounded-full bg-muted/60 p-1"
+                >
+                  {([
+                    { value: 'search', label: 'Search', Icon: SearchIcon },
+                    { value: 'url', label: 'Paste URL', Icon: Link2 },
+                  ] as const).map(({ value, label, Icon }) => {
+                    const isActive = activeEntryMode === value;
+                    return (
+                      <Label
+                        key={value}
+                        htmlFor={`entry-mode-${value}`}
+                        className={`flex cursor-pointer items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                          isActive
+                            ? 'bg-background text-foreground shadow-sm'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <RadioGroupItem
+                          id={`entry-mode-${value}`}
+                          value={value}
+                          className="sr-only"
+                        />
+                        <Icon className="h-4 w-4" />
+                        {label}
+                      </Label>
+                    );
+                  })}
+                </RadioGroup>
               )}
               <TabsContent value="url" className="mt-0">
+
             {/* URL Auto-Fill Hero Card */}
             <div className="relative overflow-hidden rounded-lg border-2 border-brand-orange/30 bg-gradient-to-br from-brand-orange/5 to-transparent p-6 shadow-sm">
               <div className="flex items-start gap-3 mb-4">
