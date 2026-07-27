@@ -18,7 +18,7 @@ interface NotificationDrawerProps {
 }
 
 export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerProps) {
-  const { notifications, unreadNotifications, unreadCount, markAsRead, loading, markingAsRead, lastRefresh, isOnline, error, fetchAll } = useNotifications();
+  const { notifications, unreadNotifications, unreadCount, markAsRead, loading, markingAsRead, lastRefresh, isOnline, isRefreshing, fetchError, fetchAll } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
