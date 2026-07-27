@@ -1,81 +1,95 @@
-## Verified in code before planning
+## Verdict
 
-- `NotificationDrawer.tsx:111` — tabs wrapper is a plain `div.px-4.pb-2`: no `flex-1`, no `min-h-0`, no overflow. This is the scroll bug.
-- `sheet.tsx:104` — Radix already renders an accessible `SheetPrimitive.Close` with `sr-only` "Close". `NotificationDrawer.tsx:89` adds a second raw `<X onClick>` in the same corner. Confirmed duplicate; the raw one has no button semantics or keyboard access.
-- `useNotifications.ts:42-47` — `await markNotificationsAsRead(ids)` runs **before** `setNotifications`. **Not optimistic.** Codex is right; my previous plan was wrong.
-- `useNotifications.ts:30` — `setError(e)` on failure, never cleared on success.
-- `useNotifications.ts:23` — `setLoading(true)` fires on every 10s poll.
-- `NotificationDrawer.tsx:31` — click `await`s `markAsRead` before closing/navigating.
-- `dateUtils.ts` — `formatRelativeDate` is day-granular (`Today` / `Yesterday` / `N days ago` / `MMM d, yyyy`).
+Both corrections accepted. The error-channel one is a real defect in my plan — `markAsRead`'s catch currently calls `setError(e)`, so a failed mark would light up the refresh strip *and* mispoint its Retry. It also already contaminates the existing `hasError` empty-state path, so this is a pre-existing bug, not just a new-UI one. The `networkStatusService` guard is the same omission as the state setters, one layer out.
 
-## Adopted corrections
+## Phase 1.5 — final
 
-Both reviews approve. I'm taking all three Codex corrections and ChatGPT's centralization note.
+Logic in `src/hooks/useNotifications.ts`; strip + label in `src/components/notifications/NotificationDrawer.tsx`.
 
----
+**A. Account generation guards fetches *and* mutations**
 
-## Phase 1
+One `userGenerationRef`, bumped on `user?.id` change, captured at the start of every `fetchAll` and every `markAsRead`. A previous session's mutation commits nothing on return: no counter decrement, no rollback, no error, no toast, no pending-ID release. Safe precisely because of H.
 
-Files: `NotificationDrawer.tsx`, `NotificationList.tsx`, `useNotifications.ts`, `dateUtils.ts`.
+**B. Per-ID rollback with exact prior values + ownership**
 
-**1. Bounded scroll region**
+Capture `Map<id, boolean>` of each affected row's real prior `is_read` before the optimistic write. On failure (generation permitting), map over the *current* array and restore only those IDs to their captured values.
+
+Eligibility filter first: submit an ID only if it is **locally unread** and **not already owned** by a pending mutation (`pendingReadIdsRef: Set<string>`). Normal same-user completions always release their IDs in `finally`.
+
+**C. Pending count as state, clamped**
 
 ```text
-SheetContent (p-0)
-└── div.flex.h-full.flex-col
-    ├── SheetHeader          shrink-0
-    ├── OfflineInlineState   shrink-0 (drawer-level)
-    └── Tabs                 flex min-h-0 flex-1 flex-col
-        ├── TabsList         shrink-0
-        └── TabsContent      min-h-0 flex-1 overflow-y-auto overscroll-contain
+if (eligibleIds.length === 0) return;         // no work, no increment
+setPendingReadOps(n => n + 1);
+...
+setPendingReadOps(n => Math.max(0, n - 1));
+const markingAsRead = pendingReadOps > 0;
 ```
 
-Horizontal padding moves to header and list, never to an unbounded wrapper.
+**D. Separate error channels** *(new)*
 
-**2. Remove the duplicate close icon.** Delete the raw `<X>`; rely on the Sheet's built-in accessible close.
+- `fetchError` — set only by `fetchAll`; cleared on every successful fetch. This is what the drawer reads.
+- Mutation failures set **no** shared error state. They roll back per-ID and show the existing destructive toast, which is already the right surface for a user-initiated action per project policy.
 
-**3. Header layout.** Drop `absolute top-4 right-8`:
+Drawer consequences: `hasError` (empty + failed) and `hasStaleData` (cached + failed) both derive from `fetchError`, so a failed mark can never render a refresh failure or aim Retry at the wrong operation.
+
+**E. Monotonic poll reconciliation**
 
 ```text
-Notifications                              [×]
-Updated just now          Mark all as read
+locallyRead = ids of current rows with is_read === true  ∪  pendingReadIdsRef
+merged = fetched.map(r => locallyRead.has(r.id) ? { ...r, is_read: true } : r)
 ```
 
-Per ChatGPT: visibility is driven by the **global** `unreadCount`, not the active tab's rows, so it doesn't vanish while on the Unread tab. Keeps its existing `markingAsRead` spinner.
+Code comment: **valid only because the app has no mark-as-unread action** — Phase 2 must replace this with versioning if that changes.
 
-**4. Offline banner rendered once above `TabsList`**, so All and Unread behave identically.
+**F. Dual fetch guards, covering side effects too**
 
-**5. Genuinely optimistic read state + immediate navigation** (Codex correction 1). In `markAsRead`: snapshot the affected rows, `setNotifications` **before** the RPC, and on failure restore the snapshot alongside the existing toast. Then in `handleNotificationClick`, drop the `await` — fire, close, navigate. Rows go read instantly, the unread badge stays consistent, and a failed write visibly rolls back rather than silently diverging.
+- `userGenerationRef` — account changes.
+- `requestSeqRef` — only the newest same-user response commits.
 
-**6. Error state with proper reset** (Codex correction 2). `setError(null)` on every successful `fetchAll`, and reset `error`/`notifications` when `user?.id` changes so a previous session's state can't leak. The drawer then consumes `error`: if a fetch fails **and** there are no cached rows, show "Couldn't load notifications" + Retry calling `fetchAll`, visually distinct from the empty state. If cached rows exist, keep them visible (stale-while-revalidate, per project policy).
+Both checks gate every state commit, the `finally` loading-flag updates, **and** `networkStatusService.reportSuccess()` / `reportFailure(e)`. An obsolete request never touches app-wide network health.
 
-**7. Initial load vs background refresh** (Codex correction 3). Track "has ever loaded" with a **ref**, not `notifications.length` — keeping it out of `fetchAll`'s `useCallback` deps so the poller isn't torn down and rescheduled on every response. Expose `isInitialLoad` and `isRefreshing`. `NotificationList` then renders 4 row skeletons **only** on initial load; polls never replace visible rows.
+**G. Stale-refresh strip + label**
 
-**8. Timestamps.** Replace `toLocaleString()`. Adding one helper to `dateUtils.ts` (not inline in the row, per ChatGPT), with the boundaries Codex asked to pin down decided here:
+Above the tabs, mutually exclusive with the offline banner (which stays `!isOnline`-only):
 
-- Under 60s → `Just now`
-- Under 24h (rolling, not calendar day) → `formatDistanceToNowStrict(date, { addSuffix: true })` → "3 minutes ago", "2 hours ago". Not compact "3m" — that would mean a custom unit mapper, which is the "new date system" both reviews warned against.
-- 24h and older → existing `formatRelativeDate`
-- Invalid date → render nothing rather than "Invalid Date"
-- Future timestamps (clock skew) → clamp to `Just now`
-- No live ticking while the drawer is open (Phase 2 if it matters)
+```text
+Couldn't refresh                     Retry
+```
+
+Retry calls `fetchAll`, disabled while `isRefreshing` — putting the currently-unused `isRefreshing` export to work. Button copy becomes **"Mark these as read."** `unreadCount` keeps its name plus a comment noting loaded-page scope.
+
+**H. Reset on user change**
+
+The reset effect additionally clears `pendingReadIdsRef` and sets `pendingReadOps` to 0, so nothing can be stranded by a skipped old-generation release.
+
+## Verification I'll run after implementing
+
+Codex's nine scenarios, plus the destination sweep:
+
+1. Two overlapping row clicks
+2. Row click overlapping "Mark these as read"
+3. Mark-read failure during a successful background refresh — toast only, no refresh strip
+4. Background-refresh failure with cached rows — rows stay, strip appears
+5. Retry after refresh failure
+6. Account switch mid-fetch
+7. Account switch mid-mutation
+8. Older poll landing after a newer Retry
+9. Poll landing after a successful optimistic read
+
+Then: query the distinct `type` / `entity_type` combinations present in your `notifications` rows, trace each through `handleNotificationClick`, and report which destination each opens — flagging fall-throughs to the "no associated content" toast or deleted targets.
 
 ## Out of scope
 
-No service, database, realtime, pagination, grouping, filters, per-row actions, or `/notifications` route.
+Pagination, global unread count, server-side mark-all, deleted-content handling, grouping, realtime, filters, per-row actions, `/notifications` route.
 
-## Manual verification after implementation
+## Phase 2 order
 
-Per Codex's note that destination reliability should be checked now even though fallback design is Phase 2: I'll list the notification types currently present in your data, and you confirm each one opens a valid destination. Also worth testing: scroll with 19+ rows, keyboard Tab/Esc to close, offline banner on both tabs, and a throttled-network row tap (should navigate instantly).
+Cursor pagination / Load more → global unread count → server-side mark-all → destination and deleted-content reliability → aggregation → realtime with polling fallback.
 
-## Phase 2 — priority order
+## Technical notes
 
-1. **Pagination + global unread count + server-side mark-all.** The 20-row cap makes older activity unreachable, and today's "Mark all as read" only touches loaded rows. Acceptable for Phase 1; the first real Phase 2 project.
-2. **Destination reliability** — graceful handling of deleted/inaccessible targets.
-3. **Grouping** ("hana.li liked 3 of your posts") — designed at query level so pagination and read state stay coherent.
-4. **Realtime**, with polling as fallback.
-5. Date sections, preferences/mute, rich previews, `/notifications` route, virtualisation, push.
-
-On the bell: Codex is right that I can't clear a "new activity" dot on open without a distinct `unseen` concept — the count derives from unread rows, so clearing locally would desync the bell from the Unread tab. That needs a schema decision, so it moves to Phase 2. Phase 1 keeps: rows unread until clicked, plus explicit Mark all as read. No auto-mark on open or close.
-
-Confirm and I'll implement items 1–8.
+- Two files. No service, schema, or query changes.
+- Renaming `error` → `fetchError` is an internal hook change; the drawer is the only consumer, updated in the same pass.
+- `markAsRead` stays fire-and-forget-safe; the drawer's `void markAsRead([...])` call site is unchanged.
+- All guards live in refs, so `fetchAll`'s `useCallback` deps are untouched and the poller is never torn down.
