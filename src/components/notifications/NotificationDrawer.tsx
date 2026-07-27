@@ -78,7 +78,8 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
     }
   };
 
-  const hasError = Boolean(error);
+  // Only surface the error state when there is nothing cached to show at all
+  const hasError = Boolean(error) && notifications.length === 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
