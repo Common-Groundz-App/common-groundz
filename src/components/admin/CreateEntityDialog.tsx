@@ -840,6 +840,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
     setPendingBrandForAtomic(null);
     searchSnapshotRef.current = null;
     setActiveTab('basic');
+    setCreateEntityTab('search');
     
     // Reset progressive disclosure state (user variant only)
     if (variant === 'user') {
