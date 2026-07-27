@@ -2671,7 +2671,7 @@ export const CreateEntityDialog: React.FC<CreateEntityDialogProps> = ({
                   className="text-sm text-brand-orange hover:text-brand-orange/80 transition-colors relative after:content-[''] after:absolute after:left-0 after:right-0 after:-bottom-0.5 after:h-px after:bg-brand-orange after:scale-x-0 after:transition-transform after:duration-200 hover:after:scale-x-100"
                   type="button"
                 >
-                  Or Enter Details Manually
+                  Can't find it? Enter details manually.
                 </button>
               </div>
             )}
