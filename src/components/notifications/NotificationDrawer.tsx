@@ -3,7 +3,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
-import { Check, Loader2, X } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
 import { LastUpdatedIndicator } from '@/components/ui/LastUpdatedIndicator';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
@@ -18,19 +18,21 @@ interface NotificationDrawerProps {
 }
 
 export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerProps) {
-  const { notifications, unreadNotifications, markAsRead, loading, markingAsRead, lastRefresh, isOnline, fetchAll } = useNotifications();
+  const { notifications, unreadNotifications, unreadCount, markAsRead, loading, markingAsRead, lastRefresh, isOnline, error, fetchAll } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
 
-  const handleNotificationClick = React.useCallback(async (notification: Notification, event: React.MouseEvent) => {
+  const handleNotificationClick = React.useCallback((notification: Notification, event: React.MouseEvent) => {
     event.preventDefault();
-    
+
+    // Fire-and-forget: the hook applies the read state optimistically (with
+    // rollback on failure), so navigation must never wait on the network.
     if (!notification.is_read) {
-      await markAsRead([notification.id]);
+      void markAsRead([notification.id]);
     }
-    
+
     onOpenChange(false);
     
     if (!notification.entity_type || !notification.entity_id) {
@@ -76,75 +78,89 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
     }
   };
 
+  const hasError = Boolean(error);
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-[400px] p-0">
         <div className="flex h-full flex-col">
-          <SheetHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur-lg border-b border-border/50 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <SheetTitle className="text-sm font-semibold">Notifications</SheetTitle>
-                {lastRefresh && <LastUpdatedIndicator date={lastRefresh} />}
-              </div>
-              <X 
-                className="h-4 w-4 cursor-pointer text-muted-foreground hover:text-foreground transition-colors" 
-                onClick={() => onOpenChange(false)}
-              />
+          <SheetHeader className="shrink-0 space-y-0 bg-background/95 backdrop-blur-lg border-b border-border/50 p-4 pr-12">
+            <div className="flex items-center justify-between gap-2">
+              <SheetTitle className="text-sm font-semibold">Notifications</SheetTitle>
             </div>
             <SheetDescription className="sr-only">View and manage your notifications</SheetDescription>
-            {notifications.length > 0 && unreadNotifications.length > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="h-8 text-xs absolute top-4 right-8"
-                onClick={handleMarkAllAsRead}
-                disabled={markingAsRead}
-              >
-                {markingAsRead ? (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                ) : null}
-                Mark all as read
-              </Button>
-            )}
+            <div className="flex min-h-[28px] items-center justify-between gap-2">
+              {lastRefresh ? <LastUpdatedIndicator date={lastRefresh} /> : <span />}
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={handleMarkAllAsRead}
+                  disabled={markingAsRead}
+                >
+                  {markingAsRead ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : null}
+                  Mark all as read
+                </Button>
+              )}
+            </div>
           </SheetHeader>
 
-          <div className="px-4 pb-2">
-            <Tabs defaultValue={activeTab} value={activeTab} onValueChange={setActiveTab} className="w-full">
+          {!isOnline && (
+            <div className="shrink-0 px-4 pt-2">
+              <OfflineInlineState
+                message={notifications.length > 0 ? "Showing recent notifications" : "Can't load notifications while offline"}
+                onRetry={notifications.length === 0 ? fetchAll : undefined}
+                lastRefresh={lastRefresh}
+              />
+            </div>
+          )}
+
+          <Tabs
+            defaultValue={activeTab}
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <div className="shrink-0 px-4 pt-2">
               <TabsList className="w-full">
                 <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
                 <TabsTrigger value="unread" className="flex-1">
-                  Unread {unreadNotifications.length > 0 && `(${unreadNotifications.length})`}
+                  Unread {unreadCount > 0 && `(${unreadCount})`}
                 </TabsTrigger>
               </TabsList>
-            
-              <TabsContent value="all" className="mt-2">
-                {!isOnline && (
-                  <div className="mb-2">
-                    <OfflineInlineState
-                      message={notifications.length > 0 ? "Showing recent notifications" : "Can't load notifications while offline"}
-                      onRetry={notifications.length === 0 ? fetchAll : undefined}
-                      lastRefresh={lastRefresh}
-                    />
-                  </div>
-                )}
-                <NotificationList 
-                  notifications={notifications}
-                  loading={loading}
-                  onNotificationClick={handleNotificationClick}
-                />
-              </TabsContent>
+            </div>
 
-              <TabsContent value="unread" className="mt-2">
-                <NotificationList 
-                  notifications={unreadNotifications}
-                  loading={loading}
-                  onNotificationClick={handleNotificationClick}
-                  emptyMessage="No unread notifications"
-                  emptyIcon={Check}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
+            <TabsContent
+              value="all"
+              className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
+            >
+              <NotificationList
+                notifications={notifications}
+                loading={loading}
+                hasError={hasError}
+                onRetry={fetchAll}
+                onNotificationClick={handleNotificationClick}
+              />
+            </TabsContent>
+
+            <TabsContent
+              value="unread"
+              className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
+            >
+              <NotificationList
+                notifications={unreadNotifications}
+                loading={loading}
+                hasError={hasError}
+                onRetry={fetchAll}
+                onNotificationClick={handleNotificationClick}
+                emptyMessage="No unread notifications"
+                emptyIcon={Check}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       </SheetContent>
     </Sheet>
