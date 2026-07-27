@@ -1,38 +1,56 @@
-## Goal
-Step 1 only: make **Search** the default mode, reorder to Search → Paste URL, and replace the tab bar with a modern rounded segmented pill control. Everything else stays exactly as it is.
+## Verified before planning
 
-## Changes (UI-only, single file)
+- `NotificationList.tsx:53-57` passes `imageUrl`/`username`, no `userId`.
+- `src/components/ui/user-avatar.tsx` ignores both props and only forwards `userId` to `ProfileAvatar`, which renders hardcoded `"AU"` when `userId` is missing (`common/ProfileAvatar.tsx:35-43`). That's the bug.
+- `UserAvatar` has exactly one importer (the notification list).
+- `fetchNotifications` uses `select('*')` and `Notification` already declares `sender_id?: string` — **no type, service, or DB change needed.**
+- All existing notification rows have a sender (follow/like/comment only); `system` / `journey_*` types exist in the type union but have no rows yet.
 
-`src/components/admin/CreateEntityDialog.tsx`
+## Changes adopted from the reviews
 
-1. **Default mode**
-   - `useState<'url' | 'search'>('url')` → `useState<'url' | 'search'>('search')`.
-   - Ensure the mode resets to `'search'` when the dialog closes/resets.
-   - Guard: if the Search-to-Draft flag is off, fall back to `'url'` so the URL panel still renders.
+- Use `sender_id` as the source of truth; never `notification.title` as a username.
+- Use `ProfileAvatar` directly instead of adding a second image/initials path — one avatar source of truth.
+- Delete the now-unused wrapper.
+- Handle senderless notifications explicitly rather than letting them fall into "AU".
+- **Corrected:** my earlier prefetch note was wrong. `useProfiles` caches under `['profiles', sortedIds]`, while `ProfileAvatar` reads `['profile', id]` — a batch fetch would *not* warm those entries. Batching is out of scope; if it's ever needed it must either seed individual keys via `setQueryData` or the rows must read from the batch hook.
 
-2. **Segmented pill control replaces `TabsList`**
-   - Remove the `TabsList` / `TabsTrigger` markup in the hero section.
-   - Add a compact segmented control: a rounded-full muted container (`bg-muted/60`, `p-1`, `rounded-full`) holding two equal-width options.
-   - Active option: raised pill (`bg-background`, `rounded-full`, subtle shadow, foreground text).
-   - Inactive option: transparent, `text-muted-foreground`, hover state.
-   - Order: **Search** (with search icon) first, **Paste URL** (with link icon) second.
-   - Implemented with the existing `RadioGroup` primitive (hidden indicators, label-as-pill) for proper keyboard/ARIA behavior, driven by the same `createEntityTab` state.
-   - Only rendered when `searchToDraftEnabled` is true, same as today.
+## Implementation
 
-3. **Content panels**
-   - Keep the existing `Tabs` root + `TabsContent` panels wired to `createEntityTab` so the URL card and `SearchEntryPanel` render exactly as they do now.
+1. **`src/components/notifications/NotificationList.tsx`**
+   - Replace the `UserAvatar` import with `ProfileAvatar` from `@/components/common/ProfileAvatar` (`Bell` is already imported).
+   - Render conditionally:
 
-4. **Copy**
-   - `Or Enter Details Manually` → `Can't find it? Enter details manually.`
+```tsx
+{notification.sender_id ? (
+  <ProfileAvatar
+    userId={notification.sender_id}
+    size="sm"
+    className="h-9 w-9 shrink-0"
+  />
+) : (
+  <div
+    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+    aria-hidden="true"
+  >
+    <Bell className="h-4 w-4" />
+  </div>
+)}
+```
 
-## Explicitly NOT changing
-- URL "Quick Add" hero card, sparkle icon, gradient, input, Analyze button, and rich preview — untouched.
-- `SearchEntryPanel` — untouched.
-- URL analysis handlers, draft review, duplicate dialogs, form tabs, progressive disclosure — untouched.
-- No backend, telemetry, or feature-flag changes.
+   - `shrink-0` added so the avatar can't compress in narrow rows.
 
-## Verification
-- Open the dialog: Search is active by default and appears first.
-- Switch to Paste URL: card renders identically to today, Analyze still works.
-- Manual-entry link shows the new copy and still expands the form.
-- Screenshot the dialog after the change so we can decide separately about compacting the URL card.
+2. **Delete `src/components/ui/user-avatar.tsx`** after re-confirming zero remaining imports at edit time.
+
+No changes to `notificationService.ts`, `useNotifications.ts`, the `Notification` type, or the database.
+
+## Two small additions of my own
+
+- **Alt text correctness comes free:** `ProfileAvatar` sets `alt={profile?.displayName}`, so notification avatars gain proper accessible names instead of today's silent image. The Bell marker is `aria-hidden` since the row text already conveys the meaning.
+- **Loading behaves per the project skeleton standard:** `ProfileAvatar` shows a rounded skeleton while the profile resolves, so rows will no longer flash "AU" during fetch. Worth eyeballing on drawer open.
+
+## Manual check
+
+Open the notification drawer:
+- Like / comment / follow rows show the sender's real photo, or initials derived from **that sender's profile** (not the missing-user branch).
+- Repeated notifications from the same sender resolve from one shared query (React Query dedupes identical keys).
+- No row renders the generic missing-user placeholder.

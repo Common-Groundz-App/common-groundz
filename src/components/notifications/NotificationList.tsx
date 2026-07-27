@@ -2,7 +2,7 @@
 import React from 'react';
 import { Bell, Check, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { UserAvatar } from "@/components/ui/user-avatar";
+import { ProfileAvatar } from "@/components/common/ProfileAvatar";
 import { Notification } from "@/services/notificationService";
 
 interface NotificationListProps {
@@ -50,11 +50,20 @@ export function NotificationList({
           )}
         >
           <div className="flex items-start gap-3">
-            <UserAvatar
-              imageUrl={notification.image_url}
-              username={notification.title}
-              className="w-9 h-9"
-            />
+            {notification.sender_id ? (
+              <ProfileAvatar
+                userId={notification.sender_id}
+                size="sm"
+                className="h-9 w-9 shrink-0"
+              />
+            ) : (
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                aria-hidden="true"
+              >
+                <Bell className="h-4 w-4" />
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className={cn(
                 "text-sm leading-5 text-foreground",
