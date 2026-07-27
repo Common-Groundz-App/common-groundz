@@ -18,7 +18,7 @@ interface NotificationDrawerProps {
 }
 
 export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerProps) {
-  const { notifications, unreadNotifications, unreadCount, markAsRead, loading, markingAsRead, lastRefresh, isOnline, error, fetchAll } = useNotifications();
+  const { notifications, unreadNotifications, unreadCount, markAsRead, loading, markingAsRead, lastRefresh, isOnline, isRefreshing, fetchError, fetchAll } = useNotifications();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -72,14 +72,18 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
   }, [navigate, openContent, toast, onOpenChange, markAsRead]);
 
   const handleMarkAllAsRead = () => {
+    // Loaded-page scoped: only the rows currently in the list, hence the
+    // "Mark these as read" label. True server-side mark-all is Phase 2.
     const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
     if (unreadIds.length > 0) {
       markAsRead(unreadIds);
     }
   };
 
-  // Only surface the error state when there is nothing cached to show at all
-  const hasError = Boolean(error) && notifications.length === 0;
+  // Both derive from the fetch-only error channel, so a failed mark-as-read
+  // can never render refresh failure UI.
+  const hasError = Boolean(fetchError) && notifications.length === 0;
+  const hasStaleData = Boolean(fetchError) && notifications.length > 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -103,13 +107,13 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
                   {markingAsRead ? (
                     <Loader2 className="h-3 w-3 animate-spin mr-1" />
                   ) : null}
-                  Mark all as read
+                  Mark these as read
                 </Button>
               )}
             </div>
           </SheetHeader>
 
-          {!isOnline && (
+          {!isOnline ? (
             <div className="shrink-0 px-4 pt-2">
               <OfflineInlineState
                 message={notifications.length > 0 ? "Showing recent notifications" : "Can't load notifications while offline"}
@@ -117,7 +121,25 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
                 lastRefresh={lastRefresh}
               />
             </div>
-          )}
+          ) : hasStaleData ? (
+            // Online server failure with cached rows: keep the rows, surface a
+            // compact non-blocking retry (distinct from the offline banner).
+            <div className="shrink-0 px-4 pt-2">
+              <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-1.5">
+                <span className="text-xs text-muted-foreground">Couldn't refresh</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs"
+                  onClick={fetchAll}
+                  disabled={isRefreshing}
+                >
+                  {isRefreshing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           <Tabs
             defaultValue={activeTab}
