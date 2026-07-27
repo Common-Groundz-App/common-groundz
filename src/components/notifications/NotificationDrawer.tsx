@@ -72,14 +72,18 @@ export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerPro
   }, [navigate, openContent, toast, onOpenChange, markAsRead]);
 
   const handleMarkAllAsRead = () => {
+    // Loaded-page scoped: only the rows currently in the list, hence the
+    // "Mark these as read" label. True server-side mark-all is Phase 2.
     const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
     if (unreadIds.length > 0) {
       markAsRead(unreadIds);
     }
   };
 
-  // Only surface the error state when there is nothing cached to show at all
-  const hasError = Boolean(error) && notifications.length === 0;
+  // Both derive from the fetch-only error channel, so a failed mark-as-read
+  // can never render refresh failure UI.
+  const hasError = Boolean(fetchError) && notifications.length === 0;
+  const hasStaleData = Boolean(fetchError) && notifications.length > 0;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
