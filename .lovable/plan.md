@@ -1,80 +1,38 @@
-## Current state
+## Goal
+Step 1 only: make **Search** the default mode, reorder to Search → Paste URL, and replace the tab bar with a modern rounded segmented pill control. Everything else stays exactly as it is.
 
-**Phase 1 is complete and verified.** I checked the `search_funnel_events` table for your "Shiyaaka Sky Eau de Parfum" creation and found a clean `entity_created` row:
+## Changes (UI-only, single file)
 
-- `event`: `entity_created`
-- `source`: `search`
-- `entity_type`: `product`
-- `diagnostics.diff`:
-  - `brandChanged: false`
-  - `brandDecisionType: "create_new"`
-  - `categoryChanged: true`
-  - `descriptionChanged: true`
-  - `finalImageSource: "google_images"`
-  - `imageChanged: false`
-  - `imageMethod: "unknown"`
-  - `imageUserReplaced: false`
-  - `initialImageSource: "google_images"`
-  - `metadataChanged: true`
-  - `nameChanged: false`
-  - `websiteChanged: true`
+`src/components/admin/CreateEntityDialog.tsx`
 
-This is exactly the contract: only booleans and approved enum strings, no raw names, URLs, descriptions, or query text. Edge function logs also show no errors for `create-brand-entity` or `resolve-brand-logo`.
+1. **Default mode**
+   - `useState<'url' | 'search'>('url')` → `useState<'url' | 'search'>('search')`.
+   - Ensure the mode resets to `'search'` when the dialog closes/resets.
+   - Guard: if the Search-to-Draft flag is off, fall back to `'url'` so the URL panel still renders.
 
-The `searchSnapshotRef` is captured at Apply time, reset on dialog close/success/new search, and consumed once at `entity_created`. URL/manual flows are not affected.
+2. **Segmented pill control replaces `TabsList`**
+   - Remove the `TabsList` / `TabsTrigger` markup in the hero section.
+   - Add a compact segmented control: a rounded-full muted container (`bg-muted/60`, `p-1`, `rounded-full`) holding two equal-width options.
+   - Active option: raised pill (`bg-background`, `rounded-full`, subtle shadow, foreground text).
+   - Inactive option: transparent, `text-muted-foreground`, hover state.
+   - Order: **Search** (with search icon) first, **Paste URL** (with link icon) second.
+   - Implemented with the existing `RadioGroup` primitive (hidden indicators, label-as-pill) for proper keyboard/ARIA behavior, driven by the same `createEntityTab` state.
+   - Only rendered when `searchToDraftEnabled` is true, same as today.
 
-## Next step: Phase 2 — Minimal helper tests
+3. **Content panels**
+   - Keep the existing `Tabs` root + `TabsContent` panels wired to `createEntityTab` so the URL card and `SearchEntryPanel` render exactly as they do now.
 
-Phase 2 is the only remaining work from the agreed plan. We will export small, pure decision helpers from the two edge functions and write offline Deno tests. No full handler tests, no Supabase/auth mocks, no external API calls, no Vitest setup, no UI or behavior changes.
+4. **Copy**
+   - `Or Enter Details Manually` → `Can't find it? Enter details manually.`
 
-### What we will change
+## Explicitly NOT changing
+- URL "Quick Add" hero card, sparkle icon, gradient, input, Analyze button, and rich preview — untouched.
+- `SearchEntryPanel` — untouched.
+- URL analysis handlers, draft review, duplicate dialogs, form tabs, progressive disclosure — untouched.
+- No backend, telemetry, or feature-flag changes.
 
-1. **`supabase/functions/create-brand-entity/index.ts`**
-   - Extract `shouldBackfillLogo(existingImageUrl, logoUrl, shouldWrite)`.
-   - Extract `normalizeBrandSlug(brandName)`.
-   - Replace the inline backfill guard and slug generation with these helpers.
-
-2. **`supabase/functions/create-brand-entity/index.test.ts`** (new)
-   - `shouldBackfillLogo(..., ..., true)` returns `true` only when `existingImageUrl` is null/empty and `logoUrl` is non-empty.
-   - `shouldBackfillLogo(..., ..., false)` returns `false`.
-   - `shouldBackfillLogo` with empty `logoUrl` returns `false`.
-   - `shouldBackfillLogo` with existing image returns `false`.
-   - `normalizeBrandSlug` returns a stable, lowercase, hyphenated, trimmed slug.
-   - `normalizeBrandSlug` handles special characters and multiple spaces/hyphens.
-   - We will **not** test DB collision handling here; collision logic stays in the handler's existing insert loop, not inside this pure helper.
-
-3. **`supabase/functions/resolve-brand-logo/index.ts`**
-   - Export `normalizeBrand(raw)` (already exists as a local function).
-   - Refactor `checkRateLimit(userId)` into `checkRateLimit(userId, hits, now)` so it can be tested with explicit inputs and no mutable module state.
-   - Extract `buildFlagOffResponse()` and `buildRateLimitedResponse()`.
-   - Replace inline `flag_off` and `rate_limited` responses with the helpers.
-
-4. **`supabase/functions/resolve-brand-logo/index.test.ts`** (new)
-   - `normalizeBrand` strips non-alphanumeric characters and lowercases input.
-   - `checkRateLimit` returns `true` under the 30-hit rolling-hour limit and `false` at/after it.
-   - `checkRateLimit` ignores hits older than 1 hour.
-   - `buildFlagOffResponse` returns `{ logoUrl: null, source: "none", cached: false, skipReason: "flag_off" }`.
-   - `buildRateLimitedResponse` returns `{ logoUrl: null, source: "none", cached: false, skipReason: "rate_limited" }`.
-
-### What we will NOT do
-
-- No full handler/HTTP tests.
-- No Supabase client or auth mocking.
-- No live Google CSE, Firecrawl, or database calls.
-- No Vitest or React Testing Library setup.
-- No changes to URL Analysis, Search enrichment, image fetching, or user-facing behavior.
-- No `mem://` updates.
-- No collision handling inside `normalizeBrandSlug` unless it is already there.
-
-## Verification steps
-
-1. Run `supabase--test_edge_functions` for `create-brand-entity` and `resolve-brand-logo`.
-2. Confirm all helper tests pass.
-3. Confirm the edge functions still deploy without errors.
-4. Do one manual Search-to-Draft entity creation and confirm the `entity_created` telemetry row still contains only booleans and approved enums.
-5. Confirm no new production console logs are added; only the existing safe telemetry log remains.
-6. Confirm URL Analysis and manual entity creation flows are unchanged.
-
-## After Phase 2
-
-Once Phase 2 tests pass, the entire agreed-upon Phase 3.5 stabilization plan is complete. The recommended next move is to **feature-freeze Search-to-Draft** and let the new telemetry run for a few days before deciding what to improve next. Future candidates (in no particular order) include image quality, brand matching, category resolution, or something else entirely — but the telemetry should guide that decision, not speculation.
+## Verification
+- Open the dialog: Search is active by default and appears first.
+- Switch to Paste URL: card renders identically to today, Analyze still works.
+- Manual-entry link shows the new copy and still expands the form.
+- Screenshot the dialog after the change so we can decide separately about compacting the URL card.
