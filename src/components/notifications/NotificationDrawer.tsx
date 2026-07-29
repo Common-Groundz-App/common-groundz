@@ -84,7 +84,7 @@ export function NotificationDrawer() {
           });
         }
     }
-  }, [navigate, openContent, toast, onOpenChange, markAsRead]);
+  }, [navigate, openContent, toast, closeNotifications, markAsRead]);
 
   const handleMarkAllAsRead = () => {
     // Loaded-page scoped: only the rows currently in the list, hence the
