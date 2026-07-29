@@ -57,7 +57,7 @@ export function VerticalTubelightNavbar({
       url: '#notifications', 
       icon: Bell,
       onClick: () => openNotifications(),
-      badge: unreadCount > 0 ? unreadCount : undefined
+      badge: (unreadCount ?? 0) > 0 ? unreadCount ?? undefined : undefined
     },
     { name: 'Settings', url: '/settings', icon: Settings }
   ];
