@@ -138,18 +138,18 @@ export function NotificationDrawer() {
             <SheetDescription className="sr-only">View and manage your notifications</SheetDescription>
             <div className="flex min-h-[28px] items-center justify-between gap-2">
               {lastRefresh ? <LastUpdatedIndicator date={lastRefresh} /> : <span />}
-              {unreadCount > 0 && (
+              {showMarkAll && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={handleMarkAllAsRead}
-                  disabled={markingAsRead}
+                  onClick={() => void markAllAsRead()}
+                  disabled={!canMarkAll}
                 >
-                  {markingAsRead ? (
+                  {markAllPending ? (
                     <Loader2 className="h-3 w-3 animate-spin mr-1" />
                   ) : null}
-                  Mark these as read
+                  Mark all as read
                 </Button>
               )}
             </div>
