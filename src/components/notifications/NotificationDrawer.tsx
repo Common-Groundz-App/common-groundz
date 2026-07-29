@@ -244,6 +244,8 @@ export function NotificationDrawer() {
                 isLoadingMore={isLoadingMore}
                 pageError={pageError}
                 onLoadMore={loadMore}
+                onRecoverPagination={recoverPagination}
+                isRecovering={isRecovering}
                 unloadedUnreadMessage={unloadedUnreadMessage}
               />
             </TabsContent>
