@@ -116,6 +116,7 @@ function App() {
               <PrewarmFlagBridge />
               <AuthInitializer>
               <AuthPromptProvider>
+                <NotificationsProvider>
                 <OfflineBanner />
                 <Routes>
                   <Route path="/" element={<Index />} />
