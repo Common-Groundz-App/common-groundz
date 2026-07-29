@@ -249,8 +249,10 @@ function App() {
                   } />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
+                {/* The single app-wide notifications drawer. */}
+                <NotificationDrawer />
+                </NotificationsProvider>
               </AuthPromptProvider>
-              </AuthInitializer>
             </Router>
             <Toaster />
             <SonnerToaster />
