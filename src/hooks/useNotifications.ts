@@ -17,12 +17,10 @@ import { networkStatusService } from '@/services/networkStatusService';
 
 const PAGE_SIZE = 20;
 
-/** Status of the global unread count, tracked separately from list loading so a
- *  count failure never renders list-level error UI. */
-export type CountStatus = 'idle' | 'loading' | 'ready' | 'error';
+// Re-exported for existing consumers; the canonical declarations live alongside
+// the data layer in notificationService.
+export type { CountStatus, PageError };
 
-/** Pagination-specific failure. Never written to `fetchError`. */
-export type PageError = 'invalid-cursor' | 'network' | null;
 
 /**
  * Public return shape of the hook. Exported so the notifications provider can
