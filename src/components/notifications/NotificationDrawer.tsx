@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
@@ -12,13 +12,28 @@ import { useToast } from '@/hooks/use-toast';
 import { EntityType, Notification } from '@/services/notificationService';
 import { NotificationList } from './NotificationList';
 
-interface NotificationDrawerProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
-
-export function NotificationDrawer({ open, onOpenChange }: NotificationDrawerProps) {
-  const { notifications, unreadNotifications, unreadCount, markAsRead, loading, markingAsRead, lastRefresh, isOnline, isRefreshing, fetchError, fetchAll } = useNotifications();
+/**
+ * The single app-wide notifications drawer. Rendered exactly once by App inside
+ * NotificationsProvider — open state and data both come from the context, so
+ * every trigger in the app opens this same instance.
+ */
+export function NotificationDrawer() {
+  const {
+    notifications,
+    unreadNotifications,
+    unreadCount,
+    markAsRead,
+    loading,
+    markingAsRead,
+    lastRefresh,
+    isOnline,
+    isRefreshing,
+    fetchError,
+    fetchAll,
+    isNotificationsOpen,
+    closeNotifications,
+    setNotificationsOpen,
+  } = useNotificationsContext();
   const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
