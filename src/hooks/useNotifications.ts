@@ -6,6 +6,7 @@ import {
   markNotificationsAsRead,
   markAllNotificationsAsRead,
   mergeNotifications,
+  isValidCursor,
   InvalidCursorError,
   Notification,
   NotificationCursor,
