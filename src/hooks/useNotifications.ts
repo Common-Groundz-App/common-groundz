@@ -9,6 +9,8 @@ import {
   InvalidCursorError,
   Notification,
   NotificationCursor,
+  type CountStatus,
+  type PageError,
 } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
