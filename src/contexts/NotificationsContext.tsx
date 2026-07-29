@@ -138,6 +138,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       isLoadingMore,
       pageError,
       loadMore,
+      recoverPagination,
+      isRecovering,
       fetchAll,
       isNotificationsOpen,
       openNotifications,
