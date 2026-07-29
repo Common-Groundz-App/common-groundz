@@ -392,6 +392,10 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   const markAllAsRead = async () => {
     if (!user || isLoading) return;
     if (markAllPendingRef.current) return;
+    if (isRecoveringRef.current) {
+      toast({ description: 'Finishing previous action…' });
+      return;
+    }
     if (pendingReadIdsRef.current.size > 0) {
       toast({ description: 'Finishing previous action…' });
       return;
@@ -399,20 +403,23 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
 
     const generation = userGenerationRef.current;
 
-    // Capture the ids flipped WITH their prior values — never an array snapshot,
-    // so rows a concurrent head refresh inserts survive a rollback.
+    // Derived from the ref before the setter, so the updater stays pure.
+    // NOTE: an empty map does NOT short-circuit the RPC — unread rows older than
+    // the loaded pages must still be cleared server-side.
     const priorReadState = new Map<string, boolean>();
-    setNotifications((prev) => {
-      prev.forEach((row) => {
-        if (!row.is_read) priorReadState.set(row.id, row.is_read);
-      });
-      if (priorReadState.size === 0) return prev;
-      return prev.map((row) => (row.is_read ? row : { ...row, is_read: true }));
+    notificationsRef.current.forEach((row) => {
+      if (!row.is_read) priorReadState.set(row.id, row.is_read);
     });
 
     markAllPendingRef.current = true;
     setMarkAllPending(true);
     mutationEpochRef.current += 1;
+
+    if (priorReadState.size > 0) {
+      setNotifications((prev) =>
+        prev.map((row) => (row.is_read ? row : { ...row, is_read: true }))
+      );
+    }
     setUnreadCount(0);
     setCountStatus('ready');
 
