@@ -22,7 +22,15 @@ export function NotificationDrawer() {
     notifications,
     unreadNotifications,
     unreadCount,
+    countStatus,
+    loadedUnreadCount,
     markAsRead,
+    markAllAsRead,
+    markAllPending,
+    hasMore,
+    isLoadingMore,
+    pageError,
+    loadMore,
     loading,
     markingAsRead,
     lastRefresh,
@@ -86,19 +94,38 @@ export function NotificationDrawer() {
     }
   }, [navigate, openContent, toast, closeNotifications, markAsRead]);
 
-  const handleMarkAllAsRead = () => {
-    // Loaded-page scoped: only the rows currently in the list, hence the
-    // "Mark these as read" label. True server-side mark-all is Phase 2.
-    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
-    if (unreadIds.length > 0) {
-      markAsRead(unreadIds);
-    }
-  };
-
   // Both derive from the fetch-only error channel, so a failed mark-as-read
   // can never render refresh failure UI.
   const hasError = Boolean(fetchError) && notifications.length === 0;
   const hasStaleData = Boolean(fetchError) && notifications.length > 0;
+
+  // Server-side mark-all clears EVERY unread row, including ones older than the
+  // pages loaded — hence the global-count arm. `markingAsRead` is included
+  // because the hook refuses to start mark-all while an individual read is in
+  // flight; offering a button that can only reply with a toast is worse than
+  // disabling it.
+  const canMarkAll =
+    !markAllPending && !markingAsRead && (loadedUnreadCount > 0 || (unreadCount ?? 0) > 0);
+  const showMarkAll = markAllPending || loadedUnreadCount > 0 || (unreadCount ?? 0) > 0;
+
+  // The mismatch notice is only honest when the count is fully authoritative:
+  // pagination exhausted, count ready (not loading/error/stale), and no mutation
+  // in flight optimistically holding the count at a lower value.
+  const showCountMismatch =
+    !hasMore &&
+    countStatus === 'ready' &&
+    unreadCount !== null &&
+    !markAllPending &&
+    !markingAsRead &&
+    notifications.length > 0 &&
+    unreadCount > loadedUnreadCount;
+
+  // Unread tab: zero unread loaded doesn't mean zero unread exist.
+  const unloadedUnreadMessage =
+    loadedUnreadCount === 0 && (unreadCount ?? 0) > 0
+      ? `You have ${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'} in total. Load more to find older unread ones.`
+      : null;
+
 
   return (
     <Sheet open={isNotificationsOpen} onOpenChange={setNotificationsOpen}>
@@ -111,18 +138,18 @@ export function NotificationDrawer() {
             <SheetDescription className="sr-only">View and manage your notifications</SheetDescription>
             <div className="flex min-h-[28px] items-center justify-between gap-2">
               {lastRefresh ? <LastUpdatedIndicator date={lastRefresh} /> : <span />}
-              {unreadCount > 0 && (
+              {showMarkAll && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs"
-                  onClick={handleMarkAllAsRead}
-                  disabled={markingAsRead}
+                  onClick={() => void markAllAsRead()}
+                  disabled={!canMarkAll}
                 >
-                  {markingAsRead ? (
+                  {markAllPending ? (
                     <Loader2 className="h-3 w-3 animate-spin mr-1" />
                   ) : null}
-                  Mark these as read
+                  Mark all as read
                 </Button>
               )}
             </div>
@@ -166,7 +193,9 @@ export function NotificationDrawer() {
               <TabsList className="w-full">
                 <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
                 <TabsTrigger value="unread" className="flex-1">
-                  Unread {unreadCount > 0 && `(${unreadCount})`}
+                  {/* Global count, not the loaded-page count — hidden entirely
+                      while the count is still unknown. */}
+                  Unread {unreadCount !== null && unreadCount > 0 && `(${unreadCount})`}
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -181,6 +210,11 @@ export function NotificationDrawer() {
                 hasError={hasError}
                 onRetry={fetchAll}
                 onNotificationClick={handleNotificationClick}
+                hasMore={hasMore}
+                isLoadingMore={isLoadingMore}
+                pageError={pageError}
+                onLoadMore={loadMore}
+                showCountMismatch={showCountMismatch}
               />
             </TabsContent>
 
@@ -188,6 +222,9 @@ export function NotificationDrawer() {
               value="unread"
               className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
             >
+              {/* Pagination is shared with the All tab for now: loading more
+                  pulls in older rows of both kinds. Independent unread paging is
+                  Phase 2.2 — until then the copy stays honest about it. */}
               <NotificationList
                 notifications={unreadNotifications}
                 loading={loading}
@@ -196,6 +233,11 @@ export function NotificationDrawer() {
                 onNotificationClick={handleNotificationClick}
                 emptyMessage="No unread notifications"
                 emptyIcon={Check}
+                hasMore={hasMore}
+                isLoadingMore={isLoadingMore}
+                pageError={pageError}
+                onLoadMore={loadMore}
+                unloadedUnreadMessage={unloadedUnreadMessage}
               />
             </TabsContent>
           </Tabs>

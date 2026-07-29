@@ -1,10 +1,28 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchNotifications, markNotificationsAsRead, Notification } from '@/services/notificationService';
+import {
+  fetchNotifications,
+  fetchUnreadCount,
+  markNotificationsAsRead,
+  markAllNotificationsAsRead,
+  mergeNotifications,
+  InvalidCursorError,
+  Notification,
+  NotificationCursor,
+  type CountStatus,
+  type PageError,
+} from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { networkStatusService } from '@/services/networkStatusService';
+
+const PAGE_SIZE = 20;
+
+// Re-exported for existing consumers; the canonical declarations live alongside
+// the data layer in notificationService.
+export type { CountStatus, PageError };
+
 
 /**
  * Public return shape of the hook. Exported so the notifications provider can
@@ -13,8 +31,19 @@ import { networkStatusService } from '@/services/networkStatusService';
 export interface UseNotificationsResult {
   notifications: Notification[];
   unreadNotifications: Notification[];
-  unreadCount: number;
+  /** Global unread total from the server. `null` means "not yet known" — never
+   *  coerce to 0, a false zero hides real unread rows. */
+  unreadCount: number | null;
+  countStatus: CountStatus;
+  /** Unread rows among the pages actually loaded. Always a number. */
+  loadedUnreadCount: number;
   markAsRead: (ids: string[]) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  markAllPending: boolean;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  pageError: PageError;
+  loadMore: (opts?: { force?: boolean }) => Promise<void>;
   loading: boolean;
   isInitialLoad: boolean;
   isRefreshing: boolean;
@@ -34,51 +63,96 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   // Count of in-flight mark-as-read mutations. State (not a ref) so the spinner
   // actually re-renders, and so overlapping mutations can't clear it early.
   const [pendingReadOps, setPendingReadOps] = useState<number>(0);
+  const [markAllPending, setMarkAllPending] = useState<boolean>(false);
   // Fetch-only error channel. Mutation failures never write here — they roll
   // back per-id and surface a toast — so the drawer's refresh UI can't be
-  // triggered by a failed mark-as-read.
-  const [fetchError, setFetchError] = useState<any>(null);
+  // triggered by a failed mark-as-read. Pagination failures use `pageError`.
+  const [fetchError, setFetchError] = useState<unknown>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+
+  // --- global count state ---------------------------------------------------
+  const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const [countStatus, setCountStatus] = useState<CountStatus>('idle');
+
+  // --- pagination state -----------------------------------------------------
+  const [hasMore, setHasMore] = useState<boolean>(false);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const [pageError, setPageError] = useState<PageError>(null);
+  // Oldest successfully loaded row. Head refreshes never move it.
+  const cursorRef = useRef<NotificationCursor | null>(null);
+
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Tracks whether a fetch has ever succeeded for the current user.
-  // Kept in a ref (not state) so it never enters fetchAll's dependency list —
-  // otherwise every response would recreate fetchAll and restart the poller.
+  // Kept in a ref (not state) so it never enters refreshHead's dependency list —
+  // otherwise every response would recreate it and restart the poller.
   const hasLoadedRef = useRef<boolean>(false);
-  // Bumped whenever the authenticated user changes. Captured by both fetches
-  // and mutations so work belonging to a previous session commits nothing.
+  // Bumped whenever the authenticated user changes. Captured by every fetch and
+  // mutation so work belonging to a previous session commits nothing.
   const userGenerationRef = useRef<number>(0);
-  // Incremented per fetch; only the newest response for the current user may
-  // commit, so an older poll can't overwrite a newer manual retry.
+
+  // --- three independent request lanes --------------------------------------
+  // Head, count and page each get their own sequence guard, so a slow count can
+  // never invalidate a fresh head response (or vice versa).
   const requestSeqRef = useRef<number>(0);
+  const countSeqRef = useRef<number>(0);
+  const pageReqRef = useRef<number>(0);
+
   // Notification ids currently owned by an in-flight mark-as-read mutation.
   // Guarantees exactly one mutation owns a row, so a failed rollback can never
   // contradict a concurrent success on the same row.
   const pendingReadIdsRef = useRef<Set<string>>(new Set());
+  // Mirrors `markAllPending` for synchronous reads inside async flows.
+  const markAllPendingRef = useRef<boolean>(false);
+  // Bumped by every mutation. A count response captured before a mutation
+  // started is stale by definition and must not commit.
+  const mutationEpochRef = useRef<number>(0);
+  // Set when a count response was dropped by the gate, so exactly one trailing
+  // refetch happens once the gates clear.
+  const countRefetchQueuedRef = useRef<boolean>(false);
+
+  /** True while any read mutation owns rows. Count commits are suppressed and
+   *  the mismatch banner is hidden while this holds. */
+  const anyMutationPending = () =>
+    pendingReadIdsRef.current.size > 0 || markAllPendingRef.current;
 
   // Reset all per-user state when the authenticated user changes, so a previous
-  // session's rows/errors/mutations can never leak into the next one.
+  // session's rows/cursor/count/errors/mutations can never leak into the next.
   useEffect(() => {
     userGenerationRef.current += 1;
     requestSeqRef.current += 1;
+    countSeqRef.current += 1;
+    pageReqRef.current += 1;
+    mutationEpochRef.current += 1;
     hasLoadedRef.current = false;
     pendingReadIdsRef.current.clear();
+    markAllPendingRef.current = false;
+    countRefetchQueuedRef.current = false;
+    cursorRef.current = null;
     setPendingReadOps(0);
+    setMarkAllPending(false);
     setNotifications([]);
     setFetchError(null);
     setLastRefresh(null);
     setIsRefreshing(false);
     setIsInitialLoad(false);
+    setUnreadCount(null);
+    setCountStatus('idle');
+    setHasMore(false);
+    setIsLoadingMore(false);
+    setPageError(null);
   }, [user?.id]);
 
-  const fetchAll = useCallback(async () => {
-    // Don't fetch if user is not authenticated, still loading, or offline
+  /**
+   * Refreshes the newest page only. Deliberately does NOT request the count —
+   * keeping the lanes separate is what lets post-mutation reconciliation fire
+   * exactly one head request and one count request.
+   */
+  const refreshHead = useCallback(async () => {
     if (!user || isLoading || !isOnline) return;
 
     const generation = userGenerationRef.current;
     requestSeqRef.current += 1;
     const seq = requestSeqRef.current;
-    // A response may only touch state (or app-wide network health) if it is
-    // still the newest request for the still-current user.
     const isCurrent = () =>
       generation === userGenerationRef.current && seq === requestSeqRef.current;
 
@@ -89,28 +163,35 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     }
 
     try {
-      const data = await fetchNotifications();
+      const page = await fetchNotifications({ limit: PAGE_SIZE });
       if (!isCurrent()) return;
 
-      // Monotonic reconciliation: a fetch must never turn a locally-read row
-      // back to unread. A poll started before an optimistic read can return a
-      // stale snapshot, and the pending id may already have been released by
-      // the time it lands. This rule is valid ONLY because the app has no
-      // mark-as-unread action — if that changes, replace it with row
-      // versioning/timestamps instead.
+      const isFirstLoad = !hasLoadedRef.current;
+
+      // Monotonic reconciliation via the shared merge helper: a fetch must never
+      // turn a locally-read row back to unread. A poll started before an
+      // optimistic read can return a stale snapshot, and the pending id may
+      // already have been released by the time it lands.
       setNotifications((prev) => {
-        const locallyRead = new Set<string>(pendingReadIdsRef.current);
-        prev.forEach((row) => {
-          if (row.is_read) locallyRead.add(row.id);
-        });
-        return data.map((row) =>
-          !row.is_read && locallyRead.has(row.id) ? { ...row, is_read: true } : row
-        );
+        const merged = mergeNotifications(prev, page.rows);
+        const locallyRead = pendingReadIdsRef.current;
+        return locallyRead.size === 0
+          ? merged
+          : merged.map((row) =>
+              !row.is_read && locallyRead.has(row.id) ? { ...row, is_read: true } : row
+            );
       });
+
+      // Only the very first load establishes the cursor and hasMore. Later head
+      // refreshes must not rewind pagination to page 1.
+      if (isFirstLoad) {
+        cursorRef.current = page.nextCursor;
+        setHasMore(page.hasMore);
+      }
 
       setLastRefresh(new Date());
       hasLoadedRef.current = true;
-      // Clear any previous failure so a recovered fetch doesn't leave a stale error UI
+      // Clear any previous failure so a recovered fetch doesn't leave stale error UI
       setFetchError(null);
       networkStatusService.reportSuccess();
     } catch (e) {
@@ -119,7 +200,6 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
       networkStatusService.reportFailure(e);
       // Background fetch — fail silently (no toast)
     } finally {
-      // Only the newest applicable request owns the loading flags.
       if (isCurrent()) {
         setIsInitialLoad(false);
         setIsRefreshing(false);
@@ -127,8 +207,77 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     }
   }, [user, isLoading, isOnline]);
 
+  /**
+   * Refreshes the global unread count.
+   *
+   * Commit rule: a response applies only if its generation is current, it is the
+   * newest count request, the mutation epoch is unchanged, and no read mutation
+   * is pending. Without this, a count issued after an optimistic decrement but
+   * before the DB write commits returns the pre-mutation value and bounces the
+   * badge back up.
+   */
+  const refreshUnreadCount = useCallback(async () => {
+    if (!user || isLoading || !isOnline) return;
+
+    const generation = userGenerationRef.current;
+    countSeqRef.current += 1;
+    const seq = countSeqRef.current;
+    const epoch = mutationEpochRef.current;
+
+    setCountStatus('loading');
+
+    try {
+      const count = await fetchUnreadCount();
+
+      const canCommit =
+        generation === userGenerationRef.current &&
+        seq === countSeqRef.current &&
+        epoch === mutationEpochRef.current &&
+        !anyMutationPending();
+
+      if (!canCommit) {
+        // Queue exactly one trailing refetch for when the gates clear.
+        if (generation === userGenerationRef.current) {
+          countRefetchQueuedRef.current = true;
+        }
+        return;
+      }
+
+      setUnreadCount(count);
+      setCountStatus('ready');
+    } catch {
+      if (generation !== userGenerationRef.current || seq !== countSeqRef.current) return;
+      // Preserve the last known good value — never write 0 on failure, and
+      // never write to fetchError (this is not a list refresh failure).
+      setCountStatus('error');
+    }
+  }, [user, isLoading, isOnline]);
+
+  /** Orchestrator for polling and manual retry only. Mutation settlement calls
+   *  the two lanes directly so it can guarantee a single count request. */
+  const fetchAll = useCallback(async () => {
+    await Promise.all([refreshHead(), refreshUnreadCount()]);
+  }, [refreshHead, refreshUnreadCount]);
+
+  /**
+   * Release-before-reconcile.
+   *
+   * Every mutation path calls this in its `finally`, AFTER releasing its own
+   * gate. Reconciling before release would fail the count commit rule above and
+   * the response would be discarded. Because it no-ops while any gate is still
+   * held, a burst of five row-reads produces one reconciliation, not five.
+   */
+  const reconcileAfterMutation = useCallback(() => {
+    if (anyMutationPending()) return;
+    countRefetchQueuedRef.current = false;
+    void refreshHead();
+    void refreshUnreadCount();
+  }, [refreshHead, refreshUnreadCount]);
+
   const markAsRead = async (ids: string[]) => {
     if (!user || !ids.length || isLoading) return;
+    // Bidirectional exclusivity: mark-all owns every unread row while it runs.
+    if (markAllPendingRef.current) return;
 
     const generation = userGenerationRef.current;
 
@@ -159,6 +308,10 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
 
     eligibleIds.forEach((id) => pendingReadIdsRef.current.add(id));
     setPendingReadOps((n) => n + 1);
+    mutationEpochRef.current += 1;
+
+    // Optimistic count decrement, clamped. Only if the count is actually known.
+    setUnreadCount((c) => (c === null ? c : Math.max(0, c - eligibleIds.length)));
 
     try {
       await markNotificationsAsRead(eligibleIds);
@@ -175,6 +328,8 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
             : row
         )
       );
+      // Re-add exactly the delta this call removed, and only if a count exists.
+      setUnreadCount((c) => (c === null ? c : c + eligibleIds.length));
 
       // User-triggered action — toast is appropriate. Deliberately does not set
       // fetchError: this is not a refresh failure.
@@ -189,17 +344,146 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
       if (generation === userGenerationRef.current) {
         eligibleIds.forEach((id) => pendingReadIdsRef.current.delete(id));
         setPendingReadOps((n) => Math.max(0, n - 1));
+        reconcileAfterMutation();
       }
     }
   };
 
+  /**
+   * Server-side mark-all. Mutually exclusive with individual reads in BOTH
+   * directions — without the check below, a row read could fail and roll itself
+   * back to unread locally after mark-all had already read it on the server.
+   */
+  const markAllAsRead = async () => {
+    if (!user || isLoading) return;
+    if (markAllPendingRef.current) return;
+    if (pendingReadIdsRef.current.size > 0) {
+      toast({ description: 'Finishing previous action…' });
+      return;
+    }
+
+    const generation = userGenerationRef.current;
+
+    // Capture the ids flipped WITH their prior values — never an array snapshot,
+    // so rows a concurrent head refresh inserts survive a rollback.
+    const priorReadState = new Map<string, boolean>();
+    setNotifications((prev) => {
+      prev.forEach((row) => {
+        if (!row.is_read) priorReadState.set(row.id, row.is_read);
+      });
+      if (priorReadState.size === 0) return prev;
+      return prev.map((row) => (row.is_read ? row : { ...row, is_read: true }));
+    });
+
+    markAllPendingRef.current = true;
+    setMarkAllPending(true);
+    mutationEpochRef.current += 1;
+    setUnreadCount(0);
+    setCountStatus('ready');
+
+    try {
+      await markAllNotificationsAsRead();
+    } catch (e) {
+      if (generation !== userGenerationRef.current) return;
+
+      setNotifications((prev) =>
+        prev.map((row) =>
+          priorReadState.has(row.id)
+            ? { ...row, is_read: priorReadState.get(row.id) as boolean }
+            : row
+        )
+      );
+      // Only undo the zero WE wrote — if something else has since set a real
+      // count, leave it alone.
+      setUnreadCount((c) => (c === 0 ? null : c));
+      setCountStatus((s) => (s === 'ready' ? 'idle' : s));
+
+      toast({
+        title: 'Error updating notifications',
+        description: 'Failed to mark all notifications as read',
+        variant: 'destructive',
+      });
+    } finally {
+      if (generation === userGenerationRef.current) {
+        markAllPendingRef.current = false;
+        setMarkAllPending(false);
+        reconcileAfterMutation();
+      }
+    }
+  };
+
+  /**
+   * Loads the next page from the keyset cursor.
+   *
+   * `force` exists because the guard below refuses to run while `pageError` is
+   * set — without a bypass the Retry button would be permanently inert. The
+   * IntersectionObserver always calls the UNFORCED variant, so it can never
+   * retry-loop against a broken cursor; only the explicit button can.
+   */
+  const loadMore = useCallback(
+    async (opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
+
+      if (!user || isLoading || !isOnline) return;
+      if (!hasMore) return;
+      if (isLoadingMore) return;
+      // Mark-all rewrites every unread row; appending a page mid-flight would
+      // land rows that the mutation never covered.
+      if (markAllPendingRef.current) return;
+      if (pageError && !force) return;
+
+      const cursor = cursorRef.current;
+      if (!cursor) {
+        setHasMore(false);
+        return;
+      }
+
+      if (force) setPageError(null);
+
+      const generation = userGenerationRef.current;
+      pageReqRef.current += 1;
+      const seq = pageReqRef.current;
+      const isCurrent = () =>
+        generation === userGenerationRef.current && seq === pageReqRef.current;
+
+      setIsLoadingMore(true);
+
+      try {
+        const page = await fetchNotifications({ limit: PAGE_SIZE, cursor });
+        if (!isCurrent()) return;
+
+        setNotifications((prev) => mergeNotifications(prev, page.rows));
+        // Only advance the cursor on success — a failed page stays retryable at
+        // exactly the same boundary.
+        if (page.nextCursor) cursorRef.current = page.nextCursor;
+        setHasMore(page.hasMore);
+        setPageError(null);
+      } catch (e) {
+        if (!isCurrent()) return;
+        // An invalid cursor must NOT fall back to an uncursored fetch (that
+        // would silently refetch page 1) and must NOT set hasMore=false (that
+        // would claim "all caught up" when it isn't).
+        setPageError(e instanceof InvalidCursorError ? 'invalid-cursor' : 'network');
+      } finally {
+        if (isCurrent()) setIsLoadingMore(false);
+      }
+    },
+    [user, isLoading, isOnline, hasMore, isLoadingMore, pageError]
+  );
+
+  // Drain a count refetch that was dropped by the commit gate, once every
+  // mutation has settled.
+  useEffect(() => {
+    if (pendingReadOps === 0 && !markAllPending && countRefetchQueuedRef.current) {
+      countRefetchQueuedRef.current = false;
+      void refreshUnreadCount();
+    }
+  }, [pendingReadOps, markAllPending, refreshUnreadCount]);
+
   // Get unread notifications as a computed property
   const unreadNotifications = notifications.filter((n) => !n.is_read);
-
-  // NOTE: loaded-page scoped. fetchNotifications() caps at 20 rows, so this is
-  // the unread count of what's loaded — not the user's global unread total.
-  // A true global count is Phase 2 (needs a server-side count query).
-  const unreadCount = unreadNotifications.length;
+  // Scoped to loaded pages. Distinct from the server-authoritative `unreadCount`.
+  const loadedUnreadCount = unreadNotifications.length;
 
   useEffect(() => {
     // Only set up polling if user is authenticated and not loading
@@ -234,14 +518,22 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     notifications,
     unreadNotifications,
     unreadCount,
+    countStatus,
+    loadedUnreadCount,
     markAsRead,
+    markAllAsRead,
+    markAllPending,
+    hasMore,
+    isLoadingMore,
+    pageError,
+    loadMore,
     // `loading` now means "first load, nothing to show yet" — background polls
     // never flip it, so existing rows are never replaced by loading UI.
     loading: isInitialLoad,
     isInitialLoad,
     isRefreshing,
     markingAsRead: pendingReadOps > 0,
-    // Fetch-only. Mutation failures surface via toast, not here.
+    // Fetch-only. Mutation failures surface via toast, pagination via pageError.
     fetchError,
     lastRefresh,
     isOnline,

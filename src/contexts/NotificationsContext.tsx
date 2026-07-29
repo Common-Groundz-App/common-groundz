@@ -25,6 +25,8 @@ type NotificationsData = Pick<
   | 'notifications'
   | 'unreadNotifications'
   | 'unreadCount'
+  | 'countStatus'
+  | 'loadedUnreadCount'
   | 'loading'
   | 'isRefreshing'
   | 'markingAsRead'
@@ -32,6 +34,12 @@ type NotificationsData = Pick<
   | 'isOnline'
   | 'lastRefresh'
   | 'markAsRead'
+  | 'markAllAsRead'
+  | 'markAllPending'
+  | 'hasMore'
+  | 'isLoadingMore'
+  | 'pageError'
+  | 'loadMore'
   | 'fetchAll'
 >;
 
@@ -50,6 +58,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     notifications,
     unreadNotifications,
     unreadCount,
+    countStatus,
+    loadedUnreadCount,
     loading,
     isRefreshing,
     markingAsRead,
@@ -57,6 +67,12 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     isOnline,
     lastRefresh,
     markAsRead,
+    markAllAsRead,
+    markAllPending,
+    hasMore,
+    isLoadingMore,
+    pageError,
+    loadMore,
     fetchAll,
   } = useNotifications();
 
@@ -76,6 +92,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       notifications,
       unreadNotifications,
       unreadCount,
+      countStatus,
+      loadedUnreadCount,
       loading,
       isRefreshing,
       markingAsRead,
@@ -83,6 +101,12 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       isOnline,
       lastRefresh,
       markAsRead,
+      markAllAsRead,
+      markAllPending,
+      hasMore,
+      isLoadingMore,
+      pageError,
+      loadMore,
       fetchAll,
       isNotificationsOpen,
       openNotifications,
@@ -93,6 +117,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       notifications,
       unreadNotifications,
       unreadCount,
+      countStatus,
+      loadedUnreadCount,
       loading,
       isRefreshing,
       markingAsRead,
@@ -100,6 +126,12 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       isOnline,
       lastRefresh,
       markAsRead,
+      markAllAsRead,
+      markAllPending,
+      hasMore,
+      isLoadingMore,
+      pageError,
+      loadMore,
       fetchAll,
       isNotificationsOpen,
       openNotifications,
