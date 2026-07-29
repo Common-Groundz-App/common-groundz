@@ -83,6 +83,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [pageError, setPageError] = useState<PageError>(null);
+  const [isRecovering, setIsRecovering] = useState<boolean>(false);
   // Oldest successfully loaded row. Head refreshes never move it.
   const cursorRef = useRef<NotificationCursor | null>(null);
 
@@ -102,18 +103,39 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   const countSeqRef = useRef<number>(0);
   const pageReqRef = useRef<number>(0);
 
+  // Synchronous ownership token for the page lane, holding the pageReqRef seq of
+  // the request that currently owns it. `isLoadingMore` is React state and does
+  // NOT settle within a tick, so two same-tick callers (observer + button) would
+  // both see `false` and both hit the network. A TOKEN rather than a boolean:
+  // an obsolete request whose ownership was revoked by a reset or by recovery
+  // must never release a lock that a newer request has since taken.
+  const pageOwnerRef = useRef<number | null>(null);
+
   // Notification ids currently owned by an in-flight mark-as-read mutation.
   // Guarantees exactly one mutation owns a row, so a failed rollback can never
   // contradict a concurrent success on the same row.
   const pendingReadIdsRef = useRef<Set<string>>(new Set());
   // Mirrors `markAllPending` for synchronous reads inside async flows.
   const markAllPendingRef = useRef<boolean>(false);
+  // Mirrors `isRecovering`. Pagination recovery and read mutations are mutually
+  // exclusive in BOTH directions: a reset that replaces the list mid-mutation
+  // would resurrect optimistic read state against rows the mutation never owned.
+  const isRecoveringRef = useRef<boolean>(false);
   // Bumped by every mutation. A count response captured before a mutation
   // started is stale by definition and must not commit.
   const mutationEpochRef = useRef<number>(0);
   // Set when a count response was dropped by the gate, so exactly one trailing
   // refetch happens once the gates clear.
   const countRefetchQueuedRef = useRef<boolean>(false);
+
+  // Read-only mirror of `notifications`, so mutation eligibility and rollback
+  // data can be derived BEFORE calling setNotifications. React may invoke an
+  // updater callback more than once (Strict Mode, replays), so deriving RPC
+  // ownership inside one can yield duplicated or empty id sets.
+  const notificationsRef = useRef<Notification[]>(notifications);
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
 
   /** True while any read mutation owns rows. Count commits are suppressed and
    *  the mismatch banner is hidden while this holds. */
