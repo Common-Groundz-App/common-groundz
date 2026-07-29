@@ -6,7 +6,26 @@ import { toast } from '@/hooks/use-toast';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
 import { networkStatusService } from '@/services/networkStatusService';
 
-export function useNotifications(pollInterval = 10000) {
+/**
+ * Public return shape of the hook. Exported so the notifications provider can
+ * derive its context contract from it without duplicating types.
+ */
+export interface UseNotificationsResult {
+  notifications: Notification[];
+  unreadNotifications: Notification[];
+  unreadCount: number;
+  markAsRead: (ids: string[]) => Promise<void>;
+  loading: boolean;
+  isInitialLoad: boolean;
+  isRefreshing: boolean;
+  markingAsRead: boolean;
+  fetchError: unknown;
+  lastRefresh: Date | null;
+  isOnline: boolean;
+  fetchAll: () => Promise<void>;
+}
+
+export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   const { user, isLoading } = useAuth();
   const { isOnline } = useNetworkStatus();
   const [notifications, setNotifications] = useState<Notification[]>([]);
