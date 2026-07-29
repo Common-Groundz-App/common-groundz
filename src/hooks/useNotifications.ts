@@ -523,6 +523,129 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     [user, isLoading, isOnline, hasMore, isLoadingMore, pageError]
   );
 
+  /**
+   * Recovers pagination after the cursor turns out to be structurally invalid.
+   *
+   * Retrying the same malformed cursor can never succeed, so the Reload button
+   * routes here instead of to loadMore. Two ordered attempts:
+   *
+   *   Step A — a cursor re-derived from the oldest loaded row, but ONLY if it is
+   *            structurally valid and actually different from the failed one.
+   *   Step B — an uncursored page-one fetch that replaces the list.
+   *
+   * Branch selection is structural, never failure-driven: a transient network
+   * error while requesting a valid candidate does not prove the candidate is
+   * unusable, so it must not escalate to a full reset in the same attempt.
+   *
+   * Rows stay on screen the entire time — the list is only ever replaced after a
+   * replacement page has actually arrived.
+   */
+  const recoverPagination = useCallback(async () => {
+    if (!user || isLoading || !isOnline) return;
+    if (isRecoveringRef.current) return;
+    // Read mutations own rows optimistically; replacing the list underneath them
+    // would leave their rollback pointing at rows that no longer exist.
+    if (markAllPendingRef.current) return;
+    if (pendingReadIdsRef.current.size > 0) return;
+
+    const generation = userGenerationRef.current;
+
+    // Invalidate every in-flight page request from the broken boundary, and take
+    // the page lane for this recovery pass.
+    pageReqRef.current += 1;
+    const seq = pageReqRef.current;
+    pageOwnerRef.current = seq;
+    const isCurrent = () =>
+      generation === userGenerationRef.current && seq === pageReqRef.current;
+
+    isRecoveringRef.current = true;
+    setIsRecovering(true);
+
+    const failedCursor = cursorRef.current;
+    const oldest = notificationsRef.current[notificationsRef.current.length - 1];
+    // Held locally: the shared cursorRef is never written with an unproven value.
+    const candidate: NotificationCursor | null = oldest
+      ? { created_at: oldest.created_at, id: oldest.id }
+      : null;
+
+    const candidateIsUsable =
+      candidate !== null &&
+      isValidCursor(candidate) &&
+      !(
+        failedCursor !== null &&
+        candidate.created_at === failedCursor.created_at &&
+        candidate.id === failedCursor.id
+      );
+
+    let recovered = false;
+
+    try {
+      // --- Step A: repaired cursor --------------------------------------------
+      if (candidateIsUsable) {
+        try {
+          const page = await fetchNotifications({ limit: PAGE_SIZE, cursor: candidate });
+          if (!isCurrent()) return;
+
+          setNotifications((prev) => mergeNotifications(prev, page.rows));
+          // The server's next boundary, not the candidate we sent.
+          cursorRef.current = page.nextCursor;
+          setHasMore(page.hasMore);
+          setPageError(null);
+          recovered = true;
+        } catch (e) {
+          if (!isCurrent()) return;
+          if (!(e instanceof InvalidCursorError)) {
+            // Transient. Keep the rows and stay on the Reload path so the next
+            // attempt retries Step A rather than escalating to a hard reset.
+            toast({
+              description: "Couldn't reach the server. Try again.",
+              variant: 'destructive',
+            });
+            return;
+          }
+          // The re-derived cursor is structurally rejected too — fall to Step B.
+        }
+      }
+
+      // --- Step B: hard reset to page one -------------------------------------
+      if (!recovered) {
+        try {
+          const page = await fetchNotifications({ limit: PAGE_SIZE });
+          if (!isCurrent()) return;
+
+          // Replace, never merge: the old rows belong to a pagination history
+          // that the broken cursor makes unreconstructable.
+          setNotifications(page.rows);
+          cursorRef.current = page.nextCursor;
+          setHasMore(page.hasMore);
+          setPageError(null);
+          recovered = true;
+        } catch {
+          if (!isCurrent()) return;
+          // Keep the rows and keep 'invalid-cursor' even for a network failure,
+          // so the UI stays on Reload and never offers a same-cursor Retry.
+          setPageError('invalid-cursor');
+          toast({
+            description: "Couldn't reload notifications. Try again.",
+            variant: 'destructive',
+          });
+        }
+      }
+    } finally {
+      if (pageOwnerRef.current === seq) pageOwnerRef.current = null;
+      isRecoveringRef.current = false;
+      setIsRecovering(false);
+    }
+
+    // Release-before-reconcile: the count lane only runs once recovery has given
+    // up ownership. Deliberately NOT refreshHead() — Step B already fetched the
+    // head, and the two lanes are kept separate on purpose.
+    if (recovered && generation === userGenerationRef.current) {
+      void refreshUnreadCount();
+    }
+  }, [user, isLoading, isOnline, refreshUnreadCount]);
+
+
   // Drain a count refetch that was dropped by the commit gate, once every
   // mutation has settled.
   useEffect(() => {
