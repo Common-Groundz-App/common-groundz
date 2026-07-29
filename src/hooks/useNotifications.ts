@@ -45,6 +45,10 @@ export interface UseNotificationsResult {
   isLoadingMore: boolean;
   pageError: PageError;
   loadMore: (opts?: { force?: boolean }) => Promise<void>;
+  /** Recovers pagination after a structurally invalid cursor. Never blanks the
+   *  list: rows stay visible until a replacement page has actually arrived. */
+  recoverPagination: () => Promise<void>;
+  isRecovering: boolean;
   loading: boolean;
   isInitialLoad: boolean;
   isRefreshing: boolean;
