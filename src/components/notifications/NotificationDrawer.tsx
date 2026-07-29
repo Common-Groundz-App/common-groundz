@@ -101,7 +101,7 @@ export function NotificationDrawer() {
   const hasStaleData = Boolean(fetchError) && notifications.length > 0;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={isNotificationsOpen} onOpenChange={setNotificationsOpen}>
       <SheetContent side="right" className="w-full sm:max-w-[400px] p-0">
         <div className="flex h-full flex-col">
           <SheetHeader className="shrink-0 space-y-0 bg-background/95 backdrop-blur-lg border-b border-border/50 p-4 pr-12">
