@@ -702,6 +702,8 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     isLoadingMore,
     pageError,
     loadMore,
+    recoverPagination,
+    isRecovering,
     // `loading` now means "first load, nothing to show yet" — background polls
     // never flip it, so existing rows are never replaced by loading UI.
     loading: isInitialLoad,
