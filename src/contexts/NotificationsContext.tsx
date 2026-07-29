@@ -25,6 +25,8 @@ type NotificationsData = Pick<
   | 'notifications'
   | 'unreadNotifications'
   | 'unreadCount'
+  | 'countStatus'
+  | 'loadedUnreadCount'
   | 'loading'
   | 'isRefreshing'
   | 'markingAsRead'
@@ -32,6 +34,12 @@ type NotificationsData = Pick<
   | 'isOnline'
   | 'lastRefresh'
   | 'markAsRead'
+  | 'markAllAsRead'
+  | 'markAllPending'
+  | 'hasMore'
+  | 'isLoadingMore'
+  | 'pageError'
+  | 'loadMore'
   | 'fetchAll'
 >;
 
