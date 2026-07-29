@@ -115,13 +115,14 @@ export function NotificationDrawer() {
 
   // The mismatch notice is only honest when the count is fully authoritative:
   // pagination exhausted, count ready (not loading/error/stale), and no mutation
-  // in flight optimistically holding the count at a lower value.
+  // or pagination recovery in flight holding the count or the list mid-change.
   const showCountMismatch =
     !hasMore &&
     countStatus === 'ready' &&
     unreadCount !== null &&
     !markAllPending &&
     !markingAsRead &&
+    !isRecovering &&
     notifications.length > 0 &&
     unreadCount > loadedUnreadCount;
 
