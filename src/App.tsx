@@ -253,6 +253,7 @@ function App() {
                 <NotificationDrawer />
                 </NotificationsProvider>
               </AuthPromptProvider>
+              </AuthInitializer>
             </Router>
             <Toaster />
             <SonnerToaster />
