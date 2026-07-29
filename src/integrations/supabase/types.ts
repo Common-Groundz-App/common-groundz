@@ -4672,6 +4672,7 @@ export type Database = {
           review_id: string
         }[]
       }
+      get_unread_notification_count: { Args: never; Returns: number }
       get_user_post_likes: {
         Args: { p_post_ids: string[]; p_user_id: string }
         Returns: {
@@ -4800,6 +4801,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      mark_all_notifications_as_read: { Args: never; Returns: number }
       mark_notifications_as_read: {
         Args: { notification_ids: string[] }
         Returns: string[]
