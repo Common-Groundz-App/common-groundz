@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SmartComposerButton } from '@/components/feed/SmartComposerButton';
 import { Bell, Search, ChevronDown, ArrowUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useMemoryOptimization } from '@/hooks/useMemoryOptimization';
 import { Toaster } from '@/components/ui/toaster';
@@ -45,7 +45,7 @@ const Feed = React.memo(() => {
   const isMobile = useIsMobile();
   const location = useLocation();
   const [activeTab, setActiveTab] = React.useState("for-you");
-  const { unreadCount } = useNotifications();
+  const { unreadCount, openNotifications } = useNotificationsContext();
   const [refreshing, setRefreshing] = useState(false);
   const [pullProgress, setPullProgress] = useState(0);
   const [pullIntent, setPullIntent] = useState(false);
@@ -553,10 +553,7 @@ const Feed = React.memo(() => {
             </button>
             {user && (
               <button
-                onClick={() => {
-                  const event = new CustomEvent('open-notifications');
-                  window.dispatchEvent(event);
-                }}
+                onClick={openNotifications}
                 className="p-2 rounded-full hover:bg-accent relative"
               >
                 <Bell size={20} />

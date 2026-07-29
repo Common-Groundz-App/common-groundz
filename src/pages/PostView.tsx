@@ -13,7 +13,7 @@ import SEOHead from '@/components/seo/SEOHead';
 import Logo from '@/components/Logo';
 import { Bell, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { MuxOwnerHint } from '@/components/media/MuxOwnerHint';
 import { isPostOwner } from '@/lib/isPostOwner';
 import { analytics } from '@/services/analytics';
@@ -37,7 +37,7 @@ const PostView = () => {
   const [searchParams] = useSearchParams();
   const commentId = searchParams.get('commentId');
   const { user } = useAuth();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, openNotifications } = useNotificationsContext();
 
   const [postMeta, setPostMeta] = useState<PostMeta | null>(null);
   const [loadComplete, setLoadComplete] = useState(false);
@@ -202,7 +202,7 @@ const PostView = () => {
               <Search size={20} />
             </button>
             <button
-              onClick={() => window.dispatchEvent(new CustomEvent('open-notifications'))}
+              onClick={openNotifications}
               className="p-2 rounded-full hover:bg-accent relative"
             >
               <Bell size={20} />
