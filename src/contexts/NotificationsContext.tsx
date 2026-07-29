@@ -40,6 +40,8 @@ type NotificationsData = Pick<
   | 'isLoadingMore'
   | 'pageError'
   | 'loadMore'
+  | 'recoverPagination'
+  | 'isRecovering'
   | 'fetchAll'
 >;
 
@@ -73,6 +75,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     isLoadingMore,
     pageError,
     loadMore,
+    recoverPagination,
+    isRecovering,
     fetchAll,
   } = useNotifications();
 
@@ -107,6 +111,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       isLoadingMore,
       pageError,
       loadMore,
+      recoverPagination,
+      isRecovering,
       fetchAll,
       isNotificationsOpen,
       openNotifications,
@@ -132,6 +138,8 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       isLoadingMore,
       pageError,
       loadMore,
+      recoverPagination,
+      isRecovering,
       fetchAll,
       isNotificationsOpen,
       openNotifications,

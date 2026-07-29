@@ -31,6 +31,8 @@ export function NotificationDrawer() {
     isLoadingMore,
     pageError,
     loadMore,
+    recoverPagination,
+    isRecovering,
     loading,
     markingAsRead,
     lastRefresh,
@@ -105,18 +107,22 @@ export function NotificationDrawer() {
   // flight; offering a button that can only reply with a toast is worse than
   // disabling it.
   const canMarkAll =
-    !markAllPending && !markingAsRead && (loadedUnreadCount > 0 || (unreadCount ?? 0) > 0);
+    !markAllPending &&
+    !markingAsRead &&
+    !isRecovering &&
+    (loadedUnreadCount > 0 || (unreadCount ?? 0) > 0);
   const showMarkAll = markAllPending || loadedUnreadCount > 0 || (unreadCount ?? 0) > 0;
 
   // The mismatch notice is only honest when the count is fully authoritative:
   // pagination exhausted, count ready (not loading/error/stale), and no mutation
-  // in flight optimistically holding the count at a lower value.
+  // or pagination recovery in flight holding the count or the list mid-change.
   const showCountMismatch =
     !hasMore &&
     countStatus === 'ready' &&
     unreadCount !== null &&
     !markAllPending &&
     !markingAsRead &&
+    !isRecovering &&
     notifications.length > 0 &&
     unreadCount > loadedUnreadCount;
 
@@ -214,6 +220,8 @@ export function NotificationDrawer() {
                 isLoadingMore={isLoadingMore}
                 pageError={pageError}
                 onLoadMore={loadMore}
+                onRecoverPagination={recoverPagination}
+                isRecovering={isRecovering}
                 showCountMismatch={showCountMismatch}
               />
             </TabsContent>
@@ -237,6 +245,8 @@ export function NotificationDrawer() {
                 isLoadingMore={isLoadingMore}
                 pageError={pageError}
                 onLoadMore={loadMore}
+                onRecoverPagination={recoverPagination}
+                isRecovering={isRecovering}
                 unloadedUnreadMessage={unloadedUnreadMessage}
               />
             </TabsContent>

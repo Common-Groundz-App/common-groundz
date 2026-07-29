@@ -6,6 +6,7 @@ import {
   markNotificationsAsRead,
   markAllNotificationsAsRead,
   mergeNotifications,
+  isValidCursor,
   InvalidCursorError,
   Notification,
   NotificationCursor,
@@ -44,6 +45,10 @@ export interface UseNotificationsResult {
   isLoadingMore: boolean;
   pageError: PageError;
   loadMore: (opts?: { force?: boolean }) => Promise<void>;
+  /** Recovers pagination after a structurally invalid cursor. Never blanks the
+   *  list: rows stay visible until a replacement page has actually arrived. */
+  recoverPagination: () => Promise<void>;
+  isRecovering: boolean;
   loading: boolean;
   isInitialLoad: boolean;
   isRefreshing: boolean;
@@ -78,6 +83,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   const [hasMore, setHasMore] = useState<boolean>(false);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [pageError, setPageError] = useState<PageError>(null);
+  const [isRecovering, setIsRecovering] = useState<boolean>(false);
   // Oldest successfully loaded row. Head refreshes never move it.
   const cursorRef = useRef<NotificationCursor | null>(null);
 
@@ -97,18 +103,39 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   const countSeqRef = useRef<number>(0);
   const pageReqRef = useRef<number>(0);
 
+  // Synchronous ownership token for the page lane, holding the pageReqRef seq of
+  // the request that currently owns it. `isLoadingMore` is React state and does
+  // NOT settle within a tick, so two same-tick callers (observer + button) would
+  // both see `false` and both hit the network. A TOKEN rather than a boolean:
+  // an obsolete request whose ownership was revoked by a reset or by recovery
+  // must never release a lock that a newer request has since taken.
+  const pageOwnerRef = useRef<number | null>(null);
+
   // Notification ids currently owned by an in-flight mark-as-read mutation.
   // Guarantees exactly one mutation owns a row, so a failed rollback can never
   // contradict a concurrent success on the same row.
   const pendingReadIdsRef = useRef<Set<string>>(new Set());
   // Mirrors `markAllPending` for synchronous reads inside async flows.
   const markAllPendingRef = useRef<boolean>(false);
+  // Mirrors `isRecovering`. Pagination recovery and read mutations are mutually
+  // exclusive in BOTH directions: a reset that replaces the list mid-mutation
+  // would resurrect optimistic read state against rows the mutation never owned.
+  const isRecoveringRef = useRef<boolean>(false);
   // Bumped by every mutation. A count response captured before a mutation
   // started is stale by definition and must not commit.
   const mutationEpochRef = useRef<number>(0);
   // Set when a count response was dropped by the gate, so exactly one trailing
   // refetch happens once the gates clear.
   const countRefetchQueuedRef = useRef<boolean>(false);
+
+  // Read-only mirror of `notifications`, so mutation eligibility and rollback
+  // data can be derived BEFORE calling setNotifications. React may invoke an
+  // updater callback more than once (Strict Mode, replays), so deriving RPC
+  // ownership inside one can yield duplicated or empty id sets.
+  const notificationsRef = useRef<Notification[]>(notifications);
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
 
   /** True while any read mutation owns rows. Count commits are suppressed and
    *  the mismatch banner is hidden while this holds. */
@@ -126,8 +153,12 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     hasLoadedRef.current = false;
     pendingReadIdsRef.current.clear();
     markAllPendingRef.current = false;
+    isRecoveringRef.current = false;
     countRefetchQueuedRef.current = false;
     cursorRef.current = null;
+    // Revoke page ownership outright. The obsolete request still in flight can
+    // no longer release it, because its token no longer matches.
+    pageOwnerRef.current = null;
     setPendingReadOps(0);
     setMarkAllPending(false);
     setNotifications([]);
@@ -139,6 +170,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     setCountStatus('idle');
     setHasMore(false);
     setIsLoadingMore(false);
+    setIsRecovering(false);
     setPageError(null);
   }, [user?.id]);
 
@@ -278,37 +310,40 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     if (!user || !ids.length || isLoading) return;
     // Bidirectional exclusivity: mark-all owns every unread row while it runs.
     if (markAllPendingRef.current) return;
+    // Recovery may replace the whole list; an optimistic flip against rows that
+    // are about to be discarded would be rolled back onto unrelated rows.
+    if (isRecoveringRef.current) return;
 
     const generation = userGenerationRef.current;
 
-    // Eligibility: only rows that are actually unread locally and not already
-    // owned by another in-flight mutation. Capture each row's exact prior
-    // is_read value so a rollback restores reality, not an assumption.
+    // Eligibility and rollback data are derived from the ref BEFORE any setter,
+    // so the updater below stays pure and replay-safe. Same-id overlap is
+    // impossible because pendingReadIdsRef is claimed synchronously below, and
+    // the updater itself is idempotent (it only ever sets is_read: true).
+    const requested = new Set(ids);
     const priorReadState = new Map<string, boolean>();
     const eligibleIds: string[] = [];
 
-    setNotifications((prev) => {
-      const requested = new Set(ids);
-      prev.forEach((row) => {
-        if (!requested.has(row.id)) return;
-        if (row.is_read) return;
-        if (pendingReadIdsRef.current.has(row.id)) return;
-        priorReadState.set(row.id, row.is_read);
-        eligibleIds.push(row.id);
-      });
-
-      if (eligibleIds.length === 0) return prev;
-
-      const owned = new Set(eligibleIds);
-      return prev.map((row) => (owned.has(row.id) ? { ...row, is_read: true } : row));
+    notificationsRef.current.forEach((row) => {
+      if (!requested.has(row.id)) return;
+      if (row.is_read) return;
+      if (pendingReadIdsRef.current.has(row.id)) return;
+      priorReadState.set(row.id, row.is_read);
+      eligibleIds.push(row.id);
     });
 
     // Nothing to do — don't take ownership and don't move the spinner.
     if (eligibleIds.length === 0) return;
 
+    // Claim ownership synchronously, before the first await and before render.
     eligibleIds.forEach((id) => pendingReadIdsRef.current.add(id));
     setPendingReadOps((n) => n + 1);
     mutationEpochRef.current += 1;
+
+    const owned = new Set(eligibleIds);
+    setNotifications((prev) =>
+      prev.map((row) => (owned.has(row.id) ? { ...row, is_read: true } : row))
+    );
 
     // Optimistic count decrement, clamped. Only if the count is actually known.
     setUnreadCount((c) => (c === null ? c : Math.max(0, c - eligibleIds.length)));
@@ -357,6 +392,10 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   const markAllAsRead = async () => {
     if (!user || isLoading) return;
     if (markAllPendingRef.current) return;
+    if (isRecoveringRef.current) {
+      toast({ description: 'Finishing previous action…' });
+      return;
+    }
     if (pendingReadIdsRef.current.size > 0) {
       toast({ description: 'Finishing previous action…' });
       return;
@@ -364,20 +403,23 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
 
     const generation = userGenerationRef.current;
 
-    // Capture the ids flipped WITH their prior values — never an array snapshot,
-    // so rows a concurrent head refresh inserts survive a rollback.
+    // Derived from the ref before the setter, so the updater stays pure.
+    // NOTE: an empty map does NOT short-circuit the RPC — unread rows older than
+    // the loaded pages must still be cleared server-side.
     const priorReadState = new Map<string, boolean>();
-    setNotifications((prev) => {
-      prev.forEach((row) => {
-        if (!row.is_read) priorReadState.set(row.id, row.is_read);
-      });
-      if (priorReadState.size === 0) return prev;
-      return prev.map((row) => (row.is_read ? row : { ...row, is_read: true }));
+    notificationsRef.current.forEach((row) => {
+      if (!row.is_read) priorReadState.set(row.id, row.is_read);
     });
 
     markAllPendingRef.current = true;
     setMarkAllPending(true);
     mutationEpochRef.current += 1;
+
+    if (priorReadState.size > 0) {
+      setNotifications((prev) =>
+        prev.map((row) => (row.is_read ? row : { ...row, is_read: true }))
+      );
+    }
     setUnreadCount(0);
     setCountStatus('ready');
 
@@ -427,9 +469,14 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
       if (!user || isLoading || !isOnline) return;
       if (!hasMore) return;
       if (isLoadingMore) return;
+      // Synchronous lane ownership. `isLoadingMore` above is React state and
+      // does not settle within a tick, so this is the guard that actually stops
+      // the observer and the button from firing the same request twice.
+      if (pageOwnerRef.current !== null) return;
       // Mark-all rewrites every unread row; appending a page mid-flight would
       // land rows that the mutation never covered.
       if (markAllPendingRef.current) return;
+      if (isRecoveringRef.current) return;
       if (pageError && !force) return;
 
       const cursor = cursorRef.current;
@@ -443,6 +490,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
       const generation = userGenerationRef.current;
       pageReqRef.current += 1;
       const seq = pageReqRef.current;
+      pageOwnerRef.current = seq;
       const isCurrent = () =>
         generation === userGenerationRef.current && seq === pageReqRef.current;
 
@@ -465,11 +513,138 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
         // would claim "all caught up" when it isn't).
         setPageError(e instanceof InvalidCursorError ? 'invalid-cursor' : 'network');
       } finally {
+        // Release ONLY the ownership this request still holds. A reset or a
+        // recovery pass revokes the token, and an obsolete request must not
+        // unlock the lane for whoever owns it now.
+        if (pageOwnerRef.current === seq) pageOwnerRef.current = null;
         if (isCurrent()) setIsLoadingMore(false);
       }
     },
     [user, isLoading, isOnline, hasMore, isLoadingMore, pageError]
   );
+
+  /**
+   * Recovers pagination after the cursor turns out to be structurally invalid.
+   *
+   * Retrying the same malformed cursor can never succeed, so the Reload button
+   * routes here instead of to loadMore. Two ordered attempts:
+   *
+   *   Step A — a cursor re-derived from the oldest loaded row, but ONLY if it is
+   *            structurally valid and actually different from the failed one.
+   *   Step B — an uncursored page-one fetch that replaces the list.
+   *
+   * Branch selection is structural, never failure-driven: a transient network
+   * error while requesting a valid candidate does not prove the candidate is
+   * unusable, so it must not escalate to a full reset in the same attempt.
+   *
+   * Rows stay on screen the entire time — the list is only ever replaced after a
+   * replacement page has actually arrived.
+   */
+  const recoverPagination = useCallback(async () => {
+    if (!user || isLoading || !isOnline) return;
+    if (isRecoveringRef.current) return;
+    // Read mutations own rows optimistically; replacing the list underneath them
+    // would leave their rollback pointing at rows that no longer exist.
+    if (markAllPendingRef.current) return;
+    if (pendingReadIdsRef.current.size > 0) return;
+
+    const generation = userGenerationRef.current;
+
+    // Invalidate every in-flight page request from the broken boundary, and take
+    // the page lane for this recovery pass.
+    pageReqRef.current += 1;
+    const seq = pageReqRef.current;
+    pageOwnerRef.current = seq;
+    const isCurrent = () =>
+      generation === userGenerationRef.current && seq === pageReqRef.current;
+
+    isRecoveringRef.current = true;
+    setIsRecovering(true);
+
+    const failedCursor = cursorRef.current;
+    const oldest = notificationsRef.current[notificationsRef.current.length - 1];
+    // Held locally: the shared cursorRef is never written with an unproven value.
+    const candidate: NotificationCursor | null = oldest
+      ? { created_at: oldest.created_at, id: oldest.id }
+      : null;
+
+    const candidateIsUsable =
+      candidate !== null &&
+      isValidCursor(candidate) &&
+      !(
+        failedCursor !== null &&
+        candidate.created_at === failedCursor.created_at &&
+        candidate.id === failedCursor.id
+      );
+
+    let recovered = false;
+
+    try {
+      // --- Step A: repaired cursor --------------------------------------------
+      if (candidateIsUsable) {
+        try {
+          const page = await fetchNotifications({ limit: PAGE_SIZE, cursor: candidate });
+          if (!isCurrent()) return;
+
+          setNotifications((prev) => mergeNotifications(prev, page.rows));
+          // The server's next boundary, not the candidate we sent.
+          cursorRef.current = page.nextCursor;
+          setHasMore(page.hasMore);
+          setPageError(null);
+          recovered = true;
+        } catch (e) {
+          if (!isCurrent()) return;
+          if (!(e instanceof InvalidCursorError)) {
+            // Transient. Keep the rows and stay on the Reload path so the next
+            // attempt retries Step A rather than escalating to a hard reset.
+            toast({
+              description: "Couldn't reach the server. Try again.",
+              variant: 'destructive',
+            });
+            return;
+          }
+          // The re-derived cursor is structurally rejected too — fall to Step B.
+        }
+      }
+
+      // --- Step B: hard reset to page one -------------------------------------
+      if (!recovered) {
+        try {
+          const page = await fetchNotifications({ limit: PAGE_SIZE });
+          if (!isCurrent()) return;
+
+          // Replace, never merge: the old rows belong to a pagination history
+          // that the broken cursor makes unreconstructable.
+          setNotifications(page.rows);
+          cursorRef.current = page.nextCursor;
+          setHasMore(page.hasMore);
+          setPageError(null);
+          recovered = true;
+        } catch {
+          if (!isCurrent()) return;
+          // Keep the rows and keep 'invalid-cursor' even for a network failure,
+          // so the UI stays on Reload and never offers a same-cursor Retry.
+          setPageError('invalid-cursor');
+          toast({
+            description: "Couldn't reload notifications. Try again.",
+            variant: 'destructive',
+          });
+        }
+      }
+    } finally {
+      if (pageOwnerRef.current === seq) pageOwnerRef.current = null;
+      isRecoveringRef.current = false;
+      setIsRecovering(false);
+    }
+
+    // Release-before-reconcile: the count lane only runs once recovery has given
+    // up ownership. Deliberately NOT refreshHead() — Step B already fetched the
+    // head, and the two lanes are kept separate on purpose.
+    if (recovered && generation === userGenerationRef.current) {
+      void refreshUnreadCount();
+    }
+  }, [user, isLoading, isOnline, refreshUnreadCount]);
+
 
   // Drain a count refetch that was dropped by the commit gate, once every
   // mutation has settled.
@@ -527,6 +702,8 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     isLoadingMore,
     pageError,
     loadMore,
+    recoverPagination,
+    isRecovering,
     // `loading` now means "first load, nothing to show yet" — background polls
     // never flip it, so existing rows are never replaced by loading UI.
     loading: isInitialLoad,
