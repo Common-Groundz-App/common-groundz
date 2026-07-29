@@ -310,37 +310,40 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     if (!user || !ids.length || isLoading) return;
     // Bidirectional exclusivity: mark-all owns every unread row while it runs.
     if (markAllPendingRef.current) return;
+    // Recovery may replace the whole list; an optimistic flip against rows that
+    // are about to be discarded would be rolled back onto unrelated rows.
+    if (isRecoveringRef.current) return;
 
     const generation = userGenerationRef.current;
 
-    // Eligibility: only rows that are actually unread locally and not already
-    // owned by another in-flight mutation. Capture each row's exact prior
-    // is_read value so a rollback restores reality, not an assumption.
+    // Eligibility and rollback data are derived from the ref BEFORE any setter,
+    // so the updater below stays pure and replay-safe. Same-id overlap is
+    // impossible because pendingReadIdsRef is claimed synchronously below, and
+    // the updater itself is idempotent (it only ever sets is_read: true).
+    const requested = new Set(ids);
     const priorReadState = new Map<string, boolean>();
     const eligibleIds: string[] = [];
 
-    setNotifications((prev) => {
-      const requested = new Set(ids);
-      prev.forEach((row) => {
-        if (!requested.has(row.id)) return;
-        if (row.is_read) return;
-        if (pendingReadIdsRef.current.has(row.id)) return;
-        priorReadState.set(row.id, row.is_read);
-        eligibleIds.push(row.id);
-      });
-
-      if (eligibleIds.length === 0) return prev;
-
-      const owned = new Set(eligibleIds);
-      return prev.map((row) => (owned.has(row.id) ? { ...row, is_read: true } : row));
+    notificationsRef.current.forEach((row) => {
+      if (!requested.has(row.id)) return;
+      if (row.is_read) return;
+      if (pendingReadIdsRef.current.has(row.id)) return;
+      priorReadState.set(row.id, row.is_read);
+      eligibleIds.push(row.id);
     });
 
     // Nothing to do — don't take ownership and don't move the spinner.
     if (eligibleIds.length === 0) return;
 
+    // Claim ownership synchronously, before the first await and before render.
     eligibleIds.forEach((id) => pendingReadIdsRef.current.add(id));
     setPendingReadOps((n) => n + 1);
     mutationEpochRef.current += 1;
+
+    const owned = new Set(eligibleIds);
+    setNotifications((prev) =>
+      prev.map((row) => (owned.has(row.id) ? { ...row, is_read: true } : row))
+    );
 
     // Optimistic count decrement, clamped. Only if the count is actually known.
     setUnreadCount((c) => (c === null ? c : Math.max(0, c - eligibleIds.length)));
