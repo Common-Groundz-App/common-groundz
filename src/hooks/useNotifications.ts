@@ -67,7 +67,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   // Fetch-only error channel. Mutation failures never write here — they roll
   // back per-id and surface a toast — so the drawer's refresh UI can't be
   // triggered by a failed mark-as-read. Pagination failures use `pageError`.
-  const [fetchError, setFetchError] = useState<any>(null);
+  const [fetchError, setFetchError] = useState<unknown>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   // --- global count state ---------------------------------------------------
