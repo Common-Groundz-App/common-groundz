@@ -469,9 +469,14 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
       if (!user || isLoading || !isOnline) return;
       if (!hasMore) return;
       if (isLoadingMore) return;
+      // Synchronous lane ownership. `isLoadingMore` above is React state and
+      // does not settle within a tick, so this is the guard that actually stops
+      // the observer and the button from firing the same request twice.
+      if (pageOwnerRef.current !== null) return;
       // Mark-all rewrites every unread row; appending a page mid-flight would
       // land rows that the mutation never covered.
       if (markAllPendingRef.current) return;
+      if (isRecoveringRef.current) return;
       if (pageError && !force) return;
 
       const cursor = cursorRef.current;
@@ -485,6 +490,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
       const generation = userGenerationRef.current;
       pageReqRef.current += 1;
       const seq = pageReqRef.current;
+      pageOwnerRef.current = seq;
       const isCurrent = () =>
         generation === userGenerationRef.current && seq === pageReqRef.current;
 
@@ -507,6 +513,10 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
         // would claim "all caught up" when it isn't).
         setPageError(e instanceof InvalidCursorError ? 'invalid-cursor' : 'network');
       } finally {
+        // Release ONLY the ownership this request still holds. A reset or a
+        // recovery pass revokes the token, and an obsolete request must not
+        // unlock the lane for whoever owns it now.
+        if (pageOwnerRef.current === seq) pageOwnerRef.current = null;
         if (isCurrent()) setIsLoadingMore(false);
       }
     },
