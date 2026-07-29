@@ -193,7 +193,9 @@ export function NotificationDrawer() {
               <TabsList className="w-full">
                 <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
                 <TabsTrigger value="unread" className="flex-1">
-                  Unread {unreadCount > 0 && `(${unreadCount})`}
+                  {/* Global count, not the loaded-page count — hidden entirely
+                      while the count is still unknown. */}
+                  Unread {unreadCount !== null && unreadCount > 0 && `(${unreadCount})`}
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -208,6 +210,11 @@ export function NotificationDrawer() {
                 hasError={hasError}
                 onRetry={fetchAll}
                 onNotificationClick={handleNotificationClick}
+                hasMore={hasMore}
+                isLoadingMore={isLoadingMore}
+                pageError={pageError}
+                onLoadMore={loadMore}
+                showCountMismatch={showCountMismatch}
               />
             </TabsContent>
 
@@ -215,6 +222,9 @@ export function NotificationDrawer() {
               value="unread"
               className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
             >
+              {/* Pagination is shared with the All tab for now: loading more
+                  pulls in older rows of both kinds. Independent unread paging is
+                  Phase 2.2 — until then the copy stays honest about it. */}
               <NotificationList
                 notifications={unreadNotifications}
                 loading={loading}
@@ -223,6 +233,11 @@ export function NotificationDrawer() {
                 onNotificationClick={handleNotificationClick}
                 emptyMessage="No unread notifications"
                 emptyIcon={Check}
+                hasMore={hasMore}
+                isLoadingMore={isLoadingMore}
+                pageError={pageError}
+                onLoadMore={loadMore}
+                unloadedUnreadMessage={unloadedUnreadMessage}
               />
             </TabsContent>
           </Tabs>
