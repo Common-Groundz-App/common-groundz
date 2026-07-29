@@ -45,8 +45,7 @@ export function VerticalTubelightNavbar({
   logoSize = "md"
 }: VerticalNavBarProps) {
   const [showSearchDialog, setShowSearchDialog] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const { unreadCount } = useNotifications();
+  const { unreadCount, openNotifications } = useNotificationsContext();
   const { profileUrl } = useCanonicalProfileUrl();
 
   const defaultNavItems: NavItem[] = [
