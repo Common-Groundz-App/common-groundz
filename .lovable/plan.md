@@ -1,95 +1,85 @@
-## Verdict
+## My take
 
-Both corrections accepted. The error-channel one is a real defect in my plan — `markAsRead`'s catch currently calls `setError(e)`, so a failed mark would light up the refresh strip *and* mispoint its Retry. It also already contaminates the existing `hasError` empty-state path, so this is a pre-existing bug, not just a new-UI one. The `networkStatusService` guard is the same omission as the state setters, one layer out.
+Codex found a real bug and I'm folding it in. Both reviews are otherwise aligned with the plan.
 
-## Phase 1.5 — final
+**The dead-event finding is confirmed.** I grepped for it:
 
-Logic in `src/hooks/useNotifications.ts`; strip + label in `src/components/notifications/NotificationDrawer.tsx`.
-
-**A. Account generation guards fetches *and* mutations**
-
-One `userGenerationRef`, bumped on `user?.id` change, captured at the start of every `fetchAll` and every `markAsRead`. A previous session's mutation commits nothing on return: no counter decrement, no rollback, no error, no toast, no pending-ID release. Safe precisely because of H.
-
-**B. Per-ID rollback with exact prior values + ownership**
-
-Capture `Map<id, boolean>` of each affected row's real prior `is_read` before the optimistic write. On failure (generation permitting), map over the *current* array and restore only those IDs to their captured values.
-
-Eligibility filter first: submit an ID only if it is **locally unread** and **not already owned** by a pending mutation (`pendingReadIdsRef: Set<string>`). Normal same-user completions always release their IDs in `finally`.
-
-**C. Pending count as state, clamped**
-
-```text
-if (eligibleIds.length === 0) return;         // no work, no increment
-setPendingReadOps(n => n + 1);
-...
-setPendingReadOps(n => Math.max(0, n - 1));
-const markingAsRead = pendingReadOps > 0;
+```
+Feed.tsx:557          dispatchEvent(new CustomEvent('open-notifications'))
+PostView.tsx:205      dispatchEvent(new CustomEvent('open-notifications'))
+MyStuffPage.tsx:35    dispatchEvent(new CustomEvent('open-notifications'))
+→ addEventListener('open-notifications', …)   ZERO matches in src/
 ```
 
-**D. Separate error channels** *(new)*
+For contrast, the sibling `open-search-dialog` event *does* have a listener in `NavBarComponent.tsx:44`. So the mobile bells on those three pages are currently inert — they render an unread badge and do nothing on tap. Swapping only the `unreadCount` source would have left three dead buttons behind. They'll call `openNotifications()` directly, and the `open-notifications` event disappears from the codebase entirely.
 
-- `fetchError` — set only by `fetchAll`; cleared on every successful fetch. This is what the drawer reads.
-- Mutation failures set **no** shared error state. They roll back per-ID and show the existing destructive toast, which is already the right surface for a user-initiated action per project policy.
+**Codex's wording correction is right and I'm dropping the overclaim.** `Pick<UseNotificationsResult, …>` guarantees the selected fields stay type-accurate; it does *not* prevent a future field from being left out. That's fine — the context should expose a deliberate public surface — but I won't describe it as automatic protection.
 
-Drawer consequences: `hasError` (empty + failed) and `hasStaleData` (cached + failed) both derive from `fetchError`, so a failed mark can never render a refresh failure or aim Retry at the wrong operation.
+**One thing to add:** `NotificationBell` currently early-returns `null` when there's no user. The provider must not do that — it has to render children unconditionally, or every page inside it unmounts on signed-out routes. It renders children always; only the hook internals stay dormant without a user.
 
-**E. Monotonic poll reconciliation**
+## Phase 2.0 — One notification surface, one state owner
 
-```text
-locallyRead = ids of current rows with is_read === true  ∪  pendingReadIdsRef
-merged = fetched.map(r => locallyRead.has(r.id) ? { ...r, is_read: true } : r)
+**1. `src/contexts/NotificationsContext.tsx` (new)**
+
+- Calls `useNotifications()` exactly once. Imports the hook; does **not** import `NotificationDrawer`.
+- Owns drawer visibility: `isNotificationsOpen`, `openNotifications()`, `closeNotifications()`, `setNotificationsOpen(open)`.
+- Forces the drawer closed when `user?.id` changes (sign-out / account switch).
+- **Always renders children**, signed in or out.
+- Explicit typed contract, no `ReturnType<>` passthrough. Data fields via `Pick<UseNotificationsResult, …>`: `notifications`, `unreadNotifications`, `unreadCount`, `loading`, `isRefreshing`, `markingAsRead`, `fetchError`, `isOnline`, `lastRefresh`, `markAsRead`, `fetchAll` — plus the four drawer controls. No raw setters. Adding a field later is a deliberate edit here, by design.
+- `useNotificationsContext()` throws outside the provider.
+
+**2. `App.tsx` — provider wraps, App renders the one drawer**
+
+```
+<AuthPromptProvider>
+  <NotificationsProvider>
+    <OfflineBanner />
+    <Routes>…</Routes>
+    <NotificationDrawer />
+  </NotificationsProvider>
+</AuthPromptProvider>
 ```
 
-Code comment: **valid only because the app has no mark-as-unread action** — Phase 2 must replace this with versioning if that changes.
+Every route lives inside `<Routes>`, so all seven consumers are provably within the provider — nothing can throw. Nested inside `Router`, `AuthInitializer`, `ContentViewerProvider`, `QueryClientProvider`, and `AuthProvider` (from `main.tsx`), giving the drawer navigation, content-viewer, auth, and toast access.
 
-**F. Dual fetch guards, covering side effects too**
+**3. Migrate all seven consumers**
 
-- `userGenerationRef` — account changes.
-- `requestSeqRef` — only the newest same-user response commits.
+| File | Change |
+|---|---|
+| `Feed.tsx` | badge from context; mobile bell → `openNotifications()` |
+| `PostView.tsx` | badge from context; mobile bell → `openNotifications()` |
+| `MyStuffPage.tsx` | badge from context; mobile bell → `openNotifications()` |
+| `vertical-tubelight-navbar.tsx` | drop hook + local `showNotifications`; remove its `<NotificationDrawer/>` (line 255); trigger → `openNotifications()` |
+| `NotificationBell.tsx` | badge from context; → `openNotifications()`; renders no popover; dynamic `aria-label`, **no `aria-live`** |
+| `NotificationDrawer.tsx` | drops props; open state + data + actions from context |
+| `NotificationPopover.tsx` | deleted |
 
-Both checks gate every state commit, the `finally` loading-flag updates, **and** `networkStatusService.reportSuccess()` / `reportFailure(e)`. An obsolete request never touches app-wide network health.
+`open-search-dialog` is untouched — different feature, working listener.
 
-**G. Stale-refresh strip + label**
+Drawer row click keeps today's exact order: `void markAsRead([id])` → `closeNotifications()` → navigate/`openContent`.
 
-Above the tabs, mutually exclusive with the offline banner (which stays `!isOnline`-only):
+**4. `useNotifications.ts` logic untouched.** Only addition: exported `UseNotificationsResult` interface. All Phase 1.5 guards byte-for-byte — `userGenerationRef`, `requestSeqRef`, per-ID rollback, `pendingReadIdsRef`, clamped `pendingReadOps`, `fetchError` channel, monotonic merge.
 
-```text
-Couldn't refresh                     Retry
-```
+**5. ESLint guard.** `no-restricted-imports` on `@/hooks/useNotifications` **and** relative forms (`../hooks/useNotifications`, `../../hooks/useNotifications`), with overrides allowing `src/contexts/NotificationsContext.tsx` and `**/*.test.*`.
 
-Retry calls `fetchAll`, disabled while `isRefreshing` — putting the currently-unused `isRefreshing` export to work. Button copy becomes **"Mark these as read."** `unreadCount` keeps its name plus a comment noting loaded-page scope.
+## Verification
 
-**H. Reset on user change**
+- `rg "open-notifications"` → zero matches. `rg NotificationPopover` → zero. `rg "hooks/useNotifications"` outside the context file and tests → zero.
+- Tap the mobile bell on `/home`, `/post/:id`, `/my-stuff` → shared drawer opens (currently: nothing happens).
+- `/u/:username` bell → same drawer; mark a row read → navbar badge decrements in the same frame.
+- Count notification requests over ~25s on `/home`: **one** per interval, not three.
+- Exactly one `[role="dialog"]` when open, desktop (1305px) and mobile.
+- Open from navbar, close from drawer, reopen from bell → consistent.
+- Focus returns to the opening trigger; if it unmounted during navigation, focus lands on a stable element, not `document.body`.
+- Sign out with drawer open → closes, state clears. Signed-out public routes (`/`, `/entity/:slug`) render normally.
+- Lint + typecheck clean, no console errors.
 
-The reset effect additionally clears `pendingReadIdsRef` and sets `pendingReadOps` to 0, so nothing can be stranded by a skipped old-generation release.
+## Deferred (unchanged)
 
-## Verification I'll run after implementing
+**2.1** global unread RPC + server mark-all + cursor pagination (`created_at` + `id`) together; `security definer`, `search_path = public`, `auth.uid()`-scoped, `EXECUTE` to `authenticated`. **2.2** destination routing vs target availability. **2.3** page-scoped aggregation. **2.4** single realtime channel, merge-by-ID on INSERT + UPDATE, reconcile on reconnect.
 
-Codex's nine scenarios, plus the destination sweep:
-
-1. Two overlapping row clicks
-2. Row click overlapping "Mark these as read"
-3. Mark-read failure during a successful background refresh — toast only, no refresh strip
-4. Background-refresh failure with cached rows — rows stay, strip appears
-5. Retry after refresh failure
-6. Account switch mid-fetch
-7. Account switch mid-mutation
-8. Older poll landing after a newer Retry
-9. Poll landing after a successful optimistic read
-
-Then: query the distinct `type` / `entity_type` combinations present in your `notifications` rows, trace each through `handleNotificationClick`, and report which destination each opens — flagging fall-throughs to the "no associated content" toast or deleted targets.
-
-## Out of scope
-
-Pagination, global unread count, server-side mark-all, deleted-content handling, grouping, realtime, filters, per-row actions, `/notifications` route.
-
-## Phase 2 order
-
-Cursor pagination / Load more → global unread count → server-side mark-all → destination and deleted-content reliability → aggregation → realtime with polling fallback.
+Out of scope for all of Phase 2: filters, per-row actions, `/notifications` route, rich previews, preferences, date sections, virtualization, web push.
 
 ## Technical notes
 
-- Two files. No service, schema, or query changes.
-- Renaming `error` → `fetchError` is an internal hook change; the drawer is the only consumer, updated in the same pass.
-- `markAsRead` stays fire-and-forget-safe; the drawer's `void markAsRead([...])` call site is unchanged.
-- All guards live in refs, so `fetchAll`'s `useCallback` deps are untouched and the poller is never torn down.
+New: `src/contexts/NotificationsContext.tsx`. Edited: `App.tsx`, `Feed.tsx`, `PostView.tsx`, `MyStuffPage.tsx`, `vertical-tubelight-navbar.tsx`, `NotificationBell.tsx`, `NotificationDrawer.tsx`, `useNotifications.ts` (type export only), `eslint.config.js`. Deleted: `NotificationPopover.tsx`. No database changes.
