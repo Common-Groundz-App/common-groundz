@@ -48,7 +48,7 @@ export function NotificationDrawer() {
       void markAsRead([notification.id]);
     }
 
-    onOpenChange(false);
+    closeNotifications();
     
     if (!notification.entity_type || !notification.entity_id) {
       if (notification.action_url) {
