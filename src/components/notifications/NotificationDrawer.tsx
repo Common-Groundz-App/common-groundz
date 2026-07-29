@@ -94,19 +94,38 @@ export function NotificationDrawer() {
     }
   }, [navigate, openContent, toast, closeNotifications, markAsRead]);
 
-  const handleMarkAllAsRead = () => {
-    // Loaded-page scoped: only the rows currently in the list, hence the
-    // "Mark these as read" label. True server-side mark-all is Phase 2.
-    const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
-    if (unreadIds.length > 0) {
-      markAsRead(unreadIds);
-    }
-  };
-
   // Both derive from the fetch-only error channel, so a failed mark-as-read
   // can never render refresh failure UI.
   const hasError = Boolean(fetchError) && notifications.length === 0;
   const hasStaleData = Boolean(fetchError) && notifications.length > 0;
+
+  // Server-side mark-all clears EVERY unread row, including ones older than the
+  // pages loaded — hence the global-count arm. `markingAsRead` is included
+  // because the hook refuses to start mark-all while an individual read is in
+  // flight; offering a button that can only reply with a toast is worse than
+  // disabling it.
+  const canMarkAll =
+    !markAllPending && !markingAsRead && (loadedUnreadCount > 0 || (unreadCount ?? 0) > 0);
+  const showMarkAll = markAllPending || loadedUnreadCount > 0 || (unreadCount ?? 0) > 0;
+
+  // The mismatch notice is only honest when the count is fully authoritative:
+  // pagination exhausted, count ready (not loading/error/stale), and no mutation
+  // in flight optimistically holding the count at a lower value.
+  const showCountMismatch =
+    !hasMore &&
+    countStatus === 'ready' &&
+    unreadCount !== null &&
+    !markAllPending &&
+    !markingAsRead &&
+    notifications.length > 0 &&
+    unreadCount > loadedUnreadCount;
+
+  // Unread tab: zero unread loaded doesn't mean zero unread exist.
+  const unloadedUnreadMessage =
+    loadedUnreadCount === 0 && (unreadCount ?? 0) > 0
+      ? `You have ${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'} in total. Load more to find older unread ones.`
+      : null;
+
 
   return (
     <Sheet open={isNotificationsOpen} onOpenChange={setNotificationsOpen}>
