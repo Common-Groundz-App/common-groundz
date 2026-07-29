@@ -1,12 +1,13 @@
 
-import React from 'react';
-import { Bell, Check, AlertCircle } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { Bell, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfileAvatar } from "@/components/common/ProfileAvatar";
 import { Notification } from "@/services/notificationService";
 import { formatNotificationTime } from "@/utils/dateUtils";
+import type { PageError } from "@/hooks/useNotifications";
 
 interface NotificationListProps {
   notifications: Notification[];
@@ -16,6 +17,16 @@ interface NotificationListProps {
   emptyIcon?: React.ElementType;
   hasError?: boolean;
   onRetry?: () => void;
+  // --- pagination ---
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  pageError?: PageError;
+  onLoadMore?: (opts?: { force?: boolean }) => void;
+  /** True only when the global count is authoritative AND exceeds what's loaded. */
+  showCountMismatch?: boolean;
+  /** Rendered instead of the plain empty state on the Unread tab when older
+   *  unread rows exist but haven't been paged in yet. */
+  unloadedUnreadMessage?: string | null;
 }
 
 function NotificationRowSkeleton() {
@@ -31,6 +42,87 @@ function NotificationRowSkeleton() {
   );
 }
 
+/**
+ * Pagination footer.
+ *
+ * A real focusable <button> is the primary control — an IntersectionObserver
+ * alone is unreliable inside a Sheet and unreachable by keyboard. The observer
+ * is a progressive enhancement that calls the SAME callback (never a synthetic
+ * click), and stays inert while a page error is showing so it can't retry-loop
+ * against a broken cursor.
+ */
+function PaginationFooter({
+  hasMore,
+  isLoadingMore,
+  pageError,
+  onLoadMore,
+}: {
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  pageError: PageError;
+  onLoadMore: (opts?: { force?: boolean }) => void;
+}) {
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    // Deliberately disabled while an error is shown — recovery is the explicit
+    // Retry button's job.
+    if (!hasMore || pageError || isLoadingMore) return;
+    const node = sentinelRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
+      },
+      { rootMargin: '120px' }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, pageError, isLoadingMore, onLoadMore]);
+
+  if (!hasMore) return null;
+
+  return (
+    <div className="px-3 py-3">
+      <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
+      {pageError ? (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-1.5">
+          <span className="text-xs text-muted-foreground">Couldn't load more</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 text-xs"
+            // force: true clears the error guard first — a plain loadMore()
+            // would be refused while pageError is still set.
+            onClick={() => onLoadMore({ force: true })}
+            disabled={isLoadingMore}
+          >
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-full text-xs"
+          onClick={() => onLoadMore()}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? (
+            <>
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              Loading more…
+            </>
+          ) : (
+            'Load more'
+          )}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function NotificationList({ 
   notifications, 
   loading, 
@@ -38,7 +130,13 @@ export function NotificationList({
   emptyMessage = "No notifications yet",
   emptyIcon: EmptyIcon = Bell,
   hasError = false,
-  onRetry
+  onRetry,
+  hasMore = false,
+  isLoadingMore = false,
+  pageError = null,
+  onLoadMore,
+  showCountMismatch = false,
+  unloadedUnreadMessage = null,
 }: NotificationListProps) {
   // Initial load only — background polling never renders skeletons over existing rows
   if (loading && notifications.length === 0) {
@@ -71,7 +169,19 @@ export function NotificationList({
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <EmptyIcon className="h-8 w-8 text-muted-foreground/50 mb-2" />
-        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+        {/* On the Unread tab, an empty page is NOT proof of zero unread — older
+            unread rows may simply not be paged in yet. */}
+        <p className="text-sm text-muted-foreground px-6">
+          {unloadedUnreadMessage ?? emptyMessage}
+        </p>
+        {unloadedUnreadMessage && onLoadMore && hasMore && (
+          <PaginationFooter
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            pageError={pageError}
+            onLoadMore={onLoadMore}
+          />
+        )}
       </div>
     );
   }
@@ -129,6 +239,34 @@ export function NotificationList({
           </button>
         );
       })}
+
+      {onLoadMore && (
+        <PaginationFooter
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          pageError={pageError}
+          onLoadMore={onLoadMore}
+        />
+      )}
+
+      {/* Only rendered when the count is fully authoritative — see the drawer's
+          guard. A count failure must never produce alarming copy. */}
+      {!hasMore && showCountMismatch && (
+        <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-1.5 mx-1 mb-2">
+          <span className="text-xs text-muted-foreground">Some notifications may not be shown</span>
+          {onRetry && (
+            <Button variant="ghost" size="sm" className="h-6 text-xs" onClick={onRetry}>
+              Refresh
+            </Button>
+          )}
+        </div>
+      )}
+
+      {!hasMore && !showCountMismatch && (
+        <p className="py-3 text-center text-[11px] text-muted-foreground/70">
+          You're all caught up
+        </p>
+      )}
     </div>
   );
 }
