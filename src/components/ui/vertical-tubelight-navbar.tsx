@@ -18,8 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { SearchDialog } from "@/components/SearchDialog";
-import { useNotifications } from "@/hooks/useNotifications";
-import { NotificationDrawer } from "@/components/notifications/NotificationDrawer";
+import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import { useProfile } from "@/hooks/use-profile-cache";
 import { useCanonicalProfileUrl } from "@/hooks/useCanonicalProfileUrl";
 
@@ -45,8 +44,7 @@ export function VerticalTubelightNavbar({
   logoSize = "md"
 }: VerticalNavBarProps) {
   const [showSearchDialog, setShowSearchDialog] = useState(false);
-  const [showNotifications, setShowNotifications] = useState(false);
-  const { unreadCount } = useNotifications();
+  const { unreadCount, openNotifications } = useNotificationsContext();
   const { profileUrl } = useCanonicalProfileUrl();
 
   const defaultNavItems: NavItem[] = [
@@ -58,7 +56,7 @@ export function VerticalTubelightNavbar({
       name: 'Notifications', 
       url: '#notifications', 
       icon: Bell,
-      onClick: () => setShowNotifications(true),
+      onClick: () => openNotifications(),
       badge: unreadCount > 0 ? unreadCount : undefined
     },
     { name: 'Settings', url: '/settings', icon: Settings }
@@ -252,7 +250,6 @@ export function VerticalTubelightNavbar({
       </div>
 
       <SearchDialog open={showSearchDialog} onOpenChange={setShowSearchDialog} />
-      <NotificationDrawer open={showNotifications} onOpenChange={setShowNotifications} />
     </>
   );
 }

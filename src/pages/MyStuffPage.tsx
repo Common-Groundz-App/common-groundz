@@ -6,11 +6,11 @@ import MyStuffContent from '@/components/mystuff/MyStuffContent';
 import Logo from '@/components/Logo';
 import { Bell, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationsContext } from '@/contexts/NotificationsContext';
 
 const MyStuffPage = () => {
   const { user } = useAuth();
-  const { unreadCount } = useNotifications();
+  const { unreadCount, openNotifications } = useNotificationsContext();
 
   return (
     <div className="min-h-screen flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] xl:pb-0">
@@ -31,10 +31,7 @@ const MyStuffPage = () => {
             </button>
             {user && (
               <button
-                onClick={() => {
-                  const event = new CustomEvent('open-notifications');
-                  window.dispatchEvent(event);
-                }}
+                onClick={openNotifications}
                 className="p-2 rounded-full hover:bg-accent relative"
               >
                 <Bell size={20} />

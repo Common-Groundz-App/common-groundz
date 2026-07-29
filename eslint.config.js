@@ -24,6 +24,34 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
+      // Notifications must have exactly one state owner. Only the provider
+      // (and tests) may touch the low-level hook directly; every component
+      // reads through useNotificationsContext().
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@/hooks/useNotifications",
+                "**/hooks/useNotifications",
+              ],
+              message:
+                "Import useNotificationsContext from '@/contexts/NotificationsContext' instead. useNotifications() may only be called by NotificationsProvider.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "src/contexts/NotificationsContext.tsx",
+      "**/*.test.{ts,tsx}",
+      "**/__tests__/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": "off",
     },
   }
 );
