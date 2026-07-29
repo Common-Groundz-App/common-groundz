@@ -21,6 +21,10 @@ interface NotificationListProps {
   isLoadingMore?: boolean;
   pageError?: PageError;
   onLoadMore?: (opts?: { force?: boolean }) => void;
+  /** Invoked for `invalid-cursor` only — retrying a malformed cursor can never
+   *  succeed, so that path gets Reload instead of Retry. */
+  onRecoverPagination?: () => void;
+  isRecovering?: boolean;
   /** True only when the global count is authoritative AND exceeds what's loaded. */
   showCountMismatch?: boolean;
   /** Rendered instead of the plain empty state on the Unread tab when older
