@@ -31,6 +31,8 @@ export function NotificationDrawer() {
     isLoadingMore,
     pageError,
     loadMore,
+    recoverPagination,
+    isRecovering,
     loading,
     markingAsRead,
     lastRefresh,
