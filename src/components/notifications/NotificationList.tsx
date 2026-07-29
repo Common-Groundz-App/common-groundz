@@ -276,6 +276,8 @@ export function NotificationList({
           isLoadingMore={isLoadingMore}
           pageError={pageError}
           onLoadMore={onLoadMore}
+          onRecoverPagination={onRecoverPagination}
+          isRecovering={isRecovering}
         />
       )}
 
