@@ -59,18 +59,22 @@ function PaginationFooter({
   isLoadingMore,
   pageError,
   onLoadMore,
+  onRecoverPagination,
+  isRecovering = false,
 }: {
   hasMore: boolean;
   isLoadingMore: boolean;
   pageError: PageError;
   onLoadMore: (opts?: { force?: boolean }) => void;
+  onRecoverPagination?: () => void;
+  isRecovering?: boolean;
 }) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    // Deliberately disabled while an error is shown — recovery is the explicit
-    // Retry button's job.
-    if (!hasMore || pageError || isLoadingMore) return;
+    // Deliberately disabled while an error is shown or while recovery runs —
+    // recovery is the explicit button's job.
+    if (!hasMore || pageError || isLoadingMore || isRecovering) return;
     const node = sentinelRef.current;
     if (!node || typeof IntersectionObserver === 'undefined') return;
 
@@ -82,27 +86,46 @@ function PaginationFooter({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMore, pageError, isLoadingMore, onLoadMore]);
+  }, [hasMore, pageError, isLoadingMore, isRecovering, onLoadMore]);
 
   if (!hasMore) return null;
+
+  // A structurally invalid cursor can never succeed on retry, so that path gets
+  // its own copy and routes to recovery rather than to the same request again.
+  const isInvalidCursor = pageError === 'invalid-cursor';
 
   return (
     <div className="px-3 py-3">
       <div ref={sentinelRef} aria-hidden="true" className="h-px w-full" />
       {pageError ? (
         <div className="flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-1.5">
-          <span className="text-xs text-muted-foreground">Couldn't load more</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 text-xs"
-            // force: true clears the error guard first — a plain loadMore()
-            // would be refused while pageError is still set.
-            onClick={() => onLoadMore({ force: true })}
-            disabled={isLoadingMore}
-          >
-            Retry
-          </Button>
+          <span className="text-xs text-muted-foreground">
+            {isInvalidCursor ? "Couldn't continue loading" : "Couldn't load more"}
+          </span>
+          {isInvalidCursor ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs"
+              onClick={() => onRecoverPagination?.()}
+              disabled={isRecovering || isLoadingMore || !onRecoverPagination}
+            >
+              {isRecovering ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+              Reload
+            </Button>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-xs"
+              // force: true clears the error guard first — a plain loadMore()
+              // would be refused while pageError is still set.
+              onClick={() => onLoadMore({ force: true })}
+              disabled={isLoadingMore || isRecovering}
+            >
+              Retry
+            </Button>
+          )}
         </div>
       ) : (
         <Button
@@ -110,7 +133,7 @@ function PaginationFooter({
           size="sm"
           className="h-8 w-full text-xs"
           onClick={() => onLoadMore()}
-          disabled={isLoadingMore}
+          disabled={isLoadingMore || isRecovering}
         >
           {isLoadingMore ? (
             <>
