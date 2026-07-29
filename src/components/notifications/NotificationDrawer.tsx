@@ -107,7 +107,10 @@ export function NotificationDrawer() {
   // flight; offering a button that can only reply with a toast is worse than
   // disabling it.
   const canMarkAll =
-    !markAllPending && !markingAsRead && (loadedUnreadCount > 0 || (unreadCount ?? 0) > 0);
+    !markAllPending &&
+    !markingAsRead &&
+    !isRecovering &&
+    (loadedUnreadCount > 0 || (unreadCount ?? 0) > 0);
   const showMarkAll = markAllPending || loadedUnreadCount > 0 || (unreadCount ?? 0) > 0;
 
   // The mismatch notice is only honest when the count is fully authoritative:
