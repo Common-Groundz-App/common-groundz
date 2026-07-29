@@ -153,8 +153,12 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     hasLoadedRef.current = false;
     pendingReadIdsRef.current.clear();
     markAllPendingRef.current = false;
+    isRecoveringRef.current = false;
     countRefetchQueuedRef.current = false;
     cursorRef.current = null;
+    // Revoke page ownership outright. The obsolete request still in flight can
+    // no longer release it, because its token no longer matches.
+    pageOwnerRef.current = null;
     setPendingReadOps(0);
     setMarkAllPending(false);
     setNotifications([]);
@@ -166,6 +170,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     setCountStatus('idle');
     setHasMore(false);
     setIsLoadingMore(false);
+    setIsRecovering(false);
     setPageError(null);
   }, [user?.id]);
 
