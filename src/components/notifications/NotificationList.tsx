@@ -161,6 +161,8 @@ export function NotificationList({
   isLoadingMore = false,
   pageError = null,
   onLoadMore,
+  onRecoverPagination,
+  isRecovering = false,
   showCountMismatch = false,
   unloadedUnreadMessage = null,
 }: NotificationListProps) {
