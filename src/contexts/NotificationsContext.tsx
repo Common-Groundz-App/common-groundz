@@ -40,6 +40,8 @@ type NotificationsData = Pick<
   | 'isLoadingMore'
   | 'pageError'
   | 'loadMore'
+  | 'recoverPagination'
+  | 'isRecovering'
   | 'fetchAll'
 >;
 
