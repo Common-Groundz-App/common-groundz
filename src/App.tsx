@@ -50,6 +50,8 @@ import ScrollToTop from '@/components/ScrollToTop';
 import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
 import { AuthPromptProvider } from '@/contexts/AuthPromptContext';
+import { NotificationsProvider } from '@/contexts/NotificationsContext';
+import { NotificationDrawer } from '@/components/notifications/NotificationDrawer';
 import { networkStatusService } from '@/services/networkStatusService';
 import PrewarmFlagBridge from '@/components/system/PrewarmFlagBridge';
 
