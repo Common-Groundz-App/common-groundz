@@ -5,9 +5,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfileAvatar } from "@/components/common/ProfileAvatar";
-import { Notification } from "@/services/notificationService";
+import { Notification, type PageError } from "@/services/notificationService";
 import { formatNotificationTime } from "@/utils/dateUtils";
-import type { PageError } from "@/hooks/useNotifications";
 
 interface NotificationListProps {
   notifications: Notification[];

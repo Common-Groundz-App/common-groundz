@@ -4,6 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 export type NotificationType = 'like' | 'comment' | 'follow' | 'system' | 'journey_watched' | 'journey_digest';
 export type EntityType = 'post' | 'recommendation' | 'review' | 'profile' | 'system' | 'journey';
 
+/** Status of the global unread count, tracked separately from list loading so a
+ *  count failure never renders list-level error UI. */
+export type CountStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+/** Pagination-specific failure. Never conflated with the fetch error channel.
+ *  Declared here (not in the hook) so presentational components can type against
+ *  it without importing the provider-only hook module. */
+export type PageError = 'invalid-cursor' | 'network' | null;
+
 export interface Notification {
   id: string;
   user_id: string;
