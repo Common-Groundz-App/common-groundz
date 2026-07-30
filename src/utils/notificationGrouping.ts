@@ -147,33 +147,86 @@ export const groupNotifications = (
   return out;
 };
 
-/**
- * Group copy WITHOUT identity parsing and WITHOUT profile lookups.
+/* ------------------------------------------------------------------------ *
+ * Copy
  *
- * The helper is pure and only has sender ids, so it never claims display names.
- * It reuses the representative's own title verbatim and appends a distinct-actor
- * remainder. Returns `null` for singletons, whose copy must stay byte-identical
- * to today's rendering.
- */
-export const formatGroupSummary = (group: NotificationGroup): string | null => {
-  if (!group.isAggregated) return null;
+ * DB rows carry copy in two different shapes:
+ *   - mention / reply  → `title` is the sentence, `message` is the comment text
+ *   - like / comment   → `title` is a generic label ("New like"), `message` is
+ *                        the sentence
+ * The UI therefore never renders a generic header line; it renders the sentence
+ * as the primary line and the comment text (when there is one) as a preview.
+ * ------------------------------------------------------------------------ */
 
-  const others = Math.max(0, group.actorIds.length - 1);
-  // Duplicate events from a single actor (unlike / re-like, retries) must not
-  // render as "and 0 others".
-  if (others === 0) return null;
+const isSentenceTitleEvent = (n: Notification): boolean => {
+  const event = n.metadata?.event;
+  return event === 'mention' || event === 'reply';
+};
 
-  const title = group.representative.title?.trim();
-  if (title) {
-    return `${title} and ${others} ${others === 1 ? 'other' : 'others'}`;
+/** The single line a non-aggregated row shows. */
+export const formatSingleLine = (n: Notification): string => {
+  const title = n.title?.trim();
+  const message = n.message?.trim();
+  if (isSentenceTitleEvent(n)) return title || message || 'Notification';
+  return message || title || 'Notification';
+};
+
+/** Optional second line — comment/reply/mention content only. Never duplicates
+ *  the primary line. */
+export const getPreviewLine = (n: Notification): string | null => {
+  const primary = formatSingleLine(n);
+  const candidates = [
+    isSentenceTitleEvent(n) ? n.message : undefined,
+    typeof n.metadata?.comment_text === 'string' ? n.metadata.comment_text : undefined,
+  ];
+  for (const c of candidates) {
+    const text = c?.trim();
+    if (text && text !== primary) return text;
   }
-  return `${group.actorIds.length} people reacted`;
+  return null;
+};
+
+const targetNoun = (n: Notification): string =>
+  n.entity_type === 'recommendation' ? 'your recommendation' : 'your post';
+
+/**
+ * Primary line for a group.
+ *
+ * `names` are display names already resolved by the caller for the FIRST actors
+ * (in `group.actorIds` order). The "and N others" remainder is computed against
+ * distinct actors minus the names actually rendered, so it is never off by one
+ * and never claims a name we could not resolve.
+ */
+export const formatGroupPrimary = (
+  group: NotificationGroup,
+  names: string[] = []
+): string => {
+  if (!group.isAggregated) return formatSingleLine(group.representative);
+
+  const distinct = group.actorIds.length;
+  // Repeat events from one actor (unlike / re-like, retries) stay personal.
+  if (distinct <= 1) return formatSingleLine(group.representative);
+
+  const shown = names.filter((n) => !!n?.trim()).slice(0, 2);
+  const others = Math.max(0, distinct - shown.length);
+  const noun = targetNoun(group.representative);
+  const otherLabel = `${others} ${others === 1 ? 'other' : 'others'}`;
+
+  if (shown.length === 0) return `${distinct} people liked ${noun}`;
+  if (shown.length === 1) {
+    return others > 0
+      ? `${shown[0]} and ${otherLabel} liked ${noun}`
+      : formatSingleLine(group.representative);
+  }
+  return others > 0
+    ? `${shown[0]}, ${shown[1]} and ${otherLabel} liked ${noun}`
+    : `${shown[0]} and ${shown[1]} liked ${noun}`;
 };
 
 /** Aggregate-aware label so screen readers don't only hear the representative. */
-export const groupAriaLabel = (group: NotificationGroup): string => {
-  const summary = formatGroupSummary(group);
-  const base = summary ?? group.representative.title ?? 'Notification';
-  const message = group.representative.message?.trim();
-  return message ? `${base}. ${message}` : base;
+export const groupAriaLabel = (group: NotificationGroup, names: string[] = []): string => {
+  const base = formatGroupPrimary(group, names);
+  const preview = getPreviewLine(group.representative);
+  return preview ? `${base}. ${preview}` : base;
 };
+
