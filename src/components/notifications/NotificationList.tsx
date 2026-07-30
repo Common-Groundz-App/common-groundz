@@ -129,8 +129,9 @@ function NotificationRow({
   );
 }
 
-
+function NotificationRowSkeleton() {
   return (
+
     <div className="flex items-start gap-3 px-3 py-2.5">
       <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
       <div className="flex-1 space-y-2 py-0.5">
