@@ -19,7 +19,20 @@ export interface CommentData {
   is_from_circle?: boolean;
 }
 
-export const fetchComments = async (itemId: string, itemType: 'recommendation' | 'post', currentUserId?: string | null): Promise<CommentData[]> => {
+/**
+ * Load result contract: callers must be able to tell "the thread really is
+ * empty / this comment is gone" from "the request failed", otherwise a network
+ * blip renders a false "no longer available" message.
+ */
+export type CommentsLoadResult =
+  | { status: 'ok'; comments: CommentData[] }
+  | { status: 'error'; comments: CommentData[] };
+
+export const fetchCommentsResult = async (
+  itemId: string,
+  itemType: 'recommendation' | 'post',
+  currentUserId?: string | null
+): Promise<CommentsLoadResult> => {
   try {
     const tableName = itemType === 'recommendation' ? 'recommendation_comments' : 'post_comments';
     const idField = itemType === 'recommendation' ? 'recommendation_id' : 'post_id';
@@ -38,7 +51,7 @@ export const fetchComments = async (itemId: string, itemType: 'recommendation' |
 
     if (error) throw error;
 
-    return Array.isArray(data) ? data.map(comment => {
+    const comments = Array.isArray(data) ? data.map(comment => {
       const displayName = [comment.first_name, comment.last_name].filter(Boolean).join(' ') || comment.username || 'Unknown user';
       return {
         id: comment.id,
@@ -58,11 +71,20 @@ export const fetchComments = async (itemId: string, itemType: 'recommendation' |
         is_from_circle: comment.is_from_circle || false,
       };
     }) : [];
+
+    return { status: 'ok', comments };
   } catch (error) {
     console.error(`Error fetching ${itemType} comments:`, error);
-    return [];
+    return { status: 'error', comments: [] };
   }
 };
+
+/** Legacy array-only wrapper — kept for existing callers. */
+export const fetchComments = async (itemId: string, itemType: 'recommendation' | 'post', currentUserId?: string | null): Promise<CommentData[]> => {
+  const { comments } = await fetchCommentsResult(itemId, itemType, currentUserId);
+  return comments;
+};
+
 
 export const fetchCommentCount = async (itemId: string, itemType: 'recommendation' | 'post') => {
   try {
