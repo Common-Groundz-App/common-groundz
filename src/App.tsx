@@ -253,6 +253,8 @@ function App() {
                 </Routes>
                 {/* The single app-wide notifications drawer. */}
                 <NotificationDrawer />
+                {/* The single app-wide content viewer modal. Do not mount elsewhere. */}
+                <ContentViewerModal />
                 </NotificationsProvider>
               </AuthPromptProvider>
               </AuthInitializer>
