@@ -52,6 +52,7 @@ import { Howl } from 'howler';
 import { AuthPromptProvider } from '@/contexts/AuthPromptContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { NotificationDrawer } from '@/components/notifications/NotificationDrawer';
+import ContentViewerModal from '@/components/content/ContentViewerModal';
 import { networkStatusService } from '@/services/networkStatusService';
 import PrewarmFlagBridge from '@/components/system/PrewarmFlagBridge';
 
@@ -253,6 +254,8 @@ function App() {
                 </Routes>
                 {/* The single app-wide notifications drawer. */}
                 <NotificationDrawer />
+                {/* The single app-wide content viewer modal. Do not mount elsewhere. */}
+                <ContentViewerModal />
                 </NotificationsProvider>
               </AuthPromptProvider>
               </AuthInitializer>
