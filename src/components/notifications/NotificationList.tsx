@@ -223,12 +223,7 @@ export function NotificationList({
 
 
   return (
-    <div className="px-2 py-1">
-      {notifications.map((notification) => {
-        const timestamp = formatNotificationTime(notification.created_at);
 
-        return (
-  return (
     <div className="px-2 py-1">
       {groups.map((group) => {
         const { representative } = group;
