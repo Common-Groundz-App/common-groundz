@@ -9,10 +9,13 @@ import { Notification, type PageError } from "@/services/notificationService";
 import { formatNotificationTime } from "@/utils/dateUtils";
 import {
   groupNotifications,
-  formatGroupSummary,
+  formatGroupPrimary,
+  getPreviewLine,
   groupAriaLabel,
   type NotificationGroup,
 } from "@/utils/notificationGrouping";
+import { useProfile } from "@/hooks/use-profile-cache";
+
 
 interface NotificationListProps {
   notifications: Notification[];
