@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { Bell, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProfileAvatar } from "@/components/common/ProfileAvatar";
 import { Notification, type PageError } from "@/services/notificationService";
 import { formatNotificationTime } from "@/utils/dateUtils";
+import {
+  groupNotifications,
+  formatGroupSummary,
+  groupAriaLabel,
+  type NotificationGroup,
+} from "@/utils/notificationGrouping";
 
 interface NotificationListProps {
   notifications: Notification[];
   loading: boolean;
-  onNotificationClick: (notification: Notification, event: React.MouseEvent) => void;
+  /** Receives the whole group. Singletons arrive as a 1-event group, so the
+   *  drawer has one code path for both. */
+  onNotificationClick: (group: NotificationGroup, event: React.MouseEvent) => void;
   emptyMessage?: string;
   emptyIcon?: React.ElementType;
   hasError?: boolean;
@@ -28,6 +36,7 @@ interface NotificationListProps {
   /** True only when the global count is authoritative AND exceeds what's loaded. */
   showCountMismatch?: boolean;
 }
+
 
 
 function NotificationRowSkeleton() {
