@@ -44,8 +44,21 @@ The `ContentViewerModal` / `ContentViewerContext` surface is deleted. Notificati
 | Unsafe `action_url` | none | `unsafe-url` toast | n/a | n/a |
 
 
+## Phase 2.3 — Aggregation and grouping (v1: likes only)
+
+Render-time only. `src/utils/notificationGrouping.ts` is a pure transform over the rows a lane has already loaded — no schema change, no new fetches, no new state.
+
+- **Eligibility:** top-level `like` rows on `post` / `recommendation` with a valid uuid `entity_id` and **no** `metadata.comment_id`. Comments, replies, mentions, comment likes, follows and system rows always render as singletons, because each has its own `?commentId` destination.
+- **Bounding:** children must be **contiguous** in the loaded list AND within a 24h window anchored on the group's newest child (no transitive chaining). A non-matching row breaks the run, so the feed is never reordered. Unparseable timestamps never aggregate.
+- **Copy:** the representative's own title plus "and N others", where N counts *distinct* actors minus the representative. No profile fetches and no name parsing — the helper only has sender ids. Duplicate events from one actor render as a plain singleton-style title (never "and 0 others").
+- **Identity:** group key is `${type}|${entity_type}|${entity_id}|${representativeId}`, unique even if the same target appears twice in one page.
+- **Interaction:** `NotificationList` passes the whole group to `onNotificationClick` (singletons arrive as 1-event groups). The drawer marks every unread child in a single `markAsRead(ids)` call and navigates via the representative's destination — valid because a group shares one target by construction.
+- **Visuals:** up to 3 stacked `ProfileAvatar`s (existing cache, no extra requests) plus an event-count chip. Singleton rendering is unchanged.
+- **Invariant:** unread counts, the mismatch banner and pagination stay **event-based** over flat server rows. Group counts are presentation only.
+- **Tests:** `src/utils/notificationGrouping.test.ts` — 20 cases covering eligibility, adjacency, the window anchor, and total/unread event-count preservation.
+
 ## Next
 
-- **Phase 2.3 — Grouping and digests:** collapse "X and 4 others liked your post"; per-type preferences.
+- **Phase 2.3b — Preferences:** per-type notification preferences (deferred from 2.3).
 - **Phase 2.4 — Realtime:** Supabase realtime inserts into the head window instead of polling.
 - **Phase 2.5 — Coverage:** emit review and journey notifications once those surfaces exist, then extend the resolver's allowlist.

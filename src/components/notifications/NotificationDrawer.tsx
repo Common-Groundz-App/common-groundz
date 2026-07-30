@@ -8,9 +8,10 @@ import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
 import { LastUpdatedIndicator } from '@/components/ui/LastUpdatedIndicator';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { Notification } from '@/services/notificationService';
-import { resolveNotificationDestination } from '@/utils/notificationDestination';
+import { resolveNotificationDestination, destinationUnavailableMessage } from '@/utils/notificationDestination';
+import type { NotificationGroup } from '@/utils/notificationGrouping';
 import { NotificationList } from './NotificationList';
+
 
 
 /**
@@ -57,19 +58,23 @@ export function NotificationDrawer() {
   }, [isNotificationsOpen, activeTab, setUnreadLaneActive]);
 
 
-  const handleNotificationClick = React.useCallback((notification: Notification, event: React.MouseEvent) => {
+  const handleNotificationClick = React.useCallback((group: NotificationGroup, event: React.MouseEvent) => {
     event.preventDefault();
 
     // Fire-and-forget: the hook applies the read state optimistically (with
     // rollback on failure), so navigation must never wait on the network.
     // Read state is independent of whether the target still exists.
-    if (!notification.is_read) {
-      void markAsRead([notification.id]);
+    // A group marks EVERY unread child in one call — the visible row stands in
+    // for all of its events, so leaving siblings unread would be a lie.
+    if (group.unreadEventIds.length > 0) {
+      void markAsRead(group.unreadEventIds);
     }
 
     closeNotifications();
 
-    const destination = resolveNotificationDestination(notification);
+    // Aggregated groups share one target by construction, so the
+    // representative's destination is correct for the whole group.
+    const destination = resolveNotificationDestination(group.representative);
 
     if (destination.kind === 'route') {
       navigate(destination.path);
@@ -77,14 +82,10 @@ export function NotificationDrawer() {
     }
 
     toast({
-      description:
-        destination.reason === 'unsafe-url'
-          ? "This notification's link couldn't be opened safely"
-          : destination.reason === 'unsupported-type'
-            ? "This kind of notification can't be opened yet"
-            : "This notification doesn't have any associated content",
+      description: destinationUnavailableMessage(destination.reason),
     });
   }, [navigate, toast, closeNotifications, markAsRead]);
+
 
 
   // Both derive from the ALL lane's fetch-only error channel, so a failed
