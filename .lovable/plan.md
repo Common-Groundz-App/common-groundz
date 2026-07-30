@@ -1,57 +1,60 @@
 ## Verdict
 
-Yes, both of Codex's additions are correct and small. I'm folding them in.
+Accept. I verified the claim in `supabase/migrations/20260401105731_*.sql` and it's correct — my proposed predicate would have mis-rendered every comment-like.
 
-- **Validate `sender_id` before aggregating.** Confirmed in `src/utils/notificationGrouping.ts`: `isGroupableNotification` validates `type`, `entity_type`, `entity_id` and the absence of `comment_id`, but never checks `sender_id`. `finalize()` then builds `actorIds` by filtering on `row.sender_id`, so two senderless like rows on the same target would aggregate into a group with an empty `actorIds` array — no names, no avatars, and a nonsense sentence. Guard it at eligibility.
-- **Derive "others" from distinct actors minus names actually rendered.** Not from the two name slots and definitely not from `eventIds.length` (that's the event count, which is exactly what makes the current `15` / `25` chips misleading).
+`toggle_comment_like` inserts:
+```sql
+'comment',                                              -- type
+liker_username || ' liked your comment',                -- title
+'',                                                     -- message (empty)
+jsonb_build_object('event','like','comment_id', ...)    -- metadata
+```
 
-## The fix
+So the emitted shape is `type='comment'` + `metadata.event='like'`, **not** `type='like'`. My branch `type === 'like' && metadata.comment_id` would never match it, and the next branch (`type === 'comment'`) would render "Linda Williams commented on your post" for a comment like. Also confirmed `notificationDestination.test.ts:94` uses the legacy `metadata.event === 'comment_like'` shape, so both must be recognized.
 
-**1. Event-aware primary line.**
-I verified in `supabase/migrations/20260730064207_*.sql` that mentions insert `title = '<user> mentioned you'` with `message = LEFT(comment_text, 200)`, and replies insert `title = '<user> replied to your comment'` with `message = LEFT(reply_text, 200)`. So `message` cannot blindly become the primary line. A pure formatter picks per event:
+The wording note is also fair — I'll say the row is not cleared or skeletoned during resolution, not that its height is literally fixed.
 
-| Event | Primary line | Second line |
-|---|---|---|
-| Like on post/recommendation | `linda_williamss liked your post` (`message`) | — |
-| Comment on post/recommendation | `dhanuu commented on your post` (`message`) | — |
-| Mention (`metadata.event === 'mention'`) | `linda_williamss mentioned you` (`title`) | comment text preview, 2-line clamp |
-| Reply (`metadata.event === 'reply'`) | `linda_williamss replied to your comment` (`title`) | reply text preview, 2-line clamp |
-| Comment like | `linda_williamss liked your comment` (`title`) | — |
-| Follow / system / other | first non-empty of `message`, then `title` | — |
+## The one correction
 
-"New like" / "New comment" never render as visible text again. Both fields empty → neutral "New notification" rather than a blank row.
+**Comment-like predicate** — a shape-tolerant helper, evaluated before the plain-comment branch:
 
-**2. Named grouped copy, from the already-warm cache.**
-`ProfileAvatar` subscribes to `['profile', userId]` via `useProfile`. The extracted `NotificationRow` subscribes to the *same* key for the first two actor ids, so React Query dedupes — no new request, no second cache path. Fixed hook count (two `useProfile` calls, undefined-safe), never in a loop, so hook order stays stable.
+```ts
+const isCommentLike = (n) =>
+  !!n.metadata?.comment_id && (
+    (n.type === 'comment' && n.metadata.event === 'like') ||   // current DB shape
+    n.metadata.event === 'comment_like' ||                     // legacy/fixture
+    (n.type === 'like' && !!n.metadata.comment_id)             // defensive
+  );
+```
 
-Remainder = `actorIds.length − (names actually rendered)`:
+Final precedence, first match wins:
+```
+1. metadata.event === 'mention'   → {name} mentioned you
+2. metadata.event === 'reply'     → {name} replied to your comment
+3. isCommentLike(n)               → {name} liked your comment
+4. type === 'comment'             → {name} commented on your post|recommendation
+5. type === 'like'                → {name} liked your post|recommendation
+6. type === 'follow'              → {name} followed you
+7. otherwise                      → message || title || 'New notification'
+```
+Mention and reply claim their rows before step 3, so a mention carrying `comment_id` can never become a comment-like.
 
-| Distinct actors | Names resolved | Sentence |
-|---|---|---|
-| 2 | 2 | `linda_williamss and hana.li liked your post` |
-| 5 | 2 | `linda_williamss, hana.li and 3 others liked your post` |
-| 5 | 1 | `linda_williamss and 4 others liked your post` |
-| 5 | 0 | `5 people liked your post` |
+Note the comment-like row stores its sentence in `title` with an empty `message`, so the unresolved-profile fallback must prefer the first non-empty of `message` then `title` — the existing `formatSingleLine` already does this correctly.
 
-The trailing phrase derives from `entity_type` (`your post` / `your recommendation`); anything unrecognised falls back to the representative's `message`. Names come from `profile.username` (falling back to `displayName`) to match what the triggers already stored — a deliberate, notification-scoped exception to the app-wide displayName rule, commented so it isn't "corrected" later.
+## Everything else, as previously approved
 
-While profiles load, the row shows the neutral `5 people liked your post` and swaps to names on resolve. The avatars beside it are already skeleton-loading in that same instant, so the transition reads as the row settling rather than as a copy glitch.
+- **Sender guard:** `isGroupableNotification` additionally requires a UUID-valid `sender_id`. Senderless likes render as singletons.
+- **Name resolution:** `displayName`, then `username`, only when `profile.id === actorId` and the value isn't a fallback sentinel (`Anonymous User`). Otherwise `null` → stored DB sentence.
+- **Grouped likes:** 2 / 3+ / 1 / 0 resolved-name shapes; remainder computed from distinct actors minus names actually rendered.
+- **Structure:** `notificationGrouping.ts` stays pure. `NotificationRow` makes two fixed `useProfile` calls on the existing `['profile', id]` key — same hook, no new fetch path; React Query dedupes against `ProfileAvatar`'s concurrent subscription rather than guaranteeing a pure cache hit.
+- **Loading:** no skeleton, no row clearing — the stored sentence renders and the resolved-name sentence swaps in place. Natural re-wrapping is acceptable.
+- **`aria-label`** derives from the same final sentence plus preview; never reads "New like".
+- **Count chip** beside the timestamp stays removed.
 
-**3. Sender guard.**
-`isGroupableNotification` gains a `typeof n.sender_id === 'string' && UUID_RE.test(n.sender_id)` check. Senderless or malformed-sender likes render as singletons — the safe, existing behaviour. This is the one membership change in the plan, and it only ever *reduces* aggregation.
+## Tests (`notificationGrouping.test.ts`)
 
-**4. Count chip removed.**
-The `{group.eventIds.length}` span beside the timestamp goes away entirely. The count now lives in the sentence; the stacked avatars carry the visual signal.
-
-**5. Accessibility.**
-`aria-label` is composed from the same visible sentence plus the preview line when present. It never reads "New like".
-
-## Technical notes
-
-- `src/utils/notificationGrouping.ts` — stays pure, no fetching. Add the `sender_id` guard to `isGroupableNotification`. Replace `formatGroupSummary` with `formatGroupCopy(group, resolvedNames: string[])` returning `{ primary, preview }`, plus an event-aware singleton formatter. `groupAriaLabel` consumes the same output.
-- `src/utils/notificationGrouping.test.ts` — extend for: every event row in the table; 2/1/0 resolved names against 2 and 5 distinct actors; senderless likes staying singletons; unknown `entity_type`; empty `title` and `message`.
-- `src/components/notifications/NotificationList.tsx` — extract the row body into a `NotificationRow` component so it can call `useProfile` for the first two actors; render primary line + optional preview + timestamp; delete the count-chip span.
+Verified displayName; verified username fallback; sentinel rejected; mismatched `profile.id` rejected; each event-type line; **the real DB comment-like shape** (`type:'comment'`, `event:'like'`) → "liked your comment"; legacy `comment_like` shape → same; mention carrying `comment_id` → "mentioned you"; senderless like not grouped; grouped likes at 2 / 1 / 0 resolved names; empty title+message → `New notification`.
 
 ## Out of scope
 
-Strictly presentational. No changes to triggers, DB columns, notification lanes, unread counts, pagination, or click destinations. The only grouping-membership change is the sender-validity guard above.
+DB triggers and stored messages, lanes, unread counts, pagination, destinations, avatars, preview-line rules.
