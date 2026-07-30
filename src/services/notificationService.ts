@@ -408,8 +408,9 @@ export const markNotificationsAsRead = async (notificationIds: string[]): Promis
  *    only because the app has no mark-as-unread action; if that ever ships,
  *    replace this with row versioning.
  *  - rows only present in older loaded pages are preserved
- *  - de-duped by id, then sorted `created_at DESC, id DESC` (the id tiebreak
- *    matters — timestamps collide)
+ *  - de-duped by id, then sorted through `compareNotifications` — the single
+ *    ordering authority. Raw string comparison is NOT used: it would order by
+ *    timestamp formatting rather than by time.
  */
 export const mergeNotifications = (
   accumulated: Notification[],
@@ -424,10 +425,9 @@ export const mergeNotifications = (
     byId.set(row.id, existing ? { ...existing, ...row, is_read: existing.is_read || row.is_read } : row);
   });
 
-  return Array.from(byId.values()).sort((a, b) => {
-    if (a.created_at === b.created_at) return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
-    return a.created_at < b.created_at ? 1 : -1;
-  });
+  // Total comparator — safe inside a functional setState.
+  return Array.from(byId.values()).sort(compareNotifications);
+
 };
 
 
