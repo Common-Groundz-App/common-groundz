@@ -6,6 +6,7 @@ import RecommendationCard from '@/components/recommendations/RecommendationCard'
 import CommentsPreview from '@/components/comments/CommentsPreview';
 import CommentDialog from '@/components/comments/CommentDialog';
 import { Shell } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useSearchParams } from 'react-router-dom';
 import { useProfile } from '@/hooks/use-profile-cache';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
@@ -28,6 +29,7 @@ const RecommendationContentViewer = ({
   const [recommendation, setRecommendation] = React.useState<any>(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [reloadTick, setReloadTick] = React.useState(0);
   const [showComments, setShowComments] = React.useState(false);
   const [searchParams] = useSearchParams();
 
@@ -131,7 +133,7 @@ const RecommendationContentViewer = ({
     if (recommendationId) {
       fetchRecommendation();
     }
-  }, [recommendationId, user?.id]);
+  }, [recommendationId, user?.id, reloadTick]);
 
   // Update recommendation with profile data when available
   React.useEffect(() => {
@@ -179,10 +181,7 @@ const RecommendationContentViewer = ({
   
   
   const handleRefresh = () => {
-    if (recommendationId) {
-      setLoading(true);
-      setError(null);
-    }
+    if (recommendationId) setReloadTick(tick => tick + 1);
   };
 
   const handleCommentsClick = () => {
@@ -201,11 +200,23 @@ const RecommendationContentViewer = ({
   }
 
   if (error || !recommendation) {
+    const isTransient = error === 'transient';
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
-          <h3 className="font-medium mb-2">Content Not Available</h3>
-          <p className="text-muted-foreground text-sm">{error || 'This recommendation is no longer available'}</p>
+          <h3 className="font-medium mb-2">
+            {isTransient ? "Couldn't load this recommendation" : 'Content Not Available'}
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            {isTransient
+              ? 'Something went wrong while loading. Please try again.'
+              : 'This content is no longer available'}
+          </p>
+          {isTransient && (
+            <Button variant="outline" size="sm" className="mt-3" onClick={handleRefresh}>
+              Retry
+            </Button>
+          )}
         </div>
       </div>
     );
