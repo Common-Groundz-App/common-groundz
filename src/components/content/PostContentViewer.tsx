@@ -163,10 +163,12 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
           venue: e.venue,
         })),
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching post:', err);
-      setError('Error loading post');
+      // PGRST116 = no rows returned; anything else is treated as transport.
+      setError(err?.code === 'PGRST116' ? 'not-found' : 'transient');
       onPostLoaded?.(null);
+
     } finally {
       setLoading(false);
     }
