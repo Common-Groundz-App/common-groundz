@@ -9,10 +9,13 @@ import { Notification, type PageError } from "@/services/notificationService";
 import { formatNotificationTime } from "@/utils/dateUtils";
 import {
   groupNotifications,
-  formatGroupSummary,
+  formatGroupPrimary,
+  getPreviewLine,
   groupAriaLabel,
   type NotificationGroup,
 } from "@/utils/notificationGrouping";
+import { useProfile } from "@/hooks/use-profile-cache";
+
 
 interface NotificationListProps {
   notifications: Notification[];
@@ -39,8 +42,96 @@ interface NotificationListProps {
 
 
 
+/**
+ * One rendered group.
+ *
+ * Extracted into its own component so it can call `useProfile` for the first
+ * two actors — hooks can't run inside a `.map()` in the parent. Those lookups
+ * are the SAME react-query keys `ProfileAvatar` already uses (`['profile', id]`),
+ * so naming an actor costs no extra request.
+ */
+function NotificationRow({
+  group,
+  onNotificationClick,
+}: {
+  group: NotificationGroup;
+  onNotificationClick: (group: NotificationGroup, event: React.MouseEvent) => void;
+}) {
+  const { representative } = group;
+  // Only aggregated rows need names; singletons already carry a full sentence.
+  const needsNames = group.isAggregated && group.actorIds.length > 1;
+  const { data: actorA } = useProfile(needsNames ? group.actorIds[0] : undefined);
+  const { data: actorB } = useProfile(needsNames ? group.actorIds[1] : undefined);
+
+  const names = needsNames
+    ? [actorA?.displayName, actorB?.displayName].filter((n): n is string => !!n?.trim())
+    : [];
+
+  const primary = formatGroupPrimary(group, names);
+  const preview = getPreviewLine(representative);
+  const timestamp = formatNotificationTime(representative.created_at);
+  // Stacked avatars are capped at 3.
+  const stackedActorIds = group.actorIds.slice(0, 3);
+
+  return (
+    <button
+      onClick={(e) => onNotificationClick(group, e)}
+      aria-label={groupAriaLabel(group, names)}
+      className={cn(
+        "w-full text-left px-3 py-2.5 rounded-lg transition-all duration-200",
+        "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        group.isUnread && "bg-primary/5"
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {stackedActorIds.length > 0 ? (
+          <div className="flex shrink-0 -space-x-2">
+            {stackedActorIds.map((actorId) => (
+              <ProfileAvatar
+                key={actorId}
+                userId={actorId}
+                size="sm"
+                className="h-9 w-9 shrink-0 ring-2 ring-background rounded-full"
+              />
+            ))}
+          </div>
+        ) : (
+          <div
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+            aria-hidden="true"
+          >
+            <Bell className="h-4 w-4" />
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p
+            className={cn(
+              "text-sm leading-5 text-foreground",
+              group.isUnread && "font-medium"
+            )}
+          >
+            {primary}
+          </p>
+          {preview && (
+            <p className="text-xs text-muted-foreground mt-0.5 break-words line-clamp-2">
+              {preview}
+            </p>
+          )}
+          {timestamp && (
+            <p className="text-[11px] text-muted-foreground/75 mt-1">{timestamp}</p>
+          )}
+        </div>
+        {!group.isUnread && (
+          <Check className="w-4 h-4 text-primary/50 mt-1 shrink-0" />
+        )}
+      </div>
+    </button>
+  );
+}
+
 function NotificationRowSkeleton() {
   return (
+
     <div className="flex items-start gap-3 px-3 py-2.5">
       <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
       <div className="flex-1 space-y-2 py-0.5">
@@ -230,74 +321,14 @@ export function NotificationList({
   return (
 
     <div className="px-2 py-1">
-      {groups.map((group) => {
-        const { representative } = group;
-        const timestamp = formatNotificationTime(representative.created_at);
-        const summary = formatGroupSummary(group);
-        // Stacked avatars are capped at 3 — the count chip carries the rest.
-        const stackedActorIds = group.actorIds.slice(0, 3);
+      {groups.map((group) => (
+        <NotificationRow
+          key={group.key}
+          group={group}
+          onNotificationClick={onNotificationClick}
+        />
+      ))}
 
-        return (
-          <button
-            key={group.key}
-            onClick={(e) => onNotificationClick(group, e)}
-            aria-label={groupAriaLabel(group)}
-            className={cn(
-              "w-full text-left px-3 py-2.5 rounded-lg transition-all duration-200",
-              "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-              group.isUnread && "bg-primary/5"
-            )}
-          >
-            <div className="flex items-start gap-3">
-              {stackedActorIds.length > 0 ? (
-                <div className="flex shrink-0 -space-x-2">
-                  {stackedActorIds.map((actorId) => (
-                    <ProfileAvatar
-                      key={actorId}
-                      userId={actorId}
-                      size="sm"
-                      className="h-9 w-9 shrink-0 ring-2 ring-background rounded-full"
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
-                  aria-hidden="true"
-                >
-                  <Bell className="h-4 w-4" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className={cn(
-                  "text-sm leading-5 text-foreground",
-                  group.isUnread && "font-medium"
-                )}>
-                  {summary ?? representative.title}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5 break-words">
-                  {representative.message}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  {timestamp && (
-                    <p className="text-[11px] text-muted-foreground/75">
-                      {timestamp}
-                    </p>
-                  )}
-                  {group.isAggregated && (
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                      {group.eventIds.length}
-                    </span>
-                  )}
-                </div>
-              </div>
-              {!group.isUnread && (
-                <Check className="w-4 h-4 text-primary/50 mt-1 shrink-0" />
-              )}
-            </div>
-          </button>
-        );
-      })}
 
       {onLoadMore && (
         <PaginationFooter

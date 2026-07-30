@@ -8,7 +8,9 @@
 import type { Notification } from '@/services/notificationService';
 import {
   GROUP_WINDOW_MS,
-  formatGroupSummary,
+  formatGroupPrimary,
+  getPreviewLine,
+
   groupNotifications,
   isGroupableNotification,
 } from './notificationGrouping';
@@ -143,24 +145,59 @@ if (typeof describe === 'function' && typeof it === 'function' && typeof expect 
     });
   });
 
-  describe('formatGroupSummary — copy without identity lookups', () => {
-    it('returns null for singletons (copy stays unchanged)', () => {
-      expect(formatGroupSummary(groupNotifications([row()])[0])).toBeNull();
+  describe('formatGroupPrimary — event-aware, name-aware copy', () => {
+    it('uses the sentence (message) for singleton likes', () => {
+      const g = groupNotifications([row({ message: 'linda liked your post' })])[0];
+      expect(formatGroupPrimary(g)).toBe('linda liked your post');
     });
 
-    it('returns null when all events share one actor', () => {
-      const groups = groupNotifications([row({ sender_id: 'same' }), row({ sender_id: 'same' })]);
-      expect(formatGroupSummary(groups[0])).toBeNull();
+    it('uses the title for mentions (title carries the sentence there)', () => {
+      const g = groupNotifications([
+        row({ type: 'comment', title: 'linda mentioned you', message: 'hey @me', metadata: { event: 'mention' } }),
+      ])[0];
+      expect(formatGroupPrimary(g)).toBe('linda mentioned you');
+      expect(getPreviewLine(g.representative)).toBe('hey @me');
     });
 
-    it('appends the distinct-actor remainder', () => {
-      const groups = groupNotifications([row(), row(), row()]);
-      expect(formatGroupSummary(groups[0])).toBe('Someone liked your post and 2 others');
+    it('falls back to the single sentence when all events share one actor', () => {
+      const groups = groupNotifications([
+        row({ sender_id: 'same', message: 'linda liked your post' }),
+        row({ sender_id: 'same', message: 'linda liked your post' }),
+      ]);
+      expect(formatGroupPrimary(groups[0])).toBe('linda liked your post');
     });
 
-    it('singularises one other', () => {
+    it('names two actors when both resolve', () => {
       const groups = groupNotifications([row(), row()]);
-      expect(formatGroupSummary(groups[0])).toBe('Someone liked your post and 1 other');
+      expect(formatGroupPrimary(groups[0], ['linda', 'hana'])).toBe('linda and hana liked your post');
+    });
+
+    it('adds the others remainder against distinct actors', () => {
+      const groups = groupNotifications([row(), row(), row(), row(), row()]);
+      expect(formatGroupPrimary(groups[0], ['linda', 'hana'])).toBe(
+        'linda, hana and 3 others liked your post'
+      );
+    });
+
+    it('singularises one other with a single resolved name', () => {
+      const groups = groupNotifications([row(), row()]);
+      expect(formatGroupPrimary(groups[0], ['linda'])).toBe('linda and 1 other liked your post');
+    });
+
+    it('degrades to a countable sentence when no name resolves', () => {
+      const groups = groupNotifications([row(), row(), row()]);
+      expect(formatGroupPrimary(groups[0], [])).toBe('3 people liked your post');
+    });
+
+    it('uses the recommendation noun', () => {
+      const groups = groupNotifications([
+        row({ entity_type: 'recommendation', entity_id: POST_B }),
+        row({ entity_type: 'recommendation', entity_id: POST_B }),
+      ]);
+      expect(formatGroupPrimary(groups[0], ['linda', 'hana'])).toBe(
+        'linda and hana liked your recommendation'
+      );
     });
   });
+
 }
