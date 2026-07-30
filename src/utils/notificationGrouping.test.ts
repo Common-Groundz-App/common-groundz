@@ -8,7 +8,9 @@
 import type { Notification } from '@/services/notificationService';
 import {
   GROUP_WINDOW_MS,
-  formatGroupSummary,
+  formatGroupPrimary,
+  getPreviewLine,
+
   groupNotifications,
   isGroupableNotification,
 } from './notificationGrouping';
