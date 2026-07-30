@@ -169,8 +169,8 @@ if (typeof describe === 'function' && typeof it === 'function' && typeof expect 
 
     it('falls back to the single sentence when all events share one actor', () => {
       const groups = groupNotifications([
-        row({ sender_id: 'same', message: 'linda liked your post' }),
-        row({ sender_id: 'same', message: 'linda liked your post' }),
+        row({ sender_id: ACTOR_A, message: 'linda liked your post' }),
+        row({ sender_id: ACTOR_A, message: 'linda liked your post' }),
       ]);
       expect(formatGroupPrimary(groups[0])).toBe('linda liked your post');
     });
