@@ -281,16 +281,15 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const loadComments = async () => {
     if (!itemId) return;
     setIsLoading(true);
-    try {
-      const commentData = await fetchComments(itemId, itemType, user?.id);
-      setComments(commentData);
-      onCommentCountChange?.(commentData.length);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-    } finally {
-      setIsLoading(false);
+    const result = await fetchCommentsResult(itemId, itemType, user?.id);
+    setLoadStatus(result.status);
+    if (result.status === 'ok') {
+      setComments(result.comments);
+      onCommentCountChange?.(result.comments.length);
     }
+    setIsLoading(false);
   };
+
 
   const handleAddComment = async () => {
     if (!requireAuth({ action: 'comment', surface: 'inline_comment_thread' })) return;
