@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
-import { fetchComments, addComment, deleteComment, updateComment, toggleCommentLike, fetchCommentUserReputations, CommentData } from '@/services/commentsService';
+import { fetchCommentsResult, addComment, deleteComment, updateComment, toggleCommentLike, fetchCommentUserReputations, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { MessageCircle, ArrowUp, User, ArrowUpDown } from 'lucide-react';
@@ -53,6 +53,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const [comments, setComments] = useState<CommentData[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadStatus, setLoadStatus] = useState<'ok' | 'error'>('ok');
   const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -281,16 +282,15 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const loadComments = async () => {
     if (!itemId) return;
     setIsLoading(true);
-    try {
-      const commentData = await fetchComments(itemId, itemType, user?.id);
-      setComments(commentData);
-      onCommentCountChange?.(commentData.length);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-    } finally {
-      setIsLoading(false);
+    const result = await fetchCommentsResult(itemId, itemType, user?.id);
+    setLoadStatus(result.status);
+    if (result.status === 'ok') {
+      setComments(result.comments);
+      onCommentCountChange?.(result.comments.length);
     }
+    setIsLoading(false);
   };
+
 
   const handleAddComment = async () => {
     if (!requireAuth({ action: 'comment', surface: 'inline_comment_thread' })) return;
@@ -578,6 +578,15 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
         )}
       </div>
 
+      {/* Highlighted comment that no longer exists — only claimed when the
+          load actually succeeded, never on a transport failure. */}
+      {!isLoading && loadStatus === 'ok' && highlightCommentId &&
+        !comments.some(c => c.id === highlightCommentId) && (
+        <div className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          That comment is no longer available.
+        </div>
+      )}
+
       {/* Comment List */}
       {isLoading ? (
         <div className="space-y-3">
@@ -591,7 +600,15 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
             </div>
           ))}
         </div>
+      ) : loadStatus === 'error' ? (
+        <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+          <p className="text-sm text-muted-foreground">Couldn't load comments.</p>
+          <Button variant="outline" size="sm" onClick={() => loadComments()}>
+            Retry
+          </Button>
+        </div>
       ) : comments.length === 0 ? (
+
         /* #6: Community-driven empty state */
         <div className="flex flex-col items-center justify-center py-10 text-center">
           <div className="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">

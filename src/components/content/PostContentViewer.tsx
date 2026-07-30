@@ -54,6 +54,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
   const fetchPost = React.useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       
       const { data, error } = await supabase
         .from('posts')
@@ -63,13 +64,15 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         `)
         .eq('id', postId)
         .eq('is_deleted', false)
-        .single();
+        .maybeSingle();
         
       if (error) throw error;
       if (!data) {
-        setError('Post not found or has been deleted');
+        // Confirmed absent (deleted or RLS-hidden) — not a transport failure.
+        setError('not-found');
         onPostLoaded?.(null);
         return;
+
       }
       
       const { count: likeCount } = await supabase
@@ -160,10 +163,12 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
           venue: e.venue,
         })),
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching post:', err);
-      setError('Error loading post');
+      // PGRST116 = no rows returned; anything else is treated as transport.
+      setError(err?.code === 'PGRST116' ? 'not-found' : 'transient');
       onPostLoaded?.(null);
+
     } finally {
       setLoading(false);
     }
@@ -314,15 +319,28 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
   }
 
   if (error || !post) {
+    const isTransient = error === 'transient';
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
-          <h3 className="font-medium mb-2">Content Not Available</h3>
-          <p className="text-muted-foreground text-sm">{error || 'This post is no longer available'}</p>
+          <h3 className="font-medium mb-2">
+            {isTransient ? "Couldn't load this post" : 'Content Not Available'}
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            {isTransient
+              ? 'Something went wrong while loading. Please try again.'
+              : 'This content is no longer available'}
+          </p>
+          {isTransient && (
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => fetchPost()}>
+              Retry
+            </Button>
+          )}
         </div>
       </div>
     );
   }
+
 
   const handleBack = () => {
     if (window.history.length > 1) {
