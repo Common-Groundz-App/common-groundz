@@ -107,10 +107,11 @@ export const normalizeInternalPath = (raw: unknown): string | null => {
   return search ? `${pathname}?${search}` : pathname;
 };
 
-type ResolverInput = Pick<
+export type NotificationDestinationInput = Pick<
   Notification,
   'type' | 'entity_type' | 'entity_id' | 'action_url' | 'sender_id'
 > & { metadata?: Record<string, any> | null };
+
 
 /**
  * Structured entity fields take precedence over the stored `action_url`, which
