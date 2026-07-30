@@ -29,7 +29,6 @@ interface NotificationListProps {
   showCountMismatch?: boolean;
   /** Rendered instead of the plain empty state on the Unread tab when older
    *  unread rows exist but haven't been paged in yet. */
-  unloadedUnreadMessage?: string | null;
 }
 
 function NotificationRowSkeleton() {
@@ -164,7 +163,6 @@ export function NotificationList({
   onRecoverPagination,
   isRecovering = false,
   showCountMismatch = false,
-  unloadedUnreadMessage = null,
 }: NotificationListProps) {
   // Initial load only — background polling never renders skeletons over existing rows
   if (loading && notifications.length === 0) {
