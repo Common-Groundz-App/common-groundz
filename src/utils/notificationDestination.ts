@@ -7,6 +7,7 @@
  */
 
 import type { Notification } from '@/services/notificationService';
+import { buildContentPath, isRoutableContentType } from '@/utils/contentRoutes';
 
 /** Never emitted — only used so `new URL()` has something to resolve against. */
 const PARSE_ORIGIN = 'http://internal.invalid';
@@ -19,17 +20,12 @@ const USERNAME_RE = /^[a-zA-Z0-9._-]{1,30}$/;
 const UNSAFE_CHARS_RE = /[\u0000-\u001f\u007f\\]/;
 
 export type NotificationDestination =
-  | {
-      kind: 'viewer';
-      contentType: 'post' | 'recommendation';
-      id: string;
-      commentId: string | null;
-    }
   | { kind: 'route'; path: string }
   | {
       kind: 'none';
       reason: 'missing-target' | 'unsupported-type' | 'unsafe-url';
     };
+
 
 /** RFC-shaped, version-agnostic (matches the app's own `generateUUID()`). */
 export const isUuid = (value: unknown): value is string =>
