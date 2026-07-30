@@ -12,6 +12,7 @@ import {
   formatGroupPrimary,
   getPreviewLine,
   groupAriaLabel,
+  resolveActorName,
   type NotificationGroup,
 } from "@/utils/notificationGrouping";
 import { useProfile } from "@/hooks/use-profile-cache";
