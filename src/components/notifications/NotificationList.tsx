@@ -228,22 +228,38 @@ export function NotificationList({
         const timestamp = formatNotificationTime(notification.created_at);
 
         return (
+  return (
+    <div className="px-2 py-1">
+      {groups.map((group) => {
+        const { representative } = group;
+        const timestamp = formatNotificationTime(representative.created_at);
+        const summary = formatGroupSummary(group);
+        // Stacked avatars are capped at 3 — the count chip carries the rest.
+        const stackedActorIds = group.actorIds.slice(0, 3);
+
+        return (
           <button
-            key={notification.id}
-            onClick={(e) => onNotificationClick(notification, e)}
+            key={group.key}
+            onClick={(e) => onNotificationClick(group, e)}
+            aria-label={groupAriaLabel(group)}
             className={cn(
               "w-full text-left px-3 py-2.5 rounded-lg transition-all duration-200",
               "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
-              !notification.is_read && "bg-primary/5"
+              group.isUnread && "bg-primary/5"
             )}
           >
             <div className="flex items-start gap-3">
-              {notification.sender_id ? (
-                <ProfileAvatar
-                  userId={notification.sender_id}
-                  size="sm"
-                  className="h-9 w-9 shrink-0"
-                />
+              {stackedActorIds.length > 0 ? (
+                <div className="flex shrink-0 -space-x-2">
+                  {stackedActorIds.map((actorId) => (
+                    <ProfileAvatar
+                      key={actorId}
+                      userId={actorId}
+                      size="sm"
+                      className="h-9 w-9 shrink-0 ring-2 ring-background rounded-full"
+                    />
+                  ))}
+                </div>
               ) : (
                 <div
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
@@ -255,20 +271,27 @@ export function NotificationList({
               <div className="flex-1 min-w-0">
                 <p className={cn(
                   "text-sm leading-5 text-foreground",
-                  !notification.is_read && "font-medium"
+                  group.isUnread && "font-medium"
                 )}>
-                  {notification.title}
+                  {summary ?? representative.title}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5 break-words">
-                  {notification.message}
+                  {representative.message}
                 </p>
-                {timestamp && (
-                  <p className="text-[11px] text-muted-foreground/75 mt-1">
-                    {timestamp}
-                  </p>
-                )}
+                <div className="flex items-center gap-2 mt-1">
+                  {timestamp && (
+                    <p className="text-[11px] text-muted-foreground/75">
+                      {timestamp}
+                    </p>
+                  )}
+                  {group.isAggregated && (
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {group.eventIds.length}
+                    </span>
+                  )}
+                </div>
               </div>
-              {notification.is_read && (
+              {!group.isUnread && (
                 <Check className="w-4 h-4 text-primary/50 mt-1 shrink-0" />
               )}
             </div>
@@ -286,6 +309,7 @@ export function NotificationList({
           isRecovering={isRecovering}
         />
       )}
+
 
       {/* Only rendered when the count is fully authoritative — see the drawer's
           guard. A count failure must never produce alarming copy. */}
