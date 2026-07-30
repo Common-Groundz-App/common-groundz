@@ -9,8 +9,10 @@ import { LastUpdatedIndicator } from '@/components/ui/LastUpdatedIndicator';
 import { useContentViewer } from '@/contexts/ContentViewerContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { EntityType, Notification } from '@/services/notificationService';
+import { Notification } from '@/services/notificationService';
+import { resolveNotificationDestination } from '@/utils/notificationDestination';
 import { NotificationList } from './NotificationList';
+
 
 /**
  * The single app-wide notifications drawer. Rendered exactly once by App inside
