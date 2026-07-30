@@ -8,9 +8,10 @@ import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
 import { LastUpdatedIndicator } from '@/components/ui/LastUpdatedIndicator';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
-import { Notification } from '@/services/notificationService';
-import { resolveNotificationDestination } from '@/utils/notificationDestination';
+import { resolveNotificationDestination, destinationUnavailableMessage } from '@/utils/notificationDestination';
+import type { NotificationGroup } from '@/utils/notificationGrouping';
 import { NotificationList } from './NotificationList';
+
 
 
 /**
