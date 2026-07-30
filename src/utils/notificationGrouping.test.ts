@@ -9,8 +9,10 @@ import type { Notification } from '@/services/notificationService';
 import {
   GROUP_WINDOW_MS,
   formatGroupPrimary,
+  formatRowPrimary,
   getPreviewLine,
-
+  isCommentLike,
+  resolveActorName,
   groupNotifications,
   isGroupableNotification,
 } from './notificationGrouping';
@@ -18,17 +20,23 @@ import {
 const POST_A = '11111111-1111-4111-8111-111111111111';
 const POST_B = '22222222-2222-4222-8222-222222222222';
 const COMMENT_ID = '33333333-3333-4333-8333-333333333333';
+const ACTOR_A = '44444444-4444-4444-8444-444444444444';
+const ACTOR_B = '55555555-5555-4555-8555-555555555555';
 
 const BASE = Date.parse('2026-01-10T12:00:00.000Z');
 const at = (msAgo: number) => new Date(BASE - msAgo).toISOString();
 
 let seq = 0;
+/** Senders must be real UUIDs — the eligibility fence rejects anything else. */
+const sender = (n: number) =>
+  `66666666-6666-4666-8666-${String(n).padStart(12, '0')}`;
+
 const row = (over: Partial<Notification> = {}): Notification =>
   ({
     id: `n${++seq}`,
     user_id: 'u1',
     type: 'like',
-    sender_id: `s${seq}`,
+    sender_id: sender(seq),
     title: 'Someone liked your post',
     message: 'My post',
     entity_type: 'post',
