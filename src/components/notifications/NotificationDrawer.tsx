@@ -104,10 +104,11 @@ export function NotificationDrawer() {
     }
   }, [navigate, openContent, toast, closeNotifications, markAsRead]);
 
-  // Both derive from the fetch-only error channel, so a failed mark-as-read
-  // can never render refresh failure UI.
-  const hasError = Boolean(fetchError) && notifications.length === 0;
-  const hasStaleData = Boolean(fetchError) && notifications.length > 0;
+  // Both derive from the ALL lane's fetch-only error channel, so a failed
+  // mark-as-read can never render refresh failure UI.
+  const hasError = Boolean(all.fetchError) && notifications.length === 0;
+  const hasStaleData = Boolean(all.fetchError) && notifications.length > 0;
+  const unreadHasError = Boolean(unread.fetchError) && unreadNotifications.length === 0;
 
   // Server-side mark-all clears EVERY unread row, including ones older than the
   // pages loaded — hence the global-count arm. `markingAsRead` is included
@@ -121,24 +122,23 @@ export function NotificationDrawer() {
     (loadedUnreadCount > 0 || (unreadCount ?? 0) > 0);
   const showMarkAll = markAllPending || loadedUnreadCount > 0 || (unreadCount ?? 0) > 0;
 
-  // The mismatch notice is only honest when the count is fully authoritative:
-  // pagination exhausted, count ready (not loading/error/stale), and no mutation
-  // or pagination recovery in flight holding the count or the list mid-change.
+  // Mismatch is an UNREAD-lane statement: it compares the global count with the
+  // unread rows actually loaded, so it is only honest once the UNREAD lane is
+  // exhausted, its history is verified (not stale/revalidating), the count is
+  // ready, and nothing is mid-mutation or mid-recovery.
   const showCountMismatch =
-    !hasMore &&
+    activeTab === 'unread' &&
+    !unread.hasMore &&
+    !historyStale &&
+    !isRevalidating &&
     countStatus === 'ready' &&
     unreadCount !== null &&
     !markAllPending &&
     !markingAsRead &&
     !isRecovering &&
-    notifications.length > 0 &&
+    unreadNotifications.length > 0 &&
     unreadCount > loadedUnreadCount;
 
-  // Unread tab: zero unread loaded doesn't mean zero unread exist.
-  const unloadedUnreadMessage =
-    loadedUnreadCount === 0 && (unreadCount ?? 0) > 0
-      ? `You have ${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'} in total. Load more to find older unread ones.`
-      : null;
 
 
   return (
