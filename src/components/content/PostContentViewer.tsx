@@ -314,15 +314,28 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
   }
 
   if (error || !post) {
+    const isTransient = error === 'transient';
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center">
-          <h3 className="font-medium mb-2">Content Not Available</h3>
-          <p className="text-muted-foreground text-sm">{error || 'This post is no longer available'}</p>
+          <h3 className="font-medium mb-2">
+            {isTransient ? "Couldn't load this post" : 'Content Not Available'}
+          </h3>
+          <p className="text-muted-foreground text-sm">
+            {isTransient
+              ? 'Something went wrong while loading. Please try again.'
+              : 'This content is no longer available'}
+          </p>
+          {isTransient && (
+            <Button variant="outline" size="sm" className="mt-3" onClick={() => fetchPost()}>
+              Retry
+            </Button>
+          )}
         </div>
       </div>
     );
   }
+
 
   const handleBack = () => {
     if (window.history.length > 1) {
