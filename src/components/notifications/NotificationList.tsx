@@ -27,9 +27,8 @@ interface NotificationListProps {
   isRecovering?: boolean;
   /** True only when the global count is authoritative AND exceeds what's loaded. */
   showCountMismatch?: boolean;
-  /** Rendered instead of the plain empty state on the Unread tab when older
-   *  unread rows exist but haven't been paged in yet. */
 }
+
 
 function NotificationRowSkeleton() {
   return (
