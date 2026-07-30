@@ -21,24 +21,25 @@ export function NotificationDrawer() {
   const {
     notifications,
     unreadNotifications,
+    all,
+    unread,
     unreadCount,
     countStatus,
     loadedUnreadCount,
     markAsRead,
     markAllAsRead,
     markAllPending,
-    hasMore,
-    isLoadingMore,
-    pageError,
-    loadMore,
-    recoverPagination,
+    historyStale,
+    isRevalidating,
+    refreshUnreadHistory,
+    setUnreadLaneActive,
     isRecovering,
     loading,
+    isUnreadInitialLoad,
     markingAsRead,
     lastRefresh,
     isOnline,
     isRefreshing,
-    fetchError,
     fetchAll,
     isNotificationsOpen,
     closeNotifications,
@@ -48,6 +49,13 @@ export function NotificationDrawer() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
+
+  // The Unread lane only fetches/polls while the drawer is open AND the tab is
+  // selected. The provider handles deactivation on close.
+  React.useEffect(() => {
+    setUnreadLaneActive(isNotificationsOpen && activeTab === 'unread');
+  }, [isNotificationsOpen, activeTab, setUnreadLaneActive]);
+
 
   const handleNotificationClick = React.useCallback((notification: Notification, event: React.MouseEvent) => {
     event.preventDefault();
