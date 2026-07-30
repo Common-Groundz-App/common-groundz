@@ -54,6 +54,7 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
   const fetchPost = React.useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       
       const { data, error } = await supabase
         .from('posts')
@@ -63,13 +64,15 @@ const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDe
         `)
         .eq('id', postId)
         .eq('is_deleted', false)
-        .single();
+        .maybeSingle();
         
       if (error) throw error;
       if (!data) {
-        setError('Post not found or has been deleted');
+        // Confirmed absent (deleted or RLS-hidden) — not a transport failure.
+        setError('not-found');
         onPostLoaded?.(null);
         return;
+
       }
       
       const { count: likeCount } = await supabase
