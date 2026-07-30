@@ -273,11 +273,15 @@ export interface NotificationPage {
  * Ordering is `(created_at DESC, id DESC)` and the keyset predicate matches it
  * exactly. The predicate is a SINGLE `.or()` — two chained `.lt()` filters would
  * be AND-ed together and silently drop rows that tie on `created_at`.
+ *
+ * `unreadOnly` produces the Unread lane's dataset. Note this is a FILTERED
+ * dataset, not a view of the All lane: rows leave it once they are read, which
+ * is why the Unread lane reconciles differently (see useNotificationLane).
  */
 export const fetchNotifications = async (
-  options: { limit?: number; cursor?: NotificationCursor | null } = {}
+  options: { limit?: number; cursor?: NotificationCursor | null; unreadOnly?: boolean } = {}
 ): Promise<NotificationPage> => {
-  const { limit = 20, cursor = null } = options;
+  const { limit = 20, cursor = null, unreadOnly = false } = options;
 
   let query = supabase
     .from('notifications')
@@ -286,6 +290,11 @@ export const fetchNotifications = async (
     .order('id', { ascending: false })
     // Over-fetch by one to detect a further page without a second round trip.
     .limit(limit + 1);
+
+  // Applied BEFORE the keyset predicate so the two compose as AND.
+  if (unreadOnly) {
+    query = query.eq('is_read', false);
+  }
 
   if (cursor) {
     if (!isValidCursor(cursor)) throw new InvalidCursorError();
@@ -301,6 +310,9 @@ export const fetchNotifications = async (
 
   const raw = (data ?? []) as Notification[];
   const rows = raw.slice(0, limit);
+  // Throws here, at the fetch boundary, if any row is unsortable — the caller
+  // turns that into a lane error and commits nothing.
+  assertSortableRows(rows);
   const last = rows.length > 0 ? rows[rows.length - 1] : null;
 
   return {
@@ -309,6 +321,60 @@ export const fetchNotifications = async (
     nextCursor: last ? { created_at: last.created_at, id: last.id } : null,
   };
 };
+
+const MEMBERSHIP_CHUNK_SIZE = 200;
+
+/**
+ * Which of `ids` are STILL unread on the server.
+ *
+ * Exists because the Unread lane's older pages can go stale invisibly: a row on
+ * page 2 read from another device never appears in a head refresh, so without
+ * this it would linger forever.
+ *
+ * Contract:
+ *  - `userId` is REQUIRED and passed in by the caller, which holds it already
+ *    and ties it to an auth generation. The service never calls `getUser()` —
+ *    that would be redundant auth work per chunk and would decouple the query
+ *    from the caller's generation token. RLS remains the authorization
+ *    boundary; this predicate exists for index selection.
+ *  - empty `ids` performs ZERO queries.
+ *  - ALL-OR-NOTHING: one failed chunk rejects the whole call. A partial result
+ *    would be indistinguishable from "these ids are read" and would delete live
+ *    rows.
+ */
+export const fetchUnreadMembership = async (
+  ids: string[],
+  userId: string
+): Promise<Set<string>> => {
+  if (!ids.length) return new Set();
+  if (!userId) {
+    throw new Error('fetchUnreadMembership requires an explicit userId');
+  }
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += MEMBERSHIP_CHUNK_SIZE) {
+    chunks.push(ids.slice(i, i + MEMBERSHIP_CHUNK_SIZE));
+  }
+
+  // Promise.all rejects on the first failure, so nothing partial is returned.
+  const results = await Promise.all(
+    chunks.map(async (chunk) => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('is_read', false)
+        .in('id', chunk);
+      if (error) throw error;
+      return (data ?? []) as { id: string }[];
+    })
+  );
+
+  const stillUnread = new Set<string>();
+  results.forEach((rows) => rows.forEach((row) => stillUnread.add(row.id)));
+  return stillUnread;
+};
+
 
 /** Global unread total for the signed-in user. The RPC returns `bigint`, which
  *  arrives as a string or number depending on size — always normalise it. */
