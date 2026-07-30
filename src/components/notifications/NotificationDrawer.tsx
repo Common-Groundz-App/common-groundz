@@ -62,47 +62,35 @@ export function NotificationDrawer() {
 
     // Fire-and-forget: the hook applies the read state optimistically (with
     // rollback on failure), so navigation must never wait on the network.
+    // Read state is independent of whether the target still exists.
     if (!notification.is_read) {
       void markAsRead([notification.id]);
     }
 
     closeNotifications();
-    
-    if (!notification.entity_type || !notification.entity_id) {
-      if (notification.action_url) {
-        navigate(notification.action_url);
-      } else {
-        toast({
-          description: "This notification doesn't have any associated content"
-        });
-      }
+
+    const destination = resolveNotificationDestination(notification);
+
+    if (destination.kind === 'viewer') {
+      openContent(destination.contentType, destination.id, destination.commentId);
       return;
     }
-    
-    const commentId = notification.metadata?.comment_id || null;
-    
-    switch (notification.entity_type as EntityType) {
-      case 'post':
-        openContent('post', notification.entity_id, commentId);
-        break;
-      case 'recommendation':
-        openContent('recommendation', notification.entity_id, commentId);
-        break;
-      case 'profile':
-        // entity_id here is the user ID; action_url may contain username info
-        // Fall back to /profile/:id which will redirect to /u/:username
-        navigate(`/profile/${notification.entity_id}`);
-        break;
-      default:
-        if (notification.action_url) {
-          navigate(notification.action_url);
-        } else {
-          toast({
-            description: "This notification doesn't have any associated content"
-          });
-        }
+
+    if (destination.kind === 'route') {
+      navigate(destination.path);
+      return;
     }
+
+    toast({
+      description:
+        destination.reason === 'unsafe-url'
+          ? "This notification's link couldn't be opened safely"
+          : destination.reason === 'unsupported-type'
+            ? "This kind of notification can't be opened yet"
+            : "This notification doesn't have any associated content",
+    });
   }, [navigate, openContent, toast, closeNotifications, markAsRead]);
+
 
   // Both derive from the ALL lane's fetch-only error channel, so a failed
   // mark-as-read can never render refresh failure UI.
