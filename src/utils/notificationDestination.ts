@@ -120,17 +120,14 @@ export const resolveNotificationDestination = (
   const entityId = asUuid(notification.entity_id);
   const commentId = asUuid(notification.metadata?.comment_id);
 
-  // 1. Post / recommendation → in-app viewer, with exact comment when known.
-  if (entityType === 'post' || entityType === 'recommendation') {
-    if (entityId) {
-      return {
-        kind: 'viewer',
-        contentType: entityType,
-        id: entityId,
-        commentId,
-      };
+  // 1. Post / recommendation → full content page, with exact comment when known.
+  if (isRoutableContentType(entityType)) {
+    const path = buildContentPath(entityType, entityId, commentId);
+    if (path) {
+      return { kind: 'route', path };
     }
   }
+
 
   // 2. Follows and profile notifications → the actor's profile.
   if (entityType === 'profile' || notification.type === 'follow') {
