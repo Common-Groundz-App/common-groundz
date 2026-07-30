@@ -197,12 +197,11 @@ export function NotificationList({
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <EmptyIcon className="h-8 w-8 text-muted-foreground/50 mb-2" />
-        {/* On the Unread tab, an empty page is NOT proof of zero unread — older
-            unread rows may simply not be paged in yet. */}
-        <p className="text-sm text-muted-foreground px-6">
-          {unloadedUnreadMessage ?? emptyMessage}
-        </p>
-        {unloadedUnreadMessage && onLoadMore && hasMore && (
+        {/* Each lane now paginates its own dataset, so an empty Unread lane
+            genuinely means "nothing unread loaded" — but older pages may still
+            exist, hence the footer below. */}
+        <p className="text-sm text-muted-foreground px-6">{emptyMessage}</p>
+        {onLoadMore && hasMore && (
           <PaginationFooter
             hasMore={hasMore}
             isLoadingMore={isLoadingMore}
@@ -215,6 +214,7 @@ export function NotificationList({
       </div>
     );
   }
+
 
   return (
     <div className="px-2 py-1">
