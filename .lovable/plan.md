@@ -1,60 +1,57 @@
-## Phase 2.3 — Aggregation & grouping (v1: likes only)
+## Verdict
 
-Verified first: Phase 2.2A/B/C are complete with no leftovers — two independent lanes in `useNotificationLane.ts`, sticky reads and unread revalidation in `useNotifications.ts`, `notificationDestination.ts` returning only `route | none`, and zero traces of the modal viewer (`ContentViewerContext`, `ContentViewerModal`, `useContentViewer`, `contentViewerRoutes`, `modal=true`). The one `isInModal` hit is an unrelated local in `LightboxPreview.tsx`.
+Yes, both of Codex's additions are correct and small. I'm folding them in.
 
-Both reviews are correct and their corrections are adopted in full. Grouping stays a **pure, page-scoped, render-time transform**: the hook keeps storing flat rows, and pagination, cursors, unread count, sticky reads, recovery and mutation gates are untouched. No database or service changes.
+- **Validate `sender_id` before aggregating.** Confirmed in `src/utils/notificationGrouping.ts`: `isGroupableNotification` validates `type`, `entity_type`, `entity_id` and the absence of `comment_id`, but never checks `sender_id`. `finalize()` then builds `actorIds` by filtering on `row.sender_id`, so two senderless like rows on the same target would aggregate into a group with an empty `actorIds` array — no names, no avatars, and a nonsense sentence. Guard it at eligibility.
+- **Derive "others" from distinct actors minus names actually rendered.** Not from the two name slots and definitely not from `eventIds.length` (that's the event count, which is exactly what makes the current `15` / `25` chips misleading).
 
-### 1. Eligibility — top-level content likes only
-A row is groupable only when **all** hold:
-- `type === 'like'`
-- `entity_type` is `post` or `recommendation`
-- `entity_id` is a valid UUID
-- `metadata.comment_id` is absent
+## The fix
 
-Everything else renders exactly as it does today: comments (new and legacy), mentions, replies, comment likes, follows, journey and system rows. This removes the age-dependent inconsistency in comment grouping and guarantees every child of a group shares one identical destination.
+**1. Event-aware primary line.**
+I verified in `supabase/migrations/20260730064207_*.sql` that mentions insert `title = '<user> mentioned you'` with `message = LEFT(comment_text, 200)`, and replies insert `title = '<user> replied to your comment'` with `message = LEFT(reply_text, 200)`. So `message` cannot blindly become the primary line. A pure formatter picks per event:
 
-### 2. Bounding — contiguity **and** a real time window
-- Children must be **contiguous in the loaded row order** (a non-matching row between two likes breaks the group, so the feed never reorders).
-- Children must fall inside a **24h window measured from the group's newest child**, not neighbour-to-neighbour — no transitive chaining across days. Rows outside the window start a new group.
+| Event | Primary line | Second line |
+|---|---|---|
+| Like on post/recommendation | `linda_williamss liked your post` (`message`) | — |
+| Comment on post/recommendation | `dhanuu commented on your post` (`message`) | — |
+| Mention (`metadata.event === 'mention'`) | `linda_williamss mentioned you` (`title`) | comment text preview, 2-line clamp |
+| Reply (`metadata.event === 'reply'`) | `linda_williamss replied to your comment` (`title`) | reply text preview, 2-line clamp |
+| Comment like | `linda_williamss liked your comment` (`title`) | — |
+| Follow / system / other | first non-empty of `message`, then `title` | — |
 
-### 3. Copy — no name parsing, no new fetches
-`formatGroupSummary(group)` never parses titles or messages for identity:
-- 1 event → the row's existing title/message, byte-identical to today.
-- 2+ events → the **representative's existing title** plus a numeric remainder, e.g. `"… and 3 others liked your experience"`, or the fully safe form `"4 people liked your experience"` when the representative's title can't be reused verbatim.
-- Zero new profile queries in this phase. Actor display names are deferred to a later presentational upgrade that reads the existing profile cache.
+"New like" / "New comment" never render as visible text again. Both fields empty → neutral "New notification" rather than a blank row.
 
-### 4. Count semantics — distinct actors vs events
-- `actorIds`: distinct `sender_id`s, newest-first — this is what the "and N others" number is derived from.
-- `eventIds`: every underlying notification id, retained in full for read mutation.
-- If distinct actors collapse to 1 (unlike/re-like duplicates), the group renders as a single-actor row with the event count suppressed, never "Alice and 0 others".
+**2. Named grouped copy, from the already-warm cache.**
+`ProfileAvatar` subscribes to `['profile', userId]` via `useProfile`. The extracted `NotificationRow` subscribes to the *same* key for the first two actor ids, so React Query dedupes — no new request, no second cache path. Fixed hook count (two `useProfile` calls, undefined-safe), never in a loop, so hook order stays stable.
 
-### 5. Identity — unique group instance keys
-Group key is `${type}|${entity_type}|${entity_id}|${representativeId}`. The representative's id makes each contiguous instance unique, so `Like A / Follow / Like A` produces two groups with distinct React keys and no row reuse bugs.
+Remainder = `actorIds.length − (names actually rendered)`:
 
-### 6. Click contract — groups, not smuggled representatives
-`NotificationList`'s callback signature changes to `onGroupClick(group, event)`. The drawer then:
-- calls `markAsRead(group.unreadEventIds)` once (array API already exists, mutation exclusivity untouched),
-- resolves the destination from the representative — valid **only because eligibility guarantees identical targets** — and navigates,
-- falls back to today's differentiated toasts for unsafe/missing/unsupported destinations.
+| Distinct actors | Names resolved | Sentence |
+|---|---|---|
+| 2 | 2 | `linda_williamss and hana.li liked your post` |
+| 5 | 2 | `linda_williamss, hana.li and 3 others liked your post` |
+| 5 | 1 | `linda_williamss and 4 others liked your post` |
+| 5 | 0 | `5 people liked your post` |
 
-### 7. Visuals
-- Single-event groups render exactly the current markup — same avatar, same copy, same timestamp, same read check.
-- Multi-event groups add a stacked secondary avatar and a `+N` chip, both rendered through the existing `ProfileAvatar` (same profile cache, no new avatar/loader path).
-- Timestamp shows the newest child. A group is highlighted while any child is unread.
-- `aria-label` states the aggregate ("4 people liked your experience") so screen readers don't get only the representative.
+The trailing phrase derives from `entity_type` (`your post` / `your recommendation`); anything unrecognised falls back to the representative's `message`. Names come from `profile.username` (falling back to `displayName`) to match what the triggers already stored — a deliberate, notification-scoped exception to the app-wide displayName rule, commented so it isn't "corrected" later.
 
-### 8. Counts stay event-based (documented invariant)
-Global unread count, `loadedUnreadCount`, the mismatch banner, `hasMore` and every cursor remain **event** counts over flat server rows. Nothing compares against the rendered group count. This is written into the roadmap so future work can't quietly swap in group counts.
+While profiles load, the row shows the neutral `5 people liked your post` and swaps to names on resolve. The avatars beside it are already skeleton-loading in that same instant, so the transition reads as the row settling rather than as a copy glitch.
 
-### 9. Tests — `src/utils/notificationGrouping.test.ts`
-Adjacent likes group; non-adjacent likes don't; likes >24h apart don't; no transitive chaining; comments/mentions/replies/comment-likes/follows/system never group; rows with `comment_id` never group; rows without a valid `entity_id` never group; unread propagation; distinct-actor vs event-count; unique keys for repeated base keys; representative destination identity.
+**3. Sender guard.**
+`isGroupableNotification` gains a `typeof n.sender_id === 'string' && UUID_RE.test(n.sender_id)` check. Senderless or malformed-sender likes render as singletons — the safe, existing behaviour. This is the one membership change in the plan, and it only ever *reduces* aggregation.
 
-### Files touched
-- `src/utils/notificationGrouping.ts` (new)
-- `src/utils/notificationGrouping.test.ts` (new)
-- `src/components/notifications/NotificationList.tsx`
-- `src/components/notifications/NotificationDrawer.tsx`
-- `docs/NOTIFICATION_CENTER_ROADMAP.md`
+**4. Count chip removed.**
+The `{group.eventIds.length}` span beside the timestamp goes away entirely. The count now lives in the sentence; the stacked avatars carry the visual signal.
 
-### Deferred
-Comment/follow grouping, server-side or cross-page aggregation, digest rows, preference-driven grouping, actor display names, realtime group reconciliation beyond recomputing the transform.
+**5. Accessibility.**
+`aria-label` is composed from the same visible sentence plus the preview line when present. It never reads "New like".
+
+## Technical notes
+
+- `src/utils/notificationGrouping.ts` — stays pure, no fetching. Add the `sender_id` guard to `isGroupableNotification`. Replace `formatGroupSummary` with `formatGroupCopy(group, resolvedNames: string[])` returning `{ primary, preview }`, plus an event-aware singleton formatter. `groupAriaLabel` consumes the same output.
+- `src/utils/notificationGrouping.test.ts` — extend for: every event row in the table; 2/1/0 resolved names against 2 and 5 distinct actors; senderless likes staying singletons; unknown `entity_type`; empty `title` and `message`.
+- `src/components/notifications/NotificationList.tsx` — extract the row body into a `NotificationRow` component so it can call `useProfile` for the first two actors; render primary line + optional preview + timestamp; delete the count-chip span.
+
+## Out of scope
+
+Strictly presentational. No changes to triggers, DB columns, notification lanes, unread counts, pagination, or click destinations. The only grouping-membership change is the sender-validity guard above.
