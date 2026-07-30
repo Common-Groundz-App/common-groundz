@@ -14,14 +14,12 @@ import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 interface RecommendationContentViewerProps {
   recommendationId: string;
   highlightCommentId: string | null;
-  isInModal?: boolean;
   onRecommendationLoaded?: (meta: { title: string; content: string; visibility: string; entityName?: string; imageUrl?: string } | null) => void;
 }
 
 const RecommendationContentViewer = ({ 
   recommendationId, 
   highlightCommentId,
-  isInModal = false,
   onRecommendationLoaded
 }: RecommendationContentViewerProps) => {
   const { user } = useAuth();
