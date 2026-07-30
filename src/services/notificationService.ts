@@ -101,6 +101,166 @@ export const isValidCursor = (cursor: unknown): cursor is NotificationCursor => 
   return true;
 };
 
+// ---------------------------------------------------------------------------
+// Cursor ordering — the single ordering authority
+// ---------------------------------------------------------------------------
+//
+// Raw ISO strings CANNOT be compared lexicographically: `.123Z`,
+// `.123000+00:00` and `2026-07-29T15:30:00.123000+05:30` all describe the same
+// instant but sort by their formatting, not their time. So every comparison
+// goes through a NORMALIZED key: UTC, fixed width, 9 fractional digits, built
+// with integer arithmetic so PostgreSQL's microseconds survive (JS `Date`
+// truncates to milliseconds).
+//
+// The key is for LOCAL comparison only. Cursors sent to PostgREST always carry
+// the exact original string, byte for byte.
+
+/** Days since 1970-01-01 from a proleptic Gregorian date (Howard Hinnant). */
+const daysFromCivil = (y: number, m: number, d: number): number => {
+  const yy = y - (m <= 2 ? 1 : 0);
+  const era = Math.floor(yy / 400);
+  const yoe = yy - era * 400;
+  const doy = Math.floor((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  return era * 146097 + doe - 719468;
+};
+
+/** Inverse of `daysFromCivil`. */
+const civilFromDays = (z: number): [number, number, number] => {
+  const zz = z + 719468;
+  const era = Math.floor(zz / 146097);
+  const doe = zz - era * 146097;
+  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
+  const y = yoe + era * 400;
+  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100));
+  const mp = Math.floor((5 * doy + 2) / 153);
+  const d = doy - Math.floor((153 * mp + 2) / 5) + 1;
+  const m = mp + (mp < 10 ? 3 : -9);
+  return [y + (m <= 2 ? 1 : 0), m, d];
+};
+
+const pad = (n: number, width: number) => String(n).padStart(width, '0');
+
+const cursorKeyCache = new Map<string, string | null>();
+const CURSOR_KEY_CACHE_LIMIT = 2000;
+
+/**
+ * Normalized, fixed-width UTC comparison key: `YYYYMMDDhhmmssfffffffff`.
+ * Returns `null` for anything unparseable — NEVER throws, because this runs
+ * inside sort callbacks and React state updaters where an exception would
+ * escape the lane's try/catch and take out the drawer.
+ */
+export const tryCursorKey = (createdAt: unknown): string | null => {
+  if (typeof createdAt !== 'string') return null;
+
+  const cached = cursorKeyCache.get(createdAt);
+  if (cached !== undefined) return cached;
+
+  let key: string | null = null;
+  const match = TIMESTAMP_RE.exec(createdAt);
+
+  if (match) {
+    const [, y, mo, d, h, mi, s, frac, offset] = match;
+    const year = Number(y);
+    const month = Number(mo);
+    const day = Number(d);
+    const hour = Number(h);
+    const minute = Number(mi);
+    const second = Number(s);
+
+    const isLeap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+    const daysInMonth = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+
+    const calendarOk =
+      month >= 1 && month <= 12 &&
+      day >= 1 && day <= daysInMonth &&
+      hour <= 23 && minute <= 59 && second <= 60;
+
+    if (calendarOk) {
+      let offsetMinutes = 0;
+      if (offset !== 'Z') {
+        const sign = offset[0] === '-' ? -1 : 1;
+        const digits = offset.slice(1).replace(':', '');
+        offsetMinutes = sign * (Number(digits.slice(0, 2)) * 60 + Number(digits.slice(2, 4)));
+      }
+
+      // Shift to UTC with integer arithmetic — no Date, no precision loss.
+      let totalSeconds =
+        daysFromCivil(year, month, day) * 86400 +
+        hour * 3600 + minute * 60 + second -
+        offsetMinutes * 60;
+
+      const dayIndex = Math.floor(totalSeconds / 86400);
+      let rem = totalSeconds - dayIndex * 86400;
+      const [uy, um, ud] = civilFromDays(dayIndex);
+      const uh = Math.floor(rem / 3600);
+      rem -= uh * 3600;
+      const umin = Math.floor(rem / 60);
+      const usec = rem - umin * 60;
+
+      const fraction = (frac ?? '').padEnd(9, '0');
+      key = `${pad(uy, 4)}${pad(um, 2)}${pad(ud, 2)}${pad(uh, 2)}${pad(umin, 2)}${pad(usec, 2)}${fraction}`;
+    }
+  }
+
+  if (cursorKeyCache.size >= CURSOR_KEY_CACHE_LIMIT) cursorKeyCache.clear();
+  cursorKeyCache.set(createdAt, key);
+  return key;
+};
+
+/** Service-boundary form. Only ever called where a rejection can be caught and
+ *  turned into a normal lane error BEFORE any state is committed. */
+export const cursorKeyOrThrow = (createdAt: unknown): string => {
+  const key = tryCursorKey(createdAt);
+  if (key === null) throw new Error(`Unparseable notification timestamp: ${String(createdAt)}`);
+  return key;
+};
+
+/**
+ * DIRECTION IS EXPLICIT — returns a NEGATIVE number when `a` is NEWER, i.e. it
+ * sorts first in the `created_at DESC` display order. Never reason about this
+ * sign inline; use `isNewerOrEqual` / `isOlderThan` instead.
+ *
+ * Unkeyable input sorts last rather than throwing (see `tryCursorKey`).
+ */
+export const compareCursorKeys = (a: string | null, b: string | null): number => {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return a > b ? -1 : 1;
+};
+
+/** `key` is at or newer than `boundary` — i.e. inside a head window ending at
+ *  `boundary`. A null boundary means "no window exists". */
+export const isNewerOrEqual = (key: string | null, boundary: string | null): boolean =>
+  boundary !== null && compareCursorKeys(key, boundary) <= 0;
+
+/** `key` is strictly older than `boundary` (falls outside the head window). */
+export const isOlderThan = (key: string | null, boundary: string | null): boolean =>
+  boundary !== null && compareCursorKeys(key, boundary) > 0;
+
+/** Comparison key for a loaded row. */
+export const rowCursorKey = (row: Pick<Notification, 'created_at'>): string | null =>
+  tryCursorKey(row.created_at);
+
+/** Canonical display order: `created_at DESC, id DESC`. Total — never throws. */
+export const compareNotifications = (a: Notification, b: Notification): number => {
+  const byTime = compareCursorKeys(rowCursorKey(a), rowCursorKey(b));
+  if (byTime !== 0) return byTime;
+  return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+};
+
+/**
+ * Fetch-boundary validation. A malformed `created_at` must fail the REQUEST —
+ * surfacing as an ordinary, recoverable lane error — rather than reaching state
+ * and throwing later from inside a render or a functional setState.
+ */
+const assertSortableRows = (rows: Notification[]): Notification[] => {
+  rows.forEach((row) => cursorKeyOrThrow(row.created_at));
+  return rows;
+};
+
+
 export interface NotificationPage {
   rows: Notification[];
   hasMore: boolean;
