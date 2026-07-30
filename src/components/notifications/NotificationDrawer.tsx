@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Check, Loader2 } from 'lucide-react';
 import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
 import { LastUpdatedIndicator } from '@/components/ui/LastUpdatedIndicator';
-import { useContentViewer } from '@/contexts/ContentViewerContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { Notification } from '@/services/notificationService';
@@ -47,7 +46,6 @@ export function NotificationDrawer() {
     closeNotifications,
     setNotificationsOpen,
   } = useNotificationsContext();
-  const { openContent } = useContentViewer();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
@@ -73,11 +71,6 @@ export function NotificationDrawer() {
 
     const destination = resolveNotificationDestination(notification);
 
-    if (destination.kind === 'viewer') {
-      openContent(destination.contentType, destination.id, destination.commentId);
-      return;
-    }
-
     if (destination.kind === 'route') {
       navigate(destination.path);
       return;
@@ -91,7 +84,7 @@ export function NotificationDrawer() {
             ? "This kind of notification can't be opened yet"
             : "This notification doesn't have any associated content",
     });
-  }, [navigate, openContent, toast, closeNotifications, markAsRead]);
+  }, [navigate, toast, closeNotifications, markAsRead]);
 
 
   // Both derive from the ALL lane's fetch-only error channel, so a failed
