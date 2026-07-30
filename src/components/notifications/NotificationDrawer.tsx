@@ -21,24 +21,25 @@ export function NotificationDrawer() {
   const {
     notifications,
     unreadNotifications,
+    all,
+    unread,
     unreadCount,
     countStatus,
     loadedUnreadCount,
     markAsRead,
     markAllAsRead,
     markAllPending,
-    hasMore,
-    isLoadingMore,
-    pageError,
-    loadMore,
-    recoverPagination,
+    historyStale,
+    isRevalidating,
+    refreshUnreadHistory,
+    setUnreadLaneActive,
     isRecovering,
     loading,
+    isUnreadInitialLoad,
     markingAsRead,
     lastRefresh,
     isOnline,
     isRefreshing,
-    fetchError,
     fetchAll,
     isNotificationsOpen,
     closeNotifications,
@@ -48,6 +49,13 @@ export function NotificationDrawer() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
+
+  // The Unread lane only fetches/polls while the drawer is open AND the tab is
+  // selected. The provider handles deactivation on close.
+  React.useEffect(() => {
+    setUnreadLaneActive(isNotificationsOpen && activeTab === 'unread');
+  }, [isNotificationsOpen, activeTab, setUnreadLaneActive]);
+
 
   const handleNotificationClick = React.useCallback((notification: Notification, event: React.MouseEvent) => {
     event.preventDefault();
@@ -96,10 +104,11 @@ export function NotificationDrawer() {
     }
   }, [navigate, openContent, toast, closeNotifications, markAsRead]);
 
-  // Both derive from the fetch-only error channel, so a failed mark-as-read
-  // can never render refresh failure UI.
-  const hasError = Boolean(fetchError) && notifications.length === 0;
-  const hasStaleData = Boolean(fetchError) && notifications.length > 0;
+  // Both derive from the ALL lane's fetch-only error channel, so a failed
+  // mark-as-read can never render refresh failure UI.
+  const hasError = Boolean(all.fetchError) && notifications.length === 0;
+  const hasStaleData = Boolean(all.fetchError) && notifications.length > 0;
+  const unreadHasError = Boolean(unread.fetchError) && unreadNotifications.length === 0;
 
   // Server-side mark-all clears EVERY unread row, including ones older than the
   // pages loaded — hence the global-count arm. `markingAsRead` is included
@@ -113,24 +122,23 @@ export function NotificationDrawer() {
     (loadedUnreadCount > 0 || (unreadCount ?? 0) > 0);
   const showMarkAll = markAllPending || loadedUnreadCount > 0 || (unreadCount ?? 0) > 0;
 
-  // The mismatch notice is only honest when the count is fully authoritative:
-  // pagination exhausted, count ready (not loading/error/stale), and no mutation
-  // or pagination recovery in flight holding the count or the list mid-change.
+  // Mismatch is an UNREAD-lane statement: it compares the global count with the
+  // unread rows actually loaded, so it is only honest once the UNREAD lane is
+  // exhausted, its history is verified (not stale/revalidating), the count is
+  // ready, and nothing is mid-mutation or mid-recovery.
   const showCountMismatch =
-    !hasMore &&
+    activeTab === 'unread' &&
+    !unread.hasMore &&
+    !historyStale &&
+    !isRevalidating &&
     countStatus === 'ready' &&
     unreadCount !== null &&
     !markAllPending &&
     !markingAsRead &&
     !isRecovering &&
-    notifications.length > 0 &&
+    unreadNotifications.length > 0 &&
     unreadCount > loadedUnreadCount;
 
-  // Unread tab: zero unread loaded doesn't mean zero unread exist.
-  const unloadedUnreadMessage =
-    loadedUnreadCount === 0 && (unreadCount ?? 0) > 0
-      ? `You have ${unreadCount} unread ${unreadCount === 1 ? 'notification' : 'notifications'} in total. Load more to find older unread ones.`
-      : null;
 
 
   return (
@@ -216,13 +224,12 @@ export function NotificationDrawer() {
                 hasError={hasError}
                 onRetry={fetchAll}
                 onNotificationClick={handleNotificationClick}
-                hasMore={hasMore}
-                isLoadingMore={isLoadingMore}
-                pageError={pageError}
-                onLoadMore={loadMore}
-                onRecoverPagination={recoverPagination}
-                isRecovering={isRecovering}
-                showCountMismatch={showCountMismatch}
+                hasMore={all.hasMore}
+                isLoadingMore={all.isLoadingMore}
+                pageError={all.pageError}
+                onLoadMore={all.loadMore}
+                onRecoverPagination={all.recoverPagination}
+                isRecovering={all.isRecovering}
               />
             </TabsContent>
 
@@ -230,26 +237,45 @@ export function NotificationDrawer() {
               value="unread"
               className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
             >
-              {/* Pagination is shared with the All tab for now: loading more
-                  pulls in older rows of both kinds. Independent unread paging is
-                  Phase 2.2 — until then the copy stays honest about it. */}
+              {/* Older unread rows couldn't be re-verified. This is a freshness
+                  warning, NOT a pagination failure — hence its own strip. */}
+              {historyStale && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    Some older items may be out of date
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => void refreshUnreadHistory()}
+                    disabled={isRevalidating || markAllPending || markingAsRead}
+                  >
+                    {isRevalidating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    Refresh
+                  </Button>
+                </div>
+              )}
+              {/* Independent unread pagination: this lane has its own cursor, so
+                  loading more here pulls older UNREAD rows only. */}
               <NotificationList
                 notifications={unreadNotifications}
-                loading={loading}
-                hasError={hasError}
+                loading={isUnreadInitialLoad}
+                hasError={unreadHasError}
                 onRetry={fetchAll}
                 onNotificationClick={handleNotificationClick}
                 emptyMessage="No unread notifications"
                 emptyIcon={Check}
-                hasMore={hasMore}
-                isLoadingMore={isLoadingMore}
-                pageError={pageError}
-                onLoadMore={loadMore}
-                onRecoverPagination={recoverPagination}
-                isRecovering={isRecovering}
-                unloadedUnreadMessage={unloadedUnreadMessage}
+                hasMore={unread.hasMore}
+                isLoadingMore={unread.isLoadingMore}
+                pageError={unread.pageError}
+                onLoadMore={unread.loadMore}
+                onRecoverPagination={unread.recoverPagination}
+                isRecovering={unread.isRecovering}
+                showCountMismatch={showCountMismatch}
               />
             </TabsContent>
+
           </Tabs>
         </div>
       </SheetContent>

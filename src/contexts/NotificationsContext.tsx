@@ -24,23 +24,24 @@ type NotificationsData = Pick<
   UseNotificationsResult,
   | 'notifications'
   | 'unreadNotifications'
+  | 'all'
+  | 'unread'
   | 'unreadCount'
   | 'countStatus'
   | 'loadedUnreadCount'
   | 'loading'
+  | 'isUnreadInitialLoad'
   | 'isRefreshing'
   | 'markingAsRead'
-  | 'fetchError'
   | 'isOnline'
   | 'lastRefresh'
   | 'markAsRead'
   | 'markAllAsRead'
   | 'markAllPending'
-  | 'hasMore'
-  | 'isLoadingMore'
-  | 'pageError'
-  | 'loadMore'
-  | 'recoverPagination'
+  | 'historyStale'
+  | 'isRevalidating'
+  | 'refreshUnreadHistory'
+  | 'setUnreadLaneActive'
   | 'isRecovering'
   | 'fetchAll'
 >;
@@ -59,23 +60,24 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
   const {
     notifications,
     unreadNotifications,
+    all,
+    unread,
     unreadCount,
     countStatus,
     loadedUnreadCount,
     loading,
+    isUnreadInitialLoad,
     isRefreshing,
     markingAsRead,
-    fetchError,
     isOnline,
     lastRefresh,
     markAsRead,
     markAllAsRead,
     markAllPending,
-    hasMore,
-    isLoadingMore,
-    pageError,
-    loadMore,
-    recoverPagination,
+    historyStale,
+    isRevalidating,
+    refreshUnreadHistory,
+    setUnreadLaneActive,
     isRecovering,
     fetchAll,
   } = useNotifications();
@@ -91,27 +93,34 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     setNotificationsOpen(false);
   }, [user?.id]);
 
+  // Closing the drawer deactivates the Unread lane in one place, so no consumer
+  // can leave a second poller running behind a closed drawer.
+  useEffect(() => {
+    if (!isNotificationsOpen) setUnreadLaneActive(false);
+  }, [isNotificationsOpen, setUnreadLaneActive]);
+
   const value = useMemo<NotificationsContextValue>(
     () => ({
       notifications,
       unreadNotifications,
+      all,
+      unread,
       unreadCount,
       countStatus,
       loadedUnreadCount,
       loading,
+      isUnreadInitialLoad,
       isRefreshing,
       markingAsRead,
-      fetchError,
       isOnline,
       lastRefresh,
       markAsRead,
       markAllAsRead,
       markAllPending,
-      hasMore,
-      isLoadingMore,
-      pageError,
-      loadMore,
-      recoverPagination,
+      historyStale,
+      isRevalidating,
+      refreshUnreadHistory,
+      setUnreadLaneActive,
       isRecovering,
       fetchAll,
       isNotificationsOpen,
@@ -122,23 +131,24 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     [
       notifications,
       unreadNotifications,
+      all,
+      unread,
       unreadCount,
       countStatus,
       loadedUnreadCount,
       loading,
+      isUnreadInitialLoad,
       isRefreshing,
       markingAsRead,
-      fetchError,
       isOnline,
       lastRefresh,
       markAsRead,
       markAllAsRead,
       markAllPending,
-      hasMore,
-      isLoadingMore,
-      pageError,
-      loadMore,
-      recoverPagination,
+      historyStale,
+      isRevalidating,
+      refreshUnreadHistory,
+      setUnreadLaneActive,
       isRecovering,
       fetchAll,
       isNotificationsOpen,
