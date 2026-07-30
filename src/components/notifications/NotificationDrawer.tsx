@@ -224,13 +224,12 @@ export function NotificationDrawer() {
                 hasError={hasError}
                 onRetry={fetchAll}
                 onNotificationClick={handleNotificationClick}
-                hasMore={hasMore}
-                isLoadingMore={isLoadingMore}
-                pageError={pageError}
-                onLoadMore={loadMore}
-                onRecoverPagination={recoverPagination}
-                isRecovering={isRecovering}
-                showCountMismatch={showCountMismatch}
+                hasMore={all.hasMore}
+                isLoadingMore={all.isLoadingMore}
+                pageError={all.pageError}
+                onLoadMore={all.loadMore}
+                onRecoverPagination={all.recoverPagination}
+                isRecovering={all.isRecovering}
               />
             </TabsContent>
 
@@ -238,26 +237,45 @@ export function NotificationDrawer() {
               value="unread"
               className="mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
             >
-              {/* Pagination is shared with the All tab for now: loading more
-                  pulls in older rows of both kinds. Independent unread paging is
-                  Phase 2.2 — until then the copy stays honest about it. */}
+              {/* Older unread rows couldn't be re-verified. This is a freshness
+                  warning, NOT a pagination failure — hence its own strip. */}
+              {historyStale && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    Some older items may be out of date
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => void refreshUnreadHistory()}
+                    disabled={isRevalidating || markAllPending || markingAsRead}
+                  >
+                    {isRevalidating ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                    Refresh
+                  </Button>
+                </div>
+              )}
+              {/* Independent unread pagination: this lane has its own cursor, so
+                  loading more here pulls older UNREAD rows only. */}
               <NotificationList
                 notifications={unreadNotifications}
-                loading={loading}
-                hasError={hasError}
+                loading={isUnreadInitialLoad}
+                hasError={unreadHasError}
                 onRetry={fetchAll}
                 onNotificationClick={handleNotificationClick}
                 emptyMessage="No unread notifications"
                 emptyIcon={Check}
-                hasMore={hasMore}
-                isLoadingMore={isLoadingMore}
-                pageError={pageError}
-                onLoadMore={loadMore}
-                onRecoverPagination={recoverPagination}
-                isRecovering={isRecovering}
-                unloadedUnreadMessage={unloadedUnreadMessage}
+                hasMore={unread.hasMore}
+                isLoadingMore={unread.isLoadingMore}
+                pageError={unread.pageError}
+                onLoadMore={unread.loadMore}
+                onRecoverPagination={unread.recoverPagination}
+                isRecovering={unread.isRecovering}
+                showCountMismatch={showCountMismatch}
               />
             </TabsContent>
+
           </Tabs>
         </div>
       </SheetContent>
