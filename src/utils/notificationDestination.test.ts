@@ -36,12 +36,12 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
   [
     'post like → post viewer',
     n({ type: 'like', entity_type: 'post', entity_id: POST_ID, action_url: `/post/${POST_ID}` }),
-    { kind: 'viewer', contentType: 'post', id: POST_ID, commentId: null },
+    { kind: 'route', path: `/post/${POST_ID}` },
   ],
   [
     'recommendation like → recommendation viewer',
     n({ type: 'like', entity_type: 'recommendation', entity_id: REC_ID }),
-    { kind: 'viewer', contentType: 'recommendation', id: REC_ID, commentId: null },
+    { kind: 'route', path: `/recommendations/${REC_ID}` },
   ],
   [
     'legacy post comment (no comment_id) → parent, no false highlight',
@@ -52,7 +52,7 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
       action_url: `/post/${POST_ID}`,
       metadata: { comment_text: 'hi' },
     }),
-    { kind: 'viewer', contentType: 'post', id: POST_ID, commentId: null },
+    { kind: 'route', path: `/post/${POST_ID}` },
   ],
   [
     'legacy recommendation comment → recommendation viewer',
@@ -63,7 +63,7 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
       action_url: `/recommendations/${REC_ID}`,
       metadata: { comment_text: 'hi' },
     }),
-    { kind: 'viewer', contentType: 'recommendation', id: REC_ID, commentId: null },
+    { kind: 'route', path: `/recommendations/${REC_ID}` },
   ],
   [
     'mention → viewer with commentId',
@@ -73,7 +73,7 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
       entity_id: POST_ID,
       metadata: { event: 'mention', comment_id: COMMENT_ID },
     }),
-    { kind: 'viewer', contentType: 'post', id: POST_ID, commentId: COMMENT_ID },
+    { kind: 'route', path: `/post/${POST_ID}?commentId=${COMMENT_ID}` },
   ],
   [
     'reply → viewer with commentId',
@@ -83,7 +83,7 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
       entity_id: REC_ID,
       metadata: { event: 'reply', comment_id: COMMENT_ID },
     }),
-    { kind: 'viewer', contentType: 'recommendation', id: REC_ID, commentId: COMMENT_ID },
+    { kind: 'route', path: `/recommendations/${REC_ID}?commentId=${COMMENT_ID}` },
   ],
   [
     'comment like → viewer with commentId',
@@ -93,7 +93,7 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
       entity_id: POST_ID,
       metadata: { event: 'comment_like', comment_id: COMMENT_ID },
     }),
-    { kind: 'viewer', contentType: 'post', id: POST_ID, commentId: COMMENT_ID },
+    { kind: 'route', path: `/post/${POST_ID}?commentId=${COMMENT_ID}` },
   ],
   [
     'follow → profile route',
@@ -115,7 +115,7 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
   [
     'non-UUID comment_id is dropped',
     n({ type: 'comment', entity_type: 'post', entity_id: POST_ID, metadata: { comment_id: 'nope' } }),
-    { kind: 'viewer', contentType: 'post', id: POST_ID, commentId: null },
+    { kind: 'route', path: `/post/${POST_ID}` },
   ],
   [
     'legacy singular recommendation action_url is rewritten',

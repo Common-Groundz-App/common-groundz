@@ -20,7 +20,6 @@ import type { PostFeedItem as PostFeedItemType } from '@/hooks/feed/api/posts/ty
 interface PostContentViewerProps {
   postId: string;
   highlightCommentId: string | null;
-  isInModal?: boolean;
   isDetailView?: boolean;
   /**
    * Bump to force a refetch of the post (Phase 5 — Mux ready → playback patch).
@@ -30,7 +29,7 @@ interface PostContentViewerProps {
   onPostLoaded?: (meta: { title: string; content: string; visibility: string; imageUrl?: string; authorId?: string; taggedEntities?: any[]; media?: any[]; post_type?: string | null; structured_fields?: Record<string, any> | null; created_at?: string | null; last_edited_at?: string | null } | null) => void;
 }
 
-const PostContentViewer = ({ postId, highlightCommentId, isInModal = false, isDetailView = false, refreshTick, onPostLoaded }: PostContentViewerProps) => {
+const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, refreshTick, onPostLoaded }: PostContentViewerProps) => {
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
   const navigate = useNavigate();

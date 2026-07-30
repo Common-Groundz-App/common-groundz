@@ -7,6 +7,7 @@
  */
 
 import type { Notification } from '@/services/notificationService';
+import { buildContentPath, isRoutableContentType } from '@/utils/contentRoutes';
 
 /** Never emitted — only used so `new URL()` has something to resolve against. */
 const PARSE_ORIGIN = 'http://internal.invalid';
@@ -19,17 +20,12 @@ const USERNAME_RE = /^[a-zA-Z0-9._-]{1,30}$/;
 const UNSAFE_CHARS_RE = /[\u0000-\u001f\u007f\\]/;
 
 export type NotificationDestination =
-  | {
-      kind: 'viewer';
-      contentType: 'post' | 'recommendation';
-      id: string;
-      commentId: string | null;
-    }
   | { kind: 'route'; path: string }
   | {
       kind: 'none';
       reason: 'missing-target' | 'unsupported-type' | 'unsafe-url';
     };
+
 
 /** RFC-shaped, version-agnostic (matches the app's own `generateUUID()`). */
 export const isUuid = (value: unknown): value is string =>
@@ -124,17 +120,14 @@ export const resolveNotificationDestination = (
   const entityId = asUuid(notification.entity_id);
   const commentId = asUuid(notification.metadata?.comment_id);
 
-  // 1. Post / recommendation → in-app viewer, with exact comment when known.
-  if (entityType === 'post' || entityType === 'recommendation') {
-    if (entityId) {
-      return {
-        kind: 'viewer',
-        contentType: entityType,
-        id: entityId,
-        commentId,
-      };
+  // 1. Post / recommendation → full content page, with exact comment when known.
+  if (isRoutableContentType(entityType)) {
+    const path = buildContentPath(entityType, entityId, commentId);
+    if (path) {
+      return { kind: 'route', path };
     }
   }
+
 
   // 2. Follows and profile notifications → the actor's profile.
   if (entityType === 'profile' || notification.type === 'follow') {
