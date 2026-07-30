@@ -117,10 +117,12 @@ const RecommendationContentViewer = ({
           entityName: entity?.name,
           imageUrl: data.image_url || entity?.image_url || undefined,
         });
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching recommendation:', err);
-        setError('Error loading recommendation');
+        // PGRST116 = no rows returned; anything else is treated as transport.
+        setError(err?.code === 'PGRST116' ? 'not-found' : 'transient');
         onRecommendationLoaded?.(null);
+
       } finally {
         setLoading(false);
       }
