@@ -45,18 +45,21 @@ const RecommendationContentViewer = ({
     const fetchRecommendation = async () => {
       try {
         setLoading(true);
+        setError(null);
         
         const { data, error } = await supabase
           .from('recommendations')
           .select('*')
           .eq('id', recommendationId)
-          .single();
+          .maybeSingle();
           
         if (error) throw error;
         if (!data) {
-          setError('Recommendation not found or has been deleted');
+          // Confirmed absent (deleted or RLS-hidden) — not a transport failure.
+          setError('not-found');
           onRecommendationLoaded?.(null);
           return;
+
         }
         
         const { count: likeCount } = await supabase
