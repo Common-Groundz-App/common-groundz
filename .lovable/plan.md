@@ -1,41 +1,44 @@
 ## Verdict
 
-Both reviews agree with the root cause, and Codex's additions are correct — I verified the two that mattered:
+Implement it as written, with Codex's type refinement. Verified before planning:
+- `ContentViewerContext` has exactly four importers: `App.tsx`, `contentViewerRoutes.ts`, `ContentViewerModal.tsx`, `NotificationDrawer.tsx`. No other feature consumes it — safe to delete.
+- `isInModal` is declared and destructured in `PostContentViewer` / `RecommendationContentViewer` but never read (already dead). The `isInModal` in `LightboxPreview.tsx:165` is an unrelated local Radix-portal check — leave it.
+- `isViewableContentType` in the route helper has no callers outside that file.
 
-- `PostContentViewer.tsx:43` reads `focus=comment` as **autofocus the comment composer**, not "reveal the comment". So my earlier plan's "add `focus=comment`" was wrong for mention/reply notifications: it would steal focus from the highlighted comment. `commentId` alone is what highlights. Dropped from the plan.
-- `ContentViewerModal.tsx:135` puts `onClick={handleViewFullPage}` on the whole card. Mounting it as-is means every like, save, retry, comment control and text selection inside the viewer navigates away. Must be fixed in the same change.
+## Final plan
 
-Everything else in both reviews is folded in below.
+**1. Route helper: `src/utils/contentViewerRoutes.ts` → `src/utils/contentRoutes.ts`**
+- Define the union locally and narrow it to what is actually routable: `export type RoutableContentType = 'post' | 'recommendation'`. No `review`, no `null` — unroutable cases are the caller's business, not the type's.
+- `buildContentPath(type: RoutableContentType, id: string, commentId?: string | null): string | null` — drops the `opts.modal` parameter and all `modal=true` generation.
+- Keep: UUID guard on `commentId`, and the rule that `focus=comment` is never synthesized.
+- Drop `isViewableContentType` (unused once the resolver owns type validation), replacing it with an internal type-guard the resolver uses to decide `route` vs `none`.
 
-## Root cause
+**2. Resolver: `src/utils/notificationDestination.ts`**
+- Collapse `{ kind: 'viewer', contentType, id, commentId }` into `{ kind: 'route', path }`; post → `/post/:id`, recommendation → `/recommendations/:id`, with `?commentId=<uuid>` when valid.
+- If `buildContentPath` returns null (unroutable type or bad id), fall through to the existing `kind: 'none'` reasons rather than emitting a partial route.
+- Follow/profile and safe `action_url` branches already return `kind: 'route'` — untouched. All three `none` reasons untouched.
 
-`ContentViewerModal` is never rendered anywhere (`rg ContentViewerModal src` matches only its own file). Click → mark read → drawer closes → `openContent()` sets context state → no consumer renders. Route destinations (follow) work; every post/recommendation notification is dead.
+**3. Drawer: `src/components/notifications/NotificationDrawer.tsx`**
+- Remove the `useContentViewer` import and the `kind === 'viewer'` branch (lines 9, 50, 76-79); every resolvable destination becomes one `navigate(destination.path)`.
+- Unchanged: optimistic fire-and-forget `markAsRead`, `closeNotifications()` before navigation, and the three reason-specific toasts.
 
-## Plan
+**4. Delete the modal surface**
+- Delete `src/components/content/ContentViewerModal.tsx` and `src/contexts/ContentViewerContext.tsx`.
+- `src/App.tsx`: remove the `ContentViewerModal` mount, the `ContentViewerProvider` wrapper, and both imports.
 
-**1. Mount one app-wide viewer**
-Render `<ContentViewerModal />` exactly once in `App.tsx`, inside `<Router>` and `ContentViewerProvider`, adjacent to `<NotificationDrawer />`. No per-row or per-drawer instances.
+**5. Page bodies stay**
+- `PostContentViewer` / `RecommendationContentViewer` remain the bodies rendered by `PostView` / `RecommendationView`.
+- Remove only the dead `isInModal` prop (type + destructure) from both. `highlightCommentId`, the `not-found` vs `transient` split, and Retry are untouched.
 
-**2. Canonical route builder**
-Add a single helper (colocated with the viewer) mapping content type → path: `post → /post/:id`, `recommendation → /recommendations/:id`, `review → null` (unsupported, never pushed). Both the modal's URL sync and "View full page" use it, so they can't drift. Append `commentId` when it's a valid UUID. Never append `focus=comment`.
+**6. Tests + docs**
+- `src/utils/notificationDestination.test.ts`: the nine `kind: 'viewer'` expectations become `{ kind: 'route', path: '/post/<id>' }` / `'/recommendations/<id>?commentId=<id>'`. Hostile-URL and `none`-reason cases are unaffected.
+- `docs/NOTIFICATION_CENTER_ROADMAP.md`: record that Phase 2.2B's modal viewer was superseded — notification destinations are full-page routes.
 
-**3. Explicit history ownership**
-Delete the current effect that calls `window.history.back()` whenever `isOpen` is false — that fires on first mount today.
-Replace with a ref holding the entry this instance pushed:
-- On open (and on content change while open): if we don't own an entry, `pushState` and record ownership; if we already own one, `replaceState` (no stacking).
-- On close from button / backdrop / Escape / full-page transition: if we own the entry, `history.back()` once and release ownership; otherwise no history call at all.
-- On `popstate`: release ownership first, then `closeContent()` — so the close path can't push a second `back()` and loop.
-- On unmount and on account/route change: release ownership without navigating.
+**7. Verification (post-implementation audit, not another planning cycle)**
+- `rg "useContentViewer|ContentViewerProvider|ContentViewerContext|ContentViewerModal|openContent|modal=true|contentViewerRoutes" src` → zero hits.
+- `rg "isInModal" src` → only `LightboxPreview.tsx`.
+- Typecheck + `notificationDestination` tests.
+- Manual: post like, recommendation like, plain comment, mention, reply, comment like, follow → profile, deleted target ("no longer available"), network failure ("Couldn't load" + Retry), browser Back, mobile width.
 
-**4. Remove whole-modal click navigation**
-Drop `onClick={handleViewFullPage}` from the content card and the `cursor-pointer` class. Add an explicit "View full page" control in the modal header next to Close. Backdrop click still closes.
-
-**5. Baseline dialog accessibility**
-Escape closes. Focus moves into the dialog on open and returns to the previously focused element on close. Keep `role="dialog"`/`aria-modal` and the described-by wiring. Keep the existing body `overflow` / `pointer-events` cleanup, including on unmount.
-
-**6. No resolver changes**
-`notificationDestination.ts`, the drawer wiring, and Phase 2.1 / 2.2A invariants stay untouched. The `focus=comment` param stays supported in the resolver for `action_url` values that legitimately carry it — we simply never synthesize it.
-
-## Verification
-
-Typecheck + existing resolver tests, then manual: post like, recommendation like, plain comment, mention, reply, comment-like (comment highlighted, composer **not** focused), follow → `/profile/:id`, close button, backdrop, Escape, browser Back, View full page, deleted target → "no longer available", network failure → "Couldn't load" + Retry, and confirm closing never leaves the underlying page.
+### Technical note
+Old shared links carrying `?modal=true` keep loading as normal full pages — `PostView` / `RecommendationView` read only `commentId` from search params and ignore everything else, so no legacy-param handling is needed.
