@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
-import { fetchComments, addComment, deleteComment, updateComment, toggleCommentLike, fetchCommentUserReputations, CommentData } from '@/services/commentsService';
+import { fetchComments, fetchCommentsResult, addComment, deleteComment, updateComment, toggleCommentLike, fetchCommentUserReputations, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { MessageCircle, ArrowUp, User, ArrowUpDown } from 'lucide-react';
@@ -53,6 +53,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const [comments, setComments] = useState<CommentData[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadStatus, setLoadStatus] = useState<'ok' | 'error'>('ok');
   const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
