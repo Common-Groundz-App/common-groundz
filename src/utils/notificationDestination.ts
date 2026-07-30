@@ -118,7 +118,7 @@ export type NotificationDestinationInput = Pick<
  * is only used as a last-resort fallback for shapes we don't model.
  */
 export const resolveNotificationDestination = (
-  notification: ResolverInput
+  notification: NotificationDestinationInput
 ): NotificationDestination => {
   const entityType = notification.entity_type ?? null;
   const entityId = asUuid(notification.entity_id);
