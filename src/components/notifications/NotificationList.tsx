@@ -12,6 +12,7 @@ import {
   formatGroupPrimary,
   getPreviewLine,
   groupAriaLabel,
+  resolveActorName,
   type NotificationGroup,
 } from "@/utils/notificationGrouping";
 import { useProfile } from "@/hooks/use-profile-cache";
@@ -47,8 +48,12 @@ interface NotificationListProps {
  *
  * Extracted into its own component so it can call `useProfile` for the first
  * two actors — hooks can't run inside a `.map()` in the parent. Those lookups
- * are the SAME react-query keys `ProfileAvatar` already uses (`['profile', id]`),
- * so naming an actor costs no extra request.
+ * use the SAME react-query key `ProfileAvatar` already uses (`['profile', id]`),
+ * so react-query dedupes the request rather than issuing a second one.
+ *
+ * Exactly two fixed hook calls, never a loop. While a profile is in flight the
+ * row shows its stored database sentence — no skeleton, no cleared row; the
+ * text simply swaps in place once a verified name resolves.
  */
 function NotificationRow({
   group,
@@ -58,14 +63,17 @@ function NotificationRow({
   onNotificationClick: (group: NotificationGroup, event: React.MouseEvent) => void;
 }) {
   const { representative } = group;
-  // Only aggregated rows need names; singletons already carry a full sentence.
-  const needsNames = group.isAggregated && group.actorIds.length > 1;
-  const { data: actorA } = useProfile(needsNames ? group.actorIds[0] : undefined);
-  const { data: actorB } = useProfile(needsNames ? group.actorIds[1] : undefined);
+  const actorIdA = group.actorIds[0];
+  const actorIdB = group.actorIds[1];
+  const { data: profileA } = useProfile(actorIdA);
+  const { data: profileB } = useProfile(actorIdB);
 
-  const names = needsNames
-    ? [actorA?.displayName, actorB?.displayName].filter((n): n is string => !!n?.trim())
-    : [];
+  // Verified profiles only — a fallback "Anonymous User" resolves to null and
+  // the row keeps whatever sentence the database stored.
+  const names = [
+    resolveActorName(profileA, actorIdA),
+    resolveActorName(profileB, actorIdB),
+  ];
 
   const primary = formatGroupPrimary(group, names);
   const preview = getPreviewLine(representative);

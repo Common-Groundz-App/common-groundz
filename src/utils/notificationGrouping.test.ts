@@ -9,8 +9,10 @@ import type { Notification } from '@/services/notificationService';
 import {
   GROUP_WINDOW_MS,
   formatGroupPrimary,
+  formatRowPrimary,
   getPreviewLine,
-
+  isCommentLike,
+  resolveActorName,
   groupNotifications,
   isGroupableNotification,
 } from './notificationGrouping';
@@ -18,17 +20,23 @@ import {
 const POST_A = '11111111-1111-4111-8111-111111111111';
 const POST_B = '22222222-2222-4222-8222-222222222222';
 const COMMENT_ID = '33333333-3333-4333-8333-333333333333';
+const ACTOR_A = '44444444-4444-4444-8444-444444444444';
+const ACTOR_B = '55555555-5555-4555-8555-555555555555';
 
 const BASE = Date.parse('2026-01-10T12:00:00.000Z');
 const at = (msAgo: number) => new Date(BASE - msAgo).toISOString();
 
 let seq = 0;
+/** Senders must be real UUIDs — the eligibility fence rejects anything else. */
+const sender = (n: number) =>
+  `66666666-6666-4666-8666-${String(n).padStart(12, '0')}`;
+
 const row = (over: Partial<Notification> = {}): Notification =>
   ({
     id: `n${++seq}`,
     user_id: 'u1',
     type: 'like',
-    sender_id: `s${seq}`,
+    sender_id: sender(seq),
     title: 'Someone liked your post',
     message: 'My post',
     entity_type: 'post',
@@ -161,8 +169,8 @@ if (typeof describe === 'function' && typeof it === 'function' && typeof expect 
 
     it('falls back to the single sentence when all events share one actor', () => {
       const groups = groupNotifications([
-        row({ sender_id: 'same', message: 'linda liked your post' }),
-        row({ sender_id: 'same', message: 'linda liked your post' }),
+        row({ sender_id: ACTOR_A, message: 'linda liked your post' }),
+        row({ sender_id: ACTOR_A, message: 'linda liked your post' }),
       ]);
       expect(formatGroupPrimary(groups[0])).toBe('linda liked your post');
     });
@@ -196,6 +204,115 @@ if (typeof describe === 'function' && typeof it === 'function' && typeof expect 
       ]);
       expect(formatGroupPrimary(groups[0], ['linda', 'hana'])).toBe(
         'linda and hana liked your recommendation'
+      );
+    });
+  });
+
+  describe('resolveActorName — verified profiles only', () => {
+    it('prefers the display name', () => {
+      expect(
+        resolveActorName({ id: ACTOR_A, displayName: 'Linda Williams', username: 'linda_williamss' }, ACTOR_A)
+      ).toBe('Linda Williams');
+    });
+    it('falls back to the username when there is no display name', () => {
+      expect(resolveActorName({ id: ACTOR_A, displayName: '', username: 'linda_williamss' }, ACTOR_A)).toBe(
+        'linda_williamss'
+      );
+    });
+    it('rejects the Anonymous User sentinel', () => {
+      expect(
+        resolveActorName({ id: ACTOR_A, displayName: 'Anonymous User', username: 'Anonymous User' }, ACTOR_A)
+      ).toBeNull();
+    });
+    it('rejects a profile belonging to a different actor', () => {
+      expect(resolveActorName({ id: ACTOR_B, displayName: 'Hana Li' }, ACTOR_A)).toBeNull();
+    });
+    it('rejects the empty-id fallback profile', () => {
+      expect(resolveActorName({ id: '', displayName: 'Someone' }, ACTOR_A)).toBeNull();
+    });
+    it('returns null with no profile or no actor id', () => {
+      expect(resolveActorName(null, ACTOR_A)).toBeNull();
+      expect(resolveActorName({ id: ACTOR_A, displayName: 'Linda' }, undefined)).toBeNull();
+    });
+  });
+
+  describe('isCommentLike — real and legacy shapes', () => {
+    it('accepts the shape toggle_comment_like actually emits', () => {
+      expect(
+        isCommentLike(row({ type: 'comment', metadata: { event: 'like', comment_id: COMMENT_ID } }))
+      ).toBe(true);
+    });
+    it('accepts the legacy comment_like shape', () => {
+      expect(
+        isCommentLike(row({ type: 'comment', metadata: { event: 'comment_like', comment_id: COMMENT_ID } }))
+      ).toBe(true);
+    });
+    it('rejects a plain post like', () => {
+      expect(isCommentLike(row())).toBe(false);
+    });
+    it('rejects a plain comment with no comment_id', () => {
+      expect(isCommentLike(row({ type: 'comment', metadata: { event: 'comment' } }))).toBe(false);
+    });
+  });
+
+  describe('formatRowPrimary — event precedence with a resolved name', () => {
+    const named = (over: Partial<Notification>) => formatRowPrimary(row(over), 'Linda Williams');
+
+    it('mention wins even when the row carries a comment_id', () => {
+      expect(named({ type: 'comment', metadata: { event: 'mention', comment_id: COMMENT_ID } })).toBe(
+        'Linda Williams mentioned you'
+      );
+    });
+    it('reply wins over the comment-like check', () => {
+      expect(named({ type: 'comment', metadata: { event: 'reply', comment_id: COMMENT_ID } })).toBe(
+        'Linda Williams replied to your comment'
+      );
+    });
+    it('renders the real comment-like shape as a comment like', () => {
+      expect(
+        named({
+          type: 'comment',
+          title: 'linda_williamss liked your comment',
+          message: '',
+          metadata: { event: 'like', comment_id: COMMENT_ID },
+        })
+      ).toBe('Linda Williams liked your comment');
+    });
+    it('renders a plain comment', () => {
+      expect(named({ type: 'comment', metadata: { event: 'comment' } })).toBe(
+        'Linda Williams commented on your post'
+      );
+    });
+    it('renders a like on a recommendation', () => {
+      expect(named({ entity_type: 'recommendation' })).toBe('Linda Williams liked your recommendation');
+    });
+    it('renders a follow', () => {
+      expect(named({ type: 'follow', entity_type: null, entity_id: null })).toBe(
+        'Linda Williams followed you'
+      );
+    });
+
+    it('keeps stored copy while the profile is unresolved', () => {
+      expect(formatRowPrimary(row({ message: 'linda_williamss liked your post' }), null)).toBe(
+        'linda_williamss liked your post'
+      );
+    });
+    it('prefers title when message is empty (comment-like rows)', () => {
+      expect(
+        formatRowPrimary(
+          row({
+            type: 'comment',
+            title: 'linda_williamss liked your comment',
+            message: '',
+            metadata: { event: 'like', comment_id: COMMENT_ID },
+          }),
+          null
+        )
+      ).toBe('linda_williamss liked your comment');
+    });
+    it('degrades to a generic label when there is no stored copy', () => {
+      expect(formatRowPrimary(row({ type: 'system', title: '', message: '' }), null)).toBe(
+        'New notification'
       );
     });
   });
