@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
-import { fetchComments, fetchCommentsResult, addComment, deleteComment, updateComment, toggleCommentLike, fetchCommentUserReputations, CommentData } from '@/services/commentsService';
+import { fetchCommentsResult, addComment, deleteComment, updateComment, toggleCommentLike, fetchCommentUserReputations, CommentData } from '@/services/commentsService';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { MessageCircle, ArrowUp, User, ArrowUpDown } from 'lucide-react';
