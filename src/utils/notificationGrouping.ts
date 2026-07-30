@@ -47,9 +47,13 @@ export interface NotificationGroup {
   isAggregated: boolean;
 }
 
-/** A row may participate in aggregation only if all of these hold. */
+/** A row may participate in aggregation only if all of these hold.
+ *  `sender_id` MUST be valid — otherwise a group can end up with fewer distinct
+ *  actors than events, and the "and N others" arithmetic silently under-counts. */
 export const isGroupableNotification = (n: Notification): boolean =>
   n.type === 'like' &&
+  typeof n.sender_id === 'string' &&
+  UUID_RE.test(n.sender_id) &&
   typeof n.entity_type === 'string' &&
   GROUPABLE_ENTITY_TYPES.has(n.entity_type) &&
   typeof n.entity_id === 'string' &&
