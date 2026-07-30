@@ -172,7 +172,12 @@ export function NotificationList({
   isRecovering = false,
   showCountMismatch = false,
 }: NotificationListProps) {
+  // Display-only transform over the rows this lane has loaded. Hooks run before
+  // any early return so the order stays stable across loading/empty/error states.
+  const groups = useMemo(() => groupNotifications(notifications), [notifications]);
+
   // Initial load only — background polling never renders skeletons over existing rows
+
   if (loading && notifications.length === 0) {
     return (
       <div className="px-2 py-1">
