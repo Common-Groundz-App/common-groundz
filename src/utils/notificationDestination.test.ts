@@ -7,6 +7,7 @@
  * Vitest-compatible structure; harmless no-op if vitest is absent at import
  * time (matches the project convention in renderBranching.test.ts).
  */
+import { describe, it, expect } from 'vitest';
 import type { NotificationType } from '@/services/notificationService';
 import {
   normalizeInternalPath,
@@ -167,14 +168,7 @@ const pathRejectCases: unknown[] = [
   42,
 ];
 
-// Vitest-compatible structure; harmless no-op if vitest absent at import time.
-declare const describe: undefined | ((name: string, fn: () => void) => void);
-declare const it: undefined | ((name: string, fn: () => void) => void);
-declare const expect:
-  | undefined
-  | ((v: unknown) => { toEqual: (v: unknown) => void; toBeNull: () => void });
-
-if (typeof describe === 'function' && typeof it === 'function' && typeof expect === 'function') {
+{
   describe('resolveNotificationDestination — emitted + degraded shapes', () => {
     for (const [name, input, expected] of destinationCases) {
       it(name, () => {
