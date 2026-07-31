@@ -21,18 +21,14 @@ const cases: Array<[MuxDbStatus, MuxUiStatus]> = [
   ['cancelled', 'failed'],
 ];
 
-declare const describe: undefined | ((name: string, fn: () => void) => void);
-declare const it: undefined | ((name: string, fn: () => void) => void);
-declare const expect: undefined | ((v: unknown) => { toBe: (v: unknown) => void });
+import { describe, expect, it } from 'vitest';
 
-if (typeof describe === 'function' && typeof it === 'function' && typeof expect === 'function') {
-  describe('useMuxStatus — normalizeMuxStatus', () => {
-    for (const [db, ui] of cases) {
-      it(`maps ${db} -> ${ui}`, () => {
-        expect(normalizeMuxStatus(db)).toBe(ui);
-      });
-    }
-  });
-}
+describe('useMuxStatus — normalizeMuxStatus', () => {
+  for (const [db, ui] of cases) {
+    it(`maps ${db} -> ${ui}`, () => {
+      expect(normalizeMuxStatus(db)).toBe(ui);
+    });
+  }
+});
 
 export { cases as muxStatusNormalizationCases };

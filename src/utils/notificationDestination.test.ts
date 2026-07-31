@@ -168,34 +168,28 @@ const pathRejectCases: unknown[] = [
 ];
 
 // Vitest-compatible structure; harmless no-op if vitest absent at import time.
-declare const describe: undefined | ((name: string, fn: () => void) => void);
-declare const it: undefined | ((name: string, fn: () => void) => void);
-declare const expect:
-  | undefined
-  | ((v: unknown) => { toEqual: (v: unknown) => void; toBeNull: () => void });
+import { describe, expect, it } from 'vitest';
 
-if (typeof describe === 'function' && typeof it === 'function' && typeof expect === 'function') {
-  describe('resolveNotificationDestination — emitted + degraded shapes', () => {
-    for (const [name, input, expected] of destinationCases) {
-      it(name, () => {
-        expect(resolveNotificationDestination(input)).toEqual(expected);
-      });
-    }
-  });
+describe('resolveNotificationDestination — emitted + degraded shapes', () => {
+  for (const [name, input, expected] of destinationCases) {
+    it(name, () => {
+      expect(resolveNotificationDestination(input)).toEqual(expected);
+    });
+  }
+});
 
-  describe('normalizeInternalPath — accepts safe internal paths', () => {
-    for (const [input, expected] of pathAcceptCases) {
-      it(input, () => {
-        expect(normalizeInternalPath(input)).toEqual(expected);
-      });
-    }
-  });
+describe('normalizeInternalPath — accepts safe internal paths', () => {
+  for (const [input, expected] of pathAcceptCases) {
+    it(input, () => {
+      expect(normalizeInternalPath(input)).toEqual(expected);
+    });
+  }
+});
 
-  describe('normalizeInternalPath — rejects unsafe input', () => {
-    for (const input of pathRejectCases) {
-      it(String(input), () => {
-        expect(normalizeInternalPath(input)).toBeNull();
-      });
-    }
-  });
-}
+describe('normalizeInternalPath — rejects unsafe input', () => {
+  for (const input of pathRejectCases) {
+    it(String(input), () => {
+      expect(normalizeInternalPath(input)).toBeNull();
+    });
+  }
+});
