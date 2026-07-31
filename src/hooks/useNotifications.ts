@@ -14,6 +14,16 @@ import {
   type PageError,
 } from '@/services/notificationService';
 import { useNotificationLane } from '@/hooks/notifications/useNotificationLane';
+import {
+  useNotificationsRealtime,
+  type RealtimeStatus,
+} from '@/hooks/notifications/useNotificationsRealtime';
+import { useNotificationsRealtimeEnabled } from '@/hooks/useAppConfig';
+import {
+  applyRealtimeUpdate,
+  classifyInsert,
+  mergeRealtimeRow,
+} from '@/utils/notificationRealtime';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
@@ -21,6 +31,9 @@ import { networkStatusService } from '@/services/networkStatusService';
 
 const PAGE_SIZE = 20;
 const STICKY_READ_LIMIT = 50;
+/** Backstop cadence while realtime is `ready`. Polling is never switched off —
+ *  a silently dead socket must still self-heal. */
+const REALTIME_POLL_INTERVAL = 60000;
 
 // Re-exported for existing consumers; the canonical declarations live alongside
 // the data layer in notificationService.
@@ -75,6 +88,9 @@ export interface UseNotificationsResult {
   lastRefresh: Date | null;
   isOnline: boolean;
   fetchAll: () => Promise<void>;
+  /** Transport state of the realtime channel. Diagnostics only — no correctness
+   *  decision in the UI may depend on it. */
+  realtimeStatus: RealtimeStatus;
 }
 
 export function useNotifications(pollInterval = 10000): UseNotificationsResult {
@@ -605,6 +621,67 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     }
   };
 
+  // --- realtime -------------------------------------------------------------
+
+  const realtimeFlagEnabled = useNotificationsRealtimeEnabled();
+
+  /**
+   * Fold a live INSERT into a lane, but ONLY where doing so keeps that lane's
+   * window contiguous. Classification uses the lane's server cursor (what it has
+   * fetched), never its rendered rows, which are filtered by sticky reads.
+   *
+   * Anything skipped here is still covered: every event also schedules a
+   * coalesced reconcile, which is the authoritative path.
+   */
+  const applyRealtimeInsert = useCallback((row: Notification) => {
+    // A mutation owns rows right now; merging would fight the optimistic state.
+    if (anyMutationPending()) return;
+
+    const lanes = [
+      { lane: allLaneRef.current, accepts: true },
+      {
+        lane: unreadLaneRef.current,
+        // The unread lane is a FILTERED dataset: a read row is not a member.
+        accepts: unreadActiveRef.current && !row.is_read,
+      },
+    ];
+
+    lanes.forEach(({ lane, accepts }) => {
+      if (!accepts) return;
+      if (!lane.hasLoadedRef.current) return; // nothing loaded to be part of
+      if (lane.isRecovering) return;
+      const cursor = lane.serverCursorRef.current;
+      const boundary = cursor ? rowCursorKey({ created_at: cursor.created_at }) : null;
+      if (classifyInsert(row, boundary, lane.hasMoreRef.current) !== 'merge') return;
+      lane.replaceRows(applyPendingReads(mergeRealtimeRow(lane.rowsRef.current, row)));
+    });
+  }, [anyMutationPending]);
+
+  /** Live UPDATE (typically a read on another device). Loaded rows only. */
+  const applyRealtimeRowUpdate = useCallback((row: Notification) => {
+    if (anyMutationPending()) return;
+    [allLaneRef.current, unreadLaneRef.current].forEach((lane) => {
+      if (!lane.hasLoadedRef.current) return;
+      if (lane.isRecovering) return;
+      const next = applyRealtimeUpdate(lane.rowsRef.current, row);
+      if (next !== lane.rowsRef.current) lane.replaceRows(applyPendingReads(next));
+    });
+  }, [anyMutationPending]);
+
+  const fetchAllRef = useRef<() => Promise<void>>();
+  fetchAllRef.current = fetchAll;
+
+  const { status: realtimeStatus } = useNotificationsRealtime({
+    userId: user?.id,
+    enabled: baseEnabled && realtimeFlagEnabled,
+    onInsert: applyRealtimeInsert,
+    onUpdate: applyRealtimeRowUpdate,
+    // Head refresh + count: the same authoritative path polling uses.
+    onReconcile: async () => {
+      await fetchAllRef.current?.();
+    },
+  });
+
   // --- gate drains ----------------------------------------------------------
 
   // Count refetch dropped by the commit gate, drained once mutations settle.
@@ -651,6 +728,11 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
 
   // --- polling --------------------------------------------------------------
 
+  // Realtime is a latency optimization, never a replacement: when the channel is
+  // live the backstop poll simply slows down.
+  const effectivePollInterval =
+    realtimeStatus === 'ready' ? Math.max(pollInterval, REALTIME_POLL_INTERVAL) : pollInterval;
+
   useEffect(() => {
     if (!user || isLoading) return;
 
@@ -665,7 +747,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
         }
         await fetchAll();
         scheduleNext();
-      }, pollInterval);
+      }, effectivePollInterval);
     };
 
     scheduleNext();
@@ -676,7 +758,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
         timerRef.current = null;
       }
     };
-  }, [user, isLoading, fetchAll, pollInterval]);
+  }, [user, isLoading, fetchAll, effectivePollInterval]);
 
   // --- derived --------------------------------------------------------------
 
@@ -744,5 +826,6 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     lastRefresh: allLane.lastRefresh,
     isOnline,
     fetchAll,
+    realtimeStatus,
   };
 }
