@@ -43,6 +43,7 @@ export function NotificationDrawer() {
     isOnline,
     isRefreshing,
     fetchAll,
+    realtimeStatus,
     isNotificationsOpen,
     closeNotifications,
     setNotificationsOpen,
@@ -262,6 +263,14 @@ export function NotificationDrawer() {
 
           </Tabs>
         </div>
+
+        {/* Dev-only transport readout. Never shipped to users: realtime is a
+            latency optimization, so its state is diagnostic, not product UI. */}
+        {import.meta.env.DEV && (
+          <div className="shrink-0 border-t px-4 py-1.5 text-[11px] text-muted-foreground">
+            realtime: {realtimeStatus}
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );
