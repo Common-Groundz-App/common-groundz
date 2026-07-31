@@ -101,6 +101,9 @@ export function useNotificationLane({
   const rowsRef = useRef<Notification[]>([]);
   const hasLoadedRef = useRef(false);
   const serverCursorRef = useRef<NotificationCursor | null>(null);
+  // Synchronous mirror of `hasMore`. Realtime classification runs inside socket
+  // callbacks that capture a stale render closure, so it must read the ref.
+  const hasMoreRef = useRef(false);
   const headSeqRef = useRef(0);
   const pageSeqRef = useRef(0);
   // Synchronous lane ownership token. `isLoadingMore` is state and does not
