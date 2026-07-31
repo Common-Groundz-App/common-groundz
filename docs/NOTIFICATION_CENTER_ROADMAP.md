@@ -57,8 +57,21 @@ Render-time only. `src/utils/notificationGrouping.ts` is a pure transform over t
 - **Invariant:** unread counts, the mismatch banner and pagination stay **event-based** over flat server rows. Group counts are presentation only.
 - **Tests:** `src/utils/notificationGrouping.test.ts` — 20 cases covering eligibility, adjacency, the window anchor, and total/unread event-count preservation.
 
+## Phase 2.4 — Realtime with polling reconciliation (done)
+
+Realtime is a **delivery hint**, never a source of truth. The unread count RPC and each lane's own fetches stay authoritative, so a dropped, duplicated or out-of-order event costs latency only — never correctness.
+
+- **Step 0 — Test harness:** `vitest.config.ts` (node env, explicit include list) plus `npm test`. Suites previously "passed" without running; the no-op `describe` guards are gone, so a missing runner now fails loudly. 138 tests.
+- **Step 1 — Pure layer:** `src/utils/notificationRealtime.ts` — `validateRealtimePayload` (all 14 columns, rejects other users' rows and unkeyable timestamps), `classifyInsert` (merge vs out-of-window, judged against the lane's **server cursor**, not its rendered rows), `mergeRealtimeRow` / `applyRealtimeUpdate` (delegating order and de-dup to `mergeNotifications`), and `createTrailingScheduler`.
+- **Step 2 — Migration:** `REPLICA IDENTITY FULL` and a guarded, schema-qualified `supabase_realtime` publication add. No RLS/grant change — the existing `auth.uid() = user_id` SELECT policy already scopes the stream.
+- **Step 3 — Kill switch, end to end:** `notifications.realtime_enabled` in `app_config`, allowlisted in `set_app_flag` with a strict `{ enabled: boolean }` shape, surfaced by `get_public_flags()`, read via `useNotificationsRealtimeEnabled()` (which ignores placeholder data and treats a failed fetch as OFF), and toggleable from the admin Feature Flags panel.
+- **Step 4 — Transport:** `useNotificationsRealtime.ts` owns exactly one channel, `notifications:<userId>`, filtered server-side to `user_id=eq.<uid>`, INSERT + UPDATE only (DELETE carries no usable payload and the app never hard-deletes).
+- **Step 5 — State machine:** `disabled → disconnected → reconciling → ready`. Joining *and* rejoining reconcile before any event is trusted; events outside `ready` are dropped because the gating reconcile is a superset of them.
+- **Step 6 — Coalescing:** trailing 250ms scheduler, so a like storm produces one reconcile at the end of the burst rather than one per event. Backstop polling never stops — it slows to 60s while `ready`, so a silently dead socket still self-heals.
+- **Step 7 — Dev tools:** token-keyed duplicate-channel assertion (a second provider is a bug, not a second user) and a DEV-only `realtime: <status>` footer in the drawer.
+- **Invariant:** realtime never writes rows while a read mutation holds them, never merges into a lane that hasn't loaded or is recovering, and never adds a row to the unread lane that is already read.
+
 ## Next
 
 - **Phase 2.3b — Preferences:** per-type notification preferences (deferred from 2.3).
-- **Phase 2.4 — Realtime:** Supabase realtime inserts into the head window instead of polling.
 - **Phase 2.5 — Coverage:** emit review and journey notifications once those surfaces exist, then extend the resolver's allowlist.
