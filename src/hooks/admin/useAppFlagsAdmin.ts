@@ -22,6 +22,7 @@ const ALLOWED_KEYS = [
   'entity_extraction.search_image_firecrawl_enabled',
   'entity_extraction.search_image_cse_fallback_enabled',
   'entity_extraction.search_brand_logo_lookup_enabled',
+  'notifications.realtime_enabled',
 ] as const;
 
 type AllowedKey = (typeof ALLOWED_KEYS)[number];
