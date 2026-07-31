@@ -44,6 +44,7 @@ type NotificationsData = Pick<
   | 'setUnreadLaneActive'
   | 'isRecovering'
   | 'fetchAll'
+  | 'realtimeStatus'
 >;
 
 interface NotificationsContextValue extends NotificationsData {
@@ -80,6 +81,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     setUnreadLaneActive,
     isRecovering,
     fetchAll,
+    realtimeStatus,
   } = useNotifications();
 
   const [isNotificationsOpen, setNotificationsOpen] = useState(false);
@@ -123,6 +125,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       setUnreadLaneActive,
       isRecovering,
       fetchAll,
+      realtimeStatus,
       isNotificationsOpen,
       openNotifications,
       closeNotifications,
@@ -151,6 +154,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       setUnreadLaneActive,
       isRecovering,
       fetchAll,
+      realtimeStatus,
       isNotificationsOpen,
       openNotifications,
       closeNotifications,
