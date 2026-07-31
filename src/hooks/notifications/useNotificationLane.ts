@@ -127,6 +127,13 @@ export function useNotificationLane({
     setRows(next);
   }, []);
 
+  /** The ONLY way to write `hasMore` — keeps the synchronous mirror aligned. */
+  const setHasMoreTracked = useCallback((next: boolean) => {
+    hasMoreRef.current = next;
+    setHasMore(next);
+  }, []);
+
+
   const patchRowsById = useCallback(
     (ids: Set<string>, patch: (row: Notification) => Notification) => {
       if (ids.size === 0) return;
