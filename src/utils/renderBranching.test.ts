@@ -30,18 +30,14 @@ const cases: Array<[string, MediaItem, ReturnType<typeof pickRenderBranch>]> = [
 ];
 
 // Vitest-compatible structure; harmless no-op if vitest absent at import time.
-declare const describe: undefined | ((name: string, fn: () => void) => void);
-declare const it: undefined | ((name: string, fn: () => void) => void);
-declare const expect: undefined | ((v: unknown) => { toBe: (v: unknown) => void });
+import { describe, expect, it } from 'vitest';
 
-if (typeof describe === 'function' && typeof it === 'function' && typeof expect === 'function') {
-  describe('pickRenderBranch — locked Mux state matrix', () => {
-    for (const [name, item, expected] of cases) {
-      it(name, () => {
-        expect(pickRenderBranch(item)).toBe(expected);
-      });
-    }
-  });
-}
+describe('pickRenderBranch — locked Mux state matrix', () => {
+  for (const [name, item, expected] of cases) {
+    it(name, () => {
+      expect(pickRenderBranch(item)).toBe(expected);
+    });
+  }
+});
 
 export { cases as renderBranchingCases };
