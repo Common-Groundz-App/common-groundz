@@ -58,6 +58,11 @@ export interface NotificationLane {
   rows: Notification[];
   rowsRef: React.MutableRefObject<Notification[]>;
   hasMore: boolean;
+  /** Synchronous mirror of `hasMore`, for socket callbacks. */
+  hasMoreRef: React.MutableRefObject<boolean>;
+  /** Boundary of what this lane has FETCHED (not what it renders). Realtime
+   *  window classification must use this, never the rendered rows. */
+  serverCursorRef: React.MutableRefObject<NotificationCursor | null>;
   isLoadingMore: boolean;
   pageError: PageError;
   /** Lane-scoped fetch failure. Deliberately NOT global: an All-lane failure
@@ -394,6 +399,8 @@ export function useNotificationLane({
     rows,
     rowsRef,
     hasMore,
+    hasMoreRef,
+    serverCursorRef,
     isLoadingMore,
     pageError,
     fetchError,
