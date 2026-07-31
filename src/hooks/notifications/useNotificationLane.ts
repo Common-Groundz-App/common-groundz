@@ -155,7 +155,7 @@ export function useNotificationLane({
     serverCursorRef.current = null;
     rowsRef.current = [];
     setRows([]);
-    setHasMore(false);
+    setHasMoreTracked(false);
     setIsLoadingMore(false);
     setPageError(null);
     setFetchError(null);
@@ -188,7 +188,7 @@ export function useNotificationLane({
       // refreshes must never rewind pagination to page one.
       if (isFirstLoad) {
         serverCursorRef.current = page.nextCursor;
-        setHasMore(page.hasMore);
+        setHasMoreTracked(page.hasMore);
       }
 
       hasLoadedRef.current = true;
@@ -227,7 +227,7 @@ export function useNotificationLane({
 
       const cursor = serverCursorRef.current;
       if (!cursor) {
-        setHasMore(false);
+        setHasMoreTracked(false);
         return;
       }
 
@@ -250,7 +250,7 @@ export function useNotificationLane({
         // Advance only on success — a failed page stays retryable at exactly
         // the same boundary.
         if (page.nextCursor) serverCursorRef.current = page.nextCursor;
-        setHasMore(page.hasMore);
+        setHasMoreTracked(page.hasMore);
         setPageError(null);
       } catch (e) {
         if (!isCurrent()) return;
@@ -326,7 +326,7 @@ export function useNotificationLane({
           commitRows(reconcilersRef.current.append(rowsRef.current, page));
           // The server's next boundary, not the candidate we sent.
           serverCursorRef.current = page.nextCursor;
-          setHasMore(page.hasMore);
+          setHasMoreTracked(page.hasMore);
           setPageError(null);
           recovered = true;
         } catch (e) {
@@ -351,7 +351,7 @@ export function useNotificationLane({
           // the broken cursor makes unreconstructable.
           commitRows(page.rows);
           serverCursorRef.current = page.nextCursor;
-          setHasMore(page.hasMore);
+          setHasMoreTracked(page.hasMore);
           setPageError(null);
           recovered = true;
         } catch {
