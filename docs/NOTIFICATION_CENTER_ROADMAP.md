@@ -71,7 +71,23 @@ Realtime is a **delivery hint**, never a source of truth. The unread count RPC a
 - **Step 7 — Dev tools:** token-keyed duplicate-channel assertion (a second provider is a bug, not a second user) and a DEV-only `realtime: <status>` footer in the drawer.
 - **Invariant:** realtime never writes rows while a read mutation holds them, never merges into a lane that hasn't loaded or is recovering, and never adds a row to the unread lane that is already read.
 
+## Phase 2.5 — Reversible notification lifecycle / retraction (done)
+
+A notification for a reversible action is **live state**, not an event log entry. Undoing the source action retracts the notification; redoing it produces a fresh one.
+
+- **Tombstone, not delete:** `notifications.retracted_at`. Every read path filters `retracted_at IS NULL` server-side (`fetchNotifications`, both membership probes, `get_unread_notification_count`, `mark_all_notifications_as_read`), so no client path can render or count one. Soft, because a hard `DELETE` carries no usable realtime payload.
+- **Identity:** partial unique indexes on ACTIVE rows only — `(user_id, sender_id, entity_type, entity_id)` for top-level likes (excludes comment likes via `metadata->>'comment_id' IS NULL`, which share the parent `entity_id`) and `(user_id, sender_id)` for follows. Insert triggers use **targeted** `ON CONFLICT (cols) WHERE <predicate> DO NOTHING`, so a primary-key or future unique violation still raises instead of being swallowed. This is what stops the badge climbing on every re-like.
+- **Re-like creates a NEW row** rather than un-retracting the old one: `is_read` is monotonic app-wide, and resurrecting a read row would either lie about read state or break that invariant.
+- **Retraction triggers** (`SECURITY DEFINER`, `search_path = public`): `AFTER DELETE` on `post_likes`, `recommendation_likes`, `follows`; `AFTER UPDATE ... WHEN (is_deleted false → true)` on both comment tables. Comment deletion retracts the comment, reply, mention and comment-like rows pointing at it (`type IN ('comment','like')` — `mention` is not a type, it is `metadata.event` on `comment`); system and moderation rows referencing the same comment are deliberately left alone.
+- **Backfill + gate:** 76 pre-existing orphaned like/follow rows retracted, older duplicates per identity retracted keeping the newest, then a `RAISE EXCEPTION` gate — the migration refuses to create the unique indexes if any duplicate identity survives.
+- **Client removal:** realtime UPDATE with a non-null `retracted_at` removes the row from **both** lanes immediately, unconditionally (a retraction is not an optimistic conflict — the row no longer exists). The id is remembered in a bounded `retractedIdsRef` so a fetch already in flight cannot merge it back; every server payload passes through `applyServerRows` (optimistic reads re-applied, tombstones stripped). The badge is never adjusted locally — the coalesced reconcile re-reads the count RPC.
+- **Older pages:** a head refresh only sees the newest window, so it can never notice a retraction on page 2+. `fetchActiveMembership` + an All-lane `onHeadCommitted` pass covers those, with its own sequence token, all-or-nothing commit, and a gate-release drain. The manual Refresh runs **one owner, one coordinated pass over both lanes** — two independently owned passes would compete and flap `historyStale`.
+- **Retention:** `prune_retracted_notifications(limit)` (`service_role` only, `ORDER BY retracted_at, id` so batches always progress) on a nightly `pg_cron` job, deleting tombstones older than 60 days.
+- **Verified in DB:** 5 retraction triggers, 5 indexes, 5 `SECURITY DEFINER` functions, both RPCs filtered, `REPLICA IDENTITY FULL`, table in `supabase_realtime`, cron job scheduled, and a live `ON CONFLICT` inference probe that inserted 0 rows without erroring. 143 unit tests pass.
+
 ## Next
 
 - **Phase 2.3b — Preferences:** per-type notification preferences (deferred from 2.3).
-- **Phase 2.5 — Coverage:** emit review and journey notifications once those surfaces exist, then extend the resolver's allowlist.
+- **Phase 2.6 — Coverage:** emit review and journey notifications once those surfaces exist, then extend the resolver's allowlist.
+- **Deferred:** mention-edit diffing (retracting a mention removed by an edit rather than a deletion).
+
