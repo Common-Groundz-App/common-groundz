@@ -98,7 +98,7 @@ Supabase types regenerate after the migration, before any frontend work. `Notifi
 
 - `fetchNotifications` and `fetchUnreadMembership` add `.is('retracted_at', null)`.
 - New `fetchActiveMembership(ids, userId)` — same all-or-nothing chunked contract as `fetchUnreadMembership` (a partial result is indistinguishable from "these were retracted" and would delete live rows), returning which ids are still active.
-- `revalidateUnreadHistory` generalises into one membership pass parameterised by lane and predicate, reusing the existing `revalidationSeqRef` / `revalidationOwnerRef` gates. The All lane revalidates loaded rows older than its head window and drops any that came back retracted. This is what makes manual check 8 (kill switch off) actually pass.
+- `revalidateUnreadHistory` generalises into **one coordinated pass that reconciles both lanes in a single operation** under the existing `revalidationSeqRef` / `revalidationOwnerRef` gates. It must not be two lanes each calling the pass from their own head commit: `useNotifications.ts:386` returns early when ownership is held, so the second caller would silently skip and stay stale until another poll. One acquisition, one batched membership query set (active ids for the All lane, unread ids for the Unread lane), one commit. The All lane revalidates loaded rows older than its head window and drops any that came back retracted. This is what makes manual check 8 (kill switch off) actually pass.
 
 ## Step 4 — Realtime retraction
 
