@@ -5,6 +5,8 @@ import {
   mergeRealtimeRow,
   applyRealtimeUpdate,
   createTrailingScheduler,
+  isRetracted,
+  removeRetractedRows,
 } from './notificationRealtime';
 import { rowCursorKey, type Notification } from '@/services/notificationService';
 
@@ -245,5 +247,49 @@ describe('createTrailingScheduler', () => {
 
     vi.advanceTimersByTime(1000);
     expect(run).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 2.5 — retraction
+// ---------------------------------------------------------------------------
+
+describe('retraction payloads', () => {
+  it('carries retracted_at through validation, defaulting to null', () => {
+    expect(validateRealtimePayload(rawRow(), USER)?.retracted_at).toBeNull();
+    expect(validateRealtimePayload(rawRow({ retracted_at: null }), USER)?.retracted_at).toBeNull();
+    expect(
+      validateRealtimePayload(rawRow({ retracted_at: '2026-08-01T10:00:00+00:00' }), USER)
+        ?.retracted_at
+    ).toBe('2026-08-01T10:00:00+00:00');
+  });
+
+  it('rejects a non-string retracted_at rather than guessing', () => {
+    expect(validateRealtimePayload(rawRow({ retracted_at: 123 }), USER)).toBeNull();
+    expect(validateRealtimePayload(rawRow({ retracted_at: {} }), USER)).toBeNull();
+  });
+
+  it('isRetracted is true only for a non-empty timestamp', () => {
+    expect(isRetracted({ retracted_at: '2026-08-01T10:00:00+00:00' })).toBe(true);
+    expect(isRetracted({ retracted_at: null })).toBe(false);
+    expect(isRetracted({ retracted_at: undefined })).toBe(false);
+    expect(isRetracted({ retracted_at: '' })).toBe(false);
+    expect(isRetracted({})).toBe(false);
+  });
+});
+
+describe('removeRetractedRows', () => {
+  const a = row('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', '2026-07-31T10:00:02+00:00');
+  const b = row('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', '2026-07-31T10:00:01+00:00');
+
+  it('is identity-stable when nothing matches, so callers can skip a commit', () => {
+    const rows = [a, b];
+    expect(removeRetractedRows(rows, new Set())).toBe(rows);
+    expect(removeRetractedRows(rows, new Set(['cccccccc-cccc-4ccc-8ccc-cccccccccccc']))).toBe(rows);
+  });
+
+  it('strips tombstoned ids and keeps the rest in order', () => {
+    const next = removeRetractedRows([a, b], new Set([a.id]));
+    expect(next.map((r) => r.id)).toEqual([b.id]);
   });
 });

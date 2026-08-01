@@ -102,6 +102,10 @@ export const validateRealtimePayload = (
   if (tryCursorKey(row.created_at) === null) return null;
   if (typeof row.updated_at !== 'string') return null;
 
+  // Retraction tombstone. Validated (not ignored) because an UPDATE that sets it
+  // is exactly how the client learns a like/follow was undone.
+  if (!isOptionalString(row.retracted_at)) return null;
+
   let metadata: Notification['metadata'];
   if (row.metadata !== null && row.metadata !== undefined) {
     if (typeof row.metadata !== 'object' || Array.isArray(row.metadata)) return null;
@@ -122,9 +126,30 @@ export const validateRealtimePayload = (
     action_url: (row.action_url as string | null) ?? null,
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
+    retracted_at: (row.retracted_at as string | null) ?? null,
     metadata,
   };
 };
+
+/**
+ * A retracted row is a TOMBSTONE, not a notification: the user undid the action
+ * that produced it. Treated as a removal everywhere — never rendered, never
+ * counted, never merged back in by an in-flight fetch.
+ */
+export const isRetracted = (row: Pick<Notification, 'retracted_at'>): boolean =>
+  typeof row.retracted_at === 'string' && row.retracted_at.length > 0;
+
+/** Remove tombstoned ids from a lane's rows. Pure; identity-stable when nothing
+ *  matches, so callers can skip a commit. */
+export const removeRetractedRows = (
+  rows: Notification[],
+  retractedIds: Set<string>
+): Notification[] => {
+  if (retractedIds.size === 0) return rows;
+  if (!rows.some((row) => retractedIds.has(row.id))) return rows;
+  return rows.filter((row) => !retractedIds.has(row.id));
+};
+
 
 /**
  * What a lane should do with a validated INSERT.

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   fetchUnreadCount,
   fetchUnreadMembership,
+  fetchActiveMembership,
   markNotificationsAsRead,
   markAllNotificationsAsRead,
   mergeNotifications,
@@ -22,7 +23,9 @@ import { useNotificationsRealtimeEnabled } from '@/hooks/useAppConfig';
 import {
   applyRealtimeUpdate,
   classifyInsert,
+  isRetracted,
   mergeRealtimeRow,
+  removeRetractedRows,
 } from '@/utils/notificationRealtime';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
@@ -117,6 +120,12 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   // exactly one trailing revalidation runs once the gates release — rather than
   // leaving older rows unverified until the next poll.
   const pendingRevalidationRef = useRef<boolean>(false);
+  // Separate sequence token for the All lane's ACTIVE-membership revalidation.
+  // It shares neither its token nor its ownership with the unread pass: the two
+  // answer different questions ("still unread?" vs "still not retracted?") and
+  // one superseding the other would leave the other's rows unverified.
+  const activeRevalidationSeqRef = useRef<number>(0);
+  const pendingActiveRevalidationRef = useRef<boolean>(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Bumped whenever the authenticated user changes. Captured by every fetch and
@@ -139,6 +148,11 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   // cursor, loadedUnreadCount, mismatch detection, mark-all eligibility and
   // membership validation.
   const stickyReadIdsRef = useRef<Set<string>>(new Set());
+
+  // Ids realtime has reported as RETRACTED (Phase 2.5). Kept so a fetch that was
+  // already in flight when the retraction arrived cannot merge the row back in.
+  // Bounded: a tombstone only has to outlive the requests overlapping it.
+  const retractedIdsRef = useRef<Set<string>>(new Set());
 
   // Whether the Unread lane should be doing any work at all.
   const [unreadActive, setUnreadActive] = useState<boolean>(false);
@@ -166,10 +180,17 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
       // Monotonic reconciliation: a fetch must never turn a locally-read row
       // back to unread. A poll started before an optimistic read can return a
       // stale snapshot, and the pending id may already have been released.
-      head: (prev, page) => applyPendingReads(mergeNotifications(prev, page.rows)),
-      append: (prev, page) => mergeNotifications(prev, page.rows),
+      head: (prev, page) => applyServerRows(mergeNotifications(prev, page.rows)),
+      append: (prev, page) => applyServerRows(mergeNotifications(prev, page.rows)),
+    },
+    onHeadCommitted: (page, isCurrent) => {
+      // A head refresh only ever sees the NEWEST window, so it can never notice
+      // that a row on page 2+ was retracted. This is the only path that removes
+      // those (Phase 2.5).
+      void revalidateActiveHistoryRef.current?.(page, isCurrent);
     },
   });
+
 
   /**
    * Unread head reconciliation.
@@ -197,7 +218,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
         return isOlderThan(rowCursorKey(row), boundaryKey);
       });
 
-      return applyPendingReads(mergeNotifications(retained, page.rows));
+      return applyServerRows(mergeNotifications(retained, page.rows));
     },
     []
   );
@@ -210,7 +231,7 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     isMutationHeld: anyMutationPending,
     reconcilers: {
       head: reconcileUnreadHead,
-      append: (prev, page) => applyPendingReads(mergeNotifications(prev, page.rows)),
+      append: (prev, page) => applyServerRows(mergeNotifications(prev, page.rows)),
     },
     onHeadCommitted: (page, isCurrent) => {
       // Sticky rows are cleared atomically with their removal on every
@@ -240,6 +261,20 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
       !row.is_read && locallyRead.has(row.id) ? { ...row, is_read: true } : row
     );
   }
+
+  /**
+   * The single gate every server payload passes through before it becomes lane
+   * state: local optimistic reads are re-applied, and rows realtime has already
+   * reported as retracted are stripped.
+   *
+   * The retraction strip matters because a fetch already in flight when the
+   * retraction arrived still carries the row (it was active when the query ran),
+   * and merging it back would resurrect a notification the user just undid.
+   */
+  function applyServerRows(rows: Notification[]): Notification[] {
+    return applyPendingReads(removeRetractedRows(rows, retractedIdsRef.current));
+  }
+
 
   /**
    * Canonical cross-lane read state.
@@ -273,11 +308,14 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     countSeqRef.current += 1;
     mutationEpochRef.current += 1;
     revalidationSeqRef.current += 1;
+    activeRevalidationSeqRef.current += 1;
     pendingReadIdsRef.current.clear();
     stickyReadIdsRef.current = new Set();
+    retractedIdsRef.current = new Set();
     markAllPendingRef.current = false;
     countRefetchQueuedRef.current = false;
     pendingRevalidationRef.current = false;
+    pendingActiveRevalidationRef.current = false;
     revalidationOwnerRef.current = false;
     allLaneRef.current.reset();
     unreadLaneRef.current.reset();
@@ -381,12 +419,93 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
   const revalidateUnreadHistoryRef = useRef(revalidateUnreadHistory);
   revalidateUnreadHistoryRef.current = revalidateUnreadHistory;
 
-  /** Manual Refresh for the stale-history strip. Ownership-guarded. */
+  /**
+   * All-lane mirror: verifies that loaded rows OUTSIDE the head window are still
+   * ACTIVE (not retracted).
+   *
+   * Needed because retraction is the first thing that can remove a row from the
+   * All lane at all. Head refreshes are authoritative only over the newest
+   * window, so without this an unliked notification sitting on page 3 would stay
+   * on screen until a full reload.
+   *
+   * Commit is all-or-nothing for the same reason as the unread pass: a partial
+   * result is indistinguishable from "these rows were retracted".
+   */
+  const revalidateActiveHistory = useCallback(
+    async (page: NotificationPage, isHeadCurrent: () => boolean) => {
+      const currentUserId = user?.id;
+      if (!currentUserId) return;
+
+      const lane = allLaneRef.current;
+      const pageIds = new Set(page.rows.map((row) => row.id));
+      const boundaryKey =
+        page.rows.length > 0 ? rowCursorKey(page.rows[page.rows.length - 1]) : null;
+
+      const candidateIds = lane.rowsRef.current
+        .filter((row) => {
+          if (pageIds.has(row.id)) return false;
+          // Empty head page => no window => everything needs verifying.
+          if (boundaryKey === null) return true;
+          return isOlderThan(rowCursorKey(row), boundaryKey);
+        })
+        .map((row) => row.id);
+
+      if (candidateIds.length === 0) return;
+
+      const generation = userGenerationRef.current;
+      activeRevalidationSeqRef.current += 1;
+      const seq = activeRevalidationSeqRef.current;
+
+      const isApplicable = () =>
+        generation === userGenerationRef.current &&
+        seq === activeRevalidationSeqRef.current &&
+        isHeadCurrent();
+
+      try {
+        const stillActive = await fetchActiveMembership(candidateIds, currentUserId);
+        if (!isApplicable()) return;
+
+        if (anyMutationPending()) {
+          pendingActiveRevalidationRef.current = true;
+          return;
+        }
+
+        const toDrop = new Set(candidateIds.filter((id) => !stillActive.has(id)));
+        if (toDrop.size > 0) {
+          // Dropping rows never moves the cursor.
+          lane.dropRowsById(toDrop);
+          // Also drop them from the unread lane: a retracted row is not unread,
+          // it does not exist.
+          unreadLaneRef.current.dropRowsById(toDrop);
+        }
+      } catch {
+        if (!isApplicable()) return;
+        // Retry on gate release rather than surfacing an error: a lingering row
+        // is a cosmetic staleness, not a failure the user can act on.
+        if (anyMutationPending()) pendingActiveRevalidationRef.current = true;
+      }
+    },
+    [user?.id, anyMutationPending]
+  );
+
+  const revalidateActiveHistoryRef = useRef(revalidateActiveHistory);
+  revalidateActiveHistoryRef.current = revalidateActiveHistory;
+
+  /**
+   * Manual Refresh for the stale-history strip.
+   *
+   * ONE owner runs ONE coordinated pass over BOTH lanes. Two independently
+   * owned passes would compete: whichever finished second would see the other's
+   * committed rows and could re-verify or re-drop them, and the shared
+   * `historyStale` flag would flap.
+   */
   const refreshUnreadHistory = useCallback(async () => {
     if (revalidationOwnerRef.current) return;
     revalidationOwnerRef.current = true;
     try {
-      await unreadLaneRef.current.refreshHead();
+      const passes: Promise<void>[] = [allLaneRef.current.refreshHead()];
+      if (unreadActiveRef.current) passes.push(unreadLaneRef.current.refreshHead());
+      await Promise.all(passes);
     } finally {
       revalidationOwnerRef.current = false;
     }
@@ -633,9 +752,51 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
    * Anything skipped here is still covered: every event also schedules a
    * coalesced reconcile, which is the authoritative path.
    */
+  const MAX_TRACKED_RETRACTIONS = 500;
+
+  /**
+   * Remove a retracted row everywhere, immediately (Phase 2.5).
+   *
+   * Runs regardless of the mutation gate. A retraction is not an optimistic
+   * conflict: the row no longer exists server-side, so there is nothing a
+   * pending read could disagree with. The id is remembered so an in-flight fetch
+   * that still carries the row cannot merge it back.
+   */
+  const applyRetraction = useCallback((row: Notification) => {
+    const tracked = retractedIdsRef.current;
+    // Bounded: a tombstone only needs to outlive the requests overlapping it.
+    if (tracked.size >= MAX_TRACKED_RETRACTIONS) tracked.clear();
+    tracked.add(row.id);
+
+    pendingReadIdsRef.current.delete(row.id);
+    stickyReadIdsRef.current.delete(row.id);
+
+    const toDrop = new Set([row.id]);
+    allLaneRef.current.dropRowsById(toDrop);
+    unreadLaneRef.current.dropRowsById(toDrop);
+    // The badge is NOT adjusted locally: the coalesced reconcile that follows
+    // every realtime event re-reads the count RPC, which already excludes
+    // retracted rows. Guessing here could double-count against that.
+  }, []);
+
+  /**
+   * Fold a live INSERT into a lane, but ONLY where doing so keeps that lane's
+   * window contiguous. Classification uses the lane's server cursor (what it has
+   * fetched), never its rendered rows, which are filtered by sticky reads.
+   *
+   * Anything skipped here is still covered: every event also schedules a
+   * coalesced reconcile, which is the authoritative path.
+   */
   const applyRealtimeInsert = useCallback((row: Notification) => {
+    // Defensive: an INSERT is never born retracted, but a replayed/backfilled
+    // event could be. A tombstone must never enter a lane.
+    if (isRetracted(row)) {
+      applyRetraction(row);
+      return;
+    }
     // A mutation owns rows right now; merging would fight the optimistic state.
     if (anyMutationPending()) return;
+    if (retractedIdsRef.current.has(row.id)) return;
 
     const lanes = [
       { lane: allLaneRef.current, accepts: true },
@@ -653,20 +814,31 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
       const cursor = lane.serverCursorRef.current;
       const boundary = cursor ? rowCursorKey({ created_at: cursor.created_at }) : null;
       if (classifyInsert(row, boundary, lane.hasMoreRef.current) !== 'merge') return;
-      lane.replaceRows(applyPendingReads(mergeRealtimeRow(lane.rowsRef.current, row)));
+      lane.replaceRows(applyServerRows(mergeRealtimeRow(lane.rowsRef.current, row)));
     });
-  }, [anyMutationPending]);
+  }, [anyMutationPending, applyRetraction]);
 
-  /** Live UPDATE (typically a read on another device). Loaded rows only. */
+  /**
+   * Live UPDATE — either a read on another device, or a RETRACTION.
+   *
+   * Retraction is checked first and is unconditional: it is how "unlike",
+   * "unfollow" and "comment deleted" reach the client, and the row must vanish
+   * the moment the undo lands rather than at the next poll.
+   */
   const applyRealtimeRowUpdate = useCallback((row: Notification) => {
+    if (isRetracted(row)) {
+      applyRetraction(row);
+      return;
+    }
     if (anyMutationPending()) return;
     [allLaneRef.current, unreadLaneRef.current].forEach((lane) => {
       if (!lane.hasLoadedRef.current) return;
       if (lane.isRecovering) return;
       const next = applyRealtimeUpdate(lane.rowsRef.current, row);
-      if (next !== lane.rowsRef.current) lane.replaceRows(applyPendingReads(next));
+      if (next !== lane.rowsRef.current) lane.replaceRows(applyServerRows(next));
     });
-  }, [anyMutationPending]);
+  }, [anyMutationPending, applyRetraction]);
+
 
   const fetchAllRef = useRef<() => Promise<void>>();
   fetchAllRef.current = fetchAll;
@@ -701,6 +873,14 @@ export function useNotifications(pollInterval = 10000): UseNotificationsResult {
     pendingRevalidationRef.current = false;
     if (!unreadActiveRef.current) return;
     void unreadLaneRef.current.refreshHead();
+  }, [pendingReadOps, markAllPending]);
+
+  // Same drain for the All lane's ACTIVE-membership pass (Phase 2.5).
+  useEffect(() => {
+    if (pendingReadOps > 0 || markAllPending) return;
+    if (!pendingActiveRevalidationRef.current) return;
+    pendingActiveRevalidationRef.current = false;
+    void allLaneRef.current.refreshHead();
   }, [pendingReadOps, markAllPending]);
 
   // --- unread lane lifecycle ------------------------------------------------

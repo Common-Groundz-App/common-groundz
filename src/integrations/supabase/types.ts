@@ -1998,6 +1998,7 @@ export type Database = {
           is_read: boolean | null
           message: string
           metadata: Json | null
+          retracted_at: string | null
           sender_id: string | null
           title: string
           type: string
@@ -2014,6 +2015,7 @@ export type Database = {
           is_read?: boolean | null
           message: string
           metadata?: Json | null
+          retracted_at?: string | null
           sender_id?: string | null
           title: string
           type: string
@@ -2030,6 +2032,7 @@ export type Database = {
           is_read?: boolean | null
           message?: string
           metadata?: Json | null
+          retracted_at?: string | null
           sender_id?: string | null
           title?: string
           type?: string
@@ -4933,6 +4936,10 @@ export type Database = {
         }[]
       }
       prune_image_enrich_rate_limits: { Args: never; Returns: undefined }
+      prune_retracted_notifications: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       prune_search_rate_limits: { Args: never; Returns: undefined }
       repair_hashtag_relationships: { Args: never; Returns: Json }
       run_duplicate_detection: {
