@@ -1,100 +1,110 @@
-# Phase 2.4 audit + Phase 2.5 — Retraction integrity (undo)
+# Phase 2.5 — Reversible notification lifecycle (retraction)
 
-## Part 1 — Phase 2.4 audit result
+## Which approach
 
-Verified against the code and the database, not assumed:
+Hybrid, with Codex's core mechanic. All three agree on the diagnosis and on soft retraction over hard delete. They differ on one decision that actually matters for *our* codebase:
 
-- `src/utils/notificationRealtime.ts` + 24 tests, `src/hooks/notifications/useNotificationsRealtime.ts` (state machine `disabled → disconnected → reconciling → ready`, one user-scoped channel, dev duplicate-channel guard, 250 ms trailing coalescer) are all present.
-- `useNotifications.ts` wires `onInsert` / `onUpdate` / `onReconcile`, gates merges on mutation pending, lane `hasLoadedRef`, `isRecovering`, and the lane `serverCursorRef` boundary, and slows the backstop poll only while `ready`.
-- `realtimeStatus` is plumbed hook → `UseNotificationsResult` → `NotificationsContext` → dev-only drawer footer.
-- Kill switch is end to end: `app_config` row, `set_app_flag` allowlist, `get_public_flags()`, `useNotificationsRealtimeEnabled()` status-gated, admin toggle.
-- DB: `notifications` is in `supabase_realtime` with `REPLICA IDENTITY FULL`.
+| Decision | ChatGPT | Codex | Chosen |
+| --- | --- | --- | --- |
+| Column | `cancelled_at` | `retracted_at` | `retracted_at` |
+| Re-like | reactivate the old row (`is_read=false`, bump `created_at`) | insert a **new** row, old one stays retracted | **new row** |
+| DB enforcement | partial unique index (tentative) | partial unique index, active rows only | partial unique index on active rows |
+| Realtime | UPDATE carries retraction | same | same |
+| Retention | not covered | prune retracted rows | prune, 60 days |
+| Comments/mentions/system | nuanced, don't blanket-retract | same, plus never retract system/moderation | same |
 
-No leftover or dead code from the phase. Phase 2.4 is complete. The behaviour you are seeing is not a 2.4 bug — it is a gap that predates it.
+**Why "new row" beats "reactivate" here, specifically for this app:** our merge layer treats `is_read` as monotonic on purpose — `mergeRealtimeRow` refuses to turn a locally-read row back to unread, and the Unread lane keeps "sticky read" rows visible until the drawer closes. Reactivating a row means flipping `is_read` back to `false` and moving its `created_at`, which forces a special-case exception into the single rule that keeps read state from flickering across two lanes, a poller, and a socket. That is the most delicate invariant in Phase 2.1–2.4, and it is not worth spending on a re-like. A retract + fresh INSERT needs **zero** exceptions: retraction is a removal, a re-like is an ordinary insert with a new id, and both already have a working path.
 
-## Part 2 — Why the count keeps climbing
+`retracted_at` over `cancelled_at` only because "cancelled" reads like a user-cancelled action in our domain (cancelled uploads, cancelled Mux jobs), while "retracted" unambiguously means the source event stopped being true.
 
-Confirmed from the database:
+The one thing Codex adds that neither of the other two do, and that we should keep, is **retention**: toggling generates rows forever under soft retraction, so pruning is part of the phase, not a later cleanup.
 
-- `post_likes` has only `on_new_post_like` (AFTER INSERT). Same for `recommendation_likes` and `follows`. There is **no DELETE trigger anywhere**, so unliking removes the like but leaves the notification row.
-- There is no uniqueness on notifications, so every re-like inserts a **brand new row**. 64 → 65 → 66 is real rows accumulating. You only see one item because the 2.3 grouping layer collapses them visually — the rows and the unread count are genuinely duplicated underneath.
+## Confirmed current state
 
-So two distinct defects: retraction is not propagated, and repeat actions are not idempotent.
+- `post_likes`, `recommendation_likes`, `follows` each have only an AFTER INSERT trigger. There is **no DELETE trigger anywhere**, so unliking leaves the notification active.
+- `notifications` has no uniqueness, so each re-like inserts a genuinely new row. 64 → 65 → 66 is real rows; the 2.3 grouping layer only hides it visually.
+- `comment_likes`, `review_likes` have **no notification trigger at all** today, so there is nothing to retract there — out of scope rather than "to do".
+- `notifications` is in `supabase_realtime` with `REPLICA IDENTITY FULL`, and the client subscribes to INSERT + UPDATE only. Retraction as an UPDATE therefore travels on the existing, RLS-filtered path.
 
-## Part 3 — How the big platforms handle it
-
-Instagram/Twitter treat a like/follow notification as a **projection of a live relationship**, not an event log entry:
-
-1. One notification row per (recipient, type, target, actor). Re-liking touches that row, it never creates a second one.
-2. Undoing the action retracts the notification — it disappears from the list and stops counting.
-3. Structural events (comments, mentions) are retracted when the comment is deleted; the parent content disappearing hides the row rather than leaving a dead link.
-
-We can match all three.
-
-## Part 4 — Design: soft retraction, not hard delete
-
-Hard `DELETE` looks tempting but is the wrong tool here: Supabase realtime does not apply RLS to DELETE payloads, so we would have to subscribe to unfiltered deletes. Instead, retraction becomes an **UPDATE**, which our existing RLS-filtered UPDATE subscription already delivers safely and instantly.
+## Target behaviour
 
 ```text
-hana likes    -> upsert row, retracted_at = NULL, is_read = false, created_at = now()  (INSERT or UPDATE)
-hana unlikes  -> UPDATE row SET retracted_at = now()      -> realtime UPDATE -> row vanishes, count drops
-hana re-likes -> UPDATE same row, retracted_at = NULL      -> row reappears at top, count +1 (never +2)
+hana likes    -> INSERT active row            -> 65
+hana unlikes  -> UPDATE retracted_at = now()  -> 64, row disappears
+hana re-likes -> INSERT a new active row      -> 65   (never 66)
+repeat x10    -> still 65, one visible row
 ```
 
-### Step 1 — Migration
+## Step 1 — Migration: lifecycle column and identity
 
-1. `notifications.retracted_at timestamptz NULL`, partial index `(user_id) WHERE retracted_at IS NULL AND is_read = false`.
-2. Unique index on retractable identity: `(user_id, type, entity_type, entity_id, sender_id)` restricted to `type IN ('like','follow')` — the classes of event that are reversible and actor-scoped. Comments/mentions stay append-only (many per actor is legitimate).
-3. Backfill: collapse existing duplicate like/follow rows to the newest per identity group and retract notifications whose underlying like/follow no longer exists, so your 66 settles to the truth before the index is created.
-4. Rewrite `create_post_like_notification`, `create_recommendation_like_notification`, `create_follow_notification` as upserts: `ON CONFLICT ... DO UPDATE SET created_at = now(), updated_at = now(), is_read = false, retracted_at = NULL`.
-5. New AFTER DELETE triggers on `post_likes`, `recommendation_likes`, `follows` that set `retracted_at = now()` on the matching row.
-6. New AFTER DELETE trigger on `post_comments` / `recommendation_comments` retracting the notification whose `metadata->>'comment_id'` matches.
-7. Update `get_unread_notification_count` and `mark_all_notifications_as_read` to ignore retracted rows.
+1. `ALTER TABLE public.notifications ADD COLUMN retracted_at timestamptz NULL`.
+2. Backfill, in this order, so the index can be created cleanly:
+   - retract notifications of type `like` / `follow` whose underlying like/follow row no longer exists;
+   - for the remaining active like/follow rows, keep the newest per identity group and retract the older duplicates. Your 66 settles to the truth here.
+3. Partial unique index enforcing one active notification per identity:
+   `(user_id, type, entity_type, entity_id, sender_id) WHERE retracted_at IS NULL AND type IN ('like','follow')`.
+   Database-level, because two tabs, retries, and concurrent trigger execution can all defeat client-side dedupe.
+4. Supporting partial index for the unread count: `(user_id) WHERE retracted_at IS NULL AND is_read = false`.
 
-### Step 2 — Read path
+Comment, mention, and system notifications are deliberately excluded from the index — multiple per actor is legitimate there.
 
-`fetchNotificationsPage` and `fetchUnreadMembership` add `.is('retracted_at', null)`. Retraction therefore also self-heals on the next poll even if the socket is down.
+## Step 2 — Migration: triggers
 
-### Step 3 — Realtime path
+- Rewrite `create_post_like_notification`, `create_recommendation_like_notification`, `create_follow_notification` to `INSERT ... ON CONFLICT DO NOTHING` against the new index, so a duplicate insert from a double-fire is a no-op rather than an error.
+- New AFTER DELETE triggers on `post_likes`, `recommendation_likes`, `follows`: set `retracted_at = now()`, `updated_at = now()` on the matching **active** row. `is_read` is left untouched — retraction removes the row from view and from the count, so mutating read state adds nothing and would fight the monotonic rule.
+- New AFTER DELETE trigger on `post_comments` / `recommendation_comments`: retract the notification whose `metadata->>'comment_id'` matches. A deleted comment must not keep exposing its quoted preview text.
+- `get_unread_notification_count` and `mark_all_notifications_as_read` gain `AND retracted_at IS NULL`.
+- Explicitly **not** applied to moderation, security, or system notification types: those are durable messages, and a correction is a new notification, not a silent erasure.
 
-- `validateRealtimePayload` accepts `retracted_at` (string or null).
-- A validated UPDATE carrying `retracted_at != null` **removes** the row from both lanes instead of patching it, then schedules the coalesced reconcile that corrects the count.
-- The monotonic `is_read` rule gets one narrow exception: an UPDATE whose `created_at` is strictly newer than the loaded row's (a re-trigger) may reset `is_read` to false. Without this, a re-like after you had read the original would stay silently read.
-- Retracted rows are never merged by `applyRealtimeInsert`.
-- A retraction arriving for a row a mutation currently owns is still dropped by the existing gate and picked up by the release-time reconcile — the invariant does not change.
+## Step 3 — Read path
 
-### Step 4 — Other undo cases to cover
+`fetchNotificationsPage` and `fetchUnreadMembership` add `.is('retracted_at', null)`. Retraction then self-heals through the poller even with the socket down, and unread-membership revalidation drops retracted rows for free.
+
+## Step 4 — Realtime retraction
+
+- `validateRealtimePayload` accepts `retracted_at` (ISO string or null) as a validated field; a malformed value drops the payload to a reconcile, as today.
+- A validated UPDATE with `retracted_at !== null` is handled as a **removal, not a patch**: drop the id from the All lane, the Unread lane, and `stickyReadIdsRef`, then let the existing 250 ms coalesced scheduler refresh the authoritative count via the RPC. The count is never derived from payload arithmetic.
+- `applyRealtimeInsert` refuses rows that already carry `retracted_at`.
+- Retractions arriving while a read mutation owns rows are dropped by the existing gate and picked up by the release-time reconcile. No change to the mutation-exclusivity or release-before-reconcile invariants.
+- Grouping recomputes naturally from the reduced row set, so aggregation stays correct with no changes to `notificationGrouping.ts`.
+
+## Step 5 — Retention
+
+Retracted rows accumulate under toggling. Add a `prune_retracted_notifications()` maintenance function deleting rows with `retracted_at < now() - interval '60 days'`, invoked from the existing daily refresh workflow. Retracted rows are never returned to a user or counted at any point in their life; the window exists purely for debugging and abuse analysis.
+
+## Step 6 — Other undo cases
 
 | Undo | Handling |
 | --- | --- |
-| Unlike post / recommendation | DELETE trigger retracts (Step 1.5) |
-| Unfollow | DELETE trigger retracts |
+| Unlike post / recommendation | DELETE trigger retracts |
+| Unfollow | DELETE trigger retracts; refollow inserts a fresh row |
+| Re-like / re-follow, repeated | Unique index caps active rows at one, count moves by at most 1 |
 | Delete own comment | DELETE trigger retracts via `metadata.comment_id` |
-| Re-like / re-follow | Upsert, count moves by at most 1 |
-| Author deletes the post/recommendation | Retract dependent notifications in the same delete path so the drawer never links to a dead target |
+| Author deletes the post/recommendation | Retract dependent notifications so the drawer never links to a dead target |
 | Mention removed while editing a post | Retract the mention notification for actors no longer mentioned |
-| Read state | Unchanged — read is not retraction, and mark-all still ignores retracted rows |
+| Comment likes / review likes | No notification trigger exists — out of scope, and this lifecycle is the pattern to follow when one is added |
+| System / moderation / security | Never auto-retracted |
+| Read state | Unchanged. Read is not retraction; mark-all ignores retracted rows |
 
-Review/comment likes have no notification trigger today, so nothing to retract there; out of scope.
+## Step 7 — Tests
 
-### Step 5 — Tests
+Extend `notificationRealtime.test.ts`: a retraction UPDATE removes the row from a lane rather than patching it, a retracted INSERT is refused, `retracted_at` validation accepts null/ISO and rejects garbage, and a burst of retractions coalesces to exactly one reconcile. All 138 existing tests must stay green.
 
-Extend `notificationRealtime.test.ts`: retraction UPDATE drops the row from a lane, retracted INSERT is refused, `created_at`-bump un-reads a row while an equal/older UPDATE cannot, and a retraction burst coalesces to one reconcile. Existing 138 tests must stay green.
+## Step 8 — Docs
 
-### Step 6 — Docs
-
-Append Phase 2.5 to `docs/NOTIFICATION_CENTER_ROADMAP.md` with the standing invariant: **like and follow notifications are relationship projections — one row per (recipient, type, target, actor), retracted rather than deleted.**
+Append Phase 2.5 to `docs/NOTIFICATION_CENTER_ROADMAP.md` with the standing invariants: **like and follow notifications are projections of live state — at most one active row per (recipient, type, target, actor); undoing the source retracts, re-doing it inserts a new row; retracted rows are invisible to users and to the count; read state remains monotonic.**
 
 ## Manual verification
 
-1. Rishab at 64. Hana likes → 65 and the row appears. Hana unlikes → back to **64**, row gone from the drawer, no refresh.
-2. Re-like → 65, not 66. Repeat five times → still 65, one row, timestamp refreshes to "just now".
-3. Read the like, then have Hana unlike and re-like → row returns as unread.
-4. Same cycle with the drawer closed → count is correct when you open it.
-5. Follow / unfollow / re-follow → same single-row behaviour.
-6. Hana comments, then deletes the comment → notification disappears.
-7. Realtime flag off → all of the above still correct within one poll cycle.
+1. Rishab at 64. Hana likes → 65, row appears. Hana unlikes → **64**, row gone, no refresh.
+2. Re-like → 65. Toggle five more times → still 65, one visible row, newest timestamp.
+3. Read the like, Hana unlikes then re-likes → a fresh unread row appears; the old one does not resurrect.
+4. Same cycle with the drawer closed → count correct on open.
+5. Follow / unfollow / refollow → identical single-row behaviour.
+6. Hana comments, then deletes the comment → notification disappears, preview text gone.
+7. Realtime kill switch off → all of the above still correct within one poll cycle.
+8. Two tabs open, toggle rapidly in one → the other converges to the same count, no duplicate rows.
 
 ## Out of scope
 
-Hard deletion / retention pruning, DELETE realtime events, per-type preferences (2.3b), the `/notifications` route, web push.
+Hard deletes, DELETE realtime subscriptions, changes to grouping or pagination, deriving counts from payloads, push/email suppression windows (the `retracted_at` field is the hook a future delivery worker will check), per-type preferences (2.3b), the `/notifications` route.
