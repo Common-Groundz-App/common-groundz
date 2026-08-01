@@ -26,7 +26,7 @@ Both reviews approve this plan. Codex added three acceptance criteria and a data
 
 ## Where I disagree
 
-**Codex 3, partially.** Retracting *every* notification tied to a deleted comment is right for mention, reply and comment-like rows, but I am not retracting **moderation or system rows** that happen to reference a comment id. Those are durable by design — a moderation record that vanishes because the author deleted the evidence is worse than a stale preview. The trigger will therefore retract rows whose `type IN ('comment','like','mention')`, not every row matching the id.
+**Codex 3, partially.** Retracting *every* notification tied to a deleted comment is right for mention, reply and comment-like rows, but I am not retracting **moderation or system rows** that happen to reference a comment id. Those are durable by design — a moderation record that vanishes because the author deleted the evidence is worse than a stale preview. The trigger therefore retracts rows whose `type IN ('comment','like')` and leaves `system` rows alone.
 
 **Codex 2's framing.** The comment-like shape is not merely hypothetical for the future — it is an asserted, supported shape *today*. Under my previous index, a comment like and a post like from the same actor on the same post collide, and `ON CONFLICT DO NOTHING` would have silently swallowed the second one. The broad index was not just future-risky, it was wrong now.
 
