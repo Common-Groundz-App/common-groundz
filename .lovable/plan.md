@@ -1,6 +1,16 @@
 # Phase 2.5 — Reversible notification lifecycle (retraction) — final
 
-I checked every correction against the code and the database instead of taking them on trust. Two of Codex's points are real bugs in my plan and I am folding them in. One of ChatGPT's is a genuine hardening. The rest are already satisfied, and one I am declining with a reason.
+Both reviews approve this plan. Codex added three acceptance criteria and a database-verification request in the latest round; I checked all four against the code and all four are right, so they are folded in below. No further planning round after this.
+
+### Latest round — folded in
+
+| Correction | Verified | Outcome |
+| --- | --- | --- |
+| Competing lane revalidation calls | **True.** `useNotifications.ts:386` returns early when `revalidationOwnerRef.current` is held, so if All and Unread each invoke the pass from their own head commit, the second silently skips and stays stale until another poll | One owner runs **one coordinated pass covering both lanes**, not two lanes competing for ownership |
+| Targeted conflict inference instead of bare `ON CONFLICT DO NOTHING` | **Correct, and better than my version.** Untargeted suppression would also swallow a PK collision or a future unique rule. Postgres *can* infer a partial unique index when the columns and the predicate are both supplied | `ON CONFLICT (cols) WHERE <predicate> DO NOTHING`, predicate byte-identical to the index. If the index changes, the trigger fails loudly instead of hiding an unrelated conflict |
+| `type IN ('comment','like','mention')` names a nonexistent type | **True.** `NotificationType` is `like \| comment \| follow \| system \| journey_watched \| journey_digest`; mentions are `type='comment'` with `metadata.event='mention'` | Filter is `type IN ('comment','like')`; `metadata.event` distinguishes comment, reply, mention and comment-like |
+| Prune ordering must be deterministic | **Correct.** Equal `retracted_at` values could stall progress | `ORDER BY retracted_at, id`, matching the cleanup index |
+| Database-boundary verification | **Correct.** The 138 TS tests cannot prove trigger security, backfill mapping, index inference, or concurrent-insert idempotency | Added as Step 6b — Deno/SQL verification of the riskiest half of this phase |
 
 ## Verification of the feedback
 
