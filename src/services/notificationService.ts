@@ -27,6 +27,17 @@ export interface Notification {
   action_url?: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Retraction tombstone (Phase 2.5). Non-null means the source action was
+   * undone (unlike / unfollow / comment deletion) and the row is no longer a
+   * notification: it is excluded from every fetch, from the unread count, and
+   * removed from local state the moment realtime reports it.
+   *
+   * Rows arriving from a normal fetch are ALWAYS `null` here — the filter is
+   * server-side. The field is still carried so realtime UPDATE payloads can be
+   * classified as retractions.
+   */
+  retracted_at?: string | null;
   metadata?: {
     comment_id?: string;
     from_entity_id?: string;
@@ -35,6 +46,7 @@ export interface Notification {
     [key: string]: any;
   };
 }
+
 
 /**
  * Keyset pagination cursor. `created_at` MUST be stored as the exact string
@@ -286,6 +298,9 @@ export const fetchNotifications = async (
   let query = supabase
     .from('notifications')
     .select('*')
+    // Retracted rows are tombstones, not notifications. Filtered server-side so
+    // no client path can ever render or count one.
+    .is('retracted_at', null)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     // Over-fetch by one to detect a further page without a second round trip.
@@ -364,6 +379,7 @@ export const fetchUnreadMembership = async (
         .select('id')
         .eq('user_id', userId)
         .eq('is_read', false)
+        .is('retracted_at', null)
         .in('id', chunk);
       if (error) throw error;
       return (data ?? []) as { id: string }[];
@@ -374,6 +390,52 @@ export const fetchUnreadMembership = async (
   results.forEach((rows) => rows.forEach((row) => stillUnread.add(row.id)));
   return stillUnread;
 };
+
+/**
+ * Which of `ids` are STILL active (not retracted) on the server.
+ *
+ * The All lane's mirror of `fetchUnreadMembership`, and the only way a retracted
+ * row can leave an OLDER loaded page: a head refresh only ever sees the newest
+ * window, so a row retracted on page 3 would otherwise linger until reload.
+ *
+ * Same contract as `fetchUnreadMembership`: explicit `userId` for index
+ * selection (RLS remains the authorization boundary), zero queries for an empty
+ * input, and ALL-OR-NOTHING — a partial result is indistinguishable from "these
+ * rows were retracted" and would delete live rows.
+ */
+export const fetchActiveMembership = async (
+  ids: string[],
+  userId: string
+): Promise<Set<string>> => {
+  if (!ids.length) return new Set();
+  if (!userId) {
+    throw new Error('fetchActiveMembership requires an explicit userId');
+  }
+
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += MEMBERSHIP_CHUNK_SIZE) {
+    chunks.push(ids.slice(i, i + MEMBERSHIP_CHUNK_SIZE));
+  }
+
+  const results = await Promise.all(
+    chunks.map(async (chunk) => {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', userId)
+        .is('retracted_at', null)
+        .in('id', chunk);
+      if (error) throw error;
+      return (data ?? []) as { id: string }[];
+    })
+  );
+
+  const stillActive = new Set<string>();
+  results.forEach((rows) => rows.forEach((row) => stillActive.add(row.id)));
+  return stillActive;
+};
+
+
 
 
 /** Global unread total for the signed-in user. The RPC returns `bigint`, which
