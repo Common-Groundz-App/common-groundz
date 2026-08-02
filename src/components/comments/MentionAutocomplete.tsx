@@ -138,7 +138,7 @@ const MentionAutocomplete: React.FC<MentionAutocompleteProps> = ({
           );
         })
       )}
-    </div>
+    </PopoverContent>
   );
 };
 
