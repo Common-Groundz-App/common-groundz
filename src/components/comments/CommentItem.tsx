@@ -32,7 +32,14 @@ interface CommentItemProps {
   highlightCommentId?: string | null;
   isMostHelpful?: boolean;
   isTrustedContributor?: boolean;
+  /** Mention autocomplete wiring for the edit textarea (optional). */
+  editTextareaRef?: React.RefObject<HTMLTextAreaElement>;
+  onEditCaretChange?: (value: string, caretIndex: number) => void;
+  mentionOpen?: boolean;
+  onMentionClose?: () => void;
+  mentionPopup?: React.ReactNode;
 }
+
 
 const CommentItem: React.FC<CommentItemProps> = ({
   comment,
