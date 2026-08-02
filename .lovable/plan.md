@@ -16,6 +16,11 @@ Carried over from the previous round: preview fields differ per notification sha
 
 Scope stays closed after this: no realtime expansion, no DELETE subscription, no grouping changes, no review/journey types, no target-deletion cleanup, no preferences in this migration. Preferences is the next phase.
 
+**Final round — both clarifications accepted, no redesign:**
+- Every replaced function **explicitly re-declares** `SECURITY DEFINER` and `SET search_path = public` instead of assuming `CREATE OR REPLACE` carries them. Codex is right that this is a real hazard once direct DML is revoked: an accidental `SECURITY INVOKER` would break liking entirely.
+- Mention reconciliation is driven by **actual membership changes** (`DELETE ... RETURNING`, `INSERT ... ON CONFLICT DO NOTHING RETURNING`) rather than a diff computed before the write — concurrency-safe and idempotent on retry.
+- Verification includes **database probes** (privileges, function security attributes, dedup result, unlike/re-like, mention add/remove/re-add, repeated edits), not just the TypeScript suite.
+
 
 ## Plan
 
@@ -30,7 +35,7 @@ Scope stays closed after this: no realtime expansion, no DELETE subscription, no
 - **Like branch:** add `AND n.retracted_at IS NULL` to the `NOT EXISTS`, so a re-like inserts a **fresh unread row** rather than being permanently suppressed.
 - Fix `action_url` from `/recommendation/<id>` to `/recommendations/<id>`.
 - Keep the canonical `type='comment'` + `metadata.event='like'` shape so grouping and destination resolution are untouched.
-- `CREATE OR REPLACE` preserves the existing `SECURITY DEFINER`, pinned `search_path`, `auth.uid()` ownership check, like-count side effects and boolean return contract — nothing unrelated is simplified.
+- Each replacement definition **explicitly re-declares** `SECURITY DEFINER` and `SET search_path = public` rather than relying on `CREATE OR REPLACE` to carry them over, plus the existing `auth.uid()` ownership check, like-count side effects and boolean return contract. This matters most here: with direct DML revoked, a `toggle_comment_like` that silently became `SECURITY INVOKER` would make liking impossible.
 
 ### 3. Enforce the writer invariant
 Verified before committing to this: **no direct writes exist.** Searched the whole project for `.from('comment_likes')` insert/update/delete/upsert — the only mutations of `comment_likes` anywhere are inside `toggle_comment_like` itself (`src/services/commentsService.ts` calls only the RPC; `get_comments_with_profiles` reads only). So revoking is safe and won't break the like UI.
@@ -46,8 +51,9 @@ New `SECURITY DEFINER` helper returning resolved `(user_id, username)` rows for 
 
 ### 5. `update_comment` — mention and preview reconciliation
 In the same transaction, after the content update:
-- **Removed mentions:** delete the `comment_mentions` row and retract the active mention notification.
-- **Added mentions:** insert `comment_mentions`, and insert a mention notification only when no active one exists (guard filtered on `retracted_at IS NULL`).
+- **Membership changes drive notifications, not a pre-computed diff.** Removals use `DELETE ... RETURNING mentioned_user_id` and retract only for returned rows; additions use `INSERT ... ON CONFLICT DO NOTHING RETURNING mentioned_user_id` and notify only for returned rows. Two overlapping edits can't both conclude the same mention is new, and retries are idempotent.
+- **Removed mentions:** the deleted `comment_mentions` rows retract their active mention notification.
+- **Added mentions:** genuinely inserted rows get a mention notification, guarded on `retracted_at IS NULL` so a re-add after removal yields a fresh row.
 - **Kept mentions:** leave `is_read` and `created_at` alone; refresh only the preview.
 - **Preview refresh, per row shape:**
   - mention / reply rows → update `message` to `LEFT(new_content, 200)`, leave `title` alone.
@@ -64,11 +70,11 @@ In the same transaction, after the content update:
 
 ## Technical notes
 
-- One transactional migration, applied in this order: orphan backfill → dedup (newest wins) → assert no duplicates → partial unique index → replace `toggle_comment_like` → revoke direct table mutations → add the internal mention parser (`REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated`) → replace `add_comment` and `update_comment`. All three RPCs are already `SECURITY DEFINER` with a pinned `search_path`, and `CREATE OR REPLACE` keeps their existing grants, auth checks, mention cap, reply behaviour and comment-count side effects intact.
-- The index predicate and the `ON CONFLICT` predicate/column list must match **exactly**, including the `(metadata->>'comment_id')` expression.
+- One transactional migration, applied in this order: orphan backfill → dedup (newest wins) → assert no duplicates → partial unique index → replace `toggle_comment_like` → revoke direct table mutations → add the internal mention parser (`REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated`) → replace `add_comment` and `update_comment`. Every function body explicitly restates `SECURITY DEFINER` + `SET search_path = public` and re-issues its intended grants; auth checks, mention cap, reply behaviour and comment-count side effects are carried over verbatim.
+- The index predicate and the `ON CONFLICT` predicate/column list must match **exactly**, including the `(metadata->>'comment_id')` expression — if they drift, Postgres won't infer the index.
 - Retraction stays an `UPDATE`; the existing realtime channel and coalesced count reconcile deliver everything with **zero client changes**. Counts are never derived from payloads.
 - No new triggers on `comment_likes` — step 3 makes the RPC genuinely the only writer, which is the cheaper of the two enforcement options and matches the existing design.
-- After applying: probe the toggle and edit paths against real rows, then run the unit suite (143 tests) — the pure layers shouldn't move.
+- After applying, verify in the **database** as well as the app: `pg_proc` security attributes and search_path on all three RPCs, `EXECUTE` still granted to `authenticated` on `toggle_comment_like`, `SELECT`-only DML on `comment_likes`, zero duplicate active groups, and probes for unlike → re-like and mention add/remove/re-add. Then run the unit suite (143 tests) — the pure layers shouldn't move.
 
 ## Manual test pass
 
