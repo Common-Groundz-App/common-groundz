@@ -18,6 +18,8 @@ import { getInitialsFromName } from '@/utils/profileUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import CommentItem from './CommentItem';
 import MentionAutocomplete from './MentionAutocomplete';
+import { useMentionAutocomplete } from './useMentionAutocomplete';
+import { Popover, PopoverAnchor } from '@/components/ui/popover';
 
 interface InlineCommentThreadProps {
   itemId: string;
@@ -70,10 +72,9 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const [replyContent, setReplyContent] = useState('');
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
 
-  // Mention autocomplete state
-  const [mentionQuery, setMentionQuery] = useState('');
-  const [mentionVisible, setMentionVisible] = useState(false);
-  const [mentionTarget, setMentionTarget] = useState<'main' | 'reply'>('main');
+  // Mention autocomplete (shared, caret-aware controller)
+  const mention = useMentionAutocomplete();
+
 
   // Reputation/badge state
   const [trustedUserIds, setTrustedUserIds] = useState<Set<string>>(new Set());
@@ -81,6 +82,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const commentToDeleteRef = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const commentSectionRef = useRef<HTMLDivElement>(null);
 
   const { user } = useAuth();
@@ -426,17 +428,20 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   }, [requireAuth, canPerformAction, showVerificationRequired, user, itemType]);
 
   const handleEditClick = (comment: CommentData) => {
+    mention.reset();
     setEditingCommentId(comment.id);
     setEditCommentContent(comment.content);
   };
 
   const handleEditCancel = () => {
+    mention.reset();
     setEditingCommentId(null);
     setEditCommentContent('');
   };
 
   const handleEditSave = async () => {
     if (!user || !editingCommentId || !editCommentContent.trim()) return;
+    mention.reset();
     setIsEditing(true);
     try {
       const success = await updateComment(editingCommentId, editCommentContent, itemType, user.id);
@@ -521,37 +526,60 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     return mentionedUsername;
   };
 
-  // Mention detection for textareas
-  const detectMention = (text: string, target: 'main' | 'reply') => {
-    const match = text.match(/(?:^|\s)@([a-z0-9._]*)$/i);
-    if (match) {
-      setMentionQuery(match[1]);
-      setMentionVisible(true);
-      setMentionTarget(target);
-    } else {
-      setMentionVisible(false);
-      setMentionQuery('');
-    }
+  // Restores focus + caret after a mention is inserted
+  const restoreCaret = (ref: React.RefObject<HTMLTextAreaElement>, caret: number) => {
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
   };
 
   const handleMentionSelect = (username: string) => {
-    const insertMention = (text: string): string => {
-      return text.replace(/(?:^|\s)@([a-z0-9._]*)$/i, (match) => {
-        const prefix = match.startsWith(' ') ? ' ' : '';
-        return `${prefix}@${username} `;
-      });
-    };
+    const target = mention.target;
+    if (!target) return;
 
-    if (mentionTarget === 'main') {
-      setNewComment(prev => insertMention(prev));
-      textareaRef.current?.focus();
+    if (target.kind === 'main') {
+      const result = mention.insert(newComment, username);
+      if (result) {
+        setNewComment(result.value);
+        restoreCaret(textareaRef, result.caret);
+      }
+    } else if (target.kind === 'reply') {
+      const result = mention.insert(replyContent, username);
+      if (result) {
+        setReplyContent(result.value);
+        restoreCaret(replyTextareaRef, result.caret);
+      }
     } else {
-      setReplyContent(prev => insertMention(prev));
-      replyTextareaRef.current?.focus();
+      const result = mention.insert(editCommentContent, username);
+      if (result) {
+        setEditCommentContent(result.value);
+        restoreCaret(editTextareaRef, result.caret);
+      }
     }
-    setMentionVisible(false);
-    setMentionQuery('');
+
+    mention.close();
   };
+
+  // Mention wiring for a comment row's edit textarea (scoped per comment id)
+  const editMentionProps = (commentId: string) => ({
+    editTextareaRef,
+    onEditCaretChange: (value: string, caretIndex: number) =>
+      mention.detect(value, caretIndex, { kind: 'edit', commentId }),
+    mentionOpen: mention.isOpenFor('edit', commentId),
+    onMentionClose: mention.close,
+    mentionPopup: (
+      <MentionAutocomplete
+        query={mention.query}
+        visible={mention.isOpenFor('edit', commentId)}
+        onSelect={handleMentionSelect}
+        onClose={mention.close}
+      />
+    ),
+  });
+
 
   // #10 & #6: Dynamic placeholders based on itemType
   const mainPlaceholder = itemType === 'post'
@@ -637,6 +665,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                 onEditCancel={handleEditCancel}
                 onEditSave={handleEditSave}
                 onEditContentChange={setEditCommentContent}
+                {...editMentionProps(group.comment.id)}
                 onDeleteClick={handleDeleteClick}
                 onReplyClick={handleReplyClick}
                 onLikeClick={handleLikeClick}
@@ -670,6 +699,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                         onEditCancel={handleEditCancel}
                         onEditSave={handleEditSave}
                         onEditContentChange={setEditCommentContent}
+                        {...editMentionProps(reply.id)}
                         onDeleteClick={handleDeleteClick}
                         onReplyClick={handleReplyClick}
                         onLikeClick={handleLikeClick}
@@ -714,6 +744,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                             onEditCancel={handleEditCancel}
                             onEditSave={handleEditSave}
                             onEditContentChange={setEditCommentContent}
+                            {...editMentionProps(reply.id)}
                             onDeleteClick={handleDeleteClick}
                             onReplyClick={handleReplyClick}
                             onLikeClick={handleLikeClick}
@@ -735,38 +766,47 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                   </div>
                   <div className="flex gap-2 items-start relative">
                     {/* #7: Dynamic reply placeholder */}
-                    <Textarea
-                      ref={replyTextareaRef}
-                      placeholder={`Reply to ${replyingTo.displayName || replyingTo.username}...`}
-                      value={replyContent}
-                      onChange={(e) => {
-                        setReplyContent(e.target.value);
-                        detectMention(e.target.value, 'reply');
-                      }}
-                      disabled={isSending}
-                      rows={1}
-                      className="min-h-[36px] max-h-[100px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-3 text-sm"
-                      onKeyDown={(e) => {
-                        if (mentionVisible) return; // Let MentionAutocomplete handle keys
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleReplySubmit(replyingTo);
-                        }
-                        if (e.key === 'Escape') {
-                          setReplyingTo(null);
-                          setReplyContent('');
-                        }
-                      }}
-                    />
-                    {mentionVisible && mentionTarget === 'reply' && (
+                    <Popover
+                      open={mention.isOpenFor('reply')}
+                      onOpenChange={(open) => { if (!open) mention.close(); }}
+                    >
+                      <PopoverAnchor asChild>
+                        <Textarea
+                          ref={replyTextareaRef}
+                          placeholder={`Reply to ${replyingTo.displayName || replyingTo.username}...`}
+                          value={replyContent}
+                          onChange={(e) => {
+                            setReplyContent(e.target.value);
+                            mention.detect(
+                              e.target.value,
+                              e.target.selectionStart ?? e.target.value.length,
+                              { kind: 'reply' }
+                            );
+                          }}
+                          disabled={isSending}
+                          rows={1}
+                          className="min-h-[36px] max-h-[100px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-3 text-sm"
+                          onKeyDown={(e) => {
+                            if (mention.visible) return; // Let MentionAutocomplete handle keys
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleReplySubmit(replyingTo);
+                            }
+                            if (e.key === 'Escape') {
+                              setReplyingTo(null);
+                              setReplyContent('');
+                            }
+                          }}
+                        />
+                      </PopoverAnchor>
                       <MentionAutocomplete
-                        query={mentionQuery}
-                        visible={mentionVisible}
+                        query={mention.query}
+                        visible={mention.isOpenFor('reply')}
                         onSelect={handleMentionSelect}
-                        onClose={() => setMentionVisible(false)}
-                        className="bottom-full mb-1 left-0"
+                        onClose={mention.close}
                       />
-                    )}
+                    </Popover>
+
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
@@ -816,41 +856,50 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
             )}
           </Avatar>
           {/* #10: Dynamic main input placeholder */}
-          <Textarea
-            ref={textareaRef}
-            placeholder={mainPlaceholder}
-            value={newComment}
-            onChange={(e) => {
-              setNewComment(e.target.value);
-              detectMention(e.target.value, 'main');
-            }}
-            disabled={isSending}
-            rows={1}
-            className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
-            onFocus={() => {
-              if (!user) {
-                setNewComment('');
-                requireAuth({ action: 'comment', surface: 'inline_comment_thread' });
-                textareaRef.current?.blur();
-              }
-            }}
-            onKeyDown={(e) => {
-              if (mentionVisible) return;
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleAddComment();
-              }
-            }}
-          />
-          {mentionVisible && mentionTarget === 'main' && (
+          <Popover
+            open={mention.isOpenFor('main')}
+            onOpenChange={(open) => { if (!open) mention.close(); }}
+          >
+            <PopoverAnchor asChild>
+              <Textarea
+                ref={textareaRef}
+                placeholder={mainPlaceholder}
+                value={newComment}
+                onChange={(e) => {
+                  setNewComment(e.target.value);
+                  mention.detect(
+                    e.target.value,
+                    e.target.selectionStart ?? e.target.value.length,
+                    { kind: 'main' }
+                  );
+                }}
+                disabled={isSending}
+                rows={1}
+                className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
+                onFocus={() => {
+                  if (!user) {
+                    setNewComment('');
+                    requireAuth({ action: 'comment', surface: 'inline_comment_thread' });
+                    textareaRef.current?.blur();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (mention.visible) return;
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAddComment();
+                  }
+                }}
+              />
+            </PopoverAnchor>
             <MentionAutocomplete
-              query={mentionQuery}
-              visible={mentionVisible}
+              query={mention.query}
+              visible={mention.isOpenFor('main')}
               onSelect={handleMentionSelect}
-              onClose={() => setMentionVisible(false)}
-              className="bottom-full mb-1 left-11"
+              onClose={mention.close}
             />
-          )}
+          </Popover>
+
           <Button
             size="icon"
             className={cn(

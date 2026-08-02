@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { getInitialsFromName } from '@/utils/profileUtils';
+import { PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 interface MentionUser {
@@ -90,13 +91,22 @@ const MentionAutocomplete: React.FC<MentionAutocompleteProps> = ({
   if (!visible || (users.length === 0 && !loading)) return null;
 
   return (
-    <div
+    <PopoverContent
       ref={containerRef}
+      side="top"
+      align="start"
+      sideOffset={6}
+      collisionPadding={8}
+      // Focus must never leave the textarea, otherwise the caret is lost and
+      // the capture-phase key handling below stops receiving keys.
+      onOpenAutoFocus={(e) => e.preventDefault()}
+      onCloseAutoFocus={(e) => e.preventDefault()}
       className={cn(
-        "absolute z-50 w-64 bg-popover border border-border rounded-lg shadow-lg overflow-hidden",
+        "w-64 max-w-[calc(100vw-2rem)] p-0 overflow-hidden",
         className
       )}
     >
+
       {loading && users.length === 0 ? (
         <div className="px-3 py-2 text-xs text-muted-foreground">Searching...</div>
       ) : (
@@ -129,7 +139,7 @@ const MentionAutocomplete: React.FC<MentionAutocompleteProps> = ({
           );
         })
       )}
-    </div>
+    </PopoverContent>
   );
 };
 

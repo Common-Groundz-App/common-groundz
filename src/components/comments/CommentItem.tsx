@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MoreHorizontal, Heart, MessageCircle, Users, ThumbsUp, ShieldCheck } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -32,7 +33,14 @@ interface CommentItemProps {
   highlightCommentId?: string | null;
   isMostHelpful?: boolean;
   isTrustedContributor?: boolean;
+  /** Mention autocomplete wiring for the edit textarea (optional). */
+  editTextareaRef?: React.RefObject<HTMLTextAreaElement>;
+  onEditCaretChange?: (value: string, caretIndex: number) => void;
+  mentionOpen?: boolean;
+  onMentionClose?: () => void;
+  mentionPopup?: React.ReactNode;
 }
+
 
 const CommentItem: React.FC<CommentItemProps> = ({
   comment,
@@ -53,6 +61,11 @@ const CommentItem: React.FC<CommentItemProps> = ({
   highlightCommentId,
   isMostHelpful = false,
   isTrustedContributor = false,
+  editTextareaRef,
+  onEditCaretChange,
+  mentionOpen = false,
+  onMentionClose,
+  mentionPopup,
 }) => {
   const isCurrentUser = currentUserId && currentUserId === comment.user_id;
   const isBeingEdited = editingCommentId === comment.id;
@@ -137,13 +150,43 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
             {isBeingEdited ? (
               <div className="mt-1">
-                <Textarea
-                  value={editCommentContent}
-                  onChange={(e) => onEditContentChange(e.target.value)}
-                  className="min-h-[60px] text-sm resize-none bg-muted/30 border focus:border-primary focus:ring-0 focus-visible:ring-0"
-                  placeholder="Edit your comment..."
-                  disabled={isEditing}
-                />
+                {(() => {
+                  const editTextarea = (
+                    <Textarea
+                      ref={editTextareaRef}
+                      value={editCommentContent}
+                      onChange={(e) => {
+                        onEditContentChange(e.target.value);
+                        onEditCaretChange?.(
+                          e.target.value,
+                          e.target.selectionStart ?? e.target.value.length
+                        );
+                      }}
+                      onKeyDown={(e) => {
+                        // Let the mention popup own Arrow/Enter/Tab/Escape.
+                        if (mentionOpen) return;
+                      }}
+                      className="min-h-[60px] text-sm resize-none bg-muted/30 border focus:border-primary focus:ring-0 focus-visible:ring-0"
+                      placeholder="Edit your comment..."
+                      disabled={isEditing}
+                    />
+                  );
+
+                  if (!mentionPopup) return editTextarea;
+
+                  return (
+                    <Popover
+                      open={mentionOpen}
+                      onOpenChange={(open) => {
+                        if (!open) onMentionClose?.();
+                      }}
+                    >
+                      <PopoverAnchor asChild>{editTextarea}</PopoverAnchor>
+                      {mentionPopup}
+                    </Popover>
+                  );
+                })()}
+
                 <div className="flex justify-end gap-2 mt-2">
                   <Button variant="ghost" size="sm" onClick={onEditCancel} disabled={isEditing}>
                     Cancel
