@@ -1,59 +1,63 @@
-# Phase 2.5A — Comment lifecycle sync (then preferences)
+# Phase 2.5A — Comment lifecycle sync (final)
 
-## Verdict on Codex's answer
+## Verdict
 
-I agree with almost all of it, and it's more right than my first draft was.
+Both reviews are right, and codex's four corrections are all factually correct — I verified each against the database before folding them in. Two of them would have caused real bugs:
 
-Agreed, no changes needed:
-- **Don't expand realtime.** The channel is generic: INSERT + UPDATE + retraction-as-UPDATE + count reconcile + polling backstop. New notification types inherit it for free. Adding a DELETE subscription buys nothing — retraction is an UPDATE, and pruning only deletes rows invisible for 60 days.
-- **Don't redo the Phase 2.5 rollout.** Expand/deploy/activate is a deployment strategy, not a missing feature. Phase 2.5 is live and correct; replaying the migration, re-running the backfill, or adding compat branches for a client nobody is served would add risk for zero user value. Record it as a rule for the *next* schema change.
-- **Leave deferred:** review/journey notifications (product surface doesn't exist), target-deletion retraction (2.2C already degrades gracefully), grouping beyond likes.
-- **Preferences next**, enforced at creation rather than filtered in the drawer.
+1. **`comment_likes` is not RPC-only.** Verified: the table has `INSERT` ("Verified users can like comments") and `DELETE` ("Users can unlike their own") policies for `public`. So "the RPC is the single writer" is a convention, not an invariant — my previous note was wrong. Fixed below.
+2. **Preview text lives in different fields per shape.** Verified: `create_post_comment_notification` writes `message` = the event sentence ("linda commented on your post") and `metadata.comment_text` = a 50-char preview. `add_comment`'s mention/reply rows write `title` = the event sentence and `message` = a 200-char preview. Blindly rewriting `message` for plain comments would replace the event copy with raw comment text. Fixed below.
+3. **A shared parser means `add_comment` must be replaced too** — otherwise the "single authority" claim is false and the two flows drift. Correct; the migration now replaces three functions, and the helper's `EXECUTE` is revoked from `PUBLIC`.
+4. **Orphan backfill + active uniqueness must stay.** Correct — fixing the unlike branch only helps future unlikes; rows already orphaned by past unlikes stay live forever.
 
-Where I'd extend it: Codex found one comment-lifecycle gap. I checked the database and there are **three**, all in the same two RPCs, so they should land as one migration.
+One thing I'd add that neither review raised: **`add_comment` also writes the stale `/recommendation/` singular URL** (line 96 of the reference SQL and in the live function). Since that function is being replaced anyway, fix it in the same pass so the two comment producers agree.
 
-## The three confirmed gaps
-
-Verified by reading `toggle_comment_like` and `update_comment` in the database:
-
-1. **Comment un-like never retracts.** `toggle_comment_like` deletes the `comment_likes` row and returns — it never touches the notification. `comment_likes` has no triggers at all. So un-liking a comment leaves a live unread row and the badge never drops. This is the same class of bug Phase 2.5 fixed for post/recommendation likes, just missed because this path is an RPC rather than a trigger.
-2. **Re-like will be suppressed once retraction exists.** The insert is guarded by a `NOT EXISTS` that does **not** filter `retracted_at IS NULL`. The moment gap 1 is fixed, a retracted row would block every future comment-like notification from that actor on that comment — permanently silent.
-3. **Comment edits don't reconcile mentions or previews** (Codex's point). `update_comment` only rewrites `content`: removing `@hana` leaves her mention notification live, adding `@hana` creates nothing, and existing mention/comment previews keep the pre-edit text.
-
-Also found while reading: `toggle_comment_like` builds `action_url` as `/recommendation/<id>` (singular) — the stale form 2.2B corrected everywhere else. The resolver prefers `entity_id`, so it isn't breaking navigation today, but it's a leftover and should be fixed in the same pass.
+Scope stays closed after this: no realtime expansion, no DELETE subscription, no grouping changes, no review/journey types, no target-deletion cleanup, no preferences in this migration.
 
 ## Plan
 
-### 1. Retract on comment un-like (`toggle_comment_like`)
-On the DELETE branch, set `retracted_at = now()` on the matching **active** notification (same `user_id`/`sender_id`/`entity_id`/`entity_type`/`metadata.comment_id`, `event = 'like'`). Realtime delivers the UPDATE, the client drops the row from both lanes, and the coalesced reconcile re-reads the count RPC — no client change required.
+### 1. Repair existing comment-like state (data, runs once)
+- **Retract orphans:** set `retracted_at = now()` on active `type='comment'`, `metadata.event='like'` notifications whose `(comment_id, sender_id)` no longer has a matching `comment_likes` row.
+- **Deduplicate:** keep the oldest active row per `(user_id, sender_id, entity_type, entity_id, metadata->>'comment_id')` for `event='like'`, retract the rest, ordered deterministically (`retracted_at, id`) as in 2.5.
+- **Assert:** raise if any duplicate active group survives, so the migration fails loudly rather than half-applying.
+- **Constrain:** partial unique index on those five columns `WHERE retracted_at IS NULL AND type='comment' AND metadata->>'event'='like'`, matching the 2.5 index style so `ON CONFLICT` inference works.
 
-### 2. Make the insert guard retraction-aware
-Add `AND n.retracted_at IS NULL` to the `NOT EXISTS` on the like branch, so a re-like after a retraction creates a **fresh unread row** (consistent with Phase 2.5: `is_read` stays monotonic, retracted rows are never resurrected). Fix the singular `/recommendation/` action_url to `/recommendations/` in the same function.
+### 2. `toggle_comment_like`
+- **Unlike branch:** before returning, retract the matching **active** row (same recipient, sender, `entity_type`/`entity_id`, `metadata.comment_id`, `event='like'`) with `retracted_at = now(), updated_at = now()`. Never touch `is_read`.
+- **Like branch:** add `AND n.retracted_at IS NULL` to the `NOT EXISTS`, so a re-like inserts a **fresh unread row** rather than being permanently suppressed.
+- Fix `action_url` from `/recommendation/<id>` to `/recommendations/<id>`.
+- Keep the canonical `type='comment'` + `metadata.event='like'` shape so grouping and destination resolution are untouched.
 
-### 3. Reconcile mentions and previews on edit (`update_comment`)
-After the content update, inside the same transaction:
-- Re-parse mentions with the **same** regex, dedup and 5-cap logic `add_comment` uses (extract it so the two can't drift).
-- **Removed** mentions: delete the `comment_mentions` row and retract its active mention notification.
-- **Added** mentions: insert the `comment_mentions` row and a mention notification, reusing `add_comment`'s guard shape plus `retracted_at IS NULL`; skip self-mentions and deleted profiles.
-- **Kept** mentions: leave the notification's read state alone, only refresh `message` to `LEFT(new_content, 200)`.
-- Refresh the preview `message` on the comment/reply notifications for this `comment_id` too, so no drawer row shows pre-edit text.
-- Read state is never reset by an edit — an edit is not a new event.
+### 3. Enforce the writer invariant
+Revoke direct `INSERT`/`DELETE` on `comment_likes` from `anon`/`authenticated` (drop the two mutation policies) and leave `SELECT` in place for counts and liked-state. The `SECURITY DEFINER` RPC keeps working; direct client writes — which would silently skip notification creation and retraction — stop being possible.
 
-### 4. Documentation
-- Correct the stale **Phase 2.3** roadmap entry: it still describes "representative title + and N others", no profile-name resolution, and an event-count chip. Shipped behaviour is verified display names, event-aware singleton copy, no count chip, and shared React Query profile keys with `ProfileAvatar`.
-- Add **Phase 2.5A** with the three gaps and their fixes, and update the behaviour-matrix rows for comment likes and mentions.
-- Add a short **"Notification schema rollout rule"** note: future schema changes go expand → deploy → activate; Phase 2.5 shipped stable and is deliberately not being replayed.
+### 4. Shared mention parser
+New `SECURITY DEFINER` helper returning resolved `(user_id, username)` rows for a body, with `REVOKE EXECUTE ... FROM PUBLIC`. It reproduces today's behaviour byte-for-byte: same regex `(?:^|[^a-z0-9.@])@([a-z0-9._]+)` with `gi`, same lower/trim normalization, same dedup on the normalized handle, same 5-mention cap, same self-mention skip, same `deleted_at IS NULL` profile filter. `add_comment` is replaced to call it, so there is exactly one parsing authority.
 
-### 5. Then Phase 2.3b — Preferences
-Server-enforced at creation: the producers (`add_comment`, `toggle_comment_like`, the like/follow triggers) check the recipient's per-type preference before inserting, so a disabled category produces no row at all — no unread count, no realtime traffic, no retention cost. Existing `notification_preferences` infrastructure gets extended rather than replaced. Scoped as its own phase after 2.5A lands.
+### 5. `update_comment` — mention and preview reconciliation
+In the same transaction, after the content update:
+- **Removed mentions:** delete the `comment_mentions` row and retract the active mention notification.
+- **Added mentions:** insert `comment_mentions`, and insert a mention notification only when no active one exists (guard filtered on `retracted_at IS NULL`).
+- **Kept mentions:** leave `is_read` and `created_at` alone; refresh only the preview.
+- **Preview refresh, per row shape:**
+  - mention / reply rows → update `message` to `LEFT(new_content, 200)`, leave `title` alone.
+  - plain comment rows → update `metadata.comment_text` to the 50-char-plus-ellipsis form, and **never** touch `message` (that's the event sentence).
+  - comment-like rows → no body preview at all; leave untouched.
+- An edit is not a new event: no read-state reset, no `created_at` change, no new notification for unchanged recipients.
+- Fix the same stale `/recommendation/` URL in `add_comment` while it's being replaced.
+
+### 6. Documentation
+- Correct the stale **Phase 2.3** entry (it still describes "representative title + and N others", no name resolution, and an event-count chip; shipped behaviour is verified display names, event-aware singleton copy, no chip, shared React Query profile keys with `ProfileAvatar`).
+- Add **Phase 2.5A** lifecycle rules, including the per-shape preview-field table.
+- Record **expand → deploy → activate** as the rollout rule for *future* notification schema changes; Phase 2.5 shipped stable and is deliberately not replayed.
+- Mark **server-enforced preferences** as next.
 
 ## Technical notes
 
-- One migration, replacing `toggle_comment_like` and `update_comment` via `CREATE OR REPLACE`, both already `SECURITY DEFINER` with a pinned `search_path`. No table, RLS, or grant change; no new triggers on `comment_likes` (the RPC is the single writer for that path).
-- The mention-parsing helper is a new `SECURITY DEFINER` function returning the resolved user ids for a body, called by both `add_comment` and `update_comment`.
-- No client changes expected. Comment likes and mentions stay singletons with their own `?commentId` destination, so grouping is untouched.
-- Verification: after the migration, probe like → unlike → re-like on a comment (tombstone, then a *new* row), and edit a comment to add and remove a mention. Then run the unit suite (143 tests) — pure-layer behaviour shouldn't move.
+- One transactional migration: backfill → dedup → assert → index → `CREATE OR REPLACE` of `add_comment`, `update_comment`, `toggle_comment_like` → new parser helper with revoked `PUBLIC` execute → policy revocation on `comment_likes`. All three RPCs are already `SECURITY DEFINER` with a pinned `search_path`.
+- Retraction stays an `UPDATE`; the existing realtime channel and coalesced count reconcile deliver everything with **zero client changes**. Counts are never derived from payloads.
+- No new triggers on `comment_likes` — step 3 makes the RPC genuinely the only writer, which is the cheaper of the two enforcement options and matches the existing design.
+- After applying: probe the toggle and edit paths against real rows, then run the unit suite (143 tests) — the pure layers shouldn't move.
 
 ## Manual test pass
 
-Comment-like → unread row appears; unlike → row disappears within ~250ms and the badge drops; re-like → a new unread row, not a resurrected read one; self-like → nothing. Edit a comment to drop `@user` → that mention row disappears; edit to add `@user` → a new mention row; edit the text only → same rows, read state preserved, preview text updated.
+Comment like → unread row appears. Unlike → row disappears within ~250ms and the badge drops. Re-like → a **new** unread row, not a resurrected read one. Toggle repeatedly → no count drift. Self-like → nothing. Edit a comment removing `@user` → that mention row disappears. Edit adding `@user` → a new mention row. Text-only edit → same rows, read state and ordering preserved, mention/reply previews updated, and the plain "commented on your post" sentence unchanged with a refreshed snippet.
