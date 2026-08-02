@@ -55,6 +55,41 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   
   const commentToDeleteRef = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Shared, caret-aware mention autocomplete controller
+  const mention = useMentionAutocomplete();
+
+  const restoreCaret = (ref: React.RefObject<HTMLTextAreaElement>, caret: number) => {
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
+  };
+
+  const handleMentionSelect = (username: string) => {
+    const target = mention.target;
+    if (!target) return;
+
+    if (target.kind === 'main') {
+      const result = mention.insert(newComment, username);
+      if (result) {
+        setNewComment(result.value);
+        restoreCaret(textareaRef, result.caret);
+      }
+    } else {
+      const result = mention.insert(editCommentContent, username);
+      if (result) {
+        setEditCommentContent(result.value);
+        restoreCaret(editTextareaRef, result.caret);
+      }
+    }
+
+    mention.close();
+  };
+
   
   const { user } = useAuth();
   const { requireAuth } = useAuthPrompt();
