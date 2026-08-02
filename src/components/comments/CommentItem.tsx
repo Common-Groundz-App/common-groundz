@@ -60,6 +60,11 @@ const CommentItem: React.FC<CommentItemProps> = ({
   highlightCommentId,
   isMostHelpful = false,
   isTrustedContributor = false,
+  editTextareaRef,
+  onEditCaretChange,
+  mentionOpen = false,
+  onMentionClose,
+  mentionPopup,
 }) => {
   const isCurrentUser = currentUserId && currentUserId === comment.user_id;
   const isBeingEdited = editingCommentId === comment.id;
