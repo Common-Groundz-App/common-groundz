@@ -149,13 +149,43 @@ const CommentItem: React.FC<CommentItemProps> = ({
 
             {isBeingEdited ? (
               <div className="mt-1">
-                <Textarea
-                  value={editCommentContent}
-                  onChange={(e) => onEditContentChange(e.target.value)}
-                  className="min-h-[60px] text-sm resize-none bg-muted/30 border focus:border-primary focus:ring-0 focus-visible:ring-0"
-                  placeholder="Edit your comment..."
-                  disabled={isEditing}
-                />
+                {(() => {
+                  const editTextarea = (
+                    <Textarea
+                      ref={editTextareaRef}
+                      value={editCommentContent}
+                      onChange={(e) => {
+                        onEditContentChange(e.target.value);
+                        onEditCaretChange?.(
+                          e.target.value,
+                          e.target.selectionStart ?? e.target.value.length
+                        );
+                      }}
+                      onKeyDown={(e) => {
+                        // Let the mention popup own Arrow/Enter/Tab/Escape.
+                        if (mentionOpen) return;
+                      }}
+                      className="min-h-[60px] text-sm resize-none bg-muted/30 border focus:border-primary focus:ring-0 focus-visible:ring-0"
+                      placeholder="Edit your comment..."
+                      disabled={isEditing}
+                    />
+                  );
+
+                  if (!mentionPopup) return editTextarea;
+
+                  return (
+                    <Popover
+                      open={mentionOpen}
+                      onOpenChange={(open) => {
+                        if (!open) onMentionClose?.();
+                      }}
+                    >
+                      <PopoverAnchor asChild>{editTextarea}</PopoverAnchor>
+                      {mentionPopup}
+                    </Popover>
+                  );
+                })()}
+
                 <div className="flex justify-end gap-2 mt-2">
                   <Button variant="ghost" size="sm" onClick={onEditCancel} disabled={isEditing}>
                     Cancel
