@@ -18,6 +18,8 @@ import { getInitialsFromName } from '@/utils/profileUtils';
 import { Skeleton } from '@/components/ui/skeleton';
 import CommentItem from './CommentItem';
 import MentionAutocomplete from './MentionAutocomplete';
+import { useMentionAutocomplete } from './useMentionAutocomplete';
+import { Popover, PopoverAnchor } from '@/components/ui/popover';
 
 interface InlineCommentThreadProps {
   itemId: string;
