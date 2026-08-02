@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MoreHorizontal, Heart, MessageCircle, Users, ThumbsUp, ShieldCheck } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
