@@ -815,41 +815,50 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
             )}
           </Avatar>
           {/* #10: Dynamic main input placeholder */}
-          <Textarea
-            ref={textareaRef}
-            placeholder={mainPlaceholder}
-            value={newComment}
-            onChange={(e) => {
-              setNewComment(e.target.value);
-              detectMention(e.target.value, 'main');
-            }}
-            disabled={isSending}
-            rows={1}
-            className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
-            onFocus={() => {
-              if (!user) {
-                setNewComment('');
-                requireAuth({ action: 'comment', surface: 'inline_comment_thread' });
-                textareaRef.current?.blur();
-              }
-            }}
-            onKeyDown={(e) => {
-              if (mentionVisible) return;
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleAddComment();
-              }
-            }}
-          />
-          {mentionVisible && mentionTarget === 'main' && (
+          <Popover
+            open={mention.isOpenFor('main')}
+            onOpenChange={(open) => { if (!open) mention.close(); }}
+          >
+            <PopoverAnchor asChild>
+              <Textarea
+                ref={textareaRef}
+                placeholder={mainPlaceholder}
+                value={newComment}
+                onChange={(e) => {
+                  setNewComment(e.target.value);
+                  mention.detect(
+                    e.target.value,
+                    e.target.selectionStart ?? e.target.value.length,
+                    { kind: 'main' }
+                  );
+                }}
+                disabled={isSending}
+                rows={1}
+                className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
+                onFocus={() => {
+                  if (!user) {
+                    setNewComment('');
+                    requireAuth({ action: 'comment', surface: 'inline_comment_thread' });
+                    textareaRef.current?.blur();
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (mention.visible) return;
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAddComment();
+                  }
+                }}
+              />
+            </PopoverAnchor>
             <MentionAutocomplete
-              query={mentionQuery}
-              visible={mentionVisible}
+              query={mention.query}
+              visible={mention.isOpenFor('main')}
               onSelect={handleMentionSelect}
-              onClose={() => setMentionVisible(false)}
-              className="bottom-full mb-1 left-11"
+              onClose={mention.close}
             />
-          )}
+          </Popover>
+
           <Button
             size="icon"
             className={cn(
