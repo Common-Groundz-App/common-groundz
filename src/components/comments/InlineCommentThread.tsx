@@ -82,6 +82,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const commentToDeleteRef = useRef<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const replyTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const commentSectionRef = useRef<HTMLDivElement>(null);
 
   const { user } = useAuth();
