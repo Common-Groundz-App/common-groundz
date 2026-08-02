@@ -4919,6 +4919,13 @@ export type Database = {
           updated_count: number
         }[]
       }
+      parse_comment_mentions: {
+        Args: { p_author_id: string; p_content: string }
+        Returns: {
+          user_id: string
+          username: string
+        }[]
+      }
       patch_content_media_from_mux: {
         Args: { p_mapping_id: string }
         Returns: string
