@@ -2,16 +2,20 @@
 
 ## Verdict
 
-Both reviews are right, and codex's four corrections are all factually correct — I verified each against the database before folding them in. Two of them would have caused real bugs:
+Yes — both corrections are right and I've folded them in. One of them (dedup direction) was a genuine error in my plan; the other two review points were already satisfied, and I verified the third myself rather than asking you to.
 
-1. **`comment_likes` is not RPC-only.** Verified: the table has `INSERT` ("Verified users can like comments") and `DELETE` ("Users can unlike their own") policies for `public`. So "the RPC is the single writer" is a convention, not an invariant — my previous note was wrong. Fixed below.
-2. **Preview text lives in different fields per shape.** Verified: `create_post_comment_notification` writes `message` = the event sentence ("linda commented on your post") and `metadata.comment_text` = a 50-char preview. `add_comment`'s mention/reply rows write `title` = the event sentence and `message` = a 200-char preview. Blindly rewriting `message` for plain comments would replace the event copy with raw comment text. Fixed below.
-3. **A shared parser means `add_comment` must be replaced too** — otherwise the "single authority" claim is false and the two flows drift. Correct; the migration now replaces three functions, and the helper's `EXECUTE` is revoked from `PUBLIC`.
-4. **Orphan backfill + active uniqueness must stay.** Correct — fixing the unlike branch only helps future unlikes; rows already orphaned by past unlikes stay live forever.
+**Accepted as a fix:** dedup keeps the **newest** active row (`created_at DESC, id DESC`), not the oldest. Keeping the oldest could preserve an already-read row with a stale timestamp and URL over the newer real event, and it contradicts Phase 2.5. Codex's added detail is also right: `retracted_at` cannot order active candidates because they're all NULL there.
 
-One thing I'd add that neither review raised: **`add_comment` also writes the stale `/recommendation/` singular URL** (line 96 of the reference SQL and in the live function). Since that function is being replaced anyway, fix it in the same pass so the two comment producers agree.
+**Already in the plan (now stated explicitly):** the partial unique index identity always included `(metadata->>'comment_id')` — without it, "Hana liked comment A" and "Hana liked comment B" on the same post would collide. Spelled out in step 1 so it can't be lost in implementation.
 
-Scope stays closed after this: no realtime expansion, no DELETE subscription, no grouping changes, no review/journey types, no target-deletion cleanup, no preferences in this migration.
+**Verified rather than asked:** I searched the project for direct `comment_likes` writes before agreeing to revoke. There are none — every mutation lives inside `toggle_comment_like`; `commentsService.ts` calls only the RPC and `get_comments_with_profiles` only reads. Revocation is safe.
+
+**Also folded in from codex:** orphan cleanup validates the *full* canonical identity (recipient = comment author, `entity_id` = parent, `entity_type` matches) rather than just `(comment_id, sender_id)`, and enforcement covers **both** privileges and policies since those are independent controls in Postgres.
+
+Carried over from the previous round: preview fields differ per notification shape (plain comments use `metadata.comment_text`, mention/reply rows use `message`), `add_comment` is replaced too so there's a single mention-parsing authority, and `add_comment`'s stale `/recommendation/` singular URL gets fixed in the same pass.
+
+Scope stays closed after this: no realtime expansion, no DELETE subscription, no grouping changes, no review/journey types, no target-deletion cleanup, no preferences in this migration. Preferences is the next phase.
+
 
 ## Plan
 
