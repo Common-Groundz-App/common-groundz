@@ -50,12 +50,12 @@ Render-time only. `src/utils/notificationGrouping.ts` is a pure transform over t
 
 - **Eligibility:** top-level `like` rows on `post` / `recommendation` with a valid uuid `entity_id` and **no** `metadata.comment_id`. Comments, replies, mentions, comment likes, follows and system rows always render as singletons, because each has its own `?commentId` destination.
 - **Bounding:** children must be **contiguous** in the loaded list AND within a 24h window anchored on the group's newest child (no transitive chaining). A non-matching row breaks the run, so the feed is never reordered. Unparseable timestamps never aggregate.
-- **Copy:** the representative's own title plus "and N others", where N counts *distinct* actors minus the representative. No profile fetches and no name parsing — the helper only has sender ids. Duplicate events from one actor render as a plain singleton-style title (never "and 0 others").
+- **Copy (shipped):** grouped rows read as personal sentences built from resolved **display names** — "Linda Williams and Hana Li liked your post", collapsing to "… and N others" past two named actors. Event-aware singleton copy; no numeric event chip. Names come from the same React Query profile keys `ProfileAvatar` already uses, so there are no extra requests and no flicker.
 - **Identity:** group key is `${type}|${entity_type}|${entity_id}|${representativeId}`, unique even if the same target appears twice in one page.
 - **Interaction:** `NotificationList` passes the whole group to `onNotificationClick` (singletons arrive as 1-event groups). The drawer marks every unread child in a single `markAsRead(ids)` call and navigates via the representative's destination — valid because a group shares one target by construction.
-- **Visuals:** up to 3 stacked `ProfileAvatar`s (existing cache, no extra requests) plus an event-count chip. Singleton rendering is unchanged.
+- **Visuals:** up to 3 stacked `ProfileAvatar`s (existing cache, no extra requests). No event-count chip. Singleton rendering is unchanged.
 - **Invariant:** unread counts, the mismatch banner and pagination stay **event-based** over flat server rows. Group counts are presentation only.
-- **Tests:** `src/utils/notificationGrouping.test.ts` — 20 cases covering eligibility, adjacency, the window anchor, and total/unread event-count preservation.
+- **Tests:** `src/utils/notificationGrouping.test.ts` — 43 cases covering eligibility, adjacency, the window anchor, name resolution/copy, and total/unread event-count preservation.
 
 ## Phase 2.4 — Realtime with polling reconciliation (done)
 
