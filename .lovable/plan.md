@@ -2,17 +2,20 @@
 
 ## Verdict on the feedback
 
-Both refinements from Codex are right and are now in the plan. ChatGPT's approval notes are already covered.
+Both of Codex's implementation details are real and are now folded in, plus its call for unit coverage. ChatGPT's cautions are already covered by the manual checks.
 
-- **Caret-aware detection:** agreed, and this is the right moment to fix it. Today's regex only matches a mention at the very end of the value, so editing mid-text (`Thanks, @han| this was useful.`) never opens the popup and an insert could rewrite the wrong token. Since the logic is being centralized anyway, it becomes caret-aware once.
-- **CommentDialog composer:** verified — `CommentDialog` has a main `Textarea` ("Add a comment...") with no mention wiring at all. Wiring only its edit box would create the reverse inconsistency, so both dialog surfaces are in scope.
-- **Popup positioning:** agreed. Instead of hand-computing above/below inside an overflow container, anchor the popup with the project's existing Radix `Popover` primitive, which portals out and handles collisions.
+- **`PopoverAnchor` does not exist:** verified — `src/components/ui/popover.tsx` exports only `Popover`, `PopoverTrigger`, `PopoverContent`. The plan now adds the `PopoverAnchor` re-export, prevents `onOpenAutoFocus`/`onCloseAutoFocus` focus transfer, and puts the popover root + anchor at the call site around each textarea (the component can't anchor itself from elsewhere in the tree).
+- **Bare `@` behavior:** correct catch — `MentionAutocomplete` bails when `query` is empty, so "bare `@` opens" would silently fail. Decision: **require at least one character**, matching today's main/reply behavior exactly, and the acceptance criteria are written that way. A default "recent users" list is a nicer UX but needs a new data source and would change existing surfaces' behavior; it stays out of this bug fix and can be a small follow-up if you want it.
+- **Unit tests:** agreed. The detect/insert range math is the most regression-prone part and is pure, so it gets a test file in the existing Vitest setup.
+- **Caret-aware detection:** the right moment to fix it, since editing usually happens mid-text (`Thanks, @han| this was useful.`) where today's end-anchored regex never fires.
+- **CommentDialog composer:** verified it has a main "Add a comment..." `Textarea` with no mention wiring, so both dialog surfaces are in scope.
 
 ## Additions of my own
 
-- **Caret restoration after insert.** After replacing the `@query` token, set the textarea selection to just after the inserted `@username ` rather than letting the caret jump to the end. Without this, mid-text edits move the cursor and the next keystroke lands in the wrong place.
-- **Keep the hook's detection separate from server parsing.** The hook detects a *partial* token being typed; `parse_comment_mentions` parses *final* text. They stay intentionally different, and no server change is made.
-- **Regression cases pinned in the manual checks** so the centralized regex doesn't change today's behaviour: `@hana`, `@hana.li`, `@linda_williamss`, and email-like text (`a@b.com`) not triggering.
+- **Caret restoration after insert.** After replacing the `@query` token, set the textarea selection to just after the inserted `@username ` instead of letting the caret jump to the end.
+- **Hook detection stays separate from server parsing.** The hook detects a *partial* token being typed; `parse_comment_mentions` parses *final* text. No server change.
+- **Regression cases pinned** so centralizing the regex doesn't change today's behaviour: `@hana`, `@hana.li`, `@linda_williamss`, `hi @hana`, `(@hana`, `,@hana` all match; `a@b.com` does not.
+
 
 ## Changes
 
