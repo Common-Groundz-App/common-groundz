@@ -566,22 +566,47 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                     </AvatarFallback>
                   )}
                 </Avatar>
-                <Textarea
-                  ref={textareaRef}
-                  placeholder="Add a comment..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  disabled={isSending}
-                  rows={1}
-                  className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
-                  onFocus={() => {
-                    if (!user) {
-                      setNewComment('');
-                      requireAuth({ action: 'comment', surface: 'comment_dialog' });
-                      textareaRef.current?.blur();
-                    }
-                  }}
-                />
+                <Popover
+                  open={mention.isOpenFor('main')}
+                  onOpenChange={(open) => { if (!open) mention.close(); }}
+                >
+                  <PopoverAnchor asChild>
+                    <Textarea
+                      ref={textareaRef}
+                      placeholder="Add a comment..."
+                      value={newComment}
+                      onChange={(e) => {
+                        setNewComment(e.target.value);
+                        mention.detect(
+                          e.target.value,
+                          e.target.selectionStart ?? e.target.value.length,
+                          { kind: 'main' }
+                        );
+                      }}
+                      disabled={isSending}
+                      rows={1}
+                      className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
+                      onFocus={() => {
+                        if (!user) {
+                          setNewComment('');
+                          requireAuth({ action: 'comment', surface: 'comment_dialog' });
+                          textareaRef.current?.blur();
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        // Let the mention popup own Arrow/Enter/Tab/Escape.
+                        if (mention.visible) return;
+                      }}
+                    />
+                  </PopoverAnchor>
+                  <MentionAutocomplete
+                    query={mention.query}
+                    visible={mention.isOpenFor('main')}
+                    onSelect={handleMentionSelect}
+                    onClose={mention.close}
+                  />
+                </Popover>
+
                 <Button
                   size="icon"
                   className={cn(
