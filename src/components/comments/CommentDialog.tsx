@@ -187,6 +187,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
       if (!success) throw new Error("Failed to add comment");
 
       setNewComment('');
+      mention.reset();
       loadComments();
       
       if (onCommentAdded) {
@@ -221,11 +222,13 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
   };
 
   const handleEditClick = (comment: CommentData) => {
+    mention.reset();
     setEditingCommentId(comment.id);
     setEditCommentContent(comment.content);
   };
 
   const handleEditCancel = () => {
+    mention.reset();
     setEditingCommentId(null);
     setEditCommentContent('');
   };
@@ -235,6 +238,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
       return;
     }
     
+    mention.reset();
     setIsEditing(true);
     
     try {
@@ -352,6 +356,8 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
       setDeleteDialogOpen(false);
     }
     
+    mention.reset();
+
     if (editingCommentId) {
       setEditingCommentId(null);
       setEditCommentContent('');
