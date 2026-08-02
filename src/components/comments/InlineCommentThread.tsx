@@ -428,17 +428,20 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   }, [requireAuth, canPerformAction, showVerificationRequired, user, itemType]);
 
   const handleEditClick = (comment: CommentData) => {
+    mention.reset();
     setEditingCommentId(comment.id);
     setEditCommentContent(comment.content);
   };
 
   const handleEditCancel = () => {
+    mention.reset();
     setEditingCommentId(null);
     setEditCommentContent('');
   };
 
   const handleEditSave = async () => {
     if (!user || !editingCommentId || !editCommentContent.trim()) return;
+    mention.reset();
     setIsEditing(true);
     try {
       const success = await updateComment(editingCommentId, editCommentContent, itemType, user.id);
