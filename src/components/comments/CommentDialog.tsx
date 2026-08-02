@@ -19,6 +19,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import UsernameLink from '@/components/common/UsernameLink';
 import { feedbackActions } from '@/services/feedbackService';
 import { getInitialsFromName } from '@/utils/profileUtils';
+import MentionAutocomplete from './MentionAutocomplete';
+import { useMentionAutocomplete } from './useMentionAutocomplete';
+import { Popover, PopoverAnchor } from '@/components/ui/popover';
 
 interface CommentDialogProps {
   isOpen: boolean;
