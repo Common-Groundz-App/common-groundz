@@ -30,7 +30,7 @@ Scope stays closed after this: no realtime expansion, no DELETE subscription, no
 - **Like branch:** add `AND n.retracted_at IS NULL` to the `NOT EXISTS`, so a re-like inserts a **fresh unread row** rather than being permanently suppressed.
 - Fix `action_url` from `/recommendation/<id>` to `/recommendations/<id>`.
 - Keep the canonical `type='comment'` + `metadata.event='like'` shape so grouping and destination resolution are untouched.
-- `CREATE OR REPLACE` preserves the existing `SECURITY DEFINER`, pinned `search_path`, `auth.uid()` ownership check, like-count side effects and boolean return contract — nothing unrelated is simplified.
+- Each replacement definition **explicitly re-declares** `SECURITY DEFINER` and `SET search_path = public` rather than relying on `CREATE OR REPLACE` to carry them over, plus the existing `auth.uid()` ownership check, like-count side effects and boolean return contract. This matters most here: with direct DML revoked, a `toggle_comment_like` that silently became `SECURITY INVOKER` would make liking impossible.
 
 ### 3. Enforce the writer invariant
 Verified before committing to this: **no direct writes exist.** Searched the whole project for `.from('comment_likes')` insert/update/delete/upsert — the only mutations of `comment_likes` anywhere are inside `toggle_comment_like` itself (`src/services/commentsService.ts` calls only the RPC; `get_comments_with_profiles` reads only). So revoking is safe and won't break the like UI.
