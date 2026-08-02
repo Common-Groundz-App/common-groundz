@@ -85,9 +85,25 @@ A notification for a reversible action is **live state**, not an event log entry
 - **Retention:** `prune_retracted_notifications(limit)` (`service_role` only, `ORDER BY retracted_at, id` so batches always progress) on a nightly `pg_cron` job, deleting tombstones older than 60 days.
 - **Verified in DB:** 5 retraction triggers, 5 indexes, 5 `SECURITY DEFINER` functions, both RPCs filtered, `REPLICA IDENTITY FULL`, table in `supabase_realtime`, cron job scheduled, and a live `ON CONFLICT` inference probe that inserted 0 rows without erroring. 143 unit tests pass.
 
+## Phase 2.5A — Comment lifecycle sync (done)
+
+Phase 2.5 covered post likes, recommendation likes, follows and comment deletion. 2.5A closes the two remaining reversible paths: **comment likes** and **comment edits**. Zero client changes — retraction is an `UPDATE`, so the existing realtime channel and coalesced count reconcile deliver it.
+
+- **State repair (one-off):** active comment-like rows were validated against their *full* canonical identity (recipient = comment author, `entity_id` = parent post/recommendation, `entity_type` agreement, sender still holds a like) and orphans retracted; duplicates per identity retracted keeping the **newest** (`created_at DESC, id DESC` — `retracted_at` cannot order active rows, they are all NULL); then a `RAISE EXCEPTION` gate before the index is created.
+- **Identity:** `uniq_active_comment_like_notifications` on `(user_id, sender_id, entity_type, entity_id, (metadata->>'comment_id'))` `WHERE retracted_at IS NULL AND type='comment' AND metadata->>'event'='like'`. The `comment_id` expression is required — two likes on different comments of the same post share `entity_id`. `toggle_comment_like` uses the **exact** same column list and predicate in its targeted `ON CONFLICT`, or Postgres cannot infer the index.
+- **Unlike retracts, re-like inserts fresh:** the unlike branch retracts the active row (never touching `is_read`); the like branch's existence guard is filtered on `retracted_at IS NULL`, so a re-like is a new unread event rather than being permanently suppressed.
+- **Single writer, DB-enforced:** all `comment_likes` mutation policies dropped and `INSERT/UPDATE/DELETE` revoked from `anon`/`authenticated` (verified beforehand: every mutation in the codebase already went through the RPC). `SELECT` stays for counts and liked-state; `EXECUTE` on `toggle_comment_like` stays for `authenticated`. No trigger needed — the RPC is now genuinely the only writer.
+- **One mention-parsing authority:** internal `parse_comment_mentions(content, author_id)` reproduces the previous inline behaviour exactly (same regex, lower/trim normalization, dedupe on handle, 5-mention cap counted only for resolvable non-self profiles, `deleted_at IS NULL` filter). `EXECUTE` revoked from `PUBLIC`/`anon`/`authenticated`; both `add_comment` and `update_comment` call it.
+- **Edit reconciliation driven by membership changes, not a diff:** removals come from `DELETE ... RETURNING mentioned_user_id` and additions from `INSERT ... ON CONFLICT DO NOTHING RETURNING mentioned_user_id`, so overlapping edits can't both claim the same mention is new and retries stay idempotent. Removed mentions retract; genuinely inserted ones notify.
+- **Preview refresh per row shape:** mention/reply rows update `message` (title untouched); plain "commented on …" rows update `metadata.comment_text` only — their `message` is the event sentence and must never be overwritten with raw comment text; comment-like rows have no body preview and are left alone. An edit is not a new event: no `is_read` reset, no `created_at` change, no reordering.
+- **URLs:** stale singular `/recommendation/<id>` fixed to `/recommendations/<id>` in `toggle_comment_like`, `add_comment` and existing rows.
+- **Verified in DB:** all four functions `SECURITY DEFINER` with pinned `search_path` (explicitly re-declared, not inherited — an accidental `SECURITY INVOKER` here would break liking entirely now that direct DML is revoked), `parse_comment_mentions` not executable by `anon`/`authenticated`, `toggle_comment_like` executable by `authenticated`, `comment_likes` down to `SELECT` with 0 mutation policies, unique index present, 0 stale URLs. 143 unit tests pass.
+
+**Rollout rule for future notification schema changes:** expand → deploy → activate. Add the nullable column and read-path filters first, deploy, then activate writers. Phase 2.5 shipped stable and is deliberately not replayed.
+
 ## Next
 
-- **Phase 2.3b — Preferences:** per-type notification preferences (deferred from 2.3).
+- **Phase 2.3b — Preferences:** server-enforced per-type notification preferences (deferred from 2.3). This is the next phase.
 - **Phase 2.6 — Coverage:** emit review and journey notifications once those surfaces exist, then extend the resolver's allowlist.
-- **Deferred:** mention-edit diffing (retracting a mention removed by an edit rather than a deletion).
+
 
