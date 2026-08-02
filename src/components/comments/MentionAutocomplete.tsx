@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { getInitialsFromName } from '@/utils/profileUtils';
+import { PopoverContent } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 interface MentionUser {
