@@ -25,6 +25,7 @@ export default defineConfig({
       'src/utils/brandTextHelpers.test.ts',
       'src/utils/renderBranching.test.ts',
       'src/hooks/useMuxStatus.test.ts',
+      'src/components/comments/useMentionAutocomplete.test.ts',
     ],
   },
   resolve: {
