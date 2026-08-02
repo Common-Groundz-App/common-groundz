@@ -1,29 +1,43 @@
-# Mention autocomplete in the comment edit box
+# Mention autocomplete in every comment edit surface
 
-## Phase 2.5A status
+## Verdict on the feedback
 
-Verified last turn and unchanged since: migration applied (orphan retraction, dedupe, `uniq_active_comment_like_notifications`), `toggle_comment_like` retraction + targeted `ON CONFLICT`, `parse_comment_mentions` internal-only, `add_comment`/`update_comment` membership-driven notifications with shape-aware preview refresh, `comment_likes` reduced to read-only for clients, 0 stale `/recommendation/` URLs, 143 tests passing, roadmap updated. No leftover or dead code found. Good to move to the next phase after this fix.
+Both points are right and are now folded in:
 
-## The bug
+- **Keyboard handling (ChatGPT):** correct. The existing main/reply textareas already do `if (mentionVisible) return;` *before* their own Enter/Escape shortcuts — that only skips the composer's own shortcuts, it never blocks typing (`MentionAutocomplete` owns Arrow/Enter/Tab/Escape via a capture-phase document listener). The edit textarea will reuse exactly that pattern, not a new one.
+- **Scope (Codex):** correct, and verified — `CommentDialog` is user-facing. It is rendered by `RecommendationFeedItem`, `ProfilePostItem`, and `RecommendationContentViewer`, and it has its own edit `Textarea` with no mention wiring. Leaving it out would ship two different behaviours for the same action, so it is in scope.
 
-Typing `@` works in the main comment box and the reply box because both call `detectMention` and render `MentionAutocomplete`. The edit textarea lives in `CommentItem` and has no mention wiring at all, so no popup appears while editing.
+## What I'm adding beyond their notes
 
-## What to change
+- **One shared hook instead of three copies.** `detectMention` and `insertMention` currently live inline in `InlineCommentThread`. Extract them into `useMentionAutocomplete` so inline-thread (main/reply/edit) and dialog (main/edit) all use one regex and one insert transform. No third implementation.
+- **Target the popup by comment id, not by a generic `'edit'` string**, so a stale popup can never render next to a different comment.
+- **Popup opens downward when there isn't room above.** Both edit textareas sit inside scroll containers; `bottom-full` alone can clip. The popup gets a simple side choice based on available space above the textarea.
 
-Reuse the existing mention state in `InlineCommentThread` rather than duplicating logic — one popup, one query, one selection handler.
+## Changes
 
-1. `InlineCommentThread.tsx`
-   - Widen `mentionTarget` to `'main' | 'reply' | 'edit'`.
-   - In `handleMentionSelect`, add an `edit` branch that applies the same `insertMention` transform to `editCommentContent`.
-   - Pass two new props to every `CommentItem` instance (top-level, auto-expanded replies, collapsible replies): a change handler that sets `editCommentContent` and calls `detectMention(value, 'edit')`, plus the mention popup state (`mentionVisible && mentionTarget === 'edit'`, `mentionQuery`, `onSelect`, `onClose`).
-   - When edit is cancelled or saved, clear `mentionVisible`/`mentionQuery` so a stale popup can't linger.
+1. **New `src/components/comments/useMentionAutocomplete.ts`**
+   - Owns `{ visible, query, target }` where `target` is `{ kind: 'main' | 'reply' | 'edit', commentId?: string }`.
+   - Exports `detect(text, target)`, `insert(text, username)`, `close()`, `reset()`.
+   - Same regexes as today, moved verbatim: detect `/(?:^|\s)@([a-z0-9._]*)$/i`, insert replaces that trailing token with `@username `.
 
-2. `CommentItem.tsx`
-   - Route the edit `Textarea`'s `onChange` through the new mention-aware handler (falling back to the existing `onEditContentChange` when not provided, so other callers keep working).
-   - Wrap the edit textarea in a `relative` container and render `MentionAutocomplete` above it (`bottom-full mb-1`) only when this comment is the one being edited.
-   - Add `onKeyDown` that returns early while the popup is open, so arrow keys/Enter go to the autocomplete instead of the textarea.
+2. **`InlineCommentThread.tsx`**
+   - Replace local mention state/handlers with the hook; main and reply call sites behave identically.
+   - `handleMentionSelect` gains an `edit` branch applying `insert` to `editCommentContent`.
+   - Pass to every `CommentItem` (top-level, auto-expanded replies, collapsible replies): a mention-aware edit change handler, plus popup props gated on `target.kind === 'edit' && target.commentId === comment.id`.
+   - Edit save (success or failure) and cancel call `reset()`.
 
-## Notes
+3. **`CommentDialog.tsx`**
+   - Same hook wiring for its main comment box (if it has none today, only the edit box is required) and its edit textarea, with the same id-scoped gating and reset-on-save/cancel.
 
-- `CommentDialog.tsx` has its own separate edit textarea and no mention support anywhere in it; leaving it untouched keeps this change scoped to the inline thread the bug was reported on. Say the word if you want it there too.
-- No database, service, or notification changes — `update_comment` already re-parses mentions server-side, so a mention added during an edit already creates the notification once the text is saved.
+4. **`CommentItem.tsx`**
+   - Route the edit `Textarea` `onChange` through the new handler, falling back to `onEditContentChange` when the mention props aren't supplied, so existing callers keep working.
+   - Wrap the textarea in a `relative` container and render `MentionAutocomplete` positioned above (falling back to below when clipped).
+   - `onKeyDown`: `if (mentionVisible) return;` first, then existing behaviour — typing is unaffected; Enter while the popup is open selects a mention and cannot reach Save.
+
+## Out of scope
+
+No database, service, or notification changes. `update_comment` already re-parses mentions and reconciles notifications on save (Phase 2.5A), so an added or removed mention during an edit is handled server-side.
+
+## Manual checks
+
+Inline thread and dialog, each: `@` popup appears while editing; arrows/Enter pick a result and don't submit the form; Escape closes; cancel then edit another comment shows no stale popup; failed save keeps text and closes the popup; main and reply autocomplete still work; popup isn't clipped inside the scroll area.
