@@ -70,11 +70,11 @@ In the same transaction, after the content update:
 
 ## Technical notes
 
-- One transactional migration, applied in this order: orphan backfill → dedup (newest wins) → assert no duplicates → partial unique index → replace `toggle_comment_like` → revoke direct table mutations → add the internal mention parser (`REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated`) → replace `add_comment` and `update_comment`. All three RPCs are already `SECURITY DEFINER` with a pinned `search_path`, and `CREATE OR REPLACE` keeps their existing grants, auth checks, mention cap, reply behaviour and comment-count side effects intact.
-- The index predicate and the `ON CONFLICT` predicate/column list must match **exactly**, including the `(metadata->>'comment_id')` expression.
+- One transactional migration, applied in this order: orphan backfill → dedup (newest wins) → assert no duplicates → partial unique index → replace `toggle_comment_like` → revoke direct table mutations → add the internal mention parser (`REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated`) → replace `add_comment` and `update_comment`. Every function body explicitly restates `SECURITY DEFINER` + `SET search_path = public` and re-issues its intended grants; auth checks, mention cap, reply behaviour and comment-count side effects are carried over verbatim.
+- The index predicate and the `ON CONFLICT` predicate/column list must match **exactly**, including the `(metadata->>'comment_id')` expression — if they drift, Postgres won't infer the index.
 - Retraction stays an `UPDATE`; the existing realtime channel and coalesced count reconcile deliver everything with **zero client changes**. Counts are never derived from payloads.
 - No new triggers on `comment_likes` — step 3 makes the RPC genuinely the only writer, which is the cheaper of the two enforcement options and matches the existing design.
-- After applying: probe the toggle and edit paths against real rows, then run the unit suite (143 tests) — the pure layers shouldn't move.
+- After applying, verify in the **database** as well as the app: `pg_proc` security attributes and search_path on all three RPCs, `EXECUTE` still granted to `authenticated` on `toggle_comment_like`, `SELECT`-only DML on `comment_likes`, zero duplicate active groups, and probes for unlike → re-like and mention add/remove/re-add. Then run the unit suite (143 tests) — the pure layers shouldn't move.
 
 ## Manual test pass
 
