@@ -520,37 +520,43 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     return mentionedUsername;
   };
 
-  // Mention detection for textareas
-  const detectMention = (text: string, target: 'main' | 'reply') => {
-    const match = text.match(/(?:^|\s)@([a-z0-9._]*)$/i);
-    if (match) {
-      setMentionQuery(match[1]);
-      setMentionVisible(true);
-      setMentionTarget(target);
-    } else {
-      setMentionVisible(false);
-      setMentionQuery('');
-    }
+  // Restores focus + caret after a mention is inserted
+  const restoreCaret = (ref: React.RefObject<HTMLTextAreaElement>, caret: number) => {
+    requestAnimationFrame(() => {
+      const el = ref.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
   };
 
   const handleMentionSelect = (username: string) => {
-    const insertMention = (text: string): string => {
-      return text.replace(/(?:^|\s)@([a-z0-9._]*)$/i, (match) => {
-        const prefix = match.startsWith(' ') ? ' ' : '';
-        return `${prefix}@${username} `;
-      });
-    };
+    const target = mention.target;
+    if (!target) return;
 
-    if (mentionTarget === 'main') {
-      setNewComment(prev => insertMention(prev));
-      textareaRef.current?.focus();
+    if (target.kind === 'main') {
+      const result = mention.insert(newComment, username);
+      if (result) {
+        setNewComment(result.value);
+        restoreCaret(textareaRef, result.caret);
+      }
+    } else if (target.kind === 'reply') {
+      const result = mention.insert(replyContent, username);
+      if (result) {
+        setReplyContent(result.value);
+        restoreCaret(replyTextareaRef, result.caret);
+      }
     } else {
-      setReplyContent(prev => insertMention(prev));
-      replyTextareaRef.current?.focus();
+      const result = mention.insert(editCommentContent, username);
+      if (result) {
+        setEditCommentContent(result.value);
+        restoreCaret(editTextareaRef, result.caret);
+      }
     }
-    setMentionVisible(false);
-    setMentionQuery('');
+
+    mention.close();
   };
+
 
   // #10 & #6: Dynamic placeholders based on itemType
   const mainPlaceholder = itemType === 'post'
