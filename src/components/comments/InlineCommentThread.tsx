@@ -734,38 +734,47 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                   </div>
                   <div className="flex gap-2 items-start relative">
                     {/* #7: Dynamic reply placeholder */}
-                    <Textarea
-                      ref={replyTextareaRef}
-                      placeholder={`Reply to ${replyingTo.displayName || replyingTo.username}...`}
-                      value={replyContent}
-                      onChange={(e) => {
-                        setReplyContent(e.target.value);
-                        detectMention(e.target.value, 'reply');
-                      }}
-                      disabled={isSending}
-                      rows={1}
-                      className="min-h-[36px] max-h-[100px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-3 text-sm"
-                      onKeyDown={(e) => {
-                        if (mentionVisible) return; // Let MentionAutocomplete handle keys
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleReplySubmit(replyingTo);
-                        }
-                        if (e.key === 'Escape') {
-                          setReplyingTo(null);
-                          setReplyContent('');
-                        }
-                      }}
-                    />
-                    {mentionVisible && mentionTarget === 'reply' && (
+                    <Popover
+                      open={mention.isOpenFor('reply')}
+                      onOpenChange={(open) => { if (!open) mention.close(); }}
+                    >
+                      <PopoverAnchor asChild>
+                        <Textarea
+                          ref={replyTextareaRef}
+                          placeholder={`Reply to ${replyingTo.displayName || replyingTo.username}...`}
+                          value={replyContent}
+                          onChange={(e) => {
+                            setReplyContent(e.target.value);
+                            mention.detect(
+                              e.target.value,
+                              e.target.selectionStart ?? e.target.value.length,
+                              { kind: 'reply' }
+                            );
+                          }}
+                          disabled={isSending}
+                          rows={1}
+                          className="min-h-[36px] max-h-[100px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-3 text-sm"
+                          onKeyDown={(e) => {
+                            if (mention.visible) return; // Let MentionAutocomplete handle keys
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleReplySubmit(replyingTo);
+                            }
+                            if (e.key === 'Escape') {
+                              setReplyingTo(null);
+                              setReplyContent('');
+                            }
+                          }}
+                        />
+                      </PopoverAnchor>
                       <MentionAutocomplete
-                        query={mentionQuery}
-                        visible={mentionVisible}
+                        query={mention.query}
+                        visible={mention.isOpenFor('reply')}
                         onSelect={handleMentionSelect}
-                        onClose={() => setMentionVisible(false)}
-                        className="bottom-full mb-1 left-0"
+                        onClose={mention.close}
                       />
-                    )}
+                    </Popover>
+
                     <div className="flex gap-1">
                       <Button
                         variant="ghost"
