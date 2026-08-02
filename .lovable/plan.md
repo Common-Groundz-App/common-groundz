@@ -2,33 +2,44 @@
 
 ## Verdict
 
-Both reviews are right, and codex's four corrections are all factually correct — I verified each against the database before folding them in. Two of them would have caused real bugs:
+Yes — both corrections are right and I've folded them in. One of them (dedup direction) was a genuine error in my plan; the other two review points were already satisfied, and I verified the third myself rather than asking you to.
 
-1. **`comment_likes` is not RPC-only.** Verified: the table has `INSERT` ("Verified users can like comments") and `DELETE` ("Users can unlike their own") policies for `public`. So "the RPC is the single writer" is a convention, not an invariant — my previous note was wrong. Fixed below.
-2. **Preview text lives in different fields per shape.** Verified: `create_post_comment_notification` writes `message` = the event sentence ("linda commented on your post") and `metadata.comment_text` = a 50-char preview. `add_comment`'s mention/reply rows write `title` = the event sentence and `message` = a 200-char preview. Blindly rewriting `message` for plain comments would replace the event copy with raw comment text. Fixed below.
-3. **A shared parser means `add_comment` must be replaced too** — otherwise the "single authority" claim is false and the two flows drift. Correct; the migration now replaces three functions, and the helper's `EXECUTE` is revoked from `PUBLIC`.
-4. **Orphan backfill + active uniqueness must stay.** Correct — fixing the unlike branch only helps future unlikes; rows already orphaned by past unlikes stay live forever.
+**Accepted as a fix:** dedup keeps the **newest** active row (`created_at DESC, id DESC`), not the oldest. Keeping the oldest could preserve an already-read row with a stale timestamp and URL over the newer real event, and it contradicts Phase 2.5. Codex's added detail is also right: `retracted_at` cannot order active candidates because they're all NULL there.
 
-One thing I'd add that neither review raised: **`add_comment` also writes the stale `/recommendation/` singular URL** (line 96 of the reference SQL and in the live function). Since that function is being replaced anyway, fix it in the same pass so the two comment producers agree.
+**Already in the plan (now stated explicitly):** the partial unique index identity always included `(metadata->>'comment_id')` — without it, "Hana liked comment A" and "Hana liked comment B" on the same post would collide. Spelled out in step 1 so it can't be lost in implementation.
 
-Scope stays closed after this: no realtime expansion, no DELETE subscription, no grouping changes, no review/journey types, no target-deletion cleanup, no preferences in this migration.
+**Verified rather than asked:** I searched the project for direct `comment_likes` writes before agreeing to revoke. There are none — every mutation lives inside `toggle_comment_like`; `commentsService.ts` calls only the RPC and `get_comments_with_profiles` only reads. Revocation is safe.
+
+**Also folded in from codex:** orphan cleanup validates the *full* canonical identity (recipient = comment author, `entity_id` = parent, `entity_type` matches) rather than just `(comment_id, sender_id)`, and enforcement covers **both** privileges and policies since those are independent controls in Postgres.
+
+Carried over from the previous round: preview fields differ per notification shape (plain comments use `metadata.comment_text`, mention/reply rows use `message`), `add_comment` is replaced too so there's a single mention-parsing authority, and `add_comment`'s stale `/recommendation/` singular URL gets fixed in the same pass.
+
+Scope stays closed after this: no realtime expansion, no DELETE subscription, no grouping changes, no review/journey types, no target-deletion cleanup, no preferences in this migration. Preferences is the next phase.
+
 
 ## Plan
 
 ### 1. Repair existing comment-like state (data, runs once)
-- **Retract orphans:** set `retracted_at = now()` on active `type='comment'`, `metadata.event='like'` notifications whose `(comment_id, sender_id)` no longer has a matching `comment_likes` row.
-- **Deduplicate:** keep the oldest active row per `(user_id, sender_id, entity_type, entity_id, metadata->>'comment_id')` for `event='like'`, retract the rest, ordered deterministically (`retracted_at, id`) as in 2.5.
+- **Retract orphans:** set `retracted_at = now()` on active `type='comment'`, `metadata.event='like'` notifications that don't map to a real like. The check validates the **full canonical identity**, not just `(comment_id, sender_id)`: join `comment_likes` to the owning `post_comments` / `recommendation_comments` row and confirm the notification's `user_id` is the comment author, `entity_id` is the parent post/recommendation, and `entity_type` matches. Malformed historical rows get retracted instead of being locked in by the new index.
+- **Deduplicate:** keep the **newest** active row per `(user_id, sender_id, entity_type, entity_id, metadata->>'comment_id')`, ordered `created_at DESC, id DESC`, and retract the rest. (Correction accepted — my earlier "oldest" was wrong and inconsistent with 2.5; `retracted_at` can't order active rows since they're all NULL.)
 - **Assert:** raise if any duplicate active group survives, so the migration fails loudly rather than half-applying.
-- **Constrain:** partial unique index on those five columns `WHERE retracted_at IS NULL AND type='comment' AND metadata->>'event'='like'`, matching the 2.5 index style so `ON CONFLICT` inference works.
+- **Constrain:** partial unique index on `(user_id, sender_id, entity_type, entity_id, (metadata->>'comment_id'))` `WHERE retracted_at IS NULL AND type='comment' AND metadata->>'event'='like'`. The `comment_id` expression is required so two likes on different comments of the same post don't collide; the targeted `ON CONFLICT` inference uses this exact column list and predicate.
 
 ### 2. `toggle_comment_like`
 - **Unlike branch:** before returning, retract the matching **active** row (same recipient, sender, `entity_type`/`entity_id`, `metadata.comment_id`, `event='like'`) with `retracted_at = now(), updated_at = now()`. Never touch `is_read`.
 - **Like branch:** add `AND n.retracted_at IS NULL` to the `NOT EXISTS`, so a re-like inserts a **fresh unread row** rather than being permanently suppressed.
 - Fix `action_url` from `/recommendation/<id>` to `/recommendations/<id>`.
 - Keep the canonical `type='comment'` + `metadata.event='like'` shape so grouping and destination resolution are untouched.
+- `CREATE OR REPLACE` preserves the existing `SECURITY DEFINER`, pinned `search_path`, `auth.uid()` ownership check, like-count side effects and boolean return contract — nothing unrelated is simplified.
 
 ### 3. Enforce the writer invariant
-Revoke direct `INSERT`/`DELETE` on `comment_likes` from `anon`/`authenticated` (drop the two mutation policies) and leave `SELECT` in place for counts and liked-state. The `SECURITY DEFINER` RPC keeps working; direct client writes — which would silently skip notification creation and retraction — stop being possible.
+Verified before committing to this: **no direct writes exist.** Searched the whole project for `.from('comment_likes')` insert/update/delete/upsert — the only mutations of `comment_likes` anywhere are inside `toggle_comment_like` itself (`src/services/commentsService.ts` calls only the RPC; `get_comments_with_profiles` reads only). So revoking is safe and won't break the like UI.
+
+Because privileges and RLS are separate controls, do both:
+- Drop the `INSERT`/`DELETE` policies ("Verified users can like comments", "Users can unlike their own").
+- `REVOKE INSERT, UPDATE, DELETE ON public.comment_likes FROM anon, authenticated`.
+- Keep `SELECT` for counts and liked-state, and keep `EXECUTE ON toggle_comment_like TO authenticated`.
+
 
 ### 4. Shared mention parser
 New `SECURITY DEFINER` helper returning resolved `(user_id, username)` rows for a body, with `REVOKE EXECUTE ... FROM PUBLIC`. It reproduces today's behaviour byte-for-byte: same regex `(?:^|[^a-z0-9.@])@([a-z0-9._]+)` with `gi`, same lower/trim normalization, same dedup on the normalized handle, same 5-mention cap, same self-mention skip, same `deleted_at IS NULL` profile filter. `add_comment` is replaced to call it, so there is exactly one parsing authority.
@@ -53,7 +64,8 @@ In the same transaction, after the content update:
 
 ## Technical notes
 
-- One transactional migration: backfill → dedup → assert → index → `CREATE OR REPLACE` of `add_comment`, `update_comment`, `toggle_comment_like` → new parser helper with revoked `PUBLIC` execute → policy revocation on `comment_likes`. All three RPCs are already `SECURITY DEFINER` with a pinned `search_path`.
+- One transactional migration, applied in this order: orphan backfill → dedup (newest wins) → assert no duplicates → partial unique index → replace `toggle_comment_like` → revoke direct table mutations → add the internal mention parser (`REVOKE EXECUTE ... FROM PUBLIC, anon, authenticated`) → replace `add_comment` and `update_comment`. All three RPCs are already `SECURITY DEFINER` with a pinned `search_path`, and `CREATE OR REPLACE` keeps their existing grants, auth checks, mention cap, reply behaviour and comment-count side effects intact.
+- The index predicate and the `ON CONFLICT` predicate/column list must match **exactly**, including the `(metadata->>'comment_id')` expression.
 - Retraction stays an `UPDATE`; the existing realtime channel and coalesced count reconcile deliver everything with **zero client changes**. Counts are never derived from payloads.
 - No new triggers on `comment_likes` — step 3 makes the RPC genuinely the only writer, which is the cheaper of the two enforcement options and matches the existing design.
 - After applying: probe the toggle and edit paths against real rows, then run the unit suite (143 tests) — the pure layers shouldn't move.
