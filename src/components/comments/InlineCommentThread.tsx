@@ -70,10 +70,9 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const [replyContent, setReplyContent] = useState('');
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set());
 
-  // Mention autocomplete state
-  const [mentionQuery, setMentionQuery] = useState('');
-  const [mentionVisible, setMentionVisible] = useState(false);
-  const [mentionTarget, setMentionTarget] = useState<'main' | 'reply'>('main');
+  // Mention autocomplete (shared, caret-aware controller)
+  const mention = useMentionAutocomplete();
+
 
   // Reputation/badge state
   const [trustedUserIds, setTrustedUserIds] = useState<Set<string>>(new Set());
