@@ -563,6 +563,23 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     mention.close();
   };
 
+  // Mention wiring for a comment row's edit textarea (scoped per comment id)
+  const editMentionProps = (commentId: string) => ({
+    editTextareaRef,
+    onEditCaretChange: (value: string, caretIndex: number) =>
+      mention.detect(value, caretIndex, { kind: 'edit', commentId }),
+    mentionOpen: mention.isOpenFor('edit', commentId),
+    onMentionClose: mention.close,
+    mentionPopup: (
+      <MentionAutocomplete
+        query={mention.query}
+        visible={mention.isOpenFor('edit', commentId)}
+        onSelect={handleMentionSelect}
+        onClose={mention.close}
+      />
+    ),
+  });
+
 
   // #10 & #6: Dynamic placeholders based on itemType
   const mainPlaceholder = itemType === 'post'
