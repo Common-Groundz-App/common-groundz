@@ -16,19 +16,26 @@ Scope stays closed after this: no realtime expansion, no DELETE subscription, no
 ## Plan
 
 ### 1. Repair existing comment-like state (data, runs once)
-- **Retract orphans:** set `retracted_at = now()` on active `type='comment'`, `metadata.event='like'` notifications whose `(comment_id, sender_id)` no longer has a matching `comment_likes` row.
-- **Deduplicate:** keep the oldest active row per `(user_id, sender_id, entity_type, entity_id, metadata->>'comment_id')` for `event='like'`, retract the rest, ordered deterministically (`retracted_at, id`) as in 2.5.
+- **Retract orphans:** set `retracted_at = now()` on active `type='comment'`, `metadata.event='like'` notifications that don't map to a real like. The check validates the **full canonical identity**, not just `(comment_id, sender_id)`: join `comment_likes` to the owning `post_comments` / `recommendation_comments` row and confirm the notification's `user_id` is the comment author, `entity_id` is the parent post/recommendation, and `entity_type` matches. Malformed historical rows get retracted instead of being locked in by the new index.
+- **Deduplicate:** keep the **newest** active row per `(user_id, sender_id, entity_type, entity_id, metadata->>'comment_id')`, ordered `created_at DESC, id DESC`, and retract the rest. (Correction accepted — my earlier "oldest" was wrong and inconsistent with 2.5; `retracted_at` can't order active rows since they're all NULL.)
 - **Assert:** raise if any duplicate active group survives, so the migration fails loudly rather than half-applying.
-- **Constrain:** partial unique index on those five columns `WHERE retracted_at IS NULL AND type='comment' AND metadata->>'event'='like'`, matching the 2.5 index style so `ON CONFLICT` inference works.
+- **Constrain:** partial unique index on `(user_id, sender_id, entity_type, entity_id, (metadata->>'comment_id'))` `WHERE retracted_at IS NULL AND type='comment' AND metadata->>'event'='like'`. The `comment_id` expression is required so two likes on different comments of the same post don't collide; the targeted `ON CONFLICT` inference uses this exact column list and predicate.
 
 ### 2. `toggle_comment_like`
 - **Unlike branch:** before returning, retract the matching **active** row (same recipient, sender, `entity_type`/`entity_id`, `metadata.comment_id`, `event='like'`) with `retracted_at = now(), updated_at = now()`. Never touch `is_read`.
 - **Like branch:** add `AND n.retracted_at IS NULL` to the `NOT EXISTS`, so a re-like inserts a **fresh unread row** rather than being permanently suppressed.
 - Fix `action_url` from `/recommendation/<id>` to `/recommendations/<id>`.
 - Keep the canonical `type='comment'` + `metadata.event='like'` shape so grouping and destination resolution are untouched.
+- `CREATE OR REPLACE` preserves the existing `SECURITY DEFINER`, pinned `search_path`, `auth.uid()` ownership check, like-count side effects and boolean return contract — nothing unrelated is simplified.
 
 ### 3. Enforce the writer invariant
-Revoke direct `INSERT`/`DELETE` on `comment_likes` from `anon`/`authenticated` (drop the two mutation policies) and leave `SELECT` in place for counts and liked-state. The `SECURITY DEFINER` RPC keeps working; direct client writes — which would silently skip notification creation and retraction — stop being possible.
+Verified before committing to this: **no direct writes exist.** Searched the whole project for `.from('comment_likes')` insert/update/delete/upsert — the only mutations of `comment_likes` anywhere are inside `toggle_comment_like` itself (`src/services/commentsService.ts` calls only the RPC; `get_comments_with_profiles` reads only). So revoking is safe and won't break the like UI.
+
+Because privileges and RLS are separate controls, do both:
+- Drop the `INSERT`/`DELETE` policies ("Verified users can like comments", "Users can unlike their own").
+- `REVOKE INSERT, UPDATE, DELETE ON public.comment_likes FROM anon, authenticated`.
+- Keep `SELECT` for counts and liked-state, and keep `EXECUTE ON toggle_comment_like TO authenticated`.
+
 
 ### 4. Shared mention parser
 New `SECURITY DEFINER` helper returning resolved `(user_id, username)` rows for a body, with `REVOKE EXECUTE ... FROM PUBLIC`. It reproduces today's behaviour byte-for-byte: same regex `(?:^|[^a-z0-9.@])@([a-z0-9._]+)` with `gi`, same lower/trim normalization, same dedup on the normalized handle, same 5-mention cap, same self-mention skip, same `deleted_at IS NULL` profile filter. `add_comment` is replaced to call it, so there is exactly one parsing authority.
