@@ -46,8 +46,9 @@ New `SECURITY DEFINER` helper returning resolved `(user_id, username)` rows for 
 
 ### 5. `update_comment` — mention and preview reconciliation
 In the same transaction, after the content update:
-- **Removed mentions:** delete the `comment_mentions` row and retract the active mention notification.
-- **Added mentions:** insert `comment_mentions`, and insert a mention notification only when no active one exists (guard filtered on `retracted_at IS NULL`).
+- **Membership changes drive notifications, not a pre-computed diff.** Removals use `DELETE ... RETURNING mentioned_user_id` and retract only for returned rows; additions use `INSERT ... ON CONFLICT DO NOTHING RETURNING mentioned_user_id` and notify only for returned rows. Two overlapping edits can't both conclude the same mention is new, and retries are idempotent.
+- **Removed mentions:** the deleted `comment_mentions` rows retract their active mention notification.
+- **Added mentions:** genuinely inserted rows get a mention notification, guarded on `retracted_at IS NULL` so a re-add after removal yields a fresh row.
 - **Kept mentions:** leave `is_read` and `created_at` alone; refresh only the preview.
 - **Preview refresh, per row shape:**
   - mention / reply rows → update `message` to `LEFT(new_content, 200)`, leave `title` alone.
