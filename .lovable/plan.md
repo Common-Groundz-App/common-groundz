@@ -16,6 +16,11 @@ Carried over from the previous round: preview fields differ per notification sha
 
 Scope stays closed after this: no realtime expansion, no DELETE subscription, no grouping changes, no review/journey types, no target-deletion cleanup, no preferences in this migration. Preferences is the next phase.
 
+**Final round — both clarifications accepted, no redesign:**
+- Every replaced function **explicitly re-declares** `SECURITY DEFINER` and `SET search_path = public` instead of assuming `CREATE OR REPLACE` carries them. Codex is right that this is a real hazard once direct DML is revoked: an accidental `SECURITY INVOKER` would break liking entirely.
+- Mention reconciliation is driven by **actual membership changes** (`DELETE ... RETURNING`, `INSERT ... ON CONFLICT DO NOTHING RETURNING`) rather than a diff computed before the write — concurrency-safe and idempotent on retry.
+- Verification includes **database probes** (privileges, function security attributes, dedup result, unlike/re-like, mention add/remove/re-add, repeated edits), not just the TypeScript suite.
+
 
 ## Plan
 
