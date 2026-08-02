@@ -473,13 +473,39 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                             
                             {editingCommentId === comment.id ? (
                               <div className="mt-1">
-                                <Textarea
-                                  value={editCommentContent}
-                                  onChange={(e) => setEditCommentContent(e.target.value)}
-                                  className="min-h-[60px] text-sm resize-none bg-gray-50 border-gray-200 focus:border-primary focus:ring-0 focus-visible:ring-0"
-                                  placeholder="Edit your comment..."
-                                  disabled={isEditing}
-                                />
+                                <Popover
+                                  open={mention.isOpenFor('edit', comment.id)}
+                                  onOpenChange={(open) => { if (!open) mention.close(); }}
+                                >
+                                  <PopoverAnchor asChild>
+                                    <Textarea
+                                      ref={editTextareaRef}
+                                      value={editCommentContent}
+                                      onChange={(e) => {
+                                        setEditCommentContent(e.target.value);
+                                        mention.detect(
+                                          e.target.value,
+                                          e.target.selectionStart ?? e.target.value.length,
+                                          { kind: 'edit', commentId: comment.id }
+                                        );
+                                      }}
+                                      onKeyDown={(e) => {
+                                        // Let the mention popup own Arrow/Enter/Tab/Escape.
+                                        if (mention.visible) return;
+                                      }}
+                                      className="min-h-[60px] text-sm resize-none bg-gray-50 border-gray-200 focus:border-primary focus:ring-0 focus-visible:ring-0"
+                                      placeholder="Edit your comment..."
+                                      disabled={isEditing}
+                                    />
+                                  </PopoverAnchor>
+                                  <MentionAutocomplete
+                                    query={mention.query}
+                                    visible={mention.isOpenFor('edit', comment.id)}
+                                    onSelect={handleMentionSelect}
+                                    onClose={mention.close}
+                                  />
+                                </Popover>
+
                                 <div className="flex justify-end gap-2 mt-2">
                                   <Button 
                                     variant="ghost" 
