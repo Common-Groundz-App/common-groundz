@@ -148,7 +148,7 @@ Extend the existing Notifications tab in `src/pages/Settings.tsx` with an "Activ
 - **Comment likes** — "When someone likes your comment"
 - **New followers** — "When someone follows you"
 
-Behavior: skeletons while loading (per the project's skeleton standard); optimistic toggle with per-key rollback and a destructive toast on failure; refetch on account switch (the hook already keys on `user`); each switch labelled via `id`/`htmlFor` with its description wired through `aria-describedby`.
+Behavior: skeletons while loading (per the project's skeleton standard); optimistic toggle with per-key rollback and a destructive toast on failure; account switch resets state and refetches under the generation guard above; each switch labelled via `id`/`htmlFor` with its description wired through `aria-describedby`.
 
 ## Migration and rollout
 
