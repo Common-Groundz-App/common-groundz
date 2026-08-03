@@ -39,10 +39,57 @@ serve(async (req) => {
 
     console.log(`[Phase6][${runId}] Found ${watchedItems?.length || 0} watched items`);
 
+    // Phase 2.3b: honour journey_notifications_enabled BEFORE the expensive
+    // per-item loop. There is no FK between user_stuff and
+    // notification_preferences, so this is a bounded bulk lookup rather than an
+    // embedded join. Missing preference row = enabled (matches column default).
+    //
+    // All-or-nothing contract: if any chunk fails we abort the whole run and
+    // create zero notifications. Delivering to users whose opt-out status is
+    // unknown is worse than skipping a run — cron retries, an unwanted
+    // notification cannot be taken back.
+    const PREF_CHUNK_SIZE = 200;
+    const distinctUserIds = Array.from(
+      new Set((watchedItems || []).map((item: any) => item.user_id).filter(Boolean))
+    );
+    const journeyDisabledUserIds = new Set<string>();
+
+    for (let i = 0; i < distinctUserIds.length; i += PREF_CHUNK_SIZE) {
+      const chunk = distinctUserIds.slice(i, i + PREF_CHUNK_SIZE);
+      const { data: prefRows, error: prefError } = await supabase
+        .from('notification_preferences')
+        .select('user_id, journey_notifications_enabled')
+        .in('user_id', chunk);
+
+      if (prefError) {
+        console.error(
+          `[Phase6][${runId}] Preference lookup failed for chunk ${i / PREF_CHUNK_SIZE}, aborting run:`,
+          prefError
+        );
+        throw prefError;
+      }
+
+      for (const row of prefRows || []) {
+        if (row.journey_notifications_enabled === false) {
+          journeyDisabledUserIds.add(row.user_id as string);
+        }
+      }
+    }
+
+    const eligibleWatchedItems = (watchedItems || []).filter(
+      (item: any) => !journeyDisabledUserIds.has(item.user_id)
+    );
+
+    console.log(
+      `[Phase6][${runId}] ${journeyDisabledUserIds.size} user(s) opted out of journey notifications; ` +
+        `${eligibleWatchedItems.length} of ${watchedItems?.length || 0} watched items eligible`
+    );
+
     let notificationsCreated = 0;
 
     // Process each watched item
-    for (const item of watchedItems || []) {
+    for (const item of eligibleWatchedItems) {
+
       const userId = item.user_id;
       const entityId = item.entity_id;
       const entity = item.entities as any;
