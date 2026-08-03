@@ -23,6 +23,8 @@ import { useToast } from '@/hooks/use-toast';
 import { locationEventBus } from '@/hooks/use-geolocation';
 import PreferencesSection from '@/components/preferences/PreferencesSection';
 import { useNotificationPreferences } from '@/hooks/use-notification-preferences';
+import ActivityNotificationsCard from '@/components/settings/ActivityNotificationsCard';
+
 import ChangePasswordModal from '@/components/settings/ChangePasswordModal';
 import DeleteAccountModal from '@/components/settings/DeleteAccountModal';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
@@ -42,12 +44,13 @@ const Settings = () => {
   const { preferences, learnedPreferences } = usePreferences();
   const isMobile = useIsMobile();
   const { toast } = useToast();
-  const { 
-    preferences: notifPrefs, 
-    isLoading: notifLoading, 
-    toggleWeeklyDigest,
-    toggleJourneyNotifications 
+  const {
+    preferences: notifPrefs,
+    isLoading: notifLoading,
+    setPreference: setNotifPreference,
+    isPending: isNotifPending,
   } = useNotificationPreferences();
+
   const { isVerified } = useEmailVerification();
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
@@ -210,6 +213,13 @@ const Settings = () => {
               
               {/* Notifications Tab */}
               <TabsContent value="notifications">
+                <ActivityNotificationsCard
+                  preferences={notifPrefs}
+                  isLoading={notifLoading}
+                  setPreference={setNotifPreference}
+                  isPending={isNotifPending}
+                />
+
                 <Card className="mb-6">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -232,9 +242,11 @@ const Settings = () => {
                       </div>
                       <Switch
                         id="journey-toggle"
-                        checked={notifPrefs?.journey_notifications_enabled ?? true}
-                        onCheckedChange={toggleJourneyNotifications}
-                        disabled={notifLoading}
+                        checked={notifPrefs.journey_notifications_enabled}
+                        onCheckedChange={value =>
+                          setNotifPreference('journey_notifications_enabled', value)
+                        }
+                        disabled={notifLoading || isNotifPending('journey_notifications_enabled')}
                       />
                     </div>
                     
@@ -252,9 +264,9 @@ const Settings = () => {
                       </div>
                       <Switch
                         id="digest-toggle"
-                        checked={notifPrefs?.weekly_digest_enabled ?? false}
-                        onCheckedChange={toggleWeeklyDigest}
-                        disabled={notifLoading}
+                        checked={notifPrefs.weekly_digest_enabled}
+                        onCheckedChange={value => setNotifPreference('weekly_digest_enabled', value)}
+                        disabled={notifLoading || isNotifPending('weekly_digest_enabled')}
                       />
                     </div>
                     
@@ -270,18 +282,8 @@ const Settings = () => {
                     </div>
                   </CardContent>
                 </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Other Notifications</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground">
-                      Additional notification settings will be available soon.
-                    </p>
-                  </CardContent>
-                </Card>
               </TabsContent>
+
               
               {/* Privacy Tab */}
               <TabsContent value="privacy">

@@ -22,6 +22,8 @@ export default defineConfig({
       'src/utils/notificationGrouping.test.ts',
       'src/utils/notificationDestination.test.ts',
       'src/utils/notificationRealtime.test.ts',
+      'src/utils/notificationPreferences.test.ts',
+
       'src/utils/brandTextHelpers.test.ts',
       'src/utils/renderBranching.test.ts',
       'src/hooks/useMuxStatus.test.ts',
