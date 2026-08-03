@@ -53,6 +53,23 @@ So the rule is **one category per recipient per source comment**, not per produc
 
 Only after those skips is `comments_enabled` consulted. This makes the documented precedence (mention > reply > generic comment) true in the database rather than aspirational, and is a strict de-duplication improvement independent of preferences.
 
+### Comment edits must preserve precedence (Codex correction 1 — accepted)
+
+Codex found a real hole: the skips only run on INSERT. If Hana comments without mentioning Rishab (he gets the generic comment notification) and *then* edits the comment to add `@rishab`, `update_comment` inserts a mention notification and Rishab holds two rows for one source comment — breaking the stated invariant.
+
+Since Phase 2.5 already gave us a retraction lifecycle, the clean fix is precedence *replacement* rather than suppression. In `update_comment`, for each recipient in the newly-added mention set:
+
+1. insert the mention notification (subject to `mentions_enabled`), then
+2. retract that recipient's lower-precedence rows for the **same source comment** — the generic `comment`/`comment_like`-sibling projection is untouched, only the generic comment row keyed to that comment id — by setting `retracted_at = now()` where `retracted_at IS NULL`.
+
+Only *downward* transitions are handled, i.e. generic comment → mention. The reverse (a mention removed by an edit) already retracts the mention row per Phase 2.5A and deliberately does **not** resurrect a generic comment notification: resurrecting a notification the user may have already read is worse than losing it, and re-notifying for an old comment is misleading. That asymmetry is stated in the roadmap so it isn't mistaken for an oversight later.
+
+If `mentions_enabled` is false for that recipient, no mention row is inserted and the existing generic comment row is left alone — a disabled category must never *remove* a notification the user legitimately received.
+
+### Dependency guard
+
+The trigger skips call `public.parse_comment_mentions` from Phase 2.5A. Migration B asserts it exists before replacing any function body and aborts with a clear message if not, so environment drift fails loudly instead of installing triggers that error on every comment.
+
 ## Server-side enforcement
 
 One authoritative helper so trigger and RPC behavior cannot drift:
@@ -65,15 +82,15 @@ public.notification_allowed(_user_id uuid, _category text) returns boolean
 It left-joins the single preference row and returns the column for `_category`, falling back to the documented default when the row is missing. One unique-index lookup per notification — no N+1, no new realtime or polling work, no change to grouping, retraction, or the drawer.
 
 **Fail closed, and internal only** (both reviewers flagged this):
-- an unrecognised `_category` returns `false` — a typo like `'comment_like'` must never silently allow a notification. (A `RAISE` would abort the user's like/comment transaction, so `false` is the safer failure mode; the category set is also asserted in tests.)
+- an unrecognised `_category` returns `false` — a typo like `'comment_like'` must never silently allow a notification. (A `RAISE` would abort the user's like/comment transaction, so `false` is the safer failure mode.) It also emits `RAISE WARNING 'notification_allowed: unknown category %'` so a typo is visible in Postgres logs instead of silently muting a whole category, and the full category set is asserted in tests.
 - `REVOKE EXECUTE ... FROM public, anon, authenticated;` and `GRANT EXECUTE ... TO service_role;`. `SECURITY DEFINER` producers invoke it through the function owner, so the browser never needs it — otherwise any signed-in user could probe another user's settings.
 
 Each producer gains the guard in the position that already filters self-notifications:
 - triggers: `IF ... AND public.notification_allowed(recipient, 'likes') THEN insert`
 - RPC inserts (which are `INSERT ... SELECT ... WHERE NOT EXISTS`): add `AND public.notification_allowed(recipient, '<category>')` to the existing `WHERE`.
-- `generate-smart-notifications`: filter watchers by `journey_notifications_enabled` (missing row = enabled) before insert, mirroring `send-weekly-digest`. This is a real fix — the function currently ignores the toggle Settings already exposes.
+- `generate-smart-notifications`: preference eligibility is **joined into the candidate/watcher selection in bulk** (one query, missing row = enabled), not queried per watcher inside the existing loop. Mirrors `send-weekly-digest`, and fixes a real bug — the function currently ignores the toggle Settings already exposes.
 
-Every replaced SQL function body is patched from its **current live `pg_get_functiondef()`** output, not from migration history, preserving auth guards, return contracts, counters, retraction guards, and targeted `ON CONFLICT` inference. `SECURITY DEFINER` and pinned `search_path` are re-declared on each.
+Every replaced SQL function body is patched from its **current live `pg_get_functiondef()`** output, not from migration history, preserving auth guards, return contracts, counters, Phase 2.5/2.5A retraction and comment-lifecycle logic, and targeted `ON CONFLICT` inference. `SECURITY DEFINER` and pinned `search_path` are re-declared on each. `CREATE OR REPLACE FUNCTION` resets nothing about grants in Postgres, but because these are security-sensitive we still **re-assert and then re-verify** the intended grant/revoke set on every touched function after the migration, via `pg_proc.proacl` inspection.
 
 Self-notification suppression logic is untouched.
 
@@ -91,9 +108,20 @@ Codex's third point is correct and confirmed: `use-notification-preferences.ts` 
 
 Fixes in `use-notification-preferences.ts` / `notificationPreferencesService.ts` (extended, not replaced — single state owner):
 - an `effectivePreferences` object is always available: the six activity categories `true`, `journey_notifications_enabled` `true`, `weekly_digest_enabled` `false` when the row is absent.
-- `setPreference(key, value)` applies an optimistic update to the **effective** object, and on success adopts the row returned by the upsert as authoritative (so the first write materialises real state).
-- rollback restores the previous **effective** object, never `null`.
+- `setPreference(key, value)` applies an optimistic update to the **effective** object.
 - the two legacy toggles are re-expressed through `setPreference` so there is one write path.
+
+### Overlapping toggles must not corrupt state (Codex correction 2 — accepted)
+
+Codex is right that "adopt the returned row as authoritative" is unsafe once two switches are toggled quickly: an older in-flight response can clobber a newer local value, and a failed request restoring a whole snapshot can undo an unrelated successful toggle. Concretely: disable Likes, disable Mentions before Likes settles, Mentions resolves first, then the stale Likes row re-enables Mentions in the UI.
+
+The write path becomes per-key and merge-based:
+
+- one monotonically increasing sequence per key; a response is applied only if it is the latest for **that key**, older responses are discarded.
+- success **merges only that key** (plus server-owned `id`/`updated_at`) from the returned row — it never adopts the whole row over locally-pending keys.
+- failure reverts **only that key** to its pre-request value, never a full snapshot, and shows the destructive toast.
+- per-key pending set, so each switch shows its own in-flight state while others stay usable — no global lock needed, because ordering is now correct by construction.
+- a background refetch is likewise ignored for any key with a write in flight.
 
 Extend the existing Notifications tab in `src/pages/Settings.tsx` with an "Activity notifications" card above the Journey section (replacing the "coming soon" placeholder), one `Switch` per category:
 
@@ -104,40 +132,46 @@ Extend the existing Notifications tab in `src/pages/Settings.tsx` with an "Activ
 - **Comment likes** — "When someone likes your comment"
 - **New followers** — "When someone follows you"
 
-Behavior: skeletons while loading (per the project's skeleton standard); optimistic toggle with rollback plus a destructive toast on failure; the individual switch disabled while its save is in flight; refetch on account switch (the hook already keys on `user`); each switch labelled via `id`/`htmlFor` with its description wired through `aria-describedby`.
+Behavior: skeletons while loading (per the project's skeleton standard); optimistic toggle with per-key rollback and a destructive toast on failure; refetch on account switch (the hook already keys on `user`); each switch labelled via `id`/`htmlFor` with its description wired through `aria-describedby`.
 
 ## Migration and rollout
 
 Ordered, expand-first:
 
 1. Migration A — add the six columns `NOT NULL DEFAULT true`; create `notification_allowed` with the revoke/grant above.
-2. Migration B — `CREATE OR REPLACE` the five trigger functions and three RPCs (patched from live definitions), including the two comment-precedence skips.
-3. Deploy `generate-smart-notifications` with the `journey_notifications_enabled` filter.
+2. Migration B — assert `parse_comment_mentions` exists, then `CREATE OR REPLACE` the five trigger functions and three RPCs (patched from live definitions), including the comment-precedence skips and the edit-time precedence replacement.
+3. Deploy `generate-smart-notifications` with the bulk `journey_notifications_enabled` filter.
 4. Regenerated Supabase types, then service/hook/UI.
 5. Verification matrix, then roadmap update.
 
-Post-migration assertion (per ChatGPT's safeguard):
+Post-migration assertions:
 
 ```sql
+-- 1. no null preference values
 select count(*) from public.notification_preferences
 where likes_enabled is null or comments_enabled is null or replies_enabled is null
    or mentions_enabled is null or comment_likes_enabled is null or follows_enabled is null;
 -- expect 0
+
+-- 2. helper is not reachable by app users
+select has_function_privilege('authenticated', 'public.notification_allowed(uuid,text)', 'execute');
+-- expect false
 ```
 
-Existing RLS and grants on `notification_preferences` are re-verified, not changed. No new index needed (`user_id` is already unique). Rollback = drop the columns and restore the prior function bodies; steps 1–2 are backward compatible with the shipped client.
+Existing RLS and grants on `notification_preferences` are re-verified, not changed. No new index needed (`user_id` is already unique). Rollback order matters: **restore the prior producer function bodies first, then drop the columns** — dropping columns while the new bodies are live would break every like and comment. Steps 1–2 are backward compatible with the shipped client.
 
 ## Tests
 
-- Producer-by-category DB matrix: for each of the 8 in-database producers — enabled (row created), disabled (**zero** rows), missing preference row (default behavior), self-event (still suppressed), concurrent preference update.
-- Precedence: comment that mentions the content owner → exactly one notification (mention); reply to the owner's comment → exactly one (reply), no generic comment row; mention with `comments_enabled = false` → mention still delivered; reply with `comments_enabled = false` → reply still delivered.
-- Helper: unknown category returns `false`; `authenticated` cannot execute it.
+- Producer-by-category DB matrix: for each of the 8 in-database producers — enabled (row created), disabled (**zero** rows), missing preference row (default behavior), self-event (still suppressed).
+- Precedence on insert: comment mentioning the content owner → exactly one notification (mention); reply to the owner's comment → exactly one (reply), no generic comment row; mention with `comments_enabled = false` → mention still delivered; reply with `comments_enabled = false` → reply still delivered.
+- Precedence on edit: generic comment then edited to add `@owner` → mention row active, prior generic row retracted, total active rows for that comment = 1. With `mentions_enabled = false` → no mention row and the generic row stays active. Mention later removed → mention retracted, no generic row resurrected.
+- Helper: unknown category returns `false` and warns; `authenticated` cannot execute it; missing row yields documented defaults (activity + journey true, digest false).
 - `system` type inserts regardless of preferences.
-- Client unit tests for `setPreference`: missing-row first write, optimistic update, rollback to the effective object (not `null`).
+- Client unit tests for `setPreference`: missing-row first write; out-of-order responses (stale success must not clobber a newer key); failure reverts only its own key; refetch ignored for in-flight keys.
 
 ## Manual verification
 
-From a second account, with each category off in turn: like, comment, reply, mention, comment-like, follow, journey event. Confirm no drawer row, no badge change, no realtime event, and that pre-existing notifications and their read state are untouched. Re-enable and confirm new events arrive with no backfill.
+From a second account, with each category off in turn: like, comment, reply, mention, comment-like, follow, journey event. Confirm no drawer row, no badge change, no realtime event, and that pre-existing notifications and their read state are untouched. Re-enable and confirm new events arrive with no backfill. Then toggle three switches in rapid succession and reload — the UI must match the database exactly.
 
 
 ## Documentation
