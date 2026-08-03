@@ -184,6 +184,8 @@ Existing RLS and grants on `notification_preferences` are re-verified, not chang
 - Helper: unknown category returns `false` and warns; `authenticated` cannot execute it; missing row yields documented defaults (activity + journey true, digest false).
 - `system` type inserts regardless of preferences.
 - Client unit tests for `setPreference`: missing-row first write; out-of-order responses (stale success must not clobber a newer key); failure reverts only its own key; refetch ignored for in-flight keys.
+- Client account-switch tests: a fetch resolving after a user change is discarded; a mutation resolving after switch or sign-out writes no state and shows no toast; state resets to defaults + loading on switch rather than showing the prior account's toggles; per-key sequences/pending are cleared.
+- Edge function: chunking splits >200 ids into multiple lookups and merges results; a failing chunk aborts the run with zero notifications created.
 
 ## Manual verification
 
