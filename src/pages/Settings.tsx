@@ -23,6 +23,8 @@ import { useToast } from '@/hooks/use-toast';
 import { locationEventBus } from '@/hooks/use-geolocation';
 import PreferencesSection from '@/components/preferences/PreferencesSection';
 import { useNotificationPreferences } from '@/hooks/use-notification-preferences';
+import ActivityNotificationsCard from '@/components/settings/ActivityNotificationsCard';
+
 import ChangePasswordModal from '@/components/settings/ChangePasswordModal';
 import DeleteAccountModal from '@/components/settings/DeleteAccountModal';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
