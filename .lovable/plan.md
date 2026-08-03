@@ -85,11 +85,18 @@ Self-notification suppression logic is untouched.
 - Re-enabling never backfills skipped events.
 - Unread counts and the retraction lifecycle are unaffected, since skipped rows never exist.
 
-## Settings UI
+## Settings UI and the missing-row hook bug
 
-Extend the existing Notifications tab in `src/pages/Settings.tsx` with a single "Activity notifications" card above the current Journey section. One `Switch` per category, reusing `use-notification-preferences.ts` (extended with a generic `setPreference(key, value)`); no second state owner.
+Codex's third point is correct and confirmed: `use-notification-preferences.ts` stores `null` when no row exists, and its toggles do `prev ? {...prev, x} : null` — so a user's *first* toggle succeeds on the server but leaves local state `null` until a refetch. The new generic setter must not inherit that.
 
-Labels / descriptions:
+Fixes in `use-notification-preferences.ts` / `notificationPreferencesService.ts` (extended, not replaced — single state owner):
+- an `effectivePreferences` object is always available: the six activity categories `true`, `journey_notifications_enabled` `true`, `weekly_digest_enabled` `false` when the row is absent.
+- `setPreference(key, value)` applies an optimistic update to the **effective** object, and on success adopts the row returned by the upsert as authoritative (so the first write materialises real state).
+- rollback restores the previous **effective** object, never `null`.
+- the two legacy toggles are re-expressed through `setPreference` so there is one write path.
+
+Extend the existing Notifications tab in `src/pages/Settings.tsx` with an "Activity notifications" card above the Journey section (replacing the "coming soon" placeholder), one `Switch` per category:
+
 - **Likes** — "When someone likes your experience or recommendation"
 - **Comments** — "When someone comments on your experience or recommendation"
 - **Replies** — "When someone replies to your comment"
@@ -97,22 +104,41 @@ Labels / descriptions:
 - **Comment likes** — "When someone likes your comment"
 - **New followers** — "When someone follows you"
 
-Behavior: skeleton rows while loading; optimistic toggle with rollback and a destructive toast on failure; switches disabled during in-flight save; preferences refetch on account switch (hook already keys on `user`); each switch labelled via `id`/`htmlFor` with the description as `aria-describedby`.
+Behavior: skeletons while loading (per the project's skeleton standard); optimistic toggle with rollback plus a destructive toast on failure; the individual switch disabled while its save is in flight; refetch on account switch (the hook already keys on `user`); each switch labelled via `id`/`htmlFor` with its description wired through `aria-describedby`.
 
 ## Migration and rollout
 
-Single expand-only migration: `ALTER TABLE ... ADD COLUMN ... NOT NULL DEFAULT true` (six columns), then `CREATE OR REPLACE` for the helper and the five trigger functions and three RPCs (re-declared `SECURITY DEFINER` with pinned `search_path`, matching existing hardening). Adding columns with defaults is backward compatible — the old client keeps working before the UI ships. `GRANT EXECUTE` on the helper to `authenticated`, `service_role`. Existing RLS and grants on `notification_preferences` are re-verified, not changed. No new index needed (`user_id` is already unique). Rollback = drop columns and restore prior function bodies; Supabase types regenerate after the migration.
+Ordered, expand-first:
+
+1. Migration A — add the six columns `NOT NULL DEFAULT true`; create `notification_allowed` with the revoke/grant above.
+2. Migration B — `CREATE OR REPLACE` the five trigger functions and three RPCs (patched from live definitions), including the two comment-precedence skips.
+3. Deploy `generate-smart-notifications` with the `journey_notifications_enabled` filter.
+4. Regenerated Supabase types, then service/hook/UI.
+5. Verification matrix, then roadmap update.
+
+Post-migration assertion (per ChatGPT's safeguard):
+
+```sql
+select count(*) from public.notification_preferences
+where likes_enabled is null or comments_enabled is null or replies_enabled is null
+   or mentions_enabled is null or comment_likes_enabled is null or follows_enabled is null;
+-- expect 0
+```
+
+Existing RLS and grants on `notification_preferences` are re-verified, not changed. No new index needed (`user_id` is already unique). Rollback = drop the columns and restore the prior function bodies; steps 1–2 are backward compatible with the shipped client.
 
 ## Tests
 
-- Producer-by-category DB matrix (via `supabase--read_query` against seeded fixtures): for each of the 8 in-DB producers — enabled, disabled (asserts **zero** rows inserted), missing preference row (default), self-event, and concurrent preference update.
-- Precedence tests: mention-inside-a-reply, mention with `comments_enabled = false`.
-- `system` type still inserts regardless of preferences.
-- Client unit tests for the optimistic `setPreference` update and rollback path.
+- Producer-by-category DB matrix: for each of the 8 in-database producers — enabled (row created), disabled (**zero** rows), missing preference row (default behavior), self-event (still suppressed), concurrent preference update.
+- Precedence: comment that mentions the content owner → exactly one notification (mention); reply to the owner's comment → exactly one (reply), no generic comment row; mention with `comments_enabled = false` → mention still delivered; reply with `comments_enabled = false` → reply still delivered.
+- Helper: unknown category returns `false`; `authenticated` cannot execute it.
+- `system` type inserts regardless of preferences.
+- Client unit tests for `setPreference`: missing-row first write, optimistic update, rollback to the effective object (not `null`).
 
 ## Manual verification
 
-Toggle each category off, trigger the event from a second account, confirm: nothing appears in the drawer, badge count unchanged, no realtime event, existing notifications untouched; then re-enable and confirm no backfill and that new events arrive.
+From a second account, with each category off in turn: like, comment, reply, mention, comment-like, follow, journey event. Confirm no drawer row, no badge change, no realtime event, and that pre-existing notifications and their read state are untouched. Re-enable and confirm new events arrive with no backfill.
+
 
 ## Documentation
 
