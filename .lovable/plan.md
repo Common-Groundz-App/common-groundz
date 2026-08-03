@@ -1,68 +1,79 @@
-# Phase 2.3b verification + Phase 3 scope (3.0 and 3.3)
+# Phase 3 — scoped to 3.0 and 3.3, split into three increments
 
-## Verification result: complete, no leftovers
+## Verdict on the review
 
-Checked in this turn:
-- 170 unit tests pass across 8 suites (including the 14 preference concurrency/account-safety cases).
-- No `coming soon` / TODO placeholders left in `Settings.tsx`, the preferences hook, the service, or `ActivityNotificationsCard`.
-- `generate-smart-notifications` honours `journey_notifications_enabled` with chunked lookups.
-- Roadmap doc records the DB verification (all 8 producers guarded, `notification_allowed` internal-only).
+Both reviews are right, and I verified both technical objections against the live project rather than taking them on trust:
 
-Phase 2.3b is closed.
+**1. `notifications.image_url` is the actor's avatar — confirmed.** Queried every active row grouped by type:
 
-## Your scope call — agreed
+| type | active rows | image_url set | image_url equals the actor's avatar |
+| --- | --- | --- | --- |
+| like | 38 | 24 | 24 |
+| comment | 62 | 20 | 20 |
+| follow | 13 | 8 | 7 |
 
-**3.0 (date sections)** — yes. It's the cheapest readability win, it's what Instagram/X both do, and it's pure presentation over rows already loaded.
+Every populated value except one legacy follow row is literally the sender's `profiles.avatar_url`. My earlier "render `image_url` as the fast path" was wrong — it would have painted the same avatar twice on most rows. Dropping that entirely: the column is never used as a target thumbnail.
 
-**3.3 (rich previews + Follow back)** — yes, and it's the item that actually changes behaviour: a thumbnail answers "which post?" without a navigation, and Follow back removes a two-hop trip to a profile.
+**2. `useUserFollowing()` cannot back Follow back — confirmed.** It sets `initialData: []` and swallows query errors into `return []`, so "still loading" and "query failed" are both indistinguishable from "follows nobody". It also has no mutation and no optimistic cache write. Using it directly would flash `Follow back` at people you already follow. Needs its own state layer.
 
-**Skip 3.2 (`/notifications` page)** — agreed, and for a stronger reason than "Instagram doesn't". X needs a page because it's the primary desktop surface; your drawer already has independent lanes, cursor pagination and infinite scroll, so a page adds a second surface with zero new capability. Keep it as a future item.
+**3. Ship as three increments — agreed.** 3.0 is render-only, 3.3A is a read-only fetch, 3.3B introduces a mutation. Separate phases, separate verification passes.
 
-**One thing I'd add to 3.3 — mute/skip nothing, but note this:** don't put a Follow-back button on grouped like rows or comment rows. It only belongs on `follow` rows, where the actor is unambiguous.
+## What I'd add on top of their notes
 
-## Phase 3.0 — Date sections
+- **`image_url` is not just unused — it's a trap.** Once thumbnails ship, the next person will see a populated `image_url` and wire it in. So Phase 3.3A adds a comment on the field in `notificationService.ts` recording that it is actor-avatar data with mixed legacy semantics and is not content media. Cheaper than re-litigating this later.
+- **A group's section is decided by one timestamp, chosen explicitly.** Grouped rows already carry many events. The section uses the group's newest event (the same timestamp the row displays), so the header and the visible "3 hours ago" can never disagree.
+- **Tri-state follow state, not boolean.** `unknown | following | not_following`. `unknown` renders **no button at all** — never a wrong one. This is the single rule that makes 3.3B safe.
+- **Follow back needs the account-generation guard we already built for preferences.** Same failure mode: switch accounts mid-flight and a resolved follow set leaks across users. Reuse the pattern.
+- **From your `follow_avatar.png`:** that row is currently avatar + sentence + timestamp with dead space on the right — exactly where the button goes. Its vertical rhythm must not change when the button appears, so the row reserves the action slot rather than growing.
 
-Pure layer above the existing grouping, no schema change, no new fetches.
+---
 
-- `src/utils/notificationSections.ts` — takes the already-grouped array plus an injected `now`, returns `{ label, groups }[]` with labels Today / Yesterday / This week / This month / Earlier. No ambient `Date.now()` in the pure layer so tests are deterministic.
-- Sticky section headers rendered inside the existing scroll region.
-- Sections are **presentation only**: unread counts, the mismatch banner and pagination stay event-based over flat server rows, exactly like Phase 2.3 groups.
-- Unparseable timestamps fall into `Earlier` — never dropped.
-- Section headers must not disturb the pagination sentinel or the lane error/recovery strips.
+## Phase 3.0 — Date sections (render layer only)
 
-## Phase 3.3 — Rich previews and contextual actions
+- New `src/utils/notificationSections.ts`: takes the already-grouped array plus an injected `now`, returns `{ label, groups }[]` with **Today / Yesterday / This week / This month / Earlier**.
+- Section chosen from each group's newest event timestamp. Order inside a section is untouched. Empty sections never render.
+- Unparseable or future timestamps land in a defined bucket (`Earlier` / `Today` respectively) — a row is never dropped.
+- Sticky headers inside the existing scroll region, `top` offset below the fixed All/Unread tabs so a header never slides under them. Rendered as real headings for screen-reader order.
+- Applies identically to both lanes. **No change** to counts, cursors, the pagination sentinel, error/recovery strips, realtime merging, retraction or preferences.
+- Tests: boundary cases at midnight, week and month edges; a group whose events straddle a boundary stays in one section; empty and single-section lists.
 
-### Thumbnails
-`notifications.image_url` already exists and is populated on 52 of 113 active rows, so it's an unreliable single source. Design accordingly:
+## Phase 3.3A — Target thumbnails (read-only)
 
-- Render `image_url` when present (fast path, zero requests).
-- For rows without one, resolve the target's media in **one batched lookup per rendered page**, keyed by `(entity_type, entity_id)`: `posts.media` (jsonb — first image frame, or a video's poster) and `recommendations.image_url`. Cached in React Query, deduped across groups sharing a target — so a 20-row page issues at most two queries, never one per row.
-- Missing/failed media renders **nothing** — no grey box, no letter placeholder. A thumbnail is a bonus, never a layout requirement.
-- Thumbnail goes on the right of the row (matching both references), fixed square, `rounded-md`, `loading="lazy"`, decorative (`aria-hidden`) since the sentence already names the target.
-- Only for like / comment / reply / mention / comment-like rows. `follow` and `system` rows have no target media.
+- New batched hook: collect the distinct `(entity_type, entity_id)` targets of the rows currently rendered, resolve media in **at most two queries per page** — `posts.media` (jsonb; first image frame, or a video's poster; never a playing video) and `recommendations.image_url`. React Query cached and deduped across groups sharing a target.
+- Rows eligible: like, comment, reply, mention, comment-like. Not follow, not system.
+- Missing, deleted, RLS-hidden, or failed media renders **nothing** — no placeholder, no grey box, no row-height change. The slot is fixed-size and reserved, so a late-arriving image never reflows the list.
+- `notifications.image_url` is not read. A comment on the field records why.
+- Clicking the thumbnail does nothing special — the whole row still navigates to its canonical destination.
 
-### Follow back
-- Only on singleton `follow` rows.
-- Follow state comes from the existing batched `useUserFollowing()` set — **not** `useFollow(id)` per row, which would fire one query per notification.
-- Three states: `Follow back` (not following) → optimistic `Following` → nothing rendered when the actor is you.
-- Reuses the existing follow social-button variant, `requireAuth()` first, and the email-verification gate — same contract as the profile header. Clicking it must **not** trigger row navigation (`stopPropagation`), and must not mark the row read; those are separate intents.
+## Phase 3.3B — Follow back (mutation)
 
-### Invariants preserved
-No change to counts, cursors, retraction, realtime merging or read semantics. Both phases are additive and reversible.
+- New `useNotificationFollowState`: one batched `follows` lookup for the distinct actors of visible singleton `follow` rows, returning tri-state per actor and exposing a follow mutation.
+- `unknown` (loading, error, or not yet fetched) renders no button. `following` renders `Following`, inert. `not_following` renders `Follow back`.
+- Own-account actor: no button.
+- Mutation goes through the existing shared follow write path so profile pages and the drawer cannot disagree; optimistic flip to `Following`, revert on failure with a toast.
+- `requireAuth()` first, then the email-verification gate — same contract as the profile header.
+- `stopPropagation` on click: does **not** navigate the row and does **not** mark it read. Reading stays tied to opening the row.
+- Account-generation guard so a switch or sign-out discards in-flight resolutions.
+- No DB, edge function, realtime, cursor or count changes.
 
-## Deferred, with the trigger that would un-defer each
+## Deferred, with the trigger to revisit
 
 | Item | Ship when |
 | --- | --- |
-| 3.1 per-actor / per-thread mute | users ask to silence a specific actor or thread (2.3b covers per-category) |
-| 3.2 `/notifications` page | history depth or deep-link sharing becomes a real request |
+| 3.1 per-actor / per-thread mute | users ask to silence a specific actor or thread |
+| 3.2 `/notifications` page | history depth, deep links, or search/filter justify a second surface |
 | 3.4 type filters / mentions view | typical unread counts exceed ~50 |
-| 3.5 per-row mark unread / dismiss | needs its own plan — replaces the monotonic `is_read` merge with row versioning |
+| 3.5 per-row mark unread / dismiss | needs row versioning to replace the monotonic `is_read` merge |
 | 3.6 web push | after retention justifies re-engagement |
-| 3.7 virtualization | profiling shows list scroll jank |
+| 3.7 virtualization | profiling shows scroll jank |
 
-## Files this touches
+## Order
 
-- New: `src/utils/notificationSections.ts`, `src/utils/notificationSections.test.ts`, a batched target-media hook, a small `NotificationThumbnail` and `FollowBackButton`.
-- Edited: `NotificationList.tsx` (sections + row slots), `vitest.config.ts` (new suite), `docs/NOTIFICATION_CENTER_ROADMAP.md`.
-- No database migration, no edge function change.
+Implement **3.0 alone** and stop for your manual pass. Then 3.3A. Then 3.3B. Nothing bundled.
+
+## Files
+
+- 3.0: new `src/utils/notificationSections.ts` + test; edit `NotificationList.tsx`, `vitest.config.ts`, roadmap doc.
+- 3.3A: new batched target-media hook + `NotificationThumbnail`; edit `NotificationList.tsx`, comment in `notificationService.ts`.
+- 3.3B: new `useNotificationFollowState` + test + `FollowBackButton`; edit `NotificationList.tsx`.
+- No migration, no edge function change, in any of the three.
