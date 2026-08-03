@@ -140,8 +140,8 @@ Behavior: skeletons while loading (per the project's skeleton standard); optimis
 
 Ordered, expand-first:
 
-1. Migration A — add the six columns `NOT NULL DEFAULT true`; create `notification_allowed` with the revoke/grant above.
-2. Migration B — assert `parse_comment_mentions` exists, then `CREATE OR REPLACE` the five trigger functions and three RPCs (patched from live definitions), including the comment-precedence skips and the edit-time precedence replacement.
+1. Migration A — add the six columns `NOT NULL DEFAULT true`; create `notification_allowed` (PL/pgSQL) with the revoke/grant above.
+2. Migration B — assert `parse_comment_mentions` exists, then `CREATE OR REPLACE` the five trigger functions and three RPCs (patched from live definitions), including the comment-precedence skips and the edit-time insert-then-retract precedence replacement.
 3. Deploy `generate-smart-notifications` with the bulk `journey_notifications_enabled` filter.
 4. Regenerated Supabase types, then service/hook/UI.
 5. Verification matrix, then roadmap update.
