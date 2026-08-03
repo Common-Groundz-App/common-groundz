@@ -42,7 +42,16 @@ Existing `journey_notifications_enabled` (default true) and `weekly_digest_enabl
 
 **Not disableable:** `system` type — moderation, security, account, and admin messages. No control is exposed and no producer is gated for it.
 
-**Precedence:** mention wins over reply wins over comment. A comment that mentions you is governed only by `mentions_enabled`; a reply to your comment only by `replies_enabled`; the generic `comments_enabled` governs only the post/recommendation-author top-level notification. This matches the existing producer structure, which already suppresses the reply notification when the same user was mentioned.
+## Comment precedence — a real bug this phase must fix first
+
+Codex is right, and I verified it against the live definitions. `create_post_comment_notification` / `create_recommendation_comment_notification` fire on **every** `post_comments` / `recommendation_comments` insert and check only "don't notify yourself". They do **not** look at `parent_id` and do **not** look at mentions, and they run *before* `add_comment` inserts its mention/reply rows. So today a content owner who is replied to and mentioned can receive up to three notifications for one comment, and preference checks alone would let a disabled `mentions_enabled` leak through as a generic comment notification.
+
+So the rule is **one category per recipient per source comment**, not per producer. The two comment triggers gain two skips before inserting:
+
+1. `IF NEW.parent_id IS NOT NULL THEN RETURN NEW;` — replies are owned by `add_comment`'s reply notification (which also correctly targets the parent comment's author, not the content owner).
+2. skip if the content owner appears in `public.parse_comment_mentions(NEW.content, NEW.user_id)` — mentions are owned by `add_comment`'s mention notification.
+
+Only after those skips is `comments_enabled` consulted. This makes the documented precedence (mention > reply > generic comment) true in the database rather than aspirational, and is a strict de-duplication improvement independent of preferences.
 
 ## Server-side enforcement
 
@@ -53,14 +62,21 @@ public.notification_allowed(_user_id uuid, _category text) returns boolean
   language sql stable security definer set search_path = public
 ```
 
-It left-joins the single preference row and returns the column for `_category`, falling back to the documented default when the row is missing. One indexed primary-key/unique lookup per notification — no N+1, no new realtime or polling work, no change to grouping, retraction, or the drawer.
+It left-joins the single preference row and returns the column for `_category`, falling back to the documented default when the row is missing. One unique-index lookup per notification — no N+1, no new realtime or polling work, no change to grouping, retraction, or the drawer.
+
+**Fail closed, and internal only** (both reviewers flagged this):
+- an unrecognised `_category` returns `false` — a typo like `'comment_like'` must never silently allow a notification. (A `RAISE` would abort the user's like/comment transaction, so `false` is the safer failure mode; the category set is also asserted in tests.)
+- `REVOKE EXECUTE ... FROM public, anon, authenticated;` and `GRANT EXECUTE ... TO service_role;`. `SECURITY DEFINER` producers invoke it through the function owner, so the browser never needs it — otherwise any signed-in user could probe another user's settings.
 
 Each producer gains the guard in the position that already filters self-notifications:
 - triggers: `IF ... AND public.notification_allowed(recipient, 'likes') THEN insert`
 - RPC inserts (which are `INSERT ... SELECT ... WHERE NOT EXISTS`): add `AND public.notification_allowed(recipient, '<category>')` to the existing `WHERE`.
-- `generate-smart-notifications`: filter watchers by `journey_notifications_enabled` (defaulting missing rows to enabled) before insert, mirroring `send-weekly-digest`.
+- `generate-smart-notifications`: filter watchers by `journey_notifications_enabled` (missing row = enabled) before insert, mirroring `send-weekly-digest`. This is a real fix — the function currently ignores the toggle Settings already exposes.
+
+Every replaced SQL function body is patched from its **current live `pg_get_functiondef()`** output, not from migration history, preserving auth guards, return contracts, counters, retraction guards, and targeted `ON CONFLICT` inference. `SECURITY DEFINER` and pinned `search_path` are re-declared on each.
 
 Self-notification suppression logic is untouched.
+
 
 ## Semantics
 
