@@ -59,8 +59,10 @@ Codex found a real hole: the skips only run on INSERT. If Hana comments without 
 
 Since Phase 2.5 already gave us a retraction lifecycle, the clean fix is precedence *replacement* rather than suppression. In `update_comment`, for each recipient in the newly-added mention set:
 
-1. insert the mention notification (subject to `mentions_enabled`), then
-2. retract that recipient's lower-precedence rows for the **same source comment** — the generic `comment`/`comment_like`-sibling projection is untouched, only the generic comment row keyed to that comment id — by setting `retracted_at = now()` where `retracted_at IS NULL`.
+1. resolve `mentions_enabled` for that recipient, and insert the mention notification;
+2. **only after** confirming the mention row is active (newly inserted, or already present from an earlier edit) retract that recipient's lower-precedence generic comment row for the **same source comment** — `retracted_at = now()` where `retracted_at IS NULL`. Sibling projections (comment likes, etc.) are untouched.
+
+The ordering matters: never retract first. If the insert is skipped or fails, the user keeps the notification they already had.
 
 Only *downward* transitions are handled, i.e. generic comment → mention. The reverse (a mention removed by an edit) already retracts the mention row per Phase 2.5A and deliberately does **not** resurrect a generic comment notification: resurrecting a notification the user may have already read is worse than losing it, and re-notifying for an old comment is misleading. That asymmetry is stated in the roadmap so it isn't mistaken for an oversight later.
 
@@ -76,19 +78,19 @@ One authoritative helper so trigger and RPC behavior cannot drift:
 
 ```sql
 public.notification_allowed(_user_id uuid, _category text) returns boolean
-  language sql stable security definer set search_path = public
+  language plpgsql stable security definer set search_path = public
 ```
 
-It left-joins the single preference row and returns the column for `_category`, falling back to the documented default when the row is missing. One unique-index lookup per notification — no N+1, no new realtime or polling work, no change to grouping, retraction, or the drawer.
+**Correction accepted — PL/pgSQL, not SQL.** Codex is right: `RAISE WARNING` is a PL/pgSQL statement and is invalid in a `LANGUAGE sql` body. Since a producer-side category typo would otherwise silently mute a whole category with no trace, the warning is worth the language change. The body is a `CASE _category WHEN ... ` over the explicit column list, reading the single preference row (`SELECT ... INTO`), applying the documented default when no row exists, and `ELSE RAISE WARNING 'notification_allowed: unknown category %', _category; RETURN false;`. Still `STABLE`, still one unique-index lookup per notification — no N+1, no new realtime or polling work, no change to grouping, retraction, or the drawer.
 
 **Fail closed, and internal only** (both reviewers flagged this):
-- an unrecognised `_category` returns `false` — a typo like `'comment_like'` must never silently allow a notification. (A `RAISE` would abort the user's like/comment transaction, so `false` is the safer failure mode.) It also emits `RAISE WARNING 'notification_allowed: unknown category %'` so a typo is visible in Postgres logs instead of silently muting a whole category, and the full category set is asserted in tests.
+- an unrecognised `_category` returns `false` **and warns** — a typo like `'comment_like'` must never silently allow *or* silently mute a notification. Returning `false` rather than raising an exception keeps the user's like/comment transaction alive. Tests assert both the exact valid category set and the `'comment_like'` vs `'comment_likes'` pair.
 - `REVOKE EXECUTE ... FROM public, anon, authenticated;` and `GRANT EXECUTE ... TO service_role;`. `SECURITY DEFINER` producers invoke it through the function owner, so the browser never needs it — otherwise any signed-in user could probe another user's settings.
 
 Each producer gains the guard in the position that already filters self-notifications:
 - triggers: `IF ... AND public.notification_allowed(recipient, 'likes') THEN insert`
 - RPC inserts (which are `INSERT ... SELECT ... WHERE NOT EXISTS`): add `AND public.notification_allowed(recipient, '<category>')` to the existing `WHERE`.
-- `generate-smart-notifications`: preference eligibility is **joined into the candidate/watcher selection in bulk** (one query, missing row = enabled), not queried per watcher inside the existing loop. Mirrors `send-weekly-digest`, and fixes a real bug — the function currently ignores the toggle Settings already exposes.
+- `generate-smart-notifications`: **two bounded bulk queries, not an embedded join.** Codex is right that PostgREST can't embed `notification_preferences` from `user_stuff` — there's no FK between them, only a shared `user_id`. So: fetch watched items → collect distinct user ids → one `select user_id, journey_notifications_enabled from notification_preferences in (ids)` → build a disabled-user set → filter watched items *before* the expensive per-item loop. Missing row = enabled. No view or RPC needed. This fixes a real bug: the function currently ignores the toggle Settings already exposes. `send-weekly-digest` stays unchanged (missing row = `false` there, by design).
 
 Every replaced SQL function body is patched from its **current live `pg_get_functiondef()`** output, not from migration history, preserving auth guards, return contracts, counters, Phase 2.5/2.5A retraction and comment-lifecycle logic, and targeted `ON CONFLICT` inference. `SECURITY DEFINER` and pinned `search_path` are re-declared on each. `CREATE OR REPLACE FUNCTION` resets nothing about grants in Postgres, but because these are security-sensitive we still **re-assert and then re-verify** the intended grant/revoke set on every touched function after the migration, via `pg_proc.proacl` inspection.
 
@@ -138,9 +140,9 @@ Behavior: skeletons while loading (per the project's skeleton standard); optimis
 
 Ordered, expand-first:
 
-1. Migration A — add the six columns `NOT NULL DEFAULT true`; create `notification_allowed` with the revoke/grant above.
-2. Migration B — assert `parse_comment_mentions` exists, then `CREATE OR REPLACE` the five trigger functions and three RPCs (patched from live definitions), including the comment-precedence skips and the edit-time precedence replacement.
-3. Deploy `generate-smart-notifications` with the bulk `journey_notifications_enabled` filter.
+1. Migration A — add the six columns `NOT NULL DEFAULT true`; create `notification_allowed` (PL/pgSQL) with the revoke/grant above.
+2. Migration B — assert `parse_comment_mentions` exists, then `CREATE OR REPLACE` the five trigger functions and three RPCs (patched from live definitions), including the comment-precedence skips and the edit-time insert-then-retract precedence replacement.
+3. Deploy `generate-smart-notifications` with the two-query bulk `journey_notifications_enabled` filter applied before the per-item loop.
 4. Regenerated Supabase types, then service/hook/UI.
 5. Verification matrix, then roadmap update.
 
