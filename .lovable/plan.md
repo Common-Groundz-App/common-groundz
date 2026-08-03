@@ -82,15 +82,15 @@ public.notification_allowed(_user_id uuid, _category text) returns boolean
 It left-joins the single preference row and returns the column for `_category`, falling back to the documented default when the row is missing. One unique-index lookup per notification — no N+1, no new realtime or polling work, no change to grouping, retraction, or the drawer.
 
 **Fail closed, and internal only** (both reviewers flagged this):
-- an unrecognised `_category` returns `false` — a typo like `'comment_like'` must never silently allow a notification. (A `RAISE` would abort the user's like/comment transaction, so `false` is the safer failure mode; the category set is also asserted in tests.)
+- an unrecognised `_category` returns `false` — a typo like `'comment_like'` must never silently allow a notification. (A `RAISE` would abort the user's like/comment transaction, so `false` is the safer failure mode.) It also emits `RAISE WARNING 'notification_allowed: unknown category %'` so a typo is visible in Postgres logs instead of silently muting a whole category, and the full category set is asserted in tests.
 - `REVOKE EXECUTE ... FROM public, anon, authenticated;` and `GRANT EXECUTE ... TO service_role;`. `SECURITY DEFINER` producers invoke it through the function owner, so the browser never needs it — otherwise any signed-in user could probe another user's settings.
 
 Each producer gains the guard in the position that already filters self-notifications:
 - triggers: `IF ... AND public.notification_allowed(recipient, 'likes') THEN insert`
 - RPC inserts (which are `INSERT ... SELECT ... WHERE NOT EXISTS`): add `AND public.notification_allowed(recipient, '<category>')` to the existing `WHERE`.
-- `generate-smart-notifications`: filter watchers by `journey_notifications_enabled` (missing row = enabled) before insert, mirroring `send-weekly-digest`. This is a real fix — the function currently ignores the toggle Settings already exposes.
+- `generate-smart-notifications`: preference eligibility is **joined into the candidate/watcher selection in bulk** (one query, missing row = enabled), not queried per watcher inside the existing loop. Mirrors `send-weekly-digest`, and fixes a real bug — the function currently ignores the toggle Settings already exposes.
 
-Every replaced SQL function body is patched from its **current live `pg_get_functiondef()`** output, not from migration history, preserving auth guards, return contracts, counters, retraction guards, and targeted `ON CONFLICT` inference. `SECURITY DEFINER` and pinned `search_path` are re-declared on each.
+Every replaced SQL function body is patched from its **current live `pg_get_functiondef()`** output, not from migration history, preserving auth guards, return contracts, counters, Phase 2.5/2.5A retraction and comment-lifecycle logic, and targeted `ON CONFLICT` inference. `SECURITY DEFINER` and pinned `search_path` are re-declared on each. `CREATE OR REPLACE FUNCTION` resets nothing about grants in Postgres, but because these are security-sensitive we still **re-assert and then re-verify** the intended grant/revoke set on every touched function after the migration, via `pg_proc.proacl` inspection.
 
 Self-notification suppression logic is untouched.
 
