@@ -72,8 +72,11 @@ class NotificationPreferencesService {
 
   /**
    * Writes a single preference key for an explicitly passed user id.
-   * Any missing columns fall back to the documented defaults on insert, so a
-   * user's first toggle can never create a row with unintended values.
+   *
+   * Update-then-insert rather than an upsert carrying every column: a full-row
+   * upsert would overwrite the user's other categories with defaults whenever
+   * two toggles race. The insert path only supplies defaults when no row exists
+   * yet, so a user's first toggle can never create a row with unintended values.
    */
   async setPreference(
     userId: string,
@@ -84,7 +87,24 @@ class NotificationPreferencesService {
       throw new Error('User not authenticated');
     }
 
-    const { data, error } = await supabase
+    const { data: updated, error: updateError } = await supabase
+      .from('notification_preferences')
+      .update({ [key]: value })
+      .eq('user_id', userId)
+      .select()
+      .maybeSingle();
+
+    if (updateError) {
+      console.error('[NotificationPreferencesService] Error updating preferences:', updateError);
+      throw updateError;
+    }
+
+    if (updated) {
+      return updated as NotificationPreferences;
+    }
+
+    // No row yet: create one from the documented defaults with this key applied.
+    const { data: inserted, error: insertError } = await supabase
       .from('notification_preferences')
       .upsert(
         {
@@ -97,13 +117,14 @@ class NotificationPreferencesService {
       .select()
       .single();
 
-    if (error) {
-      console.error('[NotificationPreferencesService] Error upserting preferences:', error);
-      throw error;
+    if (insertError) {
+      console.error('[NotificationPreferencesService] Error creating preferences:', insertError);
+      throw insertError;
     }
 
-    return data as NotificationPreferences;
+    return inserted as NotificationPreferences;
   }
 }
+
 
 export const notificationPreferencesService = new NotificationPreferencesService();
