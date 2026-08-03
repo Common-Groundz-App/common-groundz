@@ -125,6 +125,18 @@ The write path becomes per-key and merge-based:
 - per-key pending set, so each switch shows its own in-flight state while others stay usable — no global lock needed, because ordering is now correct by construction.
 - a background refetch is likewise ignored for any key with a write in flight.
 
+### Account switching must not leak preferences across users (accepted)
+
+Codex is right, and confirmed by reading the file: `use-notification-preferences.ts` is a plain `useState` hook whose effect merely reruns when `user` changes. Nothing prevents the previous account's values from staying on screen, or an in-flight fetch/mutation from committing into the next account's UI. The main notification system already uses account-generation guards; preferences will follow the same rule.
+
+- an `accountGeneration` counter (or a captured `user.id` per request, compared on resolve) increments on every `user?.id` change **and on sign-out**.
+- on switch, state resets immediately — preferences cleared to the missing-row defaults and the card shows skeletons — rather than showing the prior user's toggles while the new fetch runs.
+- every fetch and mutation captures the generation *and* the target `user.id` before it starts; on resolve, a mismatch discards the result silently (no toast, no state write). This also covers sign-out mid-flight.
+- `notificationPreferencesService` stops resolving the current auth user *inside* the write. The caller passes the captured `userId`, so a queued mutation can never land on a different account's row. (Server-side, RLS on `notification_preferences` already scopes writes to `auth.uid()`, so a mistargeted write would fail rather than corrupt — this guard prevents the confusing UI state and misleading toast.)
+- the per-key sequence counters and pending set are cleared on generation change, so no stale key ownership carries into the next account.
+
+
+
 Extend the existing Notifications tab in `src/pages/Settings.tsx` with an "Activity notifications" card above the Journey section (replacing the "coming soon" placeholder), one `Switch` per category:
 
 - **Likes** — "When someone likes your experience or recommendation"
