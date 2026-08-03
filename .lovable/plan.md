@@ -78,19 +78,19 @@ One authoritative helper so trigger and RPC behavior cannot drift:
 
 ```sql
 public.notification_allowed(_user_id uuid, _category text) returns boolean
-  language sql stable security definer set search_path = public
+  language plpgsql stable security definer set search_path = public
 ```
 
-It left-joins the single preference row and returns the column for `_category`, falling back to the documented default when the row is missing. One unique-index lookup per notification — no N+1, no new realtime or polling work, no change to grouping, retraction, or the drawer.
+**Correction accepted — PL/pgSQL, not SQL.** Codex is right: `RAISE WARNING` is a PL/pgSQL statement and is invalid in a `LANGUAGE sql` body. Since a producer-side category typo would otherwise silently mute a whole category with no trace, the warning is worth the language change. The body is a `CASE _category WHEN ... ` over the explicit column list, reading the single preference row (`SELECT ... INTO`), applying the documented default when no row exists, and `ELSE RAISE WARNING 'notification_allowed: unknown category %', _category; RETURN false;`. Still `STABLE`, still one unique-index lookup per notification — no N+1, no new realtime or polling work, no change to grouping, retraction, or the drawer.
 
 **Fail closed, and internal only** (both reviewers flagged this):
-- an unrecognised `_category` returns `false` — a typo like `'comment_like'` must never silently allow a notification. (A `RAISE` would abort the user's like/comment transaction, so `false` is the safer failure mode.) It also emits `RAISE WARNING 'notification_allowed: unknown category %'` so a typo is visible in Postgres logs instead of silently muting a whole category, and the full category set is asserted in tests.
+- an unrecognised `_category` returns `false` **and warns** — a typo like `'comment_like'` must never silently allow *or* silently mute a notification. Returning `false` rather than raising an exception keeps the user's like/comment transaction alive. Tests assert both the exact valid category set and the `'comment_like'` vs `'comment_likes'` pair.
 - `REVOKE EXECUTE ... FROM public, anon, authenticated;` and `GRANT EXECUTE ... TO service_role;`. `SECURITY DEFINER` producers invoke it through the function owner, so the browser never needs it — otherwise any signed-in user could probe another user's settings.
 
 Each producer gains the guard in the position that already filters self-notifications:
 - triggers: `IF ... AND public.notification_allowed(recipient, 'likes') THEN insert`
 - RPC inserts (which are `INSERT ... SELECT ... WHERE NOT EXISTS`): add `AND public.notification_allowed(recipient, '<category>')` to the existing `WHERE`.
-- `generate-smart-notifications`: preference eligibility is **joined into the candidate/watcher selection in bulk** (one query, missing row = enabled), not queried per watcher inside the existing loop. Mirrors `send-weekly-digest`, and fixes a real bug — the function currently ignores the toggle Settings already exposes.
+- `generate-smart-notifications`: **two bounded bulk queries, not an embedded join.** Codex is right that PostgREST can't embed `notification_preferences` from `user_stuff` — there's no FK between them, only a shared `user_id`. So: fetch watched items → collect distinct user ids → one `select user_id, journey_notifications_enabled from notification_preferences in (ids)` → build a disabled-user set → filter watched items *before* the expensive per-item loop. Missing row = enabled. No view or RPC needed. This fixes a real bug: the function currently ignores the toggle Settings already exposes. `send-weekly-digest` stays unchanged (missing row = `false` there, by design).
 
 Every replaced SQL function body is patched from its **current live `pg_get_functiondef()`** output, not from migration history, preserving auth guards, return contracts, counters, Phase 2.5/2.5A retraction and comment-lifecycle logic, and targeted `ON CONFLICT` inference. `SECURITY DEFINER` and pinned `search_path` are re-declared on each. `CREATE OR REPLACE FUNCTION` resets nothing about grants in Postgres, but because these are security-sensitive we still **re-assert and then re-verify** the intended grant/revoke set on every touched function after the migration, via `pg_proc.proacl` inspection.
 
