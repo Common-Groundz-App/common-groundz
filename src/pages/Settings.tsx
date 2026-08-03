@@ -42,12 +42,13 @@ const Settings = () => {
   const { preferences, learnedPreferences } = usePreferences();
   const isMobile = useIsMobile();
   const { toast } = useToast();
-  const { 
-    preferences: notifPrefs, 
-    isLoading: notifLoading, 
-    toggleWeeklyDigest,
-    toggleJourneyNotifications 
+  const {
+    preferences: notifPrefs,
+    isLoading: notifLoading,
+    setPreference: setNotifPreference,
+    isPending: isNotifPending,
   } = useNotificationPreferences();
+
   const { isVerified } = useEmailVerification();
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
