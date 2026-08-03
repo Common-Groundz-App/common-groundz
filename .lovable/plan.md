@@ -139,33 +139,39 @@ Behavior: skeletons while loading (per the project's skeleton standard); optimis
 Ordered, expand-first:
 
 1. Migration A — add the six columns `NOT NULL DEFAULT true`; create `notification_allowed` with the revoke/grant above.
-2. Migration B — `CREATE OR REPLACE` the five trigger functions and three RPCs (patched from live definitions), including the two comment-precedence skips.
-3. Deploy `generate-smart-notifications` with the `journey_notifications_enabled` filter.
+2. Migration B — assert `parse_comment_mentions` exists, then `CREATE OR REPLACE` the five trigger functions and three RPCs (patched from live definitions), including the comment-precedence skips and the edit-time precedence replacement.
+3. Deploy `generate-smart-notifications` with the bulk `journey_notifications_enabled` filter.
 4. Regenerated Supabase types, then service/hook/UI.
 5. Verification matrix, then roadmap update.
 
-Post-migration assertion (per ChatGPT's safeguard):
+Post-migration assertions:
 
 ```sql
+-- 1. no null preference values
 select count(*) from public.notification_preferences
 where likes_enabled is null or comments_enabled is null or replies_enabled is null
    or mentions_enabled is null or comment_likes_enabled is null or follows_enabled is null;
 -- expect 0
+
+-- 2. helper is not reachable by app users
+select has_function_privilege('authenticated', 'public.notification_allowed(uuid,text)', 'execute');
+-- expect false
 ```
 
-Existing RLS and grants on `notification_preferences` are re-verified, not changed. No new index needed (`user_id` is already unique). Rollback = drop the columns and restore the prior function bodies; steps 1–2 are backward compatible with the shipped client.
+Existing RLS and grants on `notification_preferences` are re-verified, not changed. No new index needed (`user_id` is already unique). Rollback order matters: **restore the prior producer function bodies first, then drop the columns** — dropping columns while the new bodies are live would break every like and comment. Steps 1–2 are backward compatible with the shipped client.
 
 ## Tests
 
-- Producer-by-category DB matrix: for each of the 8 in-database producers — enabled (row created), disabled (**zero** rows), missing preference row (default behavior), self-event (still suppressed), concurrent preference update.
-- Precedence: comment that mentions the content owner → exactly one notification (mention); reply to the owner's comment → exactly one (reply), no generic comment row; mention with `comments_enabled = false` → mention still delivered; reply with `comments_enabled = false` → reply still delivered.
-- Helper: unknown category returns `false`; `authenticated` cannot execute it.
+- Producer-by-category DB matrix: for each of the 8 in-database producers — enabled (row created), disabled (**zero** rows), missing preference row (default behavior), self-event (still suppressed).
+- Precedence on insert: comment mentioning the content owner → exactly one notification (mention); reply to the owner's comment → exactly one (reply), no generic comment row; mention with `comments_enabled = false` → mention still delivered; reply with `comments_enabled = false` → reply still delivered.
+- Precedence on edit: generic comment then edited to add `@owner` → mention row active, prior generic row retracted, total active rows for that comment = 1. With `mentions_enabled = false` → no mention row and the generic row stays active. Mention later removed → mention retracted, no generic row resurrected.
+- Helper: unknown category returns `false` and warns; `authenticated` cannot execute it; missing row yields documented defaults (activity + journey true, digest false).
 - `system` type inserts regardless of preferences.
-- Client unit tests for `setPreference`: missing-row first write, optimistic update, rollback to the effective object (not `null`).
+- Client unit tests for `setPreference`: missing-row first write; out-of-order responses (stale success must not clobber a newer key); failure reverts only its own key; refetch ignored for in-flight keys.
 
 ## Manual verification
 
-From a second account, with each category off in turn: like, comment, reply, mention, comment-like, follow, journey event. Confirm no drawer row, no badge change, no realtime event, and that pre-existing notifications and their read state are untouched. Re-enable and confirm new events arrive with no backfill.
+From a second account, with each category off in turn: like, comment, reply, mention, comment-like, follow, journey event. Confirm no drawer row, no badge change, no realtime event, and that pre-existing notifications and their read state are untouched. Re-enable and confirm new events arrive with no backfill. Then toggle three switches in rapid succession and reload — the UI must match the database exactly.
 
 
 ## Documentation
