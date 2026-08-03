@@ -189,7 +189,7 @@ Existing RLS and grants on `notification_preferences` are re-verified, not chang
 
 ## Manual verification
 
-From a second account, with each category off in turn: like, comment, reply, mention, comment-like, follow, journey event. Confirm no drawer row, no badge change, no realtime event, and that pre-existing notifications and their read state are untouched. Re-enable and confirm new events arrive with no backfill. Then toggle three switches in rapid succession and reload — the UI must match the database exactly.
+From a second account, with each category off in turn: like, comment, reply, mention, comment-like, follow, journey event. Confirm no drawer row, no badge change, no realtime event, and that pre-existing notifications and their read state are untouched. Re-enable and confirm new events arrive with no backfill. Then toggle three switches in rapid succession and reload — the UI must match the database exactly. Finally, open Settings on account A, toggle a switch, immediately sign out and into account B, and confirm B's card shows B's own values (no flash of A's toggles, no stray toast).
 
 
 ## Documentation
