@@ -24,7 +24,7 @@ export function toEffectivePreferences(
   const effective = { ...NOTIFICATION_PREFERENCE_DEFAULTS };
   if (!row) return effective;
   for (const key of NOTIFICATION_PREFERENCE_KEYS) {
-    const value = (row as Record<string, unknown>)[key];
+    const value = (row as unknown as Record<string, unknown>)[key];
     if (typeof value === 'boolean') {
       effective[key] = value;
     }
