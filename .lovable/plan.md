@@ -108,9 +108,20 @@ Codex's third point is correct and confirmed: `use-notification-preferences.ts` 
 
 Fixes in `use-notification-preferences.ts` / `notificationPreferencesService.ts` (extended, not replaced — single state owner):
 - an `effectivePreferences` object is always available: the six activity categories `true`, `journey_notifications_enabled` `true`, `weekly_digest_enabled` `false` when the row is absent.
-- `setPreference(key, value)` applies an optimistic update to the **effective** object, and on success adopts the row returned by the upsert as authoritative (so the first write materialises real state).
-- rollback restores the previous **effective** object, never `null`.
+- `setPreference(key, value)` applies an optimistic update to the **effective** object.
 - the two legacy toggles are re-expressed through `setPreference` so there is one write path.
+
+### Overlapping toggles must not corrupt state (Codex correction 2 — accepted)
+
+Codex is right that "adopt the returned row as authoritative" is unsafe once two switches are toggled quickly: an older in-flight response can clobber a newer local value, and a failed request restoring a whole snapshot can undo an unrelated successful toggle. Concretely: disable Likes, disable Mentions before Likes settles, Mentions resolves first, then the stale Likes row re-enables Mentions in the UI.
+
+The write path becomes per-key and merge-based:
+
+- one monotonically increasing sequence per key; a response is applied only if it is the latest for **that key**, older responses are discarded.
+- success **merges only that key** (plus server-owned `id`/`updated_at`) from the returned row — it never adopts the whole row over locally-pending keys.
+- failure reverts **only that key** to its pre-request value, never a full snapshot, and shows the destructive toast.
+- per-key pending set, so each switch shows its own in-flight state while others stay usable — no global lock needed, because ordering is now correct by construction.
+- a background refetch is likewise ignored for any key with a write in flight.
 
 Extend the existing Notifications tab in `src/pages/Settings.tsx` with an "Activity notifications" card above the Journey section (replacing the "coming soon" placeholder), one `Switch` per category:
 
@@ -121,7 +132,7 @@ Extend the existing Notifications tab in `src/pages/Settings.tsx` with an "Activ
 - **Comment likes** — "When someone likes your comment"
 - **New followers** — "When someone follows you"
 
-Behavior: skeletons while loading (per the project's skeleton standard); optimistic toggle with rollback plus a destructive toast on failure; the individual switch disabled while its save is in flight; refetch on account switch (the hook already keys on `user`); each switch labelled via `id`/`htmlFor` with its description wired through `aria-describedby`.
+Behavior: skeletons while loading (per the project's skeleton standard); optimistic toggle with per-key rollback and a destructive toast on failure; refetch on account switch (the hook already keys on `user`); each switch labelled via `id`/`htmlFor` with its description wired through `aria-describedby`.
 
 ## Migration and rollout
 
