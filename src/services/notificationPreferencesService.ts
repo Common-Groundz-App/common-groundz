@@ -5,22 +5,61 @@ export interface NotificationPreferences {
   user_id: string;
   weekly_digest_enabled: boolean;
   journey_notifications_enabled: boolean;
+  likes_enabled: boolean;
+  comment_likes_enabled: boolean;
+  comments_enabled: boolean;
+  replies_enabled: boolean;
+  mentions_enabled: boolean;
+  follows_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
 
+/** Preference keys the UI can toggle. */
+export type NotificationPreferenceKey =
+  | 'weekly_digest_enabled'
+  | 'journey_notifications_enabled'
+  | 'likes_enabled'
+  | 'comment_likes_enabled'
+  | 'comments_enabled'
+  | 'replies_enabled'
+  | 'mentions_enabled'
+  | 'follows_enabled';
+
+/**
+ * Missing-row semantics, mirrored from the database column defaults and from
+ * `public.notification_allowed`. A user with no preference row behaves exactly
+ * as if every activity category were enabled, journey notifications enabled,
+ * and the weekly digest disabled.
+ */
+export const NOTIFICATION_PREFERENCE_DEFAULTS: Record<NotificationPreferenceKey, boolean> = {
+  weekly_digest_enabled: false,
+  journey_notifications_enabled: true,
+  likes_enabled: true,
+  comment_likes_enabled: true,
+  comments_enabled: true,
+  replies_enabled: true,
+  mentions_enabled: true,
+  follows_enabled: true,
+};
+
+export const NOTIFICATION_PREFERENCE_KEYS = Object.keys(
+  NOTIFICATION_PREFERENCE_DEFAULTS
+) as NotificationPreferenceKey[];
+
 class NotificationPreferencesService {
-  async getPreferences(): Promise<NotificationPreferences | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
-      return null;
-    }
+  /**
+   * Reads the preference row for an explicitly passed user id. The caller owns
+   * identity resolution so a queued request can never land on a different
+   * account after a sign-out or account switch.
+   */
+  async getPreferences(userId: string): Promise<NotificationPreferences | null> {
+    if (!userId) return null;
 
     const { data, error } = await supabase
       .from('notification_preferences')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .maybeSingle();
 
     if (error) {
@@ -28,13 +67,20 @@ class NotificationPreferencesService {
       throw error;
     }
 
-    return data as NotificationPreferences | null;
+    return (data as NotificationPreferences | null) ?? null;
   }
 
-  async upsertPreferences(preferences: Partial<Pick<NotificationPreferences, 'weekly_digest_enabled' | 'journey_notifications_enabled'>>): Promise<NotificationPreferences> {
-    const { data: { user } } = await supabase.auth.getUser();
-    
-    if (!user) {
+  /**
+   * Writes a single preference key for an explicitly passed user id.
+   * Any missing columns fall back to the documented defaults on insert, so a
+   * user's first toggle can never create a row with unintended values.
+   */
+  async setPreference(
+    userId: string,
+    key: NotificationPreferenceKey,
+    value: boolean
+  ): Promise<NotificationPreferences> {
+    if (!userId) {
       throw new Error('User not authenticated');
     }
 
@@ -42,10 +88,11 @@ class NotificationPreferencesService {
       .from('notification_preferences')
       .upsert(
         {
-          user_id: user.id,
-          ...preferences,
+          user_id: userId,
+          ...NOTIFICATION_PREFERENCE_DEFAULTS,
+          [key]: value,
         },
-        { onConflict: 'user_id' }
+        { onConflict: 'user_id', ignoreDuplicates: false }
       )
       .select()
       .single();
@@ -56,14 +103,6 @@ class NotificationPreferencesService {
     }
 
     return data as NotificationPreferences;
-  }
-
-  async toggleWeeklyDigest(enabled: boolean): Promise<void> {
-    await this.upsertPreferences({ weekly_digest_enabled: enabled });
-  }
-
-  async toggleJourneyNotifications(enabled: boolean): Promise<void> {
-    await this.upsertPreferences({ journey_notifications_enabled: enabled });
   }
 }
 
