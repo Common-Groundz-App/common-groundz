@@ -53,6 +53,23 @@ So the rule is **one category per recipient per source comment**, not per produc
 
 Only after those skips is `comments_enabled` consulted. This makes the documented precedence (mention > reply > generic comment) true in the database rather than aspirational, and is a strict de-duplication improvement independent of preferences.
 
+### Comment edits must preserve precedence (Codex correction 1 — accepted)
+
+Codex found a real hole: the skips only run on INSERT. If Hana comments without mentioning Rishab (he gets the generic comment notification) and *then* edits the comment to add `@rishab`, `update_comment` inserts a mention notification and Rishab holds two rows for one source comment — breaking the stated invariant.
+
+Since Phase 2.5 already gave us a retraction lifecycle, the clean fix is precedence *replacement* rather than suppression. In `update_comment`, for each recipient in the newly-added mention set:
+
+1. insert the mention notification (subject to `mentions_enabled`), then
+2. retract that recipient's lower-precedence rows for the **same source comment** — the generic `comment`/`comment_like`-sibling projection is untouched, only the generic comment row keyed to that comment id — by setting `retracted_at = now()` where `retracted_at IS NULL`.
+
+Only *downward* transitions are handled, i.e. generic comment → mention. The reverse (a mention removed by an edit) already retracts the mention row per Phase 2.5A and deliberately does **not** resurrect a generic comment notification: resurrecting a notification the user may have already read is worse than losing it, and re-notifying for an old comment is misleading. That asymmetry is stated in the roadmap so it isn't mistaken for an oversight later.
+
+If `mentions_enabled` is false for that recipient, no mention row is inserted and the existing generic comment row is left alone — a disabled category must never *remove* a notification the user legitimately received.
+
+### Dependency guard
+
+The trigger skips call `public.parse_comment_mentions` from Phase 2.5A. Migration B asserts it exists before replacing any function body and aborts with a clear message if not, so environment drift fails loudly instead of installing triggers that error on every comment.
+
 ## Server-side enforcement
 
 One authoritative helper so trigger and RPC behavior cannot drift:
