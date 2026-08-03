@@ -59,8 +59,10 @@ Codex found a real hole: the skips only run on INSERT. If Hana comments without 
 
 Since Phase 2.5 already gave us a retraction lifecycle, the clean fix is precedence *replacement* rather than suppression. In `update_comment`, for each recipient in the newly-added mention set:
 
-1. insert the mention notification (subject to `mentions_enabled`), then
-2. retract that recipient's lower-precedence rows for the **same source comment** — the generic `comment`/`comment_like`-sibling projection is untouched, only the generic comment row keyed to that comment id — by setting `retracted_at = now()` where `retracted_at IS NULL`.
+1. resolve `mentions_enabled` for that recipient, and insert the mention notification;
+2. **only after** confirming the mention row is active (newly inserted, or already present from an earlier edit) retract that recipient's lower-precedence generic comment row for the **same source comment** — `retracted_at = now()` where `retracted_at IS NULL`. Sibling projections (comment likes, etc.) are untouched.
+
+The ordering matters: never retract first. If the insert is skipped or fails, the user keeps the notification they already had.
 
 Only *downward* transitions are handled, i.e. generic comment → mention. The reverse (a mention removed by an edit) already retracts the mention row per Phase 2.5A and deliberately does **not** resurrect a generic comment notification: resurrecting a notification the user may have already read is worse than losing it, and re-notifying for an old comment is misleading. That asymmetry is stated in the roadmap so it isn't mistaken for an oversight later.
 
