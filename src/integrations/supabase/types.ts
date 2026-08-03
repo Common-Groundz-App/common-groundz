@@ -1962,25 +1962,43 @@ export type Database = {
       }
       notification_preferences: {
         Row: {
+          comment_likes_enabled: boolean
+          comments_enabled: boolean
           created_at: string
+          follows_enabled: boolean
           id: string
           journey_notifications_enabled: boolean
+          likes_enabled: boolean
+          mentions_enabled: boolean
+          replies_enabled: boolean
           updated_at: string
           user_id: string
           weekly_digest_enabled: boolean
         }
         Insert: {
+          comment_likes_enabled?: boolean
+          comments_enabled?: boolean
           created_at?: string
+          follows_enabled?: boolean
           id?: string
           journey_notifications_enabled?: boolean
+          likes_enabled?: boolean
+          mentions_enabled?: boolean
+          replies_enabled?: boolean
           updated_at?: string
           user_id: string
           weekly_digest_enabled?: boolean
         }
         Update: {
+          comment_likes_enabled?: boolean
+          comments_enabled?: boolean
           created_at?: string
+          follows_enabled?: boolean
           id?: string
           journey_notifications_enabled?: boolean
+          likes_enabled?: boolean
+          mentions_enabled?: boolean
+          replies_enabled?: boolean
           updated_at?: string
           user_id?: string
           weekly_digest_enabled?: boolean
@@ -4918,6 +4936,10 @@ export type Database = {
           entities_processed: string[]
           updated_count: number
         }[]
+      }
+      notification_allowed: {
+        Args: { _category: string; _user_id: string }
+        Returns: boolean
       }
       parse_comment_mentions: {
         Args: { p_author_id: string; p_content: string }
