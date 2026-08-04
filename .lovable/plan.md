@@ -1,79 +1,82 @@
-# Phase 3 — scoped to 3.0 and 3.3, split into three increments
+# Phase 3.0 — Date sections in the notification drawer
 
-## Verdict on the review
+Scope this increment to date sections only. 3.3A and 3.3B stay unimplemented and get their own revised plans after your manual pass on this one.
 
-Both reviews are right, and I verified both technical objections against the live project rather than taking them on trust:
+## Verdict on the two reviews
 
-**1. `notifications.image_url` is the actor's avatar — confirmed.** Queried every active row grouped by type:
+Both are right, and Codex found real problems. I checked its structural claims against the code rather than accepting them:
 
-| type | active rows | image_url set | image_url equals the actor's avatar |
-| --- | --- | --- | --- |
-| like | 38 | 24 | 24 |
-| comment | 62 | 20 | 20 |
-| follow | 13 | 8 | 7 |
+- **Nested interactive controls — confirmed, and it kills 3.3B as written.** `NotificationRow` renders the *entire* row as a single `<button onClick=...>` (`NotificationList.tsx:85`). A `Follow back` button inside it is a button inside a button: invalid HTML, and browsers recover unpredictably — keyboard and screen-reader traversal both break. `stopPropagation` does not fix invalid nesting, it only hides the symptom on mouse clicks. So 3.3B genuinely needs a row-structure refactor first, and 3.3A's thumbnail can stay inside the main button because it has no interaction of its own. Noted for later; not this increment.
+- **No shared follow write path — accepted.** My earlier wording claimed one exists. Codex says there are several independent implementations and none centrally updates the `user-following` cache. That is a 3.3B problem and I will verify it properly when I plan 3.3B, rather than restate it as fact now.
+- **`now` cannot rerender by itself — correct and it applies to *this* increment.** A pure function given `now` is deterministic, but nothing re-invokes it when the clock crosses midnight. Leave the drawer open overnight and yesterday's rows keep saying "Today". Fixed below.
+- **"This week" is ambiguous — correct.** Needs a defined week start.
+- **Future timestamps should not all become Today — correct, and better than my version.** Clock skew is minutes; a row dated 2031 is corrupt data and labelling it "Today" is worse than labelling it honestly.
 
-Every populated value except one legacy follow row is literally the sender's `profiles.avatar_url`. My earlier "render `image_url` as the fast path" was wrong — it would have painted the same avatar twice on most rows. Dropping that entirely: the column is never used as a target thumbnail.
+One correction to Codex on the sticky-header worry: I checked the drawer. The tabs (`TabsList`) sit *outside* the scroll container, and the scrolling element is `TabsContent` (`NotificationDrawer.tsx:204,223`). So a header with `top-0` sticks to the top of the scroll region and cannot slide under the tabs — no magic offset needed, which also keeps us aligned with the no-magic-margins rule.
 
-**2. `useUserFollowing()` cannot back Follow back — confirmed.** It sets `initialData: []` and swallows query errors into `return []`, so "still loading" and "query failed" are both indistinguishable from "follows nobody". It also has no mutation and no optimistic cache write. Using it directly would flash `Follow back` at people you already follow. Needs its own state layer.
+## What I'd add beyond both reviews
 
-**3. Ship as three increments — agreed.** 3.0 is render-only, 3.3A is a read-only fetch, 3.3B introduces a mutation. Separate phases, separate verification passes.
+- **Sections are computed from the grouped array, not the raw rows.** Grouping already ran; re-partitioning raw notifications would let a group's members land in two different sections.
+- **Sections must not break the "all caught up" / count-mismatch / pagination footers.** Those render *after* the sections, as siblings, never inside the last one.
+- **The label set is capped at five and never pluralised or counted.** No "3 new", no numeric chips — you already rejected event-count chips, and a header showing a number is the same mistake in a different place.
 
-## What I'd add on top of their notes
+## Behaviour
 
-- **`image_url` is not just unused — it's a trap.** Once thumbnails ship, the next person will see a populated `image_url` and wire it in. So Phase 3.3A adds a comment on the field in `notificationService.ts` recording that it is actor-avatar data with mixed legacy semantics and is not content media. Cheaper than re-litigating this later.
-- **A group's section is decided by one timestamp, chosen explicitly.** Grouped rows already carry many events. The section uses the group's newest event (the same timestamp the row displays), so the header and the visible "3 hours ago" can never disagree.
-- **Tri-state follow state, not boolean.** `unknown | following | not_following`. `unknown` renders **no button at all** — never a wrong one. This is the single rule that makes 3.3B safe.
-- **Follow back needs the account-generation guard we already built for preferences.** Same failure mode: switch accounts mid-flight and a resolved follow set leaks across users. Reuse the pattern.
-- **From your `follow_avatar.png`:** that row is currently avatar + sentence + timestamp with dead space on the right — exactly where the button goes. Its vertical rhythm must not change when the button appears, so the row reserves the action slot rather than growing.
+`src/utils/notificationSections.ts` — new pure module, no React, no dates read from the ambient clock:
 
----
+```
+partitionIntoSections(groups, now) -> { label, groups }[]
+```
 
-## Phase 3.0 — Date sections (render layer only)
+Bucketing uses the group's **newest event timestamp** — the exact timestamp the row already displays — resolved in the **viewer's local calendar**, not UTC:
 
-- New `src/utils/notificationSections.ts`: takes the already-grouped array plus an injected `now`, returns `{ label, groups }[]` with **Today / Yesterday / This week / This month / Earlier**.
-- Section chosen from each group's newest event timestamp. Order inside a section is untouched. Empty sections never render.
-- Unparseable or future timestamps land in a defined bucket (`Earlier` / `Today` respectively) — a row is never dropped.
-- Sticky headers inside the existing scroll region, `top` offset below the fixed All/Unread tabs so a header never slides under them. Rendered as real headings for screen-reader order.
-- Applies identically to both lanes. **No change** to counts, cursors, the pagination sentinel, error/recovery strips, realtime merging, retraction or preferences.
-- Tests: boundary cases at midnight, week and month edges; a group whose events straddle a boundary stays in one section; empty and single-section lists.
-
-## Phase 3.3A — Target thumbnails (read-only)
-
-- New batched hook: collect the distinct `(entity_type, entity_id)` targets of the rows currently rendered, resolve media in **at most two queries per page** — `posts.media` (jsonb; first image frame, or a video's poster; never a playing video) and `recommendations.image_url`. React Query cached and deduped across groups sharing a target.
-- Rows eligible: like, comment, reply, mention, comment-like. Not follow, not system.
-- Missing, deleted, RLS-hidden, or failed media renders **nothing** — no placeholder, no grey box, no row-height change. The slot is fixed-size and reserved, so a late-arriving image never reflows the list.
-- `notifications.image_url` is not read. A comment on the field records why.
-- Clicking the thumbnail does nothing special — the whole row still navigates to its canonical destination.
-
-## Phase 3.3B — Follow back (mutation)
-
-- New `useNotificationFollowState`: one batched `follows` lookup for the distinct actors of visible singleton `follow` rows, returning tri-state per actor and exposing a follow mutation.
-- `unknown` (loading, error, or not yet fetched) renders no button. `following` renders `Following`, inert. `not_following` renders `Follow back`.
-- Own-account actor: no button.
-- Mutation goes through the existing shared follow write path so profile pages and the drawer cannot disagree; optimistic flip to `Following`, revert on failure with a toast.
-- `requireAuth()` first, then the email-verification gate — same contract as the profile header.
-- `stopPropagation` on click: does **not** navigate the row and does **not** mark it read. Reading stays tied to opening the row.
-- Account-generation guard so a switch or sign-out discards in-flight resolutions.
-- No DB, edge function, realtime, cursor or count changes.
-
-## Deferred, with the trigger to revisit
-
-| Item | Ship when |
+| Label | Rule |
 | --- | --- |
-| 3.1 per-actor / per-thread mute | users ask to silence a specific actor or thread |
-| 3.2 `/notifications` page | history depth, deep links, or search/filter justify a second surface |
-| 3.4 type filters / mentions view | typical unread counts exceed ~50 |
-| 3.5 per-row mark unread / dismiss | needs row versioning to replace the monotonic `is_read` merge |
-| 3.6 web push | after retention justifies re-engagement |
-| 3.7 virtualization | profiling shows scroll jank |
+| Today | same local calendar day as `now` |
+| Yesterday | the local calendar day before |
+| This week | within the current local week, **week starts Monday**, excluding the two above |
+| This month | within the current local calendar month, excluding the above |
+| Earlier | everything older |
 
-## Order
+Edge rules:
+- **Near-future (within 5 minutes of `now`):** treated as Today. This is ordinary client/server clock skew.
+- **Far-future (beyond 5 minutes):** goes to `Earlier`. Malformed, but visible — never silently dropped.
+- **Unparseable / missing timestamp:** goes to `Earlier`. Also never dropped.
+- Order inside every section is exactly the incoming order — the utility partitions, it never sorts.
+- Empty sections are omitted. A list with one section renders one header.
+- Total groups out always equals total groups in. This is asserted in the tests.
 
-Implement **3.0 alone** and stop for your manual pass. Then 3.3A. Then 3.3B. Nothing bundled.
+**Midnight rollover:** `NotificationList` holds `now` in state and advances it on a `setTimeout` scheduled for the next local midnight (plus a second of slack), rescheduling itself after each fire. Consistent with the project's timers rule — `setTimeout`, never `setInterval` — and it is cleared on unmount. So a drawer left open overnight relabels correctly instead of lying.
+
+## Rendering
+
+In `NotificationList.tsx`, the flat `groups.map(...)` becomes sections → rows. Each header is a real heading (`<h3>`), `sticky top-0` inside the existing scroll region, with a translucent blurred background so rows scrolling under it stay legible. Typography is small, muted, uppercase-tracked — a divider, not a title competing with the rows.
+
+Untouched, verified by reading the file: row markup, grouping, avatars, `formatNotificationTime`, the skeleton/error/empty branches, `PaginationFooter` and its IntersectionObserver sentinel, the count-mismatch strip, the "You're all caught up" line, both lanes, realtime merging, retraction filtering, preferences.
+
+## Tests
+
+New `src/utils/notificationSections.test.ts`, added to `vitest.config.ts`'s explicit include list, with `now` injected — no reliance on the real clock:
+
+- one row just before and just after local midnight → Yesterday vs Today
+- Monday-morning `now`: Sunday's row is *not* "This week"
+- month boundary: Jul 31 vs Aug 1 with an August `now`
+- a grouped row whose events straddle midnight stays in the section of its newest event
+- 3-minute future → Today; 400-day future → Earlier
+- `null` / `"not-a-date"` → Earlier, still present
+- empty input → `[]`; conservation of count across a mixed fixture
+- section order is always Today → Yesterday → This week → This month → Earlier
 
 ## Files
 
-- 3.0: new `src/utils/notificationSections.ts` + test; edit `NotificationList.tsx`, `vitest.config.ts`, roadmap doc.
-- 3.3A: new batched target-media hook + `NotificationThumbnail`; edit `NotificationList.tsx`, comment in `notificationService.ts`.
-- 3.3B: new `useNotificationFollowState` + test + `FollowBackButton`; edit `NotificationList.tsx`.
-- No migration, no edge function change, in any of the three.
+- new `src/utils/notificationSections.ts`
+- new `src/utils/notificationSections.test.ts`
+- edit `src/components/notifications/NotificationList.tsx` (section rendering + midnight timer)
+- edit `vitest.config.ts` (include the new suite)
+- edit `docs/NOTIFICATION_CENTER_ROADMAP.md` (3.0 done; 3.3A/3.3B pending with the row-refactor and follow-mutation prerequisites recorded; 3.1/3.2/3.4–3.7 deferred with revisit triggers)
+
+No migration, no edge function, no service or hook changes.
+
+## Then we stop
+
+I run the suite, you do your manual pass. After that I write the revised 3.3A plan (bounded account-safe media resolution reusing `muxMedia.ts`, image/poster URLs only — never a raw video URL) and then 3.3B (row-structure refactor first, then a single cache-aware follow mutation, tri-state, no button for missing or deleted actors).
