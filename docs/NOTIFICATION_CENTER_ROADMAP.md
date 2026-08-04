@@ -120,10 +120,27 @@ Preferences are now authoritative **at the database boundary**: a disabled categ
 
 **Rollback order matters:** restore the prior producer bodies *first*, then drop the columns — dropping columns while the new bodies are live would break every like and comment.
 
+## Phase 3.0 — Date sections (done)
+
+Presentation-only readability pass. No DB, edge function, service, hook, fetch, pagination, realtime, count, preference or retraction change — the drawer's data layer is byte-for-byte unchanged.
+
+- **`src/utils/notificationSections.ts`** — pure module, no React, never reads the ambient clock. `partitionIntoSections(groups, now)` buckets the **already-grouped** array (re-partitioning raw rows would split one group's children across two headers).
+- **Sectioned by the representative timestamp**, i.e. exactly the timestamp the row already renders. Anything else lets a header read "This week" above a row reading "2 hours ago".
+- **Labels:** Today / Yesterday / This week / This month / Earlier, resolved in the **viewer's local calendar** (not UTC). **The week starts Monday** — "this week" is meaningless without a defined start.
+- **Future timestamps:** within 5 minutes of `now` → Today (ordinary clock skew). Beyond that → `Earlier`. A row dated next year is corrupt data, and labelling it "Today" is worse than labelling it honestly.
+- **Never drops a row:** `null`, missing and unparseable timestamps land in `Earlier`. Group count out always equals group count in, asserted in the suite.
+- **Never sorts.** Order inside a section is the incoming order; empty sections are omitted.
+- **Midnight rollover:** a pure function cannot re-label anything by itself, so `NotificationList` holds `now` in state and advances it with a `setTimeout` scheduled for the next local midnight (+1s slack), rescheduling after each fire and cleared on unmount. `setTimeout`, never `setInterval`, per the background-timer rule. A drawer left open overnight relabels instead of lying.
+- **Headers:** real `<h3>`, `sticky top-0` inside the drawer's scroll region. Verified structurally: `TabsList` lives *outside* the scrolling `TabsContent`, so `top-0` is correct and no offset margin is needed. Footers (pagination, count-mismatch strip, "You're all caught up") render as **siblings after** the sections, never inside the last one, so the IntersectionObserver sentinel is untouched.
+- **Verified:** 184 unit tests pass, with `now` injected in every date case and fixtures built from local-calendar constructors so the suite is timezone-independent.
+
 ## Next
 
+- **Phase 3.3A — Target thumbnails.** Prerequisite noted: **do not use `notifications.image_url`** — it holds the *actor's avatar*, so rendering it as the target preview would show the same avatar twice. Resolve from `posts.media` and `recommendations.image_url` via bounded, account-safe batched lookups reusing `muxMedia.ts`; image or poster URLs only, never a raw video playback URL; missing/deleted/RLS-hidden media renders nothing in a fixed-size slot.
+- **Phase 3.3B — Follow back.** Two prerequisites: (1) `NotificationRow` currently renders the whole row as a single `<button>`, so the row must first become a non-interactive container with one navigation button plus one sibling action — a button inside a button is invalid HTML and `stopPropagation` does not repair it; (2) there is no single cache-aware follow mutation today (several independent implementations exist and `useUserFollowing` swallows errors into `[]`), so that authority must be created rather than assumed. Tri-state unknown/following/not_following; no button for missing or deleted actors.
 - **Phase 2.6 — Coverage:** emit review and journey notifications once those surfaces exist, then extend the resolver's allowlist.
-- **Deferred:** quiet hours, per-actor muting, push/email delivery, the full `/notifications` page, rich previews.
+- **Deferred:** the full `/notifications` page (the drawer already has full history and pagination; Instagram ships drawer-only), filters, mark-unread, quiet hours, per-actor muting, push/email delivery, virtualization. Revisit when notification volume per user makes scanning the drawer slow.
+
 
 
 

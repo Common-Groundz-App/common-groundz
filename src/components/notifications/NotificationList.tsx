@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,10 @@ import {
   resolveActorName,
   type NotificationGroup,
 } from "@/utils/notificationGrouping";
+import {
+  msUntilNextLocalMidnight,
+  partitionIntoSections,
+} from "@/utils/notificationSections";
 import { useProfile } from "@/hooks/use-profile-cache";
 
 
@@ -275,6 +279,19 @@ export function NotificationList({
   // any early return so the order stays stable across loading/empty/error states.
   const groups = useMemo(() => groupNotifications(notifications), [notifications]);
 
+  // `now` drives date sectioning. It lives in state (not a fresh Date on every
+  // render) and advances exactly once per local midnight, so a drawer left open
+  // overnight relabels instead of keeping yesterday's rows under "Today".
+  // setTimeout per the project's background-timer rule — never setInterval.
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setTimeout(() => setNow(new Date()), msUntilNextLocalMidnight(now));
+    return () => clearTimeout(timer);
+  }, [now]);
+
+  const sections = useMemo(() => partitionIntoSections(groups, now), [groups, now]);
+
   // Initial load only — background polling never renders skeletons over existing rows
 
   if (loading && notifications.length === 0) {
@@ -329,12 +346,21 @@ export function NotificationList({
   return (
 
     <div className="px-2 py-1">
-      {groups.map((group) => (
-        <NotificationRow
-          key={group.key}
-          group={group}
-          onNotificationClick={onNotificationClick}
-        />
+      {sections.map((section) => (
+        <section key={section.label} aria-label={section.label}>
+          {/* Sticks to the top of the drawer's scroll region. The tabs live
+              OUTSIDE that region, so top-0 is correct — no offset hacks. */}
+          <h3 className="sticky top-0 z-10 -mx-2 px-3 py-1.5 bg-background/85 backdrop-blur-sm text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80">
+            {section.label}
+          </h3>
+          {section.groups.map((group) => (
+            <NotificationRow
+              key={group.key}
+              group={group}
+              onNotificationClick={onNotificationClick}
+            />
+          ))}
+        </section>
       ))}
 
 
