@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,10 @@ import {
   resolveActorName,
   type NotificationGroup,
 } from "@/utils/notificationGrouping";
+import {
+  msUntilNextLocalMidnight,
+  partitionIntoSections,
+} from "@/utils/notificationSections";
 import { useProfile } from "@/hooks/use-profile-cache";
 
 
