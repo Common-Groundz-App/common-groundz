@@ -279,6 +279,19 @@ export function NotificationList({
   // any early return so the order stays stable across loading/empty/error states.
   const groups = useMemo(() => groupNotifications(notifications), [notifications]);
 
+  // `now` drives date sectioning. It lives in state (not a fresh Date on every
+  // render) and advances exactly once per local midnight, so a drawer left open
+  // overnight relabels instead of keeping yesterday's rows under "Today".
+  // setTimeout per the project's background-timer rule — never setInterval.
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = setTimeout(() => setNow(new Date()), msUntilNextLocalMidnight(now));
+    return () => clearTimeout(timer);
+  }, [now]);
+
+  const sections = useMemo(() => partitionIntoSections(groups, now), [groups, now]);
+
   // Initial load only — background polling never renders skeletons over existing rows
 
   if (loading && notifications.length === 0) {
