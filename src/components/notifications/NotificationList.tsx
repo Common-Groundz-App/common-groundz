@@ -333,12 +333,21 @@ export function NotificationList({
   return (
 
     <div className="px-2 py-1">
-      {groups.map((group) => (
-        <NotificationRow
-          key={group.key}
-          group={group}
-          onNotificationClick={onNotificationClick}
-        />
+      {sections.map((section) => (
+        <section key={section.label} aria-label={section.label}>
+          {/* Sticks to the top of the drawer's scroll region. The tabs live
+              OUTSIDE that region, so top-0 is correct — no offset hacks. */}
+          <h3 className="sticky top-0 z-10 -mx-2 px-3 py-1.5 bg-background/85 backdrop-blur-sm text-[11px] font-medium uppercase tracking-wide text-muted-foreground/80">
+            {section.label}
+          </h3>
+          {section.groups.map((group) => (
+            <NotificationRow
+              key={group.key}
+              group={group}
+              onNotificationClick={onNotificationClick}
+            />
+          ))}
+        </section>
       ))}
 
 
