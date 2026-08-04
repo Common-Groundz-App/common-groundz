@@ -23,6 +23,7 @@ export default defineConfig({
       'src/utils/notificationDestination.test.ts',
       'src/utils/notificationRealtime.test.ts',
       'src/utils/notificationPreferences.test.ts',
+      'src/utils/notificationSections.test.ts',
 
       'src/utils/brandTextHelpers.test.ts',
       'src/utils/renderBranching.test.ts',
