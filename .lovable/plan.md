@@ -17,37 +17,39 @@ So the same 29 unread reads as "29" in one place and "9+" in another, and the co
 
 The `9+` circle also looks lopsided because it is a fixed `w-4 h-4` (16px) box with no horizontal padding — two glyphs get squeezed, so the `9` touches the left edge while the `+` keeps a little air on the right.
 
-## What the big guys do, and what we should do
+## The rule (approved)
 
-- **Instagram / iOS app icons:** small round overlay badges cap early and keep a fixed footprint, because the badge is decoration on top of an icon — it must never grow and shift the icon or push nav items around.
-- **X (Twitter) / Slack sidebars:** an inline label next to a nav row has real horizontal space, so it shows a higher cap (`20+`, `99+`) since the exact-ish number is actually useful there.
+Every compact notification entry point uses the same cap, so the same unread state never reads as two different numbers:
 
-The shared principle: the cap follows the amount of space, and the badge never changes the layout around it. Beyond a small number, the precise value stops driving behaviour — "you have a lot to read" is the whole message.
+- `unreadCount === null` (not yet resolved) → render nothing (never falls back to 0)
+- `0` → render nothing
+- `1–9` → exact number
+- `10+` → `9+`
 
-**Recommendation:** one shared component with two sizes and one cap rule.
+Applies to: desktop sidebar Notifications item, top nav bell, Feed header bell, My Stuff header bell, Post View header bell, mobile bottom nav badge, and any future compact entry point.
 
-- Overlay badges on a bell/tab icon (top nav, feed/my-stuff/post headers, bottom nav): cap at **9+**.
-- Inline sidebar row (where the label sits in a wide row): cap at **99+**, so 29 still reads as 29.
+Inside the drawer the Unread tab keeps the exact count (e.g. `Unread 30`) — the user is already on the notification surface and there is room for the precise number.
 
-This is consistent in the way that matters — same component, same colors, same typography, same rounding rule — while respecting that a 16px circle over an icon cannot hold three digits. If you'd rather have literally the same string everywhere, we set the sidebar to `9+` too; say the word and I'll use a single cap of 9.
+Rationale: the badge is an attention indicator, not an analytics counter. A small round badge over an icon also must keep a fixed footprint so it never shifts the icon or nav layout. `variant` stays a *styling* switch (size/positioning), never a count-semantics switch.
 
 ## The plan
 
 1. **New `src/components/notifications/NotificationBadge.tsx`** — the single renderer:
-   - Props: `count: number | null`, `variant: 'overlay' | 'inline'`.
-   - Renders nothing when count is null or 0.
-   - Formats via a small pure helper: `formatUnreadBadge(count, cap)` → `"29"` / `"9+"` / `"99+"`.
-   - `overlay`: absolutely-positioned pill, `h-4 min-w-4 px-1` with `rounded-full`, `text-[10px] leading-none font-medium`, centered via flex — so a single digit stays a perfect circle and `9+` grows symmetrically instead of cramping. Uses `bg-destructive text-destructive-foreground` (semantic tokens, no `bg-red-500`).
-   - `inline`: `h-5 min-w-5 px-1.5`, same tokens, same centering.
-   - Includes an accessible label (`aria-label="N unread notifications"`, `aria-hidden` on the visual text) so the count is announced once, not twice.
+   - Props: `count: number | null | undefined`, `variant: 'overlay' | 'inline'`, optional `className`.
+   - Renders nothing when count is null/undefined or `<= 0`.
+   - Formats via the shared helper (single cap of 9 for both variants).
+   - `overlay`: absolutely-positioned pill, `h-4 min-w-4 px-1`, `rounded-full`, `text-[10px] leading-none font-medium`, flex-centered — a single digit stays a perfect circle and `9+` grows symmetrically instead of cramping. Uses `bg-destructive text-destructive-foreground`.
+   - `inline`: `h-5 min-w-5 px-1.5`, same tokens, same centering, same cap.
+   - Accessibility: `aria-hidden` on the visual text; the surrounding button keeps the descriptive `aria-label` (as `NotificationBell` already does) so the count is announced once, not twice.
 
-2. **New `src/utils/notificationBadge.ts`** — `formatUnreadBadge` + the two cap constants, unit-testable.
+2. **New `src/utils/notificationBadge.ts`** — `formatUnreadBadge(count, cap = ENTRY_BADGE_CAP)` returning `string | null`, plus `ENTRY_BADGE_CAP = 9`. `cap` stays a parameter for testability, but every call site uses the default.
 
-3. **Replace all six inline implementations** with `<NotificationBadge />`:
+3. **Replace all six hand-written implementations** with `<NotificationBadge />`:
    - `NotificationBell.tsx`, `Feed.tsx`, `MyStuffPage.tsx`, `PostView.tsx`, `BottomNavigation.tsx` → `variant="overlay"`.
-   - `vertical-tubelight-navbar.tsx` → `variant="inline"` (keeps its existing responsive absolute→relative positioning wrapper).
+   - `vertical-tubelight-navbar.tsx` → `variant="inline"`, keeping its existing responsive absolute→relative positioning wrapper.
+   - `BottomNavigation` also gets its truthiness bug fixed: `item.badge && item.badge > 0` is replaced by the component's own null/zero handling.
 
-4. **Tests** in `src/utils/notificationBadge.test.ts`: 0/null hidden, 1–9 exact, 10 → `9+` at cap 9, 29 exact at cap 99, 150 → `99+`.
+4. **Tests** in `src/utils/notificationBadge.test.ts`: null/undefined → null, 0 → null, negative → null, 1 and 9 → exact, 10 and 29 and 150 → `9+`, non-integer/NaN guarded.
 
 ## Notes
 
