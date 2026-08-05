@@ -13,30 +13,34 @@ Goal: each notification row shows a small preview of the *content it points at* 
 
 ### Behavior
 
-- Thumbnail only for rows whose target is a post or recommendation (`entity_type` = `post` / `recommendation` with a valid UUID). Follows, system rows and comment-scoped rows show no thumbnail.
-- Fixed-size 40x40 rounded slot. If media is missing, deleted, video-only-without-poster, or hidden by RLS, the slot renders nothing (no placeholder box, no letter initials) and text simply spans wider.
-- Never render the actor avatar as the thumbnail — the actor avatar already sits on the left.
-- Images only: for `posts.media`, take the first non-deleted item that yields an image URL; for Mux video items use the Mux poster/thumbnail via existing `muxMedia.ts` helpers; never a raw playback URL.
-- Aggregated like-groups share one target, so one lookup per group.
+- Eligibility is target-based, not type-based: any row whose `entity_type` is `post` or `recommendation` with a valid UUID `entity_id` gets a thumbnail — likes, comments, replies, mentions and comment-likes alike. Confirmed in the data: comment rows carry `entity_type='post'` plus the parent `entity_id`, with `metadata.comment_id` only identifying the comment inside it.
+- Excluded: follow rows (`entity_type='profile'`), system rows, and anything without a valid post/recommendation target.
+- 40x40 rounded slot on the right. While a known target is still resolving, the slot is reserved to avoid a layout shift; once the query conclusively returns no image, the slot is removed and the text column reclaims the space. No placeholder box, no letter initials, no permanent blank gutter.
+- Never render the actor avatar as the thumbnail, and never use `notifications.image_url` (actor-avatar data).
+- Aggregated like-groups share one target, so one lookup per distinct target, not per row.
 
 ### Data
 
-- New hook `src/hooks/useNotificationTargets.ts`: collects distinct `(entity_type, entity_id)` pairs from the currently rendered groups, chunks ids (200 max per request), and issues at most one query per entity type:
-  - `posts`: `select id, media` filtered by `id in (...)` and `is_deleted = false`.
-  - `recommendations`: `select id, image_url` filtered by `id in (...)`.
-- RLS stays the authorization boundary — rows the viewer can't see simply come back absent and render no thumbnail.
-- Results cached with react-query keyed per entity type + id, so scrolling and polling do not refetch, and the cache is account-scoped like the other notification queries.
-- Resolution logic lives in a pure module `src/utils/notificationThumbnail.ts` (`resolveTargetThumbnail(entityType, row)`), unit-tested: image item, Mux ready item, Mux preparing item, deleted media, empty media, malformed jsonb, missing row.
+- New hook `src/hooks/useNotificationTargets.ts`: collects the distinct `(entity_type, entity_id)` pairs from the rows currently loaded in the active lane, sorts them for stable keys, chunks at 200 ids, and issues `ceil(unique/200)` bounded requests per entity type (one query *family* per type — typically one request each):
+  - `posts`: `select id, media where id in (...) and is_deleted = false`.
+  - `recommendations`: `select id, image_url where id in (...)` (this table has no `is_deleted` column).
+- RLS remains the authorization boundary — invisible rows come back absent and render nothing.
+- Caching is explicit about being batched: react-query key is `['notification-targets', userId, entityType, chunkKey]` where `chunkKey` is the sorted chunk of ids. `userId` (the current account) is part of the key so RLS-scoped media can never leak across accounts; sign-out/account switch changes the key and the cache is also cleared alongside the existing notification caches.
+- Resolution lives in a pure module `src/utils/notificationThumbnail.ts`:
+  - posts: first non-deleted media item that yields a *validated image* URL; for Mux video items use `muxThumbnailUrl(playback_id)` directly rather than `muxPosterUrl`, because `muxPosterUrl` falls back to `thumbnail_url ?? url` and `url` can be the raw video file. Legacy video items only qualify via `thumbnail_url`.
+  - recommendations: `image_url`, validated.
+  - Validation: `http`/`https` only, parseable URL, no `data:`/`blob:`/relative junk; anything else resolves to no thumbnail.
 
 ### UI
 
-- `NotificationList` calls the hook once with the flat groups and passes the resolved `thumbnailUrl` down to each `NotificationRow`.
-- `NotificationRow` renders the thumbnail as a non-interactive `<img aria-hidden>` inside the existing row button (no nested interactive element, so no HTML validity issue in this phase), placed where the read check currently sits; the read check moves next to the timestamp.
-- External URLs route through the existing image proxy path used elsewhere for non-Supabase hosts; `loading="lazy"` and `decoding="async"`; on `onError` the slot collapses.
+- `NotificationList` calls the hook once with the flat rows and passes `thumbnailUrl` plus a `targetPending` flag to each `NotificationRow`.
+- Row layout: left = actor avatar stack; center = sentence, optional preview, then timestamp with the read/unread indicator adjacent to it (kept visually distinct so unread state stays obvious, not buried in the timestamp line); right = optional 40x40 thumbnail.
+- Thumbnail is a decorative non-interactive `<img aria-hidden>` inside the existing row button — no nested interactive element. External hosts route through the existing image proxy path; `loading="lazy"`, `decoding="async"`; `onError` collapses the slot.
 
 ### Out of scope (stays for 3.3B)
 
-Follow-back button, the row-structure refactor it requires, and any centralized follow mutation.
+Follow-back button, the row-structure refactor it requires, any follow mutation, DB migrations, edge-function and notification-producer changes, and anything touching realtime/counts/cursors/read state/retraction/preferences.
+
 
 ### Verification
 
