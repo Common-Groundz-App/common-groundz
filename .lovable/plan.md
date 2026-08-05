@@ -22,6 +22,7 @@ Rules:
 - Only on **single** follow rows (`entity_type = 'profile'`). Aggregated follow groups get no button.
 - Never for yourself, never for an actor whose profile can't be resolved (deleted account).
 - Tri-state: while follow state is unknown or errored, no button is rendered (no flicker, no wrong label). Once known: "Follow back" if not following, and a plain non-interactive "Following" label if already following.
+- "Following" reads as a **status, not a control**: muted `text-xs text-muted-foreground`, no border, no hover, no focus ring, not focusable. Only "Follow back" is a real button.
 - Optimistic on click, reverts with a toast on failure, disabled while in flight.
 - Clicking the button never navigates and never marks the row read; clicking anywhere else on the row keeps today's navigation + read behaviour exactly.
 
