@@ -25,6 +25,7 @@ export default defineConfig({
       'src/utils/notificationPreferences.test.ts',
       'src/utils/notificationSections.test.ts',
       'src/utils/notificationThumbnail.test.ts',
+      'src/utils/notificationFollowBack.test.ts',
 
       'src/utils/brandTextHelpers.test.ts',
       'src/utils/renderBranching.test.ts',
