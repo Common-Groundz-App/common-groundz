@@ -21,6 +21,7 @@ import { SearchDialog } from "@/components/SearchDialog";
 import { useNotificationsContext } from "@/contexts/NotificationsContext";
 import { useProfile } from "@/hooks/use-profile-cache";
 import { useCanonicalProfileUrl } from "@/hooks/useCanonicalProfileUrl";
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 
 interface NavItem {
   name: string;

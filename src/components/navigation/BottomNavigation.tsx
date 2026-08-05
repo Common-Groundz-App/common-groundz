@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { isExploreRelatedRoute } from '@/utils/navigation';
 import { useCanonicalProfileUrl } from '@/hooks/useCanonicalProfileUrl';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 
 interface NavItem {
   name: string;

@@ -31,6 +31,7 @@ import { ProfileAvatar } from '@/components/common/ProfileAvatar';
 import UsernameLink from '@/components/common/UsernameLink';
 import { UserRecommendationCard, MutualData } from '@/components/feed/UserRecommendationCard';
 import { supabase } from '@/integrations/supabase/client';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 
 const Feed = React.memo(() => {
   const { user, isLoading } = useAuth();

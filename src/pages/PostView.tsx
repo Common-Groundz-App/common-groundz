@@ -17,6 +17,7 @@ import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { MuxOwnerHint } from '@/components/media/MuxOwnerHint';
 import { isPostOwner } from '@/lib/isPostOwner';
 import { analytics } from '@/services/analytics';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 
 interface PostMeta {
   title: string;

@@ -7,6 +7,7 @@ import Logo from '@/components/Logo';
 import { Bell, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 
 const MyStuffPage = () => {
   const { user } = useAuth();
