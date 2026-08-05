@@ -228,14 +228,20 @@ function NotificationRow({
         {followBackActorId && followStatus !== 'unknown' && (
           <div className="pointer-events-auto relative z-10 shrink-0 self-center">
             {followStatus === 'following' ? (
-              // Status text, not a fake disabled button: not focusable, no border.
-              <span className="text-xs text-muted-foreground">Following</span>
+              // Same pill footprint as the action, but NOT a button: the drawer
+              // has no unfollow path, so this must not look pressable/focusable.
+              <span
+                aria-label="Following"
+                className="inline-flex h-7 items-center justify-center rounded-md bg-brand-orange/10 px-2.5 text-xs font-medium text-muted-foreground"
+              >
+                Following
+              </span>
             ) : (
               <Button
                 type="button"
                 size="sm"
                 variant="secondary"
-                className="h-7 px-2.5 text-xs"
+                className="h-7 px-2.5 text-xs bg-brand-orange text-white hover:bg-brand-orange/90"
                 disabled={followPending}
                 aria-label={`Follow back ${names[0] ?? 'this user'}`}
                 onClick={(e) => {
