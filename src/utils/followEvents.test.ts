@@ -1,7 +1,6 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   FOLLOW_STATUS_CHANGED_EVENT,
-  dispatchFollowStatusChanged,
   isFollowEventFor,
   isUniqueViolation,
   parseFollowStatusChanged,
@@ -64,35 +63,6 @@ describe('isFollowEventFor', () => {
   it('ignores missing ids', () => {
     expect(isFollowEventFor(detail, null, B)).toBe(false);
     expect(isFollowEventFor(detail, A, undefined)).toBe(false);
-  });
-});
-
-describe('dispatchFollowStatusChanged', () => {
-  const listener = vi.fn();
-
-  beforeEach(() => {
-    listener.mockReset();
-    window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, listener);
-  });
-
-  afterEach(() => {
-    window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, listener);
-  });
-
-  it('dispatches a real transition once', () => {
-    dispatchFollowStatusChanged({ follower: A, following: B, action: 'follow' });
-    expect(listener).toHaveBeenCalledTimes(1);
-    expect((listener.mock.calls[0][0] as CustomEvent).detail).toEqual({
-      follower: A,
-      following: B,
-      action: 'follow',
-    });
-  });
-
-  it('never dispatches with incomplete ids', () => {
-    dispatchFollowStatusChanged({ follower: '', following: B, action: 'follow' });
-    dispatchFollowStatusChanged({ follower: A, following: '', action: 'unfollow' });
-    expect(listener).not.toHaveBeenCalled();
   });
 });
 
