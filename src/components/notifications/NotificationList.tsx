@@ -20,6 +20,13 @@ import {
   partitionIntoSections,
 } from "@/utils/notificationSections";
 import { useProfile } from "@/hooks/use-profile-cache";
+import {
+  useNotificationTargets,
+  selectTargetThumbnail,
+  type NotificationTargetMedia,
+} from "@/hooks/notifications/useNotificationTargets";
+import { getProxyUrlForImage } from "@/utils/imageUtils";
+
 
 
 interface NotificationListProps {
@@ -48,6 +55,44 @@ interface NotificationListProps {
 
 
 /**
+ * Target preview (Phase 3.3A).
+ *
+ * Decorative and non-interactive: it lives inside the row's existing button so
+ * no nested interactive element is introduced (the row refactor stays in 3.3B).
+ * While a known target is still resolving the slot is reserved to avoid a
+ * layout shift; once it conclusively resolves to no media the slot disappears
+ * and the text column reclaims the width. No placeholder box is ever shown.
+ */
+function TargetThumbnail({ url, pending }: { url: string | null; pending: boolean }) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [url]);
+
+  if (url && !failed) {
+    return (
+      <img
+        src={getProxyUrlForImage(url)}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="h-10 w-10 shrink-0 rounded-md object-cover bg-muted"
+      />
+    );
+  }
+
+  // Reserve only while the answer is genuinely unknown.
+  if (pending && !failed) {
+    return <div aria-hidden="true" className="h-10 w-10 shrink-0 rounded-md bg-muted/40" />;
+  }
+
+  return null;
+}
+
+/**
  * One rendered group.
  *
  * Extracted into its own component so it can call `useProfile` for the first
@@ -62,9 +107,11 @@ interface NotificationListProps {
 function NotificationRow({
   group,
   onNotificationClick,
+  targetMedia,
 }: {
   group: NotificationGroup;
   onNotificationClick: (group: NotificationGroup, event: React.MouseEvent) => void;
+  targetMedia: NotificationTargetMedia;
 }) {
   const { representative } = group;
   const actorIdA = group.actorIds[0];
@@ -84,6 +131,12 @@ function NotificationRow({
   const timestamp = formatNotificationTime(representative.created_at);
   // Stacked avatars are capped at 3.
   const stackedActorIds = group.actorIds.slice(0, 3);
+  // An aggregated group shares one target, so this is one lookup per group.
+  const { url: thumbnailUrl, pending: thumbnailPending } = selectTargetThumbnail(
+    targetMedia,
+    representative,
+  );
+
 
   return (
     <button
@@ -129,14 +182,28 @@ function NotificationRow({
               {preview}
             </p>
           )}
-          {timestamp && (
-            <p className="text-[11px] text-muted-foreground/75 mt-1">{timestamp}</p>
-          )}
+          {/* Read state sits beside the timestamp so the right edge belongs to
+              the target thumbnail. The check keeps its own colour/size so
+              unread vs read stays obvious at a glance. */}
+          <div className="mt-1 flex items-center gap-1.5">
+            {timestamp && (
+              <span className="text-[11px] text-muted-foreground/75">{timestamp}</span>
+            )}
+            {group.isUnread ? (
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+              />
+            ) : (
+              <Check aria-hidden="true" className="h-3 w-3 shrink-0 text-primary/50" />
+            )}
+          </div>
         </div>
-        {!group.isUnread && (
-          <Check className="w-4 h-4 text-primary/50 mt-1 shrink-0" />
-        )}
+        {/* Decorative preview of the CONTENT this notification points at.
+            Never the actor avatar, never notifications.image_url. */}
+        <TargetThumbnail url={thumbnailUrl} pending={thumbnailPending} />
       </div>
+
     </button>
   );
 }
@@ -292,6 +359,12 @@ export function NotificationList({
 
   const sections = useMemo(() => partitionIntoSections(groups, now), [groups, now]);
 
+  // One batched, account-scoped lookup for every distinct post/recommendation
+  // target currently loaded — not one request per row. Hook runs before the
+  // early returns so hook order stays stable.
+  const targetMedia = useNotificationTargets(notifications);
+
+
   // Initial load only — background polling never renders skeletons over existing rows
 
   if (loading && notifications.length === 0) {
@@ -358,8 +431,10 @@ export function NotificationList({
               key={group.key}
               group={group}
               onNotificationClick={onNotificationClick}
+              targetMedia={targetMedia}
             />
           ))}
+
         </section>
       ))}
 
