@@ -44,5 +44,7 @@ Follow-back button, the row-structure refactor it requires, any follow mutation,
 
 ### Verification
 
-- New unit tests for `notificationThumbnail.ts` plus a batching test for the id-chunking helper; full suite must stay green.
-- Manual: like a post with an image, a post with a video, a text-only post, and a recommendation, then confirm the drawer shows correct previews and clean empty slots.
+- Unit tests for `notificationThumbnail.ts`: image item, Mux ready poster, Mux preparing/no poster, legacy video without `thumbnail_url` (must resolve to nothing), deleted media, empty media, malformed jsonb, missing row, invalid/non-http URL, recommendation with and without `image_url`.
+- Unit tests for the dedup/chunking helper: dedup across grouped rows, 200-id boundary, stable sorted chunk keys, empty input issues no query.
+- Manual: liked image post; liked video post with poster; text-only post; recommendation with image; comment, reply, mention and comment-like on a post with an image; deleted and RLS-hidden targets; account switch (no cross-account thumbnails).
+
