@@ -35,6 +35,8 @@ The overlay button is not an unlabelled hit area:
 - Tab reaches the row navigation and "Follow back" as two separate stops, each with a visible focus ring;
 - Enter/Space on the row opens the destination; Enter/Space on the button follows and does not navigate.
 
+**Stacking must be verified, not assumed.** The overlay spans the whole row, so the action slot sits in a higher-stacked sibling (`relative z-10` against the overlay's `absolute inset-0`) and the manual checks include clicking "Follow back" dead-centre to confirm the overlay isn't swallowing the press.
+
 Visual appearance, hover, unread tint and the 3.3A thumbnail stay unchanged.
 
 ## Prerequisite 2 — A single follow authority for the drawer
