@@ -135,6 +135,10 @@ export function useFollowBackState(
     [viewerId],
   );
 
+  // Live mirror of the signed-in id, readable from inside an async closure.
+  const supabaseViewerRef = useRef<string | null>(viewerId);
+  supabaseViewerRef.current = viewerId;
+
   const followBack = useCallback(
     (actorId: string) => {
       if (!actorId) return;
@@ -221,10 +225,6 @@ export function useFollowBackState(
       viewerId,
     ],
   );
-
-  // Live mirror of the signed-in id, readable from inside an async closure.
-  const supabaseViewerRef = useRef<string | null>(viewerId);
-  supabaseViewerRef.current = viewerId;
 
   // Drop optimistic overrides that belong to another account.
   const lastViewerRef = useRef<string | null>(viewerId);
