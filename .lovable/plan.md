@@ -68,15 +68,16 @@ Visual appearance, hover, unread tint and the 3.3A thumbnail stay unchanged.
 
 - New: `src/utils/notificationFollowBack.ts`, `src/utils/notificationFollowBack.test.ts`, `src/hooks/notifications/useFollowBackState.ts`.
 - Edited: `src/components/notifications/NotificationList.tsx` (row restructure + action slot), `vitest.config.ts`, `docs/NOTIFICATION_CENTER_ROADMAP.md`.
-- No database migration: `follows` already allows a self-authored insert under existing RLS.
+- No database migration: `follows` already allows a self-authored insert under existing RLS, and the unique `(follower_id, following_id)` index already exists (verified live).
 
 ## Manual checks
 
 1. Follow notification from someone you don't follow shows "Follow back"; clicking it flips to "Following" and the action is gone.
 2. Open that profile — it agrees, including follower/following counts, without a manual refresh.
-3. An actor you already follow shows "Following" or nothing, never "Follow back".
+3. An actor you already follow shows a muted "Following" status, never a "Follow back" button.
 4. Grouped follow rows and non-follow rows show no button.
-5. Clicking the row still navigates and marks read; clicking the button does neither.
-6. Keyboard: two separate Tab stops, visible focus rings, Enter/Space does the right thing on each.
+5. Clicking the row still navigates and marks read; clicking the button dead-centre does neither and is not swallowed by the overlay.
+6. Keyboard: two separate Tab stops, visible focus rings, Enter/Space does the right thing on each; "Following" is not a Tab stop.
 7. Unverified email → verification toast, no optimistic flip.
 8. Sign out or switch accounts mid-request → no stale toast, no leaked state.
+9. Double-click "Follow back" rapidly → one follow row in the database, one "Following" result, no error toast.
