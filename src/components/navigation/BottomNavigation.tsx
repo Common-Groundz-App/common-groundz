@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { isExploreRelatedRoute } from '@/utils/navigation';
 import { useCanonicalProfileUrl } from '@/hooks/useCanonicalProfileUrl';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 
 interface NavItem {
   name: string;
@@ -68,11 +69,7 @@ export const BottomNavigation = () => {
                     "h-5 w-5 mb-1",
                     item.primary && "text-brand-orange"
                   )} />
-                  {item.badge && item.badge > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                      {item.badge > 9 ? '9+' : item.badge}
-                    </span>
-                  )}
+                  <NotificationBadge count={item.badge} variant="overlay" />
                 </div>
                 <span className="text-xs">{item.name}</span>
               </button>

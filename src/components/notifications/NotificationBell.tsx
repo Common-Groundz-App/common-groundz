@@ -3,6 +3,7 @@ import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 
 /**
  * Notifications trigger. Renders no drawer of its own — it opens the single
@@ -30,14 +31,7 @@ export const NotificationBell: React.FC = () => {
       aria-label={badgeCount > 0 ? `Notifications, ${badgeCount} unread` : 'Notifications'}
     >
       <Bell className="h-5 w-5" />
-      {badgeCount > 0 && (
-        <span
-          aria-hidden="true"
-          className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white"
-        >
-          {badgeCount > 9 ? '9+' : badgeCount}
-        </span>
-      )}
+      <NotificationBadge count={unreadCount} variant="overlay" />
     </Button>
   );
 };
