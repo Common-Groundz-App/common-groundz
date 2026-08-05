@@ -55,6 +55,44 @@ interface NotificationListProps {
 
 
 /**
+ * Target preview (Phase 3.3A).
+ *
+ * Decorative and non-interactive: it lives inside the row's existing button so
+ * no nested interactive element is introduced (the row refactor stays in 3.3B).
+ * While a known target is still resolving the slot is reserved to avoid a
+ * layout shift; once it conclusively resolves to no media the slot disappears
+ * and the text column reclaims the width. No placeholder box is ever shown.
+ */
+function TargetThumbnail({ url, pending }: { url: string | null; pending: boolean }) {
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [url]);
+
+  if (url && !failed) {
+    return (
+      <img
+        src={getProxyUrlForImage(url)}
+        alt=""
+        aria-hidden="true"
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="h-10 w-10 shrink-0 rounded-md object-cover bg-muted"
+      />
+    );
+  }
+
+  // Reserve only while the answer is genuinely unknown.
+  if (pending && !failed) {
+    return <div aria-hidden="true" className="h-10 w-10 shrink-0 rounded-md bg-muted/40" />;
+  }
+
+  return null;
+}
+
+/**
  * One rendered group.
  *
  * Extracted into its own component so it can call `useProfile` for the first
@@ -69,9 +107,11 @@ interface NotificationListProps {
 function NotificationRow({
   group,
   onNotificationClick,
+  targetMedia,
 }: {
   group: NotificationGroup;
   onNotificationClick: (group: NotificationGroup, event: React.MouseEvent) => void;
+  targetMedia: NotificationTargetMedia;
 }) {
   const { representative } = group;
   const actorIdA = group.actorIds[0];
@@ -91,6 +131,12 @@ function NotificationRow({
   const timestamp = formatNotificationTime(representative.created_at);
   // Stacked avatars are capped at 3.
   const stackedActorIds = group.actorIds.slice(0, 3);
+  // An aggregated group shares one target, so this is one lookup per group.
+  const { url: thumbnailUrl, pending: thumbnailPending } = selectTargetThumbnail(
+    targetMedia,
+    representative,
+  );
+
 
   return (
     <button
