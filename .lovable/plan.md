@@ -1,34 +1,58 @@
-# Phase 3.3A.1 — Thumbnail polish
+# Phase 3.3B — Follow back
 
-Two questions, two different answers.
+## White poster: no change needed
 
-## 1. Mentions and comments: already covered, nothing to add
+Confirmed by you: the poster is a faithful frame of a video that genuinely opens on a white frame. The resolver behaved correctly, so nothing to fix. Phase 3.3A stays as-is.
 
-Thumbnail eligibility is already **target-based**, not type-based. Any row whose target is a post or a recommendation gets a preview — likes, comments, replies, mentions and comment-likes all qualify, because a comment-scoped row still carries `entity_type = 'post'` plus the parent post id.
+## Phase 3.3A verification (closed)
 
-Verified against live data: of 82 `comment` notifications pointing at posts, 32 target posts that actually have media. So comment rows without a thumbnail in your screenshot are text-only posts, not a gap in the feature.
+- `src/utils/notificationThumbnail.ts` — pure resolver, no Supabase/React imports, never returns a raw video URL, Mux goes through `image.mux.com`.
+- `src/utils/notificationThumbnail.test.ts` — registered in `vitest.config.ts`; whole suite green.
+- `src/hooks/notifications/useNotificationTargets.ts` — bounded chunked batches, `user.id` in the cache key, settled-chunk tracking so a slot never stays reserved.
+- `src/components/notifications/NotificationList.tsx` — decorative `aria-hidden` thumbnail, lazy/async, `onError` collapses the slot, read state moved beside the timestamp.
+- Roadmap marks 3.3A done and records the two 3.3B prerequisites.
 
-That is also the behaviour to keep: Instagram/X show a preview only when the target has visual content, and suppress the slot otherwise. Forcing a placeholder on text-only targets would add visual noise and would tell the user nothing. **No change here.**
+No leftovers, no dead code, no stale flags.
 
-## 2. White poster on non-Mux (raw) video uploads: fix it
+## What 3.3B adds
 
-Raw video uploads do get a stored `_poster.jpg` (client-generated at upload time), and `notificationThumbnail.ts` correctly accepts it as the only safe still for a legacy video. The problem is upstream: that poster is sometimes an effectively blank/white frame, so a valid-looking image URL renders as a white square.
+A "Follow back" action on follow notifications, so the user can reciprocate without leaving the drawer.
 
-The poster is produced in `src/utils/videoPoster.ts` by seeking to ~0.1s and drawing on the `seeked` event. On some codecs/browsers the frame is not decoded yet at that moment, so the canvas is drawn empty — which is the most likely cause, but it is **not yet confirmed**, so verification is step one.
+Rules:
+- Only on **single** follow rows (`entity_type = 'profile'`). Aggregated follow groups get no button.
+- Never for yourself, never for an actor whose profile can't be resolved (deleted account).
+- Tri-state: while follow state is unknown, no button is rendered (no flicker, no wrong label). Once known: "Follow back" if not following, and a plain non-interactive "Following" label if already following.
+- Optimistic on click, reverts with a toast on failure, and disabled while in flight.
 
-### Approach
+## Two prerequisites, handled first
 
-1. **Verify first** — inspect one of the existing non-Mux `_poster.jpg` files to confirm it is genuinely blank (uniform near-white) rather than a legitimately bright frame. This decides whether the rest is needed.
-2. **Notification-side guard (safe now, regardless of the cause):** in `src/utils/notificationThumbnail.ts`, stop treating a legacy (non-Mux) video poster as a thumbnail source, and resolve those rows to `null` — the slot then collapses and the row shows no preview instead of a white box. Mux videos keep using the deterministic `image.mux.com` thumbnail and are unaffected. Cover this with unit tests alongside the existing thumbnail tests.
-3. **Root fix for new uploads (only if step 1 confirms blank posters):** harden `generateVideoPoster` so it waits for a genuinely decoded frame — prefer `requestVideoFrameCallback` when available, otherwise a short retry/re-seek — and reject rather than upload a blank poster. This improves every surface that uses the poster (feed, lightbox, previews), not just notifications.
+**1. Row structure.** The row today is one big `<button>`; a button inside a button is invalid HTML and `stopPropagation` does not repair it. `NotificationRow` becomes a non-interactive container holding an absolutely-positioned overlay navigation button (the whole row surface) plus the action control as a sibling above it in stacking order. Visual appearance, hover, focus ring, unread tint and the existing thumbnail stay unchanged.
 
-Existing blank posters already in storage are not rewritten; step 2 makes them harmless in the notification drawer.
+**2. A single follow authority.** There is no cache-aware follow mutation today, and `useUserFollowing` swallows errors into `[]` — meaning "no error" and "not following" are indistinguishable, which is exactly what breaks a tri-state. A new hook `src/hooks/notifications/useFollowBackState.ts` owns this for the drawer:
+- one batched query of `follows` for the actor ids currently loaded (chunked, account-scoped cache key, same pattern as `useNotificationTargets`),
+- a real error state instead of an empty-array fallback,
+- one mutation that inserts the follow row and updates both its own cache and the existing `['user-following', userId]` cache so the rest of the app agrees immediately.
 
-## Why this split
+`useUserFollowing` is left untouched — no behaviour change elsewhere in this phase.
 
-Step 2 is small, reversible and removes the odd artefact immediately. Step 3 is the real cause but touches the upload pipeline, so it stays gated behind evidence and is kept separate from Phase 3.3A's scope.
+## Pure layer + tests
 
-## Technical notes
+`src/utils/notificationFollowBack.ts`:
+- `getFollowBackActorId(group, viewerId)` — returns the actor id when a group qualifies, otherwise `null` (covers aggregated groups, non-follow types, self-follow, missing actor).
+- `collectFollowBackActorIds(groups, viewerId)` — distinct, sorted ids for stable cache keys.
 
-- Files touched: `src/utils/notificationThumbnail.ts`, `src/utils/notificationThumbnail.test.ts`, and (conditionally) `src/utils/videoPoster.ts`.
-- No database changes, no changes to `NotificationList.tsx` — the empty-slot behaviour it already implements is what handles a `null` result.
+`src/utils/notificationFollowBack.test.ts` covers all of it, registered in `vitest.config.ts`.
+
+## Files
+
+- New: `src/utils/notificationFollowBack.ts`, `src/utils/notificationFollowBack.test.ts`, `src/hooks/notifications/useFollowBackState.ts`.
+- Edited: `src/components/notifications/NotificationList.tsx` (row restructure + action slot), `vitest.config.ts`, `docs/NOTIFICATION_CENTER_ROADMAP.md`.
+- No database migration: `follows` already carries the needed RLS for a self-authored insert.
+
+## Manual check after implementation
+
+1. A follow notification from someone you don't follow shows "Follow back"; clicking it flips to "Following" and the button no longer offers the action.
+2. Reopen the drawer and visit that profile — the follow state agrees in both places.
+3. Clicking anywhere else on the row still navigates to the profile; clicking the button does not navigate.
+4. Grouped follow rows and non-follow rows show no button.
+5. Keyboard: Tab reaches the row and the button separately, both with a visible focus ring.
