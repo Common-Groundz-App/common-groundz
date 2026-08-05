@@ -22,6 +22,7 @@ Rules:
 - Only on **single** follow rows (`entity_type = 'profile'`). Aggregated follow groups get no button.
 - Never for yourself, never for an actor whose profile can't be resolved (deleted account).
 - Tri-state: while follow state is unknown or errored, no button is rendered (no flicker, no wrong label). Once known: "Follow back" if not following, and a plain non-interactive "Following" label if already following.
+- "Following" reads as a **status, not a control**: muted `text-xs text-muted-foreground`, no border, no hover, no focus ring, not focusable. Only "Follow back" is a real button.
 - Optimistic on click, reverts with a toast on failure, disabled while in flight.
 - Clicking the button never navigates and never marks the row read; clicking anywhere else on the row keeps today's navigation + read behaviour exactly.
 
@@ -34,6 +35,8 @@ The overlay button is not an unlabelled hit area:
 - Tab reaches the row navigation and "Follow back" as two separate stops, each with a visible focus ring;
 - Enter/Space on the row opens the destination; Enter/Space on the button follows and does not navigate.
 
+**Stacking must be verified, not assumed.** The overlay spans the whole row, so the action slot sits in a higher-stacked sibling (`relative z-10` against the overlay's `absolute inset-0`) and the manual checks include clicking "Follow back" dead-centre to confirm the overlay isn't swallowing the press.
+
 Visual appearance, hover, unread tint and the 3.3A thumbnail stay unchanged.
 
 ## Prerequisite 2 — A single follow authority for the drawer
@@ -42,7 +45,7 @@ Visual appearance, hover, unread tint and the 3.3A thumbnail stay unchanged.
 
 - **Batched read.** One chunked, account-scoped query of `follows` for the actor ids currently loaded (same pattern as `useNotificationTargets`), exposing a real `unknown` / `error` state instead of an empty-array fallback.
 - **Gates, in this order.** `requireAuth()` first, then `canPerformAction('canFollowUsers')` with `showVerificationRequired(...)` — matching `use-follow.ts`. UX never depends on an RLS failure to explain itself.
-- **Duplicate is success.** If the row already exists (another surface followed first, or a double click), the unique-violation resolves to `Following` with no error toast.
+- **Duplicate is success.** If the row already exists (another surface followed first, or a double click), it resolves to `Following` with no error toast. **Verified against the live database:** `public.follows` carries `follows_follower_id_following_id_key`, a UNIQUE index on `(follower_id, following_id)`, so a duplicate insert genuinely conflicts rather than writing a second row. Codex only saw the separate non-unique `idx_follows_follower_following` in the migration files; the unique index is real and no migration is needed. The insert uses an explicit `onConflict: 'follower_id,following_id'` upsert, so idempotency is enforced at the database boundary rather than by catching an error code.
 - **Account safety.** Viewer id + account generation + actor id are captured before the read and before the mutation; stale results are discarded, pending state clears, and no toast fires after a sign-out or account switch.
 - **Cache + event fan-out.** On success: update the hook's own cache and `['user-following', userId]`, invalidate `['followers', actorId]` / `['following', viewerId]`, and dispatch the existing `follow-status-changed` window event with `action: 'follow'` — `use-viewed-profile.ts` and `profile/use-profile-follows.ts` listen for it, so profile counts cannot lag behind the drawer.
 
@@ -65,15 +68,16 @@ Visual appearance, hover, unread tint and the 3.3A thumbnail stay unchanged.
 
 - New: `src/utils/notificationFollowBack.ts`, `src/utils/notificationFollowBack.test.ts`, `src/hooks/notifications/useFollowBackState.ts`.
 - Edited: `src/components/notifications/NotificationList.tsx` (row restructure + action slot), `vitest.config.ts`, `docs/NOTIFICATION_CENTER_ROADMAP.md`.
-- No database migration: `follows` already allows a self-authored insert under existing RLS.
+- No database migration: `follows` already allows a self-authored insert under existing RLS, and the unique `(follower_id, following_id)` index already exists (verified live).
 
 ## Manual checks
 
 1. Follow notification from someone you don't follow shows "Follow back"; clicking it flips to "Following" and the action is gone.
 2. Open that profile — it agrees, including follower/following counts, without a manual refresh.
-3. An actor you already follow shows "Following" or nothing, never "Follow back".
+3. An actor you already follow shows a muted "Following" status, never a "Follow back" button.
 4. Grouped follow rows and non-follow rows show no button.
-5. Clicking the row still navigates and marks read; clicking the button does neither.
-6. Keyboard: two separate Tab stops, visible focus rings, Enter/Space does the right thing on each.
+5. Clicking the row still navigates and marks read; clicking the button dead-centre does neither and is not swallowed by the overlay.
+6. Keyboard: two separate Tab stops, visible focus rings, Enter/Space does the right thing on each; "Following" is not a Tab stop.
 7. Unverified email → verification toast, no optimistic flip.
 8. Sign out or switch accounts mid-request → no stale toast, no leaked state.
+9. Double-click "Follow back" rapidly → one follow row in the database, one "Following" result, no error toast.
