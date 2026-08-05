@@ -69,7 +69,7 @@ Visual appearance, hover, unread tint and the 3.3A thumbnail stay unchanged.
 
 - New: `src/utils/notificationFollowBack.ts`, `src/utils/notificationFollowBack.test.ts`, `src/hooks/notifications/useFollowBackState.ts`.
 - Edited: `src/components/notifications/NotificationList.tsx` (row restructure + action slot), `vitest.config.ts`, `docs/NOTIFICATION_CENTER_ROADMAP.md`.
-- No database migration: `follows` already allows a self-authored insert under existing RLS, and the unique `(follower_id, following_id)` index already exists (verified live).
+- One migration, non-behavioural: `CREATE UNIQUE INDEX IF NOT EXISTS follows_follower_id_following_id_key ON public.follows (follower_id, following_id)`. A no-op live; it makes the uniqueness guarantee reproducible from the repo. No policy, column or grant changes — `follows` already allows a self-authored insert under existing RLS.
 
 ## Manual checks
 
