@@ -189,16 +189,33 @@ export function NotificationDrawer() {
             onValueChange={setActiveTab}
             className="flex min-h-0 flex-1 flex-col"
           >
-            <div className="shrink-0 px-4 pt-2">
-              <TabsList className="w-full">
-                <TabsTrigger value="all" className="flex-1">All</TabsTrigger>
-                <TabsTrigger value="unread" className="flex-1">
-                  {/* Global count, not the loaded-page count — hidden entirely
-                      while the count is still unknown. */}
-                  Unread {unreadCount !== null && unreadCount > 0 && `(${unreadCount})`}
+            <div className="shrink-0 px-4">
+              {/* Underline tab bar — same treatment as the entity page tabs. */}
+              <TabsList className="flex h-auto w-full justify-start gap-1 rounded-none border-b border-border bg-transparent p-0">
+                <TabsTrigger
+                  value="all"
+                  className="flex-1 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-muted-foreground transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                >
+                  All
+                </TabsTrigger>
+                <TabsTrigger
+                  value="unread"
+                  className="flex-1 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium text-muted-foreground transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+                >
+                  <span className="flex items-center justify-center gap-2">
+                    Unread
+                    {/* Global count, not the loaded-page count — hidden entirely
+                        while the count is still unknown. */}
+                    {unreadCount !== null && unreadCount > 0 && (
+                      <Badge variant="secondary" className="h-5 px-1.5 py-0.5 text-xs">
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </span>
                 </TabsTrigger>
               </TabsList>
             </div>
+
 
             <TabsContent
               value="all"
