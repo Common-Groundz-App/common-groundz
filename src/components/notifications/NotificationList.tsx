@@ -26,6 +26,10 @@ import {
   type NotificationTargetMedia,
 } from "@/hooks/notifications/useNotificationTargets";
 import { getProxyUrlForImage } from "@/utils/imageUtils";
+import {
+  useFollowBackState,
+  type FollowBackState,
+} from "@/hooks/notifications/useFollowBackState";
 
 
 
@@ -413,6 +417,10 @@ export function NotificationList({
   // early returns so hook order stays stable.
   const targetMedia = useNotificationTargets(notifications);
 
+  // Phase 3.3B — one batched, account-scoped follow-state lookup for the follow
+  // rows currently loaded. Also runs before the early returns.
+  const followBack = useFollowBackState(groups);
+
 
   // Initial load only — background polling never renders skeletons over existing rows
 
@@ -481,6 +489,7 @@ export function NotificationList({
               group={group}
               onNotificationClick={onNotificationClick}
               targetMedia={targetMedia}
+              followBack={followBack}
             />
           ))}
 
