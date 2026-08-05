@@ -557,11 +557,7 @@ const Feed = React.memo(() => {
                 className="p-2 rounded-full hover:bg-accent relative"
               >
                 <Bell size={20} />
-                {(unreadCount ?? 0) > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                    {(unreadCount ?? 0) > 9 ? "9+" : unreadCount}
-                  </span>
-                )}
+                <NotificationBadge count={unreadCount} variant="overlay" />
               </button>
             )}
           </div>

@@ -171,11 +171,11 @@ export function VerticalTubelightNavbar({
                     >
                       <Icon size={18} strokeWidth={2.5} />
                       <span className="hidden xl:inline">{item.name}</span>
-                      {item.badge && (
-                        <span className="absolute right-2 top-2 xl:relative xl:right-auto xl:top-auto xl:ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-medium text-white">
-                          {item.badge}
-                        </span>
-                      )}
+                      <NotificationBadge
+                        count={item.badge}
+                        variant="inline"
+                        className="absolute right-2 top-2 xl:relative xl:right-auto xl:top-auto xl:ml-auto"
+                      />
                     </button>
                   ) : (
                     <Link 
