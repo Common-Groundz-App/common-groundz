@@ -129,14 +129,28 @@ function NotificationRow({
               {preview}
             </p>
           )}
-          {timestamp && (
-            <p className="text-[11px] text-muted-foreground/75 mt-1">{timestamp}</p>
-          )}
+          {/* Read state sits beside the timestamp so the right edge belongs to
+              the target thumbnail. The check keeps its own colour/size so
+              unread vs read stays obvious at a glance. */}
+          <div className="mt-1 flex items-center gap-1.5">
+            {timestamp && (
+              <span className="text-[11px] text-muted-foreground/75">{timestamp}</span>
+            )}
+            {group.isUnread ? (
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
+              />
+            ) : (
+              <Check aria-hidden="true" className="h-3 w-3 shrink-0 text-primary/50" />
+            )}
+          </div>
         </div>
-        {!group.isUnread && (
-          <Check className="w-4 h-4 text-primary/50 mt-1 shrink-0" />
-        )}
+        {/* Decorative preview of the CONTENT this notification points at.
+            Never the actor avatar, never notifications.image_url. */}
+        <TargetThumbnail url={thumbnailUrl} pending={thumbnailPending} />
       </div>
+
     </button>
   );
 }
