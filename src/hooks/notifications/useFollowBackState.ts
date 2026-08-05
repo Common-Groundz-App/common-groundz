@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +10,12 @@ import {
   collectFollowBackActorIds,
   getFollowBackActorId,
 } from '@/utils/notificationFollowBack';
+import {
+  FOLLOW_STATUS_CHANGED_EVENT,
+  dispatchFollowStatusChanged,
+  isUniqueViolation,
+  parseFollowStatusChanged,
+} from '@/utils/followEvents';
 import type { NotificationGroup } from '@/utils/notificationGrouping';
 
 /**
@@ -165,17 +171,24 @@ export function useFollowBackState(
         };
 
         try {
-          const { error } = await supabase
+          const { data, error } = await supabase
             .from('follows')
             .upsert(
               { follower_id: currentViewerId, following_id: actorId },
               // DO NOTHING, not DO UPDATE: `follows` has no UPDATE policy, and a
               // duplicate follow must not mutate the existing row's timestamp.
               { onConflict: 'follower_id,following_id', ignoreDuplicates: true },
-            );
-          if (error) throw error;
+            )
+            .select('follower_id');
+          // A residual race that still raises a unique violation is a success.
+          if (error && !isUniqueViolation(error)) throw error;
 
           if (!isSameAccount()) return;
+
+          // Zero returned rows == the follow already existed. State still
+          // resolves to "following", but nothing changed, so we must not
+          // announce it: count listeners treat every event as a +1.
+          const inserted = !error && (data ?? []).length > 0;
 
           queryClient.setQueryData<string[]>(['user-following', currentViewerId], (prev) =>
             prev ? (prev.includes(actorId) ? prev : [...prev, actorId]) : prev,
@@ -186,14 +199,15 @@ export function useFollowBackState(
           void queryClient.invalidateQueries({ queryKey: ['followers', actorId] });
           void queryClient.invalidateQueries({ queryKey: ['following', currentViewerId] });
 
-          // Non-react-query consumers (profile header counts) listen for this.
-          window.dispatchEvent(
-            new CustomEvent('follow-status-changed', {
-              detail: { follower: currentViewerId, following: actorId, action: 'follow' },
-            }),
-          );
-
-          toast({ title: 'Following', description: 'You are now following this user.' });
+          if (inserted) {
+            // Non-react-query consumers (profile header/button, counts) listen.
+            dispatchFollowStatusChanged({
+              follower: currentViewerId,
+              following: actorId,
+              action: 'follow',
+            });
+            toast({ title: 'Following', description: 'You are now following this user.' });
+          }
         } catch (error: any) {
           if (!isSameAccount()) return;
           setOptimistic((prev) => {
@@ -234,6 +248,28 @@ export function useFollowBackState(
     if (Object.keys(pending).length > 0) setPending({});
     inFlight.current = new Set();
   }
+
+  // Live sync: a follow/unfollow performed elsewhere (profile header) flips the
+  // matching drawer row immediately. Account-scoped: only the signed-in user's
+  // own actions matter, and the override is keyed by the target actor id.
+  useEffect(() => {
+    if (!viewerId) return;
+    const handler = (event: Event) => {
+      const detail = parseFollowStatusChanged(event);
+      if (!detail) return;
+      if (detail.follower !== viewerId) return;
+      if (detail.following === viewerId) return;
+      setOptimistic((prev) => ({
+        ...prev,
+        [detail.following]: detail.action === 'follow' ? 'following' : 'not_following',
+      }));
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-follow-back', viewerId],
+      });
+    };
+    window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+  }, [viewerId, queryClient]);
 
   return { getStatus, isPending, followBack, getActorId };
 }

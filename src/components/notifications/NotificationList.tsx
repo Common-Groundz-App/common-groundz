@@ -232,7 +232,7 @@ function NotificationRow({
               // has no unfollow path, so this must not look pressable/focusable.
               <span
                 aria-label="Following"
-                className="inline-flex h-7 items-center justify-center rounded-md bg-brand-orange/10 px-2.5 text-xs font-medium text-muted-foreground"
+                className="inline-flex h-7 items-center justify-center rounded-md bg-brand-orange/10 px-2.5 text-xs font-medium text-brand-orange"
               >
                 Following
               </span>
