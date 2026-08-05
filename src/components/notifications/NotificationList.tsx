@@ -425,8 +425,10 @@ export function NotificationList({
               key={group.key}
               group={group}
               onNotificationClick={onNotificationClick}
+              targetMedia={targetMedia}
             />
           ))}
+
         </section>
       ))}
 
