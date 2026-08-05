@@ -16,7 +16,7 @@ interface NotificationBadgeProps {
 }
 
 const VARIANT_CLASSES: Record<NotificationBadgeVariant, string> = {
-  overlay: 'absolute -top-1 -right-1 h-4 min-w-4 px-1 text-[10px]',
+  overlay: 'absolute -top-1.5 -right-1.5 h-4 min-w-4 px-1 text-[10px] ring-2 ring-background',
   inline: 'h-5 min-w-5 px-1.5 text-xs',
 };
 
