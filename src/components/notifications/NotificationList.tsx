@@ -20,6 +20,13 @@ import {
   partitionIntoSections,
 } from "@/utils/notificationSections";
 import { useProfile } from "@/hooks/use-profile-cache";
+import {
+  useNotificationTargets,
+  selectTargetThumbnail,
+  type NotificationTargetMedia,
+} from "@/hooks/notifications/useNotificationTargets";
+import { getProxyUrlForImage } from "@/utils/imageUtils";
+
 
 
 interface NotificationListProps {
