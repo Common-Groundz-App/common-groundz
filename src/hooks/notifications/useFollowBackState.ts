@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +10,12 @@ import {
   collectFollowBackActorIds,
   getFollowBackActorId,
 } from '@/utils/notificationFollowBack';
+import {
+  FOLLOW_STATUS_CHANGED_EVENT,
+  dispatchFollowStatusChanged,
+  isUniqueViolation,
+  parseFollowStatusChanged,
+} from '@/utils/followEvents';
 import type { NotificationGroup } from '@/utils/notificationGrouping';
 
 /**
