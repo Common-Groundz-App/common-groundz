@@ -3,6 +3,7 @@ import { useNotificationsContext } from '@/contexts/NotificationsContext';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Check, Loader2 } from 'lucide-react';
 import { OfflineInlineState } from '@/components/ui/OfflineInlineState';
 import { LastUpdatedIndicator } from '@/components/ui/LastUpdatedIndicator';
