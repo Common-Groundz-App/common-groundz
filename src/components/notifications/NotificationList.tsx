@@ -108,10 +108,12 @@ function NotificationRow({
   group,
   onNotificationClick,
   targetMedia,
+  followBack,
 }: {
   group: NotificationGroup;
   onNotificationClick: (group: NotificationGroup, event: React.MouseEvent) => void;
   targetMedia: NotificationTargetMedia;
+  followBack: FollowBackState;
 }) {
   const { representative } = group;
   const actorIdA = group.actorIds[0];
@@ -137,18 +139,34 @@ function NotificationRow({
     representative,
   );
 
+  // Phase 3.3B — single follow rows only; null for everything else.
+  const followBackActorId = followBack.getActorId(group);
+  const followStatus = followBack.getStatus(followBackActorId);
+  const followPending = followBack.isPending(followBackActorId);
+  const rowLabel = groupAriaLabel(group, names);
 
   return (
-    <button
-      onClick={(e) => onNotificationClick(group, e)}
-      aria-label={groupAriaLabel(group, names)}
+    // Phase 3.3B: the row is a plain container, NOT a button. The action slot can
+    // hold a real <button>, and a button inside a button would be invalid HTML.
+    <div
       className={cn(
-        "w-full text-left px-3 py-2.5 rounded-lg transition-all duration-200",
-        "hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+        "relative rounded-lg transition-all duration-200",
+        "hover:bg-accent/50 focus-within:bg-accent/40",
         group.isUnread && "bg-primary/5"
       )}
     >
-      <div className="flex items-start gap-3">
+      {/* Full-surface navigation control. Labelled from the row's own sentence so
+          it is never an unlabelled hit area, and it is its own Tab stop. */}
+      <button
+        type="button"
+        onClick={(e) => onNotificationClick(group, e)}
+        aria-label={`Open notification: ${rowLabel}`}
+        className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      />
+
+      {/* Content is pointer-transparent so clicks fall through to the overlay;
+          the action slot below re-enables pointer events for itself only. */}
+      <div className="pointer-events-none relative z-[1] flex items-start gap-3 px-3 py-2.5 text-left">
         {stackedActorIds.length > 0 ? (
           <div className="flex shrink-0 -space-x-2">
             {stackedActorIds.map((actorId) => (
@@ -199,12 +217,43 @@ function NotificationRow({
             )}
           </div>
         </div>
+
+        {/* Action slot. Stacked ABOVE the overlay (z-10 vs the overlay's z-0) and
+            pointer-events re-enabled, so a centre press lands on the button and
+            never navigates. Nothing renders while follow state is unknown. */}
+        {followBackActorId && followStatus !== 'unknown' && (
+          <div className="pointer-events-auto relative z-10 shrink-0 self-center">
+            {followStatus === 'following' ? (
+              // Status text, not a fake disabled button: not focusable, no border.
+              <span className="text-xs text-muted-foreground">Following</span>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-7 px-2.5 text-xs"
+                disabled={followPending}
+                aria-label={`Follow back ${names[0] ?? 'this user'}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  followBack.followBack(followBackActorId);
+                }}
+              >
+                {followPending ? (
+                  <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />
+                ) : (
+                  'Follow back'
+                )}
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Decorative preview of the CONTENT this notification points at.
             Never the actor avatar, never notifications.image_url. */}
         <TargetThumbnail url={thumbnailUrl} pending={thumbnailPending} />
       </div>
-
-    </button>
+    </div>
   );
 }
 
