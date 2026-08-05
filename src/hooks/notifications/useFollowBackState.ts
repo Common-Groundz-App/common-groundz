@@ -249,5 +249,27 @@ export function useFollowBackState(
     inFlight.current = new Set();
   }
 
+  // Live sync: a follow/unfollow performed elsewhere (profile header) flips the
+  // matching drawer row immediately. Account-scoped: only the signed-in user's
+  // own actions matter, and the override is keyed by the target actor id.
+  useEffect(() => {
+    if (!viewerId) return;
+    const handler = (event: Event) => {
+      const detail = parseFollowStatusChanged(event);
+      if (!detail) return;
+      if (detail.follower !== viewerId) return;
+      if (detail.following === viewerId) return;
+      setOptimistic((prev) => ({
+        ...prev,
+        [detail.following]: detail.action === 'follow' ? 'following' : 'not_following',
+      }));
+      void queryClient.invalidateQueries({
+        queryKey: ['notification-follow-back', viewerId],
+      });
+    };
+    window.addEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(FOLLOW_STATUS_CHANGED_EVENT, handler);
+  }, [viewerId, queryClient]);
+
   return { getStatus, isPending, followBack, getActorId };
 }
