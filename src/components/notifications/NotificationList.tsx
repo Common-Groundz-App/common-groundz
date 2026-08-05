@@ -359,6 +359,12 @@ export function NotificationList({
 
   const sections = useMemo(() => partitionIntoSections(groups, now), [groups, now]);
 
+  // One batched, account-scoped lookup for every distinct post/recommendation
+  // target currently loaded — not one request per row. Hook runs before the
+  // early returns so hook order stays stable.
+  const targetMedia = useNotificationTargets(notifications);
+
+
   // Initial load only — background polling never renders skeletons over existing rows
 
   if (loading && notifications.length === 0) {
