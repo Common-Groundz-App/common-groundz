@@ -520,7 +520,9 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
           </div>
         );
       })()}
+      </div>
     </div>
+
   );
 };
 
