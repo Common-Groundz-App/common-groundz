@@ -226,7 +226,7 @@ const PostView = () => {
             <div className="hidden xl:block col-span-1" />
 
             {/* Main content */}
-            <div className="col-span-1 xl:col-span-4 max-w-3xl w-full mx-auto">
+            <div className="col-span-1 xl:col-span-4 max-w-2xl w-full mx-auto px-0 sm:px-4">
               {isOwner && (
                 <MuxOwnerHint post={ownerPost} onReady={handleMuxReady} />
               )}
