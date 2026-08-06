@@ -160,7 +160,7 @@ const PostView = () => {
           canonical={isPublic ? `${window.location.origin}/post/${postId}` : undefined}
         />
         <GuestNavBar />
-        <div className="flex-1 container max-w-3xl mx-auto py-6 px-4">
+        <div className="flex-1 container max-w-3xl mx-auto py-6 px-0 sm:px-4">
           {isOwner && (
             <MuxOwnerHint post={ownerPost} onReady={handleMuxReady} />
           )}
