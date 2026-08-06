@@ -386,7 +386,7 @@ const PostDetailSidebar: React.FC<PostDetailSidebarProps> = ({
 }) => {
   if (loading) {
     return (
-      <div className="space-y-4 sticky top-4">
+      <div className="space-y-4 sticky top-20">
         <Card>
           <CardContent className="p-0">
             <Skeleton className="h-32 w-full rounded-t-lg" />
@@ -432,7 +432,7 @@ const PostDetailSidebar: React.FC<PostDetailSidebarProps> = ({
   }
 
   return (
-    <div className="space-y-4 sticky top-4">
+    <div className="space-y-4 sticky top-20">
       {/* Entity Card(s) — first */}
       {taggedEntities.length > 0 && (
         <EntityCard entity={taggedEntities[0]} />
