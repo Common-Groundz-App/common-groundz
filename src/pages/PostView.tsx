@@ -160,7 +160,7 @@ const PostView = () => {
           canonical={isPublic ? `${window.location.origin}/post/${postId}` : undefined}
         />
         <GuestNavBar />
-        <div className="flex-1 container max-w-3xl mx-auto py-6 px-4">
+        <div className="flex-1 container max-w-3xl mx-auto py-6 px-0 sm:px-4">
           {isOwner && (
             <MuxOwnerHint post={ownerPost} onReady={handleMuxReady} />
           )}
@@ -221,7 +221,7 @@ const PostView = () => {
 
         <div className="flex-1 pt-16 xl:pt-0 xl:ml-64 min-w-0">
           {/* Three-column grid on desktop */}
-          <div className="w-full mx-auto grid justify-center xl:grid-cols-7 gap-4 px-4 py-6">
+          <div className="w-full mx-auto grid justify-center xl:grid-cols-7 gap-4 px-0 sm:px-4 py-6">
             {/* Left spacer */}
             <div className="hidden xl:block col-span-1" />
 

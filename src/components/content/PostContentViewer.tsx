@@ -350,18 +350,20 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
   };
 
   return (
-    <div className="p-4 sm:p-6 overflow-y-auto max-h-full">
+    <div className="py-4 px-0 sm:p-6 overflow-y-auto max-h-full">
       {/* Back button */}
       {isDetailView && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
-          onClick={handleBack}
-        >
-          <ArrowLeft className="h-4 w-4 mr-1" />
-          Back
-        </Button>
+        <div className="px-4 sm:px-0">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
+            onClick={handleBack}
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+        </div>
       )}
 
       <PostFeedItem 
@@ -373,9 +375,12 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
         isDetailView={isDetailView}
       />
 
+      {/* Detail-only content — keeps readable side padding on mobile */}
+      <div className="px-4 sm:px-0">
       {/* Post Type Badge (detail view) */}
       {shouldShowTypeBadge(post.post_type ?? 'experience') && (
         <div className="mt-2 mb-1 px-1">
+
           <span
             className={cn(
               'inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none',
@@ -515,7 +520,9 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
           </div>
         );
       })()}
+      </div>
     </div>
+
   );
 };
 
