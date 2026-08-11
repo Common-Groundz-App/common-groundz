@@ -486,7 +486,11 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
             <div className={cn(hasTextAbove ? "mt-2" : "mt-2")}>
               {/* Post Title */}
               {hasTitle && (
-                <h3 className="font-semibold text-base mb-1">{post.title}</h3>
+                isDetailView ? (
+                  <h2 className="font-semibold text-base mb-1">{post.title}</h2>
+                ) : (
+                  <h3 className="font-semibold text-base mb-1">{post.title}</h3>
+                )
               )}
 
               {/* Post Content — only render when there is actual content */}
