@@ -350,19 +350,27 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
   };
 
   return (
-    <div className="py-4 px-0 sm:p-6 overflow-y-auto max-h-full">
-      {/* Back button */}
+    <div
+      className={cn(
+        'overflow-y-auto max-h-full',
+        isDetailView
+          ? 'pt-1 pb-4 px-0 sm:pt-2 sm:pb-6 sm:px-6'
+          : 'py-4 px-0 sm:p-6'
+      )}
+    >
+      {/* Compact detail header — icon-only back + page title */}
       {isDetailView && (
-        <div className="px-4 sm:px-0">
+        <div className="px-4 sm:px-0 mb-1 flex items-center gap-1">
           <Button
             variant="ghost"
-            size="sm"
-            className="mb-4 -ml-2 text-muted-foreground hover:text-foreground"
+            size="icon"
+            aria-label="Back"
+            className="h-10 w-10 -ml-2 rounded-full text-muted-foreground hover:text-foreground"
             onClick={handleBack}
           >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
+            <ArrowLeft className="h-5 w-5" />
           </Button>
+          <h1 className="text-lg font-bold leading-none">Post</h1>
         </div>
       )}
 
