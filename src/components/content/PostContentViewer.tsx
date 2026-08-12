@@ -311,7 +311,13 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6">
+      <div
+        className={cn(
+          isDetailView
+            ? 'pt-0 pb-4 px-0 sm:pt-2 sm:pb-6 sm:px-6'
+            : 'p-4 sm:p-6'
+        )}
+      >
         <FeedSkeleton count={1} />
       </div>
     );
@@ -354,13 +360,13 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
       className={cn(
         'overflow-y-auto max-h-full',
         isDetailView
-          ? 'pt-1 pb-4 px-0 sm:pt-2 sm:pb-6 sm:px-6'
+          ? 'pt-0 pb-4 px-0 sm:pt-2 sm:pb-6 sm:px-6'
           : 'py-4 px-0 sm:p-6'
       )}
     >
       {/* Compact detail header — icon-only back + page title */}
       {isDetailView && (
-        <div className="px-4 sm:px-0 mb-1 flex items-center gap-1">
+        <div className="px-4 sm:px-0 mb-0 flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
