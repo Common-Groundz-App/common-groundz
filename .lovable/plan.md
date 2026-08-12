@@ -1,39 +1,49 @@
-# Mobile edge-to-edge: feed vs post detail
+# Post detail: the side bars come from the grid, not the media
 
-## What the code actually says
+## The real cause (visible in your DevTools shots)
 
-The card geometry on the two pages is already identical — I compared them line by line:
+In `inspect_1.png` the selected grid container measures **425 × 1151 with padding `24px 0px`** — so the page container itself is full width with zero horizontal padding. The inset starts one level in, at the main column. That matches the class strings:
 
-| | Feed (`src/pages/Feed.tsx:618/625`) | Detail (`src/pages/PostView.tsx:224/229`) |
-|---|---|---|
-| Grid container | `grid … gap-4 px-0 sm:px-4 py-6` | same |
-| Main column | `max-w-2xl w-full mx-auto px-0 sm:px-4` | same |
-| Viewer wrapper | n/a | `pt-1 pb-4 px-0 sm:…` (no mobile side padding) |
-| Card | `rounded-none border-x-0`, `CardContent px-3 sm:px-4` | same component, same classes |
+`src/pages/PostView.tsx:224`
+```
+w-full mx-auto grid justify-center xl:grid-cols-7 gap-4 px-0 sm:px-4 py-6
+```
 
-So on mobile both pages give the post card the full viewport width with the same internal `px-3` (12px) gutter. There is no extra inset coded into the detail page.
+Below `xl` there is **no** column definition, so the grid has a single implicit column. `justify-center` sets `justify-content: center` on the grid, and an implicit track is `auto`-sized — it is sized to its content and then centered, instead of stretching to the container. The main column's `w-full` resolves to 100% *of that shrunk track*, not of the viewport. Result: symmetric empty bars on both sides, exactly what the green/dashed overlays show.
 
-## Why the screenshots still look different
+This explains every observation you reported:
 
-Two candidates, and I have not confirmed which is in play:
+- It happens for portrait video, landscape video, images, and posts with no media at all — because the track width follows whatever the widest child happens to be, not the media.
+- The mobile header is unaffected, because it is outside this grid.
+- The feed uses the same grid classes but *looks* edge-to-edge, because its column also contains the full-width "For You / Following" tab bar and page heading, which push the auto track out to (or near) the container width. The detail page has no such wide child, so its track collapses.
 
-1. **The media, not the card.** `PostMediaDisplay` sizes single media by orientation (`max-h-[600px]` for portrait, `max-h-[400px]` for landscape) with `objectFit="contain"`. In the feed shot the poster frame is landscape and fills the card; in the detail shot it is a tall/portrait frame, so height capping leaves visible side gutters — the video looks narrower even though the card is the same width.
-2. **Capture conditions.** In your two images the app header logo also sits at a different distance from the screen edge, and the header markup is byte-identical on both pages. That can only happen if the shots were taken at different zoom/device/scale — so part of the perceived difference is likely not CSS at all.
+So Codex is right that this is not a media issue and not a shared `FeedCollage` problem — and it is also not merely capture conditions. The card genuinely is narrower than the column on the detail page.
 
-## Recommendation
+## The fix
 
-Keep the card padding as-is: it already matches the feed exactly, and dropping the `px-3` gutter would make text touch the screen edge, which reads worse than the feed, not better.
+`src/pages/PostView.tsx`, logged-in layout grid container (line 224): define the single-column track explicitly so it fills the width.
 
-Proposed work, in order:
+```
+w-full mx-auto grid grid-cols-1 justify-center xl:grid-cols-7 gap-4 px-0 sm:px-4 py-6
+```
 
-1. **Measure first.** Screenshot feed and detail for the same post at a single fixed 390px viewport and print the computed left/right offsets of the card, the avatar, and the media element. This settles cause 1 vs cause 2 with numbers instead of impressions.
-2. **If the media is the cause (expected):** make single-item media in a post card fill the card's content width on mobile — set the media box to `w-full` with the orientation cap applied to height only, so a portrait video letterboxes vertically instead of shrinking horizontally. This change lives in `PostMediaDisplay` and would apply to both feed and detail identically, keeping the two surfaces in sync.
-3. **If the numbers come back identical:** no code change — the difference was capture scale, and I'll show you the measured proof.
+`grid-cols-1` makes the below-`xl` track `minmax(0, 1fr)`, so it stretches to the container. The main column's existing `max-w-2xl w-full mx-auto` then centers the card within that full-width track exactly as the feed does, and the card's own `px-3` gutter is untouched.
 
-## Explicitly not changing
+Desktop is unchanged: `xl:grid-cols-7` still wins at `xl`, and `justify-center` keeps doing its job for the 7-column layout.
 
-Card gutters (`px-3 sm:px-4`), page grid padding, desktop widths, the sidebar sticky offset, the header row, and comments layout.
+## Feed parity
+
+`src/pages/Feed.tsx:618` has the same latent bug — it is masked only because its column happens to hold wide children. Add the same `grid-cols-1` there so the two surfaces are structurally identical and the feed can't regress if its tab bar ever changes. No visual change expected on the feed.
+
+## Not changing
+
+`FeedCollage` / `PostMediaDisplay` sizing (portrait media stays as designed — the `287px` / `408px` / `518px` caps are intentional and any change there is a separate app-wide decision), the card's `px-3 sm:px-4` gutter, the guest layout, desktop widths, the sidebar sticky offset, and the header row.
 
 ## Verification
 
-Same post, same 390px viewport, feed vs detail: card edges, avatar left edge, and media left/right edges must match to the pixel. Re-check desktop to confirm nothing shifted there.
+At 425px (your DevTools width) and 390px, on the detail page:
+
+1. The main column div and the post card both report the same width as the grid container (425px), with `left: 0`.
+2. Compare the same post on `/home` — avatar left edge and card edges match to the pixel.
+3. Confirm a post with no media and a post with a landscape image both go full width.
+4. Re-check `xl` desktop: three-column layout and card width unchanged.
