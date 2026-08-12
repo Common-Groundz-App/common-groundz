@@ -380,7 +380,7 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
       role={!isDetailView ? "link" : undefined}
       tabIndex={!isDetailView ? 0 : undefined}
     >
-      <CardContent className="px-3 sm:px-4 pt-2 pb-1 sm:pb-2">
+      <CardContent className={cn('px-3 sm:px-4 pb-1 sm:pb-2', isDetailView ? 'pt-0' : 'pt-2')}>
         {/* User Info and Post Meta */}
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3" onClick={e => e.stopPropagation()}>
