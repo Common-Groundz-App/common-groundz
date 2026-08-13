@@ -149,5 +149,10 @@ export const useComposerFocusRegion = (
     });
   }, [enabled, id, deactivate]);
 
-  return { ref: containerRef, onFocusCapture, onBlurCapture };
+  return {
+    ref: containerRef,
+    onFocusCapture,
+    onBlurCapture,
+    isActive: enabled && activeIds.has(id),
+  };
 };
