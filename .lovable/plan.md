@@ -1,55 +1,77 @@
-# Hide the bottom tab bar while a comment composer is focused (revised)
+# Hide the bottom tab bar while a comment composer is focused (v3)
 
-Both reviews are right, and the revised approach is better than my first draft. Adopting all of it: mobile-only, centralized composer-activity state instead of per-textarea boolean events, `null` render instead of visual hiding, defensive resets, and no `scrollIntoView` in the first pass.
+Both follow-up reviews are right on all counts. Folding in the breakpoint mismatch, the submit-with-retained-focus problem, instance-safe ids, and the guest-auth ordering detail.
 
 ## Why the current behaviour looks broken
 
-`BottomNavigation` is `fixed bottom-0`. When the keyboard opens, mobile browsers expose a smaller visual viewport, so the fixed tab bar lands immediately above the keyboard and competes with the comment row (which is a normal in-flow element, not a docked composer). Three interaction layers stack up, the composer gets squeezed, and a mis-tap on a tab discards what was typed. Polished social apps prioritise the active writing surface and hide the tab bar during composition.
+`BottomNavigation` is `fixed bottom-0`. When the keyboard opens, the browser exposes a smaller visual viewport, so the tab bar lands directly above the keyboard and competes with the in-flow comment row. Three layers stack, the composer is squeezed, and a mis-tap on a tab discards what was typed. Polished social apps prioritise the active writing surface and hide the tab bar during composition.
 
 ## Approach
 
-### 1. One composer-activity source of truth
+### 1. Router-scoped composer-activity context
 
-New `src/contexts/ComposerFocusContext.tsx` (provider mounted in `App.tsx` alongside the existing providers):
+New `src/contexts/ComposerFocusContext.tsx`, mounted in `App.tsx` **inside** `<Router>` (it uses `useLocation`) and around the routes:
 
-- Holds a `Set<string>` of active composer ids; exposes `isComposerActive`, plus `activate(id)` / `deactivate(id)`.
-- Ref-count semantics, so main → reply → edit transitions never report "inactive" while another composer holds focus.
-- Resets the set on `location.pathname` change and on provider-level cleanup.
+- Holds a `Set<string>` of active composer region ids — active-source semantics, idempotent `activate(id)` / `deactivate(id)`, not a counter.
+- Exposes `isComposerActive` plus the two actions.
+- Clears the whole set on `location.pathname` change (defensive, so the nav can never stay hidden across navigation).
 
-Hook `useComposerFocusRegion(id)` returns props for the **composer container**, not each textarea: `onFocusCapture` → `activate(id)`, `onBlurCapture` → deferred check with `requestAnimationFrame`; if `document.activeElement` is still inside the container, stay active. This is what makes focus moving into the mention popup, the send button, or reply controls a no-op. `useEffect` cleanup calls `deactivate(id)` on unmount.
+Hook `useComposerFocusRegion(id)` returns props for the **composer container**:
 
-Mobile-only: the hook only activates when `useIsMobile()` is true, so desktop/tablet behaviour is byte-identical to today.
+- `onFocusCapture` → `activate(id)`, but only when the focus target is an actual editable element inside the region, so a click on a wrapper doesn't activate.
+- `onBlurCapture` → deferred check via `requestAnimationFrame`; if `document.activeElement` is still inside the container ref, stay active, otherwise `deactivate(id)`. This is what makes focus moving into the send button or reply controls a no-op.
+- `useEffect` cleanup → `deactivate(id)` on unmount, which is how reply/edit rows (removed from the DOM on cancel/save) release naturally.
 
-### 2. Wire the composer regions
+### 2. No viewport gate — align with the nav's own breakpoint
 
-`src/components/comments/InlineCommentThread.tsx` — wrap the three composer regions with the region props:
+Dropping `useIsMobile()`: it flips at 768px while `BottomNavigation` is `xl:hidden` (1280px), which would leave 768–1279px tablets with the original awkward behaviour. The context tracks focus with no viewport logic; `BottomNavigation` alone decides, and since it is already CSS-hidden above `xl`, no extra gate is needed.
 
-- main comment row (`id: 'comment-main'`)
-- reply row (`id: 'comment-reply'`)
-- edit row inside `CommentItem` (`id: 'comment-edit'`), driven from the thread since the edit state lives there
+### 3. Instance-safe region ids
 
-Explicit `deactivate` calls after submit, after reply cancel, and after edit cancel/save, so the nav returns even if focus is retained. `requireAuth()` stays the first statement in the existing `onFocus` handler — unchanged.
+- main composer: `comment-main:${postId}`
+- reply composer: `comment-reply:${parentCommentId}`
+- edit composer: `comment-edit:${comment.id}`
 
-### 3. Bottom navigation consumes it
+No hardcoded global ids, so two concurrently mounted threads (dialog, nested surface, retained route) can't collide.
 
-`src/components/navigation/BottomNavigation.tsx` — read `isComposerActive` and `return null` when true. Returning `null` (rather than `hidden`) also removes it from the tab order and the accessibility tree, so a screen-reader or hardware-keyboard user can't land on a tab that isn't visible. The page-level `pb-[calc(4rem+...)]` in `PostView.tsx` stays as is — removing it dynamically would make the page jump.
+### 4. Submit keeps the composer active while the textarea stays focused
 
-### 4. No scroll correction yet
+The current main submit path clears the text but does not blur. Explicitly deactivating there would pop the tab bar back above a still-open keyboard, and no new focus event would ever re-hide it. So: **no explicit deactivate on submit** — the region stays active as long as focus stays inside, which also lets the user post a second comment without reopening the keyboard. Cancel/save on reply and edit release through unmount cleanup; explicit `deactivate` is only a defensive fallback there, never a competing source of truth.
 
-iOS already scrolls a focused input into view. Adding a smooth scroll fights the keyboard animation. Deferring this; if real-device testing still shows the composer clipped, we add a conditional, measurement-gated nudge (`block: 'nearest'`, mobile only, after `requestAnimationFrame`) as a follow-up.
+### 5. Guest auth ordering
+
+React capture handlers run before the target's own `onFocus`, so `requireAuth()` in the existing textarea handler would fire *after* activation and leave the nav hidden behind the auth prompt. The region's focus handler therefore checks the signed-in state before activating, and the existing `requireAuth()` stays the first statement in the textarea's `onFocus` — unchanged.
+
+### 6. Consume it in the nav
+
+`src/components/navigation/BottomNavigation.tsx` reads `isComposerActive` and returns `null` when true — this also removes it from pointer, tab order, and the accessibility tree, unlike a visual `hidden`. The page-level `pb-[calc(4rem+...)]` in `PostView.tsx` stays, so nothing jumps.
+
+### 7. No scroll correction in this pass
+
+iOS already scrolls the focused input into view; an extra smooth scroll fights the keyboard animation. If real-device testing still shows clipping, we add a measurement-gated nudge (`block: 'nearest'`, after `requestAnimationFrame`) as a follow-up.
+
+## Files touched
+
+- `src/contexts/ComposerFocusContext.tsx` (new — provider + `useComposerFocusRegion`)
+- `src/App.tsx` (mount provider inside `<Router>`)
+- `src/components/comments/InlineCommentThread.tsx` (wire main / reply / edit regions)
+- `src/components/comments/CommentItem.tsx` (accept region props for the edit row)
+- `src/components/navigation/BottomNavigation.tsx` (return `null` while active)
+- Unit tests for the context: overlapping regions, idempotent activate/deactivate, route reset, unmount cleanup.
 
 ## Explicitly unchanged
 
 Viewport meta, the 16px mobile textarea font fix, comment behaviour, mention autocomplete, layout widths, and padding.
 
-## Verification (mobile Safari + iOS Chrome)
+## Verification (physical iOS/iPadOS, Safari + Chrome)
 
-1. Tap the main comment box → tab bar disappears, composer visible above keyboard.
+1. Tap the main comment box → tab bar disappears; composer visible above keyboard.
 2. Dismiss keyboard / tap elsewhere → tab bar returns.
-3. Submit a comment → tab bar returns.
-4. Tap Reply, then a comment's Edit → tab bar hides in both.
-5. Move between main / reply / edit fields → no flicker of the tab bar.
-6. Type `@` → mention autocomplete opens and selecting a name does not restore the tab bar mid-typing.
-7. Guest tap on the composer → auth prompt appears, tab bar not stuck hidden.
+3. Submit a comment with focus retained → tab bar stays hidden, keyboard stays open, typing again works; dismissing the keyboard restores the nav.
+4. Reply composer and a comment's Edit composer → tab bar hides in both; cancel restores it.
+5. Move between main / reply / edit regions → no flicker.
+6. Type `@` → autocomplete opens and selecting a name does not restore the tab bar.
+7. Guest tap on the composer → auth prompt appears and the tab bar is never hidden.
 8. Navigate to Home while a composer was focused → tab bar present on the new page.
-9. Desktop and tablet: no visible change.
+9. iPad at ~1024px width → same suppression as phone (this is the breakpoint fix).
+10. Desktop above `xl` → no change.
