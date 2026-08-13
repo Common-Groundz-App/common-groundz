@@ -66,6 +66,7 @@ export default defineConfig({
           // (e.g. LightboxPreview.handoff.test.tsx) with no executable tests.
           include: [
             'src/contexts/ComposerFocusContext.test.tsx',
+            'src/hooks/useSoftwareKeyboardOpen.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
           ],
         },
