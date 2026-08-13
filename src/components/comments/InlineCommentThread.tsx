@@ -52,7 +52,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   itemId,
   itemType,
   highlightCommentId,
-  autoFocusInput = false,
+  
   onCommentCountChange,
 }) => {
   const [comments, setComments] = useState<CommentData[]>([]);
