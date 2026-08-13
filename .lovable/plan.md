@@ -134,6 +134,8 @@ Temporary console instrumentation only during physical testing — no debug UI, 
 - Bottom padding is one combined value, not stacked utilities: docked with keyboard → `pb-2`; docked without a software keyboard → `pb-[calc(0.5rem+env(safe-area-inset-bottom))]`. No reliance on generated CSS order.
 - The mention popover gets an explicitly higher tier than the docked bar (bar `z-50`, popover above it) rather than depending on DOM order at equal `z-50`.
 - `PostView.tsx` bottom padding is left untouched unless measurement proves it causes a visible issue.
+- The composed ref (region ref + measurement ref) is memoized, so React never repeatedly detaches and reattaches the shell or its `ResizeObserver`.
+- The measured shell includes its top border, vertical padding, textarea growth, and any safe-area padding applied to the shell — the same box that becomes fixed.
 
 ## Technical notes
 
