@@ -64,7 +64,7 @@ export const ComposerFocusProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [location.pathname]);
 
   const value = useMemo<ComposerFocusContextValue>(
-    () => ({ isComposerActive: activeIds.size > 0, activate, deactivate }),
+    () => ({ isComposerActive: activeIds.size > 0, activeIds, activate, deactivate }),
     [activeIds, activate, deactivate]
   );
 
