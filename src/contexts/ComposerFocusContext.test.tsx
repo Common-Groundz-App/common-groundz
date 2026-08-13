@@ -53,16 +53,18 @@ const Composer = ({
   enabled?: boolean;
   label?: string;
 }) => {
-  const region = useComposerFocusRegion(id, { enabled });
+  const { isActive, ...region } = useComposerFocusRegion(id, { enabled });
   return (
     <div {...region}>
       <textarea aria-label={`${label}-input`} />
       <button type="button" aria-label={`${label}-send`}>
         send
       </button>
+      <span data-testid={`${label}-active`}>{isActive ? 'active' : 'idle'}</span>
     </div>
   );
 };
+
 
 const renderApp = (ui: React.ReactNode) =>
   render(
@@ -109,10 +111,31 @@ describe('ComposerFocusContext', () => {
     expect(screen.queryByTestId('nav')).toBeNull();
   });
 
+  it('exposes isActive for the focused region only', () => {
+    renderApp(
+      <>
+        <Composer id="a" label="one" />
+        <Composer id="b" label="two" />
+      </>
+    );
+    expect(screen.getByTestId('one-active').textContent).toBe('idle');
+    expect(screen.getByTestId('two-active').textContent).toBe('idle');
+
+    focus(screen.getByLabelText('one-input'));
+    expect(screen.getByTestId('one-active').textContent).toBe('active');
+    expect(screen.getByTestId('two-active').textContent).toBe('idle');
+  });
+
+  it('never reports isActive for a disabled (guest) region', () => {
+    renderApp(<Composer id="a" enabled={false} label="guest" />);
+    focus(screen.getByLabelText('guest-input'));
+    expect(screen.getByTestId('guest-active').textContent).toBe('idle');
+  });
+
   it('stays active while the textarea keeps focus after submit', () => {
     // Submitting clears text without blurring; the nav must not flash back.
     const Submitting = () => {
-      const region = useComposerFocusRegion('main');
+      const { isActive, ...region } = useComposerFocusRegion('main');
       const [value, setValue] = useState('hi');
       return (
         <div {...region}>
@@ -120,6 +143,7 @@ describe('ComposerFocusContext', () => {
           <button type="button" aria-label="submit" onClick={() => setValue('')}>
             post
           </button>
+          <span data-testid="main-active">{isActive ? 'active' : 'idle'}</span>
         </div>
       );
     };

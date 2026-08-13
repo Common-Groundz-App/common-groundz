@@ -22,12 +22,16 @@ import { useLocation } from 'react-router-dom';
  */
 interface ComposerFocusContextValue {
   isComposerActive: boolean;
+  activeIds: Set<string>;
   activate: (id: string) => void;
   deactivate: (id: string) => void;
 }
 
+const EMPTY_IDS: Set<string> = new Set();
+
 const ComposerFocusContext = createContext<ComposerFocusContextValue>({
   isComposerActive: false,
+  activeIds: EMPTY_IDS,
   activate: () => {},
   deactivate: () => {},
 });
@@ -60,7 +64,7 @@ export const ComposerFocusProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [location.pathname]);
 
   const value = useMemo<ComposerFocusContextValue>(
-    () => ({ isComposerActive: activeIds.size > 0, activate, deactivate }),
+    () => ({ isComposerActive: activeIds.size > 0, activeIds, activate, deactivate }),
     [activeIds, activate, deactivate]
   );
 
@@ -87,6 +91,14 @@ export interface ComposerFocusRegionProps {
 }
 
 /**
+ * DOM props plus this region's own activity flag. `isActive` is NOT a DOM prop,
+ * so consumers must destructure it out before spreading onto an element.
+ */
+export interface ComposerFocusRegion extends ComposerFocusRegionProps {
+  isActive: boolean;
+}
+
+/**
  * Returns props for a composer *container*. Focus moving between the textarea,
  * the send button, or any other control inside the container keeps the region
  * active — only focus leaving the container releases it.
@@ -94,9 +106,9 @@ export interface ComposerFocusRegionProps {
 export const useComposerFocusRegion = (
   id: string,
   options?: { enabled?: boolean }
-): ComposerFocusRegionProps => {
+): ComposerFocusRegion => {
   const enabled = options?.enabled !== false;
-  const { activate, deactivate } = useComposerFocus();
+  const { activate, deactivate, activeIds } = useComposerFocus();
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
 
@@ -137,5 +149,10 @@ export const useComposerFocusRegion = (
     });
   }, [enabled, id, deactivate]);
 
-  return { ref: containerRef, onFocusCapture, onBlurCapture };
+  return {
+    ref: containerRef,
+    onFocusCapture,
+    onBlurCapture,
+    isActive: enabled && activeIds.has(id),
+  };
 };

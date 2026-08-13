@@ -1,6 +1,8 @@
 
-import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
 import { useComposerFocusRegion } from '@/contexts/ComposerFocusContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useSoftwareKeyboardOpen } from '@/hooks/useSoftwareKeyboardOpen';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,6 +110,59 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     `${regionBase}:edit:${editingCommentId ?? 'none'}`,
     { enabled: composerEnabled }
   );
+
+  // `isActive` is not a DOM prop — strip it before spreading onto elements.
+  const { isActive: isMainComposerActive, ref: mainRegionRef, ...mainRegionHandlers } = mainRegion;
+  const { isActive: _replyActive, ...replyRegionProps } = replyRegion;
+  const { isActive: _editActive, ...editRegionProps } = editRegion;
+
+  /**
+   * Facebook-style docking: while the main composer is focused below `xl`, the
+   * composer shell becomes `fixed bottom-0` so it sits flush above the
+   * keyboard, and an equally tall spacer holds its place in the flow.
+   */
+  const viewportBelowXl = useIsMobile(1280);
+  const softwareKeyboardOpen = useSoftwareKeyboardOpen({ editableActive: isMainComposerActive });
+  const isMainComposerDocked = isMainComposerActive && viewportBelowXl;
+
+  const [composerShellHeight, setComposerShellHeight] = useState(0);
+  const composerShellRef = useRef<HTMLDivElement | null>(null);
+
+  // Compose the focus-region ref with our measurement ref. Memoized so React
+  // never detaches/reattaches the shell (and its ResizeObserver) on re-render.
+  const composerShellRefCallback = useCallback(
+    (node: HTMLDivElement | null) => {
+      composerShellRef.current = node;
+      (mainRegionRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    },
+    [mainRegionRef]
+  );
+
+  // Observe from mount, while still in flow, so a valid height exists before
+  // focus triggers docking. Zero/missing measurements are ignored so transition
+  // frames can never collapse the spacer.
+  useEffect(() => {
+    const node = composerShellRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const applyHeight = () => {
+      const height = Math.round(node.getBoundingClientRect().height);
+      if (height > 0) {
+        setComposerShellHeight((prev) => (prev === height ? prev : height));
+      }
+    };
+    applyHeight();
+    const observer = new ResizeObserver(applyHeight);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  // Belt-and-braces top-up across the flow/fixed transition.
+  useLayoutEffect(() => {
+    const node = composerShellRef.current;
+    if (!node) return;
+    const height = Math.round(node.getBoundingClientRect().height);
+    if (height > 0) setComposerShellHeight((prev) => (prev === height ? prev : height));
+  }, [isMainComposerDocked]);
 
 
 
@@ -687,7 +742,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                 onEditSave={handleEditSave}
                 onEditContentChange={setEditCommentContent}
                 {...editMentionProps(group.comment.id)}
-                editRegionProps={editRegion}
+                editRegionProps={editRegionProps}
                 onDeleteClick={handleDeleteClick}
                 onReplyClick={handleReplyClick}
                 onLikeClick={handleLikeClick}
@@ -722,7 +777,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                         onEditSave={handleEditSave}
                         onEditContentChange={setEditCommentContent}
                         {...editMentionProps(reply.id)}
-                        editRegionProps={editRegion}
+                        editRegionProps={editRegionProps}
                         onDeleteClick={handleDeleteClick}
                         onReplyClick={handleReplyClick}
                         onLikeClick={handleLikeClick}
@@ -768,7 +823,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                             onEditSave={handleEditSave}
                             onEditContentChange={setEditCommentContent}
                             {...editMentionProps(reply.id)}
-                        editRegionProps={editRegion}
+                        editRegionProps={editRegionProps}
                             onDeleteClick={handleDeleteClick}
                             onReplyClick={handleReplyClick}
                             onLikeClick={handleLikeClick}
@@ -784,7 +839,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
               {/* Inline reply input */}
               {replyingTo && (replyingTo.id === group.comment.id || group.replies.some(r => r.id === replyingTo.id)) && (
-                <div className="ml-6 p-3" {...replyRegion}>
+                <div className="ml-6 p-3" {...replyRegionProps}>
                   <div className="text-xs text-muted-foreground mb-2">
                     Replying to <span className="font-medium text-foreground">@{replyingTo.username}</span>
                   </div>
@@ -862,9 +917,31 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
         </div>
       )}
 
+      {/* Height-preserving placeholder while the composer is docked */}
+      {isMainComposerDocked && (
+        <div aria-hidden="true" style={{ height: composerShellHeight || undefined }} />
+      )}
+
       {/* Comment Input */}
-      <div className="border-t border-border mt-4 pt-4" {...mainRegion}>
-        <div className="flex gap-3 items-center relative">
+      <div
+        className={cn(
+          'border-t border-border bg-background',
+          isMainComposerDocked
+            ? [
+                'fixed inset-x-0 bottom-0 z-50 pt-2',
+                softwareKeyboardOpen ? 'pb-2' : 'pb-[calc(0.5rem+env(safe-area-inset-bottom))]',
+              ]
+            : 'mt-4 pt-4'
+        )}
+        ref={composerShellRefCallback}
+        {...mainRegionHandlers}
+      >
+        <div
+          className={cn(
+            'flex gap-3 items-center relative',
+            isMainComposerDocked && 'max-w-2xl mx-auto px-4'
+          )}
+        >
           <Avatar className="h-8 w-8 flex-shrink-0">
             {user ? (
               <>
