@@ -29,7 +29,6 @@ interface InlineCommentThreadProps {
   itemId: string;
   itemType: 'recommendation' | 'post';
   highlightCommentId?: string | null;
-  autoFocusInput?: boolean;
   onCommentCountChange?: (count: number) => void;
 }
 
