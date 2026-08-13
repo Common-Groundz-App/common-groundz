@@ -84,9 +84,11 @@ afterEach(() => {
 });
 
 describe('useSoftwareKeyboardOpen', () => {
-  it('samples synchronously and reports closed while unfocused', () => {
+  it('samples synchronously and reports unknown while unfocused', () => {
     const { getByTestId } = render(<Probe active={false} />);
     expect(getByTestId('state').textContent).toBe('closed');
+    // Inactive samples are never `closed` — they can't fabricate a dismissal.
+    expect(getByTestId('status').textContent).toBe('unknown');
   });
 
   it('reports open once a credible shrink arrives while active', () => {
@@ -99,6 +101,38 @@ describe('useSoftwareKeyboardOpen', () => {
     flushFrames();
 
     expect(getByTestId('state').textContent).toBe('open');
+    expect(getByTestId('status').textContent).toBe('open');
+  });
+
+  it('reports closed only while a composer is active', () => {
+    const { getByTestId, rerender } = render(<Probe active={false} />);
+    act(() => rerender(<Probe active />));
+    vv.height = 320;
+    act(() => vv.emit('resize'));
+    flushFrames();
+    expect(getByTestId('status').textContent).toBe('open');
+
+    // Keyboard dismissed while focus is retained → confirmed `closed`.
+    vv.height = 700;
+    act(() => vv.emit('resize'));
+    flushFrames();
+    expect(getByTestId('status').textContent).toBe('closed');
+    expect(getByTestId('state').textContent).toBe('closed');
+  });
+
+  it('reports unknown while pinch-zoomed instead of closed', () => {
+    const { getByTestId, rerender } = render(<Probe active={false} />);
+    act(() => rerender(<Probe active />));
+    vv.height = 320;
+    act(() => vv.emit('resize'));
+    flushFrames();
+    expect(getByTestId('status').textContent).toBe('open');
+
+    vv.scale = 2;
+    vv.height = 700;
+    act(() => vv.emit('resize'));
+    flushFrames();
+    expect(getByTestId('status').textContent).toBe('unknown');
   });
 
   it('keeps the baseline out of reach of keyboard frames (recovers on blur)', () => {
@@ -150,18 +184,20 @@ describe('useSoftwareKeyboardOpen', () => {
     flushFrames();
     expect(getByTestId('state').textContent).toBe('open');
 
-    // A real rotation invalidates the baseline → conservative "closed".
+    // A real rotation invalidates the baseline → unknown, never "closed".
     portraitMatches = false;
     vv.width = 700;
     act(() => mediaListeners.forEach((l) => l()));
     flushFrames();
     expect(getByTestId('state').textContent).toBe('closed');
+    expect(getByTestId('status').textContent).toBe('unknown');
   });
 
-  it('reports false when visualViewport is unavailable', () => {
+  it('reports unknown when visualViewport is unavailable', () => {
     Object.defineProperty(window, 'visualViewport', { value: undefined, configurable: true });
     const { getByTestId } = render(<Probe active />);
     expect(getByTestId('state').textContent).toBe('closed');
+    expect(getByTestId('status').textContent).toBe('unknown');
   });
 
   it('does not update state after unmount', () => {
