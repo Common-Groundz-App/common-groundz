@@ -38,8 +38,9 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchParams] = useSearchParams();
-  
-  const autoFocusComment = searchParams.has('focus') && searchParams.get('focus') === 'comment';
+  const commentsAnchorRef = React.useRef<HTMLDivElement | null>(null);
+  const hashScrollDoneRef = React.useRef(false);
+
   
   // Related posts state
   const [relatedPosts, setRelatedPosts] = React.useState<PostFeedItemType[]>([]);
