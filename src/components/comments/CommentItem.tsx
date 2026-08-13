@@ -73,6 +73,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
   mentionOpen = false,
   onMentionClose,
   mentionPopup,
+  editRegionProps,
 }) => {
   const isCurrentUser = currentUserId && currentUserId === comment.user_id;
   const isBeingEdited = editingCommentId === comment.id;
