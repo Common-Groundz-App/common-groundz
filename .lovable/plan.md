@@ -27,14 +27,17 @@ The missing navigation is intentional autofocus, not caching or Safari:
 
 `PostFeedItem`'s comment action opens the canonical detail route with a comments anchor (`/post/:id#comments`) instead of `?focus=comment`.
 
-### 2. Scroll to comments without focusing anything
+### 2. Scroll to comments via a stable anchor, not a delayed effect
 
-The comments section gets a stable `id="comments"` anchor. On the detail page, when the hash is `#comments`, scroll that section into view once after comments finish loading — no `focus()`, no keyboard.
+The comments section gets a stable `id="comments"` that exists as soon as `PostContentViewer` renders — the heading and empty state are present before comments finish loading, so nothing needs to wait on the comment fetch.
+
+Hash handling runs once, after the post content containing the anchor has mounted, and is not tied to comment-load completion. No repeating timers, no re-scroll when comments arrive late, and no chance of moving the user after they have started scrolling themselves.
 
 Two ordering rules this must respect:
 
-- `ScrollToTop` scrolls to the top on PUSH/REPLACE navigations. The comments scroll must run after that settles (post-load, in a frame/timeout) so the two don't fight.
-- A `commentId` highlight scroll always wins. When `?commentId=` is present, the highlight scroll runs and the `#comments` scroll is skipped, so deep-linked comments are never overridden.
+- `ScrollToTop` scrolls to the top on PUSH/REPLACE navigations because it depends only on `pathname`. The anchor scroll is applied after that route-change reset, so the two don't fight and the page settles in one place.
+- A `commentId` highlight scroll always wins. When `?commentId=` is present, the highlight scroll runs and the `#comments` anchor scroll is skipped, so deep-linked comments are never overridden.
+
 
 ### 3. Retire the autofocus chain, on every viewport
 
