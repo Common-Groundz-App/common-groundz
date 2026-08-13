@@ -3,8 +3,15 @@ import {
   createKeyboardState,
   reduceKeyboardState,
   type KeyboardState,
+  type KeyboardStatus,
   type ViewportOrientation,
 } from '@/utils/viewportKeyboard';
+
+export interface SoftwareKeyboardResult {
+  status: KeyboardStatus;
+  /** Derived from `status` — never set independently. */
+  open: boolean;
+}
 
 /**
  * Thin subscriber around the pure `viewportKeyboard` state machine.
@@ -17,8 +24,8 @@ export const useSoftwareKeyboardOpen = ({
   editableActive,
 }: {
   editableActive: boolean;
-}): boolean => {
-  const [open, setOpen] = useState(false);
+}): SoftwareKeyboardResult => {
+  const [status, setStatus] = useState<KeyboardStatus>('unknown');
   const activeRef = useRef(editableActive);
   activeRef.current = editableActive;
 
