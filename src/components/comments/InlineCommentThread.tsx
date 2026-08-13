@@ -90,6 +90,26 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
 
+  /**
+   * Composer focus regions — hides the mobile bottom nav while writing.
+   * Ids are prefixed with a per-instance `useId()` so two mounted threads for
+   * the same item (page + dialog) can never collide.
+   */
+  const instanceId = useId();
+  const regionBase = `${instanceId}:${itemType}:${itemId}`;
+  const composerEnabled = Boolean(user);
+  const mainRegion = useComposerFocusRegion(`${regionBase}:main`, { enabled: composerEnabled });
+  const replyRegion = useComposerFocusRegion(
+    `${regionBase}:reply:${replyingTo?.id ?? 'none'}`,
+    { enabled: composerEnabled }
+  );
+  const editRegion = useComposerFocusRegion(
+    `${regionBase}:edit:${editingCommentId ?? 'none'}`,
+    { enabled: composerEnabled }
+  );
+
+
+
   const handleSortToggle = useCallback(() => {
     setSortMode(prev => {
       const next: SortMode = prev === 'relevance' ? 'newest' : 'relevance';
