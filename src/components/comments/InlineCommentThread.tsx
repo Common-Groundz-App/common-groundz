@@ -109,6 +109,59 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     { enabled: composerEnabled }
   );
 
+  // `isActive` is not a DOM prop — strip it before spreading onto elements.
+  const { isActive: isMainComposerActive, ref: mainRegionRef, ...mainRegionHandlers } = mainRegion;
+  const { isActive: _replyActive, ...replyRegionProps } = replyRegion;
+  const { isActive: _editActive, ...editRegionProps } = editRegion;
+
+  /**
+   * Facebook-style docking: while the main composer is focused below `xl`, the
+   * composer shell becomes `fixed bottom-0` so it sits flush above the
+   * keyboard, and an equally tall spacer holds its place in the flow.
+   */
+  const viewportBelowXl = useIsMobile(1280);
+  const softwareKeyboardOpen = useSoftwareKeyboardOpen({ editableActive: isMainComposerActive });
+  const isMainComposerDocked = isMainComposerActive && viewportBelowXl;
+
+  const [composerShellHeight, setComposerShellHeight] = useState(0);
+  const composerShellRef = useRef<HTMLDivElement | null>(null);
+
+  // Compose the focus-region ref with our measurement ref. Memoized so React
+  // never detaches/reattaches the shell (and its ResizeObserver) on re-render.
+  const composerShellRefCallback = useCallback(
+    (node: HTMLDivElement | null) => {
+      composerShellRef.current = node;
+      (mainRegionRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+    },
+    [mainRegionRef]
+  );
+
+  // Observe from mount, while still in flow, so a valid height exists before
+  // focus triggers docking. Zero/missing measurements are ignored so transition
+  // frames can never collapse the spacer.
+  useEffect(() => {
+    const node = composerShellRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return;
+    const applyHeight = () => {
+      const height = Math.round(node.getBoundingClientRect().height);
+      if (height > 0) {
+        setComposerShellHeight((prev) => (prev === height ? prev : height));
+      }
+    };
+    applyHeight();
+    const observer = new ResizeObserver(applyHeight);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  // Belt-and-braces top-up across the flow/fixed transition.
+  useLayoutEffect(() => {
+    const node = composerShellRef.current;
+    if (!node) return;
+    const height = Math.round(node.getBoundingClientRect().height);
+    if (height > 0) setComposerShellHeight((prev) => (prev === height ? prev : height));
+  }, [isMainComposerDocked]);
+
 
 
   const handleSortToggle = useCallback(() => {
