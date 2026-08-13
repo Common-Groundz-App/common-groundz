@@ -147,19 +147,6 @@ describe('ComposerFocusContext', () => {
         </div>
       );
     };
-    // Submitting clears text without blurring; the nav must not flash back.
-    const Submitting = () => {
-      const region = useComposerFocusRegion('main');
-      const [value, setValue] = useState('hi');
-      return (
-        <div {...region}>
-          <textarea aria-label="main-input" value={value} onChange={() => {}} />
-          <button type="button" aria-label="submit" onClick={() => setValue('')}>
-            post
-          </button>
-        </div>
-      );
-    };
     renderApp(<Submitting />);
     const input = screen.getByLabelText('main-input');
     focus(input);
