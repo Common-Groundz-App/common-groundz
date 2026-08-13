@@ -39,6 +39,12 @@ interface CommentItemProps {
   mentionOpen?: boolean;
   onMentionClose?: () => void;
   mentionPopup?: React.ReactNode;
+  /**
+   * Composer focus-region props applied to the edit container (optional).
+   * Only the comment actually being edited renders the container, so the same
+   * props object can safely be handed to every item in the list.
+   */
+  editRegionProps?: ComposerFocusRegionProps;
 }
 
 
