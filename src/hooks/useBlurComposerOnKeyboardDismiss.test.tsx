@@ -116,6 +116,7 @@ describe('useBlurComposerOnKeyboardDismiss', () => {
 
     // Re-focus without a new confirmed `open`: a later `closed` must be inert.
     act(() => textarea.focus());
+    act(() => rerender(<Harness status="unknown" sessionId={MAIN} />));
     act(() => rerender(<Harness status="closed" sessionId={MAIN} />));
     expect(document.activeElement).toBe(textarea);
   });

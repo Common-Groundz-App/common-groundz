@@ -67,6 +67,7 @@ export default defineConfig({
           include: [
             'src/contexts/ComposerFocusContext.test.tsx',
             'src/hooks/useSoftwareKeyboardOpen.test.tsx',
+            'src/hooks/useBlurComposerOnKeyboardDismiss.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
           ],
         },
