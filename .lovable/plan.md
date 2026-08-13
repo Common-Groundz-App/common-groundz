@@ -159,7 +159,9 @@ Temporary console instrumentation only during physical testing — no debug UI, 
 
 - Below 1280px + active main region → fixed classes present and a spacer rendered.
 - The spacer has a non-zero height on its first docked frame, sourced from the in-flow measurement taken before focus.
-- `ResizeObserver` growth updates the spacer height.
+- `ResizeObserver` growth updates the spacer height while docked.
+- A zero-height `ResizeObserver` callback does not collapse the spacer — the last non-zero value is retained.
+- The composed ref is intact: focusing the textarea still activates the region (proving the measurement ref did not overwrite `mainRegion.ref`).
 - Crossing 1280px while active removes fixed classes and spacer together; above `xl` neither appears.
 - Keyboard open vs closed selects the correct combined bottom-padding class.
 - Spacer is `aria-hidden`, contains no textarea, and only one textarea exists while docked.
