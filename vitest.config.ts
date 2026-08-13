@@ -61,7 +61,12 @@ export default defineConfig({
           globals: true,
           environment: 'jsdom',
           setupFiles: ['./src/test/setup.ts'],
-          include: ['src/**/*.test.tsx'],
+          // Explicit, like the node list: `src` still holds scratch spec files
+          // (e.g. LightboxPreview.handoff.test.tsx) with no executable tests.
+          include: [
+            'src/contexts/ComposerFocusContext.test.tsx',
+            'src/components/media/MuxOwnerHint.test.tsx',
+          ],
         },
       },
     ],
