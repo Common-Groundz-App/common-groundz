@@ -309,7 +309,8 @@ export const PostFeedItem: React.FC<PostFeedItemProps> = ({
   };
 
   const handleCommentClick = () => {
-    navigate(`/post/${post.id}?focus=comment`);
+    // Take the reader to the discussion — never into composition mode.
+    navigate(`/post/${post.id}#comments`);
     if (onComment) onComment(post.id);
   };
   
