@@ -839,7 +839,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       )}
 
       {/* Comment Input */}
-      <div className="border-t border-border mt-4 pt-4">
+      <div className="border-t border-border mt-4 pt-4" {...mainRegion}>
         <div className="flex gap-3 items-center relative">
           <Avatar className="h-8 w-8 flex-shrink-0">
             {user ? (
