@@ -32,8 +32,13 @@ let portraitMatches: boolean;
 let frames: FrameRequestCallback[];
 
 const Probe = ({ active }: { active: boolean }) => {
-  const open = useSoftwareKeyboardOpen({ editableActive: active });
-  return <span data-testid="state">{open ? 'open' : 'closed'}</span>;
+  const { status, open } = useSoftwareKeyboardOpen({ editableActive: active });
+  return (
+    <>
+      <span data-testid="state">{open ? 'open' : 'closed'}</span>
+      <span data-testid="status">{status}</span>
+    </>
+  );
 };
 
 const flushFrames = () => {
