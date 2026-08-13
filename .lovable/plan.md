@@ -34,7 +34,12 @@ Database ids alone aren't enough — the same thread can mount twice (page + dia
 - reply: `${instanceId}:${itemType}:${itemId}:reply:${parentCommentId}`
 - edit: `${instanceId}:${itemType}:${itemId}:edit:${comment.id}`
 
+### 4. Submit keeps the region active while the textarea stays focused
+
+The main submit path clears the text but does not blur. Deactivating there would pop the tab bar back above a still-open keyboard, and since no new focus event fires it would never re-hide. So there is no explicit deactivate on submit — the region stays active while focus stays inside, which also lets the user post a second comment without reopening the keyboard. Reply/edit cancel and save release naturally through unmount cleanup.
+
 ### 5. Guest gating via a generic hook option, not auth knowledge
+
 
 The hook stays auth-agnostic: it takes `enabled` and simply never activates when `enabled` is false. `InlineCommentThread` passes `enabled: Boolean(user)`, so a guest's transient focus never hides the nav and the hook stays reusable for other composers.
 
@@ -56,7 +61,18 @@ iOS already scrolls the focused input into view; an extra smooth scroll fights t
 - `src/components/comments/InlineCommentThread.tsx` (wire main / reply / edit regions)
 - `src/components/comments/CommentItem.tsx` (accept region props for the edit row)
 - `src/components/navigation/BottomNavigation.tsx` (return `null` while active)
-- Tests — context reducer tests are not enough, so add hook/component integration tests (Testing Library) covering: capture-phase focus activation, deferred blur with an explicitly flushed `requestAnimationFrame`, unmount cleanup, retained focus after submit, `enabled: false` guest regions, route reset, two overlapping thread instances, and `BottomNavigation` rendering `null` while active.
+- Tests — see below.
+
+## Testing infrastructure (the missing piece)
+
+Codex is right that the integration tests aren't runnable today: `vitest.config.ts` uses the `node` environment with an explicit allowlist and the repo has no jsdom / Testing Library. So this phase also stands up DOM testing, minimally and additively:
+
+- Add devDependencies: `jsdom`, `@testing-library/react`, `@testing-library/user-event`, `@testing-library/jest-dom`.
+- Add `src/test/setup.ts` (jest-dom + a `matchMedia` stub).
+- Extend `vitest.config.ts` with the React SWC plugin, `setupFiles`, and a **second project/environment entry** so the existing pure-node suites keep running exactly as they do now (`node`, same allowlist) while new `*.test.tsx` files run under `jsdom`. No existing test file or its environment changes.
+- Add `"vitest/globals"` to `types` in `tsconfig.app.json` if not already present.
+
+New DOM tests then cover: capture-phase focus activation, deferred blur with an explicitly flushed `requestAnimationFrame`, unmount cleanup, retained focus after submit, `enabled: false` guest regions, route reset on navigation, two overlapping thread instances, and `BottomNavigation` rendering `null` while a region is active. Pure context-reducer tests stay in the node suite.
 
 ## Scope note: this tracks focus, not the keyboard
 
