@@ -917,9 +917,31 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
         </div>
       )}
 
+      {/* Height-preserving placeholder while the composer is docked */}
+      {isMainComposerDocked && (
+        <div aria-hidden="true" style={{ height: composerShellHeight || undefined }} />
+      )}
+
       {/* Comment Input */}
-      <div className="border-t border-border mt-4 pt-4" {...mainRegion}>
-        <div className="flex gap-3 items-center relative">
+      <div
+        className={cn(
+          'border-t border-border bg-background',
+          isMainComposerDocked
+            ? [
+                'fixed inset-x-0 bottom-0 z-50 pt-2',
+                softwareKeyboardOpen ? 'pb-2' : 'pb-[calc(0.5rem+env(safe-area-inset-bottom))]',
+              ]
+            : 'mt-4 pt-4'
+        )}
+        ref={composerShellRefCallback}
+        {...mainRegionHandlers}
+      >
+        <div
+          className={cn(
+            'flex gap-3 items-center relative',
+            isMainComposerDocked && 'max-w-2xl mx-auto px-4'
+          )}
+        >
           <Avatar className="h-8 w-8 flex-shrink-0">
             {user ? (
               <>
