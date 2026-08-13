@@ -22,12 +22,16 @@ import { useLocation } from 'react-router-dom';
  */
 interface ComposerFocusContextValue {
   isComposerActive: boolean;
+  activeIds: Set<string>;
   activate: (id: string) => void;
   deactivate: (id: string) => void;
 }
 
+const EMPTY_IDS: Set<string> = new Set();
+
 const ComposerFocusContext = createContext<ComposerFocusContextValue>({
   isComposerActive: false,
+  activeIds: EMPTY_IDS,
   activate: () => {},
   deactivate: () => {},
 });
