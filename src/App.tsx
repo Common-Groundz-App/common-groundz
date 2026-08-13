@@ -118,6 +118,7 @@ function App() {
               <AuthInitializer>
               <AuthPromptProvider>
                 <NotificationsProvider>
+                <ComposerFocusProvider>
                 <OfflineBanner />
                 <Routes>
                   <Route path="/" element={<Index />} />
