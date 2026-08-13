@@ -1,8 +1,10 @@
-# Dock the comment composer to the keyboard, Facebook-style (v5)
+# Dock the comment composer to the keyboard, Facebook-style (v6)
 
-v5 keeps the approved v4 model and applies the review's three valid corrections: the classifier drops `offsetTop` from its decision and moves into pure functions, the spacer height is seeded while the shell is still in flow, and the focus-to-keyboard transition gets explicit regression coverage.
+v6 closes the one real logical hole the review found: v5's reducer promised it would never re-seed from a keyboard-obscured sample, but its inputs (`height`, `width`, `scale`, `orientation`) gave it no way to know a sample was obscured after a reset discarded the baseline. The reducer now takes composer activity as an input, tolerates width jitter instead of resetting on it, and freezes the baseline while a composer is active. Spacer measurement semantics are also stated unambiguously.
 
-One review point is stale and not applied: the repository *does* already have a jsdom test project. `vitest.config.ts` defines two projects (`node` and `dom`, the latter with `environment: 'jsdom'`, `plugins: [react()]` and `setupFiles: ['./src/test/setup.ts']`), and `package.json` already carries `@testing-library/react` 16.3.2, `@testing-library/jest-dom` 7.0.1 and `jsdom` 30.0.1. New `.test.tsx` suites only need adding to the `dom` project's explicit include list — no infrastructure work.
+The docking architecture is unchanged and approved: `fixed bottom-0` with no keyboard-height offset, one `isMainComposerDocked` boolean, 1280px breakpoint, column-constrained content, guests never dock, reply/edit inline, no automatic scrolling.
+
+Testing infrastructure needs no work: `vitest.config.ts` already defines `node` and `dom` projects (`environment: 'jsdom'`, `plugins: [react()]`, `setupFiles: ['./src/test/setup.ts']`) and `package.json` carries Testing Library, user-event, jest-dom and jsdom. New suites only need registering in the explicit include lists.
 
 Settled by existing evidence: in IMG_2894 `BottomNavigation` — a plain `fixed bottom-0` element — floated *directly above* the open keyboard. Fixed positioning on your device already follows the keyboard-facing viewport edge, so `bottom: keyboardInset` would double-count by a keyboard height. It is not in this plan.
 
