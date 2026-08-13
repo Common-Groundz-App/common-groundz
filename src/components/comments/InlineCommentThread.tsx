@@ -687,6 +687,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                 onEditSave={handleEditSave}
                 onEditContentChange={setEditCommentContent}
                 {...editMentionProps(group.comment.id)}
+                editRegionProps={editRegion}
                 onDeleteClick={handleDeleteClick}
                 onReplyClick={handleReplyClick}
                 onLikeClick={handleLikeClick}
@@ -721,6 +722,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                         onEditSave={handleEditSave}
                         onEditContentChange={setEditCommentContent}
                         {...editMentionProps(reply.id)}
+                        editRegionProps={editRegion}
                         onDeleteClick={handleDeleteClick}
                         onReplyClick={handleReplyClick}
                         onLikeClick={handleLikeClick}
@@ -766,6 +768,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                             onEditSave={handleEditSave}
                             onEditContentChange={setEditCommentContent}
                             {...editMentionProps(reply.id)}
+                        editRegionProps={editRegion}
                             onDeleteClick={handleDeleteClick}
                             onReplyClick={handleReplyClick}
                             onLikeClick={handleLikeClick}
