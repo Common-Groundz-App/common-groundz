@@ -144,15 +144,16 @@ Temporary console instrumentation only during physical testing — no debug UI, 
 
 `viewportKeyboard.ts` — pure, no React, no jsdom:
 
-- Baseline seeded from the first unobscured sample; credible shrink → open; recovery → closed.
-- A frame with a credible shrink never becomes the baseline, including immediately after a reset.
+- Baseline seeded and raised only while `editableActive: false`; credible shrink while active → open; recovery → closed.
+- No sample with `editableActive: true` ever writes the baseline — asserted directly on returned state, including a keyboard-open first-active frame.
+- Width jitter while active does **not** discard the baseline; classification continues from the frozen value.
+- Orientation flip invalidates the baseline; while still active the result is `keyboardOpen: false` (padding retained), and re-seeding happens only after `editableActive` returns to `false`.
 - Pinch zoom (`scale > 1.01`) → not open, baseline unchanged.
-- Width/orientation change resets, then re-seeds from the next unobscured sample only.
 - Toolbar-sized shrink under `max(120, baseline * 0.15)` → not open.
 - Height-only decision: `offsetTop` is not an input to the reducer at all.
-- **Full focus-to-keyboard transition** replayed as a sample sequence: pre-focus baseline, then the multi-frame intermediate geometry iOS emits during keyboard presentation (including a transient width jitter and interleaved scroll-driven samples), ending keyboard-settled. Asserts the baseline is never re-seeded from a keyboard-open frame and the final state is open — the exact failure mode where safe-area padding would wrongly return.
+- **Full focus-to-keyboard transition** replayed as a sample sequence: pre-focus unobscured baseline, `editableActive` flips true, then the multi-frame intermediate geometry iOS emits during keyboard presentation (including a transient width jitter and interleaved scroll-driven samples), ending keyboard-settled. Asserts the baseline is byte-identical throughout and the final state is open — the exact failure mode where safe-area padding would wrongly return.
 
-`useSoftwareKeyboardOpen` (fake `visualViewport`): initial synchronous sample, coalesced updates from `resize`/`scroll`/`orientationchange`, missing `visualViewport` → `false`, cleanup removes listeners and cancels the pending frame, no state set after unmount.
+`useSoftwareKeyboardOpen` (fake `visualViewport`): initial synchronous sample, `editableActive` forwarded into every sample, a re-sample when `editableActive` changes, coalesced updates from `resize`/`scroll`/`orientationchange`, missing `visualViewport` → `false`, cleanup removes listeners and cancels the pending frame, no state set after unmount.
 
 `InlineCommentThread` docking (jsdom, stubbed `matchMedia` and `ResizeObserver`):
 
