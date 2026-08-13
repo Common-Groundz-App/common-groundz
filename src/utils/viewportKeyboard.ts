@@ -33,8 +33,16 @@ export interface KeyboardState {
   lastWidth: number | null;
 }
 
+/**
+ * Tri-state so callers can distinguish "the keyboard genuinely closed" from
+ * "this sample tells us nothing" (zoom, rotation, no baseline, inactive).
+ */
+export type KeyboardStatus = 'open' | 'closed' | 'unknown';
+
 export interface KeyboardReduceResult {
   state: KeyboardState;
+  keyboardStatus: KeyboardStatus;
+  /** Derived from `keyboardStatus` so the two can never disagree. */
   keyboardOpen: boolean;
 }
 
@@ -79,20 +87,25 @@ export const reduceKeyboardState = (
       baseline = baseline === null ? visualHeight : Math.max(baseline, visualHeight);
       baselineOrientation = orientation;
     }
+    // No active composer: this sample says nothing about the keyboard. Never
+    // `closed`, so an ordinary blur can't fabricate an open -> closed edge.
     return {
       state: { baseline, baselineOrientation, lastWidth: visualWidth },
+      keyboardStatus: 'unknown',
       keyboardOpen: false,
     };
   }
 
   // Composer active: the baseline is frozen. Classify only.
-  let keyboardOpen = false;
+  let keyboardStatus: KeyboardStatus = 'unknown';
   if (!zoomed && validHeight && baseline !== null) {
-    keyboardOpen = baseline - visualHeight > keyboardShrinkThreshold(baseline);
+    keyboardStatus =
+      baseline - visualHeight > keyboardShrinkThreshold(baseline) ? 'open' : 'closed';
   }
 
   return {
     state: { baseline, baselineOrientation, lastWidth: visualWidth },
-    keyboardOpen,
+    keyboardStatus,
+    keyboardOpen: keyboardStatus === 'open',
   };
 };

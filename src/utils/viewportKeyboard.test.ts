@@ -3,6 +3,7 @@ import {
   createKeyboardState,
   reduceKeyboardState,
   type KeyboardState,
+  type KeyboardStatus,
   type KeyboardViewportSample,
 } from './viewportKeyboard';
 
@@ -18,12 +19,14 @@ const sample = (over: Partial<KeyboardViewportSample> = {}): KeyboardViewportSam
 const run = (state: KeyboardState, samples: Partial<KeyboardViewportSample>[]) => {
   let current = state;
   let keyboardOpen = false;
+  let keyboardStatus: KeyboardStatus = 'unknown';
   for (const s of samples) {
     const result = reduceKeyboardState(current, sample(s));
     current = result.state;
     keyboardOpen = result.keyboardOpen;
+    keyboardStatus = result.keyboardStatus;
   }
-  return { state: current, keyboardOpen };
+  return { state: current, keyboardOpen, keyboardStatus };
 };
 
 describe('viewportKeyboard', () => {
@@ -128,6 +131,32 @@ describe('viewportKeyboard', () => {
 
     expect(transition.state.baseline).toBe(baseline);
     expect(transition.keyboardOpen).toBe(true);
+  });
+
+  it('distinguishes closed from unknown', () => {
+    const seeded = run(createKeyboardState(), [{ visualHeight: 700 }]);
+    // Inactive samples are always unknown, never closed.
+    expect(seeded.keyboardStatus).toBe('unknown');
+
+    const open = run(seeded.state, [{ visualHeight: 320, editableActive: true }]);
+    expect(open.keyboardStatus).toBe('open');
+
+    // Recovered height while still focused = confirmed dismissal.
+    const closed = run(open.state, [{ visualHeight: 700, editableActive: true }]);
+    expect(closed.keyboardStatus).toBe('closed');
+    expect(closed.keyboardOpen).toBe(false);
+
+    // Zoomed, rotated and baseline-less samples are unknown.
+    expect(run(open.state, [{ visualHeight: 700, scale: 2, editableActive: true }]).keyboardStatus)
+      .toBe('unknown');
+    expect(
+      run(open.state, [
+        { visualHeight: 380, visualWidth: 700, orientation: 'landscape', editableActive: true },
+      ]).keyboardStatus
+    ).toBe('unknown');
+    expect(
+      run(createKeyboardState(), [{ visualHeight: 320, editableActive: true }]).keyboardStatus
+    ).toBe('unknown');
   });
 
   it('ignores offsetTop entirely (not part of the sample shape)', () => {
