@@ -1,4 +1,5 @@
 import path from 'path';
+import react from '@vitejs/plugin-react-swc';
 import { defineConfig } from 'vitest/config';
 
 /**
@@ -7,38 +8,67 @@ import { defineConfig } from 'vitest/config';
  * config is exactly how the notification suites previously "passed" without
  * executing a single assertion.
  *
- * Every suite listed below is pure TypeScript: no DOM, no React rendering, no
- * Supabase client. That is why there is no jsdom / testing-library dependency.
+ * Two projects, deliberately:
  *
- * The include list is explicit rather than a broad `src/**\/*.test.ts` glob
- * because `src` still holds non-executable scratch/spec files that would break
- * a wildcard run. Broaden this to the glob once those are cleaned up.
+ * - `node`  — the original pure-TypeScript suites. Same environment and same
+ *             explicit allowlist as before; nothing about them changed. The
+ *             include list is explicit rather than a broad glob because `src`
+ *             still holds non-executable scratch/spec files.
+ * - `dom`   — React/DOM suites (`*.test.tsx`) rendered under jsdom with
+ *             Testing Library. Needed for focus, capture events and
+ *             requestAnimationFrame behaviour.
  */
-export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node',
-    include: [
-      'src/utils/notificationGrouping.test.ts',
-      'src/utils/notificationDestination.test.ts',
-      'src/utils/notificationRealtime.test.ts',
-      'src/utils/notificationPreferences.test.ts',
-      'src/utils/notificationSections.test.ts',
-      'src/utils/notificationThumbnail.test.ts',
-      'src/utils/notificationFollowBack.test.ts',
-      'src/utils/followEvents.test.ts',
-      'src/utils/notificationBadge.test.ts',
+const alias = {
+  '@': path.resolve(__dirname, './src'),
+  '@shared': path.resolve(__dirname, './shared'),
+};
 
-      'src/utils/brandTextHelpers.test.ts',
-      'src/utils/renderBranching.test.ts',
-      'src/hooks/useMuxStatus.test.ts',
-      'src/components/comments/useMentionAutocomplete.test.ts',
+const nodeIncludes = [
+  'src/utils/notificationGrouping.test.ts',
+  'src/utils/notificationDestination.test.ts',
+  'src/utils/notificationRealtime.test.ts',
+  'src/utils/notificationPreferences.test.ts',
+  'src/utils/notificationSections.test.ts',
+  'src/utils/notificationThumbnail.test.ts',
+  'src/utils/notificationFollowBack.test.ts',
+  'src/utils/followEvents.test.ts',
+  'src/utils/notificationBadge.test.ts',
+
+  'src/utils/brandTextHelpers.test.ts',
+  'src/utils/renderBranching.test.ts',
+  'src/hooks/useMuxStatus.test.ts',
+  'src/components/comments/useMentionAutocomplete.test.ts',
+];
+
+export default defineConfig({
+  resolve: { alias },
+  test: {
+    projects: [
+      {
+        resolve: { alias },
+        test: {
+          name: 'node',
+          globals: true,
+          environment: 'node',
+          include: nodeIncludes,
+        },
+      },
+      {
+        plugins: [react()],
+        resolve: { alias },
+        test: {
+          name: 'dom',
+          globals: true,
+          environment: 'jsdom',
+          setupFiles: ['./src/test/setup.ts'],
+          // Explicit, like the node list: `src` still holds scratch spec files
+          // (e.g. LightboxPreview.handoff.test.tsx) with no executable tests.
+          include: [
+            'src/contexts/ComposerFocusContext.test.tsx',
+            'src/components/media/MuxOwnerHint.test.tsx',
+          ],
+        },
+      },
     ],
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@shared': path.resolve(__dirname, './shared'),
-    },
   },
 });

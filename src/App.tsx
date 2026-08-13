@@ -50,6 +50,7 @@ import { preloadSounds } from '@/services/feedbackService';
 import { Howl } from 'howler';
 import { AuthPromptProvider } from '@/contexts/AuthPromptContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
+import { ComposerFocusProvider } from '@/contexts/ComposerFocusContext';
 import { NotificationDrawer } from '@/components/notifications/NotificationDrawer';
 import { networkStatusService } from '@/services/networkStatusService';
 import PrewarmFlagBridge from '@/components/system/PrewarmFlagBridge';
@@ -117,6 +118,7 @@ function App() {
               <AuthInitializer>
               <AuthPromptProvider>
                 <NotificationsProvider>
+                <ComposerFocusProvider>
                 <OfflineBanner />
                 <Routes>
                   <Route path="/" element={<Index />} />
@@ -251,6 +253,7 @@ function App() {
                 </Routes>
                 {/* The single app-wide notifications drawer. */}
                 <NotificationDrawer />
+                </ComposerFocusProvider>
                 </NotificationsProvider>
               </AuthPromptProvider>
               </AuthInitializer>

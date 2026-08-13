@@ -1,5 +1,6 @@
 
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
+import { useComposerFocusRegion } from '@/contexts/ComposerFocusContext';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -89,6 +90,26 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const { requireAuth } = useAuthPrompt();
   const { toast } = useToast();
   const { canPerformAction, showVerificationRequired } = useEmailVerification();
+
+  /**
+   * Composer focus regions — hides the mobile bottom nav while writing.
+   * Ids are prefixed with a per-instance `useId()` so two mounted threads for
+   * the same item (page + dialog) can never collide.
+   */
+  const instanceId = useId();
+  const regionBase = `${instanceId}:${itemType}:${itemId}`;
+  const composerEnabled = Boolean(user);
+  const mainRegion = useComposerFocusRegion(`${regionBase}:main`, { enabled: composerEnabled });
+  const replyRegion = useComposerFocusRegion(
+    `${regionBase}:reply:${replyingTo?.id ?? 'none'}`,
+    { enabled: composerEnabled }
+  );
+  const editRegion = useComposerFocusRegion(
+    `${regionBase}:edit:${editingCommentId ?? 'none'}`,
+    { enabled: composerEnabled }
+  );
+
+
 
   const handleSortToggle = useCallback(() => {
     setSortMode(prev => {
@@ -666,6 +687,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                 onEditSave={handleEditSave}
                 onEditContentChange={setEditCommentContent}
                 {...editMentionProps(group.comment.id)}
+                editRegionProps={editRegion}
                 onDeleteClick={handleDeleteClick}
                 onReplyClick={handleReplyClick}
                 onLikeClick={handleLikeClick}
@@ -700,6 +722,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                         onEditSave={handleEditSave}
                         onEditContentChange={setEditCommentContent}
                         {...editMentionProps(reply.id)}
+                        editRegionProps={editRegion}
                         onDeleteClick={handleDeleteClick}
                         onReplyClick={handleReplyClick}
                         onLikeClick={handleLikeClick}
@@ -745,6 +768,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                             onEditSave={handleEditSave}
                             onEditContentChange={setEditCommentContent}
                             {...editMentionProps(reply.id)}
+                        editRegionProps={editRegion}
                             onDeleteClick={handleDeleteClick}
                             onReplyClick={handleReplyClick}
                             onLikeClick={handleLikeClick}
@@ -760,7 +784,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
               {/* Inline reply input */}
               {replyingTo && (replyingTo.id === group.comment.id || group.replies.some(r => r.id === replyingTo.id)) && (
-                <div className="ml-6 p-3">
+                <div className="ml-6 p-3" {...replyRegion}>
                   <div className="text-xs text-muted-foreground mb-2">
                     Replying to <span className="font-medium text-foreground">@{replyingTo.username}</span>
                   </div>
@@ -839,7 +863,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       )}
 
       {/* Comment Input */}
-      <div className="border-t border-border mt-4 pt-4">
+      <div className="border-t border-border mt-4 pt-4" {...mainRegion}>
         <div className="flex gap-3 items-center relative">
           <Avatar className="h-8 w-8 flex-shrink-0">
             {user ? (

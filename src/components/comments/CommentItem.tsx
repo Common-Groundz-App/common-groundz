@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import type { ComposerFocusRegionProps } from '@/contexts/ComposerFocusContext';
 import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MoreHorizontal, Heart, MessageCircle, Users, ThumbsUp, ShieldCheck } from 'lucide-react';
@@ -39,6 +40,12 @@ interface CommentItemProps {
   mentionOpen?: boolean;
   onMentionClose?: () => void;
   mentionPopup?: React.ReactNode;
+  /**
+   * Composer focus-region props applied to the edit container (optional).
+   * Only the comment actually being edited renders the container, so the same
+   * props object can safely be handed to every item in the list.
+   */
+  editRegionProps?: ComposerFocusRegionProps;
 }
 
 
@@ -66,6 +73,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
   mentionOpen = false,
   onMentionClose,
   mentionPopup,
+  editRegionProps,
 }) => {
   const isCurrentUser = currentUserId && currentUserId === comment.user_id;
   const isBeingEdited = editingCommentId === comment.id;
@@ -149,7 +157,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             </div>
 
             {isBeingEdited ? (
-              <div className="mt-1">
+              <div className="mt-1" {...editRegionProps}>
                 {(() => {
                   const editTextarea = (
                     <Textarea

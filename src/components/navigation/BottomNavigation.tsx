@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { isExploreRelatedRoute } from '@/utils/navigation';
 import { useCanonicalProfileUrl } from '@/hooks/useCanonicalProfileUrl';
 import { NotificationBadge } from '@/components/notifications/NotificationBadge';
+import { useComposerFocus } from '@/contexts/ComposerFocusContext';
 
 interface NavItem {
   name: string;
@@ -21,8 +22,10 @@ export const BottomNavigation = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profileUrl } = useCanonicalProfileUrl();
-  
+  const { isComposerActive } = useComposerFocus();
+
   const navItems: NavItem[] = [
+
     { name: 'Home', path: '/home', icon: Home },
     { name: 'Explore', path: '/explore', icon: Search },
     { 
@@ -37,7 +40,11 @@ export const BottomNavigation = () => {
     { name: 'My Stuff', path: '/my-stuff', icon: Package },
     { name: 'Profile', path: profileUrl, icon: User }
   ];
-  
+
+  // While a composer region holds focus, get out of the way entirely: returning
+  // null also removes the tabs from pointer, tab order and the a11y tree.
+  if (isComposerActive) return null;
+
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-background border-t xl:hidden z-40 pb-[env(safe-area-inset-bottom)]">
       <div className="flex justify-around items-center h-16">
