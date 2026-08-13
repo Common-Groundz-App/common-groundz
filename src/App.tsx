@@ -253,6 +253,7 @@ function App() {
                 </Routes>
                 {/* The single app-wide notifications drawer. */}
                 <NotificationDrawer />
+                </ComposerFocusProvider>
                 </NotificationsProvider>
               </AuthPromptProvider>
               </AuthInitializer>
