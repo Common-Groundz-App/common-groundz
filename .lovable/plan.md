@@ -106,30 +106,34 @@ Temporary console instrumentation only during physical testing — no debug UI, 
 ## Files touched
 
 - `src/contexts/ComposerFocusContext.tsx` (expose `isActive` per region)
-- `src/hooks/useSoftwareKeyboardOpen.ts` (new — the baseline classifier from §4)
+- `src/utils/viewportKeyboard.ts` (new — pure baseline state machine from §4)
+- `src/hooks/useSoftwareKeyboardOpen.ts` (new — thin subscriber feeding the state machine)
 - `src/components/comments/InlineCommentThread.tsx` (docked wrapper + spacer)
-- `src/contexts/ComposerFocusContext.test.tsx` (add `isActive` cases)
-- `src/hooks/useSoftwareKeyboardOpen.test.ts` (new)
+- `src/utils/viewportKeyboard.test.ts` (new — added to the existing `node` project include list)
+- `src/hooks/useSoftwareKeyboardOpen.test.ts` (new — subscription/lifecycle only)
 - `src/components/comments/InlineCommentThread.docking.test.tsx` (new)
-- `vitest.config.ts` (add the two new suites to the existing `dom` project's explicit include list — the jsdom project already exists, so no new infrastructure is needed)
+- `src/contexts/ComposerFocusContext.test.tsx` (add `isActive` cases)
+- `vitest.config.ts` (add the new suites to the existing `node` and `dom` include lists — both projects already exist, so no infrastructure work)
 
 ## Executable coverage
 
-`useSoftwareKeyboardOpen` (fake `visualViewport`, driven events):
+`viewportKeyboard.ts` — pure, no React, no jsdom:
 
-- Baseline captured before focus; credible shrink → open; shrink recovery → closed.
-- Both `innerHeight` and `visualViewport.height` shrinking together still reports open (the case the old classifier failed).
-- Pinch zoom (`scale > 1.01`) → not open, and baseline unchanged.
-- Orientation/width change resets the baseline instead of latching the old one.
-- Small toolbar-sized shrink under threshold → not open.
-- Missing `visualViewport` → `false`.
-- Cleanup removes all listeners and cancels the pending frame.
+- Baseline seeded from the first unobscured sample; credible shrink → open; recovery → closed.
+- A frame with a credible shrink never becomes the baseline, including immediately after a reset.
+- Pinch zoom (`scale > 1.01`) → not open, baseline unchanged.
+- Width/orientation change resets, then re-seeds from the next unobscured sample only.
+- Toolbar-sized shrink under `max(120, baseline * 0.15)` → not open.
+- Height-only decision: `offsetTop` is not an input to the reducer at all.
+- **Full focus-to-keyboard transition** replayed as a sample sequence: pre-focus baseline, then the multi-frame intermediate geometry iOS emits during keyboard presentation (including a transient width jitter and interleaved scroll-driven samples), ending keyboard-settled. Asserts the baseline is never re-seeded from a keyboard-open frame and the final state is open — the exact failure mode where safe-area padding would wrongly return.
+
+`useSoftwareKeyboardOpen` (fake `visualViewport`): initial synchronous sample, coalesced updates from `resize`/`scroll`/`orientationchange`, missing `visualViewport` → `false`, cleanup removes listeners and cancels the pending frame, no state set after unmount.
 
 `InlineCommentThread` docking (jsdom, stubbed `matchMedia` and `ResizeObserver`):
 
 - Below 1280px + active main region → fixed classes present and a spacer rendered.
-- The spacer has a non-zero height on its first rendered frame.
-- `ResizeObserver` callback growth updates the spacer height.
+- The spacer has a non-zero height on its first docked frame, sourced from the in-flow measurement taken before focus.
+- `ResizeObserver` growth updates the spacer height.
 - Crossing 1280px while active removes fixed classes and spacer together; above `xl` neither appears.
 - Keyboard open vs closed selects the correct combined bottom-padding class.
 - Spacer is `aria-hidden`, contains no textarea, and only one textarea exists while docked.
