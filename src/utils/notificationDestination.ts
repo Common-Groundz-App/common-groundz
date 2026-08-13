@@ -94,10 +94,11 @@ export const normalizeInternalPath = (raw: unknown): string | null => {
   pathname = allowed;
 
   // Structural rebuild — foreign params dropped, join can never be malformed.
+  // `focus=comment` is deliberately NOT preserved: automatic comment composition
+  // has been retired, so legacy links degrade to the plain post page.
   const params = new URLSearchParams();
   const commentId = url.searchParams.get('commentId');
   if (isUuid(commentId)) params.set('commentId', commentId);
-  if (url.searchParams.get('focus') === 'comment') params.set('focus', 'comment');
 
   const search = params.toString();
   return search ? `${pathname}?${search}` : pathname;
