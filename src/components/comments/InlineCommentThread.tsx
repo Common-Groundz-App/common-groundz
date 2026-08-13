@@ -1,6 +1,8 @@
 
-import React, { useEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
+import React, { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallback, useId } from 'react';
 import { useComposerFocusRegion } from '@/contexts/ComposerFocusContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useSoftwareKeyboardOpen } from '@/hooks/useSoftwareKeyboardOpen';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
