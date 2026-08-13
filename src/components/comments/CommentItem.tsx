@@ -157,7 +157,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
             </div>
 
             {isBeingEdited ? (
-              <div className="mt-1">
+              <div className="mt-1" {...editRegionProps}>
                 {(() => {
                   const editTextarea = (
                     <Textarea
