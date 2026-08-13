@@ -22,8 +22,10 @@ export const BottomNavigation = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { profileUrl } = useCanonicalProfileUrl();
-  
+  const { isComposerActive } = useComposerFocus();
+
   const navItems: NavItem[] = [
+
     { name: 'Home', path: '/home', icon: Home },
     { name: 'Explore', path: '/explore', icon: Search },
     { 
