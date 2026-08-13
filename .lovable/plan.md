@@ -55,30 +55,42 @@ softwareKeyboardOpen = shrink > max(120, baseline * 0.15)
 
 `offsetTop` is deliberately **not** in the decision. Its coordinate meaning shifts with browser chrome, scroll position and zoom, and this plan already says that meaning must be measured on-device — so it cannot simultaneously be hard-coded into the classifier. It is read and logged during physical testing only; it enters the formula in a later patch if, and only if, device evidence requires it.
 
-**Baseline mutation is gated on composer activity.** The reducer's sample includes `editableActive`, and baseline writes only happen while it is `false`:
+**Baseline mutation is gated on composer activity, and orientation comes from an independent signal.**
 
 ```text
-reduceKeyboardState(state, { height, width, scale, editableActive })
-  → { state, keyboardOpen }
+interface KeyboardViewportSample {
+  visualHeight: number;
+  visualWidth: number;
+  scale: number;
+  orientation: 'portrait' | 'landscape';   // supplied by the hook, NEVER derived
+  editableActive: boolean;
+}
+reduceKeyboardState(state, sample) → { state, keyboardOpen }
 ```
+
+`orientation` is **never** computed from `visualHeight` vs `visualWidth`. The hook reads it from `window.matchMedia('(orientation: portrait)')` — a media query evaluated against the layout viewport, which the software keyboard does not resize — with `window.screen?.orientation?.type` as a cross-check where available, and `'portrait'` as the fallback when neither exists. The reducer receives it as an opaque label and compares labels only.
 
 Rules, in order:
 
-- `editableActive === false` and `scale <= 1.01` → this frame is trustworthy: raise the baseline to `max(baseline, height)`. `keyboardOpen` is `false`.
+- `editableActive === false` and `scale <= 1.01` → trustworthy frame: establish or raise the baseline **for that orientation label** (`max(baseline, visualHeight)`). `keyboardOpen` is `false`.
 - `editableActive === true` → the baseline is **frozen**. No write happens for any reason, so a keyboard-obscured sample can never become the baseline. Only the comparison runs.
-- Width change while `editableActive === true` is treated as **jitter, not a reset**: the frozen baseline is kept and used. iOS emits transient width changes during keyboard presentation — discarding the baseline there is exactly the hole v5 had. Only an orientation flip (a width/height *swap*, i.e. the aspect ratio crossing between portrait and landscape) invalidates it.
-- On invalidation the baseline becomes `null` while `editableActive === true`. A `null` baseline reports `keyboardOpen: false` (conservative: keep safe-area padding) and re-seeds only once `editableActive` returns to `false`. It never seeds from an active-composer frame.
+- Width jitter while active → keep the frozen baseline and keep classifying. `visualWidth` is recorded for diagnostics only; it never invalidates.
+- An apparent visual aspect-ratio crossing while active → **ignored entirely**. It is a keyboard artifact, not a rotation.
+- A change in the independently supplied `orientation` label → invalidate the baseline for the new orientation. While `editableActive` is still `true` the result is `keyboardOpen: false` (conservative: keep safe-area padding); a new baseline is established only from the next unobscured, inactive sample.
 - `scale > 1.01` (pinch zoom) → `keyboardOpen: false`, no baseline write.
 
 State model:
 
 ```text
-unfocused + valid scale         → establish or raise the unobscured baseline
-composer becomes active         → freeze the baseline
-active + credible height shrink → software keyboard open → omit safe-area padding
-active + width jitter           → keep the frozen baseline, keep classifying
-orientation flip                → invalidate; no baseline until unfocused again
-no trustworthy baseline         → retain safe-area padding
+unfocused + scale ~1                     → establish or raise baseline for current orientation
+composer becomes active                  → freeze baseline
+active + credible visual-height shrink   → software keyboard open → omit safe-area padding
+active + width jitter or apparent
+  visual aspect-ratio crossing           → preserve baseline, keep classifying
+independently confirmed rotation         → invalidate baseline
+invalid baseline while active            → unknown → retain safe-area padding
+unfocused unobscured sample after
+  rotation                               → establish new baseline
 ```
 
 **Geometry lives outside React.** A pure module (`src/utils/viewportKeyboard.ts`) owns it: `createKeyboardState()` plus `reduceKeyboardState(state, sample)`. Most classifier cases are therefore testable as plain function calls with no React and no jsdom.
@@ -91,7 +103,7 @@ const softwareKeyboardOpen = useSoftwareKeyboardOpen({ editableActive: mainRegio
 const isMainComposerDocked = mainRegion.isActive && viewportBelowXl;
 ```
 
-Hook lifecycle: synchronous initial sample, `resize` + `scroll` on `visualViewport` plus window `resize`/`orientationchange`, one `requestAnimationFrame` coalesce, a re-sample when `editableActive` changes, listeners removed and pending frame cancelled on cleanup, a mounted guard against stale callbacks, rounded values. Falls back to `false` where `visualViewport` is missing.
+Hook lifecycle: synchronous initial sample; listeners on `visualViewport` `resize`/`scroll`, window `resize`/`orientationchange`, and the portrait media-query `change`; one `requestAnimationFrame` coalesce. `editableActive` is read from a **ref** inside the scheduled callback so a coalesced frame can never apply a stale activity value, and an `editableActive` change triggers an immediate re-sample. Listeners removed and the pending frame cancelled on cleanup, a mounted guard against stale callbacks, rounded values. Falls back to `false` where `visualViewport` is missing.
 
 ### 5. Spacer: seeded in flow, then kept in sync
 
