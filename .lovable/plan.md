@@ -1,8 +1,10 @@
-# Dock the comment composer to the keyboard, Facebook-style (v5)
+# Dock the comment composer to the keyboard, Facebook-style (v6)
 
-v5 keeps the approved v4 model and applies the review's three valid corrections: the classifier drops `offsetTop` from its decision and moves into pure functions, the spacer height is seeded while the shell is still in flow, and the focus-to-keyboard transition gets explicit regression coverage.
+v6 closes the one real logical hole the review found: v5's reducer promised it would never re-seed from a keyboard-obscured sample, but its inputs (`height`, `width`, `scale`, `orientation`) gave it no way to know a sample was obscured after a reset discarded the baseline. The reducer now takes composer activity as an input, tolerates width jitter instead of resetting on it, and freezes the baseline while a composer is active. Spacer measurement semantics are also stated unambiguously.
 
-One review point is stale and not applied: the repository *does* already have a jsdom test project. `vitest.config.ts` defines two projects (`node` and `dom`, the latter with `environment: 'jsdom'`, `plugins: [react()]` and `setupFiles: ['./src/test/setup.ts']`), and `package.json` already carries `@testing-library/react` 16.3.2, `@testing-library/jest-dom` 7.0.1 and `jsdom` 30.0.1. New `.test.tsx` suites only need adding to the `dom` project's explicit include list — no infrastructure work.
+The docking architecture is unchanged and approved: `fixed bottom-0` with no keyboard-height offset, one `isMainComposerDocked` boolean, 1280px breakpoint, column-constrained content, guests never dock, reply/edit inline, no automatic scrolling.
+
+Testing infrastructure needs no work: `vitest.config.ts` already defines `node` and `dom` projects (`environment: 'jsdom'`, `plugins: [react()]`, `setupFiles: ['./src/test/setup.ts']`) and `package.json` carries Testing Library, user-event, jest-dom and jsdom. New suites only need registering in the explicit include lists.
 
 Settled by existing evidence: in IMG_2894 `BottomNavigation` — a plain `fixed bottom-0` element — floated *directly above* the open keyboard. Fixed positioning on your device already follows the keyboard-facing viewport edge, so `bottom: keyboardInset` would double-count by a keyboard height. It is not in this plan.
 
@@ -53,28 +55,51 @@ softwareKeyboardOpen = shrink > max(120, baseline * 0.15)
 
 `offsetTop` is deliberately **not** in the decision. Its coordinate meaning shifts with browser chrome, scroll position and zoom, and this plan already says that meaning must be measured on-device — so it cannot simultaneously be hard-coded into the classifier. It is read and logged during physical testing only; it enters the formula in a later patch if, and only if, device evidence requires it.
 
-Guards:
+**Baseline mutation is gated on composer activity.** The reducer's sample includes `editableActive`, and baseline writes only happen while it is `false`:
 
-- The hook mounts with the composer, not on docking, so a pre-focus baseline exists before the keyboard ever appears.
-- `scale > 1.01` (pinch zoom) → not a keyboard, and the frame does not update the baseline.
-- Baseline resets only when `width` or orientation changes, and a reset re-seeds from the *next* frame judged unobscured — a frame that already shows a credible shrink can never become the new baseline.
-- Baseline ratchets up freely (collapsing browser toolbar enlarges the viewport) and only down on a reset, so a toolbar's ~40-60px reappearance stays under the threshold.
+```text
+reduceKeyboardState(state, { height, width, scale, editableActive })
+  → { state, keyboardOpen }
+```
 
-Behavior:
+Rules, in order:
 
-- `softwareKeyboardOpen` → no bottom safe-area padding (the keyboard already covers the home indicator).
-- Focused with no software keyboard, or no trustworthy baseline → keep the safe-area inset.
+- `editableActive === false` and `scale <= 1.01` → this frame is trustworthy: raise the baseline to `max(baseline, height)`. `keyboardOpen` is `false`.
+- `editableActive === true` → the baseline is **frozen**. No write happens for any reason, so a keyboard-obscured sample can never become the baseline. Only the comparison runs.
+- Width change while `editableActive === true` is treated as **jitter, not a reset**: the frozen baseline is kept and used. iOS emits transient width changes during keyboard presentation — discarding the baseline there is exactly the hole v5 had. Only an orientation flip (a width/height *swap*, i.e. the aspect ratio crossing between portrait and landscape) invalidates it.
+- On invalidation the baseline becomes `null` while `editableActive === true`. A `null` baseline reports `keyboardOpen: false` (conservative: keep safe-area padding) and re-seeds only once `editableActive` returns to `false`. It never seeds from an active-composer frame.
+- `scale > 1.01` (pinch zoom) → `keyboardOpen: false`, no baseline write.
 
-**Geometry lives outside React.** A pure module (`viewportKeyboard.ts`) owns the state machine: `createKeyboardState()`, and `reduceKeyboardState(state, { height, width, scale, orientation })` returning `{ state, keyboardOpen }`. The hook is a thin subscriber that feeds it samples. Most classifier cases are therefore testable as plain function calls with no React and no jsdom.
+State model:
 
-Hook lifecycle: synchronous initial sample, `resize` + `scroll` on `visualViewport` plus window `resize`/`orientationchange`, one `requestAnimationFrame` coalesce, listeners removed and pending frame cancelled on cleanup, a mounted guard against stale callbacks, rounded values. Falls back to `false` where `visualViewport` is missing.
+```text
+unfocused + valid scale         → establish or raise the unobscured baseline
+composer becomes active         → freeze the baseline
+active + credible height shrink → software keyboard open → omit safe-area padding
+active + width jitter           → keep the frozen baseline, keep classifying
+orientation flip                → invalidate; no baseline until unfocused again
+no trustworthy baseline         → retain safe-area padding
+```
+
+**Geometry lives outside React.** A pure module (`src/utils/viewportKeyboard.ts`) owns it: `createKeyboardState()` plus `reduceKeyboardState(state, sample)`. Most classifier cases are therefore testable as plain function calls with no React and no jsdom.
+
+**Hook contract.** The hook takes activity as an option and keeps observing before, during and after focus — only *baseline mutation* depends on `editableActive`, never event subscription:
+
+```text
+const mainRegion = useComposerFocusRegion(id, { enabled: Boolean(user) });
+const softwareKeyboardOpen = useSoftwareKeyboardOpen({ editableActive: mainRegion.isActive });
+const isMainComposerDocked = mainRegion.isActive && viewportBelowXl;
+```
+
+Hook lifecycle: synchronous initial sample, `resize` + `scroll` on `visualViewport` plus window `resize`/`orientationchange`, one `requestAnimationFrame` coalesce, a re-sample when `editableActive` changes, listeners removed and pending frame cancelled on cleanup, a mounted guard against stale callbacks, rounded values. Falls back to `false` where `visualViewport` is missing.
 
 ### 5. Spacer: seeded in flow, then kept in sync
 
 - The measurement target is the composer's **visual shell** — the same element that becomes fixed, including border and padding.
-- A `ResizeObserver` observes the shell **from mount, while it is still in flow**, so a valid in-flow height is already stored before focus triggers docking. The first docked render therefore reads a real number rather than depending on a two-step render during keyboard presentation.
-- A `useLayoutEffect` on the docking transition re-measures as a belt-and-braces top-up, but correctness does not rely on it.
-- The stored height is only updated from frames where the shell is in flow; while docked the last in-flow value is held, then refreshed from the fixed shell's own observed height as the textarea grows.
+- That element already carries `mainRegion.ref`. The measurement ref is **composed** with it via a callback ref that assigns both — never assigned over it, which would break focus containment.
+- A `ResizeObserver` observes the shell **from mount, while it is still in flow**, so a valid height is stored before focus triggers docking. The first docked render therefore reads a real number rather than depending on a two-step render during keyboard presentation.
+- Measurement semantics, stated once: seed while in flow, then **keep accepting any non-zero `ResizeObserver` measurement, docked or not**, so multi-line growth updates the spacer. Zero or missing heights are ignored (transition and unmount frames), so the last good value is retained rather than collapsing.
+- A `useLayoutEffect` on the docking transition re-measures as a belt-and-braces top-up; correctness does not depend on it.
 - The spacer is dimension-only: an empty `div` with `aria-hidden="true"` and a height style. No duplicated composer DOM; exactly one textarea is ever rendered.
 - On blur the wrapper returns to flow and the spacer unmounts in the same commit, so there is no jump either way.
 
@@ -119,21 +144,24 @@ Temporary console instrumentation only during physical testing — no debug UI, 
 
 `viewportKeyboard.ts` — pure, no React, no jsdom:
 
-- Baseline seeded from the first unobscured sample; credible shrink → open; recovery → closed.
-- A frame with a credible shrink never becomes the baseline, including immediately after a reset.
+- Baseline seeded and raised only while `editableActive: false`; credible shrink while active → open; recovery → closed.
+- No sample with `editableActive: true` ever writes the baseline — asserted directly on returned state, including a keyboard-open first-active frame.
+- Width jitter while active does **not** discard the baseline; classification continues from the frozen value.
+- Orientation flip invalidates the baseline; while still active the result is `keyboardOpen: false` (padding retained), and re-seeding happens only after `editableActive` returns to `false`.
 - Pinch zoom (`scale > 1.01`) → not open, baseline unchanged.
-- Width/orientation change resets, then re-seeds from the next unobscured sample only.
 - Toolbar-sized shrink under `max(120, baseline * 0.15)` → not open.
 - Height-only decision: `offsetTop` is not an input to the reducer at all.
-- **Full focus-to-keyboard transition** replayed as a sample sequence: pre-focus baseline, then the multi-frame intermediate geometry iOS emits during keyboard presentation (including a transient width jitter and interleaved scroll-driven samples), ending keyboard-settled. Asserts the baseline is never re-seeded from a keyboard-open frame and the final state is open — the exact failure mode where safe-area padding would wrongly return.
+- **Full focus-to-keyboard transition** replayed as a sample sequence: pre-focus unobscured baseline, `editableActive` flips true, then the multi-frame intermediate geometry iOS emits during keyboard presentation (including a transient width jitter and interleaved scroll-driven samples), ending keyboard-settled. Asserts the baseline is byte-identical throughout and the final state is open — the exact failure mode where safe-area padding would wrongly return.
 
-`useSoftwareKeyboardOpen` (fake `visualViewport`): initial synchronous sample, coalesced updates from `resize`/`scroll`/`orientationchange`, missing `visualViewport` → `false`, cleanup removes listeners and cancels the pending frame, no state set after unmount.
+`useSoftwareKeyboardOpen` (fake `visualViewport`): initial synchronous sample, `editableActive` forwarded into every sample, a re-sample when `editableActive` changes, coalesced updates from `resize`/`scroll`/`orientationchange`, missing `visualViewport` → `false`, cleanup removes listeners and cancels the pending frame, no state set after unmount.
 
 `InlineCommentThread` docking (jsdom, stubbed `matchMedia` and `ResizeObserver`):
 
 - Below 1280px + active main region → fixed classes present and a spacer rendered.
 - The spacer has a non-zero height on its first docked frame, sourced from the in-flow measurement taken before focus.
-- `ResizeObserver` growth updates the spacer height.
+- `ResizeObserver` growth updates the spacer height while docked.
+- A zero-height `ResizeObserver` callback does not collapse the spacer — the last non-zero value is retained.
+- The composed ref is intact: focusing the textarea still activates the region (proving the measurement ref did not overwrite `mainRegion.ref`).
 - Crossing 1280px while active removes fixed classes and spacer together; above `xl` neither appears.
 - Keyboard open vs closed selects the correct combined bottom-padding class.
 - Spacer is `aria-hidden`, contains no textarea, and only one textarea exists while docked.
