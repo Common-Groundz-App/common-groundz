@@ -35,7 +35,7 @@ export const useSoftwareKeyboardOpen = ({
     if (typeof window === 'undefined') return;
     const vv = window.visualViewport;
     if (!vv) {
-      setOpen(false);
+      setStatus('unknown');
       return;
     }
 
