@@ -2,24 +2,42 @@
 
 ## What is happening
 
-This is iOS Safari's automatic focus zoom, not a layout bug. Safari zooms the page whenever a focused text field has a font size below 16px. Once it zooms, the scale persists across navigation (feed, other pages) until the user pinches back out — exactly what the screenshots show.
+This is iOS WebKit focus zoom, not a layout bug. Chrome on iPhone uses WebKit too, so the Safari rule applies: focusing a text field whose computed font size is below 16px zooms the page, and that scale persists across navigation until the user pinches out — exactly what the screenshots show.
 
-The comment inputs on the post detail page use `text-sm` (14px):
+Verified in code:
 
-- `src/components/comments/InlineCommentThread.tsx:878` — main comment composer
-- `src/components/comments/InlineCommentThread.tsx:788` — inline reply composer
-- The shared `Textarea` primitive (`src/components/ui/textarea.tsx`) also defaults to `text-sm`, while `Input` already guards against this with `text-base md:text-sm`.
+- `index.html:6` viewport is `width=device-width, initial-scale=1.0, viewport-fit=cover` (no zoom restrictions — good, leave it).
+- `src/components/ui/textarea.tsx:14` — shared primitive defaults to `text-sm` (14px).
+- `src/components/ui/input.tsx:12` — already guards with `text-base ... md:text-sm`, so this is the established project convention.
+- Explicit 14px comment fields: `InlineCommentThread.tsx:878` (main composer), `:788` (reply composer), `CommentItem.tsx:169` (edit), `CommentDialog.tsx:614` (dialog composer), `CommentDialog.tsx:496` (dialog edit).
 
 ## Changes
 
-1. `src/components/comments/InlineCommentThread.tsx` — change `text-sm` to `text-base sm:text-sm` on the two comment textareas (main composer and reply composer). 16px on mobile stops the zoom; visual size on tablet/desktop stays exactly as today.
-2. `src/components/comments/CommentItem.tsx` — apply the same `text-base sm:text-sm` to the comment edit textarea, so editing a comment on mobile does not zoom either.
+Use the existing `text-base md:text-sm` convention everywhere (matches `Input`, and keeps 16px through iPhone landscape widths, which `sm:` at 640px would not).
 
-No viewport meta change (`maximum-scale=1` would disable user pinch-zoom and hurt accessibility). No layout, padding, or spacing changes.
+1. `src/components/ui/textarea.tsx` — primitive default `text-sm` → `text-base md:text-sm`.
+2. `src/components/comments/InlineCommentThread.tsx` — main composer and reply composer textareas: `text-sm` → `text-base md:text-sm`.
+3. `src/components/comments/CommentItem.tsx` — edit textarea: same change.
+4. `src/components/comments/CommentDialog.tsx` — dialog composer and dialog edit textareas: same change.
 
-## Verification (mobile Safari)
+No viewport meta change. No `maximum-scale=1` / `user-scalable=no`. No padding, width, comment behavior, or mention-autocomplete changes.
 
-1. Open a post detail page, tap the comment box — the page must not zoom.
-2. Type, submit, then navigate back to the feed — scale unchanged.
-3. Tap "Reply" on a comment and an "Edit" on your own comment — no zoom in either.
-4. Desktop/tablet: comment text still renders at the current 14px size.
+## Also worth flagging (audit only, no edits unless you say so)
+
+A codebase scan found other editable fields still at 14px or smaller that can trigger the same zoom on mobile:
+
+- `src/components/preferences/TagInput.tsx` — two bare `<input>` fields at `text-sm`.
+- `src/components/feed/composer/DynamicStructuredFields.tsx:144` — raw input at `text-sm`.
+- `src/components/admin/TagInput.tsx` / `SimpleTagInput.tsx` — `text-xs` controls (admin-only, low priority).
+
+These are outside the reported bug. I'll list them after the fix so you can decide whether to include them in a follow-up pass.
+
+## Verification (iPhone Chrome and Safari)
+
+1. Post detail: tap the main comment box — no zoom.
+2. Type and submit — scale stays normal.
+3. Tap Reply composer — no zoom. Tap Edit on your own comment — no zoom.
+4. Open the comment dialog surface (composer and edit) — no zoom.
+5. Navigate back to the feed after typing — feed renders at normal scale.
+6. Repeat step 1 in iPhone landscape — still no zoom.
+7. Desktop/tablet: comment text still renders at today's 14px.
