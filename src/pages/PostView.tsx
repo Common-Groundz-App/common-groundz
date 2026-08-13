@@ -221,7 +221,7 @@ const PostView = () => {
 
         <div className="flex-1 pt-16 xl:pt-0 xl:ml-64 min-w-0">
           {/* Three-column grid on desktop */}
-          <div className="w-full mx-auto grid justify-center xl:grid-cols-7 gap-4 px-0 sm:px-4 py-6">
+          <div className="w-full mx-auto grid grid-cols-1 justify-center xl:grid-cols-7 gap-4 px-0 sm:px-4 py-6">
             {/* Left spacer */}
             <div className="hidden xl:block col-span-1" />
 
