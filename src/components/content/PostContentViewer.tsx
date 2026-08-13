@@ -180,6 +180,29 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
     }
   }, [postId, fetchPost]);
 
+  // Reset the one-shot hash scroll when the route target changes.
+  React.useEffect(() => {
+    hashScrollDoneRef.current = false;
+  }, [postId]);
+
+  // Anchor-based entry into the discussion: runs once, after the post content
+  // containing #comments has mounted. Never focuses the composer, and yields to
+  // a highlighted-comment deep link so the two don't fight.
+  React.useEffect(() => {
+    if (loading || !post || hashScrollDoneRef.current) return;
+    if (window.location.hash !== '#comments') return;
+    if (highlightCommentId) return;
+
+    hashScrollDoneRef.current = true;
+    // One frame after paint, so ScrollToTop's route-change reset has settled.
+    const raf = window.requestAnimationFrame(() => {
+      commentsAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [loading, post, highlightCommentId]);
+
+
+
   // Phase 5: parent (PostView) bumps refreshTick when Mux upload reaches
   // ready, so the post can be refetched to pick up patched media JSON.
   React.useEffect(() => {
