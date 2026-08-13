@@ -18,22 +18,33 @@ The tab bar is hidden by *composer focus*, not by the keyboard. `BottomNavigatio
 
 - `open` — active composer, trustworthy sample, height shrunk past the threshold against the frozen baseline.
 - `closed` — active composer, trustworthy sample (not zoomed, valid height, baseline present in the *same* orientation), height recovered to within the threshold of the baseline.
-- `unknown` — zoomed, invalid height, no baseline, baseline invalidated by rotation, or `visualViewport` unavailable.
+- `unknown` — **no active composer**, or zoomed, invalid height, no baseline, baseline invalidated by rotation, or `visualViewport` unavailable.
+
+Inactive samples are strictly `unknown` (baseline collection still happens there), so an ordinary blur can never fabricate an `open -> closed` transition during React updates.
 
 `keyboardOpen` stays for the docking caller but is now *derived* (`status === 'open'`) so the two can never disagree. The hook returns `{ status, open }`.
 
-### 2. Blur only on a consecutive confirmed dismissal
+### 2. Blur only on a consecutive confirmed dismissal of the *same* session
 
-In `InlineCommentThread`, a session-scoped tracker keyed on the previous *confirmed* status:
+In `InlineCommentThread`, a tracker keyed to the focused editable session — the active region id (and its element) — plus the previous confirmed status:
 
-- Arms on `keyboardStatus === 'open'` while a composer region is active.
-- **Disarms immediately on `unknown`** — so `open -> unknown (zoom/rotation/invalid sample) -> closed` never fires. Only a directly consecutive `open -> closed` pair counts.
-- Also disarms when composer activity ends, on unmount, on route change, and when docking becomes ineligible.
+- Arms on `keyboardStatus === 'open'`, recording *which* editable session was active.
+- Fires only when the very next usable status is `closed` **and the session identity is unchanged**.
+- Disarms on `unknown`, on any session identity change (main -> reply -> edit while the keyboard stays open), when composer activity ends, on unmount, and on route change.
+
+Eligibility is explicit and viewport-gated:
+
+```
+any thread composer active + viewport < 1280px -> observe dismissal and blur
+main composer active      + viewport < 1280px -> additionally apply fixed docking
+```
+
+Above 1280px the bottom nav is already CSS-hidden, so no corrective blur runs (hardware-keyboard users are untouched).
 
 On fire: disarm first, then resolve the target via the thread's own region container refs — not a document query:
 
 ```
-activeElement is editable AND some(regionRef.contains(activeElement)) -> activeElement.blur()
+activeElement is editable AND activeRegionRef.contains(activeElement) -> activeElement.blur()
 ```
 
 Never blurs another thread's composer, an unrelated field, a send/cancel button, the mention popover, or anything after the region deactivated. The existing `onBlurCapture` then deactivates the region, the composer undocks, and the tab bar returns through the same centralized path as tapping elsewhere.
@@ -48,13 +59,15 @@ Dropped. It cannot help here (the textarea stays focused) and it would misfire w
 
 ## Files touched
 
-- `src/utils/viewportKeyboard.ts` — add `keyboardStatus`; `keyboardOpen` derived from it.
+- `src/utils/viewportKeyboard.ts` — add `keyboardStatus` (inactive => `unknown`); `keyboardOpen` derived from it.
 - `src/hooks/useSoftwareKeyboardOpen.ts` — return `{ status, open }`.
-- `src/components/comments/InlineCommentThread.tsx` — consecutive-transition dismissal tracker + region-scoped blur; widen `editableActive` to any region.
+- `src/hooks/useBlurComposerOnKeyboardDismiss.ts` (new) — the session-keyed dismissal tracker, extracted so it is independently testable.
+- `src/components/comments/InlineCommentThread.tsx` — consume the tracker; widen `editableActive` to any region.
 - Tests:
-  - `src/utils/viewportKeyboard.test.ts` — closed vs unknown for rotation / zoom / no baseline / recovery.
+  - `src/utils/viewportKeyboard.test.ts` — closed vs unknown for inactive / rotation / zoom / no baseline / recovery.
   - `src/hooks/useSoftwareKeyboardOpen.test.tsx` — status propagation, `open` derived, no `unknown` misfire.
-  - **New component test in the existing jsdom project** — renders the thread (with the Supabase/auth mocking needed) and asserts end-to-end: focused textarea is blurred on `open -> closed`, region deactivates, composer undocks, `BottomNavigation` renders again; and that `open -> unknown -> closed` does **not** blur.
+  - `useBlurComposerOnKeyboardDismiss` unit tests — fires on `open -> closed`; no fire on `open -> unknown -> closed`, on session identity change, or above 1280px.
+  - **Component test in the existing jsdom project** — Supabase/auth/comment data mocked, asserting: focused textarea blurred on `open -> closed`, deferred `onBlurCapture` flushed via `requestAnimationFrame`, region deactivates, composer undocks, spacer removed, `BottomNavigation` renders again.
   - `ComposerFocusContext` and its tests stay as they are.
 
 ## Verification (physical iOS)
