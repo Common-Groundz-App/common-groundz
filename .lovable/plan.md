@@ -1,6 +1,6 @@
-# Dock the comment composer to the keyboard, Facebook-style (v6)
+# Dock the comment composer to the keyboard, Facebook-style (v7)
 
-v6 closes the one real logical hole the review found: v5's reducer promised it would never re-seed from a keyboard-obscured sample, but its inputs (`height`, `width`, `scale`, `orientation`) gave it no way to know a sample was obscured after a reset discarded the baseline. The reducer now takes composer activity as an input, tolerates width jitter instead of resetting on it, and freezes the baseline while a composer is active. Spacer measurement semantics are also stated unambiguously.
+v7 fixes the last correctness issue: v6 defined an orientation flip as the visual viewport's aspect ratio crossing between portrait and landscape, but a tall keyboard alone can shrink a 390×700 visual viewport to 390×300 — which reads as "landscape" with no rotation. That would invalidate the trustworthy baseline exactly when the keyboard opens, report `keyboardOpen: false`, keep the safe-area padding, and restore the gap this work removes. Orientation now comes from a signal that cannot move because the keyboard shrank the visual viewport. v6's earlier fix stands: the reducer takes composer activity, freezes the baseline while active, and tolerates width jitter.
 
 The docking architecture is unchanged and approved: `fixed bottom-0` with no keyboard-height offset, one `isMainComposerDocked` boolean, 1280px breakpoint, column-constrained content, guests never dock, reply/edit inline, no automatic scrolling.
 
@@ -55,30 +55,42 @@ softwareKeyboardOpen = shrink > max(120, baseline * 0.15)
 
 `offsetTop` is deliberately **not** in the decision. Its coordinate meaning shifts with browser chrome, scroll position and zoom, and this plan already says that meaning must be measured on-device — so it cannot simultaneously be hard-coded into the classifier. It is read and logged during physical testing only; it enters the formula in a later patch if, and only if, device evidence requires it.
 
-**Baseline mutation is gated on composer activity.** The reducer's sample includes `editableActive`, and baseline writes only happen while it is `false`:
+**Baseline mutation is gated on composer activity, and orientation comes from an independent signal.**
 
 ```text
-reduceKeyboardState(state, { height, width, scale, editableActive })
-  → { state, keyboardOpen }
+interface KeyboardViewportSample {
+  visualHeight: number;
+  visualWidth: number;
+  scale: number;
+  orientation: 'portrait' | 'landscape';   // supplied by the hook, NEVER derived
+  editableActive: boolean;
+}
+reduceKeyboardState(state, sample) → { state, keyboardOpen }
 ```
+
+`orientation` is **never** computed from `visualHeight` vs `visualWidth`. The hook reads it from `window.matchMedia('(orientation: portrait)')` — a media query evaluated against the layout viewport, which the software keyboard does not resize — with `window.screen?.orientation?.type` as a cross-check where available, and `'portrait'` as the fallback when neither exists. The reducer receives it as an opaque label and compares labels only.
 
 Rules, in order:
 
-- `editableActive === false` and `scale <= 1.01` → this frame is trustworthy: raise the baseline to `max(baseline, height)`. `keyboardOpen` is `false`.
+- `editableActive === false` and `scale <= 1.01` → trustworthy frame: establish or raise the baseline **for that orientation label** (`max(baseline, visualHeight)`). `keyboardOpen` is `false`.
 - `editableActive === true` → the baseline is **frozen**. No write happens for any reason, so a keyboard-obscured sample can never become the baseline. Only the comparison runs.
-- Width change while `editableActive === true` is treated as **jitter, not a reset**: the frozen baseline is kept and used. iOS emits transient width changes during keyboard presentation — discarding the baseline there is exactly the hole v5 had. Only an orientation flip (a width/height *swap*, i.e. the aspect ratio crossing between portrait and landscape) invalidates it.
-- On invalidation the baseline becomes `null` while `editableActive === true`. A `null` baseline reports `keyboardOpen: false` (conservative: keep safe-area padding) and re-seeds only once `editableActive` returns to `false`. It never seeds from an active-composer frame.
+- Width jitter while active → keep the frozen baseline and keep classifying. `visualWidth` is recorded for diagnostics only; it never invalidates.
+- An apparent visual aspect-ratio crossing while active → **ignored entirely**. It is a keyboard artifact, not a rotation.
+- A change in the independently supplied `orientation` label → invalidate the baseline for the new orientation. While `editableActive` is still `true` the result is `keyboardOpen: false` (conservative: keep safe-area padding); a new baseline is established only from the next unobscured, inactive sample.
 - `scale > 1.01` (pinch zoom) → `keyboardOpen: false`, no baseline write.
 
 State model:
 
 ```text
-unfocused + valid scale         → establish or raise the unobscured baseline
-composer becomes active         → freeze the baseline
-active + credible height shrink → software keyboard open → omit safe-area padding
-active + width jitter           → keep the frozen baseline, keep classifying
-orientation flip                → invalidate; no baseline until unfocused again
-no trustworthy baseline         → retain safe-area padding
+unfocused + scale ~1                     → establish or raise baseline for current orientation
+composer becomes active                  → freeze baseline
+active + credible visual-height shrink   → software keyboard open → omit safe-area padding
+active + width jitter or apparent
+  visual aspect-ratio crossing           → preserve baseline, keep classifying
+independently confirmed rotation         → invalidate baseline
+invalid baseline while active            → unknown → retain safe-area padding
+unfocused unobscured sample after
+  rotation                               → establish new baseline
 ```
 
 **Geometry lives outside React.** A pure module (`src/utils/viewportKeyboard.ts`) owns it: `createKeyboardState()` plus `reduceKeyboardState(state, sample)`. Most classifier cases are therefore testable as plain function calls with no React and no jsdom.
@@ -91,7 +103,7 @@ const softwareKeyboardOpen = useSoftwareKeyboardOpen({ editableActive: mainRegio
 const isMainComposerDocked = mainRegion.isActive && viewportBelowXl;
 ```
 
-Hook lifecycle: synchronous initial sample, `resize` + `scroll` on `visualViewport` plus window `resize`/`orientationchange`, one `requestAnimationFrame` coalesce, a re-sample when `editableActive` changes, listeners removed and pending frame cancelled on cleanup, a mounted guard against stale callbacks, rounded values. Falls back to `false` where `visualViewport` is missing.
+Hook lifecycle: synchronous initial sample; listeners on `visualViewport` `resize`/`scroll`, window `resize`/`orientationchange`, and the portrait media-query `change`; one `requestAnimationFrame` coalesce. `editableActive` is read from a **ref** inside the scheduled callback so a coalesced frame can never apply a stale activity value, and an `editableActive` change triggers an immediate re-sample. Listeners removed and the pending frame cancelled on cleanup, a mounted guard against stale callbacks, rounded values. Falls back to `false` where `visualViewport` is missing.
 
 ### 5. Spacer: seeded in flow, then kept in sync
 
@@ -122,6 +134,8 @@ Temporary console instrumentation only during physical testing — no debug UI, 
 - Bottom padding is one combined value, not stacked utilities: docked with keyboard → `pb-2`; docked without a software keyboard → `pb-[calc(0.5rem+env(safe-area-inset-bottom))]`. No reliance on generated CSS order.
 - The mention popover gets an explicitly higher tier than the docked bar (bar `z-50`, popover above it) rather than depending on DOM order at equal `z-50`.
 - `PostView.tsx` bottom padding is left untouched unless measurement proves it causes a visible issue.
+- The composed ref (region ref + measurement ref) is memoized, so React never repeatedly detaches and reattaches the shell or its `ResizeObserver`.
+- The measured shell includes its top border, vertical padding, textarea growth, and any safe-area padding applied to the shell — the same box that becomes fixed.
 
 ## Technical notes
 
@@ -147,13 +161,14 @@ Temporary console instrumentation only during physical testing — no debug UI, 
 - Baseline seeded and raised only while `editableActive: false`; credible shrink while active → open; recovery → closed.
 - No sample with `editableActive: true` ever writes the baseline — asserted directly on returned state, including a keyboard-open first-active frame.
 - Width jitter while active does **not** discard the baseline; classification continues from the frozen value.
-- Orientation flip invalidates the baseline; while still active the result is `keyboardOpen: false` (padding retained), and re-seeding happens only after `editableActive` returns to `false`.
+- A change in the supplied `orientation` label invalidates the baseline; while still active the result is `keyboardOpen: false` (padding retained), and re-seeding happens only after `editableActive` returns to `false`.
+- **Keyboard shrink must not read as rotation:** a 390×700 portrait baseline followed by an active 390×300 sample whose `orientation` label is still `'portrait'` → `keyboardOpen: true`, baseline unchanged. The reducer never inspects the aspect ratio.
 - Pinch zoom (`scale > 1.01`) → not open, baseline unchanged.
 - Toolbar-sized shrink under `max(120, baseline * 0.15)` → not open.
 - Height-only decision: `offsetTop` is not an input to the reducer at all.
-- **Full focus-to-keyboard transition** replayed as a sample sequence: pre-focus unobscured baseline, `editableActive` flips true, then the multi-frame intermediate geometry iOS emits during keyboard presentation (including a transient width jitter and interleaved scroll-driven samples), ending keyboard-settled. Asserts the baseline is byte-identical throughout and the final state is open — the exact failure mode where safe-area padding would wrongly return.
+- **Full focus-to-keyboard transition** replayed as a sample sequence: pre-focus unobscured baseline, `editableActive` flips true *before* the first keyboard resize sample, then the multi-frame intermediate geometry iOS emits during keyboard presentation (including a transient width jitter, an aspect-ratio crossing, and interleaved scroll-driven samples), ending keyboard-settled. Asserts the baseline is unchanged throughout and the final state is open — the exact failure mode where safe-area padding would wrongly return.
 
-`useSoftwareKeyboardOpen` (fake `visualViewport`): initial synchronous sample, `editableActive` forwarded into every sample, a re-sample when `editableActive` changes, coalesced updates from `resize`/`scroll`/`orientationchange`, missing `visualViewport` → `false`, cleanup removes listeners and cancels the pending frame, no state set after unmount.
+`useSoftwareKeyboardOpen` (fake `visualViewport` and stubbed `matchMedia`): initial synchronous sample; `orientation` sourced from the portrait media query, not from viewport dimensions; a media-query `change` propagates a new label; `editableActive` read from a ref so a coalesced frame never applies a stale value; an `editableActive` change forces an immediate re-sample; coalesced updates from `resize`/`scroll`/`orientationchange`; missing `visualViewport` → `false`; cleanup removes every listener and cancels the pending frame; no state set after unmount.
 
 `InlineCommentThread` docking (jsdom, stubbed `matchMedia` and `ResizeObserver`):
 
