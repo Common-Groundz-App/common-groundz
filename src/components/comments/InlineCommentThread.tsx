@@ -742,7 +742,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                 onEditSave={handleEditSave}
                 onEditContentChange={setEditCommentContent}
                 {...editMentionProps(group.comment.id)}
-                editRegionProps={editRegion}
+                editRegionProps={editRegionProps}
                 onDeleteClick={handleDeleteClick}
                 onReplyClick={handleReplyClick}
                 onLikeClick={handleLikeClick}
@@ -777,7 +777,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                         onEditSave={handleEditSave}
                         onEditContentChange={setEditCommentContent}
                         {...editMentionProps(reply.id)}
-                        editRegionProps={editRegion}
+                        editRegionProps={editRegionProps}
                         onDeleteClick={handleDeleteClick}
                         onReplyClick={handleReplyClick}
                         onLikeClick={handleLikeClick}
@@ -823,7 +823,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                             onEditSave={handleEditSave}
                             onEditContentChange={setEditCommentContent}
                             {...editMentionProps(reply.id)}
-                        editRegionProps={editRegion}
+                        editRegionProps={editRegionProps}
                             onDeleteClick={handleDeleteClick}
                             onReplyClick={handleReplyClick}
                             onLikeClick={handleLikeClick}
@@ -839,7 +839,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
 
               {/* Inline reply input */}
               {replyingTo && (replyingTo.id === group.comment.id || group.replies.some(r => r.id === replyingTo.id)) && (
-                <div className="ml-6 p-3" {...replyRegion}>
+                <div className="ml-6 p-3" {...replyRegionProps}>
                   <div className="text-xs text-muted-foreground mb-2">
                     Replying to <span className="font-medium text-foreground">@{replyingTo.username}</span>
                   </div>
