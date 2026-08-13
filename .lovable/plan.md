@@ -1,6 +1,6 @@
-# Dock the comment composer to the keyboard, Facebook-style (v6)
+# Dock the comment composer to the keyboard, Facebook-style (v7)
 
-v6 closes the one real logical hole the review found: v5's reducer promised it would never re-seed from a keyboard-obscured sample, but its inputs (`height`, `width`, `scale`, `orientation`) gave it no way to know a sample was obscured after a reset discarded the baseline. The reducer now takes composer activity as an input, tolerates width jitter instead of resetting on it, and freezes the baseline while a composer is active. Spacer measurement semantics are also stated unambiguously.
+v7 fixes the last correctness issue: v6 defined an orientation flip as the visual viewport's aspect ratio crossing between portrait and landscape, but a tall keyboard alone can shrink a 390×700 visual viewport to 390×300 — which reads as "landscape" with no rotation. That would invalidate the trustworthy baseline exactly when the keyboard opens, report `keyboardOpen: false`, keep the safe-area padding, and restore the gap this work removes. Orientation now comes from a signal that cannot move because the keyboard shrank the visual viewport. v6's earlier fix stands: the reducer takes composer activity, freezes the baseline while active, and tolerates width jitter.
 
 The docking architecture is unchanged and approved: `fixed bottom-0` with no keyboard-height offset, one `isMainComposerDocked` boolean, 1280px breakpoint, column-constrained content, guests never dock, reply/edit inline, no automatic scrolling.
 
