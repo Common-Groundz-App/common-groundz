@@ -3,6 +3,7 @@ import React, { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallba
 import { useComposerFocusRegion } from '@/contexts/ComposerFocusContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSoftwareKeyboardOpen } from '@/hooks/useSoftwareKeyboardOpen';
+import { useBlurComposerOnKeyboardDismiss } from '@/hooks/useBlurComposerOnKeyboardDismiss';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
