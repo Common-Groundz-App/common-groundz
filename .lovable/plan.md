@@ -38,24 +38,37 @@ While `isMainComposerDocked`:
 
 No `visualViewport` math in shipped positioning. If physical testing shows `bottom-0` sitting *behind* the keyboard on a specific browser, that comes back as a separate measured patch.
 
-### 4. Safe area keyed to software-keyboard visibility, not focus
+### 4. Safe area keyed to a baseline-relative keyboard signal
 
-Focus alone does not prove a software keyboard is open (iPad hardware/Bluetooth keyboard, accessibility input, programmatic focus). So a minimal one-bit classifier:
+Focus alone does not prove a software keyboard is open (iPad hardware/Bluetooth keyboard, accessibility input, programmatic focus), and `innerHeight` is not a stable layout baseline — on iOS it can shrink alongside `visualViewport.height`, which would make a difference-based test report "no keyboard" and reintroduce exactly the safe-area gap we are removing. So the classifier compares against a remembered unobscured baseline instead:
 
 ```text
-softwareKeyboardOpen = visualViewport exists && (innerHeight - (visualViewport.height + visualViewport.offsetTop)) > 120
+baseline    = max observed visualViewport.height while no keyboard is credible,
+              reset on orientationchange / width change / scale change
+obscured    = baseline - (visualViewport.height + visualViewport.offsetTop)
+softwareKeyboardOpen = obscured > max(120, baseline * 0.15)
 ```
 
-- `softwareKeyboardOpen` → no bottom safe-area padding (the keyboard already covers the home indicator); plain `py-2`.
-- Focused with no software keyboard → keep `pb-[env(safe-area-inset-bottom)]`.
+Guards:
 
-This reads the viewport only to classify, never to position. It is lifecycle-safe: synchronous initial measurement, `resize` + `scroll` on `visualViewport` plus window `resize`/`orientationchange`, one `requestAnimationFrame` coalesce, listeners removed and the pending frame cancelled on cleanup, a mounted guard against stale callbacks, and rounded values. Falls back to `false` (keep safe-area padding) where `visualViewport` is missing.
+- The hook mounts with the composer, not on docking, so a pre-focus baseline exists before the keyboard ever appears.
+- `visualViewport.scale > 1.01` (pinch zoom) → not a keyboard; baseline is not updated from zoomed frames.
+- Baseline resets when `visualViewport.width` or orientation changes; it never latches a stale portrait value in landscape.
+- Baseline ratchets *up* freely (browser toolbar collapsing enlarges the viewport) and only down on a reset, so toolbar movement alone cannot fake a keyboard: a collapsing toolbar grows the viewport, and its ~40-60px reappearance stays under the threshold.
+
+Behavior:
+
+- `softwareKeyboardOpen` → no bottom safe-area padding (the keyboard already covers the home indicator).
+- Focused with no software keyboard → keep the safe-area inset.
+
+This reads the viewport only to classify, never to position. Lifecycle: synchronous initial measurement, `resize` + `scroll` on `visualViewport` plus window `resize`/`orientationchange`, one `requestAnimationFrame` coalesce, listeners removed and pending frame cancelled on cleanup, a mounted guard against stale callbacks, rounded values. Falls back to `false` (keep safe-area padding) where `visualViewport` is missing.
 
 ### 5. Spacer: measured before first docked paint, then kept in sync
 
 - The measurement target is the composer's **visual shell** — the same element that becomes fixed, including its border and padding — not a viewport-wide outer wrapper.
-- Height is captured synchronously in a layout effect on the transition into docked state, so the first docked frame already has a correct spacer (no zero-height one-frame jump).
-- A `ResizeObserver` on that shell then keeps the height current as the textarea grows from one line to several, and while docked the spacer holds exactly that height in flow.
+- Height is captured in `useLayoutEffect` on the transition into docked state, so the state update flushes before paint and the first docked frame already has a correct spacer (no zero-height one-frame jump).
+- The spacer is dimension-only: an empty `div` with `aria-hidden="true"` and a height style. No duplicated composer DOM, and exactly one textarea is ever rendered.
+- A `ResizeObserver` on that shell keeps the height current as the textarea grows from one line to several; while docked the spacer holds exactly that height in flow.
 - On blur the wrapper returns to flow and the spacer unmounts in the same commit, so there is no jump either way.
 
 ### 6. No automatic comment-list scrolling
