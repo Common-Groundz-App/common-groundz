@@ -26,21 +26,20 @@ Hook `useComposerFocusRegion(id)` returns props for the **composer container**:
 
 Dropping `useIsMobile()`: it flips at 768px while `BottomNavigation` is `xl:hidden` (1280px), which would leave 768–1279px tablets with the original awkward behaviour. The context tracks focus with no viewport logic; `BottomNavigation` alone decides, and since it is already CSS-hidden above `xl`, no extra gate is needed.
 
-### 3. Instance-safe region ids
+### 3. Genuinely instance-safe region ids
 
-- main composer: `comment-main:${postId}`
-- reply composer: `comment-reply:${parentCommentId}`
-- edit composer: `comment-edit:${comment.id}`
+Database ids alone aren't enough — the same thread can mount twice (page + dialog). And the component's prop is `itemId` (it serves posts *and* recommendations), not `postId`. So each mounted `InlineCommentThread` generates a `useId()` instance prefix and composes:
 
-No hardcoded global ids, so two concurrently mounted threads (dialog, nested surface, retained route) can't collide.
+- main: `${instanceId}:${itemType}:${itemId}:main`
+- reply: `${instanceId}:${itemType}:${itemId}:reply:${parentCommentId}`
+- edit: `${instanceId}:${itemType}:${itemId}:edit:${comment.id}`
 
-### 4. Submit keeps the composer active while the textarea stays focused
+### 5. Guest gating via a generic hook option, not auth knowledge
 
-The current main submit path clears the text but does not blur. Explicitly deactivating there would pop the tab bar back above a still-open keyboard, and no new focus event would ever re-hide it. So: **no explicit deactivate on submit** — the region stays active as long as focus stays inside, which also lets the user post a second comment without reopening the keyboard. Cancel/save on reply and edit release through unmount cleanup; explicit `deactivate` is only a defensive fallback there, never a competing source of truth.
+The hook stays auth-agnostic: it takes `enabled` and simply never activates when `enabled` is false. `InlineCommentThread` passes `enabled: Boolean(user)`, so a guest's transient focus never hides the nav and the hook stays reusable for other composers.
 
-### 5. Guest auth ordering
+For accuracy: the existing textarea `onFocus` does *not* call `requireAuth()` first — it currently clears the draft, calls `requireAuth(...)`, then blurs the textarea. That handler is left exactly as is; the `enabled` gate is what protects the nav.
 
-React capture handlers run before the target's own `onFocus`, so `requireAuth()` in the existing textarea handler would fire *after* activation and leave the nav hidden behind the auth prompt. The region's focus handler therefore checks the signed-in state before activating, and the existing `requireAuth()` stays the first statement in the textarea's `onFocus` — unchanged.
 
 ### 6. Consume it in the nav
 
