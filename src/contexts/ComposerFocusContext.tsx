@@ -91,6 +91,14 @@ export interface ComposerFocusRegionProps {
 }
 
 /**
+ * DOM props plus this region's own activity flag. `isActive` is NOT a DOM prop,
+ * so consumers must destructure it out before spreading onto an element.
+ */
+export interface ComposerFocusRegion extends ComposerFocusRegionProps {
+  isActive: boolean;
+}
+
+/**
  * Returns props for a composer *container*. Focus moving between the textarea,
  * the send button, or any other control inside the container keeps the region
  * active — only focus leaving the container releases it.
