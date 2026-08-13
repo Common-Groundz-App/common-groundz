@@ -83,18 +83,52 @@ Simpler (stays in flow, no spacer, inherits width), but it only pins while its s
 
 Temporary console instrumentation only during physical testing — no debug UI, no feature flag, no committed logging. Values worth reading: composer `rect.bottom`, `visualViewport.height`, `visualViewport.offsetTop`, whether the keyboard-facing edge equals `offsetTop + height`, computed page bottom padding, shell and spacer heights, `document.activeElement`, and viewport width relative to 1280px. All of it is removed before the change is considered complete.
 
+## Implementation rules (explicit, per review)
+
+- One `isMainComposerDocked` boolean drives fixed positioning, spacer rendering, shell observation and docked styling — no second derived condition.
+- Region `ref` and focus handlers stay on the same element across the flow/fixed transition, so focus is never lost when the shell re-styles.
+- Bottom padding is one combined value, not stacked utilities: docked with keyboard → `pb-2`; docked without a software keyboard → `pb-[calc(0.5rem+env(safe-area-inset-bottom))]`. No reliance on generated CSS order.
+- The mention popover gets an explicitly higher tier than the docked bar (bar `z-50`, popover above it) rather than depending on DOM order at equal `z-50`.
+- `PostView.tsx` bottom padding is left untouched unless measurement proves it causes a visible issue.
+
 ## Technical notes
 
 - Purely presentational: no changes to submission, mentions, auth gating, or data flow.
-- `PostView.tsx`'s `pb-[calc(4rem+...)]` stays as-is; the docked bar occupies the band the hidden nav vacated.
 - Guests never dock: `enabled: Boolean(user)` already blocks activation and the existing blur-and-prompt `onFocus` path is untouched.
 
 ## Files touched
 
 - `src/contexts/ComposerFocusContext.tsx` (expose `isActive` per region)
-- `src/hooks/useSoftwareKeyboardOpen.ts` (new — the one-bit classifier from §4)
+- `src/hooks/useSoftwareKeyboardOpen.ts` (new — the baseline classifier from §4)
 - `src/components/comments/InlineCommentThread.tsx` (docked wrapper + spacer)
-- `src/contexts/ComposerFocusContext.test.tsx` (cover `isActive`: active / inactive / disabled / two instances)
+- `src/contexts/ComposerFocusContext.test.tsx` (add `isActive` cases)
+- `src/hooks/useSoftwareKeyboardOpen.test.ts` (new)
+- `src/components/comments/InlineCommentThread.docking.test.tsx` (new)
+- `vitest.config.ts` (add the two new suites to the existing `dom` project's explicit include list — the jsdom project already exists, so no new infrastructure is needed)
+
+## Executable coverage
+
+`useSoftwareKeyboardOpen` (fake `visualViewport`, driven events):
+
+- Baseline captured before focus; credible shrink → open; shrink recovery → closed.
+- Both `innerHeight` and `visualViewport.height` shrinking together still reports open (the case the old classifier failed).
+- Pinch zoom (`scale > 1.01`) → not open, and baseline unchanged.
+- Orientation/width change resets the baseline instead of latching the old one.
+- Small toolbar-sized shrink under threshold → not open.
+- Missing `visualViewport` → `false`.
+- Cleanup removes all listeners and cancels the pending frame.
+
+`InlineCommentThread` docking (jsdom, stubbed `matchMedia` and `ResizeObserver`):
+
+- Below 1280px + active main region → fixed classes present and a spacer rendered.
+- The spacer has a non-zero height on its first rendered frame.
+- `ResizeObserver` callback growth updates the spacer height.
+- Crossing 1280px while active removes fixed classes and spacer together; above `xl` neither appears.
+- Keyboard open vs closed selects the correct combined bottom-padding class.
+- Spacer is `aria-hidden`, contains no textarea, and only one textarea exists while docked.
+- Unmount disconnects the observer.
+
+`ComposerFocusContext`: `isActive` true for the focused region only, false for siblings, false when `enabled` is false, and independent across two mounted instances.
 
 ## Verification (physical iOS, Safari + Chrome, and iPad)
 
