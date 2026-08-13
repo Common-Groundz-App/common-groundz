@@ -53,16 +53,18 @@ const Composer = ({
   enabled?: boolean;
   label?: string;
 }) => {
-  const region = useComposerFocusRegion(id, { enabled });
+  const { isActive, ...region } = useComposerFocusRegion(id, { enabled });
   return (
     <div {...region}>
       <textarea aria-label={`${label}-input`} />
       <button type="button" aria-label={`${label}-send`}>
         send
       </button>
+      <span data-testid={`${label}-active`}>{isActive ? 'active' : 'idle'}</span>
     </div>
   );
 };
+
 
 const renderApp = (ui: React.ReactNode) =>
   render(
