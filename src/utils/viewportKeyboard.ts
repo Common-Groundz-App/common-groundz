@@ -33,8 +33,16 @@ export interface KeyboardState {
   lastWidth: number | null;
 }
 
+/**
+ * Tri-state so callers can distinguish "the keyboard genuinely closed" from
+ * "this sample tells us nothing" (zoom, rotation, no baseline, inactive).
+ */
+export type KeyboardStatus = 'open' | 'closed' | 'unknown';
+
 export interface KeyboardReduceResult {
   state: KeyboardState;
+  keyboardStatus: KeyboardStatus;
+  /** Derived from `keyboardStatus` so the two can never disagree. */
   keyboardOpen: boolean;
 }
 
