@@ -1,6 +1,6 @@
-# Dock the comment composer to the keyboard, Facebook-style (v3)
+# Dock the comment composer to the keyboard, Facebook-style (v4)
 
-Both reviews agree the shape is right; v3 folds in their three tightenings: one authoritative breakpoint signal, safe-area based on software-keyboard visibility rather than focus, and pre-paint spacer measurement.
+v4 keeps v3's positioning model and replaces the two weak parts: the keyboard classifier now works from a pre-focus baseline instead of `innerHeight` math, and the test plan covers the docking behavior rather than only the focus context.
 
 Settled by existing evidence: in IMG_2894 `BottomNavigation` — a plain `fixed bottom-0` element — floated *directly above* the open keyboard. Fixed positioning on your device already follows the keyboard-facing viewport edge, so `bottom: keyboardInset` would double-count by a keyboard height. It is not in this plan.
 
