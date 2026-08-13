@@ -56,7 +56,11 @@ iOS already scrolls the focused input into view; an extra smooth scroll fights t
 - `src/components/comments/InlineCommentThread.tsx` (wire main / reply / edit regions)
 - `src/components/comments/CommentItem.tsx` (accept region props for the edit row)
 - `src/components/navigation/BottomNavigation.tsx` (return `null` while active)
-- Unit tests for the context: overlapping regions, idempotent activate/deactivate, route reset, unmount cleanup.
+- Tests — context reducer tests are not enough, so add hook/component integration tests (Testing Library) covering: capture-phase focus activation, deferred blur with an explicitly flushed `requestAnimationFrame`, unmount cleanup, retained focus after submit, `enabled: false` guest regions, route reset, two overlapping thread instances, and `BottomNavigation` rendering `null` while active.
+
+## Scope note: this tracks focus, not the keyboard
+
+The model is composer *focus*, which is the right first-pass tradeoff. Detecting actual software-keyboard visibility would need a separate `visualViewport` mechanism with many more edge cases. So the promise is "blur the composer → nav returns", not "any keyboard-dismissal gesture → nav returns"; some browser/keyboard combinations retain element focus. If device testing shows dismissal frequently retains focus, keyboard-visibility detection becomes a follow-up.
 
 ## Explicitly unchanged
 
@@ -65,8 +69,8 @@ Viewport meta, the 16px mobile textarea font fix, comment behaviour, mention aut
 ## Verification (physical iOS/iPadOS, Safari + Chrome)
 
 1. Tap the main comment box → tab bar disappears; composer visible above keyboard.
-2. Dismiss keyboard / tap elsewhere → tab bar returns.
-3. Submit a comment with focus retained → tab bar stays hidden, keyboard stays open, typing again works; dismissing the keyboard restores the nav.
+2. Blur the composer by tapping elsewhere on the page → tab bar returns.
+3. Submit a comment with focus retained → tab bar stays hidden, keyboard stays open, typing again works; blurring restores the nav.
 4. Reply composer and a comment's Edit composer → tab bar hides in both; cancel restores it.
 5. Move between main / reply / edit regions → no flicker.
 6. Type `@` → autocomplete opens and selecting a name does not restore the tab bar.
