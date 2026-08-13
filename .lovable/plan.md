@@ -34,7 +34,12 @@ Database ids alone aren't enough — the same thread can mount twice (page + dia
 - reply: `${instanceId}:${itemType}:${itemId}:reply:${parentCommentId}`
 - edit: `${instanceId}:${itemType}:${itemId}:edit:${comment.id}`
 
+### 4. Submit keeps the region active while the textarea stays focused
+
+The main submit path clears the text but does not blur. Deactivating there would pop the tab bar back above a still-open keyboard, and since no new focus event fires it would never re-hide. So there is no explicit deactivate on submit — the region stays active while focus stays inside, which also lets the user post a second comment without reopening the keyboard. Reply/edit cancel and save release naturally through unmount cleanup.
+
 ### 5. Guest gating via a generic hook option, not auth knowledge
+
 
 The hook stays auth-agnostic: it takes `enabled` and simply never activates when `enabled` is false. `InlineCommentThread` passes `enabled: Boolean(user)`, so a guest's transient focus never hides the nav and the hook stays reusable for other composers.
 
