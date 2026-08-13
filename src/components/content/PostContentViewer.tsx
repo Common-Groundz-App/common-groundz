@@ -406,12 +406,11 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
       )}
 
       {/* Inline Comments */}
-      <div className="mt-6 pt-6 border-t">
+      <div id="comments" ref={commentsAnchorRef} className="mt-6 pt-6 border-t scroll-mt-20">
         <InlineCommentThread
           itemId={postId}
           itemType="post"
           highlightCommentId={highlightCommentId}
-          autoFocusInput={autoFocusComment}
         />
       </div>
 
