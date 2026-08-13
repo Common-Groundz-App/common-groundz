@@ -106,9 +106,9 @@ export interface ComposerFocusRegion extends ComposerFocusRegionProps {
 export const useComposerFocusRegion = (
   id: string,
   options?: { enabled?: boolean }
-): ComposerFocusRegionProps => {
+): ComposerFocusRegion => {
   const enabled = options?.enabled !== false;
-  const { activate, deactivate } = useComposerFocus();
+  const { activate, deactivate, activeIds } = useComposerFocus();
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
 
