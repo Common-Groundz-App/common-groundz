@@ -1,6 +1,8 @@
-# Dock the comment composer to the keyboard, Facebook-style (v4)
+# Dock the comment composer to the keyboard, Facebook-style (v5)
 
-v4 keeps v3's positioning model and replaces the two weak parts: the keyboard classifier now works from a pre-focus baseline instead of `innerHeight` math, and the test plan covers the docking behavior rather than only the focus context.
+v5 keeps the approved v4 model and applies the review's three valid corrections: the classifier drops `offsetTop` from its decision and moves into pure functions, the spacer height is seeded while the shell is still in flow, and the focus-to-keyboard transition gets explicit regression coverage.
+
+One review point is stale and not applied: the repository *does* already have a jsdom test project. `vitest.config.ts` defines two projects (`node` and `dom`, the latter with `environment: 'jsdom'`, `plugins: [react()]` and `setupFiles: ['./src/test/setup.ts']`), and `package.json` already carries `@testing-library/react` 16.3.2, `@testing-library/jest-dom` 7.0.1 and `jsdom` 30.0.1. New `.test.tsx` suites only need adding to the `dom` project's explicit include list — no infrastructure work.
 
 Settled by existing evidence: in IMG_2894 `BottomNavigation` — a plain `fixed bottom-0` element — floated *directly above* the open keyboard. Fixed positioning on your device already follows the keyboard-facing viewport edge, so `bottom: keyboardInset` would double-count by a keyboard height. It is not in this plan.
 
