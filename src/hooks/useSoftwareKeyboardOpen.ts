@@ -99,5 +99,5 @@ export const useSoftwareKeyboardOpen = ({
     // re-sample when activity flips, without changing what we subscribe to.
   }, [editableActive]);
 
-  return open;
+  return { status, open: status === 'open' };
 };
