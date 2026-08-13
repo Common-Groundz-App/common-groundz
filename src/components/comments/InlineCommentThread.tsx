@@ -101,20 +101,19 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const instanceId = useId();
   const regionBase = `${instanceId}:${itemType}:${itemId}`;
   const composerEnabled = Boolean(user);
-  const mainRegion = useComposerFocusRegion(`${regionBase}:main`, { enabled: composerEnabled });
-  const replyRegion = useComposerFocusRegion(
-    `${regionBase}:reply:${replyingTo?.id ?? 'none'}`,
-    { enabled: composerEnabled }
-  );
-  const editRegion = useComposerFocusRegion(
-    `${regionBase}:edit:${editingCommentId ?? 'none'}`,
-    { enabled: composerEnabled }
-  );
+  const mainRegionId = `${regionBase}:main`;
+  const replyRegionId = `${regionBase}:reply:${replyingTo?.id ?? 'none'}`;
+  const editRegionId = `${regionBase}:edit:${editingCommentId ?? 'none'}`;
+  const mainRegion = useComposerFocusRegion(mainRegionId, { enabled: composerEnabled });
+  const replyRegion = useComposerFocusRegion(replyRegionId, { enabled: composerEnabled });
+  const editRegion = useComposerFocusRegion(editRegionId, { enabled: composerEnabled });
 
   // `isActive` is not a DOM prop — strip it before spreading onto elements.
   const { isActive: isMainComposerActive, ref: mainRegionRef, ...mainRegionHandlers } = mainRegion;
-  const { isActive: _replyActive, ...replyRegionProps } = replyRegion;
-  const { isActive: _editActive, ...editRegionProps } = editRegion;
+  const { isActive: isReplyComposerActive, ...replyRegionProps } = replyRegion;
+  const { isActive: isEditComposerActive, ...editRegionProps } = editRegion;
+  const replyRegionRef = replyRegion.ref;
+  const editRegionRef = editRegion.ref;
 
   /**
    * Facebook-style docking: while the main composer is focused below `xl`, the
@@ -122,8 +121,32 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
    * keyboard, and an equally tall spacer holds its place in the flow.
    */
   const viewportBelowXl = useIsMobile(1280);
-  const softwareKeyboardOpen = useSoftwareKeyboardOpen({ editableActive: isMainComposerActive });
+  // Any of this thread's composers freezes the keyboard baseline; only the main
+  // one is ever docked.
+  const anyComposerActive =
+    isMainComposerActive || isReplyComposerActive || isEditComposerActive;
+  const { status: keyboardStatus, open: softwareKeyboardOpen } = useSoftwareKeyboardOpen({
+    editableActive: anyComposerActive,
+  });
   const isMainComposerDocked = isMainComposerActive && viewportBelowXl;
+
+  // The focused editable "session": one identity per active region.
+  const activeComposerSessionId = isMainComposerActive
+    ? mainRegionId
+    : isReplyComposerActive
+      ? replyRegionId
+      : isEditComposerActive
+        ? editRegionId
+        : null;
+
+  // iOS keyboard-dismiss key: keyboard closes but focus is retained, so nothing
+  // releases the region. A confirmed, same-session open -> closed blurs it.
+  useBlurComposerOnKeyboardDismiss({
+    status: keyboardStatus,
+    sessionId: activeComposerSessionId,
+    enabled: composerEnabled && viewportBelowXl,
+    regionRefs: [mainRegionRef, replyRegionRef, editRegionRef],
+  });
 
   const [composerShellHeight, setComposerShellHeight] = useState(0);
   const composerShellRef = useRef<HTMLDivElement | null>(null);
