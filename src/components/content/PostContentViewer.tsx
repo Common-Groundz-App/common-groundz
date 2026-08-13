@@ -38,8 +38,9 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [searchParams] = useSearchParams();
-  
-  const autoFocusComment = searchParams.has('focus') && searchParams.get('focus') === 'comment';
+  const commentsAnchorRef = React.useRef<HTMLDivElement | null>(null);
+  const hashScrollDoneRef = React.useRef(false);
+
   
   // Related posts state
   const [relatedPosts, setRelatedPosts] = React.useState<PostFeedItemType[]>([]);
@@ -178,6 +179,29 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
       fetchPost();
     }
   }, [postId, fetchPost]);
+
+  // Reset the one-shot hash scroll when the route target changes.
+  React.useEffect(() => {
+    hashScrollDoneRef.current = false;
+  }, [postId]);
+
+  // Anchor-based entry into the discussion: runs once, after the post content
+  // containing #comments has mounted. Never focuses the composer, and yields to
+  // a highlighted-comment deep link so the two don't fight.
+  React.useEffect(() => {
+    if (loading || !post || hashScrollDoneRef.current) return;
+    if (window.location.hash !== '#comments') return;
+    if (highlightCommentId) return;
+
+    hashScrollDoneRef.current = true;
+    // One frame after paint, so ScrollToTop's route-change reset has settled.
+    const raf = window.requestAnimationFrame(() => {
+      commentsAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(raf);
+  }, [loading, post, highlightCommentId]);
+
+
 
   // Phase 5: parent (PostView) bumps refreshTick when Mux upload reaches
   // ready, so the post can be refetched to pick up patched media JSON.
@@ -406,12 +430,11 @@ const PostContentViewer = ({ postId, highlightCommentId, isDetailView = false, r
       )}
 
       {/* Inline Comments */}
-      <div className="mt-6 pt-6 border-t">
+      <div id="comments" ref={commentsAnchorRef} className="mt-6 pt-6 border-t scroll-mt-20">
         <InlineCommentThread
           itemId={postId}
           itemType="post"
           highlightCommentId={highlightCommentId}
-          autoFocusInput={autoFocusComment}
         />
       </div>
 

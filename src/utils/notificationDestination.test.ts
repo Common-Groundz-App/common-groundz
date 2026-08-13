@@ -141,7 +141,8 @@ const destinationCases: Array<[string, NotificationDestinationInput, Notificatio
 
 const pathAcceptCases: Array<[string, string]> = [
   [`/recommendation/${REC_ID}?commentId=${COMMENT_ID}`, `/recommendations/${REC_ID}?commentId=${COMMENT_ID}`],
-  [`/post/${POST_ID}?focus=comment`, `/post/${POST_ID}?focus=comment`],
+  [`/post/${POST_ID}?focus=comment`, `/post/${POST_ID}`],
+  [`/post/${POST_ID}?focus=comment&commentId=${COMMENT_ID}`, `/post/${POST_ID}?commentId=${COMMENT_ID}`],
   [`/post/${POST_ID}?next=https://evil.com`, `/post/${POST_ID}`],
   [`/post/${POST_ID}?commentId=nope`, `/post/${POST_ID}`],
   ['/u/some.user_1', '/u/some.user_1'],

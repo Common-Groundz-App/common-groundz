@@ -29,7 +29,6 @@ interface InlineCommentThreadProps {
   itemId: string;
   itemType: 'recommendation' | 'post';
   highlightCommentId?: string | null;
-  autoFocusInput?: boolean;
   onCommentCountChange?: (count: number) => void;
 }
 
@@ -53,7 +52,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   itemId,
   itemType,
   highlightCommentId,
-  autoFocusInput = false,
+  
   onCommentCountChange,
 }) => {
   const [comments, setComments] = useState<CommentData[]>([]);
@@ -356,16 +355,10 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     loadComments();
   }, [itemId]);
 
-  useEffect(() => {
-    if (autoFocusInput && !isLoading) {
-      setTimeout(() => {
-        if (commentSectionRef.current) {
-          commentSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        textareaRef.current?.focus();
-      }, 300);
-    }
-  }, [autoFocusInput, isLoading]);
+  // NOTE: automatic composer focus was intentionally removed. Focusing the
+  // textarea on mount docked the composer and hid the bottom navigation before
+  // the user tapped anything. Entering the discussion is now purely anchor-based.
+
 
   // Scroll to highlighted comment
   useEffect(() => {
