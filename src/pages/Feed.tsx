@@ -615,7 +615,7 @@ const Feed = React.memo(() => {
         
         <div className="flex-1 flex flex-col pt-16 xl:pt-0 xl:ml-64">
           {/* Main Content Area - Three Column Layout on Desktop */}
-          <div className="w-full mx-auto grid justify-center xl:grid-cols-7 gap-4 px-0 sm:px-4 py-6">
+          <div className="w-full mx-auto grid grid-cols-1 justify-center xl:grid-cols-7 gap-4 px-0 sm:px-4 py-6">
             {/* Left Column for Navigation on Smaller Desktop */}
             <div className="hidden xl:block col-span-1">
               {/* This is just a spacer since VerticalTubelightNavbar is fixed */}
