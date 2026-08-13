@@ -493,7 +493,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                                         // Let the mention popup own Arrow/Enter/Tab/Escape.
                                         if (mention.visible) return;
                                       }}
-                                      className="min-h-[60px] text-sm resize-none bg-gray-50 border-gray-200 focus:border-primary focus:ring-0 focus-visible:ring-0"
+                                      className="min-h-[60px] text-base md:text-sm resize-none bg-gray-50 border-gray-200 focus:border-primary focus:ring-0 focus-visible:ring-0"
                                       placeholder="Edit your comment..."
                                       disabled={isEditing}
                                     />
@@ -611,7 +611,7 @@ const CommentDialog = ({ isOpen, onClose, itemId, itemType, onCommentAdded, high
                       }}
                       disabled={isSending}
                       rows={1}
-                      className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
+                      className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-base md:text-sm"
                       onFocus={() => {
                         if (!user) {
                           setNewComment('');

@@ -166,7 +166,7 @@ const CommentItem: React.FC<CommentItemProps> = ({
                         // Let the mention popup own Arrow/Enter/Tab/Escape.
                         if (mentionOpen) return;
                       }}
-                      className="min-h-[60px] text-sm resize-none bg-muted/30 border focus:border-primary focus:ring-0 focus-visible:ring-0"
+                      className="min-h-[60px] text-base md:text-sm resize-none bg-muted/30 border focus:border-primary focus:ring-0 focus-visible:ring-0"
                       placeholder="Edit your comment..."
                       disabled={isEditing}
                     />

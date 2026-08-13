@@ -785,7 +785,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                           }}
                           disabled={isSending}
                           rows={1}
-                          className="min-h-[36px] max-h-[100px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-3 text-sm"
+                          className="min-h-[36px] max-h-[100px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-3 text-base md:text-sm"
                           onKeyDown={(e) => {
                             if (mention.visible) return; // Let MentionAutocomplete handle keys
                             if (e.key === 'Enter' && !e.shiftKey) {
@@ -875,7 +875,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
                 }}
                 disabled={isSending}
                 rows={1}
-                className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-sm"
+                className="min-h-[40px] max-h-[120px] flex-1 resize-none bg-muted/50 border-0 focus:ring-0 focus-visible:ring-0 rounded-xl py-2 px-4 text-base md:text-sm"
                 onFocus={() => {
                   if (!user) {
                     setNewComment('');
