@@ -66,7 +66,7 @@ export const useSoftwareKeyboardOpen = ({
         editableActive: activeRef.current,
       });
       stateRef.current = result.state;
-      setOpen((prev) => (prev === result.keyboardOpen ? prev : result.keyboardOpen));
+      setStatus((prev) => (prev === result.keyboardStatus ? prev : result.keyboardStatus));
     };
 
     const schedule = () => {
