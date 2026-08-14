@@ -128,15 +128,12 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const { status: keyboardStatus, open: softwareKeyboardOpen } = useSoftwareKeyboardOpen({
     editableActive: anyComposerActive,
   });
-  // Docking waits for a *confirmed* software keyboard. Detaching to `fixed` on
-  // focus alone raced Safari's native focus scroll: on the first focus of a
-  // session it scrolled toward geometry React had already moved, leaving the bar
-  // behind the keyboard. Staying in flow until the visual viewport reports the
-  // keyboard-sized shrink means we dock after geometry has settled. It also
-  // keeps the composer in flow with a hardware keyboard, where no software
-  // keyboard is ever confirmed.
-  const isMainComposerDocked =
-    isMainComposerActive && viewportBelowXl && keyboardStatus === 'open';
+  // Docking waits for a *confirmed* software keyboard — see shouldDockMainComposer.
+  const isMainComposerDocked = shouldDockMainComposer({
+    isMainComposerActive,
+    viewportBelowXl,
+    keyboardStatus,
+  });
 
   // The focused editable "session": one identity per active region.
   const activeComposerSessionId = isMainComposerActive
