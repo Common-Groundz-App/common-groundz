@@ -40,6 +40,7 @@ const nodeIncludes = [
   'src/hooks/useMuxStatus.test.ts',
   'src/components/comments/useMentionAutocomplete.test.ts',
   'src/components/comments/composerDocking.test.ts',
+  'src/utils/dockCorrection.test.ts',
 ];
 
 export default defineConfig({
@@ -69,6 +70,7 @@ export default defineConfig({
             'src/contexts/ComposerFocusContext.test.tsx',
             'src/hooks/useSoftwareKeyboardOpen.test.tsx',
             'src/hooks/useBlurComposerOnKeyboardDismiss.test.tsx',
+            'src/hooks/useDockCorrection.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
           ],
         },

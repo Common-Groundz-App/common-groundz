@@ -11,7 +11,12 @@ export interface SoftwareKeyboardResult {
   status: KeyboardStatus;
   /** Derived from `status` — never set independently. */
   open: boolean;
+  /** Trustworthy viewport shrink; 0 when this sample tells us nothing. */
+  shrinkPx: number;
+  /** Confirmed orientation label of the latest sample. */
+  orientation: ViewportOrientation;
 }
+
 
 /**
  * Thin subscriber around the pure `viewportKeyboard` state machine.
@@ -26,6 +31,9 @@ export const useSoftwareKeyboardOpen = ({
   editableActive: boolean;
 }): SoftwareKeyboardResult => {
   const [status, setStatus] = useState<KeyboardStatus>('unknown');
+  const [shrinkPx, setShrinkPx] = useState(0);
+  const [orientation, setOrientation] = useState<ViewportOrientation>('portrait');
+
   const activeRef = useRef(editableActive);
   activeRef.current = editableActive;
 
@@ -67,7 +75,10 @@ export const useSoftwareKeyboardOpen = ({
       });
       stateRef.current = result.state;
       setStatus((prev) => (prev === result.keyboardStatus ? prev : result.keyboardStatus));
+      setShrinkPx((prev) => (prev === result.shrinkPx ? prev : result.shrinkPx));
+      setOrientation((prev) => (prev === result.orientation ? prev : result.orientation));
     };
+
 
     const schedule = () => {
       if (frame !== null) return;
@@ -99,5 +110,5 @@ export const useSoftwareKeyboardOpen = ({
     // re-sample when activity flips, without changing what we subscribe to.
   }, [editableActive]);
 
-  return { status, open: status === 'open' };
+  return { status, open: status === 'open', shrinkPx, orientation };
 };

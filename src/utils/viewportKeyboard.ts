@@ -44,7 +44,17 @@ export interface KeyboardReduceResult {
   keyboardStatus: KeyboardStatus;
   /** Derived from `keyboardStatus` so the two can never disagree. */
   keyboardOpen: boolean;
+  /**
+   * Trustworthy viewport height reduction in px, or 0 when this sample tells us
+   * nothing (inactive, zoomed, invalid height, no baseline in this
+   * orientation). Never used to *position* anything — only to bound a
+   * measured correction.
+   */
+  shrinkPx: number;
+  /** Orientation label of this sample, echoed for callers that reset on rotation. */
+  orientation: ViewportOrientation;
 }
+
 
 /** Pinch-zoom tolerance: anything above this is treated as user zoom. */
 const SCALE_EPSILON = 1.01;
@@ -93,19 +103,26 @@ export const reduceKeyboardState = (
       state: { baseline, baselineOrientation, lastWidth: visualWidth },
       keyboardStatus: 'unknown',
       keyboardOpen: false,
+      shrinkPx: 0,
+      orientation,
     };
   }
 
   // Composer active: the baseline is frozen. Classify only.
   let keyboardStatus: KeyboardStatus = 'unknown';
+  let shrinkPx = 0;
   if (!zoomed && validHeight && baseline !== null) {
-    keyboardStatus =
-      baseline - visualHeight > keyboardShrinkThreshold(baseline) ? 'open' : 'closed';
+    const shrink = baseline - visualHeight;
+    keyboardStatus = shrink > keyboardShrinkThreshold(baseline) ? 'open' : 'closed';
+    shrinkPx = Math.max(0, Math.round(shrink));
   }
 
   return {
     state: { baseline, baselineOrientation, lastWidth: visualWidth },
     keyboardStatus,
     keyboardOpen: keyboardStatus === 'open',
+    shrinkPx,
+    orientation,
   };
+
 };

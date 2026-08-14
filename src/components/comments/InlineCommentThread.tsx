@@ -3,6 +3,7 @@ import React, { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallba
 import { useComposerFocusRegion } from '@/contexts/ComposerFocusContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSoftwareKeyboardOpen } from '@/hooks/useSoftwareKeyboardOpen';
+import { useDockCorrection } from '@/hooks/useDockCorrection';
 import { useBlurComposerOnKeyboardDismiss } from '@/hooks/useBlurComposerOnKeyboardDismiss';
 import { shouldDockMainComposer } from './composerDocking';
 import { cn } from '@/lib/utils';
@@ -126,7 +127,12 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   // one is ever docked.
   const anyComposerActive =
     isMainComposerActive || isReplyComposerActive || isEditComposerActive;
-  const { status: keyboardStatus, open: softwareKeyboardOpen } = useSoftwareKeyboardOpen({
+  const {
+    status: keyboardStatus,
+    open: softwareKeyboardOpen,
+    shrinkPx: keyboardShrinkPx,
+    orientation: viewportOrientation,
+  } = useSoftwareKeyboardOpen({
     editableActive: anyComposerActive,
   });
   // Docking waits for a *confirmed* software keyboard — see shouldDockMainComposer.
@@ -135,6 +141,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     viewportBelowXl,
     keyboardStatus,
   });
+
 
   // The focused editable "session": one identity per active region.
   const activeComposerSessionId = isMainComposerActive
@@ -192,6 +199,16 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     const height = Math.round(node.getBoundingClientRect().height);
     if (height > 0) setComposerShellHeight((prev) => (prev === height ? prev : height));
   }, [isMainComposerDocked]);
+
+  // iOS anchors `fixed bottom-0` inconsistently across dismissal paths; lift the
+  // shell by exactly its measured overhang (0 when already flush).
+  const dockCorrectionPx = useDockCorrection({
+    enabled: isMainComposerDocked,
+    keyboardStatus,
+    shrinkPx: keyboardShrinkPx,
+    orientation: viewportOrientation,
+    shellRef: composerShellRef,
+  });
 
 
 
@@ -956,6 +973,11 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
               ]
             : 'mt-4 pt-4'
         )}
+        style={
+          isMainComposerDocked && dockCorrectionPx
+            ? { transform: `translate3d(0, -${dockCorrectionPx}px, 0)` }
+            : undefined
+        }
         ref={composerShellRefCallback}
         {...mainRegionHandlers}
       >

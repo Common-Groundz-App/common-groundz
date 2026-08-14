@@ -20,14 +20,17 @@ const run = (state: KeyboardState, samples: Partial<KeyboardViewportSample>[]) =
   let current = state;
   let keyboardOpen = false;
   let keyboardStatus: KeyboardStatus = 'unknown';
+  let shrinkPx = 0;
   for (const s of samples) {
     const result = reduceKeyboardState(current, sample(s));
     current = result.state;
     keyboardOpen = result.keyboardOpen;
     keyboardStatus = result.keyboardStatus;
+    shrinkPx = result.shrinkPx;
   }
-  return { state: current, keyboardOpen, keyboardStatus };
+  return { state: current, keyboardOpen, keyboardStatus, shrinkPx };
 };
+
 
 describe('viewportKeyboard', () => {
   it('seeds and raises the baseline only while inactive, then classifies a shrink', () => {
@@ -162,5 +165,23 @@ describe('viewportKeyboard', () => {
   it('ignores offsetTop entirely (not part of the sample shape)', () => {
     const seeded = run(createKeyboardState(), [{ visualHeight: 700 }]);
     expect(Object.keys(seeded.state)).toEqual(['baseline', 'baselineOrientation', 'lastWidth']);
+  });
+
+  it('reports shrinkPx only for trustworthy open-session samples', () => {
+    const seeded = run(createKeyboardState(), [{ visualHeight: 800 }]);
+    expect(seeded.shrinkPx).toBe(0); // inactive samples say nothing
+
+    const open = run(seeded.state, [{ visualHeight: 500, editableActive: true }]);
+    expect(open.keyboardStatus).toBe('open');
+    expect(open.shrinkPx).toBe(300);
+
+    // Zoomed / rotated / baseline-less samples contribute no shrink.
+    expect(run(open.state, [{ visualHeight: 500, scale: 2, editableActive: true }]).shrinkPx).toBe(0);
+    expect(
+      run(open.state, [
+        { visualHeight: 380, visualWidth: 700, orientation: 'landscape', editableActive: true },
+      ]).shrinkPx
+    ).toBe(0);
+    expect(run(createKeyboardState(), [{ visualHeight: 320, editableActive: true }]).shrinkPx).toBe(0);
   });
 });
