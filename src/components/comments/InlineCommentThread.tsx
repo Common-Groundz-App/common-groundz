@@ -697,10 +697,8 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   });
 
 
-  // #10 & #6: Dynamic placeholders based on itemType
-  const mainPlaceholder = itemType === 'post'
-    ? 'Ask the author something or share your thoughts'
-    : 'Share your experience, or ask someone who\'s tried this';
+  // Unified short placeholder for all inline comment composers
+  const mainPlaceholder = 'Share your take...';
 
 
   return (
