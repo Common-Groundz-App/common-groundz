@@ -32,23 +32,34 @@ nextOffset        = clamp(overhang, 0, maxLift)
 
 Invariant, stated as the thing the tests assert: **re-measuring after the correction is applied must produce the same correction.** With compensation, `uncorrectedBottom` is stable, so `nextOffset` is a fixed point and there is no oscillation.
 
-`maxLift` is **only** the trustworthy `shrinkPx`. There is no fallback: when `shrinkPx <= 0` the hook keeps observing and publishes no lift. A 540px speculative translation off an untrusted frame is worse than waiting a frame.
+`maxLift` is **only** `shrinkPx` measured in a confirmed-open frame. There is no fallback: no trustworthy maximum means no lift. A large speculative translation off an untrusted frame is worse than waiting a frame.
 
 Applied only when all hold:
 - `isMainComposerDocked === true`
+- `keyboardStatus === 'open'` — confirmed software keyboard, not toolbar movement or a hardware keyboard
 - `window.visualViewport` exists
 - shell rect is valid: finite, height > 0
-- trustworthy `shrinkPx > 0`
+- `shrinkPx > 0`
 - `overhang > 2px` (tolerance — sub-pixel noise never triggers a transform)
 - not pinch-zoomed (`visualViewport.scale <= 1.01`)
 
+Sequence, stated as the model to implement:
+
+```text
+docked                                      → observe immediately
+closed / unknown                            → collect samples, schedule convergence, no lift
+open + shrinkPx > 0 + measured overhang     → apply idempotent bounded correction
+closed, unknown, zoomed, rotated,
+  undocked, or >=1280px                     → clear correction
+```
+
 Invalid geometry vs. valid zero — two distinct outcomes, decided in one place:
-- **No valid measurement** (non-finite rect, zero height, missing `visualViewport`, `shrinkPx <= 0`): publish nothing, retain the current offset.
-- **Valid measurement with no overhang**: publish `0`.
+- **No valid measurement** (non-finite rect, zero height, missing `visualViewport`): publish nothing, retain the current offset.
+- **Valid measurement with no overhang, or status not `open`**: publish `0`.
 
-The pure helper returns a discriminated result (`{ kind: 'skip' }` | `{ kind: 'offset', px }`) so the hook never has to guess which case a `0` means.
+The pure helper returns a discriminated result (`{ kind: 'skip' }` | `{ kind: 'offset', px }`) so the hook never has to guess which case a `0` means: `skip` protects a valid offset from an invalid sample, `offset: 0` is a genuine recovery to no correction.
 
-Offset resets to 0 immediately on undock, on crossing to ≥1280px, on confirmed rotation, on pinch zoom, and on unmount. When the keyboard closes, `overhang` naturally returns to ~0 and the transform is dropped by the same formula.
+Offset resets to 0 immediately on undock, on crossing to ≥1280px, on confirmed rotation, on pinch zoom, on status leaving `open`, and on unmount.
 
 Rotation reset uses the **same confirmed orientation signal** as `viewportKeyboard.ts`, not a raw `orientationchange` event: the keyboard hook surfaces its orientation label, the dock hook takes it as an input and zeroes the offset when it changes. The raw event only triggers a re-sample.
 
