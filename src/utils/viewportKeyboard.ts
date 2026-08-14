@@ -103,19 +103,26 @@ export const reduceKeyboardState = (
       state: { baseline, baselineOrientation, lastWidth: visualWidth },
       keyboardStatus: 'unknown',
       keyboardOpen: false,
+      shrinkPx: 0,
+      orientation,
     };
   }
 
   // Composer active: the baseline is frozen. Classify only.
   let keyboardStatus: KeyboardStatus = 'unknown';
+  let shrinkPx = 0;
   if (!zoomed && validHeight && baseline !== null) {
-    keyboardStatus =
-      baseline - visualHeight > keyboardShrinkThreshold(baseline) ? 'open' : 'closed';
+    const shrink = baseline - visualHeight;
+    keyboardStatus = shrink > keyboardShrinkThreshold(baseline) ? 'open' : 'closed';
+    shrinkPx = Math.max(0, Math.round(shrink));
   }
 
   return {
     state: { baseline, baselineOrientation, lastWidth: visualWidth },
     keyboardStatus,
     keyboardOpen: keyboardStatus === 'open',
+    shrinkPx,
+    orientation,
   };
+
 };
