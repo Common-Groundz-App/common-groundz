@@ -163,4 +163,22 @@ describe('viewportKeyboard', () => {
     const seeded = run(createKeyboardState(), [{ visualHeight: 700 }]);
     expect(Object.keys(seeded.state)).toEqual(['baseline', 'baselineOrientation', 'lastWidth']);
   });
+
+  it('reports shrinkPx only for trustworthy open-session samples', () => {
+    const seeded = run(createKeyboardState(), [{ visualHeight: 800 }]);
+    expect(seeded.shrinkPx).toBe(0); // inactive samples say nothing
+
+    const open = run(seeded.state, [{ visualHeight: 500, editableActive: true }]);
+    expect(open.keyboardStatus).toBe('open');
+    expect(open.shrinkPx).toBe(300);
+
+    // Zoomed / rotated / baseline-less samples contribute no shrink.
+    expect(run(open.state, [{ visualHeight: 500, scale: 2, editableActive: true }]).shrinkPx).toBe(0);
+    expect(
+      run(open.state, [
+        { visualHeight: 380, visualWidth: 700, orientation: 'landscape', editableActive: true },
+      ]).shrinkPx
+    ).toBe(0);
+    expect(run(createKeyboardState(), [{ visualHeight: 320, editableActive: true }]).shrinkPx).toBe(0);
+  });
 });
