@@ -126,7 +126,12 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   // one is ever docked.
   const anyComposerActive =
     isMainComposerActive || isReplyComposerActive || isEditComposerActive;
-  const { status: keyboardStatus, open: softwareKeyboardOpen } = useSoftwareKeyboardOpen({
+  const {
+    status: keyboardStatus,
+    open: softwareKeyboardOpen,
+    shrinkPx: keyboardShrinkPx,
+    orientation: viewportOrientation,
+  } = useSoftwareKeyboardOpen({
     editableActive: anyComposerActive,
   });
   // Docking waits for a *confirmed* software keyboard — see shouldDockMainComposer.
@@ -135,6 +140,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     viewportBelowXl,
     keyboardStatus,
   });
+
 
   // The focused editable "session": one identity per active region.
   const activeComposerSessionId = isMainComposerActive
