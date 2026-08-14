@@ -64,13 +64,16 @@ export const useDockCorrection = ({
   }, [shellRef]);
 
   // Synchronous first measurement, before paint, on the dock transition.
+  // Leaving the docked/open state (or rotating) resets rather than keeping a
+  // stale lift.
   useLayoutEffect(() => {
-    if (!enabled) {
+    if (!enabled || keyboardStatus !== 'open') {
       reset();
       return;
     }
     sample();
-  }, [enabled, orientation, reset, sample]);
+  }, [enabled, keyboardStatus, orientation, reset, sample]);
+
 
   useEffect(() => {
     if (!enabled) return;
