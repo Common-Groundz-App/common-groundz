@@ -1,8 +1,8 @@
-# Fix the docked comment composer disappearing on first focus (v2)
+# Fix the docked comment composer disappearing on first focus (v3)
 
-v2 incorporates both reviews. The largest change is the **idempotency invariant**: the previous formula measured a rect that already included the transform it had applied, so the next sample would compute ~0 and drop the bar back behind the keyboard. Correction now compensates for the offset already applied.
+v3 keeps everything both reviews approved in v2 and adopts codex's four corrections. The key change: **no speculative lift**. Observation starts the moment the composer docks, but a transform is applied only once a *trustworthy* keyboard shrink exists. The 60%-of-viewport fallback is removed.
 
-Where the two reviews disagree — whether the correction should require `keyboardStatus === 'open'` — the plan follows codex. On first focus the composer docks immediately while classification is still `closed`/`unknown` for a frame or two; requiring `open` would suppress the correction during exactly the window this bug lives in. Safety comes from requiring a *measured* overhang plus a clamp, not from the status label.
+Where the reviews disagreed — whether to gate on `keyboardStatus === 'open'` — the resolution is the split codex proposed: docking starts *observation* immediately; the *transform* waits for trustworthy shrink, which arrives within the same focus (one or two frames, or the 250ms follow-up), never on a second tap. The idempotency fix from v2 stays: `uncorrectedBottom = measuredBottom + currentOffset`.
 
 ## What is happening
 
