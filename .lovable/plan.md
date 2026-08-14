@@ -1,120 +1,67 @@
-# Fix the docked comment composer disappearing on first focus (v4)
+# Fix the docked comment composer disappearing on first focus (v5)
 
-v4 adds the last safety gate: a positive transform is applied **only while `keyboardStatus === 'open'`**. v3 gated on `shrinkPx > 0`, but a positive shrink is not proof of a keyboard — browser-toolbar movement produces one too. Observation still starts the instant the composer docks, so convergence is unchanged: once the visual viewport reports the keyboard-sized shrink during the *same* focus, status flips to `open` and the correction applies. No second tap.
+The review is right, and v5 adopts it: try the timing fix first, and only fall back to v4's measurement-and-transform system if physical-device testing proves it insufficient.
 
-Clean separation of the three concepts:
-- `shrinkPx` — **measurement**: `max(0, baseline - visualHeight)`, viewport shrink, not necessarily keyboard.
-- `keyboardStatus` — **classification**: whether that shrink clears the keyboard threshold.
-- `offsetPx` — **positioning correction**: permitted only by confirmed classification.
+The symptom — first focus fails, every later focus succeeds — is the signature of a race, not a coordinate-space bug. Today the composer detaches to `fixed` the instant the textarea is focused (`InlineCommentThread.tsx:131`), so Safari runs its native focus scroll against an element that React has already moved to the layout-viewport bottom. Compensating for that with a transform treats a self-inflicted race as a browser geometry problem.
 
-Everything else from v3 stands: no 60vh fallback, discriminated skip/offset result, confirmed-orientation reset, and the idempotency fix `uncorrectedBottom = measuredBottom + currentOffset`.
+## Stage 1 (implement now): dock only after the keyboard is confirmed open
 
-## What is happening
-
-The docked composer uses `fixed inset-x-0 bottom-0` (`InlineCommentThread.tsx`, ~943-955) with no keyboard offset, relying on iOS Safari re-anchoring fixed elements to the keyboard-facing edge of the visual viewport. Safari does that only after the focus scroll settles. First focus on a not-yet-scrolled page: the bar is still anchored to the layout viewport bottom, behind the keyboard (screenshot 1). After a dismiss the viewport has settled, so the next focus lands correctly (screenshot 2).
-
-This is a positioning bug, not a focus-state bug — the tab bar is hidden and the spacer is in place, so `isMainComposerActive` is true in both screenshots.
-
-## The correction
-
-Kept unchanged: the docking model (`fixed inset-x-0 bottom-0`), the spacer, focus regions, keyboard-dismiss blur, safe-area padding rule, reply/edit composers, and all comment behaviour. Added: a corrective `translate3d` on the docked wrapper only.
-
-Self-correction-safe calculation, sampled every frame we observe:
+`InlineCommentThread` already reads `keyboardStatus` from `useSoftwareKeyboardOpen` (line 128) purely for safe-area padding. Add it to the docking condition:
 
 ```text
-currentOffset     = offset currently applied to the shell
-measuredBottom    = shellRect.bottom            // includes currentOffset
-uncorrectedBottom = measuredBottom + currentOffset
-visualBottom      = visualViewport.offsetTop + visualViewport.height
-overhang          = uncorrectedBottom - visualBottom
-nextOffset        = clamp(overhang, 0, maxLift)
+const isMainComposerDocked =
+  isMainComposerActive && viewportBelowXl && keyboardStatus === 'open';
 ```
 
-Invariant, stated as the thing the tests assert: **re-measuring after the correction is applied must produce the same correction.** With compensation, `uncorrectedBottom` is stable, so `nextOffset` is a fixed point and there is no oscillation.
-
-`maxLift` is **only** `shrinkPx` measured in a confirmed-open frame. There is no fallback: no trustworthy maximum means no lift. A large speculative translation off an untrusted frame is worse than waiting a frame.
-
-Applied only when all hold:
-- `isMainComposerDocked === true`
-- `keyboardStatus === 'open'` — confirmed software keyboard, not toolbar movement or a hardware keyboard
-- `window.visualViewport` exists
-- shell rect is valid: finite, height > 0
-- `shrinkPx > 0`
-- `overhang > 2px` (tolerance — sub-pixel noise never triggers a transform)
-- not pinch-zoomed (`visualViewport.scale <= 1.01`)
-
-Sequence, stated as the model to implement:
+Resulting sequence:
 
 ```text
-docked                                      → observe immediately
-closed / unknown                            → collect samples, schedule convergence, no lift
-open + shrinkPx > 0 + measured overhang     → apply idempotent bounded correction
-closed, unknown, zoomed, rotated,
-  undocked, or >=1280px                     → clear correction
+focus            → composer stays in flow
+Safari           → performs its normal focus scroll, geometry settles
+visual viewport  → reports keyboard-sized shrink
+keyboardStatus   → 'open'
+composer         → switches to fixed inset-x-0 bottom-0, flush above the keyboard
 ```
 
-Invalid geometry vs. valid zero — two distinct outcomes, decided in one place:
-- **No valid measurement** (non-finite rect, zero height, missing `visualViewport`): publish nothing, retain the current offset.
-- **Valid measurement with no overhang, or status not `open`**: publish `0`.
+This is one existing state value added to one existing derived boolean. Nothing else changes: docking model, spacer, focus regions, keyboard-dismiss blur, safe-area padding rule, reply/edit composers, mention popover tier, 1280px breakpoint, and all comment behaviour stay exactly as shipped.
 
-The pure helper returns a discriminated result (`{ kind: 'skip' }` | `{ kind: 'offset', px }`) so the hook never has to guess which case a `0` means: `skip` protects a valid offset from an invalid sample, `offset: 0` is a genuine recovery to no correction.
+Two properties worth noting as intended, not regressions:
+- With a hardware/Bluetooth keyboard (or accessibility input) the composer now stays in flow, because no software keyboard is ever confirmed. That is the correct behaviour.
+- The spacer only renders while docked, and the shell is already measured in flow from mount via `ResizeObserver`, so the first docked commit still has a valid height. No spacer-without-bar or bar-without-spacer state is possible — both still key off the single `isMainComposerDocked` flag.
 
-Offset resets to 0 immediately on undock, on crossing to ≥1280px, on confirmed rotation, on pinch zoom, on status leaving `open`, and on unmount.
+### Tests for Stage 1
 
-Rotation reset uses the **same confirmed orientation signal** as `viewportKeyboard.ts`, not a raw `orientationchange` event: the keyboard hook surfaces its orientation label, the dock hook takes it as an input and zeroes the offset when it changes. The raw event only triggers a re-sample.
+- Docking flag derivation: docked only when active + below 1280px + status `open`; not docked for status `closed` or `unknown`, above the breakpoint, or when inactive.
+- Transition test: active + `unknown` renders the composer in flow with no spacer; when status flips to `open` the fixed classes and the spacer appear in the same commit.
+- Undock on status leaving `open` returns the composer to flow and unmounts the spacer.
+- Guests never dock (unchanged).
 
-Style application:
+### Device verification for Stage 1 (the decisive test)
 
-```text
-style={isMainComposerDocked && offsetPx > 0
-  ? { transform: `translate3d(0, -${offsetPx}px, 0)` }
-  : undefined}
-```
-
-No change to `bottom`, margins, padding, or spacer height.
-
-## Coordinate-space check is a release gate, not just instrumentation
-
-The formula assumes `shellRect.bottom` and `visualViewport.offsetTop + visualViewport.height` live in the same client coordinate space. jsdom tests only prove the arithmetic against mocked coordinates; they cannot validate WebKit. So the equation is **not final until the physical-device recording confirms it**.
-
-Sequence:
-1. Temporary instrumentation pass on the device: log `shellRect.bottom`, `visualViewport.height`, `offsetTop`, `scale`, `shrinkPx`, `keyboardStatus`, computed `overhang`, applied `offsetPx`, and the re-measured `shellRect.bottom` after the transform — across first focus, second focus, dismiss-key, and rotation.
-2. The recording must demonstrate all of: first failing focus yields a positive overhang; a correct second focus yields ~0; applying the transform makes the bar visually flush; re-measuring reproduces the same offset; dismissal/undock returns to 0; toolbar movement without an open keyboard produces no positive transform; pinch zoom and rotation clear the transform; multi-line growth does not change the bottom-edge correction.
-3. The recorded geometry decides the `visualBottom` expression. If the two values are not in the same space on the affected iOS version, the equation is adjusted to the measured relationship before the change is considered done.
-4. All instrumentation removed before completion — no debug UI, no feature flag, no committed logging.
-
-## Where it lives
-
-`src/utils/dockOffset.ts` — pure, React-free:
-- `nextDockOffset({ uncorrectedBottom, visualBottom, maxLift, tolerancePx })` returning `{ kind: 'skip' }` for any non-finite input, and `{ kind: 'offset', px }` for a valid measurement (`px === 0` when there is no overhang above tolerance or `maxLift <= 0`).
-
-`src/hooks/useDockedComposerOffset.ts`:
-- Inputs: shell ref, `docked` boolean, `keyboardStatus`, `shrinkPx`, `orientation` label (the same confirmed label `viewportKeyboard` uses).
-- Returns `offsetPx`.
-- Keeps the applied offset in a ref so each sample compensates for it; observes for the whole docked session, but publishes a positive lift only while `keyboardStatus === 'open'`.
-- `skip` results retain the current offset; `offset` results publish it.
-- Listeners: `visualViewport` `resize`/`scroll`, `window` `resize`/`orientationchange`, coalesced through one `requestAnimationFrame`, mounted guard, full cleanup.
-- Late-geometry convergence on docking: next frame, the frame after, and one ~250ms follow-up. No `setInterval`; every pending frame and timeout cleared on cleanup and on undock.
-- Zeroes the offset on undock, ≥1280px, zoom, status leaving `open`, and a changed confirmed orientation label.
-
-`src/utils/viewportKeyboard.ts` — `reduceKeyboardState` additionally returns `shrinkPx = max(0, baseline - visualHeight)`, documented as **viewport shrink, not keyboard shrink**: positive only when the composer is active, unzoomed, the height sample is valid, and the baseline is present and orientation-matched; `0` in every other case. Whether it constitutes an open keyboard remains `keyboardStatus`'s job. Existing fields and behaviour unchanged.
-
-`src/hooks/useSoftwareKeyboardOpen.ts` — surfaces `shrinkPx` and the resolved `orientation` alongside `status`/`open`.
-
-`InlineCommentThread.tsx` — calls the new hook and applies the style on the docked wrapper. Nothing else changes.
-
-## Tests
-
-- `dockOffset` unit tests: no overhang → `offset 0`; partial overhang → positive; overhang above `maxLift` → clamped; negative and sub-tolerance overhang → `offset 0`; `maxLift <= 0` → `offset 0`; non-finite inputs → `skip`.
-- `viewportKeyboard.test.ts`: `shrinkPx` is positive only for valid active unzoomed baseline-matched samples; `0` for inactive, zoomed, rotation-invalidated and baseline-less cases; a toolbar-sized shrink yields a positive `shrinkPx` while `keyboardStatus` stays `closed`.
-- Hook tests in jsdom with stubbed `visualViewport` and a stubbed shell rect that **subtracts the applied transform on re-measure**, proving the fixed point: repeated samples keep the same offset instead of oscillating.
-- Hook tests: no lift while status is `closed`/`unknown` even with a positive `shrinkPx` (the toolbar case); the lift lands on the first `open` sample of the same focus session without a second focus; invalid geometry retains the offset rather than clearing it; offset clears on undock, ≥1280px, zoom, status leaving `open`, and orientation-label change; listeners, frames and timeouts all cleaned up on unmount.
-
-## Manual verification on device
-
-1. Cold-open a post, tap the comment input on the first try — composer sits flush above the keyboard, no gap, no flicker.
+1. Cold-open a post, tap the comment input once — composer stays in flow during the keyboard animation, then lands flush above the keyboard with no gap and no visible jump.
 2. Dismiss with the keyboard-hide key and tap again — same result; the bottom nav returns on dismissal.
-3. Type several lines so the composer grows — bar stays above the keyboard, spacer keeps pace.
-4. Rotate with the keyboard open, then re-focus — no spurious lift.
-5. Pinch-zoom while focused — no transform.
-6. Desktop / ≥1280px — composer stays in flow, no transform, no behaviour change.
+3. Type several lines — bar stays above the keyboard, spacer keeps pace.
+4. Rotate with the keyboard open, then re-focus — composer docks correctly, no stray padding.
+5. Pinch-zoom while focused — no misplacement.
+6. Desktop / ≥1280px — composer stays in flow, unchanged.
+
+If steps 1 and 2 pass consistently, the work is done. We do **not** add `dockOffset.ts`, `useDockedComposerOffset.ts`, transform reconstruction, `shrinkPx` for positioning, or the 250ms convergence follow-up.
+
+## Stage 2 (fallback only, if Stage 1 provably fails)
+
+Only if the composer still lands behind the keyboard *after* `keyboardStatus` is conclusively `open` do we implement the v4 transform correction, and only using geometry recorded on the failing device. Its safeguards remain the right ones and are carried forward verbatim if we get there:
+
+- confirmed-open gate; trustworthy `shrinkPx` clamp with no speculative viewport-percentage lift
+- idempotent calculation (`uncorrectedBottom = measuredBottom + currentOffset`) with a fixed-point invariant asserted by tests
+- discriminated `{ kind: 'skip' | 'offset' }` result so invalid geometry never clears a good offset
+- independent confirmed-orientation signal, zoom reset, bounded convergence samples, full listener/frame/timeout cleanup
+- physical coordinate verification (`shellRect.bottom` vs `visualViewport.offsetTop + visualViewport.height`) as a release gate, with all instrumentation removed before completion
+
+Sequencing rule taken from the review: do not ship status-gated docking and transform correction together. Once docking happens after the viewport settles, the measured overhang may already be zero — adding both at once would leave us unable to tell which change mattered.
+
+## Files touched in Stage 1
+
+- `src/components/comments/InlineCommentThread.tsx` — one-line change to `isMainComposerDocked`, plus a comment recording why docking waits for confirmed-open.
+- A docking-condition test suite (new file alongside the existing comment tests), registered in `vitest.config.ts`'s `dom` include list.
+
+No changes to `viewportKeyboard.ts`, `useSoftwareKeyboardOpen.ts`, or any new utility module.
