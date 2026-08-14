@@ -3,6 +3,7 @@ import React, { useEffect, useLayoutEffect, useState, useRef, useMemo, useCallba
 import { useComposerFocusRegion } from '@/contexts/ComposerFocusContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSoftwareKeyboardOpen } from '@/hooks/useSoftwareKeyboardOpen';
+import { useDockCorrection } from '@/hooks/useDockCorrection';
 import { useBlurComposerOnKeyboardDismiss } from '@/hooks/useBlurComposerOnKeyboardDismiss';
 import { shouldDockMainComposer } from './composerDocking';
 import { cn } from '@/lib/utils';
