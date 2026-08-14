@@ -44,7 +44,17 @@ export interface KeyboardReduceResult {
   keyboardStatus: KeyboardStatus;
   /** Derived from `keyboardStatus` so the two can never disagree. */
   keyboardOpen: boolean;
+  /**
+   * Trustworthy viewport height reduction in px, or 0 when this sample tells us
+   * nothing (inactive, zoomed, invalid height, no baseline in this
+   * orientation). Never used to *position* anything — only to bound a
+   * measured correction.
+   */
+  shrinkPx: number;
+  /** Orientation label of this sample, echoed for callers that reset on rotation. */
+  orientation: ViewportOrientation;
 }
+
 
 /** Pinch-zoom tolerance: anything above this is treated as user zoom. */
 const SCALE_EPSILON = 1.01;
