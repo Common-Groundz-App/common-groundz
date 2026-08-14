@@ -1,8 +1,13 @@
-# Fix the docked comment composer disappearing on first focus (v3)
+# Fix the docked comment composer disappearing on first focus (v4)
 
-v3 keeps everything both reviews approved in v2 and adopts codex's four corrections. The key change: **no speculative lift**. Observation starts the moment the composer docks, but a transform is applied only once a *trustworthy* keyboard shrink exists. The 60%-of-viewport fallback is removed.
+v4 adds the last safety gate: a positive transform is applied **only while `keyboardStatus === 'open'`**. v3 gated on `shrinkPx > 0`, but a positive shrink is not proof of a keyboard — browser-toolbar movement produces one too. Observation still starts the instant the composer docks, so convergence is unchanged: once the visual viewport reports the keyboard-sized shrink during the *same* focus, status flips to `open` and the correction applies. No second tap.
 
-Where the reviews disagreed — whether to gate on `keyboardStatus === 'open'` — the resolution is the split codex proposed: docking starts *observation* immediately; the *transform* waits for trustworthy shrink, which arrives within the same focus (one or two frames, or the 250ms follow-up), never on a second tap. The idempotency fix from v2 stays: `uncorrectedBottom = measuredBottom + currentOffset`.
+Clean separation of the three concepts:
+- `shrinkPx` — **measurement**: `max(0, baseline - visualHeight)`, viewport shrink, not necessarily keyboard.
+- `keyboardStatus` — **classification**: whether that shrink clears the keyboard threshold.
+- `offsetPx` — **positioning correction**: permitted only by confirmed classification.
+
+Everything else from v3 stands: no 60vh fallback, discriminated skip/offset result, confirmed-orientation reset, and the idempotency fix `uncorrectedBottom = measuredBottom + currentOffset`.
 
 ## What is happening
 
