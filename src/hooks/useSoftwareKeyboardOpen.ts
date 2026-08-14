@@ -75,7 +75,10 @@ export const useSoftwareKeyboardOpen = ({
       });
       stateRef.current = result.state;
       setStatus((prev) => (prev === result.keyboardStatus ? prev : result.keyboardStatus));
+      setShrinkPx((prev) => (prev === result.shrinkPx ? prev : result.shrinkPx));
+      setOrientation((prev) => (prev === result.orientation ? prev : result.orientation));
     };
+
 
     const schedule = () => {
       if (frame !== null) return;
