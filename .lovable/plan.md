@@ -4,20 +4,17 @@
 Replace the two-line, scrollable comment input placeholder on mobile with a short, single-line alternative that matches the app’s tone and intent.
 
 ## Decision
-- Post composer: **“Share your thoughts...”**
-- Recommendation composer: **“Share your experience or ask a question...”**
+- Use **“Share your take...”** for both the post and recommendation inline comment composer.
 
 Rationale:
-- Both fit on one line on mobile.
-- “Share your thoughts...” is warm and personal, matching the app’s “experience over broadcast” voice.
-- The recommendation variant still preserves the two original intents (sharing experience + asking questions), just in a tighter form.
-- The dialog composer already uses “Add a comment...”, so we intentionally differentiate the inline composer with a slightly more inviting prompt; if consistency with the dialog is preferred, we can switch both to “Add a comment...” later.
+- Fits on one line on mobile and eliminates the scrollable two-line placeholder shown in the screenshot.
+- Neutral and conversational — it reads as *“What’s your perspective on this?”* rather than a directive.
+- Matches the Common Groundz voice: opinion-forward, community-driven, and experience-centered.
+- One single placeholder across both post and recommendation detail pages keeps the interface predictable and clean.
 
 ## Changes
 1. **`src/components/comments/InlineCommentThread.tsx`**
-   - Update the `mainPlaceholder` conditional:
-     - `itemType === 'post'`: `'Share your thoughts...'`
-     - else: `'Share your experience or ask a question...'`
+   - Replace the `mainPlaceholder` conditional with a single string: `'Share your take...'` for both `itemType === 'post'` and `recommendation`.
    - No other UI or logic changes.
 
 ## Out of scope
