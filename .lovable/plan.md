@@ -78,26 +78,26 @@ No change to `bottom`, margins, padding, or spacer height.
 The formula assumes `shellRect.bottom` and `visualViewport.offsetTop + visualViewport.height` live in the same client coordinate space. jsdom tests only prove the arithmetic against mocked coordinates; they cannot validate WebKit. So the equation is **not final until the physical-device recording confirms it**.
 
 Sequence:
-1. Temporary instrumentation pass on the device: log `shellRect.bottom`, `visualViewport.height`, `offsetTop`, `scale`, `shrinkPx`, computed `overhang`, applied `offsetPx`, and the re-measured `shellRect.bottom` after the transform — across first focus, second focus, dismiss-key, and rotation.
-2. The recorded geometry decides the `visualBottom` expression. If the two values are not in the same space, the equation is adjusted to the measured relationship before the change is considered done.
-3. Acceptance either way: re-measurement reproduces the same correction, and first focus lands flush.
+1. Temporary instrumentation pass on the device: log `shellRect.bottom`, `visualViewport.height`, `offsetTop`, `scale`, `shrinkPx`, `keyboardStatus`, computed `overhang`, applied `offsetPx`, and the re-measured `shellRect.bottom` after the transform — across first focus, second focus, dismiss-key, and rotation.
+2. The recording must demonstrate all of: first failing focus yields a positive overhang; a correct second focus yields ~0; applying the transform makes the bar visually flush; re-measuring reproduces the same offset; dismissal/undock returns to 0; toolbar movement without an open keyboard produces no positive transform; pinch zoom and rotation clear the transform; multi-line growth does not change the bottom-edge correction.
+3. The recorded geometry decides the `visualBottom` expression. If the two values are not in the same space on the affected iOS version, the equation is adjusted to the measured relationship before the change is considered done.
 4. All instrumentation removed before completion — no debug UI, no feature flag, no committed logging.
 
 ## Where it lives
 
 `src/utils/dockOffset.ts` — pure, React-free:
-- `nextDockOffset({ uncorrectedBottom, visualBottom, maxLift, tolerancePx })` returning `{ kind: 'skip' }` for any non-finite input or `maxLift <= 0`, and `{ kind: 'offset', px }` for a valid measurement (`px === 0` when there is no overhang above tolerance).
+- `nextDockOffset({ uncorrectedBottom, visualBottom, maxLift, tolerancePx })` returning `{ kind: 'skip' }` for any non-finite input, and `{ kind: 'offset', px }` for a valid measurement (`px === 0` when there is no overhang above tolerance or `maxLift <= 0`).
 
 `src/hooks/useDockedComposerOffset.ts`:
-- Inputs: shell ref, `docked` boolean, `shrinkPx`, `orientation` label (the same confirmed label `viewportKeyboard` uses).
+- Inputs: shell ref, `docked` boolean, `keyboardStatus`, `shrinkPx`, `orientation` label (the same confirmed label `viewportKeyboard` uses).
 - Returns `offsetPx`.
-- Keeps the applied offset in a ref so each sample compensates for it; observes for the whole docked session, but only publishes a lift once `shrinkPx > 0`.
+- Keeps the applied offset in a ref so each sample compensates for it; observes for the whole docked session, but publishes a positive lift only while `keyboardStatus === 'open'`.
 - `skip` results retain the current offset; `offset` results publish it.
 - Listeners: `visualViewport` `resize`/`scroll`, `window` `resize`/`orientationchange`, coalesced through one `requestAnimationFrame`, mounted guard, full cleanup.
 - Late-geometry convergence on docking: next frame, the frame after, and one ~250ms follow-up. No `setInterval`; every pending frame and timeout cleared on cleanup and on undock.
-- Zeroes the offset on undock, ≥1280px, zoom, and a changed confirmed orientation label.
+- Zeroes the offset on undock, ≥1280px, zoom, status leaving `open`, and a changed confirmed orientation label.
 
-`src/utils/viewportKeyboard.ts` — `reduceKeyboardState` additionally returns `shrinkPx` with **explicit trustworthy semantics**: a positive number only when the composer is active, unzoomed, the height sample is valid, and the baseline is present and orientation-matched. In every other case (inactive, zoomed, rotation-invalidated, missing baseline) it is `0`. Existing fields and behaviour unchanged.
+`src/utils/viewportKeyboard.ts` — `reduceKeyboardState` additionally returns `shrinkPx = max(0, baseline - visualHeight)`, documented as **viewport shrink, not keyboard shrink**: positive only when the composer is active, unzoomed, the height sample is valid, and the baseline is present and orientation-matched; `0` in every other case. Whether it constitutes an open keyboard remains `keyboardStatus`'s job. Existing fields and behaviour unchanged.
 
 `src/hooks/useSoftwareKeyboardOpen.ts` — surfaces `shrinkPx` and the resolved `orientation` alongside `status`/`open`.
 
@@ -105,10 +105,10 @@ Sequence:
 
 ## Tests
 
-- `dockOffset` unit tests: no overhang → `offset 0`; partial overhang → positive; overhang above `maxLift` → clamped; negative and sub-tolerance overhang → `offset 0`; non-finite inputs and `maxLift <= 0` → `skip`.
-- `viewportKeyboard.test.ts`: `shrinkPx` is positive only for trustworthy active samples; `0` for inactive, zoomed, rotation-invalidated and baseline-less cases.
+- `dockOffset` unit tests: no overhang → `offset 0`; partial overhang → positive; overhang above `maxLift` → clamped; negative and sub-tolerance overhang → `offset 0`; `maxLift <= 0` → `offset 0`; non-finite inputs → `skip`.
+- `viewportKeyboard.test.ts`: `shrinkPx` is positive only for valid active unzoomed baseline-matched samples; `0` for inactive, zoomed, rotation-invalidated and baseline-less cases; a toolbar-sized shrink yields a positive `shrinkPx` while `keyboardStatus` stays `closed`.
 - Hook tests in jsdom with stubbed `visualViewport` and a stubbed shell rect that **subtracts the applied transform on re-measure**, proving the fixed point: repeated samples keep the same offset instead of oscillating.
-- Hook tests: no lift is published while `shrinkPx === 0` (regardless of status), and the lift lands on the first trustworthy sample of the same focus; invalid geometry retains the offset rather than clearing it; offset clears on undock, ≥1280px, zoom and orientation-label change; listeners, frames and timeouts all cleaned up on unmount.
+- Hook tests: no lift while status is `closed`/`unknown` even with a positive `shrinkPx` (the toolbar case); the lift lands on the first `open` sample of the same focus session without a second focus; invalid geometry retains the offset rather than clearing it; offset clears on undock, ≥1280px, zoom, status leaving `open`, and orientation-label change; listeners, frames and timeouts all cleaned up on unmount.
 
 ## Manual verification on device
 
