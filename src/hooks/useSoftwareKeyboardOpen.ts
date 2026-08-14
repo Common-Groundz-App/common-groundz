@@ -31,6 +31,9 @@ export const useSoftwareKeyboardOpen = ({
   editableActive: boolean;
 }): SoftwareKeyboardResult => {
   const [status, setStatus] = useState<KeyboardStatus>('unknown');
+  const [shrinkPx, setShrinkPx] = useState(0);
+  const [orientation, setOrientation] = useState<ViewportOrientation>('portrait');
+
   const activeRef = useRef(editableActive);
   activeRef.current = editableActive;
 
