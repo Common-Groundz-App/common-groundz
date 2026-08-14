@@ -20,14 +20,17 @@ const run = (state: KeyboardState, samples: Partial<KeyboardViewportSample>[]) =
   let current = state;
   let keyboardOpen = false;
   let keyboardStatus: KeyboardStatus = 'unknown';
+  let shrinkPx = 0;
   for (const s of samples) {
     const result = reduceKeyboardState(current, sample(s));
     current = result.state;
     keyboardOpen = result.keyboardOpen;
     keyboardStatus = result.keyboardStatus;
+    shrinkPx = result.shrinkPx;
   }
-  return { state: current, keyboardOpen, keyboardStatus };
+  return { state: current, keyboardOpen, keyboardStatus, shrinkPx };
 };
+
 
 describe('viewportKeyboard', () => {
   it('seeds and raises the baseline only while inactive, then classifies a shrink', () => {
