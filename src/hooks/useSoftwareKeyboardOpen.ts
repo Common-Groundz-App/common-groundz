@@ -11,7 +11,12 @@ export interface SoftwareKeyboardResult {
   status: KeyboardStatus;
   /** Derived from `status` — never set independently. */
   open: boolean;
+  /** Trustworthy viewport shrink; 0 when this sample tells us nothing. */
+  shrinkPx: number;
+  /** Confirmed orientation label of the latest sample. */
+  orientation: ViewportOrientation;
 }
+
 
 /**
  * Thin subscriber around the pure `viewportKeyboard` state machine.
