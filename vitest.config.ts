@@ -39,6 +39,7 @@ const nodeIncludes = [
   'src/utils/viewportKeyboard.test.ts',
   'src/hooks/useMuxStatus.test.ts',
   'src/components/comments/useMentionAutocomplete.test.ts',
+  'src/components/comments/composerDocking.test.ts',
 ];
 
 export default defineConfig({
