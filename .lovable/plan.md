@@ -14,9 +14,7 @@ Rationale:
 
 ## Changes
 1. **`src/components/comments/InlineCommentThread.tsx`**
-   - Update the `mainPlaceholder` conditional:
-     - `itemType === 'post'`: `'Share your thoughts...'`
-     - else: `'Share your experience or ask a question...'`
+   - Replace the `mainPlaceholder` conditional with a single string: `'Share your take...'` for both `itemType === 'post'` and `recommendation`.
    - No other UI or logic changes.
 
 ## Out of scope
