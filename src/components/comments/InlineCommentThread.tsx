@@ -973,6 +973,11 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
               ]
             : 'mt-4 pt-4'
         )}
+        style={
+          isMainComposerDocked && dockCorrectionPx
+            ? { transform: `translate3d(0, -${dockCorrectionPx}px, 0)` }
+            : undefined
+        }
         ref={composerShellRefCallback}
         {...mainRegionHandlers}
       >
