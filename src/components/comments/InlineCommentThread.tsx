@@ -199,6 +199,16 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
     if (height > 0) setComposerShellHeight((prev) => (prev === height ? prev : height));
   }, [isMainComposerDocked]);
 
+  // iOS anchors `fixed bottom-0` inconsistently across dismissal paths; lift the
+  // shell by exactly its measured overhang (0 when already flush).
+  const dockCorrectionPx = useDockCorrection({
+    enabled: isMainComposerDocked,
+    keyboardStatus,
+    shrinkPx: keyboardShrinkPx,
+    orientation: viewportOrientation,
+    shellRef: composerShellRef,
+  });
+
 
 
   const handleSortToggle = useCallback(() => {
