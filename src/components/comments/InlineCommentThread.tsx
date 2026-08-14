@@ -4,6 +4,7 @@ import { useComposerFocusRegion } from '@/contexts/ComposerFocusContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useSoftwareKeyboardOpen } from '@/hooks/useSoftwareKeyboardOpen';
 import { useBlurComposerOnKeyboardDismiss } from '@/hooks/useBlurComposerOnKeyboardDismiss';
+import { shouldDockMainComposer } from './composerDocking';
 import { cn } from '@/lib/utils';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -128,7 +129,12 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
   const { status: keyboardStatus, open: softwareKeyboardOpen } = useSoftwareKeyboardOpen({
     editableActive: anyComposerActive,
   });
-  const isMainComposerDocked = isMainComposerActive && viewportBelowXl;
+  // Docking waits for a *confirmed* software keyboard — see shouldDockMainComposer.
+  const isMainComposerDocked = shouldDockMainComposer({
+    isMainComposerActive,
+    viewportBelowXl,
+    keyboardStatus,
+  });
 
   // The focused editable "session": one identity per active region.
   const activeComposerSessionId = isMainComposerActive
