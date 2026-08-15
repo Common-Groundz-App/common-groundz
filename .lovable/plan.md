@@ -1,26 +1,27 @@
-# Shorten comment input placeholders
+# Make the empty comments state feel intentional
 
-## Goal
-Replace the two-line, scrollable comment input placeholder on mobile with a short, single-line alternative that matches the app’s tone and intent.
+The current empty state is a generic grey circle icon, a bold line, and two lines of explanatory copy — plus a large block of dead vertical space between the post and the "Comments (0)" header. On a phone it reads like a placeholder rather than part of the product.
 
-## Decision
-- Use **“Share your take...”** for both the post and recommendation inline comment composer.
+## What changes
 
-Rationale:
-- Fits on one line on mobile and eliminates the scrollable two-line placeholder shown in the screenshot.
-- Neutral and conversational — it reads as *“What’s your perspective on this?”* rather than a directive.
-- Matches the Common Groundz voice: opinion-forward, community-driven, and experience-centered.
-- One single placeholder across both post and recommendation detail pages keeps the interface predictable and clean.
+1. **Drop the grey icon medallion.** The circular muted bubble is the most generic element on screen and duplicates the icon already shown next to the "Comments" header.
 
-## Changes
-1. **`src/components/comments/InlineCommentThread.tsx`**
-   - Replace the `mainPlaceholder` conditional with a single string: `'Share your take...'` for both `itemType === 'post'` and `recommendation`.
-   - No other UI or logic changes.
+2. **Replace it with a single quiet invitation line, aligned with the composer.** Instead of a centered hero block, show a left-aligned, one-line prompt directly above the composer:
+   - Posts: "No takes yet — be the first."
+   - Recommendations: "No takes yet — share your experience."
+   
+   Small, muted, in brand voice, and consistent with the "Share your take..." placeholder we just shipped. This keeps the eye moving toward the input instead of at an empty medallion.
 
-## Out of scope
-- No changes to the `CommentDialog` placeholder (“Add a comment...”), bottom nav, composer docking, or keyboard behavior.
-- No backend changes.
+3. **Collapse the empty vertical space.** Reduce the empty-state block from `py-10` to a tight padding, and remove the extra gap/divider stack above the "Comments (0)" header so the composer sits close to the post when there is nothing to read.
 
-## Verification
-- Open a post detail page on mobile preview and confirm the inline composer placeholder stays on one line and is not scrollable.
-- Open a recommendation detail page and confirm the recommendation variant also stays on one line.
+4. **Keep the composer as the visual anchor.** With no comments, the composer is the only actionable thing in the section, so it should be the largest and closest element to the prompt.
+
+Loading, error, and populated states are untouched.
+
+## Technical notes
+
+- Single file: `src/components/comments/InlineCommentThread.tsx`, the `comments.length === 0` branch (currently lines ~752-765) plus the surrounding spacing wrappers.
+- Remove the `MessageCircle` medallion markup from the empty branch only (the import stays if still used by the header).
+- Copy stays conditional on `itemType` as it is today.
+- Semantic tokens only (`text-muted-foreground`, `text-foreground`); no new colors.
+- No changes to comment fetching, counts, or the composer logic.
