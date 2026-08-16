@@ -706,7 +706,9 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       <div className="flex items-center gap-2 mb-4">
         <MessageCircle className="h-5 w-5 text-muted-foreground" />
         <h3 className="font-semibold text-sm">Comments</h3>
-        {!isLoading && <span className="text-xs text-muted-foreground">({totalCommentCount})</span>}
+        {!isLoading && totalCommentCount > 0 && (
+          <span className="text-xs text-muted-foreground">· {totalCommentCount}</span>
+        )}
         {/* #4: Sort toggle */}
         {!isLoading && groupedComments.length >= 2 && (
           <button
@@ -751,13 +753,10 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
         </div>
       ) : comments.length === 0 ? (
 
-        /* Copy-only update: new empty state wording */
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <div className="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-            <MessageCircle className="h-7 w-7 text-muted-foreground" />
-          </div>
+        /* Compact empty state: context first, composer follows */
+        <div className="py-6 text-left">
           <p className="text-sm font-medium text-foreground mb-1">No takes yet</p>
-          <p className="text-xs text-muted-foreground max-w-xs">
+          <p className="text-xs text-muted-foreground">
             Tried it, used it, or curious? Share your take.
           </p>
         </div>
@@ -961,7 +960,8 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       {/* Comment Input */}
       <div
         className={cn(
-          'border-t border-border bg-background',
+          'bg-background',
+          comments.length > 0 && 'border-t border-border',
           isMainComposerDocked
             ? [
                 'fixed inset-x-0 bottom-0 z-50 pt-2',
