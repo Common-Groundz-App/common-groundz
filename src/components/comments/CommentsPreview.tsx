@@ -17,10 +17,10 @@ const CommentsPreview: React.FC<CommentsPreviewProps> = ({ commentCount, onClick
           onClick();
         }}
         className="w-full text-left text-muted-foreground hover:underline bg-muted/30 rounded-lg px-3 py-2 mt-2"
-        aria-label="Add a comment" 
+        aria-label="Share your take" 
         aria-haspopup="dialog"
       >
-        No comments yet. Add one!
+        Share your take...
       </button>
     );
   }
