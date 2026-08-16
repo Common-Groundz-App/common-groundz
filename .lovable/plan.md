@@ -6,11 +6,14 @@ The current empty state is a generic grey circle icon, a bold line, and two line
 
 1. **Drop the grey icon medallion.** The circular muted bubble is the most generic element on screen and duplicates the icon already shown next to the "Comments" header.
 
-2. **Replace it with a single quiet invitation line, aligned with the composer.** Instead of a centered hero block, show a left-aligned, one-line prompt directly above the composer:
-   - Posts: "No takes yet — be the first."
-   - Recommendations: "No takes yet — share your experience."
-   
-   Small, muted, in brand voice, and consistent with the "Share your take..." placeholder we just shipped. This keeps the eye moving toward the input instead of at an empty medallion.
+2. **Replace the copy with a warmer, two-line invitation.** Keep it centered but remove the icon and the bold heading. Use the exact wording the user requested for both posts and recommendations:
+
+   ```
+   No takes yet
+   Tried it, used it, or curious? Share your take.
+   ```
+
+   The first line is bold, the second line is muted, both in a single compact block. No separate icon, no medallion.
 
 3. **Collapse the empty vertical space.** Reduce the empty-state block from `py-10` to a tight padding, and remove the extra gap/divider stack above the "Comments (0)" header so the composer sits close to the post when there is nothing to read.
 
