@@ -751,16 +751,14 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
         </div>
       ) : comments.length === 0 ? (
 
-        /* #6: Community-driven empty state */
+        /* Copy-only update: new empty state wording */
         <div className="flex flex-col items-center justify-center py-10 text-center">
           <div className="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
             <MessageCircle className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="text-sm font-medium text-foreground mb-1">Start the conversation</p>
+          <p className="text-sm font-medium text-foreground mb-1">No takes yet</p>
           <p className="text-xs text-muted-foreground max-w-xs">
-            {itemType === 'post'
-              ? 'Be the first to share your thoughts or ask the author a question.'
-              : 'Be the first to share your experience or ask someone who\'s tried this.'}
+            Tried it, used it, or curious? Share your take.
           </p>
         </div>
       ) : (
