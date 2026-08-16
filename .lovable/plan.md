@@ -1,6 +1,12 @@
-# Make the empty comments state feel intentional
+# Update the empty comments copy (wording only)
 
-The current empty state is a generic grey circle icon, a bold line, and two lines of explanatory copy — plus a large block of dead vertical space between the post and the "Comments (0)" header. On a phone it reads like a placeholder rather than part of the product.
+This is a copy-only change. The UI/medallion/vertical-space refinements will be handled in a follow-up pass after this wording is confirmed.
+
+The current empty state reads:  
+**"Start the conversation"**  
+**"Be the first to share your thoughts or ask the author a question."**  
+
+That wording is generic and feels like placeholder text. We want it to sound like Common Groundz — personal, specific to a "take", and aligned with the new "Share your take..." placeholder.
 
 ## What changes
 
