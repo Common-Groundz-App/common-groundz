@@ -25,8 +25,8 @@ That wording is generic and feels like placeholder text. We want it to sound lik
 
 ## Technical notes
 
-- Single file: `src/components/comments/InlineCommentThread.tsx`, the `comments.length === 0` branch (currently lines ~752-765) plus the surrounding spacing wrappers.
-- Remove the `MessageCircle` medallion markup from the empty branch only (the import stays if still used by the header).
-- Copy stays conditional on `itemType` as it is today.
-- Semantic tokens only (`text-muted-foreground`, `text-foreground`); no new colors.
+- Single file: `src/components/comments/InlineCommentThread.tsx`, the `comments.length === 0` branch (currently lines ~752-765).
+- Only the text inside the existing empty-state markup is changed; the `MessageCircle` medallion, padding, and layout remain untouched.
+- The new copy is hardcoded once and used for both posts and recommendations (no `itemType` branching in the empty state for this wording).
+- Semantic tokens stay as-is (`text-foreground`, `text-muted-foreground`).
 - No changes to comment fetching, counts, or the composer logic.
