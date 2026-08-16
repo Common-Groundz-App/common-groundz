@@ -754,7 +754,7 @@ const InlineCommentThread: React.FC<InlineCommentThreadProps> = ({
       ) : comments.length === 0 ? (
 
         /* Compact empty state: context first, composer follows */
-        <div className="py-6 text-left">
+        <div className="py-6 text-center">
           <p className="text-sm font-medium text-foreground mb-1">No takes yet</p>
           <p className="text-xs text-muted-foreground">
             Tried it, used it, or curious? Share your take.
