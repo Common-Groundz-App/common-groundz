@@ -10,22 +10,18 @@ That wording is generic and feels like placeholder text. We want it to sound lik
 
 ## What changes
 
-1. **Drop the grey icon medallion.** The circular muted bubble is the most generic element on screen and duplicates the icon already shown next to the "Comments" header.
-
-2. **Replace the copy with a warmer, two-line invitation.** Keep it centered but remove the icon and the bold heading. Use the exact wording the user requested for both posts and recommendations:
+1. **Replace the existing copy with the new wording in the empty comments branch.**
 
    ```
    No takes yet
    Tried it, used it, or curious? Share your take.
    ```
 
-   The first line is bold, the second line is muted, both in a single compact block. No separate icon, no medallion.
+   - The first line is rendered as bold title.
+   - The second line is rendered in muted text.
+   - The same copy is used for both posts and recommendations (matching the user's request).
 
-3. **Collapse the empty vertical space.** Reduce the empty-state block from `py-10` to a tight padding, and remove the extra gap/divider stack above the "Comments (0)" header so the composer sits close to the post when there is nothing to read.
-
-4. **Keep the composer as the visual anchor.** With no comments, the composer is the only actionable thing in the section, so it should be the largest and closest element to the prompt.
-
-Loading, error, and populated states are untouched.
+2. **Keep the existing icon medallion and spacing for now.** No structural or visual layout changes yet. Only the text inside the empty-state block is updated.
 
 ## Technical notes
 
