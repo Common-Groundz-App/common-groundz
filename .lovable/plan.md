@@ -1,91 +1,101 @@
-# Phase 0 — Provider / Offering Foundation
+# Phase 0 — Canonical Types + Provider/Offering Contract
 
-## The decision: Model B, and the migration debate is moot
+## You're right, and I was wrong
 
-Both reviews spent most of their length arguing about how to preserve the semantic intent of the 17 mismatched reviews. That argument only matters if the data is real. It isn't — it's dummy data, and you've said you're fine deleting it. So the expensive, risky part of both proposals disappears.
+Deleting all 72 reviews was bad advice. Your counter-argument is correct: by that logic every dummy entity and user goes too, and you'd lose the fixtures you actively test against. "Dummy" is not the same as "worthless" — these rows exercise review cards, profile filters, entity-page sections, rating aggregates, media, visibility, edit flows, and the null-entity path. Phase 0 is now **non-destructive**: no deletes, no rewrites.
 
-What survives from their analysis is the part that actually matters: **Model B is the right destination, and the primitive is provider → offering.** I agree, and there's a stronger reason than either of them gave.
+I also accept the two corrections both reviews made:
 
-**You already have this primitive, and it already works.** Verified just now:
+- **Provider/offering are roles, not entity types.** They describe how an entity is being used in a relationship. They do not go into the Supabase `entity_type` enum, which stays at 15.
+- **`parent_id` does not mean "provider."** It's a generic parent/child edge. Provider→offering is one *semantic use* of it. Keeping that distinction is what leaves room for other relationship kinds later.
 
-- 344 entities, 45 with a `parent_id` — and every single one is the same shape: **`brand` → `product`** (45/45).
-- There are no other parent/child combinations in use.
-- Zero entities use any legacy type (`tv`, `activity`, `music`, `art`, `drink`, `travel`).
-- `get_child_entities` and `get_child_entities_with_ratings` already exist as database functions.
+And the 17 mismatched rows stay put. They're the best fixtures you have for the exact ambiguity the new architecture has to resolve — deleting them removes your regression coverage for legacy rendering.
 
-So "brand offers products" is a live, working provider/offering relationship. **"Restaurant offers dishes" is the identical shape** — `place` → `food`. You are not inventing an ontology; you are applying the one you already run to a second domain. That is why this is cheap now and why choosing Model A "temporarily" would be a real mistake: it would build a second, contradictory pattern next to a working one.
+## What I verified about the graph (this is the important part)
 
-## Where I part with both reviews
+Neither review could confirm whether `place → food` actually works. I checked:
 
-**ChatGPT's `metadata.legacy_review_context` transitional format: skip it.** It's a careful answer to "how do I preserve user intent I can't afford to lose." You can afford to lose it. Adding a transitional schema to preserve dummy rows creates a format that outlives the reason it existed — exactly the trap they both warn about.
+- **`parent_id` has no type constraint.** The only check is `chk_entities_no_self_reference`. `place → food` is already permitted at the database level — nothing to migrate.
+- **The FK is `ON DELETE SET NULL`.** Deleting a restaurant does not delete its dishes; it orphans them. That is safer than a cascade but means an orphan-offering cleanup path is needed eventually.
+- **`slug` is globally `UNIQUE`.** Two restaurants both offering a "Classic Burger" would collide — except `setEntityParent` already generates `parentSlug-childSlug` (`entityHierarchyService.ts:211`), which resolves it. **But that only runs in the reparenting path.** Whatever new dish-creation flow gets built must use the same hierarchical slug rule or it will hit a unique violation. This is the single most likely thing to break.
+- **The rendering layer is already generic.** `EntityV4` passes `childEntities` / `parentEntity`, `use-related-entities` and `use-entity-siblings` are type-agnostic, hierarchical URLs `/:parentSlug/:childSlug` exist, and `get_child_entities_with_ratings` returns ratings for any child type.
+- **But the copy is hardcoded.** `FeaturedProductsSection.tsx` renders "Featured Products" and "View All N Products". A restaurant's dishes would appear under the heading "Featured Products". Mechanism generic, vocabulary not.
+- **No `parent.type === 'brand'` branching exists** in the hierarchy logic. The two `'brand'` checks found are cosmetic image-fit rules in `EntityHeader.tsx`.
 
-**Codex's Phase 0B curated row-by-row conversion: skip it too.** Hand-migrating 17 fake reviews into 17 invented dish entities produces fake dish entities. Worse data, more work.
+So: the graph is genuinely generic, one slug rule must be reused, one FK behaviour noted, and the labels need to become relationship-derived.
 
-**Delete the dummy reviews instead.** All 72, or just the 17 mismatched — your call, but I'd argue all 72: 27 have no entity at all, so they exercise a path you're about to forbid, and keeping them means keeping compatibility code for reviews nobody wrote. A clean reviews table lets Phase 1 enforce the invariant from day one instead of coding around history.
+## Scalability — the part you asked for, and neither review answered
 
-**Codex is right that Phase 1 and 2 should merge.** A named-step wizard that deliberately keeps the category step is scaffolding nobody sees. Fold it into the step that removes the category step.
-
-**Codex is also right about JSONB:** `reviews` already has a `metadata` column. No new column in Phase 3 — namespace inside `metadata` and revisit only if querying demands it.
-
-## The three-concept model to write down now
+Both reviews said "keep it general" but neither said *how*. Hardcoding `PROVIDER_TYPES = ['brand', 'place']` is the trap. The answer is a **relationship registry**: one declarative table of allowed provider→offering pairs, with the vocabulary attached.
 
 ```text
-CONCEPT            Burger                    (taxonomy / discovery dimension)
-   ^
-   | classified as
-   |
-OFFERING           Truffles Classic Burger   (type: food, parent: Truffles)
-   |                                          <- this is what gets reviewed
-   | offered by
-   v
-PROVIDER           Truffles                  (type: place)
-                                              <- this is ALSO reviewable
+{ provider: 'brand',        offering: 'product', offeringPlural: 'Products',   verb: 'by'   }
+{ provider: 'place',        offering: 'food',    offeringPlural: 'Dishes',     verb: 'at'   }
+{ provider: 'place',        offering: 'service', offeringPlural: 'Services',   verb: 'at'   }  // later
+{ provider: 'professional', offering: 'service', offeringPlural: 'Services',   verb: 'from' }  // later
+{ provider: 'brand',        offering: 'app',     offeringPlural: 'Apps',       verb: 'by'   }  // later
 ```
 
-Two things this settles:
+Everything derives from this one table:
 
-1. **A review's subject is one entity.** Both a provider and an offering are entities, so "review the restaurant" and "review the dish" are the same mechanism, not two flows. That directly serves your requirement that a user can do either.
-2. **The concept layer is not the review subject.** A burger's quality depends on who made it. "Burger" is how search aggregates offerings; it is never what someone rates. This is the one point where naive Model B goes wrong, and both reviews caught it correctly.
+- **Can X be a provider?** → is it the `provider` of any row.
+- **What can I add under this entity?** → the `offering` types of its rows. Drives the "Add a dish / Add a product" affordance without a single `if (type === 'place')`.
+- **What do we call the child section?** → `offeringPlural`. "Featured Products" becomes "Dishes" under a restaurant, purely from data.
+- **How do we render an offering's context line?** → `Classic Burger` + `at` + `Truffles`; `Pegasus 43` + `by` + `Nike`. The verb is registry data, not a conditional.
+- **Adding a sixth relationship** = one row plus its questionnaire entry. No component edits. That is the scalability test, and it's the reason to build the registry in Phase 0 even though only two rows are active.
 
-Concepts map onto the existing `categories` table (155 rows) rather than becoming entities. Nothing to build in Phase 0 — just don't contradict it later.
+Two design rules that keep it scalable:
 
-## Phase 0 — scope
+1. **Many-to-many, not one provider type per offering type.** `service` will have several provider types. Don't model it as `offering → its one provider type`.
+2. **Validate at the application boundary, not with a DB check constraint.** A check constraint on `(parent.type, child.type)` would need a migration for every new relationship. Application-level validation plus the registry keeps the graph open for non-provider parent/child uses (variants, editions, chain→location).
 
-Code and cleanup only. No UI change, no questionnaire work, no recommendation changes, no form changes.
+## Phase 0 scope
 
-**0.1 One canonical type module**
-- Single source of truth: the 15 canonical types, a type guard, display labels, icons, fallback images.
-- Legacy aliases live in a separate boundary-only map — never a valid canonical value.
-- `parseEntityType()` returns `CanonicalEntityType | null` (ChatGPT's correction is right — no `'unsupported'` pseudo-type that someone can persist as a 16th value).
-- Delete every silent `unknown → product` and `unknown → place` fallback.
-- Remove the six deprecated `EntityType` members. Safe: zero rows.
-- `entityTypeHelpers.ts`, `entityTypeConfig.ts`, `entityTypeMapping.ts`, the recommendation mapping and the review mapping all read from it.
+Code, documentation, audit and tests. **No data changes. No review-form changes. No visible UX change.**
 
-**0.2 Consumer inventory**
-- List every reader/writer of `entities.type`, `reviews.category`, `recommendations.category` — including SQL functions, edge functions, search normalization, admin tools, filters and AI summary paths. TypeScript compiling is not evidence that string-based SQL still works.
+**0.1 Reproducible baseline**
+- Save the audit queries *and* their SQL, timestamped — not prose numbers. (The taxonomy count moved 145 → 155 between audits; that drift is exactly why.)
+- Baseline: entities by type; parent/child pairs by type; deprecated-type counts; reviews by category; reviews with null `entity_id`; review-category vs entity-type; recommendations by category; total counts.
+- Record the IDs of the 17 mismatched and 27 entity-less reviews as **named compatibility fixtures**, so future work knows they are deliberate.
 
-**0.3 Document the provider/offering model**
-- Write the three-concept model into the repo as the reference for later phases.
-- Confirm `place` → `food` uses the same `parent_id` relationship as the existing `brand` → `product`. No schema change expected — this is a verification step, and if it turns out a constraint blocks it, that surfaces here rather than mid-rebuild.
+**0.2 One canonical type module**
+- The 15 canonical types, `CanonicalEntityType`, `isCanonicalEntityType`, `parseEntityType(): CanonicalEntityType | null`.
+- **Plain TypeScript, zero React imports** (Codex's point is right) — services and edge-shared code must be able to import it. Icons, labels and fallback images live in a separate UI config keyed exhaustively by `CanonicalEntityType`.
+- No `'unsupported'` pseudo-value: `null` means invalid, so nobody can persist a 16th type.
 
-**0.4 Clear the dummy reviews**
-- Delete the dummy review rows (recommended: all 72) in a single migration.
-- Save the audit queries and their counts as a reproducible before/after record — Codex's point that prose numbers drift is fair (the taxonomy count did move from 145 to 155 between audits).
+**0.3 Kill silent fallbacks**
+- Remove every `unknown → product` and `unknown → place`. Each caller gets an intentional path: reject the payload, render generically without mutating the stored type, or log and render safely. Do not swap `return 'product'` for `return null` and leave a null dereference behind.
+- The distinction to hold: `entity.type = service` with a *generic questionnaire* is fine; `entity.type = service` producing `category = 'product'` is not.
 
-**0.5 Tests**
-- All 15 canonical values round-trip.
-- Unsupported input never becomes `product`.
-- A `service` entity never produces `reviews.category = 'product'`.
-- Legacy aliases normalize only at the boundary and are never written.
+**0.4 Deprecated types, audited then removed**
+- Classify every reference to `TV`, `Activity`, `Music`, `Art`, `Drink`, `Travel` as dead code (delete), internal logic (replace), or external boundary (normalize on the way in only).
+- Safe: zero rows. The Supabase enum already holds only the 15 — no migration.
 
-## What Phase 0 deliberately does not do
+**0.5 Consumer inventory, no semantic changes**
+- Inventory every reader/writer of `entities.type`, `reviews.category`, `recommendations.category`, `parent_id` — components, services, hooks, search, edge functions, SQL functions, filters, analytics, AI summaries, admin tools.
+- **`recommendations` is audit-only.** Recommendations are your next project; Phase 0 must not start that refactor. This is the scope-creep boundary.
+- `reviews.category` keeps its current write behaviour. Record the future invariant (`reviews.category === subject.type`) as a target, don't enforce it yet.
 
-No dish entities. No menu ingestion. No dish deduplication. No category overrides. No dish-level ranking. No search aggregation by concept. No Step 2 removal. No recommendation-signal redesign.
+**0.6 Relationship registry + provider/offering doc**
+- Build the registry above with the two live rows (`brand → product`, `place → food`) and wire the child-section label and offering context line to read from it. This replaces the hardcoded "Featured Products" copy — the one behaviour change in Phase 0, and it's a label fix, not a flow change.
+- Document: provider and offering are **roles**; a review targets exactly one entity; `parent_id` gives context and never shifts the subject; concepts ("Burger") are a discovery dimension and never the rated subject.
+- Note the semantic caveat: `place` is broader than "restaurant", so food-serving is a taxonomy property of the place, not something the type guarantees. Don't enforce it in the database.
+- Note that `entities.category_id` is single-valued, so multi-classification of a dish (Burger / American / spicy / main course) is unsolved and deferred.
+
+**0.7 Tests**
+- All 15 canonical values parse and round-trip; unknown returns null and never becomes `product` or `place`; legacy aliases work only at the approved boundary and are never written; `service`/`professional` never map to `product`.
+- Registry: `place → food` allowed, `brand → product` allowed, an unregistered pair rejected, adding a row needs no component change.
+- Compatibility: existing reads tolerate null entity, food-on-place, product-on-brand.
+- Slug: a hierarchical child slug is generated for a `place → food` child, and two same-named dishes under different places don't collide.
+
+## Explicitly out of scope
+
+Deleting or rewriting any review. Creating dish or product entities. Review-wizard changes. Removing the category step. Questionnaires. Recommendation signals or `recommendation_category`. Dish search or concept aggregation. Menu ingestion. Category inheritance. `entity_id NOT NULL`. A separate provider/offering table.
+
+## Main risk
+
+Removing the fallbacks will expose code paths that quietly depended on invalid values. That's the point — but every exposed caller needs a deliberate failure or display path, which is why 0.5's inventory comes before 0.3's deletions land.
 
 ## After Phase 0
 
-Rewrite the later phases with the provider/offering model in hand — the subject step has to search both providers and offerings, which changes what "subject" means in the wizard, so Phases 1 and 2 shouldn't be locked in before that. Then: merged wizard rebuild (subject-first, category step gone), lightweight "add a dish to this place" creation, questionnaires in namespaced `metadata`, and concept aggregation only once real dish reviews exist.
-
-## Open question
-
-Delete all 72 reviews, or only the 17 mismatched ones and keep the other 55? I recommend all 72 — the 27 with no entity exercise a path Phase 1 forbids.
+Phase 1 merges the wizard refactor with the subject-model change (a category-first wizard nobody sees isn't worth shipping alone): subject-first search returning both providers and offerings, the category step gone, and a lightweight "add a dish at this restaurant" path — provider, name, optional concept, create, continue — not the full admin entity dialog. That flow must reuse the hierarchical slug rule.
