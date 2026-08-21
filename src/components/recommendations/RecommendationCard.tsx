@@ -87,14 +87,7 @@ const RecommendationCard = ({
       [EntityType.Event]: '/event',
       [EntityType.Service]: '/service',
       [EntityType.Professional]: '/professional',
-      [EntityType.Others]: '/entity',
-      // Legacy types (mapped via canonical)
-      [EntityType.TV]: '/tv',
-      [EntityType.Activity]: '/experience',
-      [EntityType.Music]: '/product',
-      [EntityType.Art]: '/product',
-      [EntityType.Drink]: '/place',
-      [EntityType.Travel]: '/place'
+      [EntityType.Others]: '/entity'
     };
 
     const routePrefix = typeToRoute[canonical] || '/entity';
@@ -107,7 +100,7 @@ const RecommendationCard = ({
       hasMedia: Boolean(recommendation.media && Array.isArray(recommendation.media) && recommendation.media.length > 0),
       hasImageUrl: Boolean(recommendation.image_url),
       hasEntityImage: Boolean(entityImageUrl),
-      entityId: recommendation.entity?.id,
+      entityId: recommendation.entity?.id
     });
     
     // If media array is already provided (user uploads)
@@ -178,7 +171,7 @@ const RecommendationCard = ({
       await deleteRecommendation(recommendation.id);
       toast({
         title: 'Recommendation deleted',
-        description: 'Your recommendation has been deleted successfully.',
+        description: 'Your recommendation has been deleted successfully.'
       });
       setIsDeleteModalOpen(false);
       if (onDeleted) {
@@ -188,7 +181,7 @@ const RecommendationCard = ({
       toast({
         title: 'Something went wrong',
         description: error.message,
-        variant: 'destructive',
+        variant: 'destructive'
       });
     } finally {
       setIsDeleting(false);
@@ -216,14 +209,7 @@ const RecommendationCard = ({
       [EntityType.Event]: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
       [EntityType.Service]: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-300',
       [EntityType.Professional]: 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300',
-      [EntityType.Others]: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
-      // Legacy types (handled via canonical)
-      [EntityType.TV]: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
-      [EntityType.Activity]: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-      [EntityType.Music]: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300',
-      [EntityType.Art]: 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-300',
-      [EntityType.Drink]: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300',
-      [EntityType.Travel]: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300'
+      [EntityType.Others]: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
     };
     return colors[canonical] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
   };

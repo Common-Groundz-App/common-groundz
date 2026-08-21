@@ -65,14 +65,7 @@ export const getEntityTypeLabel = (type: string | EntityType): string => {
     [EntityType.Course]: 'Course',
     [EntityType.App]: 'App',
     [EntityType.Game]: 'Game',
-    [EntityType.Experience]: 'Experience',
-    // Legacy types
-    [EntityType.TV]: 'TV Show',
-    [EntityType.Activity]: 'Experience',
-    [EntityType.Music]: 'Music',
-    [EntityType.Art]: 'Art',
-    [EntityType.Drink]: 'Drink',
-    [EntityType.Travel]: 'Travel'
+    [EntityType.Experience]: 'Experience'
   };
   
   return labels[canonicalType] || 'Others';
@@ -99,14 +92,7 @@ export const getEntityTypeFallbackImage = (type: string | EntityType): string =>
     [EntityType.Course]: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1',
     [EntityType.App]: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c',
     [EntityType.Game]: 'https://images.unsplash.com/photo-1511512578047-dfb367046420',
-    [EntityType.Experience]: 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-    // Legacy types (map to canonical equivalents)
-    [EntityType.TV]: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
-    [EntityType.Activity]: 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-    [EntityType.Music]: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
-    [EntityType.Art]: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
-    [EntityType.Drink]: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
-    [EntityType.Travel]: 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
+    [EntityType.Experience]: 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51'
   };
   
   return fallbacks[canonicalType] || fallbacks[EntityType.Product];
@@ -155,14 +141,7 @@ export const getEntityTypeIcon = (type: string | EntityType): string => {
     [EntityType.Course]: 'GraduationCap',
     [EntityType.App]: 'Smartphone',
     [EntityType.Game]: 'Gamepad2',
-    [EntityType.Experience]: 'Compass',
-    // Legacy types
-    [EntityType.TV]: 'Tv',
-    [EntityType.Activity]: 'Compass',
-    [EntityType.Music]: 'Music',
-    [EntityType.Art]: 'Palette',
-    [EntityType.Drink]: 'Coffee',
-    [EntityType.Travel]: 'Plane'
+    [EntityType.Experience]: 'Compass'
   };
   
   return icons[canonicalType] || 'Circle';
@@ -175,7 +154,6 @@ export const isValidEntityType = (type: string): boolean => {
   const validTypes = [
     'movie', 'book', 'tv_show', 'course', 'app', 'game', 'experience',
     'food', 'product', 'place', 'brand', 'event', 'service', 'professional', 'others',
-    // Legacy types still in DB
     'tv', 'activity', 'music', 'art', 'drink', 'travel'
   ];
   
