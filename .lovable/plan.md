@@ -53,46 +53,48 @@ Three design rules that keep it scalable:
 
 ## Phase 0 scope
 
-Code, documentation, audit and tests. **No data changes. No review-form changes. No visible UX change.**
+Code, documentation, audit and tests. **No data changes. No review-form changes. No visible UX change — including no label changes.**
+
+The steps below are in execution order. That matters: the inventory now runs *before* any fallback is removed.
 
 **0.1 Reproducible baseline**
 - Save the audit queries *and* their SQL, timestamped — not prose numbers. (The taxonomy count moved 145 → 155 between audits; that drift is exactly why.)
 - Baseline: entities by type; parent/child pairs by type; deprecated-type counts; reviews by category; reviews with null `entity_id`; review-category vs entity-type; recommendations by category; total counts.
-- Record the IDs of the 17 mismatched and 27 entity-less reviews as **named compatibility fixtures**, so future work knows they are deliberate.
+- List the 17 mismatched and 27 entity-less review IDs **in the audit document only**. Not in application code, not as a constant, not as a fixture list the app reads. Code must handle the *shapes* — null `entity_id`, food-on-place, product-on-brand — never specific row IDs.
 
-**0.2 One canonical type module**
+**0.2 Consumer inventory (before any behaviour change)**
+- Inventory every reader/writer of `entities.type`, `reviews.category`, `recommendations.category`, `parent_id` — components, services, hooks, search, edge functions, SQL functions, filters, analytics, AI summaries, admin tools.
+- **`recommendations` is audit-only.** Recommendations are your next project; Phase 0 must not start that refactor. This is the scope-creep boundary.
+- `reviews.category` keeps its current write behaviour. Record the future invariant (`reviews.category === subject.type`) as a target, don't enforce it yet.
+
+**0.3 One canonical type module**
 - The 15 canonical types, `CanonicalEntityType`, `isCanonicalEntityType`, `parseEntityType(): CanonicalEntityType | null`.
-- **Plain TypeScript, zero React imports** (Codex's point is right) — services and edge-shared code must be able to import it. Icons, labels and fallback images live in a separate UI config keyed exhaustively by `CanonicalEntityType`.
+- **Plain TypeScript, zero React imports** — services and edge-shared code must be able to import it. Icons, labels and fallback images live in a separate UI config keyed exhaustively by `CanonicalEntityType`.
 - No `'unsupported'` pseudo-value: `null` means invalid, so nobody can persist a 16th type.
-
-**0.3 Kill silent fallbacks**
-- Remove every `unknown → product` and `unknown → place`. Each caller gets an intentional path: reject the payload, render generically without mutating the stored type, or log and render safely. Do not swap `return 'product'` for `return null` and leave a null dereference behind.
-- The distinction to hold: `entity.type = service` with a *generic questionnaire* is fine; `entity.type = service` producing `category = 'product'` is not.
 
 **0.4 Deprecated types, audited then removed**
 - Classify every reference to `TV`, `Activity`, `Music`, `Art`, `Drink`, `Travel` as dead code (delete), internal logic (replace), or external boundary (normalize on the way in only).
 - Safe: zero rows. The Supabase enum already holds only the 15 — no migration.
 
-**0.5 Consumer inventory, no semantic changes**
-- Inventory every reader/writer of `entities.type`, `reviews.category`, `recommendations.category`, `parent_id` — components, services, hooks, search, edge functions, SQL functions, filters, analytics, AI summaries, admin tools.
-- **`recommendations` is audit-only.** Recommendations are your next project; Phase 0 must not start that refactor. This is the scope-creep boundary.
-- `reviews.category` keeps its current write behaviour. Record the future invariant (`reviews.category === subject.type`) as a target, don't enforce it yet.
+**0.5 Kill silent fallbacks (last, using 0.2's inventory)**
+- Remove every `unknown → product` and `unknown → place`. Each caller gets an intentional path from the inventory: reject the payload, render generically without mutating the stored type, or log and render safely. Do not swap `return 'product'` for `return null` and leave a null dereference behind.
+- The distinction to hold: `entity.type = service` with a *generic questionnaire* is fine; `entity.type = service` producing `category = 'product'` is not.
 
-**0.6 Relationship registry + provider/offering doc**
-- Build the registry above with the two live rows (`brand → product`, `place → food`) and wire the child-section label and offering context line to read from it. This replaces the hardcoded "Featured Products" copy — the one behaviour change in Phase 0, and it's a label fix, not a flow change.
-- Document: provider and offering are **roles**; a review targets exactly one entity; `parent_id` gives context and never shifts the subject; concepts ("Burger") are a discovery dimension and never the rated subject.
-- Note the semantic caveat: `place` is broader than "restaurant", so food-serving is a taxonomy property of the place, not something the type guarantees. Don't enforce it in the database.
-- Note that `entities.category_id` is single-valued, so multi-classification of a dish (Burger / American / spicy / main course) is unsolved and deferred.
+**0.6 Relationship registry + provider/offering doc (data layer only)**
+- Build the registry with the two live rows (`brand → product`, `place → food`) plus `assertValidOfferingPair()`, and unit-test it. **Do not wire any component to it.** No label changes, no context lines — `FeaturedProductsSection` is untouched in Phase 0 and gets rewired in Phase 1.
+- Document: provider and offering are **roles**, not entity types; a review targets exactly one entity; `parent_id` gives context and never shifts the subject; concepts ("Burger") are a discovery dimension and never the rated subject.
+- Record the known gaps so Phase 1 inherits them rather than rediscovering them: `FeaturedProductsSection` hardcodes "Featured Products"/"View All N Products"; the hierarchical slug rule lives only in `setEntityParent`; `parent_id` is `ON DELETE SET NULL` so deleting a provider orphans its offerings; `entities.category_id` is single-valued so multi-classifying a dish (Burger / American / spicy / main course) is unsolved; `place` is broader than "restaurant", so food-serving is a taxonomy property, not a type guarantee, and must not be enforced in the database.
 
 **0.7 Tests**
 - All 15 canonical values parse and round-trip; unknown returns null and never becomes `product` or `place`; legacy aliases work only at the approved boundary and are never written; `service`/`professional` never map to `product`.
-- Registry: `place → food` allowed, `brand → product` allowed, an unregistered pair rejected, adding a row needs no component change.
-- Compatibility: existing reads tolerate null entity, food-on-place, product-on-brand.
+- Registry: `place → food` and `brand → product` are valid offering pairs; an unregistered pair is *not an offering pair*; a generic non-offering reparent is still permitted.
+- Compatibility: existing reads tolerate null entity, food-on-place, product-on-brand — asserted by shape, not by row ID.
 - Slug: a hierarchical child slug is generated for a `place → food` child, and two same-named dishes under different places don't collide.
 
 ## Explicitly out of scope
 
-Deleting or rewriting any review. Creating dish or product entities. Review-wizard changes. Removing the category step. Questionnaires. Recommendation signals or `recommendation_category`. Dish search or concept aggregation. Menu ingestion. Category inheritance. `entity_id NOT NULL`. A separate provider/offering table.
+Deleting or rewriting any review. Creating dish or product entities. Any UI label or copy change. Review-wizard changes. Removing the category step. Questionnaires. Recommendation signals or `recommendation_category`. Dish search or concept aggregation. Menu ingestion. Category inheritance. `entity_id NOT NULL`. A separate provider/offering table. A DB check constraint on parent/child types.
+
 
 ## Main risk
 
