@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Entity } from '@/services/recommendation/types';
+import { Entity, EntityType } from '@/services/recommendation/types';
 import { useUniversalEntitySearch } from '@/hooks/use-universal-entity-search';
 import { X, Search, Loader2 } from 'lucide-react';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
