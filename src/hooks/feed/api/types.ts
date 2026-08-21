@@ -4,6 +4,7 @@ export * from '../types';
 
 // Import the EntityType enum directly
 import { EntityType } from '@/services/recommendation/types';
+import { parseEntityTypeAtBoundary } from '@/services/entityType';
 
 // Add string literal compatibility types for existing components - expanded to include all entity types
 export type EntityTypeString = 

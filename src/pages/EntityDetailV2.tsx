@@ -264,11 +264,6 @@ const EntityDetailV2 = () => {
           label: 'Brand',
           value: entity.specifications?.brand || entity.venue || null
         };
-      case EntityType.Music:
-        return {
-          label: 'Artist',
-          value: entity.venue || null
-        };
       case EntityType.Food:
         return {
           label: 'Venue',
