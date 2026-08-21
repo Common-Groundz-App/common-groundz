@@ -134,17 +134,11 @@ export const getEntityTypeIcon = (type: string | EntityType): string => {
 };
 
 /**
- * Check if a type string is valid against Supabase enum
+ * Check if a type string is one of the 15 canonical Supabase enum values.
+ * Legacy aliases are intentionally NOT valid here.
  */
-export const isValidEntityType = (type: string): boolean => {
-  const validTypes = [
-    'movie', 'book', 'tv_show', 'course', 'app', 'game', 'experience',
-    'food', 'product', 'place', 'brand', 'event', 'service', 'professional', 'others',
-    'tv', 'activity', 'music', 'art', 'drink', 'travel'
-  ];
-  
-  return validTypes.includes(type);
-};
+export const isValidEntityType = (type: string): boolean => parseEntityType(type) !== null;
+
 
 /**
  * Get all non-deprecated entity types for UI display
