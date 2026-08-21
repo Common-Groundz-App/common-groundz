@@ -237,7 +237,7 @@ export const setEntityParent = async (childId: string, parentId: string | null):
       throw childError;
     }
 
-    const newSlug = child.name?.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
+    const newSlug = slugifyEntityName(child.name);
 
     const { error } = await supabase
       .from('entities')
