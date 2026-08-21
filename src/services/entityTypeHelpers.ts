@@ -141,24 +141,9 @@ export const isValidEntityType = (type: string): boolean => parseEntityType(type
 
 
 /**
- * Get all non-deprecated entity types for UI display
+ * All canonical entity types for UI display, derived from the canonical list.
  */
-export const getActiveEntityTypes = (): EntityType[] => {
-  return [
-    EntityType.Movie,
-    EntityType.Book,
-    EntityType.TVShow,
-    EntityType.Course,
-    EntityType.App,
-    EntityType.Game,
-    EntityType.Experience,
-    EntityType.Food,
-    EntityType.Product,
-    EntityType.Place,
-    EntityType.Brand,
-    EntityType.Event,
-    EntityType.Service,
-    EntityType.Professional,
-    EntityType.Others
-  ];
+export const getActiveEntityTypes = (): EntityType[] =>
+  CANONICAL_ENTITY_TYPES.map((t) => t as unknown as EntityType);
+
 };
