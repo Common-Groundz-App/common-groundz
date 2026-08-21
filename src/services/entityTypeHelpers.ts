@@ -145,5 +145,3 @@ export const isValidEntityType = (type: string): boolean => parseEntityType(type
  */
 export const getActiveEntityTypes = (): EntityType[] =>
   CANONICAL_ENTITY_TYPES.map((t) => t as unknown as EntityType);
-
-};
