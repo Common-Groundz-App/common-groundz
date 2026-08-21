@@ -40,14 +40,16 @@ Everything derives from this one table:
 
 - **Can X be a provider?** → is it the `provider` of any row.
 - **What can I add under this entity?** → the `offering` types of its rows. Drives the "Add a dish / Add a product" affordance without a single `if (type === 'place')`.
-- **What do we call the child section?** → `offeringPlural`. "Featured Products" becomes "Dishes" under a restaurant, purely from data.
-- **How do we render an offering's context line?** → `Classic Burger` + `at` + `Truffles`; `Pegasus 43` + `by` + `Nike`. The verb is registry data, not a conditional.
+- **What do we call the child section?** → `offeringPlural`, so "Featured Products" can become "Dishes" under a restaurant purely from data. **The registry supplies this in Phase 0; components are wired to it in Phase 1.**
+- **How do we render an offering's context line?** → `Classic Burger` + `at` + `Truffles`; `Pegasus 43` + `by` + `Nike`. Verb from registry data, not a conditional. Also Phase 1 wiring.
 - **Adding a sixth relationship** = one row plus its questionnaire entry. No component edits. That is the scalability test, and it's the reason to build the registry in Phase 0 even though only two rows are active.
 
-Two design rules that keep it scalable:
+Three design rules that keep it scalable:
 
 1. **Many-to-many, not one provider type per offering type.** `service` will have several provider types. Don't model it as `offering → its one provider type`.
-2. **Validate at the application boundary, not with a DB check constraint.** A check constraint on `(parent.type, child.type)` would need a migration for every new relationship. Application-level validation plus the registry keeps the graph open for non-provider parent/child uses (variants, editions, chain→location).
+2. **Validate at the application boundary, not with a DB check constraint.** A check constraint on `(parent.type, child.type)` would need a migration for every new relationship.
+3. **The registry validates offering operations only — never all of `parent_id`.** This is Codex's sharpest point and I'd missed the implication. `parent_id` is a generic hierarchy edge; future non-offering uses (variants, editions, chain→location, series→book) must stay legal. So the check is `assertValidOfferingPair()` called from offering-creation paths, not a blanket guard on every reparent. An unregistered pair means "not an offering relationship", not "invalid data".
+
 
 ## Phase 0 scope
 
