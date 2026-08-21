@@ -22,7 +22,7 @@ Neither review could confirm whether `place → food` actually works. I checked:
 - **But the copy is hardcoded.** `FeaturedProductsSection.tsx` renders "Featured Products" and "View All N Products". A restaurant's dishes would appear under the heading "Featured Products". Mechanism generic, vocabulary not.
 - **No `parent.type === 'brand'` branching exists** in the hierarchy logic. The two `'brand'` checks found are cosmetic image-fit rules in `EntityHeader.tsx`.
 
-So: the graph is genuinely generic, one slug rule must be reused, one FK behaviour noted, and the labels need to become relationship-derived.
+So: the graph is genuinely generic, one slug rule must be reused, one FK behaviour noted, and the hardcoded labels are a known Phase 1 task — recorded now, not touched now.
 
 ## Scalability — the part you asked for, and neither review answered
 
