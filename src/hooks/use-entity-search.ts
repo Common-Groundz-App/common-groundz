@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { useToast } from './use-toast';
 import type { Entity as ServiceEntity } from '@/services/recommendation/types';
-import { EntityTypeString, mapStringToEntityType } from '@/hooks/feed/api/types';
+import { EntityTypeString,  } from '@/hooks/feed/api/types';
 import { getEntityTypeFallbackImage } from '@/utils/urlUtils';
 import { findEntityByApiRef } from '@/services/recommendation/entityOperations';
 import { saveExternalImageToStorage, isValidImageUrl, isGooglePlacesImage } from '@/utils/imageUtils';
@@ -48,8 +48,6 @@ export function useEntitySearch(type: EntityTypeString) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   
-  // Convert string type to enum type for database operations
-  const entityTypeEnum = mapStringToEntityType(type);
 
   // Check if location is enabled in localStorage
   const isLocationEnabled = (): boolean => {

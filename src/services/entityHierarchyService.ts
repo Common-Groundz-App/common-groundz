@@ -9,10 +9,16 @@ export interface EntityWithChildren extends Omit<Entity, 'metadata'> {
   metadata?: Record<string, any> | null;
 }
 
-// Type mapping from database enum to EntityType - uses canonical helper
+// Type mapping from database enum to EntityType.
+// Rows are already canonical; an unrecognised value degrades to the explicitly
+// generic `Others` for safe rendering and is never written back.
 const mapDatabaseTypeToEntityType = (dbType: string): EntityType => {
-  // Use canonical helper to normalize database strings (handles legacy + new canonical types)
-  return mapStringToEntityType(dbType as any); // Database may return any string, canonical helper handles it
+  const mapped = mapStringToEntityType(dbType);
+  if (!mapped) {
+    console.warn('[entityHierarchy] Unrecognised entity type from database:', dbType);
+    return EntityType.Others;
+  }
+  return mapped;
 };
 
 // Convert database entity to application Entity type

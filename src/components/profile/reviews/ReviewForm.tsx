@@ -178,7 +178,7 @@ const ReviewForm = ({
       // Convert provided entity to expected format
       const entityToUse: any = {
         ...entity,
-        type: mapStringToEntityType(entity.type as any)
+        type: mapStringToEntityType(entity.type as any) ?? entity.type
       };
       
       setSelectedEntity(entityToUse);
@@ -403,7 +403,8 @@ const ReviewForm = ({
     
     // Convert string type to EntityType if needed
     if (typeof processedEntity.type === 'string') {
-      processedEntity.type = mapStringToEntityType(processedEntity.type);
+      // Keep the original value when it is not a canonical type: never coerce to `product`.
+      processedEntity.type = mapStringToEntityType(processedEntity.type) ?? processedEntity.type;
     }
     
     setSelectedEntity(processedEntity as RecommendationEntity);
