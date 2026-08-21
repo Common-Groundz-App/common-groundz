@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { parseEntityTypeAtBoundary, type CanonicalEntityType } from '@/services/entityType';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { X, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
