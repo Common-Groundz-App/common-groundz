@@ -98,8 +98,11 @@ Deleting or rewriting any review. Creating dish or product entities. Any UI labe
 
 ## Main risk
 
-Removing the fallbacks will expose code paths that quietly depended on invalid values. That's the point — but every exposed caller needs a deliberate failure or display path, which is why 0.5's inventory comes before 0.3's deletions land.
+Removing the fallbacks will expose code paths that quietly depended on invalid values. That's the point — but every exposed caller needs a deliberate failure or display path, which is why the inventory (0.2) now runs before the removals (0.5).
 
 ## After Phase 0
 
-Phase 1 merges the wizard refactor with the subject-model change (a category-first wizard nobody sees isn't worth shipping alone): subject-first search returning both providers and offerings, the category step gone, and a lightweight "add a dish at this restaurant" path — provider, name, optional concept, create, continue — not the full admin entity dialog. That flow must reuse the hierarchical slug rule.
+Stop and report before Phase 1: files changed, fallbacks removed, compatibility boundaries still standing, audit results, unresolved provider/offering questions.
+
+Then Phase 1 merges the wizard refactor with the subject-model change (a category-first wizard nobody sees isn't worth shipping alone): subject-first search returning both providers and offerings, the category step gone, relationship-derived labels wired to the registry, and a lightweight "add a dish at this restaurant" path — provider, name, optional concept, create, continue — not the full admin entity dialog. That flow must reuse the hierarchical slug rule.
+
