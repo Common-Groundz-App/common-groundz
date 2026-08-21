@@ -1,48 +1,34 @@
 /**
- * Canonical Entity Type Helpers
- * 
- * Centralized utilities for entity type handling across the application.
- * Supports both canonical (tv_show, experience, etc.) and legacy (tv, activity) types.
+ * Entity Type UI Helpers
+ *
+ * UI-facing configuration (labels, icons, fallback images) keyed by canonical
+ * entity type. The canonical list and the strict parser live in
+ * `src/services/entityType.ts` — this module never redefines them.
  */
 
 import { EntityType } from './recommendation/types';
+import {
+  CANONICAL_ENTITY_TYPES,
+  parseEntityType,
+  parseEntityTypeAtBoundary,
+} from './entityType';
 import { Database } from '@/integrations/supabase/types';
 
 type DatabaseEntityType = Database['public']['Enums']['entity_type'];
 
 /**
- * Map legacy type strings to canonical enum values
+ * DISPLAY-ONLY normalization.
+ *
+ * Resolves canonical values and legacy aliases. When the value is not
+ * recognisable it returns `EntityType.Others` so rendering stays safe — this
+ * value must NEVER be written back to the database. For persistence use
+ * `parseEntityType` (strict, returns `null`) from `entityType.ts`.
  */
 export const getCanonicalType = (type: string): EntityType => {
-  const lowerType = type.toLowerCase();
-  
-  // Priority 1: Collapse legacy types to canonical equivalents
-  const legacyToCanonical: Record<string, EntityType> = {
-    'tv': EntityType.TVShow,
-    'activity': EntityType.Experience,
-    'music': EntityType.Product,    // Semantic preservation via metadata.content_type
-    'art': EntityType.Product,      // Semantic preservation via metadata.content_type
-    'drink': EntityType.Food,       // Semantic preservation via metadata.subcategory
-    'travel': EntityType.Place      // Semantic preservation via metadata.context
-  };
-  
-  if (legacyToCanonical[lowerType]) {
-    return legacyToCanonical[lowerType];
-  }
-  
-  // Priority 2: Return canonical type if already valid
-  const activeTypes = [
-    'movie', 'book', 'tv_show', 'course', 'app', 'game', 'experience',
-    'food', 'product', 'place', 'brand', 'event', 'service', 'professional', 'others'
-  ];
-  
-  if (activeTypes.includes(lowerType)) {
-    return lowerType as EntityType;
-  }
-  
-  // Fallback
-  return EntityType.Others;
+  const canonical = parseEntityTypeAtBoundary(type);
+  return canonical ? (canonical as unknown as EntityType) : EntityType.Others;
 };
+
 
 /**
  * Get human-readable label for entity type
@@ -65,14 +51,7 @@ export const getEntityTypeLabel = (type: string | EntityType): string => {
     [EntityType.Course]: 'Course',
     [EntityType.App]: 'App',
     [EntityType.Game]: 'Game',
-    [EntityType.Experience]: 'Experience',
-    // Legacy types
-    [EntityType.TV]: 'TV Show',
-    [EntityType.Activity]: 'Experience',
-    [EntityType.Music]: 'Music',
-    [EntityType.Art]: 'Art',
-    [EntityType.Drink]: 'Drink',
-    [EntityType.Travel]: 'Travel'
+    [EntityType.Experience]: 'Experience'
   };
   
   return labels[canonicalType] || 'Others';
@@ -99,14 +78,7 @@ export const getEntityTypeFallbackImage = (type: string | EntityType): string =>
     [EntityType.Course]: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1',
     [EntityType.App]: 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c',
     [EntityType.Game]: 'https://images.unsplash.com/photo-1511512578047-dfb367046420',
-    [EntityType.Experience]: 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-    // Legacy types (map to canonical equivalents)
-    [EntityType.TV]: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1',
-    [EntityType.Activity]: 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51',
-    [EntityType.Music]: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
-    [EntityType.Art]: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
-    [EntityType.Drink]: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87',
-    [EntityType.Travel]: 'https://images.unsplash.com/photo-1501554728187-ce583db33af7'
+    [EntityType.Experience]: 'https://images.unsplash.com/photo-1526401485004-46910ecc8e51'
   };
   
   return fallbacks[canonicalType] || fallbacks[EntityType.Product];
@@ -155,52 +127,21 @@ export const getEntityTypeIcon = (type: string | EntityType): string => {
     [EntityType.Course]: 'GraduationCap',
     [EntityType.App]: 'Smartphone',
     [EntityType.Game]: 'Gamepad2',
-    [EntityType.Experience]: 'Compass',
-    // Legacy types
-    [EntityType.TV]: 'Tv',
-    [EntityType.Activity]: 'Compass',
-    [EntityType.Music]: 'Music',
-    [EntityType.Art]: 'Palette',
-    [EntityType.Drink]: 'Coffee',
-    [EntityType.Travel]: 'Plane'
+    [EntityType.Experience]: 'Compass'
   };
   
   return icons[canonicalType] || 'Circle';
 };
 
 /**
- * Check if a type string is valid against Supabase enum
+ * Check if a type string is one of the 15 canonical Supabase enum values.
+ * Legacy aliases are intentionally NOT valid here.
  */
-export const isValidEntityType = (type: string): boolean => {
-  const validTypes = [
-    'movie', 'book', 'tv_show', 'course', 'app', 'game', 'experience',
-    'food', 'product', 'place', 'brand', 'event', 'service', 'professional', 'others',
-    // Legacy types still in DB
-    'tv', 'activity', 'music', 'art', 'drink', 'travel'
-  ];
-  
-  return validTypes.includes(type);
-};
+export const isValidEntityType = (type: string): boolean => parseEntityType(type) !== null;
+
 
 /**
- * Get all non-deprecated entity types for UI display
+ * All canonical entity types for UI display, derived from the canonical list.
  */
-export const getActiveEntityTypes = (): EntityType[] => {
-  return [
-    EntityType.Movie,
-    EntityType.Book,
-    EntityType.TVShow,
-    EntityType.Course,
-    EntityType.App,
-    EntityType.Game,
-    EntityType.Experience,
-    EntityType.Food,
-    EntityType.Product,
-    EntityType.Place,
-    EntityType.Brand,
-    EntityType.Event,
-    EntityType.Service,
-    EntityType.Professional,
-    EntityType.Others
-  ];
-};
+export const getActiveEntityTypes = (): EntityType[] =>
+  CANONICAL_ENTITY_TYPES.map((t) => t as unknown as EntityType);

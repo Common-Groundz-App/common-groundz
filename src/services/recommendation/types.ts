@@ -60,22 +60,9 @@ export enum EntityType {
   Course = 'course',
   App = 'app',
   Game = 'game',
-  Experience = 'experience',
-  
-  // Legacy types (deprecated - kept for backward compatibility until data migration)
-  /** @deprecated Use TVShow instead */
-  TV = 'tv',
-  /** @deprecated Use Experience instead */
-  Activity = 'activity',
-  /** @deprecated Use appropriate specific type instead */
-  Music = 'music',
-  /** @deprecated Use appropriate specific type instead */
-  Art = 'art',
-  /** @deprecated Use appropriate specific type instead */
-  Drink = 'drink',
-  /** @deprecated Use appropriate specific type instead */
-  Travel = 'travel'
+  Experience = 'experience'
 }
+
 
 export enum RecommendationCategory {
   Food = 'Food',

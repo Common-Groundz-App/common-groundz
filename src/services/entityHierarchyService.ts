@@ -2,16 +2,23 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
+import { buildHierarchicalSlug, slugifyEntityName } from '@/services/entitySlug';
 
 export interface EntityWithChildren extends Omit<Entity, 'metadata'> {
   children?: Entity[];
   metadata?: Record<string, any> | null;
 }
 
-// Type mapping from database enum to EntityType - uses canonical helper
+// Type mapping from database enum to EntityType.
+// Rows are already canonical; an unrecognised value degrades to the explicitly
+// generic `Others` for safe rendering and is never written back.
 const mapDatabaseTypeToEntityType = (dbType: string): EntityType => {
-  // Use canonical helper to normalize database strings (handles legacy + new canonical types)
-  return mapStringToEntityType(dbType as any); // Database may return any string, canonical helper handles it
+  const mapped = mapStringToEntityType(dbType);
+  if (!mapped) {
+    console.warn('[entityHierarchy] Unrecognised entity type from database:', dbType);
+    return EntityType.Others;
+  }
+  return mapped;
 };
 
 // Convert database entity to application Entity type
@@ -206,9 +213,7 @@ export const setEntityParent = async (childId: string, parentId: string | null):
     }
 
     // Generate hierarchical slug
-    const parentSlug = parent.slug || parent.name?.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
-    const baseChildSlug = child.name?.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
-    const newHierarchicalSlug = `${parentSlug}-${baseChildSlug}`;
+    const newHierarchicalSlug = buildHierarchicalSlug(parent, child);
 
     // Update entity with parent_id and new hierarchical slug
     const { error } = await supabase
@@ -238,7 +243,7 @@ export const setEntityParent = async (childId: string, parentId: string | null):
       throw childError;
     }
 
-    const newSlug = child.name?.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
+    const newSlug = slugifyEntityName(child.name);
 
     const { error } = await supabase
       .from('entities')

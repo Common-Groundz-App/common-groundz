@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { parseEntityTypeAtBoundary, type CanonicalEntityType } from '@/services/entityType';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { X, Loader2, Search, Plus, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
@@ -24,7 +25,7 @@ import { RecentSearchesPanel } from '@/components/search/RecentSearchesPanel';
 
 // Map api_source → canonical entity type (single source of truth, mirrors use-entity-operations)
 const normalizeEntityType = (rawType: string | undefined, apiSource: string | undefined): string => {
-  const apiSourceMap: Record<string, string> = {
+  const apiSourceMap: Record<string, CanonicalEntityType> = {
     openlibrary: 'book',
     google_books: 'book',
     omdb: 'movie',
@@ -32,8 +33,11 @@ const normalizeEntityType = (rawType: string | undefined, apiSource: string | un
     google_places: 'place',
   };
   if (apiSource && apiSourceMap[apiSource]) return apiSourceMap[apiSource];
-  return rawType || 'product';
+  // No silent `product` fallback: an unrecognisable type becomes the explicitly
+  // generic `others` rather than being mislabelled as a product.
+  return parseEntityTypeAtBoundary(rawType) ?? 'others';
 };
+
 
 interface UnifiedEntitySelectorProps {
   onEntitiesChange: (entities: EntityAdapter[]) => void;
