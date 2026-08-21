@@ -2,6 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
+import { buildHierarchicalSlug, slugifyEntityName } from '@/services/entitySlug';
 
 export interface EntityWithChildren extends Omit<Entity, 'metadata'> {
   children?: Entity[];
@@ -206,9 +207,7 @@ export const setEntityParent = async (childId: string, parentId: string | null):
     }
 
     // Generate hierarchical slug
-    const parentSlug = parent.slug || parent.name?.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
-    const baseChildSlug = child.name?.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
-    const newHierarchicalSlug = `${parentSlug}-${baseChildSlug}`;
+    const newHierarchicalSlug = buildHierarchicalSlug(parent, child);
 
     // Update entity with parent_id and new hierarchical slug
     const { error } = await supabase
