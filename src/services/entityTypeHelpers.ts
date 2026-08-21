@@ -1,48 +1,34 @@
 /**
- * Canonical Entity Type Helpers
- * 
- * Centralized utilities for entity type handling across the application.
- * Supports both canonical (tv_show, experience, etc.) and legacy (tv, activity) types.
+ * Entity Type UI Helpers
+ *
+ * UI-facing configuration (labels, icons, fallback images) keyed by canonical
+ * entity type. The canonical list and the strict parser live in
+ * `src/services/entityType.ts` — this module never redefines them.
  */
 
 import { EntityType } from './recommendation/types';
+import {
+  CANONICAL_ENTITY_TYPES,
+  parseEntityType,
+  parseEntityTypeAtBoundary,
+} from './entityType';
 import { Database } from '@/integrations/supabase/types';
 
 type DatabaseEntityType = Database['public']['Enums']['entity_type'];
 
 /**
- * Map legacy type strings to canonical enum values
+ * DISPLAY-ONLY normalization.
+ *
+ * Resolves canonical values and legacy aliases. When the value is not
+ * recognisable it returns `EntityType.Others` so rendering stays safe — this
+ * value must NEVER be written back to the database. For persistence use
+ * `parseEntityType` (strict, returns `null`) from `entityType.ts`.
  */
 export const getCanonicalType = (type: string): EntityType => {
-  const lowerType = type.toLowerCase();
-  
-  // Priority 1: Collapse legacy types to canonical equivalents
-  const legacyToCanonical: Record<string, EntityType> = {
-    'tv': EntityType.TVShow,
-    'activity': EntityType.Experience,
-    'music': EntityType.Product,    // Semantic preservation via metadata.content_type
-    'art': EntityType.Product,      // Semantic preservation via metadata.content_type
-    'drink': EntityType.Food,       // Semantic preservation via metadata.subcategory
-    'travel': EntityType.Place      // Semantic preservation via metadata.context
-  };
-  
-  if (legacyToCanonical[lowerType]) {
-    return legacyToCanonical[lowerType];
-  }
-  
-  // Priority 2: Return canonical type if already valid
-  const activeTypes = [
-    'movie', 'book', 'tv_show', 'course', 'app', 'game', 'experience',
-    'food', 'product', 'place', 'brand', 'event', 'service', 'professional', 'others'
-  ];
-  
-  if (activeTypes.includes(lowerType)) {
-    return lowerType as EntityType;
-  }
-  
-  // Fallback
-  return EntityType.Others;
+  const canonical = parseEntityTypeAtBoundary(type);
+  return canonical ? (canonical as unknown as EntityType) : EntityType.Others;
 };
+
 
 /**
  * Get human-readable label for entity type
