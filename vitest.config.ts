@@ -41,7 +41,12 @@ const nodeIncludes = [
   'src/components/comments/useMentionAutocomplete.test.ts',
   'src/components/comments/composerDocking.test.ts',
   'src/utils/dockCorrection.test.ts',
+
+  'src/services/__tests__/entityType.test.ts',
+  'src/services/__tests__/entitySlug.test.ts',
+  'src/services/__tests__/entityTaxonomyCompatibility.test.ts',
 ];
+
 
 export default defineConfig({
   resolve: { alias },
