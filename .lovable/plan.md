@@ -1,77 +1,72 @@
-# Phase 1 — Relationship-aware entity hierarchy UI
+# Phase 1 — Relationship-aware labels on the V4 entity page (V4 only)
 
-Phase 0 is verified complete (15 canonical types, strict parsers, provider/offering registry, hierarchical slugs, 334 tests green). Phase 1 wires the registry into every child-entity surface. No database, review-form, or entity-creation changes.
+Phase 0 is verified complete. Phase 1 makes the **V4 entity page** stop assuming every child is a "Product". Verified facts:
+
+- `/entity/:slug` renders V4 for everyone. V2 (`EntityDetailV2`) is reachable only by internal users via `?v=2` — **no V2 changes in this phase**.
+- The V4 child-entity surfaces are exactly four: overview preview card, child tab, child-tab list, and the sidebar card. Plus one child-page context line and the sibling carousel.
+- `EntityProductsCard.tsx` is V2-only → untouched. The "Coming Soon: Product management interface" block lives in V4's empty Products tab → in scope.
 
 ## Core rule
 
-`parent_id` is a generic edge. Registry vocabulary ("Dishes", "Products", "at", "by") is used **only** when `(parent.type, child.type)` is a registered offering pair. Everything else renders under a generic "Related" label — never hidden, never mislabeled.
+Registry vocabulary ("Dishes", "Products", "at", "by") is used **only** when `(parent.type, child.type)` is a registered offering pair (`brand→product`, `place→food`). Anything else renders as generic "Related" — never hidden, never mislabeled. Registry stays at those two pairs (no `place→product` yet), so a single provider has at most one offering type today; the mixed-type rules below are written but will not trigger until a third pair is registered.
 
-## Changes by surface
+## The six visible changes (in plain words)
 
-### 1. `FeaturedProductsSection.tsx` → rename to `RelatedEntitiesSection.tsx`
-Used in the V4 overview tab and legacy V2 page.
-- Section title: `getOfferingSectionLabel(parent.type, child.type)` → "Dishes" / "Products"; "Related" when unregistered.
-- "View All N Products" → `View all N {label}` (lowercase plural from the same registry entry).
-- Props renamed: `onViewAllProducts` → `onViewAll`, `featuredProducts` → `featuredChildren`.
-- Update both call sites: `EntityTabsContent.tsx` (V4), `EntityDetailV2.tsx` (V2).
+### 1. Overview tab → "Featured Products" card
+File: `FeaturedProductsSection.tsx` → **renamed `RelatedEntitiesSection.tsx`** (call site: `EntityTabsContent.tsx`).
+- Cosmix (brand→product): still says **Featured Products** — visually identical to today.
+- A restaurant (place→food): **Featured Dishes**.
+- Unregistered children: **Related**.
+- The hidden "View All N Products" button (only appears at 5+ children) becomes "View all N products/dishes", matching the section's group.
 
-### 2. `EntityTabsContent.tsx` (V4 entity page tabs)
-- Rename the `products` tab value/label: label comes from the registry for the provider's dominant child group; "Related" fallback. (Tab key stays `products` internally or becomes `children` — one canonical key, applied consistently with V2.)
-- Empty state: "No products yet" / "This is a child product of…" → registry-derived or generic copy.
-- "Showing N products" footer → "Showing N {label}".
-- Remove the "Coming Soon: Product management interface" placeholder block.
+### 2. The child tab (currently "Products 4")
+File: `EntityTabsContent.tsx`.
+- Exactly one child type → registry label: **Products 4** (Cosmix, unchanged) or **Dishes 8** (restaurant).
+- More than one child type → **Related N**.
+- Zero children → **tab hidden entirely** (no empty tab).
+- "Showing 4 products" footer → "Showing 4 dishes" etc. Empty-state copy generalized; the "Coming Soon: Product management interface" block is removed.
 
-### 3. `EntityV4.tsx`
-- `handleViewAllProducts` currently fires a toast ("Navigate to products tab"). Replace with a real tab switch (lift tab state or use a ref/callback), mirroring V2's existing `setActiveTab('products')` behavior.
-- `EntityType.Product` fallback at line ~467 for the hero image → `EntityType.Others` (product fallback is banned by Phase 0 policy).
+### 3. "View All" actually works on V4
+File: `EntityV4.tsx`.
+- `handleViewAllProducts` currently shows a toast. It becomes a real switch to the child tab (V2 already does this via `setActiveTab`). The full tab gets no redundant "View all".
 
-### 4. `EntityChildrenCard.tsx` (sidebar children list)
-- "Related Products" / "No related products yet" / "Add Product" / "View all N products" → registry labels with "Related" fallback.
-- Hide the "Add Product" button (creation UX is Phase 2 scope) — keep the prop, render nothing.
+### 4. Right sidebar → "Related Products (4)" card
+Files: `EntitySidebar.tsx` (passes parent type down) + `EntityChildrenCard.tsx` (renders).
+- Cosmix: **Products (4)**. Restaurant: **Dishes (8)**. Mixed/unregistered: **Related (N)**.
+- ("Related Products" is dropped — they aren't merely *related*, they're Cosmix's products.)
+- The "Add Product" button stays hidden — creation UX is Phase 2.
+- No new headings added to `EntitySidebar`; only the existing card header changes.
 
-### 5. `EntitySidebar.tsx` (V4)
-- The "Related Products - Child Entities" section header becomes registry-driven ("Dishes" / "Products" / "Related").
+### 5. Child page → parent context line
+Files: V4 header area (`EntityV4.tsx` / `EntityHeader`), plus V2 untouched.
+- Viewing a dish: a small subordinate line under the title — **"Dish at Truffles"** — with "Truffles" linked to the parent's slug URL.
+- Only when a parent exists AND the pair is registered. No invented verbs for unregistered pairs. The entity name never repeats in the line.
 
-### 6. `EntityDetailV2.tsx` (legacy V2 page)
-- "Products (N)" tab trigger, "No products yet", "child product of", "Add Product", "Showing N products" → same registry treatment.
-- `handleViewAllProducts` already switches tabs correctly — keep behavior, rename only.
+### 6. Sibling carousel (child pages)
+File: `SiblingCarousel.tsx` (rendered by V4's `ReviewsSection.tsx`).
+- Keep **"More from Cosmix"** / **"More from Truffles"** when a parent exists.
+- Fallback when no parent name: "Related Products" → **"Related"**.
 
-### 7. `SiblingCarousel.tsx`
-- Fallback title "Related Products" → "Related". Keep "More from {parentName}".
+## Cleanup
 
-### 8. `EntityProductsCard.tsx`
-- Audit first: it reads from `entityProductService`, not `parent_id`. If it is not parent/child data, it stays untouched this phase.
-
-### 9. Offering context line on child pages (V4 + V2)
-- When viewing an offering (e.g. a dish), render a small subordinate line under the title: `{TypeLabel} {verb} {ParentName}` — "Dish at Truffles" — with the parent name linked to the parent's canonical slug URL.
-- Only when a parent exists AND the pair is registered. No invented verbs for unregistered pairs. Never duplicate the entity name in the line.
-
-### 10. Mixed-child grouping
-- Group children by child type. Registered groups get registry labels, unregistered groups render under "Related".
-- Deterministic order: registry declaration order, then alphabetical by type; groups never reshuffle between renders.
-- Each group's "View all" refers to its own group.
-
-### 11. Cleanup
 - Delete `src/services/entityTypeMapping.ts` (zero importers).
+- `EntityV4.tsx` line ~467 and `EntityV4LoadingWrapper`: hardcoded `EntityType.Product` drives only the loading/hero **fallback image** (a product-themed stock photo while data loads). Change to `EntityType.Others` — display-only, no behaviour change.
 
 ## Explicitly out of scope
 
-- No `ReviewForm` / `getReviewCategory()` changes (Phase 2).
-- No offering-creation UX, no category-step changes, no persistence changes.
-- No schema or data migrations.
+- No V2 (`EntityDetailV2.tsx`) changes. No `ReviewForm` / category-step changes. No dish/product creation UX. No database or data changes. No `place→product` registry entry.
 
 ## Tests
 
-- Registry-driven titles/labels for `brand → product` (regression: existing brand pages render identically) and `place → food`.
-- Unregistered pair renders as "Related" and is never dropped.
-- Mixed-child grouping order and per-group "View all".
-- Context line: shown only for registered pairs, links to parent slug, absent otherwise.
-- V4 "View All" switches tabs (no toast).
+- brand→product renders identical labels to today (regression).
+- place→food renders "Dishes" in overview, tab, sidebar; context line "Dish at {Place}" links to parent slug.
+- Unregistered pair → "Related", never dropped; zero children → tab hidden.
+- "View All" switches tabs (no toast).
 - `bunx vitest run` green + typecheck.
 
 ## After Phase 1
 
-Report exact components changed, brand→product vs place→food rendering evidence, tests added, and any hierarchy assumptions uncovered — then stop before Phase 2 (entity-first review subject).
+Report exact components changed, before/after labels for Cosmix and a place→food example, tests added — then stop before Phase 2 (entity-first review subject).
 
 ## Later phases (unchanged outline)
 
