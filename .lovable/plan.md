@@ -37,16 +37,13 @@ Rendering rules for components:
 
 ### 1. Overview tab → "Featured Products" card
 File: `FeaturedProductsSection.tsx` → **renamed `RelatedEntitiesSection.tsx`** (call site: `EntityTabsContent.tsx`).
-- Cosmix (brand→product): still says **Featured Products** — visually identical to today.
-- A restaurant (place→food): **Featured Dishes**.
-- Unregistered children: **Related**.
-- The hidden "View All N Products" button (only appears at 5+ children) becomes "View all N products/dishes", matching the section's group.
+- Single group: Cosmix still says **Featured Products** (identical to today); a restaurant says **Featured Dishes**; unregistered children: **Related**.
+- Mixed groups (future): separate minimal sections — "Featured Dishes" and "Featured Products" — never one combined "Featured Offerings" list mixing unlike children.
+- The hidden "View All N Products" button (only appears at 5+ children) becomes "View all N {group label}", matching the section's group.
 
 ### 2. The child tab (currently "Products 4")
 File: `EntityTabsContent.tsx`.
-- Exactly one child type → registry label: **Products 4** (Cosmix, unchanged) or **Dishes 8** (restaurant).
-- More than one child type → **Related N**.
-- Zero children → **tab hidden entirely** (no empty tab).
+- Labels come only from the helper: single group → **Products 4** (Cosmix, unchanged) / **Dishes 8**; mixed → **Offerings N** with per-group headings inside; zero children → **tab hidden entirely**.
 - "Showing 4 products" footer → "Showing 4 dishes" etc. Empty-state copy generalized; the "Coming Soon: Product management interface" block is removed.
 
 ### 3. "View All" actually works on V4
@@ -55,7 +52,7 @@ File: `EntityV4.tsx`.
 
 ### 4. Right sidebar → "Related Products (4)" card
 Files: `EntitySidebar.tsx` (passes parent type down) + `EntityChildrenCard.tsx` (renders).
-- Cosmix: **Products (4)**. Restaurant: **Dishes (8)**. Mixed/unregistered: **Related (N)**.
+- Labels from the helper: Cosmix: **Products (4)**. Restaurant: **Dishes (8)**. Mixed: **Offerings (N)** with per-group headings; generic-only: **Related (N)**.
 - ("Related Products" is dropped — they aren't merely *related*, they're Cosmix's products.)
 - The "Add Product" button stays hidden — creation UX is Phase 2.
 - No new headings added to `EntitySidebar`; only the existing card header changes.
