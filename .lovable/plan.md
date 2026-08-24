@@ -26,11 +26,13 @@ Grouping rules (group-preserving — an odd child never collapses valid groups):
 - Children are split into groups by type. Each registered `(parent, childType)` pair forms a group with its registry label ("Dishes", "Products"). All unregistered/generic children form one trailing group labelled **"Related"**.
 - Zero children → `mode: 'none'`, `label: null` (tab and section hidden).
 - Exactly one group → `mode: 'single'`, label = that group's label ("Products" / "Dishes" / "Related").
-- More than one group → `mode: 'mixed'`, aggregate `label: 'Offerings'`. Example: a place with 8 dishes + 1 generic child yields groups `Dishes (8)` + `Related (1)` — it does **not** collapse to "Related 9".
+- More than one group → `mode: 'mixed'`. Aggregate label: **"Offerings" only when every group is a registered offering group** (e.g. Dishes 8 + Products 3 → Offerings 11). **If any unregistered "Related" group is present, the aggregate label is "Related"** (e.g. Dishes 8 + Related 1 → Related 9). "Related" as the aggregate never means collapsing or hiding the valid groups — they still render separately inside.
+
+Vocabulary rule: singular/plural labels and the context verb always come from the registry fields (`offeringSingular` / `offeringPlural` / `verb` — already present from Phase 0). Never derive "Dish" by string-munging "Dishes". Context lines use `offeringSingular` + `verb` ("Dish at Truffles", "Product by Cosmix").
 
 Rendering rules for components:
 - `single` → one section/tab using `label`.
-- `mixed` → aggregate label "Offerings" for the tab; inside, render each group under its own heading ("Dishes 8", "Related 1") in stable order. Unlike children are never combined under one heading.
+- `mixed` → tab/sidebar use the aggregate label ("Offerings" or "Related" per the rule above); inside, render each group under its own heading ("Dishes 8", "Related 1") in stable order. Unlike children are never combined under one heading.
 - Mixed rendering stays **minimal**: headings + the existing list/grid, nothing else. No filtering, grouping menus, or other UX in this phase.
 
 ## The six visible changes (in plain words)
