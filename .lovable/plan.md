@@ -78,10 +78,10 @@ File: `SiblingCarousel.tsx` (rendered by V4's `ReviewsSection.tsx`).
 
 ## Tests
 
-- brand→product renders identical labels to today (regression).
+- `getChildPresentation` unit tests for all four shapes: zero children → none; single registered pair → Products/Dishes; multiple registered types → Offerings; unregistered/generic children → Related.
+- brand→product renders identical labels to today (Cosmix regression).
 - place→food renders "Dishes" in overview, tab, sidebar; context line "Dish at {Place}" links to parent slug.
-- Unregistered pair → "Related", never dropped; zero children → tab hidden.
-- "View All" switches tabs (no toast).
+- Zero children → tab hidden; "View All" switches tabs (no toast).
 - `bunx vitest run` green + typecheck.
 
 ## After Phase 1
