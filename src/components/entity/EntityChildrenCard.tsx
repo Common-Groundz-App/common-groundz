@@ -9,6 +9,13 @@ import { Entity } from '@/services/recommendation/types';
 import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import {
+  GENERIC_CHILDREN_LABEL,
+  getChildPresentation,
+  getOfferingRelationship,
+  getOfferingTypesFor,
+} from '@/services/entityRelationshipRegistry';
+import { parseEntityType } from '@/services/entityType';
 
 interface EntityChildrenCardProps {
   children: Entity[];
@@ -29,6 +36,27 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
   onAddChild,
   canAddChildren = false
 }) => {
+  // Registry contract: the section label comes from getChildPresentation, never
+  // from a hardcoded noun. While loading (children unknown), derive the label
+  // from the parent type alone when it has exactly one offering type.
+  const presentation = getChildPresentation(parentEntity?.type, children);
+  const parentType = parseEntityType(parentEntity?.type);
+  const soleOfferingType =
+    parentType && getOfferingTypesFor(parentType).length === 1
+      ? getOfferingTypesFor(parentType)[0]
+      : null;
+  const soleRelationship =
+    parentType && soleOfferingType
+      ? getOfferingRelationship(parentType, soleOfferingType)
+      : null;
+
+  const sectionLabel = presentation.label ?? soleRelationship?.offeringPlural ?? GENERIC_CHILDREN_LABEL;
+  const addLabel = soleRelationship ? `Add ${soleRelationship.offeringSingular}` : 'Add';
+  const viewAllLabel =
+    presentation.mode === 'single' && presentation.groups[0]?.registered
+      ? `View all ${children.length} ${sectionLabel.toLowerCase()}`
+      : `View all ${children.length} items`;
+
   // Helper function to get fallback image using parent if needed - now uses optimal URL helper
   const getChildImage = (child: Entity) => {
     const optimalUrl = getOptimalEntityImageUrl(child);
@@ -65,7 +93,7 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
         <CardHeader>
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Package className="h-4 w-4" />
-            Related Products
+            {sectionLabel}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -85,25 +113,27 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Package className="h-4 w-4" />
-            Related Products
+            {sectionLabel}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-6">
             <Package className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-            <h4 className="font-medium text-sm mb-1">No related products yet</h4>
+            <h4 className="font-medium text-sm mb-1">Nothing here yet</h4>
             <p className="text-xs text-muted-foreground mb-4">
-              Add related products or variants for {parentName}
+              {soleRelationship
+                ? `Add ${soleRelationship.offeringPlural.toLowerCase()} for ${parentName}`
+                : `Add related items or variants for ${parentName}`}
             </p>
             {canAddChildren && (
-              <Button 
+              <Button
                 onClick={onAddChild}
-                size="sm" 
-                variant="outline" 
+                size="sm"
+                variant="outline"
                 className="gap-2"
               >
                 <Plus className="h-4 w-4" />
-                Add Product
+                {addLabel}
               </Button>
             )}
           </div>
@@ -118,7 +148,7 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Package className="h-4 w-4" />
-            Related Products ({children.length})
+            {sectionLabel} ({children.length})
           </CardTitle>
           {canAddChildren && (
             <Button 
@@ -210,7 +240,7 @@ export const EntityChildrenCard: React.FC<EntityChildrenCardProps> = ({
         {children.length > 8 && (
           <div className="text-center pt-2 border-t">
             <Button variant="ghost" size="sm" className="text-xs">
-              View all {children.length} products
+              {viewAllLabel}
             </Button>
           </div>
         )}
