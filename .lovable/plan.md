@@ -70,6 +70,7 @@ File: `SiblingCarousel.tsx` (rendered by V4's `ReviewsSection.tsx`).
 ## Cleanup
 
 - Delete `src/services/entityTypeMapping.ts` (zero importers).
+- **Internal identifier renames** (so correct labels don't sit on product-specific internals): tab key `products` → `children`, `handleViewAllProducts` → `handleViewAllChildren`, `onViewAllProducts` prop → `onViewAll`, product-specific locals → child/offering names. **Caveat:** if the tab key is synced to the URL (`?tab=products`), keep the old value working by mapping `products` → `children` on read; write only the new key.
 - **Loading/hero fallback image (conditional, display-only):** `EntityV4.tsx` ~467 and `EntityV4LoadingWrapper` hardcode `EntityType.Product` / `'product'`, which only picks the stock image shown while data loads. Change it **only if** verified that a product-themed image visibly flashes on non-product pages; if fixed, use the neutral `Others` display image. This is a display preference, not semantic type logic — Phase 0's ban on semantic fallbacks does not apply to a loading image.
 
 ## Explicitly out of scope
