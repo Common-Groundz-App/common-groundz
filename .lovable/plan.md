@@ -81,7 +81,7 @@ File: `SiblingCarousel.tsx` (rendered by V4's `ReviewsSection.tsx`).
 
 ## Tests
 
-- `getChildPresentation` unit tests for every shape: zero children → none; single registered pair → Products/Dishes; only unregistered children → Related; mixed registered types → Offerings with per-group labels; **group preservation** (registered group + one generic child → `Dishes (8)` + `Related (1)`, never collapsed).
+- `getChildPresentation` unit tests for every shape: zero children → none; single registered pair → Products/Dishes; only unregistered children → Related; **all-registered mixed groups → Offerings** (Dishes + Products); **registered + generic → aggregate Related with groups preserved** (Dishes 8 + Related 1, never collapsed); context line uses `offeringSingular` + `verb` from registry fields (no string-munging).
 - brand→product renders identical labels to today (Cosmix regression).
 - place→food renders "Dishes" in overview, tab, sidebar; context line "Dish at {Place}" links to parent slug.
 - Zero children → tab hidden; "View All" switches tabs (no toast); legacy `?tab=products` URL still opens the child tab.
