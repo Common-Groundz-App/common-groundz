@@ -8,7 +8,27 @@ Phase 0 is verified complete. Phase 1 makes the **V4 entity page** stop assuming
 
 ## Core rule
 
-Registry vocabulary ("Dishes", "Products", "at", "by") is used **only** when `(parent.type, child.type)` is a registered offering pair (`brand→product`, `place→food`). Anything else renders as generic "Related" — never hidden, never mislabeled. Registry stays at those two pairs (no `place→product` yet), so a single provider has at most one offering type today; the mixed-type rules below are written but will not trigger until a third pair is registered.
+Registry vocabulary ("Dishes", "Products", "at", "by") is used **only** when `(parent.type, child.type)` is a registered offering pair (`brand→product`, `place→food`). Anything else renders as generic "Related" — never hidden, never mislabeled. Registry stays at those two pairs (no `place→product` yet), so a single provider has at most one offering type today.
+
+## Single source of truth (new requirement)
+
+One pure helper — `getChildPresentation(parentType, children)` added to `src/services/entityRelationshipRegistry.ts` — is the **only** place that decides child presentation. All four V4 surfaces (overview preview, child tab, child-tab list, sidebar card) call it; no component computes its own label. It returns:
+
+```text
+{
+  mode: 'single-offering' | 'mixed' | 'related' | 'none',
+  label: 'Products' | 'Dishes' | 'Offerings' | 'Related' | null,
+  groups: [{ type, label, children }]   // stable order; empty when mode='none'
+}
+```
+
+Rules:
+- Zero children → `mode: 'none'` (tab and section hidden).
+- Exactly one child type with a registered pair → `single-offering` with "Products"/"Dishes".
+- Multiple registered offering types → `mixed` with "Offerings" (cannot occur today; rule defined now so a future `place→product` pair needs no component changes).
+- Any unregistered/generic children → `related` with "Related".
+
+Mixed-child rendering stays **minimal**: at most one labelled section per group in stable order. No filtering, grouping menus, or other UX is built in this phase.
 
 ## The six visible changes (in plain words)
 
