@@ -12,38 +12,38 @@ Registry vocabulary ("Dishes", "Products", "at", "by") is used **only** when `(p
 
 ## Single source of truth (new requirement)
 
-One pure helper — `getChildPresentation(parentType, children)` added to `src/services/entityRelationshipRegistry.ts` — is the **only** place that decides child presentation. All four V4 surfaces (overview preview, child tab, child-tab list, sidebar card) call it; no component computes its own label. It returns:
+One pure helper — `getChildPresentation(parentType, children)` added to `src/services/entityRelationshipRegistry.ts` — is the **only** place that decides child presentation. All four V4 surfaces (overview preview, child tab, child-tab list, sidebar card) call it; **no component computes its own label or grouping**. It returns:
 
 ```text
 {
-  mode: 'single-offering' | 'mixed' | 'related' | 'none',
-  label: 'Products' | 'Dishes' | 'Offerings' | 'Related' | null,
-  groups: [{ type, label, children }]   // stable order; empty when mode='none'
+  mode: 'none' | 'single' | 'mixed',
+  label: 'Products' | 'Dishes' | 'Offerings' | 'Related' | null,  // null when mode='none'
+  groups: [{ type | null, label, children }]   // stable order; empty when mode='none'
 }
 ```
 
-Rules:
-- Zero children → `mode: 'none'` (tab and section hidden).
-- Exactly one child type with a registered pair → `single-offering` with "Products"/"Dishes".
-- Multiple registered offering types → `mixed` with "Offerings" (cannot occur today; rule defined now so a future `place→product` pair needs no component changes).
-- Any unregistered/generic children → `related` with "Related".
+Grouping rules (group-preserving — an odd child never collapses valid groups):
+- Children are split into groups by type. Each registered `(parent, childType)` pair forms a group with its registry label ("Dishes", "Products"). All unregistered/generic children form one trailing group labelled **"Related"**.
+- Zero children → `mode: 'none'`, `label: null` (tab and section hidden).
+- Exactly one group → `mode: 'single'`, label = that group's label ("Products" / "Dishes" / "Related").
+- More than one group → `mode: 'mixed'`, aggregate `label: 'Offerings'`. Example: a place with 8 dishes + 1 generic child yields groups `Dishes (8)` + `Related (1)` — it does **not** collapse to "Related 9".
 
-Mixed-child rendering stays **minimal**: at most one labelled section per group in stable order. No filtering, grouping menus, or other UX is built in this phase.
+Rendering rules for components:
+- `single` → one section/tab using `label`.
+- `mixed` → aggregate label "Offerings" for the tab; inside, render each group under its own heading ("Dishes 8", "Related 1") in stable order. Unlike children are never combined under one heading.
+- Mixed rendering stays **minimal**: headings + the existing list/grid, nothing else. No filtering, grouping menus, or other UX in this phase.
 
 ## The six visible changes (in plain words)
 
 ### 1. Overview tab → "Featured Products" card
 File: `FeaturedProductsSection.tsx` → **renamed `RelatedEntitiesSection.tsx`** (call site: `EntityTabsContent.tsx`).
-- Cosmix (brand→product): still says **Featured Products** — visually identical to today.
-- A restaurant (place→food): **Featured Dishes**.
-- Unregistered children: **Related**.
-- The hidden "View All N Products" button (only appears at 5+ children) becomes "View all N products/dishes", matching the section's group.
+- Single group: Cosmix still says **Featured Products** (identical to today); a restaurant says **Featured Dishes**; unregistered children: **Related**.
+- Mixed groups (future): separate minimal sections — "Featured Dishes" and "Featured Products" — never one combined "Featured Offerings" list mixing unlike children.
+- The hidden "View All N Products" button (only appears at 5+ children) becomes "View all N {group label}", matching the section's group.
 
 ### 2. The child tab (currently "Products 4")
 File: `EntityTabsContent.tsx`.
-- Exactly one child type → registry label: **Products 4** (Cosmix, unchanged) or **Dishes 8** (restaurant).
-- More than one child type → **Related N**.
-- Zero children → **tab hidden entirely** (no empty tab).
+- Labels come only from the helper: single group → **Products 4** (Cosmix, unchanged) / **Dishes 8**; mixed → **Offerings N** with per-group headings inside; zero children → **tab hidden entirely**.
 - "Showing 4 products" footer → "Showing 4 dishes" etc. Empty-state copy generalized; the "Coming Soon: Product management interface" block is removed.
 
 ### 3. "View All" actually works on V4
@@ -52,7 +52,7 @@ File: `EntityV4.tsx`.
 
 ### 4. Right sidebar → "Related Products (4)" card
 Files: `EntitySidebar.tsx` (passes parent type down) + `EntityChildrenCard.tsx` (renders).
-- Cosmix: **Products (4)**. Restaurant: **Dishes (8)**. Mixed/unregistered: **Related (N)**.
+- Labels from the helper: Cosmix: **Products (4)**. Restaurant: **Dishes (8)**. Mixed: **Offerings (N)** with per-group headings; generic-only: **Related (N)**.
 - ("Related Products" is dropped — they aren't merely *related*, they're Cosmix's products.)
 - The "Add Product" button stays hidden — creation UX is Phase 2.
 - No new headings added to `EntitySidebar`; only the existing card header changes.
@@ -70,6 +70,7 @@ File: `SiblingCarousel.tsx` (rendered by V4's `ReviewsSection.tsx`).
 ## Cleanup
 
 - Delete `src/services/entityTypeMapping.ts` (zero importers).
+- **Internal identifier renames** (so correct labels don't sit on product-specific internals): tab key `products` → `children`, `handleViewAllProducts` → `handleViewAllChildren`, `onViewAllProducts` prop → `onViewAll`, product-specific locals → child/offering names. **Caveat:** if the tab key is synced to the URL (`?tab=products`), keep the old value working by mapping `products` → `children` on read; write only the new key.
 - **Loading/hero fallback image (conditional, display-only):** `EntityV4.tsx` ~467 and `EntityV4LoadingWrapper` hardcode `EntityType.Product` / `'product'`, which only picks the stock image shown while data loads. Change it **only if** verified that a product-themed image visibly flashes on non-product pages; if fixed, use the neutral `Others` display image. This is a display preference, not semantic type logic — Phase 0's ban on semantic fallbacks does not apply to a loading image.
 
 ## Explicitly out of scope
@@ -78,10 +79,10 @@ File: `SiblingCarousel.tsx` (rendered by V4's `ReviewsSection.tsx`).
 
 ## Tests
 
-- `getChildPresentation` unit tests for all four shapes: zero children → none; single registered pair → Products/Dishes; multiple registered types → Offerings; unregistered/generic children → Related.
+- `getChildPresentation` unit tests for every shape: zero children → none; single registered pair → Products/Dishes; only unregistered children → Related; mixed registered types → Offerings with per-group labels; **group preservation** (registered group + one generic child → `Dishes (8)` + `Related (1)`, never collapsed).
 - brand→product renders identical labels to today (Cosmix regression).
 - place→food renders "Dishes" in overview, tab, sidebar; context line "Dish at {Place}" links to parent slug.
-- Zero children → tab hidden; "View All" switches tabs (no toast).
+- Zero children → tab hidden; "View All" switches tabs (no toast); legacy `?tab=products` URL still opens the child tab.
 - `bunx vitest run` green + typecheck.
 
 ## After Phase 1
