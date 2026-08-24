@@ -45,6 +45,7 @@ const nodeIncludes = [
   'src/services/__tests__/entityType.test.ts',
   'src/services/__tests__/entitySlug.test.ts',
   'src/services/__tests__/entityTaxonomyCompatibility.test.ts',
+  'src/services/__tests__/entityRelationshipRegistry.test.ts',
 ];
 
 

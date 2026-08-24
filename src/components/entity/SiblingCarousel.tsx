@@ -43,7 +43,10 @@ export const SiblingCarousel: React.FC<SiblingCarouselProps> = ({
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-medium">
-            {parentName ? `More from ${parentName}` : 'Related Products'}
+            {/* Generic fallback must not claim a noun ("Products") for children
+                whose pair semantics are unknown — the registry contract calls
+                these "Related". */}
+            {parentName ? `More from ${parentName}` : 'Related'}
           </CardTitle>
           <div className="flex gap-2">
             <Button

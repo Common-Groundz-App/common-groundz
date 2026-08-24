@@ -51,7 +51,8 @@ import { getEntityTypeFallbackImage, getCanonicalType, getContextualFieldLabel }
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { getEntityUrlWithParent } from '@/utils/entityUrlUtils';
 import { ExternalLinksSection } from '@/components/entity/ExternalLinksSection';
-import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
+import { RelatedEntitiesSection } from '@/components/entity/RelatedEntitiesSection';
+import { getChildPresentation } from '@/services/entityRelationshipRegistry';
 import { SiblingCarousel } from '@/components/entity/SiblingCarousel';
 import { ReviewTypeToggle } from '@/components/entity/ReviewTypeToggle';
 
@@ -714,12 +715,12 @@ const EntityDetailV2 = () => {
                   </TabsList>
                   
                   <TabsContent value="overview" className="space-y-6 mt-2">
-                    {/* Featured Products Section */}
+                    {/* Related entities section (registry-labelled) */}
                     {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
-                      <FeaturedProductsSection
-                        children={entityWithChildren.children}
+                      <RelatedEntitiesSection
+                        presentation={getChildPresentation(entity?.type, entityWithChildren.children)}
                         onViewChild={handleViewChild}
-                        onViewAllProducts={handleViewAllProducts}
+                        onViewAll={handleViewAllProducts}
                       />
                     )}
 

@@ -26,6 +26,8 @@ import { EntitySocialFollowers } from '@/components/entity/EntitySocialFollowers
 import { Entity } from '@/services/recommendation/types';
 import { EntityStats } from '@/hooks/use-entity-detail-cached';
 import { hasLocationData, openGoogleMaps, hasWebsiteData, getEntityWebsiteUrl } from '@/utils/locationUtils';
+import { getEntityUrl } from '@/utils/entityUrlUtils';
+import { getOfferingContextLine } from '@/services/entityRelationshipRegistry';
 
 interface EntityHeaderProps {
   entity: Entity;
@@ -95,6 +97,14 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
     parentEntity,
     isLoading: hierarchyLoading
   } = useEntityHierarchy(entity?.id || null);
+
+  // Subordinate context line for registered provider→offering pairs,
+  // e.g. "Dish at Truffles". Null for generic parent/child edges so nothing
+  // is mislabelled; also skipped when parent and child share a name.
+  const offeringContext =
+    parentEntity && parentEntity.name !== entity?.name
+      ? getOfferingContextLine(parentEntity.type, entity?.type)
+      : null;
 
   // Fetch circle rating data
   const {
@@ -252,10 +262,23 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                  </div>
-                </div>
+                   </div>
+                 </div>
 
-                {/* Expandable Description */}
+                 {/* Offering context line: "Dish at Truffles" / "Product by Cosmix" */}
+                 {offeringContext && parentEntity && (
+                   <p className="text-sm text-muted-foreground mb-2 -mt-1">
+                     {offeringContext.singular} {offeringContext.verb}{' '}
+                     <Link
+                       to={getEntityUrl(parentEntity)}
+                       className="font-medium text-foreground hover:text-brand-orange hover:underline transition-colors"
+                     >
+                       {parentEntity.name}
+                     </Link>
+                   </p>
+                 )}
+
+                 {/* Expandable Description */}
                 <div className="mb-4">
                   <Collapsible open={isDescriptionExpanded} onOpenChange={setIsDescriptionExpanded}>
                     <div className="relative">

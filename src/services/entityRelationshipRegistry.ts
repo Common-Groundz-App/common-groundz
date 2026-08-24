@@ -14,7 +14,7 @@
  * wired to it in Phase 1 (labels, context lines, "add an offering" affordances).
  */
 
-import type { CanonicalEntityType } from './entityType';
+import { parseEntityType, type CanonicalEntityType } from './entityType';
 
 export interface OfferingRelationship {
   /** The entity type acting as provider (the parent). */
@@ -126,4 +126,122 @@ export function getOfferingContextVerb(
   offering: CanonicalEntityType
 ): string | null {
   return getOfferingRelationship(provider, offering)?.verb ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1: Centralized child-section presentation (single source of truth)
+// ---------------------------------------------------------------------------
+
+/** Label for children that do not form a registered provider→offering pair. */
+export const GENERIC_CHILDREN_LABEL = 'Related';
+/** Aggregate label for a mixed set where EVERY group is a registered offering. */
+export const MIXED_OFFERINGS_LABEL = 'Offerings';
+
+export interface ChildPresentationGroup<T> {
+  /** Canonical child type for the group, or `null` for the unregistered catch-all. */
+  type: CanonicalEntityType | null;
+  /** Display label for the group: registry plural ("Products"/"Dishes") or "Related". */
+  label: string;
+  /** True when the group came from a registered provider→offering pair. */
+  registered: boolean;
+  children: T[];
+}
+
+export type ChildPresentationMode = 'none' | 'single' | 'mixed';
+
+export interface ChildPresentation<T> {
+  /**
+   * - `none`: no children — callers hide the section/tab entirely.
+   * - `single`: exactly one group — `label` is that group's label.
+   * - `mixed`: multiple groups — `label` is the aggregate:
+   *   "Offerings" when every group is registered, otherwise "Related".
+   *   Callers MUST render `groups` separately to keep distinct nouns.
+   */
+  mode: ChildPresentationMode;
+  /** Section/tab label, or `null` when `mode === 'none'`. */
+  label: string | null;
+  /** Groups in stable order: registered groups in registry order, generic last. */
+  groups: ChildPresentationGroup<T>[];
+  totalCount: number;
+}
+
+/**
+ * THE one place that decides how a provider's child entities are labelled.
+ *
+ * Rules (Phase 1 contract — components must not reimplement):
+ * - A child group gets the registry noun ("Products", "Dishes") ONLY when the
+ *   (provider type, child type) pair is registered. Everything else is "Related".
+ * - Distinct child types stay as distinct groups — never flattened into one
+ *   noun, and never labelled "Products" generically.
+ * - Aggregate tab/section label for mixed sets: "Offerings" if all groups are
+ *   registered offerings, "Related" if any generic group is present.
+ *
+ * `relationships` is injectable for tests; production callers use the default.
+ */
+export function getChildPresentation<T extends { type?: unknown }>(
+  providerType: unknown,
+  children: readonly T[] | null | undefined,
+  relationships: readonly OfferingRelationship[] = OFFERING_RELATIONSHIPS
+): ChildPresentation<T> {
+  const list = (children ?? []).filter((c): c is T => c != null);
+  if (list.length === 0) {
+    return { mode: 'none', label: null, groups: [], totalCount: 0 };
+  }
+
+  const provider = parseEntityType(providerType);
+  const byOfferingType = new Map<CanonicalEntityType, T[]>();
+  const generic: T[] = [];
+
+  for (const child of list) {
+    const childType = parseEntityType(child?.type);
+    const registered =
+      provider !== null &&
+      childType !== null &&
+      relationships.some((r) => r.provider === provider && r.offering === childType);
+
+    if (registered && childType) {
+      const bucket = byOfferingType.get(childType) ?? [];
+      bucket.push(child);
+      byOfferingType.set(childType, bucket);
+    } else {
+      generic.push(child);
+    }
+  }
+
+  // Stable order: registered groups follow registry order, generic group trails.
+  const groups: ChildPresentationGroup<T>[] = [];
+  for (const rel of relationships) {
+    if (provider !== rel.provider) continue;
+    const bucket = byOfferingType.get(rel.offering);
+    if (bucket && bucket.length > 0) {
+      groups.push({ type: rel.offering, label: rel.offeringPlural, registered: true, children: bucket });
+    }
+  }
+  if (generic.length > 0) {
+    groups.push({ type: null, label: GENERIC_CHILDREN_LABEL, registered: false, children: generic });
+  }
+
+  if (groups.length === 1) {
+    return { mode: 'single', label: groups[0].label, groups, totalCount: list.length };
+  }
+
+  const aggregateLabel = generic.length > 0 ? GENERIC_CHILDREN_LABEL : MIXED_OFFERINGS_LABEL;
+  return { mode: 'mixed', label: aggregateLabel, groups, totalCount: list.length };
+}
+
+/**
+ * Short provider→offering context line for a child entity header,
+ * e.g. "Dish at Truffles". Returns `null` for unregistered pairs so callers
+ * show nothing rather than mislabelling a generic parent/child edge.
+ */
+export function getOfferingContextLine(
+  providerType: unknown,
+  offeringType: unknown
+): { singular: string; verb: string } | null {
+  const provider = parseEntityType(providerType);
+  const offering = parseEntityType(offeringType);
+  if (!provider || !offering) return null;
+  const relationship = getOfferingRelationship(provider, offering);
+  if (!relationship) return null;
+  return { singular: relationship.offeringSingular, verb: relationship.verb };
 }

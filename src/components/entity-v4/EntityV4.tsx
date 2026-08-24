@@ -371,11 +371,16 @@ const EntityV4 = () => {
     }
   };
 
-  const handleViewAllProducts = () => {
-    // Could implement tab switching or modal here if needed
-    toast({
-      title: "View All Products",
-      description: "Navigate to products tab for complete list",
+  // Controlled tab state so overview CTAs ("View all …") can deep-link to tabs
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const handleViewAllChildren = () => {
+    setActiveTab('children');
+    // Bring the tab bar back into view for orientation (same pattern as the
+    // media "View all" CTA).
+    requestAnimationFrame(() => {
+      const tablist = document.querySelector('[role="tablist"]');
+      tablist?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
 
@@ -559,13 +564,14 @@ const EntityV4 = () => {
               {/* Main Content */}
               <div className="lg:col-span-3">
                 {/* SECTION 3: Tabs Navigation */}
-                <EntityTabsContent 
-                  entity={entity} 
+                <EntityTabsContent
+                  entity={entity}
                   stats={stats}
                   entityWithChildren={entityWithChildren}
-                  parentEntity={parentEntity}
                   onViewChild={handleViewChild}
-                  onViewAllProducts={handleViewAllProducts}
+                  onViewAll={handleViewAllChildren}
+                  activeTab={activeTab}
+                  onTabChange={setActiveTab}
                 />
 
                 {/* SECTION 4: Trust & Review Summary */}

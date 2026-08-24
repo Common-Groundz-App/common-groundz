@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Star, Plus, MessageSquare, MessageSquareHeart } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { RichTextDisplay } from '@/components/editor/RichTextEditor';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -10,7 +10,8 @@ import { PhotosSection } from './PhotosSection';
 import { Entity } from '@/services/recommendation/types';
 import { EntityStats } from '@/hooks/use-entity-detail-cached';
 import { EntityWithChildren } from '@/services/entityHierarchyService';
-import { FeaturedProductsSection } from '@/components/entity/FeaturedProductsSection';
+import { RelatedEntitiesSection } from '@/components/entity/RelatedEntitiesSection';
+import { getChildPresentation } from '@/services/entityRelationshipRegistry';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 import { getEntityTypeFallbackImage, getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getEntityStats } from '@/services/entityService';
@@ -18,25 +19,53 @@ import PostFeedItem from '@/components/feed/PostFeedItem';
 import { useEntityPosts } from '@/hooks/use-entity-posts';
 import { FeedVideoManagerProvider } from '@/hooks/useFeedVideoManager';
 
+/**
+ * EntityTabsContent - Controlled tab system for entity details (V4 only).
+ *
+ * Tabs: Overview, Photos & Videos, Children, Posts.
+ * Child-section labels come ONLY from getChildPresentation (the relationship
+ * registry contract) — "Products", "Dishes", or the generic "Related". The
+ * children tab is hidden entirely when the entity has no children, and the
+ * "Coming soon" placeholder block is gone by design.
+ */
 interface EntityTabsContentProps {
   entity?: Entity;
   stats?: EntityStats | null;
   entityWithChildren?: EntityWithChildren | null;
-  parentEntity?: Entity | null;
   onViewChild?: (child: Entity) => void;
-  onViewAllProducts?: () => void;
+  /** "View all" from the overview section — switches to the children tab. */
+  onViewAll?: () => void;
+  /** Controlled tab state (owned by the parent so CTAs can deep-link tabs). */
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
   entity,
   stats,
   entityWithChildren,
-  parentEntity,
   onViewChild,
-  onViewAllProducts
+  onViewAll,
+  activeTab,
+  onTabChange
 }) => {
   const [childrenStats, setChildrenStats] = useState<Record<string, EntityStats>>({});
-  
+  const [internalTab, setInternalTab] = useState('overview');
+
+  const currentTab = activeTab ?? internalTab;
+  const handleTabChange = (tab: string) => {
+    if (onTabChange) {
+      onTabChange(tab);
+    } else {
+      setInternalTab(tab);
+    }
+  };
+
+  // Registry contract: single source of truth for child-section labels/groups.
+  const children = entityWithChildren?.children ?? [];
+  const childPresentation = getChildPresentation(entity?.type, children);
+  const hasChildren = childPresentation.mode !== 'none';
+
   // Refs for scroll management
   const tablistRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLButtonElement>(null);
@@ -45,7 +74,7 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
   useEffect(() => {
     const fetchChildrenStats = async () => {
       if (!entityWithChildren?.children?.length) return;
-      
+
       const statsPromises = entityWithChildren.children.map(async (child) => {
         try {
           const childStats = await getEntityStats(child.id, null);
@@ -85,40 +114,52 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
     }
   }, []);
 
-  // Removed conflicting scroll management that interferes with child components
+  // If the active tab is the children tab but the entity has no children
+  // (e.g. data refetched empty), fall back to overview.
+  useEffect(() => {
+    if (currentTab === 'children' && !hasChildren) {
+      handleTabChange('overview');
+    }
+  }, [currentTab, hasChildren]);
+
+  const groupCountLabel = (label: string, count: number, registered: boolean) =>
+    registered
+      ? `${count} ${label.toLowerCase()}`
+      : `${count} item${count !== 1 ? 's' : ''}`;
+
   return (
-    <Tabs defaultValue="overview" className="mb-8">
-      <TabsList 
+    <Tabs value={currentTab} onValueChange={handleTabChange} className="mb-8">
+      <TabsList
         ref={tablistRef}
         className="relative flex overflow-x-auto overflow-y-hidden scrollbar-hide w-full bg-transparent border-b border-border min-h-[48px]"
       >
-        <TabsTrigger 
+        <TabsTrigger
           value="overview"
           ref={activeTabRef}
           className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
         >
           Overview
         </TabsTrigger>
-        <TabsTrigger 
+        <TabsTrigger
           value="photos"
           className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
         >
           Photos & Videos
         </TabsTrigger>
-        <TabsTrigger 
-          value="products"
-          className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
-        >
-          <span className="flex items-center gap-2">
-            Products
-            {entityWithChildren?.children && entityWithChildren.children.length > 0 && (
+        {hasChildren && (
+          <TabsTrigger
+            value="children"
+            className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
+          >
+            <span className="flex items-center gap-2">
+              {childPresentation.label}
               <Badge variant="secondary" className="text-xs px-1.5 py-0.5 h-5">
-                {entityWithChildren.children.length}
+                {childPresentation.totalCount}
               </Badge>
-            )}
-          </span>
-        </TabsTrigger>
-        <TabsTrigger 
+            </span>
+          </TabsTrigger>
+        )}
+        <TabsTrigger
           value="posts"
           className="flex-shrink-0 whitespace-nowrap border-b-2 border-transparent bg-transparent px-4 py-3 text-sm font-medium transition-all hover:border-brand-orange/50 data-[state=active]:border-brand-orange data-[state=active]:bg-transparent data-[state=active]:shadow-none rounded-none snap-start min-h-[48px] flex items-center justify-center"
         >
@@ -133,13 +174,13 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
         </TabsTrigger>
       </TabsList>
       <TabsContent value="overview" className="mt-6 space-y-6">
-        {/* Featured Products Section */}
-        {entityWithChildren?.children && entityWithChildren.children.length > 0 && onViewChild && onViewAllProducts && (
-          <FeaturedProductsSection
-            children={entityWithChildren.children}
+        {/* Related entities (registry-labelled: "Featured Products", "Featured Dishes", "Related") */}
+        {hasChildren && onViewChild && onViewAll && (
+          <RelatedEntitiesSection
+            presentation={childPresentation}
             childrenStats={childrenStats}
             onViewChild={onViewChild}
-            onViewAllProducts={onViewAllProducts}
+            onViewAll={onViewAll}
           />
         )}
 
@@ -164,13 +205,13 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
                 <p className="text-muted-foreground italic">No description available.</p>
               )}
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
               <div>
                 <h4 className="font-medium mb-2">Type</h4>
                 <Badge variant="outline">{getEntityTypeLabel(entity?.type || '')}</Badge>
               </div>
-              
+
               {entity?.venue && (
                 <div>
                   <h4 className="font-medium mb-2">Source</h4>
@@ -207,83 +248,64 @@ export const EntityTabsContent: React.FC<EntityTabsContentProps> = ({
           </div>
         )}
       </TabsContent>
-      <TabsContent value="products" className="mt-6 space-y-4">
-        {!entityWithChildren?.children || entityWithChildren.children.length === 0 ? (
-          <div className="py-12 text-center border rounded-lg bg-blue-50/30 dark:bg-blue-900/5">
-            <Plus className="h-12 w-12 mx-auto text-blue-300 dark:text-blue-700" />
-            <h3 className="font-medium text-lg mt-4">No products yet</h3>
-            <p className="text-muted-foreground mt-2">
-              This entity doesn't have any child products or related items.
-            </p>
-            {parentEntity && (
-              <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+      {hasChildren && (
+        <TabsContent value="children" className="mt-6 space-y-6">
+          {childPresentation.groups.map((group) => (
+            <div key={group.type ?? 'related'} className="space-y-4">
+              <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  This is a child product of{' '}
-                  <Button
-                    variant="link"
-                    className="p-0 h-auto text-sm font-medium"
-                    onClick={() => onViewChild?.(parentEntity)}
-                  >
-                    {parentEntity.name}
-                  </Button>
+                  {group.registered
+                    ? `Showing ${groupCountLabel(group.label, group.children.length, true)}`
+                    : `Showing ${groupCountLabel(group.label, group.children.length, false)}`}
                 </p>
+                {childPresentation.mode === 'mixed' && (
+                  <h3 className="text-sm font-medium">{group.label}</h3>
+                )}
               </div>
-            )}
-            <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-              <p>🔄 Coming Soon: Product management interface</p>
-              <p>📦 Examples: Cosmix → Whey Protein, Pre-Workout, etc.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                Showing {entityWithChildren.children.length} product{entityWithChildren.children.length !== 1 ? 's' : ''}
-              </p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {entityWithChildren.children.map((child) => (
-                <Card 
-                  key={child.id} 
-                  className="hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => onViewChild?.(child)}
-                >
-                  <CardContent className="p-4">
-                    {child.image_url && (
-                      <div className="w-full h-32 rounded-md overflow-hidden bg-muted mb-3">
-                        <ImageWithFallback
-                          src={child.image_url}
-                          alt={child.name}
-                          className="w-full h-full object-cover"
-                          fallbackSrc={getEntityTypeFallbackImage(child.type)}
-                        />
-                      </div>
-                    )}
-                    <div className="space-y-2">
-                      <h4 className="font-medium">{child.name}</h4>
-                      {child.description && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {child.description}
-                        </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {group.children.map((child) => (
+                  <Card
+                    key={child.id}
+                    className="hover:shadow-md transition-shadow cursor-pointer"
+                    onClick={() => onViewChild?.(child)}
+                  >
+                    <CardContent className="p-4">
+                      {child.image_url && (
+                        <div className="w-full h-32 rounded-md overflow-hidden bg-muted mb-3">
+                          <ImageWithFallback
+                            src={child.image_url}
+                            alt={child.name}
+                            className="w-full h-full object-cover"
+                            fallbackSrc={getEntityTypeFallbackImage(child.type)}
+                          />
+                        </div>
                       )}
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
-                          {getEntityTypeLabel(child.type)}
-                        </Badge>
-                        {child.venue && (
-                          <span className="text-xs text-muted-foreground">
-                            {child.venue}
-                          </span>
+                      <div className="space-y-2">
+                        <h4 className="font-medium">{child.name}</h4>
+                        {child.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {child.description}
+                          </p>
                         )}
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {getEntityTypeLabel(child.type)}
+                          </Badge>
+                          {child.venue && (
+                            <span className="text-xs text-muted-foreground">
+                              {child.venue}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </TabsContent>
+          ))}
+        </TabsContent>
+      )}
       <TabsContent value="photos" className="mt-6">
         {entity && <PhotosSection entity={entity} />}
       </TabsContent>
