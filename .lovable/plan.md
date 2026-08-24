@@ -54,7 +54,7 @@ File: `EntityV4.tsx`.
 
 ### 4. Right sidebar → "Related Products (4)" card
 Files: `EntitySidebar.tsx` (passes parent type down) + `EntityChildrenCard.tsx` (renders).
-- Labels from the helper: Cosmix: **Products (4)**. Restaurant: **Dishes (8)**. Mixed: **Offerings (N)** with per-group headings; generic-only: **Related (N)**.
+- Labels from the helper: Cosmix: **Products (4)**. Restaurant: **Dishes (8)**. Mixed all-registered: **Offerings (N)**; mixed with any generic group: **Related (N)** — both with per-group headings inside; generic-only: **Related (N)**.
 - ("Related Products" is dropped — they aren't merely *related*, they're Cosmix's products.)
 - The "Add Product" button stays hidden — creation UX is Phase 2.
 - No new headings added to `EntitySidebar`; only the existing card header changes.
