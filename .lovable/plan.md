@@ -70,7 +70,7 @@ File: `SiblingCarousel.tsx` (rendered by V4's `ReviewsSection.tsx`).
 ## Cleanup
 
 - Delete `src/services/entityTypeMapping.ts` (zero importers).
-- `EntityV4.tsx` line ~467 and `EntityV4LoadingWrapper`: hardcoded `EntityType.Product` drives only the loading/hero **fallback image** (a product-themed stock photo while data loads). Change to `EntityType.Others` — display-only, no behaviour change.
+- **Loading/hero fallback image (conditional, display-only):** `EntityV4.tsx` ~467 and `EntityV4LoadingWrapper` hardcode `EntityType.Product` / `'product'`, which only picks the stock image shown while data loads. Change it **only if** verified that a product-themed image visibly flashes on non-product pages; if fixed, use the neutral `Others` display image. This is a display preference, not semantic type logic — Phase 0's ban on semantic fallbacks does not apply to a loading image.
 
 ## Explicitly out of scope
 
