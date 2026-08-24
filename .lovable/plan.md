@@ -12,23 +12,26 @@ Registry vocabulary ("Dishes", "Products", "at", "by") is used **only** when `(p
 
 ## Single source of truth (new requirement)
 
-One pure helper — `getChildPresentation(parentType, children)` added to `src/services/entityRelationshipRegistry.ts` — is the **only** place that decides child presentation. All four V4 surfaces (overview preview, child tab, child-tab list, sidebar card) call it; no component computes its own label. It returns:
+One pure helper — `getChildPresentation(parentType, children)` added to `src/services/entityRelationshipRegistry.ts` — is the **only** place that decides child presentation. All four V4 surfaces (overview preview, child tab, child-tab list, sidebar card) call it; **no component computes its own label or grouping**. It returns:
 
 ```text
 {
-  mode: 'single-offering' | 'mixed' | 'related' | 'none',
-  label: 'Products' | 'Dishes' | 'Offerings' | 'Related' | null,
-  groups: [{ type, label, children }]   // stable order; empty when mode='none'
+  mode: 'none' | 'single' | 'mixed',
+  label: 'Products' | 'Dishes' | 'Offerings' | 'Related' | null,  // null when mode='none'
+  groups: [{ type | null, label, children }]   // stable order; empty when mode='none'
 }
 ```
 
-Rules:
-- Zero children → `mode: 'none'` (tab and section hidden).
-- Exactly one child type with a registered pair → `single-offering` with "Products"/"Dishes".
-- Multiple registered offering types → `mixed` with "Offerings" (cannot occur today; rule defined now so a future `place→product` pair needs no component changes).
-- Any unregistered/generic children → `related` with "Related".
+Grouping rules (group-preserving — an odd child never collapses valid groups):
+- Children are split into groups by type. Each registered `(parent, childType)` pair forms a group with its registry label ("Dishes", "Products"). All unregistered/generic children form one trailing group labelled **"Related"**.
+- Zero children → `mode: 'none'`, `label: null` (tab and section hidden).
+- Exactly one group → `mode: 'single'`, label = that group's label ("Products" / "Dishes" / "Related").
+- More than one group → `mode: 'mixed'`, aggregate `label: 'Offerings'`. Example: a place with 8 dishes + 1 generic child yields groups `Dishes (8)` + `Related (1)` — it does **not** collapse to "Related 9".
 
-Mixed-child rendering stays **minimal**: at most one labelled section per group in stable order. No filtering, grouping menus, or other UX is built in this phase.
+Rendering rules for components:
+- `single` → one section/tab using `label`.
+- `mixed` → aggregate label "Offerings" for the tab; inside, render each group under its own heading ("Dishes 8", "Related 1") in stable order. Unlike children are never combined under one heading.
+- Mixed rendering stays **minimal**: headings + the existing list/grid, nothing else. No filtering, grouping menus, or other UX in this phase.
 
 ## The six visible changes (in plain words)
 
