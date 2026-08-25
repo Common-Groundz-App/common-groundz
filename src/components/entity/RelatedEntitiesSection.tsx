@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { ArrowRight } from 'lucide-react';
 import { Entity } from '@/services/recommendation/types';
 import { EntityStats } from '@/hooks/use-entity-detail-cached';
@@ -88,17 +88,26 @@ export const RelatedEntitiesSection: React.FC<RelatedEntitiesSectionProps> = ({
                       <h4 className="font-medium text-sm mb-1 line-clamp-2 group-hover:text-brand-orange transition-colors">
                         {child.name}
                       </h4>
-                      {hasRating && (
-                        <div className="flex items-center gap-1">
-                          <ConnectedRingsRating
-                            value={childStat.averageRating!}
-                            size="xs"
-                            showValue
-                          />
+                      <div className="flex items-center gap-1">
+                        <RatingRingIcon
+                          rating={childStat?.averageRating || 0}
+                          size={12}
+                        />
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {hasRating
+                            ? childStat!.averageRating!.toFixed(1)
+                            : 'No ratings yet'}
+                        </span>
+                        {hasRating && (childStat!.reviewCount || 0) > 0 && (
                           <span className="text-xs text-muted-foreground">
-                            ({childStat.reviewCount || 0})
+                            ({childStat!.reviewCount})
                           </span>
-                        </div>
+                        )}
+                      </div>
+                      {child.description && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                          {child.description}
+                        </p>
                       )}
                     </div>
                   );
