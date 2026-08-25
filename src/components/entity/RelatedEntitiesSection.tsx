@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ImageWithFallback } from '@/components/common/ImageWithFallback';
-import { ConnectedRingsRating } from '@/components/ui/connected-rings';
+import { RatingRingIcon } from '@/components/ui/rating-ring-icon';
 import { ArrowRight } from 'lucide-react';
 import { Entity } from '@/services/recommendation/types';
 import { EntityStats } from '@/hooks/use-entity-detail-cached';
