@@ -722,7 +722,7 @@ const ReviewForm = ({
     let titleText;
     switch (currentStep) {
       case 1: return { emoji: '', text: 'Rate your experience' };
-      case 2: return { emoji: '', text: 'Select a category' };
+      case 2: return { emoji: '', text: 'What are you reviewing?' };
       case 3: return { emoji: getEmoji(), text: `Tell us about your ${category}` };
       case 4: return { emoji: '', text: 'Add final details' };
       default: return { emoji: '', text: isEditMode ? 'Edit your review' : 'Create a review' };
