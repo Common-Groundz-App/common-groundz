@@ -58,6 +58,8 @@ describe('frontend ↔ Deno bucket mapping parity', () => {
     expect(normalizeToReviewBucket('spaceship')).toBeNull();
     expect(normalizeToReviewBucket(null)).toBeNull();
     expect(normalizeToReviewBucket(undefined)).toBeNull();
-    expect(expandBucketsToCanonical(['spaceship'])).toEqual([]);
+    // Expansion is deliberately pass-through for non-bucket values: an unknown
+    // detected keyword must not silently become the whole `product` bucket.
+    expect(expandBucketsToCanonical(['spaceship'])).toEqual(['spaceship']);
   });
 });
