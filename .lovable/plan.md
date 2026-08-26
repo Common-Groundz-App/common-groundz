@@ -52,6 +52,22 @@ The bucket mapping is duplicated once into a small shared Deno helper under `sup
 - `isNextDisabled()` gets `case 2: return !selectedSubject && !isEditMode && !isFromEntityPage` so Next is disabled without a subject and "Skip for now" becomes the only explicit way past it.
 - Telemetry via the existing `search_funnel_events` path, specific enough to justify 2.2: step-2 shown, subject selected (with canonical type), skip used (with query length and whether results were present), whether a subject was later attached in Step 3, and whether the review submitted.
 
+### Explicitly NOT in this phase
+No questionnaire redesign, no required subject, no dish creation, no slug/DB migration, no wizard collapse, no component deletions, no backfill of existing rows, no change to similarity granularity.
+
+## Technical notes
+- Files touched: `ReviewForm.tsx` (state split, `subjectOrigin`, persistence, step-2 gating, telemetry), `subjectSelection.ts` (add strict `resolveQuestionnaireKind`), `SubjectSelectStep.tsx` (skip event), a new `supabase/functions/_shared/reviewCategoryBuckets.ts`, plus `calculate-lifestyle-similarity` and `smart-assistant` using it.
+- `getReviewCategory` inside `ReviewForm` is deleted in favour of the shared mapping, so there is one mapping table rather than two. `handleEntitySelect` (Step 3 fallback) sets both values and marks `subjectOrigin = 'user-selected'`; it is still removed in 2.5.
+- Guard: a stored category that cannot be resolved keeps its raw value on save. No coercion to `product`, none to `others`.
+
+## Tests
+- New review with a `course`, `tv_show`, `brand`, `service`, `event`, `game`, `app`, `professional`, `others` subject persists that canonical type while `questionnaireKind` stays in the five buckets.
+- Skipped Step 2 persists the legacy bucket exactly as today.
+- Edit of a legacy review with a linked entity whose type disagrees (`category: 'food'`, entity `place`) re-saves `food`; replacing the subject writes the new canonical type; attaching a subject to an entity-less legacy review writes the canonical type.
+- `resolveQuestionnaireKind`: canonical values, the five legacy values, and an unresolvable value (renders product layout, save preserves the raw value).
+- Bucket helper: every canonical type maps into exactly one of the five buckets, and each bucket expands back to its canonical members (round-trip lock used by both edge functions).
+- Step 2 gating: Next disabled with no subject, enabled once selected, unaffected in edit/entity-page mode.
+- `bunx vitest run`, `tsgo --noEmit`, and the Deno tests for the shared helper.
 
 ## Manual acceptance
 1. Review a course → saved review badge reads "Course", questions are the product ones.
