@@ -1003,11 +1003,17 @@ export function UnifiedEntitySelector({
               return (
                 <div className="p-3 text-center space-y-2">
                   <p className="text-sm text-muted-foreground">No specific entity found.</p>
-                  <p className="text-xs text-muted-foreground/80">
-                    For broad topics, use a hashtag like{' '}
-                    <span className="font-medium text-foreground">#{hashtag}</span> in your post.
-                  </p>
-                  {searchQuery.trim().length >= 3 && !isMaxReached && (
+                  {isSubjectMode ? (
+                    <p className="text-xs text-muted-foreground/80">
+                      Try a different spelling. Can't find it? Add it from the create flow for now.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground/80">
+                      For broad topics, use a hashtag like{' '}
+                      <span className="font-medium text-foreground">#{hashtag}</span> in your post.
+                    </p>
+                  )}
+                  {allowInlineCreate && searchQuery.trim().length >= 3 && !isMaxReached && (
                     <button
                       type="button"
                       className="text-sm text-primary hover:underline flex items-center justify-center gap-1 w-full pt-1"
@@ -1018,6 +1024,7 @@ export function UnifiedEntitySelector({
                     </button>
                   )}
                 </div>
+
               );
             })()}
 
