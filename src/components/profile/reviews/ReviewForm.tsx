@@ -11,14 +11,18 @@ import { MediaItem } from '@/types/media';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { getCanonicalType } from '@/services/entityTypeHelpers';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
+import { EntityAdapter } from '@/components/profile/circles/types';
+import { deriveSubjectPrefill } from './subjectSelection';
+import { getParentEntity } from '@/services/entityHierarchyService';
 
 // Import step components
 import StepOne from './steps/StepOne';
-import StepTwo from './steps/StepTwo';
+import SubjectSelectStep from './steps/SubjectSelectStep';
 import StepThree from './steps/StepThree';
 import StepFour from './steps/StepFour';
 import StepIndicator from './StepIndicator';
 import StepNavigation from './StepNavigation';
+
 
 // Define the entity interface for pre-populating entity data - now includes type property
 interface EntityData {
