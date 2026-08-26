@@ -194,10 +194,12 @@ export function UnifiedEntitySelector({
   }, []);
 
 
-  const isMaxReached = selectedEntities.length >= maxEntities;
+  // Subject mode always allows picking (a pick replaces the current subject).
+  const isMaxReached = !isSubjectMode && selectedEntities.length >= effectiveMaxEntities;
 
-  // Recent searches (composer surface) — declared early so callbacks can use addRecent.
-  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('composer');
+  // Recent searches — surface-scoped so the review form and composer stay isolated.
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches(recentsSurface);
+
 
   // Sync initial entities from parent
   useEffect(() => {
