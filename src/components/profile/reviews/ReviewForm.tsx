@@ -796,10 +796,9 @@ const ReviewForm = ({
                   onMediaAdd={handleAddMedia}
                    onMediaRemove={handleRemoveMedia}
                    isUploading={isUploading}
-                   {/* A Step 2 subject is authoritative: Step 3 must not replace it
-                       or edit its identity. Venue and media stay editable. */}
                    disableEntityChange={isFromEntityPage || !!selectedSubject}
                    disableEntityFields={isFromEntityPage || !!selectedSubject}
+
                 />
               )}
 
