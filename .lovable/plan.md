@@ -46,7 +46,14 @@ Confirmed by reading the functions:
 1. `supabase/functions/calculate-lifestyle-similarity/index.ts` builds a cosine-similarity vector over raw `reviews.category` values (mixed with `user_stuff.category`). With 15 values, a course reviewer and a product reviewer stop overlapping. **Decision for this phase: bucket before comparing.** The function maps each review category through the same canonical → five-bucket mapping before building the vector, so similarity behaviour is unchanged by 2.1. Making similarity type-granular becomes an intentional, separately tested change later (it belongs with the similarity work, not here).
 2. `supabase/functions/smart-assistant/index.ts` `searchReviewsSemantic` has a fallback `.in('category', detectedCategories)` fed by five-bucket keyword detection. New canonical categories would silently drop out of that fallback. **Fix: expand the detected buckets to their canonical members** (e.g. detected `product` → `['product','brand','service','professional','course','app','game','others']`, `movie` → `['movie','tv_show']`, `place` → `['place','experience','event']`) so the fallback keeps matching both old and new rows.
 3. Also checked and clear: `generate-embeddings`, `backfill-review-embeddings`, `generate-ai-summary`, `unified-search-v2`, `search-all` — none branch on review category. No SQL function filters reviews by category.
-The bucket mapping is duplicated once into a small shared Deno helper under `supabase/functions/_shared/` so the two functions and the frontend cannot drift apart silently.
+
+### Mapping parity — corrected (both reviewers)
+The earlier wording was wrong: a `_shared` Deno helper keeps the two edge functions in sync but does nothing about the frontend, so it would leave two independent 15→5 mappings. Edge functions cannot import from `src/` (only paths under `supabase/functions/` deploy), and `supabase/functions/_shared/entityTypes.ts` already shows this mirror pattern with a "keep in sync" comment and no test behind it. So: no shared-package refactor, and an **enforced parity test** instead.
+- Frontend stays the single authoring source: `mapCanonicalToLegacyCategory` in `subjectSelection.ts`.
+- `supabase/functions/_shared/reviewCategoryBuckets.ts` mirrors it, plus the reverse bucket → canonical-members expansion used by `smart-assistant`.
+- A Vitest **contract test** imports the Deno mirror by relative path (it is plain TypeScript, no Deno globals) and asserts, for all 15 canonical types, that the frontend mapping and the mirror assign the identical bucket — and that the reverse expansion is exactly the inverse. Adding a canonical type without updating the mirror fails CI.
+- A Deno test in `_shared` covers the mirror on its own so edge-function typechecking/bundling is exercised too, not just Vitest.
+
 
 ### Also in this phase (closing the 2.0 gaps)
 - `isNextDisabled()` gets `case 2: return !selectedSubject && !isEditMode && !isFromEntityPage` so Next is disabled without a subject and "Skip for now" becomes the only explicit way past it.
@@ -63,11 +70,13 @@ No questionnaire redesign, no required subject, no dish creation, no slug/DB mig
 ## Tests
 - New review with a `course`, `tv_show`, `brand`, `service`, `event`, `game`, `app`, `professional`, `others` subject persists that canonical type while `questionnaireKind` stays in the five buckets.
 - Skipped Step 2 persists the legacy bucket exactly as today.
-- Edit of a legacy review with a linked entity whose type disagrees (`category: 'food'`, entity `place`) re-saves `food`; replacing the subject writes the new canonical type; attaching a subject to an entity-less legacy review writes the canonical type.
-- `resolveQuestionnaireKind`: canonical values, the five legacy values, and an unresolvable value (renders product layout, save preserves the raw value).
-- Bucket helper: every canonical type maps into exactly one of the five buckets, and each bucket expands back to its canonical members (round-trip lock used by both edge functions).
+- **Edit-mode regression lock (ChatGPT):** open a legacy review whose stored category disagrees with its linked entity (`category: 'food'`, entity `place`), walk into and out of Step 2 without pressing "Change", save → stored category is still `food`. Merely viewing or revisiting Step 2 never canonicalizes an old row.
+- Replacing the subject writes the new canonical type; attaching a subject to an entity-less legacy review writes the canonical type.
+- `resolveQuestionnaireKind`: canonical values, the five legacy values, and an unresolvable value (renders the product layout, save preserves the raw value).
+- **Parity contract test:** frontend mapping and the `_shared` Deno mirror assign all 15 canonical types to the same bucket; the bucket → canonical-members expansion is exactly the inverse; every canonical type appears in exactly one bucket.
 - Step 2 gating: Next disabled with no subject, enabled once selected, unaffected in edit/entity-page mode.
-- `bunx vitest run`, `tsgo --noEmit`, and the Deno tests for the shared helper.
+- `bunx vitest run`, `tsgo --noEmit`, and Deno tests for the `_shared` mirror plus the two touched edge functions.
+
 
 ## Manual acceptance
 1. Review a course → saved badge reads "Course"; the questions are still the product ones (expected until Phase 3).
