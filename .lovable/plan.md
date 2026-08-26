@@ -32,35 +32,49 @@ subject.type ──parse──► canonicalType     → persisted as reviews.cat
 ```
 
 - `questionnaireKind` reuses the existing `mapCanonicalToLegacyCategory` from `subjectSelection.ts`; Steps 3/4, emoji/title copy, food-tag metadata and the `foodName` vs `contentName` branch all read `questionnaireKind`, so their behaviour is byte-identical to today.
-- Persistence writes `category = canonicalType` when a subject exists, and falls back to `questionnaireKind` when the user skipped Step 2 (no subject → no honest type to store).
-- Edit mode: the stored category is loaded, parsed with `getCanonicalType` to derive `questionnaireKind`, and re-saved unchanged unless the user picks a new subject. Legacy rows are never rewritten.
-- No database migration: `reviews.category` is already plain `text`, and no query anywhere filters reviews by category (confirmed across `src/services/review/*`, the review hooks, and explore/recommendation services — the `category` filters there belong to `user_interests`/recommendations, not reviews).
-- Display is already safe: `ReviewCard` renders the category through `getCanonicalType` + `getEntityTypeLabel` and `getEntityTypeFallbackImage`, so canonical values like `course` or `tv_show` label and illustrate correctly with no card changes.
+- **Strict parsing only (ChatGPT).** `getCanonicalType` in `entityTypeHelpers.ts` is display-only — it falls back to `Others` for anything it cannot parse, so it must never touch persistence. The new `resolveQuestionnaireKind(storedCategory)` uses `parseEntityType`/`parseEntityTypeAtBoundary` from `entityType.ts` and understands both canonical types and the five legacy review values. If a stored value resolves to nothing, the questionnaire falls back to the product layout for *rendering only* and the **raw stored category is saved back untouched** — never coerced to `product` or `others`.
+- **Subject origin flag (Codex).** Persistence does not ask "is there a subject?", it asks "did the user choose this subject?". A `subjectOrigin: 'loaded' | 'entity-page' | 'user-selected'` value is set when the subject is populated:
+  - `loaded` (opened from an existing review) → `category` is written back exactly as stored, even when the linked entity's type disagrees (a `food` review linked to a `place` entity stays `food`).
+  - `user-selected` (picked or replaced in Step 2, including attaching a subject to a previously entity-less review) → `category = canonicalType`.
+  - `entity-page` on a new review counts as user-selected (the user started from that entity); on an edit it does not.
+- Skipped Step 2 (no subject at all) → `category = questionnaireKind`, exactly as today.
+- No database migration: `reviews.category` is plain `text`, and nothing in `src` filters reviews by category (checked `src/services/review/*`, the review hooks, explore and recommendation services — those `category` filters belong to `user_interests`, `user_stuff` and `recommendations`). `convertReviewToRecommendation` only flips `is_recommended`; it never copies `category` into the `recommendation_category` enum, so widening the values cannot break it.
+- Display is already safe: `ReviewCard` renders the category through `getCanonicalType` + `getEntityTypeLabel` + `getEntityTypeFallbackImage`, so `course` or `tv_show` label and illustrate correctly with no card changes.
+
+### Backend consumer audit (Codex was right — two real consumers)
+Confirmed by reading the functions:
+1. `supabase/functions/calculate-lifestyle-similarity/index.ts` builds a cosine-similarity vector over raw `reviews.category` values (mixed with `user_stuff.category`). With 15 values, a course reviewer and a product reviewer stop overlapping. **Decision for this phase: bucket before comparing.** The function maps each review category through the same canonical → five-bucket mapping before building the vector, so similarity behaviour is unchanged by 2.1. Making similarity type-granular becomes an intentional, separately tested change later (it belongs with the similarity work, not here).
+2. `supabase/functions/smart-assistant/index.ts` `searchReviewsSemantic` has a fallback `.in('category', detectedCategories)` fed by five-bucket keyword detection. New canonical categories would silently drop out of that fallback. **Fix: expand the detected buckets to their canonical members** (e.g. detected `product` → `['product','brand','service','professional','course','app','game','others']`, `movie` → `['movie','tv_show']`, `place` → `['place','experience','event']`) so the fallback keeps matching both old and new rows.
+3. Also checked and clear: `generate-embeddings`, `backfill-review-embeddings`, `generate-ai-summary`, `unified-search-v2`, `search-all` — none branch on review category. No SQL function filters reviews by category.
+The bucket mapping is duplicated once into a small shared Deno helper under `supabase/functions/_shared/` so the two functions and the frontend cannot drift apart silently.
 
 ### Also in this phase (closing the 2.0 gaps)
 - `isNextDisabled()` gets `case 2: return !selectedSubject && !isEditMode && !isFromEntityPage` so Next is disabled without a subject and "Skip for now" becomes the only explicit way past it.
-- The skip fires the existing funnel telemetry with the step and the search query state, so 2.2 can be turned on with evidence.
+- Telemetry via the existing `search_funnel_events` path, specific enough to justify 2.2: step-2 shown, subject selected (with canonical type), skip used (with query length and whether results were present), whether a subject was later attached in Step 3, and whether the review submitted.
 
 ### Explicitly NOT in this phase
-No questionnaire changes, no required subject, no dish creation, no slug/DB migration, no wizard collapse, no component deletions, no backfill of existing rows.
+No questionnaire redesign, no required subject, no dish creation, no slug/DB migration, no wizard collapse, no component deletions, no backfill of existing rows, no change to similarity granularity.
 
 ## Technical notes
-- Files touched: `src/components/profile/reviews/ReviewForm.tsx` (state split + persistence), `src/components/profile/reviews/subjectSelection.ts` (add a `resolveQuestionnaireKind` helper for the edit-mode/legacy path), plus tests.
-- `getReviewCategory` inside `ReviewForm` is replaced by the shared mapping so there is one mapping table, not two. `handleEntitySelect` (Step 3 fallback) is updated to set both values consistently; it is still deleted in 2.5.
-- Guard: any stored category that does not parse keeps its raw stored value on save (no coercion to `product`, no coercion to `others`).
+- Files touched: `ReviewForm.tsx` (state split, `subjectOrigin`, persistence, step-2 gating, telemetry), `subjectSelection.ts` (add strict `resolveQuestionnaireKind`), `SubjectSelectStep.tsx` (skip event), a new `supabase/functions/_shared/reviewCategoryBuckets.ts`, plus `calculate-lifestyle-similarity` and `smart-assistant` using it.
+- `getReviewCategory` inside `ReviewForm` is deleted in favour of the shared mapping, so there is one mapping table rather than two. `handleEntitySelect` (Step 3 fallback) sets both values and marks `subjectOrigin = 'user-selected'`; it is still removed in 2.5.
+- Guard: a stored category that cannot be resolved keeps its raw value on save. No coercion to `product`, none to `others`.
 
 ## Tests
 - New review with a `course`, `tv_show`, `brand`, `service`, `event`, `game`, `app`, `professional`, `others` subject persists that canonical type while `questionnaireKind` stays in the five buckets.
 - Skipped Step 2 persists the legacy bucket exactly as today.
-- Edit of a legacy review (`category: 'product'`) derives the product questionnaire and re-saves `product` untouched; picking a new subject updates it.
+- Edit of a legacy review with a linked entity whose type disagrees (`category: 'food'`, entity `place`) re-saves `food`; replacing the subject writes the new canonical type; attaching a subject to an entity-less legacy review writes the canonical type.
+- `resolveQuestionnaireKind`: canonical values, the five legacy values, and an unresolvable value (renders product layout, save preserves the raw value).
+- Bucket helper: every canonical type maps into exactly one of the five buckets, and each bucket expands back to its canonical members (round-trip lock used by both edge functions).
 - Step 2 gating: Next disabled with no subject, enabled once selected, unaffected in edit/entity-page mode.
-- Regression lock on the canonical → questionnaire mapping for all 15 types stays green.
-- `bunx vitest run` + `tsgo --noEmit`.
+- `bunx vitest run`, `tsgo --noEmit`, and the Deno tests for the shared helper.
 
 ## Manual acceptance
-1. Review a course → saved review badge reads "Course", questions are the product ones.
-2. Review a TV show → badge "TV Show"; a movie still reads "Movie".
-3. Review a food entity → dish name + food tags behave exactly as before.
-4. Step 2 with nothing selected → Next greyed out, "Skip for now" works and the review still submits.
-5. Open an old review in edit mode → same questions, same badge after saving.
-6. `/create` composer unchanged.
+1. Review a course → saved badge reads "Course"; the questions are still the product ones (expected until Phase 3).
+2. Review a TV show → badge "TV Show"; a movie still reads "Movie"; an event reads "Event".
+3. Review a food entity → dish name, venue from the parent place, and food tags behave exactly as before.
+4. Step 2 with nothing selected → Next greyed out, "Skip for now" advances and the review still submits.
+5. Open an old review and save without touching the subject → same questions, same badge, category unchanged in the database.
+6. Open an old review and deliberately change the subject → badge updates to the new type.
+7. `/create` composer unchanged.
+
