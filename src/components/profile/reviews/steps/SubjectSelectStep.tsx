@@ -4,7 +4,7 @@ import { X, Check } from 'lucide-react';
 import { UnifiedEntitySelector } from '@/components/feed/UnifiedEntitySelector';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
-import { getOptimalEntityImageUrl } from '@/utils/imageUtils';
+import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 
 interface SubjectSelectStepProps {
   /** The currently chosen subject, if any. */
