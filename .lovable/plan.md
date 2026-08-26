@@ -81,7 +81,9 @@ No questionnaire redesign, no required subject, no dish creation, no slug/DB mig
 - `resolveQuestionnaireKind`: canonical values, the five legacy values, and an unresolvable value (renders the product layout, save preserves the raw value).
 - **Parity contract test:** frontend mapping and the `_shared` Deno mirror assign all 15 canonical types to the same bucket; the bucket → canonical-members expansion is exactly the inverse; every canonical type appears in exactly one bucket.
 - Step 2 gating: Next disabled with no subject, enabled once selected, unaffected in edit/entity-page mode.
-- `bunx vitest run`, `tsgo --noEmit`, and Deno tests for the `_shared` mirror plus the two touched edge functions.
+- **Normalizer idempotence:** `normalize(normalize(x)) === normalize(x)` for all 15 canonical types and all five buckets; an unrecognised value is dropped, not bucketed as `product`; `user_stuff` categories go through the same normalizer as `reviews` categories.
+- **Telemetry allow-list:** each new review event, the `review_form` source, and the widened canonical entity types are accepted; a payload containing raw query text still returns 400; a rejected write leaves the review flow unaffected.
+- `bunx vitest run`, `tsgo --noEmit`, and Deno tests for the `_shared` mirror plus the three touched edge functions (`calculate-lifestyle-similarity`, `smart-assistant`, `log-search-funnel`).
 
 
 ## Manual acceptance
