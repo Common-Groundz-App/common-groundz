@@ -346,7 +346,7 @@ export function UnifiedEntitySelector({
       isCreatingRef.current = false;
       setIsCreatingEntity(false);
     }
-  }, [isMaxReached, handleEntitySelect, toast]);
+  }, [isMaxReached, handleEntitySelect, toast, externalResultPolicy, allowInlineCreate]);
 
   // Handle people click → insert @mention
   const handlePeopleClick = useCallback((user: any) => {
