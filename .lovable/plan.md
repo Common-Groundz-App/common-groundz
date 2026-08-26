@@ -71,7 +71,7 @@ No questionnaire redesign, no required subject, no dish creation, no slug/DB mig
 ## Technical notes
 - Files touched: `ReviewForm.tsx` (state split, `subjectOrigin`, persistence, step-2 gating, telemetry), `subjectSelection.ts` (add strict `resolveQuestionnaireKind`), `SubjectSelectStep.tsx` (skip event), a new `supabase/functions/_shared/reviewCategoryBuckets.ts`, plus `calculate-lifestyle-similarity` and `smart-assistant` using it.
 - `getReviewCategory` inside `ReviewForm` is deleted in favour of the shared mapping, so there is one mapping table rather than two. `handleEntitySelect` (Step 3 fallback) sets both values and marks `subjectOrigin = 'user-selected'`; it is still removed in 2.5.
-- Guard: a stored category that cannot be resolved keeps its raw value on save. No coercion to `product`, none to `others`.
+- **Unresolvable-category fallback (ChatGPT's note) — deferred deliberately.** `resolveQuestionnaireKind` returns the five buckets and, for a value it cannot resolve, keeps rendering the current product-shaped questionnaire while preserving the raw stored category on save. Introducing a semantically honest `generic` kind means touching Steps 3/4 branching, which is exactly the questionnaire work Phase 3 owns, so it is recorded here as a Phase 3 cleanup rather than expanding 2.1. The code will carry a comment saying "unresolved, not classified as product" so the intent is not lost.
 
 ## Tests
 - New review with a `course`, `tv_show`, `brand`, `service`, `event`, `game`, `app`, `professional`, `others` subject persists that canonical type while `questionnaireKind` stays in the five buckets.
