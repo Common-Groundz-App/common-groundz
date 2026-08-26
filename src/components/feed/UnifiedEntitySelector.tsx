@@ -1032,15 +1032,18 @@ export function UnifiedEntitySelector({
         )}
       </div>
 
-      {/* Create Entity Dialog */}
-      <CreateEntityDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-        onEntityCreated={handleEntityCreated}
-        variant="user"
-        showPreviewTab={false}
-        prefillName={searchQuery.trim()}
-      />
+      {/* Create Entity Dialog — not mounted where inline creation is disabled */}
+      {allowInlineCreate && (
+        <CreateEntityDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          onEntityCreated={handleEntityCreated}
+          variant="user"
+          showPreviewTab={false}
+          prefillName={searchQuery.trim()}
+        />
+      )}
+
     </div>
   );
 }
