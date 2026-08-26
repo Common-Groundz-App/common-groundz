@@ -434,7 +434,9 @@ export function UnifiedEntitySelector({
   const books = results.categorized?.books || [];
   const movies = results.categorized?.movies || [];
   const places = results.categorized?.places || [];
-  const people = results.users || [];
+  // Subject mode reviews a *thing*, never a person → people are excluded entirely.
+  const people = isSubjectMode ? [] : (results.users || []);
+
   const hashtags = results.hashtags || [];
 
   // (recent searches hook is declared near the top of the component)
