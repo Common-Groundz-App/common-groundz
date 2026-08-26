@@ -53,7 +53,28 @@ interface UnifiedEntitySelectorProps {
    *   the composer's "Select entities" modal.
    */
   variant?: 'inline' | 'modal';
+  /**
+   * Selection semantics.
+   * - `tag` (default): composer behaviour — up to `maxEntities` tags, people
+   *   rows insert an @mention.
+   * - `subject`: exactly ONE authoritative subject (used by the review form).
+   *   People are excluded and a new pick REPLACES the current selection.
+   */
+  mode?: 'tag' | 'subject';
+  /** localStorage bucket for recent searches. Keeps surfaces from polluting each other. */
+  recentsSurface?: string;
+  /** Mount the inline CreateEntityDialog affordances. Default true. */
+  allowInlineCreate?: boolean;
+  /**
+   * What happens when an EXTERNAL result (Google Places / books / movies) is picked.
+   * - `createIfMissing` (default): dedupe, then create locally — composer behaviour.
+   * - `existingOnly`: dedupe only. A result with no local match is NOT created;
+   *   the user gets an explanatory message. Used while safe (parent-aware)
+   *   creation is not yet available for offerings such as dishes.
+   */
+  externalResultPolicy?: 'createIfMissing' | 'existingOnly';
 }
+
 
 interface CreatedEntityShape {
   id: string;
