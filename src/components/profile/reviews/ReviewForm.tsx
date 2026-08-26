@@ -394,6 +394,73 @@ const ReviewForm = ({
     }
   };
   
+  /**
+   * Step 2 subject selection (Phase 2.0).
+   *
+   * The subject is authoritative: it derives the legacy `category` and every
+   * Step 3 field. Unlike `handleEntitySelect` below, it never reads the stale
+   * `category` state — the category is computed FROM the subject.
+   */
+  const handleSubjectChange = (subject: EntityAdapter | null) => {
+    subjectRequestRef.current += 1;
+    const requestId = subjectRequestRef.current;
+
+    if (!subject) {
+      setSelectedSubject(null);
+      setSelectedEntity(null);
+      setEntityId('');
+      setSubjectContextLine(null);
+      setIsResolvingSubjectContext(false);
+      return;
+    }
+
+    const prefill = deriveSubjectPrefill(subject);
+    if (!prefill.canonicalType || !prefill.category) {
+      // Unknown/unparseable type — never coerced to `others` or `product`.
+      toast({
+        title: "We can't use this one yet",
+        description: 'Pick something else to review for now.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSelectedSubject(subject);
+    setCategory(prefill.category);
+    setEntityId(subject.id);
+    setSelectedEntity({
+      ...(subject as any),
+      type: prefill.canonicalType as unknown as EntityType,
+    } as RecommendationEntity);
+
+    // Step 3 fields come from the subject, not from the previous category.
+    setFoodName(prefill.foodName);
+    setContentName(prefill.contentName);
+    if (prefill.venue) setVenue(prefill.venue);
+
+    setSubjectContextLine(null);
+
+    // Offerings (dishes etc.) get their venue from the parent place. Resolved
+    // asynchronously; stale responses are discarded.
+    if (prefill.category === 'food') {
+      setIsResolvingSubjectContext(true);
+      getParentEntity(subject.id)
+        .then((parent) => {
+          if (requestId !== subjectRequestRef.current) return;
+          if (parent?.name) {
+            setVenue(parent.name);
+            setSubjectContextLine(`Dish at ${parent.name}`);
+          }
+        })
+        .catch((err) => console.error('Subject parent lookup failed:', err))
+        .finally(() => {
+          if (requestId === subjectRequestRef.current) {
+            setIsResolvingSubjectContext(false);
+          }
+        });
+    }
+  };
+
   // Handle entity selection, ensuring type compatibility
   const handleEntitySelect = (entity: any) => {
     console.log("Entity selected in ReviewForm:", entity);
@@ -439,6 +506,7 @@ const ReviewForm = ({
       if (entity.venue) setVenue(entity.venue);
     }
   };
+
   
   // Handle step navigation by clicking on step indicators
   const handleStepClick = (step: number) => {
