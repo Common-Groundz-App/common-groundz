@@ -53,7 +53,28 @@ interface UnifiedEntitySelectorProps {
    *   the composer's "Select entities" modal.
    */
   variant?: 'inline' | 'modal';
+  /**
+   * Selection semantics.
+   * - `tag` (default): composer behaviour — up to `maxEntities` tags, people
+   *   rows insert an @mention.
+   * - `subject`: exactly ONE authoritative subject (used by the review form).
+   *   People are excluded and a new pick REPLACES the current selection.
+   */
+  mode?: 'tag' | 'subject';
+  /** localStorage bucket for recent searches. Keeps surfaces from polluting each other. */
+  recentsSurface?: string;
+  /** Mount the inline CreateEntityDialog affordances. Default true. */
+  allowInlineCreate?: boolean;
+  /**
+   * What happens when an EXTERNAL result (Google Places / books / movies) is picked.
+   * - `createIfMissing` (default): dedupe, then create locally — composer behaviour.
+   * - `existingOnly`: dedupe only. A result with no local match is NOT created;
+   *   the user gets an explanatory message. Used while safe (parent-aware)
+   *   creation is not yet available for offerings such as dishes.
+   */
+  externalResultPolicy?: 'createIfMissing' | 'existingOnly';
 }
+
 
 interface CreatedEntityShape {
   id: string;
@@ -103,8 +124,16 @@ export function UnifiedEntitySelector({
   autoFocusSearch = false,
   maxEntities = 3,
   variant = 'inline',
+  mode = 'tag',
+  recentsSurface = 'composer',
+  allowInlineCreate = true,
+  externalResultPolicy = 'createIfMissing',
 }: UnifiedEntitySelectorProps) {
   const isModal = variant === 'modal';
+  const isSubjectMode = mode === 'subject';
+  // Subject mode is single-select by definition, whatever the caller passes.
+  const effectiveMaxEntities = isSubjectMode ? 1 : maxEntities;
+
   const [selectedEntities, setSelectedEntities] = useState<EntityAdapter[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
@@ -165,10 +194,12 @@ export function UnifiedEntitySelector({
   }, []);
 
 
-  const isMaxReached = selectedEntities.length >= maxEntities;
+  // Subject mode always allows picking (a pick replaces the current subject).
+  const isMaxReached = !isSubjectMode && selectedEntities.length >= effectiveMaxEntities;
 
-  // Recent searches (composer surface) — declared early so callbacks can use addRecent.
-  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches('composer');
+  // Recent searches — surface-scoped so the review form and composer stay isolated.
+  const { recents, addRecent, removeRecent, clearRecents } = useRecentSearches(recentsSurface);
+
 
   // Sync initial entities from parent
   useEffect(() => {
@@ -210,8 +241,13 @@ export function UnifiedEntitySelector({
   // Select a local entity
   const handleEntitySelect = useCallback((entity: EntityAdapter) => {
     if (isMaxReached) return;
-    if (selectedEntities.some(e => e.id === entity.id)) return;
-    const newEntities = [...selectedEntities, entity];
+    // Subject mode: a pick REPLACES the current subject (single authoritative subject).
+    const newEntities = isSubjectMode
+      ? [entity]
+      : selectedEntities.some(e => e.id === entity.id)
+        ? null
+        : [...selectedEntities, entity];
+    if (!newEntities) return;
     setSelectedEntities(newEntities);
     onEntitiesChange(newEntities);
     addRecent(entity.name, 'entity', {
@@ -222,7 +258,7 @@ export function UnifiedEntitySelector({
     setSearchQuery('');
     setDebouncedQuery('');
     setShowResults(false);
-  }, [selectedEntities, isMaxReached, onEntitiesChange, searchQuery, addRecent]);
+  }, [selectedEntities, isMaxReached, isSubjectMode, onEntitiesChange, searchQuery, addRecent]);
 
   // Select an external result (find-or-create entity client-side, mirrors Explore search flow)
   const handleExternalSelect = useCallback(async (result: any) => {
@@ -233,7 +269,9 @@ export function UnifiedEntitySelector({
     if (!result.api_source || !result.api_ref) {
       toast({
         title: 'Could not add this result',
-        description: 'Try the "Add as new entity" option instead.',
+        description: allowInlineCreate
+          ? 'Try the "Add as new entity" option instead.'
+          : 'Try searching for it by name instead.',
         variant: 'destructive',
       });
       return;
@@ -242,13 +280,26 @@ export function UnifiedEntitySelector({
     isCreatingRef.current = true;
     setIsCreatingEntity(true);
     try {
-      const normalizedType = normalizeEntityType(result.type, result.api_source);
+      // `others` is a REAL canonical type, never an "unknown" bucket. In
+      // existing-only mode an unparseable external type is simply not selectable
+      // (nothing is created here, so nothing unparseable can be persisted).
+      const normalizedType =
+        externalResultPolicy === 'existingOnly'
+          ? parseEntityTypeAtBoundary(result.type)
+          : normalizeEntityType(result.type, result.api_source);
 
       // Step 1: Dedupe — check if this external entity already exists locally
       let entity = await findEntityByApiRef(result.api_source, result.api_ref);
 
-      // Step 2: Create if not found
+      // Step 2: Create if not found — unless this surface is existing-only.
       if (!entity) {
+        if (externalResultPolicy === 'existingOnly') {
+          toast({
+            title: "We can't add this one yet",
+            description: 'Only things already on Groundz can be picked here for now.',
+          });
+          return;
+        }
         entity = await createEntityQuick(
           {
             name: result.name,
@@ -259,9 +310,10 @@ export function UnifiedEntitySelector({
             api_ref: result.api_ref,
             metadata: result.metadata || {},
           },
-          normalizedType
+          normalizedType as string
         );
       }
+
 
       if (!entity) throw new Error('Entity creation returned null');
 
@@ -294,7 +346,7 @@ export function UnifiedEntitySelector({
       isCreatingRef.current = false;
       setIsCreatingEntity(false);
     }
-  }, [isMaxReached, handleEntitySelect, toast]);
+  }, [isMaxReached, handleEntitySelect, toast, externalResultPolicy, allowInlineCreate]);
 
   // Handle people click → insert @mention
   const handlePeopleClick = useCallback((user: any) => {
@@ -343,9 +395,10 @@ export function UnifiedEntitySelector({
       if (isMaxReached) return;
       if (pickActive()) return;
       // No pickable results and query >= 3 chars → open create dialog
-      if (searchQuery.trim().length >= 3 && !hasAnyResults) {
+      if (allowInlineCreate && searchQuery.trim().length >= 3 && !hasAnyResults) {
         setShowCreateDialog(true);
       }
+
     }
   };
 
@@ -382,7 +435,9 @@ export function UnifiedEntitySelector({
   const books = results.categorized?.books || [];
   const movies = results.categorized?.movies || [];
   const places = results.categorized?.places || [];
-  const people = results.users || [];
+  // Subject mode reviews a *thing*, never a person → people are excluded entirely.
+  const people = isSubjectMode ? [] : (results.users || []);
+
   const hashtags = results.hashtags || [];
 
   // (recent searches hook is declared near the top of the component)
@@ -437,7 +492,7 @@ export function UnifiedEntitySelector({
         normalize(searchQuery).includes(normalize(e.name)),
     );
 
-  const showAddEntity = searchQuery.trim().length >= 3 && !isMaxReached;
+  const showAddEntity = allowInlineCreate && searchQuery.trim().length >= 3 && !isMaxReached;
 
   // Location toggle
   const showLocationToggle = places.length > 0 || searchQuery.length >= 2;
@@ -948,11 +1003,17 @@ export function UnifiedEntitySelector({
               return (
                 <div className="p-3 text-center space-y-2">
                   <p className="text-sm text-muted-foreground">No specific entity found.</p>
-                  <p className="text-xs text-muted-foreground/80">
-                    For broad topics, use a hashtag like{' '}
-                    <span className="font-medium text-foreground">#{hashtag}</span> in your post.
-                  </p>
-                  {searchQuery.trim().length >= 3 && !isMaxReached && (
+                  {isSubjectMode ? (
+                    <p className="text-xs text-muted-foreground/80">
+                      Try a different spelling. Can't find it? Add it from the create flow for now.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground/80">
+                      For broad topics, use a hashtag like{' '}
+                      <span className="font-medium text-foreground">#{hashtag}</span> in your post.
+                    </p>
+                  )}
+                  {allowInlineCreate && searchQuery.trim().length >= 3 && !isMaxReached && (
                     <button
                       type="button"
                       className="text-sm text-primary hover:underline flex items-center justify-center gap-1 w-full pt-1"
@@ -963,6 +1024,7 @@ export function UnifiedEntitySelector({
                     </button>
                   )}
                 </div>
+
               );
             })()}
 
@@ -977,15 +1039,18 @@ export function UnifiedEntitySelector({
         )}
       </div>
 
-      {/* Create Entity Dialog */}
-      <CreateEntityDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-        onEntityCreated={handleEntityCreated}
-        variant="user"
-        showPreviewTab={false}
-        prefillName={searchQuery.trim()}
-      />
+      {/* Create Entity Dialog — not mounted where inline creation is disabled */}
+      {allowInlineCreate && (
+        <CreateEntityDialog
+          open={showCreateDialog}
+          onOpenChange={setShowCreateDialog}
+          onEntityCreated={handleEntityCreated}
+          variant="user"
+          showPreviewTab={false}
+          prefillName={searchQuery.trim()}
+        />
+      )}
+
     </div>
   );
 }

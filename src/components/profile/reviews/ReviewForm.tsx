@@ -11,14 +11,18 @@ import { MediaItem } from '@/types/media';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { getCanonicalType } from '@/services/entityTypeHelpers';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
+import { EntityAdapter } from '@/components/profile/circles/types';
+import { deriveSubjectPrefill } from './subjectSelection';
+import { getParentEntity } from '@/services/entityHierarchyService';
 
 // Import step components
 import StepOne from './steps/StepOne';
-import StepTwo from './steps/StepTwo';
+import SubjectSelectStep from './steps/SubjectSelectStep';
 import StepThree from './steps/StepThree';
 import StepFour from './steps/StepFour';
 import StepIndicator from './StepIndicator';
 import StepNavigation from './StepNavigation';
+
 
 // Define the entity interface for pre-populating entity data - now includes type property
 interface EntityData {
@@ -124,6 +128,16 @@ const ReviewForm = ({
   
   // Flag to determine if the form was opened from an entity page
   const isFromEntityPage = !!entity && !isEditMode;
+
+  // Step 2 subject (Phase 2.0). Pre-filled when opened from an entity page.
+  const [selectedSubject, setSelectedSubject] = useState<EntityAdapter | null>(
+    entity ? { id: entity.id, name: entity.name, type: entity.type, venue: entity.venue, image_url: entity.image_url, description: entity.description, metadata: entity.metadata } : null
+  );
+  const [subjectContextLine, setSubjectContextLine] = useState<string | null>(null);
+  const [isResolvingSubjectContext, setIsResolvingSubjectContext] = useState(false);
+  // Guards against a slow parent lookup overwriting a newer subject.
+  const subjectRequestRef = React.useRef(0);
+
   
   const [experienceDate, setExperienceDate] = useState<Date | undefined>(
     review?.experience_date ? new Date(review.experience_date) : undefined
@@ -394,6 +408,73 @@ const ReviewForm = ({
     }
   };
   
+  /**
+   * Step 2 subject selection (Phase 2.0).
+   *
+   * The subject is authoritative: it derives the legacy `category` and every
+   * Step 3 field. Unlike `handleEntitySelect` below, it never reads the stale
+   * `category` state — the category is computed FROM the subject.
+   */
+  const handleSubjectChange = (subject: EntityAdapter | null) => {
+    subjectRequestRef.current += 1;
+    const requestId = subjectRequestRef.current;
+
+    if (!subject) {
+      setSelectedSubject(null);
+      setSelectedEntity(null);
+      setEntityId('');
+      setSubjectContextLine(null);
+      setIsResolvingSubjectContext(false);
+      return;
+    }
+
+    const prefill = deriveSubjectPrefill(subject);
+    if (!prefill.canonicalType || !prefill.category) {
+      // Unknown/unparseable type — never coerced to `others` or `product`.
+      toast({
+        title: "We can't use this one yet",
+        description: 'Pick something else to review for now.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSelectedSubject(subject);
+    setCategory(prefill.category);
+    setEntityId(subject.id);
+    setSelectedEntity({
+      ...(subject as any),
+      type: prefill.canonicalType as unknown as EntityType,
+    } as RecommendationEntity);
+
+    // Step 3 fields come from the subject, not from the previous category.
+    setFoodName(prefill.foodName);
+    setContentName(prefill.contentName);
+    if (prefill.venue) setVenue(prefill.venue);
+
+    setSubjectContextLine(null);
+
+    // Offerings (dishes etc.) get their venue from the parent place. Resolved
+    // asynchronously; stale responses are discarded.
+    if (prefill.category === 'food') {
+      setIsResolvingSubjectContext(true);
+      getParentEntity(subject.id)
+        .then((parent) => {
+          if (requestId !== subjectRequestRef.current) return;
+          if (parent?.name) {
+            setVenue(parent.name);
+            setSubjectContextLine(`Dish at ${parent.name}`);
+          }
+        })
+        .catch((err) => console.error('Subject parent lookup failed:', err))
+        .finally(() => {
+          if (requestId === subjectRequestRef.current) {
+            setIsResolvingSubjectContext(false);
+          }
+        });
+    }
+  };
+
   // Handle entity selection, ensuring type compatibility
   const handleEntitySelect = (entity: any) => {
     console.log("Entity selected in ReviewForm:", entity);
@@ -439,6 +520,7 @@ const ReviewForm = ({
       if (entity.venue) setVenue(entity.venue);
     }
   };
+
   
   // Handle step navigation by clicking on step indicators
   const handleStepClick = (step: number) => {
@@ -640,7 +722,7 @@ const ReviewForm = ({
     let titleText;
     switch (currentStep) {
       case 1: return { emoji: '', text: 'Rate your experience' };
-      case 2: return { emoji: '', text: 'Select a category' };
+      case 2: return { emoji: '', text: 'What are you reviewing?' };
       case 3: return { emoji: getEmoji(), text: `Tell us about your ${category}` };
       case 4: return { emoji: '', text: 'Add final details' };
       default: return { emoji: '', text: isEditMode ? 'Edit your review' : 'Create a review' };
@@ -690,10 +772,13 @@ const ReviewForm = ({
               )}
               
               {currentStep === 2 && (
-                <StepTwo 
-                  category={category} 
-                  onChange={handleCategoryChange}
-                  disableCategoryChange={isFromEntityPage} // Pass this prop to disable category change
+                <SubjectSelectStep
+                  subject={selectedSubject}
+                  onSubjectChange={handleSubjectChange}
+                  disabled={isFromEntityPage}
+                  onSkip={handleNext}
+                  contextLine={subjectContextLine}
+                  isResolvingContext={isResolvingSubjectContext}
                 />
               )}
               
@@ -711,10 +796,12 @@ const ReviewForm = ({
                   onMediaAdd={handleAddMedia}
                    onMediaRemove={handleRemoveMedia}
                    isUploading={isUploading}
-                   disableEntityChange={isFromEntityPage}
-                   disableEntityFields={isFromEntityPage}
+                   disableEntityChange={isFromEntityPage || !!selectedSubject}
+                   disableEntityFields={isFromEntityPage || !!selectedSubject}
+
                 />
               )}
+
               
               {currentStep === 4 && (
                 <StepFour 
