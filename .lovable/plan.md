@@ -1,59 +1,76 @@
-# Phase 2.1 verification + Phase 3 — Config-driven questionnaire
+# Phase 2.2 — Subject required for new reviews (+ 2.1 dead-code cleanup)
+
+You're right: Phase 3 (config-driven questionnaires) is a later item. The roadmap order is 2.2 next, and the config work only makes sense after subjects are reliable. This plan follows the roadmap.
 
 ## Phase 2.1 verification: complete
 
-Confirmed in code, not assumed:
+Verified in code, not assumed:
 
-- `subjectSelection.ts` exports `resolveQuestionnaireKind`, `mapCanonicalToLegacyCategory`, `deriveSubjectPrefill`, and the legacy bucket list.
-- `ReviewForm.tsx` keeps questionnaire kind and persisted canonical category separate, and `subjectOrigin` decides which value is written — opening and re-saving an old review cannot rewrite its stored category.
-- `supabase/functions/_shared/reviewCategoryBuckets.ts` exists with idempotent normalization, reverse expansion and null-on-unknown; parity with the frontend mapping is asserted by `reviewCategoryBucketParity.test.ts`.
-- Telemetry allowlists are extracted to `log-search-funnel/allowlists.ts`; only `hadResults` and a clamped `queryLength` are accepted.
-- Full suite green: 27 files, 358 tests. Build log: `build OK`.
+- `subjectSelection.ts` exports `resolveQuestionnaireKind`, `mapCanonicalToLegacyCategory`, `deriveSubjectPrefill`.
+- `ReviewForm.tsx` separates questionnaire kind from the persisted canonical category, and `subjectOrigin` decides which is written — reopening and re-saving an old review cannot rewrite its stored category.
+- `_shared/reviewCategoryBuckets.ts` exists with idempotent normalization, reverse expansion, null-on-unknown; parity enforced by `reviewCategoryBucketParity.test.ts`.
+- Telemetry allowlists extracted to `log-search-funnel/allowlists.ts`; only `hadResults` and clamped `queryLength` accepted.
+- Step 2 Next is already disabled without a subject; `review_subject_step_shown/selected/skipped/attached_late` all fire.
+- `getReviewCategory` no longer exists anywhere — already retired.
+- Suite green: 27 files / 358 tests. Build log: `build OK`.
 
-One leftover, deliberately deferred in the 2.1 scope: `steps/StepTwo.tsx` and `CategorySelector.tsx` are now unreferenced by the review flow (the remaining `CategorySelector` usage is StepTwo itself; the admin one is a different component). Phase 3 removes them.
+Deferred leftover, cleaned up in this phase: `steps/StepTwo.tsx` and `reviews/CategorySelector.tsx` are unreferenced by the review flow (StepTwo is the only consumer of that CategorySelector; the admin CategorySelector is a different component and stays).
 
-## Phase 3 goal
+## The one real decision in 2.2
 
-Step 3 and 4 still ask five hardcoded sets of questions driven by a `category: string` and long `switch` chains. A review of a course, game, service or professional is rendered with product wording. Phase 3 replaces the hardcoded branching with a declarative questionnaire config keyed by canonical entity type, and introduces the honest `generic` kind that 2.1 deferred.
+Your roadmap says the free-text-only path is removed *only once creation covers every type* — and creation coverage is Phase 2.4 (dish-under-place). So a hard block today would trap anyone whose subject isn't in the database yet.
 
-No database changes. No wizard-step count change. Persistence shape stays exactly as 2.1 left it.
+So 2.2 makes the subject **required by default with one deliberate, tracked escape hatch**, not an equal-weight "Skip for now" button:
+
+- The neutral ghost "Skip for now" button is gone.
+- In its place, an underlined text link "I can't find what I'm reviewing" that only appears **after a search has run and returned no results** — never as a default first-screen option.
+- Choosing it opens a short confirm: "Without a subject this review won't appear on any entity page or count toward its rating. Continue anyway?" → Continue / Keep searching.
+- Continuing logs `review_subject_skipped` exactly as today (no telemetry change) and proceeds to Step 3 unchanged.
+- A single constant `REQUIRE_REVIEW_SUBJECT` controls whether the escape hatch exists at all. Phase 2.4 flips it to hard-required once creation covers every type — a one-line change, no rewrite.
+
+Legacy and edit paths are untouched: an existing entity-less review stays fully readable and editable, and editing it never forces a subject.
 
 ## What changes for the user
 
-- A course review asks "Who teaches this?" instead of "Who makes this product?"; a service asks "Who provided it?"; a game asks "Who made it?"; a TV show asks "Who created it?".
-- Subjects whose type has no tailored questionnaire get neutral wording ("What is this?", "Who's behind it?") rather than product wording.
-- Location prompts and food tags appear only for types where they make sense, driven by config flags rather than `category === 'place' || category === 'food'`.
-- Everything else — rating rings, media, date, visibility, timeline, edit window — is untouched.
+- Creating a review: the subject step is now effectively mandatory; you must search and pick something.
+- If nothing matches, you get an honest explanation of what you lose before you continue without one.
+- Editing an old review with no subject: unchanged, no new blocking, and the "attach a subject" path still works and still logs `review_subject_attached_late`.
+- Entity-page reviews: unchanged — the subject is pre-filled and locked as it is today.
 
 ## Technical plan
 
-**3.1 Questionnaire config module** (`src/components/profile/reviews/questionnaireConfig.ts`, plain TS, no React)
-- `QuestionnaireKind = LegacyReviewCategory | 'generic'`.
-- One record per canonical entity type → `{ kind, titleLabel, titlePlaceholder, secondaryLabel, secondaryPlaceholder, emoji, showLocation, showFoodTags, showVenueAsAddress }`, exhaustive over `CanonicalEntityType` so a 16th type cannot compile without a config entry.
-- `resolveQuestionnaire(canonicalType | legacyValue): QuestionnaireConfig` — canonical types resolve directly; the five legacy bucket values resolve to their existing config so old reviews render exactly as today; anything unresolved resolves to `generic`, replacing the current product-shaped fallback.
+**2.2.1 Subject requirement in `ReviewForm.tsx`**
+- Add `REQUIRE_REVIEW_SUBJECT` (module constant, documented as the 2.4 flip point).
+- Replace `handleSubjectSkip` with `handleSubjectSkipConfirmed`, called only from the confirm dialog; it keeps the existing `logFunnel({ event: 'review_subject_skipped' })` call and `handleNext()`.
+- `isNextDisabled()` case 2 stays `!selectedSubject`.
+- Guard submit: for a **new, non-edit** review, if `REQUIRE_REVIEW_SUBJECT` is on and there is neither a `selectedSubject` nor an acknowledged skip, block submit with a toast pointing back to Step 2. This closes the step-indicator route around Step 2 (`handleStepClick` allows jumping to completed steps).
+- `handleStepClick` may not mark Step 2 complete unless a subject is selected or the skip was acknowledged.
 
-**3.2 Wire Step 3**
-- `StepThree.tsx` takes a `questionnaire: QuestionnaireConfig` prop instead of branching on `category`. All five `switch(category)` blocks and the inline emoji/placeholder ternaries are deleted and read from config.
-- `isLocationRelevantCategory` becomes `questionnaire.showLocation`; food-tag rendering becomes `questionnaire.showFoodTags`; the venue-vs-address handling becomes `questionnaire.showVenueAsAddress`.
-- Google Places selection behaviour and the food "restaurant name into venue" rule are preserved, just expressed through the flags.
+**2.2.2 `SubjectSelectStep.tsx`**
+- Drop the always-visible ghost "Skip for now"; add the conditional "I can't find what I'm reviewing" link, shown only when a search has completed with zero results (needs the step to expose a `hasSearchedWithNoResults` signal from the selector's result state, which it already renders an empty state for).
+- Add the confirm dialog (existing `AlertDialog` primitive) with the consequence copy above.
+- Copy stays consistent with project terminology — "experience"/"recommending", no "post".
 
-**3.3 Wire Step 4 and ReviewForm**
-- `StepFour.tsx` and `ReviewForm.tsx` header copy (`Tell us about your ${category}`) use the config label.
-- `ReviewForm` keeps its existing state; the questionnaire is derived from the subject's canonical type when there is one, otherwise from the loaded legacy category. Validation messages come from the config labels instead of interpolating the raw category string.
-- Save path unchanged: `persistedCategory` logic from 2.1 stays byte-identical.
+**2.2.3 Dead-code removal**
+- Delete `src/components/profile/reviews/steps/StepTwo.tsx` and `src/components/profile/reviews/CategorySelector.tsx`.
+- Confirm zero remaining references before deleting; the admin `CategorySelector` is untouched.
 
-**3.4 Dead-code removal**
-- Delete `steps/StepTwo.tsx` and `reviews/CategorySelector.tsx` (review-flow one only; the admin component stays).
-
-**3.5 Tests**
-- Every canonical type resolves to a config; no type falls through to `product` implicitly.
-- The five legacy values resolve to configs identical to today's rendering (regression guard).
-- Unknown/null resolves to `generic`, never `product`.
-- `showFoodTags` is true only for `food`; `showLocation` only for the location-relevant types.
-- Existing `subjectSelection` and parity suites must stay green; new test registered in `vitest.config.ts`.
+**2.2.4 Tests** (new `src/components/profile/reviews/__tests__/subjectRequirement.test.ts`, registered in `vitest.config.ts`)
+- Pure helper extracted for the rule (`canSubmitReview({ isEditMode, selectedSubject, skipAcknowledged, requireSubject })`) so it's testable without rendering:
+  - new review + no subject + no acknowledgement → blocked.
+  - new review + subject → allowed.
+  - new review + acknowledged skip → allowed while the flag permits it; blocked when the flag is flipped to hard-required.
+  - edit mode + entity-less legacy review → always allowed.
+  - entity-page origin → allowed.
+- Existing `subjectSelection` and parity suites must stay green.
 
 Verification: full Vitest run, `tsgo --noEmit`, and a clean build log before reporting.
 
-## Out of scope
+## Out of scope (stays on the roadmap)
 
-Required subjects, dish/offering creation, collapsing Step 1 and 2, `reviews.category` backfill or `NOT NULL`, new questionnaire *fields* (only labels/visibility are config-driven here), recommendation categories, and any Supabase migration.
+- 2.3 parent-aware slug DB migration, incl. whether hierarchical slugs apply to any `parent_id` or only registered offering pairs.
+- 2.4 lightweight dish-under-place creation, and the flip to hard-required.
+- 2.5 wizard collapse and removal of now-redundant Step 3 fields.
+- Config-driven questionnaires / `generic` questionnaire kind (Phase 3).
+- V4 `?tab=children` deep-link (separate Phase 1 polish patch).
+- Any Supabase migration, backfill, or `entity_id NOT NULL`.
