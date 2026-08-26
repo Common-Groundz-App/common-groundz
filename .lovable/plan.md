@@ -43,7 +43,7 @@ subject.type ──parse──► canonicalType     → persisted as reviews.cat
 
 ### Backend consumer audit (Codex was right — two real consumers)
 Confirmed by reading the functions:
-1. `supabase/functions/calculate-lifestyle-similarity/index.ts` builds a cosine-similarity vector over raw `reviews.category` values (mixed with `user_stuff.category`). With 15 values, a course reviewer and a product reviewer stop overlapping. **Decision for this phase: bucket before comparing.** The function maps each review category through the same canonical → five-bucket mapping before building the vector, so similarity behaviour is unchanged by 2.1. Making similarity type-granular becomes an intentional, separately tested change later (it belongs with the similarity work, not here).
+1. `supabase/functions/calculate-lifestyle-similarity/index.ts` builds a cosine-similarity vector over raw `reviews.category` values (mixed with `user_stuff.category`). With 15 values, a course reviewer and a product reviewer stop overlapping. **Decision for this phase: bucket before comparing.** Correction accepted from Codex: the normalizer is applied to **both** sources — every `reviews.category` *and* every `user_stuff.category` — before any vector dimension is created, so the two never occupy inconsistent dimensions. The normalizer is **idempotent** (`product → product`, `course → product`, `tv_show → movie`, `movie → movie`) and has explicit unknown handling: a value that is neither canonical nor one of the five buckets is dropped from the vector rather than folded into `product`. Similarity behaviour is therefore unchanged by 2.1; making it type-granular is a separate, separately tested change later.
 2. `supabase/functions/smart-assistant/index.ts` `searchReviewsSemantic` has a fallback `.in('category', detectedCategories)` fed by five-bucket keyword detection. New canonical categories would silently drop out of that fallback. **Fix: expand the detected buckets to their canonical members** (e.g. detected `product` → `['product','brand','service','professional','course','app','game','others']`, `movie` → `['movie','tv_show']`, `place` → `['place','experience','event']`) so the fallback keeps matching both old and new rows.
 3. Also checked and clear: `generate-embeddings`, `backfill-review-embeddings`, `generate-ai-summary`, `unified-search-v2`, `search-all` — none branch on review category. No SQL function filters reviews by category.
 
@@ -57,7 +57,13 @@ The earlier wording was wrong: a `_shared` Deno helper keeps the two edge functi
 
 ### Also in this phase (closing the 2.0 gaps)
 - `isNextDisabled()` gets `case 2: return !selectedSubject && !isEditMode && !isFromEntityPage` so Next is disabled without a subject and "Skip for now" becomes the only explicit way past it.
-- Telemetry via the existing `search_funnel_events` path, specific enough to justify 2.2: step-2 shown, subject selected (with canonical type), skip used (with query length and whether results were present), whether a subject was later attached in Step 3, and whether the review submitted.
+- **Telemetry — correction accepted from Codex.** The existing funnel path does *not* accept these events as-is; I confirmed it by reading `supabase/functions/log-search-funnel/index.ts`: `ALLOWED_EVENTS` is only `search_run | candidate_pick | review_opened | entity_created`, `ALLOWED_SOURCES` only `search | existing_match`, `ALLOWED_ENTITY_TYPES` is a legacy 8-value list (no `course`, `tv_show`, `event`, `service`, `professional`, `game`, `experience`, `others`), and `sanitizeDiagnostics` drops anything outside its allow-list. So the extension is explicit work in this phase:
+  - Add events `review_subject_step_shown`, `review_subject_selected`, `review_subject_skipped`, `review_subject_attached_late`, `review_submitted`.
+  - Add source `review_form`.
+  - Widen `ALLOWED_ENTITY_TYPES` to the 15 canonical types (keeping the legacy values already there so existing surfaces keep working).
+  - Add allow-listed diagnostics `hadResults` (boolean) and `queryLength` (clamped integer) — never the query itself; the existing hard rejection of `query|q|raw|text|prompt` keys stays untouched, and skip telemetry sends only length plus whether results were present.
+  - Client calls stay fire-and-forget: a rejected or failed telemetry write must never block or surface in the review flow.
+  - Deno tests cover each new event/source/entity type being accepted and a raw-text payload still being rejected with 400.
 
 ### Explicitly NOT in this phase
 No questionnaire redesign, no required subject, no dish creation, no slug/DB migration, no wizard collapse, no component deletions, no backfill of existing rows, no change to similarity granularity.
@@ -65,7 +71,7 @@ No questionnaire redesign, no required subject, no dish creation, no slug/DB mig
 ## Technical notes
 - Files touched: `ReviewForm.tsx` (state split, `subjectOrigin`, persistence, step-2 gating, telemetry), `subjectSelection.ts` (add strict `resolveQuestionnaireKind`), `SubjectSelectStep.tsx` (skip event), a new `supabase/functions/_shared/reviewCategoryBuckets.ts`, plus `calculate-lifestyle-similarity` and `smart-assistant` using it.
 - `getReviewCategory` inside `ReviewForm` is deleted in favour of the shared mapping, so there is one mapping table rather than two. `handleEntitySelect` (Step 3 fallback) sets both values and marks `subjectOrigin = 'user-selected'`; it is still removed in 2.5.
-- Guard: a stored category that cannot be resolved keeps its raw value on save. No coercion to `product`, none to `others`.
+- **Unresolvable-category fallback (ChatGPT's note) — deferred deliberately.** `resolveQuestionnaireKind` returns the five buckets and, for a value it cannot resolve, keeps rendering the current product-shaped questionnaire while preserving the raw stored category on save. Introducing a semantically honest `generic` kind means touching Steps 3/4 branching, which is exactly the questionnaire work Phase 3 owns, so it is recorded here as a Phase 3 cleanup rather than expanding 2.1. The code will carry a comment saying "unresolved, not classified as product" so the intent is not lost.
 
 ## Tests
 - New review with a `course`, `tv_show`, `brand`, `service`, `event`, `game`, `app`, `professional`, `others` subject persists that canonical type while `questionnaireKind` stays in the five buckets.
@@ -75,7 +81,9 @@ No questionnaire redesign, no required subject, no dish creation, no slug/DB mig
 - `resolveQuestionnaireKind`: canonical values, the five legacy values, and an unresolvable value (renders the product layout, save preserves the raw value).
 - **Parity contract test:** frontend mapping and the `_shared` Deno mirror assign all 15 canonical types to the same bucket; the bucket → canonical-members expansion is exactly the inverse; every canonical type appears in exactly one bucket.
 - Step 2 gating: Next disabled with no subject, enabled once selected, unaffected in edit/entity-page mode.
-- `bunx vitest run`, `tsgo --noEmit`, and Deno tests for the `_shared` mirror plus the two touched edge functions.
+- **Normalizer idempotence:** `normalize(normalize(x)) === normalize(x)` for all 15 canonical types and all five buckets; an unrecognised value is dropped, not bucketed as `product`; `user_stuff` categories go through the same normalizer as `reviews` categories.
+- **Telemetry allow-list:** each new review event, the `review_form` source, and the widened canonical entity types are accepted; a payload containing raw query text still returns 400; a rejected write leaves the review flow unaffected.
+- `bunx vitest run`, `tsgo --noEmit`, and Deno tests for the `_shared` mirror plus the three touched edge functions (`calculate-lifestyle-similarity`, `smart-assistant`, `log-search-funnel`).
 
 
 ## Manual acceptance
