@@ -70,9 +70,11 @@ No questionnaire redesign, no required subject, no dish creation, no slug/DB mig
 - `bunx vitest run`, `tsgo --noEmit`, and the Deno tests for the shared helper.
 
 ## Manual acceptance
-1. Review a course → saved review badge reads "Course", questions are the product ones.
-2. Review a TV show → badge "TV Show"; a movie still reads "Movie".
-3. Review a food entity → dish name + food tags behave exactly as before.
-4. Step 2 with nothing selected → Next greyed out, "Skip for now" works and the review still submits.
-5. Open an old review in edit mode → same questions, same badge after saving.
-6. `/create` composer unchanged.
+1. Review a course → saved badge reads "Course"; the questions are still the product ones (expected until Phase 3).
+2. Review a TV show → badge "TV Show"; a movie still reads "Movie"; an event reads "Event".
+3. Review a food entity → dish name, venue from the parent place, and food tags behave exactly as before.
+4. Step 2 with nothing selected → Next greyed out, "Skip for now" advances and the review still submits.
+5. Open an old review and save without touching the subject → same questions, same badge, category unchanged in the database.
+6. Open an old review and deliberately change the subject → badge updates to the new type.
+7. `/create` composer unchanged.
+
