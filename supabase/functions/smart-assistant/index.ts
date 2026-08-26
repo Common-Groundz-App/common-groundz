@@ -10,6 +10,7 @@ import {
   getCategoryFromToken,
   getCategoryFromSynonym
 } from "./discovery-config.ts";
+import { expandBucketsToCanonical } from "../_shared/reviewCategoryBuckets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1168,16 +1169,21 @@ async function searchReviewsSemantic(
       searchSource = 'category_fallback';
       
       const detectedCategories = detectCategoryFromQuery(query);
-      console.log('[searchReviewsSemantic] Detected categories:', detectedCategories);
+      // Phase 2.1: `reviews.category` now stores canonical entity types, so a
+      // detected bucket must be expanded to its canonical members or newly
+      // saved reviews (course, game, tv_show, ...) drop out of this fallback.
+      const searchableCategories = expandBucketsToCanonical(detectedCategories);
+      console.log('[searchReviewsSemantic] Detected categories:', detectedCategories, '→', searchableCategories);
 
-      if (detectedCategories.length > 0) {
+      if (searchableCategories.length > 0) {
         const { data: categoryResults, error: categoryError } = await supabaseClient
           .from('reviews')
           .select(`
             id, title, description, rating, category, venue, user_id, entity_id, created_at,
             entities!inner(id, name, type, slug, description, venue)
           `)
-          .in('category', detectedCategories)
+          .in('category', searchableCategories)
+
           .order('rating', { ascending: false })
           .limit(limit);
 

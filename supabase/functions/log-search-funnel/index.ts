@@ -18,17 +18,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ALLOWED_EVENTS = new Set([
-  "search_run",
-  "candidate_pick",
-  "review_opened",
-  "entity_created",
-]);
-const ALLOWED_SOURCES = new Set(["search", "existing_match"]);
-const FORBIDDEN_PAYLOAD_KEYS = ["query", "q", "raw", "text", "prompt"];
-const ALLOWED_ENTITY_TYPES = new Set([
-  "product", "brand", "place", "book", "movie", "food", "app", "tv",
-]);
+import {
+  ALLOWED_ENTITY_TYPES,
+  ALLOWED_EVENTS,
+  ALLOWED_SOURCES,
+  clampQueryLength,
+  FORBIDDEN_PAYLOAD_KEYS,
+} from "./allowlists.ts";
+
 
 // Best-effort in-memory rate limit — 300 events/hour/user. Never blocks writes
 // hard; on limit we return 200 with `throttled: true` so client stays quiet.
@@ -91,6 +88,11 @@ function sanitizeDiagnostics(input: unknown): Record<string, unknown> {
   }
   if (typeof src.cached === "boolean") out.cached = src.cached;
   if (typeof src.hasImage === "boolean") out.hasImage = src.hasImage;
+  // Phase 2.1 — review subject step. `queryLength` is a LENGTH, never the query.
+  if (typeof src.hadResults === "boolean") out.hadResults = src.hadResults;
+  const queryLength = clampQueryLength(src.queryLength);
+  if (queryLength !== null) out.queryLength = queryLength;
+
   const diff = sanitizeDiff(src.diff);
   if (diff) out.diff = diff;
   return out;
