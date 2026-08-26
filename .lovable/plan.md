@@ -57,7 +57,13 @@ The earlier wording was wrong: a `_shared` Deno helper keeps the two edge functi
 
 ### Also in this phase (closing the 2.0 gaps)
 - `isNextDisabled()` gets `case 2: return !selectedSubject && !isEditMode && !isFromEntityPage` so Next is disabled without a subject and "Skip for now" becomes the only explicit way past it.
-- Telemetry via the existing `search_funnel_events` path, specific enough to justify 2.2: step-2 shown, subject selected (with canonical type), skip used (with query length and whether results were present), whether a subject was later attached in Step 3, and whether the review submitted.
+- **Telemetry — correction accepted from Codex.** The existing funnel path does *not* accept these events as-is; I confirmed it by reading `supabase/functions/log-search-funnel/index.ts`: `ALLOWED_EVENTS` is only `search_run | candidate_pick | review_opened | entity_created`, `ALLOWED_SOURCES` only `search | existing_match`, `ALLOWED_ENTITY_TYPES` is a legacy 8-value list (no `course`, `tv_show`, `event`, `service`, `professional`, `game`, `experience`, `others`), and `sanitizeDiagnostics` drops anything outside its allow-list. So the extension is explicit work in this phase:
+  - Add events `review_subject_step_shown`, `review_subject_selected`, `review_subject_skipped`, `review_subject_attached_late`, `review_submitted`.
+  - Add source `review_form`.
+  - Widen `ALLOWED_ENTITY_TYPES` to the 15 canonical types (keeping the legacy values already there so existing surfaces keep working).
+  - Add allow-listed diagnostics `hadResults` (boolean) and `queryLength` (clamped integer) — never the query itself; the existing hard rejection of `query|q|raw|text|prompt` keys stays untouched, and skip telemetry sends only length plus whether results were present.
+  - Client calls stay fire-and-forget: a rejected or failed telemetry write must never block or surface in the review flow.
+  - Deno tests cover each new event/source/entity type being accepted and a raw-text payload still being rejected with 400.
 
 ### Explicitly NOT in this phase
 No questionnaire redesign, no required subject, no dish creation, no slug/DB migration, no wizard collapse, no component deletions, no backfill of existing rows, no change to similarity granularity.
