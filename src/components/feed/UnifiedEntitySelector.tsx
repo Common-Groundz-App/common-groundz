@@ -395,9 +395,10 @@ export function UnifiedEntitySelector({
       if (isMaxReached) return;
       if (pickActive()) return;
       // No pickable results and query >= 3 chars → open create dialog
-      if (searchQuery.trim().length >= 3 && !hasAnyResults) {
+      if (allowInlineCreate && searchQuery.trim().length >= 3 && !hasAnyResults) {
         setShowCreateDialog(true);
       }
+
     }
   };
 
