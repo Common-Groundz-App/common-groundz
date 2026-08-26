@@ -491,7 +491,7 @@ export function UnifiedEntitySelector({
         normalize(searchQuery).includes(normalize(e.name)),
     );
 
-  const showAddEntity = searchQuery.trim().length >= 3 && !isMaxReached;
+  const showAddEntity = allowInlineCreate && searchQuery.trim().length >= 3 && !isMaxReached;
 
   // Location toggle
   const showLocationToggle = places.length > 0 || searchQuery.length >= 2;
