@@ -241,8 +241,13 @@ export function UnifiedEntitySelector({
   // Select a local entity
   const handleEntitySelect = useCallback((entity: EntityAdapter) => {
     if (isMaxReached) return;
-    if (selectedEntities.some(e => e.id === entity.id)) return;
-    const newEntities = [...selectedEntities, entity];
+    // Subject mode: a pick REPLACES the current subject (single authoritative subject).
+    const newEntities = isSubjectMode
+      ? [entity]
+      : selectedEntities.some(e => e.id === entity.id)
+        ? null
+        : [...selectedEntities, entity];
+    if (!newEntities) return;
     setSelectedEntities(newEntities);
     onEntitiesChange(newEntities);
     addRecent(entity.name, 'entity', {
@@ -253,7 +258,7 @@ export function UnifiedEntitySelector({
     setSearchQuery('');
     setDebouncedQuery('');
     setShowResults(false);
-  }, [selectedEntities, isMaxReached, onEntitiesChange, searchQuery, addRecent]);
+  }, [selectedEntities, isMaxReached, isSubjectMode, onEntitiesChange, searchQuery, addRecent]);
 
   // Select an external result (find-or-create entity client-side, mirrors Explore search flow)
   const handleExternalSelect = useCallback(async (result: any) => {
@@ -264,7 +269,9 @@ export function UnifiedEntitySelector({
     if (!result.api_source || !result.api_ref) {
       toast({
         title: 'Could not add this result',
-        description: 'Try the "Add as new entity" option instead.',
+        description: allowInlineCreate
+          ? 'Try the "Add as new entity" option instead.'
+          : 'Try searching for it by name instead.',
         variant: 'destructive',
       });
       return;
@@ -273,13 +280,26 @@ export function UnifiedEntitySelector({
     isCreatingRef.current = true;
     setIsCreatingEntity(true);
     try {
-      const normalizedType = normalizeEntityType(result.type, result.api_source);
+      // `others` is a REAL canonical type, never an "unknown" bucket. In
+      // existing-only mode an unparseable external type is simply not selectable
+      // (nothing is created here, so nothing unparseable can be persisted).
+      const normalizedType =
+        externalResultPolicy === 'existingOnly'
+          ? parseEntityTypeAtBoundary(result.type)
+          : normalizeEntityType(result.type, result.api_source);
 
       // Step 1: Dedupe — check if this external entity already exists locally
       let entity = await findEntityByApiRef(result.api_source, result.api_ref);
 
-      // Step 2: Create if not found
+      // Step 2: Create if not found — unless this surface is existing-only.
       if (!entity) {
+        if (externalResultPolicy === 'existingOnly') {
+          toast({
+            title: "We can't add this one yet",
+            description: 'Only things already on Groundz can be picked here for now.',
+          });
+          return;
+        }
         entity = await createEntityQuick(
           {
             name: result.name,
@@ -290,9 +310,10 @@ export function UnifiedEntitySelector({
             api_ref: result.api_ref,
             metadata: result.metadata || {},
           },
-          normalizedType
+          normalizedType as string
         );
       }
+
 
       if (!entity) throw new Error('Entity creation returned null');
 
