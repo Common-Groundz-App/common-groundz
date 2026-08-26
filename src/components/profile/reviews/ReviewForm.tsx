@@ -772,10 +772,13 @@ const ReviewForm = ({
               )}
               
               {currentStep === 2 && (
-                <StepTwo 
-                  category={category} 
-                  onChange={handleCategoryChange}
-                  disableCategoryChange={isFromEntityPage} // Pass this prop to disable category change
+                <SubjectSelectStep
+                  subject={selectedSubject}
+                  onSubjectChange={handleSubjectChange}
+                  disabled={isFromEntityPage}
+                  onSkip={handleNext}
+                  contextLine={subjectContextLine}
+                  isResolvingContext={isResolvingSubjectContext}
                 />
               )}
               
@@ -793,10 +796,13 @@ const ReviewForm = ({
                   onMediaAdd={handleAddMedia}
                    onMediaRemove={handleRemoveMedia}
                    isUploading={isUploading}
-                   disableEntityChange={isFromEntityPage}
-                   disableEntityFields={isFromEntityPage}
+                   {/* A Step 2 subject is authoritative: Step 3 must not replace it
+                       or edit its identity. Venue and media stay editable. */}
+                   disableEntityChange={isFromEntityPage || !!selectedSubject}
+                   disableEntityFields={isFromEntityPage || !!selectedSubject}
                 />
               )}
+
               
               {currentStep === 4 && (
                 <StepFour 
