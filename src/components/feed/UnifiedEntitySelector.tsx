@@ -124,8 +124,16 @@ export function UnifiedEntitySelector({
   autoFocusSearch = false,
   maxEntities = 3,
   variant = 'inline',
+  mode = 'tag',
+  recentsSurface = 'composer',
+  allowInlineCreate = true,
+  externalResultPolicy = 'createIfMissing',
 }: UnifiedEntitySelectorProps) {
   const isModal = variant === 'modal';
+  const isSubjectMode = mode === 'subject';
+  // Subject mode is single-select by definition, whatever the caller passes.
+  const effectiveMaxEntities = isSubjectMode ? 1 : maxEntities;
+
   const [selectedEntities, setSelectedEntities] = useState<EntityAdapter[]>(initialEntities);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [debouncedQuery, setDebouncedQuery] = useState(initialQuery);
