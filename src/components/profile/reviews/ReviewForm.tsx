@@ -128,6 +128,16 @@ const ReviewForm = ({
   
   // Flag to determine if the form was opened from an entity page
   const isFromEntityPage = !!entity && !isEditMode;
+
+  // Step 2 subject (Phase 2.0). Pre-filled when opened from an entity page.
+  const [selectedSubject, setSelectedSubject] = useState<EntityAdapter | null>(
+    entity ? { id: entity.id, name: entity.name, type: entity.type, venue: entity.venue, image_url: entity.image_url, description: entity.description, metadata: entity.metadata } : null
+  );
+  const [subjectContextLine, setSubjectContextLine] = useState<string | null>(null);
+  const [isResolvingSubjectContext, setIsResolvingSubjectContext] = useState(false);
+  // Guards against a slow parent lookup overwriting a newer subject.
+  const subjectRequestRef = React.useRef(0);
+
   
   const [experienceDate, setExperienceDate] = useState<Date | undefined>(
     review?.experience_date ? new Date(review.experience_date) : undefined
