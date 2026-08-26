@@ -7,12 +7,54 @@
  * This module is pure and unit-tested; no React, no network.
  */
 import {
+  parseEntityType,
   parseEntityTypeAtBoundary,
   type CanonicalEntityType,
 } from '@/services/entityType';
 
 /** Legacy review categories understood by Steps 3/4 and reviewService. */
 export type LegacyReviewCategory = 'food' | 'movie' | 'book' | 'place' | 'product';
+
+export const LEGACY_REVIEW_CATEGORIES: readonly LegacyReviewCategory[] = [
+  'food',
+  'movie',
+  'book',
+  'place',
+  'product',
+];
+
+function isLegacyReviewCategory(value: string): value is LegacyReviewCategory {
+  return (LEGACY_REVIEW_CATEGORIES as readonly string[]).includes(value);
+}
+
+/**
+ * Resolve which questionnaire (Steps 3/4 UI) applies to a stored category.
+ *
+ * Accepts both the five legacy review values and the 15 canonical entity types.
+ * Uses the STRICT parsers from `entityType.ts` — never `getCanonicalType`, which
+ * is display-oriented and silently falls back to `Others`.
+ *
+ * Returns `null` when the value cannot be resolved. Callers must then keep the
+ * raw stored value on save and only pick a rendering fallback.
+ *
+ * NOTE (Phase 3 cleanup): an unresolved value currently renders the
+ * product-shaped questionnaire. That is a rendering fallback only — the value is
+ * "unresolved", it is NOT classified as a product. A semantically honest
+ * `generic` questionnaire kind arrives with the questionnaire registry in
+ * Phase 3, which is where Steps 3/4 branching is redesigned.
+ */
+export function resolveQuestionnaireKind(
+  storedCategory: unknown,
+): LegacyReviewCategory | null {
+  if (typeof storedCategory !== 'string') return null;
+  const value = storedCategory.trim().toLowerCase();
+  if (!value) return null;
+  if (isLegacyReviewCategory(value)) return value;
+  const canonical = parseEntityType(value);
+  return canonical ? mapCanonicalToLegacyCategory(canonical) : null;
+}
+
+
 
 /**
  * Map a canonical entity type onto the legacy review category.

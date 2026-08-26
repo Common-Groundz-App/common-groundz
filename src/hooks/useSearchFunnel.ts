@@ -14,9 +14,15 @@ export type FunnelEvent =
   | 'search_run'
   | 'candidate_pick'
   | 'review_opened'
-  | 'entity_created';
+  | 'entity_created'
+  // Phase 2.1 — review subject selection (Step 2 of the review wizard).
+  | 'review_subject_step_shown'
+  | 'review_subject_selected'
+  | 'review_subject_skipped'
+  | 'review_subject_attached_late'
+  | 'review_submitted';
 
-export type FunnelSource = 'search' | 'existing_match';
+export type FunnelSource = 'search' | 'existing_match' | 'review_form';
 
 import type { SearchFinalizationDiff } from '@/components/admin/entity-create/searchTelemetryTypes';
 
@@ -31,10 +37,15 @@ export interface FunnelPayload {
     latencyMs?: number;
     cached?: boolean;
     hasImage?: boolean;
+    /** Whether the search that preceded this event had any results. */
+    hadResults?: boolean;
+    /** LENGTH of the query only — never the query text itself. */
+    queryLength?: number;
     /** Phase 3.5c v2 — booleans + approved enums only. */
     diff?: SearchFinalizationDiff;
   };
 }
+
 
 const CLIENT_TIMEOUT_MS = 1_500;
 

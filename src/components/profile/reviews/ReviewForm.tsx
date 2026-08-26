@@ -9,11 +9,17 @@ import { useRecommendationUploads } from '@/hooks/recommendations/use-recommenda
 import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
-import { getCanonicalType } from '@/services/entityTypeHelpers';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
+import { parseEntityType, type CanonicalEntityType } from '@/services/entityType';
 import { EntityAdapter } from '@/components/profile/circles/types';
-import { deriveSubjectPrefill } from './subjectSelection';
+import {
+  deriveSubjectPrefill,
+  mapCanonicalToLegacyCategory,
+  resolveQuestionnaireKind,
+  type LegacyReviewCategory,
+} from './subjectSelection';
 import { getParentEntity } from '@/services/entityHierarchyService';
+import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 
 // Import step components
 import StepOne from './steps/StepOne';
@@ -63,6 +69,8 @@ const ReviewForm = ({
   const { toast } = useToast();
   const { requireAuth } = useAuthPrompt();
   const { handleImageUpload } = useRecommendationUploads();
+  // Fire-and-forget funnel telemetry. Never blocks or toasts.
+  const { log: logFunnel } = useSearchFunnel();
   
   // Form state
   const [currentStep, setCurrentStep] = useState(1);
@@ -76,33 +84,40 @@ const ReviewForm = ({
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
-  // Helper function to map canonical entity type to review category
-  const getReviewCategory = (canonicalType: EntityType): string => {
-    switch (canonicalType) {
-      case EntityType.Food:
-      case EntityType.Movie:
-      case EntityType.TVShow:
-      case EntityType.Book:
-      case EntityType.Place:
-      case EntityType.Product:
-        return canonicalType.toLowerCase();
-      case EntityType.Course:
-      case EntityType.App:
-      case EntityType.Game:
-        return 'product';
-      case EntityType.Experience:
-        return 'place';
-      default:
-        return 'product';
-    }
-  };
+  /**
+   * Phase 2.1 — two separate ideas that used to share one `category` field:
+   *
+   *  - `category`          → questionnaire kind. One of the five legacy buckets.
+   *                          Drives Steps 3/4 UI ONLY. Unchanged behaviour.
+   *  - `canonicalCategory` → the real canonical entity type of the subject.
+   *                          This is what gets PERSISTED to `reviews.category`
+   *                          when the user deliberately chose the subject.
+   *
+   * `subjectOrigin` decides which one is written on save, so merely opening and
+   * re-saving an old review can never silently rewrite its stored category.
+   */
+  type SubjectOrigin = 'none' | 'loaded' | 'entity-page' | 'user-selected';
+
+  const initialCanonical = entity ? parseEntityType(entity.type) : null;
+
+  const [canonicalCategory, setCanonicalCategory] = useState<CanonicalEntityType | null>(
+    !isEditMode ? initialCanonical : null,
+  );
+  const [subjectOrigin, setSubjectOrigin] = useState<SubjectOrigin>(() => {
+    if (isEditMode && review) return 'loaded';
+    if (entity) return 'entity-page';
+    return 'none';
+  });
 
   // Form data
   const [rating, setRating] = useState(review?.rating || 0);
-  const [category, setCategory] = useState(
-    review?.category || 
-    (entity?.type ? getReviewCategory(getCanonicalType(entity.type)) : 'food')
+  // Questionnaire kind (five legacy buckets) — never persisted directly unless
+  // the review has no deliberately chosen subject.
+  const [category, setCategory] = useState<LegacyReviewCategory>(
+    resolveQuestionnaireKind(review?.category) ??
+    (initialCanonical ? mapCanonicalToLegacyCategory(initialCanonical) : 'food')
   );
+
   
   // Separate state variables for different fields
   const [foodName, setFoodName] = useState(''); // For "What did you eat?" in food category
@@ -203,8 +218,13 @@ const ReviewForm = ({
   // Ensure proper initialization when entity is provided
   useEffect(() => {
     if (entity && isOpen && !isEditMode) {
-      // Set initial values from entity using canonical type
-      setCategory(getReviewCategory(getCanonicalType(entity.type)));
+      // Set initial values from the entity. Strict parsing only: an unparseable
+      // type never becomes `product`/`others`.
+      const canonical = parseEntityType(entity.type);
+      setCanonicalCategory(canonical);
+      setSubjectOrigin('entity-page');
+      if (canonical) setCategory(mapCanonicalToLegacyCategory(canonical));
+
       
       // IMPORTANT: Handle the foodName vs contentName differently based on category
       if (entity.type.toLowerCase() === 'food') {
@@ -268,10 +288,17 @@ const ReviewForm = ({
     } else if (isEditMode && review) {
       // Update with new data structure - cleanly separate title and subtitle
       setRating(review.rating);
-      setCategory(review.category);
+      // The stored value may be a legacy bucket OR (post-2.1) a canonical type.
+      // Either way it only resolves the questionnaire kind here; the stored
+      // value itself is preserved on save unless the subject is changed.
+      const loadedKind = resolveQuestionnaireKind(review.category) ?? 'product';
+      setCategory(loadedKind);
+      setCanonicalCategory(null);
+      setSubjectOrigin('loaded');
       
       // For food category, use the main title field for the food name
-      if (review.category === 'food') {
+      if (loadedKind === 'food') {
+
         setFoodName(review.title || '');
         setContentName(''); // Clear the other category field
       } else {
@@ -303,34 +330,12 @@ const ReviewForm = ({
     }
   }, [isOpen, review, isEditMode]);
   
-  // Handle category changes
-  const handleCategoryChange = (newCategory: string) => {
-    // Only clear category-specific data when changing categories
-    if (newCategory !== category) {
-      // Clear category-specific fields
-      setFoodName('');
-      setContentName('');
-      setSelectedEntity(null);
-      setEntityId('');
-      setVenue('');
-      setFoodTags([]);
-      
-      // Keep general fields intact
-      // - Keep rating (step 1)
-      // - Keep reviewTitle (for subtitle)
-      // - Keep description
-      // - Keep selectedMedia (photos/videos)
-      // - Keep experienceDate
-      // - Keep visibility settings
-      
-      // Set the new category
-      setCategory(newCategory);
-    }
-  };
-  
   const resetForm = () => {
     setRating(0);
     setCategory('food');
+    setCanonicalCategory(null);
+    setSubjectOrigin('none');
+
     setReviewTitle('');
     setFoodName('');
     setContentName('');
@@ -425,6 +430,8 @@ const ReviewForm = ({
       setEntityId('');
       setSubjectContextLine(null);
       setIsResolvingSubjectContext(false);
+      setCanonicalCategory(null);
+      setSubjectOrigin(isEditMode ? 'loaded' : 'none');
       return;
     }
 
@@ -441,11 +448,21 @@ const ReviewForm = ({
 
     setSelectedSubject(subject);
     setCategory(prefill.category);
+    // The canonical type is what will be persisted, because the user picked it.
+    setCanonicalCategory(prefill.canonicalType);
+    setSubjectOrigin('user-selected');
     setEntityId(subject.id);
     setSelectedEntity({
       ...(subject as any),
       type: prefill.canonicalType as unknown as EntityType,
     } as RecommendationEntity);
+
+    logFunnel({
+      event: isEditMode ? 'review_subject_attached_late' : 'review_subject_selected',
+      source: 'review_form',
+      entityType: prefill.canonicalType,
+    });
+
 
     // Step 3 fields come from the subject, not from the previous category.
     setFoodName(prefill.foodName);
@@ -634,6 +651,22 @@ const ReviewForm = ({
       // For food category: always use foodName as the main title
       // For other categories: use contentName as the main title
       const finalTitle = category === 'food' ? foodName : contentName;
+
+      /**
+       * Phase 2.1 — what actually gets written to `reviews.category`:
+       *  - the canonical entity type, when the user deliberately chose the
+       *    subject (search pick, or opening the form from an entity page);
+       *  - otherwise the previously stored raw value, untouched, so opening and
+       *    re-saving an old review never rewrites its category;
+       *  - otherwise the questionnaire bucket (subject-less new review).
+       */
+      const canonicalWins =
+        subjectOrigin === 'user-selected' || (subjectOrigin === 'entity-page' && !isEditMode);
+      const persistedCategory =
+        canonicalWins && canonicalCategory
+          ? canonicalCategory
+          : (isEditMode && review?.category ? review.category : category);
+
       
       if (isEditMode && review) {
         await updateReview(review.id, {
@@ -644,7 +677,7 @@ const ReviewForm = ({
           rating,
           image_url,
           media: selectedMedia,
-          category,
+          category: persistedCategory,
           visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
           entity_id: entityId,
           experience_date: formattedExperienceDate,
@@ -663,7 +696,7 @@ const ReviewForm = ({
           rating,
           image_url,
           media: selectedMedia,
-          category,
+          category: persistedCategory,
           visibility: visibility as "public" | "private" | "circle_only", // Match what the API expects
           entity_id: entityId,
           experience_date: formattedExperienceDate,
@@ -676,6 +709,11 @@ const ReviewForm = ({
         });
         resetForm();
       }
+      logFunnel({
+        event: 'review_submitted',
+        source: 'review_form',
+        entityType: canonicalWins && canonicalCategory ? canonicalCategory : undefined,
+      });
       await onSubmit();
       setHasUnsavedChanges(false);
       onClose();
@@ -691,18 +729,36 @@ const ReviewForm = ({
     }
   };
   
+  // Fires once per time the subject step becomes visible.
+  useEffect(() => {
+    if (isOpen && currentStep === 2) {
+      logFunnel({ event: 'review_subject_step_shown', source: 'review_form' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, currentStep]);
+
+  // Explicit skip of subject selection — logged so we can see how often people
+  // review something we can't link yet.
+  const handleSubjectSkip = () => {
+    logFunnel({ event: 'review_subject_skipped', source: 'review_form' });
+    handleNext();
+  };
+
   // Determine if the next button should be disabled
   const isNextDisabled = () => {
     if (isSubmitting) return true;
     
     switch (currentStep) {
       case 1: return rating === 0;
+      // Step 2: Next requires a subject. Users without one use "Skip for now".
+      case 2: return !selectedSubject;
       case 3: 
         if (category === 'food') return !foodName;
         return !contentName;
       default: return false;
     }
   };
+
   
   // Get dialog title based on current step
   const getDialogTitle = () => {
@@ -776,7 +832,7 @@ const ReviewForm = ({
                   subject={selectedSubject}
                   onSubjectChange={handleSubjectChange}
                   disabled={isFromEntityPage}
-                  onSkip={handleNext}
+                  onSkip={handleSubjectSkip}
                   contextLine={subjectContextLine}
                   isResolvingContext={isResolvingSubjectContext}
                 />

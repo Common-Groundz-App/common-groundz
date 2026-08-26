@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeToReviewBucket } from "../_shared/reviewCategoryBuckets.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -396,21 +397,31 @@ async function calculateCategoryPreferences(
     supabaseClient.from('user_stuff').select('category').eq('user_id', userBId)
   ]);
 
-  // Build category vectors
+  // Build category vectors.
+  //
+  // Phase 2.1: `reviews.category` now stores canonical entity types (course,
+  // tv_show, brand, ...) while `user_stuff.category` may hold either shape.
+  // BOTH sources are normalized to the same five buckets before any dimension
+  // is created, so they can never occupy inconsistent dimensions and similarity
+  // behaves exactly as it did before 2.1. Values that resolve to nothing are
+  // dropped rather than folded into `product`.
   const categoriesA: Record<string, number> = {};
   const categoriesB: Record<string, number> = {};
 
   [...(reviewsA.data || []), ...(stuffA.data || [])].forEach((item: any) => {
-    if (item.category) {
-      categoriesA[item.category] = (categoriesA[item.category] || 0) + 1;
+    const bucket = normalizeToReviewBucket(item?.category);
+    if (bucket) {
+      categoriesA[bucket] = (categoriesA[bucket] || 0) + 1;
     }
   });
 
   [...(reviewsB.data || []), ...(stuffB.data || [])].forEach((item: any) => {
-    if (item.category) {
-      categoriesB[item.category] = (categoriesB[item.category] || 0) + 1;
+    const bucket = normalizeToReviewBucket(item?.category);
+    if (bucket) {
+      categoriesB[bucket] = (categoriesB[bucket] || 0) + 1;
     }
   });
+
 
   // Normalize vectors
   const totalA = Object.values(categoriesA).reduce((a, b) => a + b, 0) || 1;
