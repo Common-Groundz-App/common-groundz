@@ -1,76 +1,60 @@
-# Phase 2.2 — Subject required for new reviews (+ 2.1 dead-code cleanup)
+# Roadmap reorder + Phase 2.2 — Parent-aware slug foundation
 
-You're right: Phase 3 (config-driven questionnaires) is a later item. The roadmap order is 2.2 next, and the config work only makes sense after subjects are reliable. This plan follows the roadmap.
+## I agree with Codex, and the database confirms it
 
-## Phase 2.1 verification: complete
+I checked the actual slug functions rather than taking either of us on trust. The findings are worse than the discussion assumed:
 
-Verified in code, not assumed:
+- `generate_entity_slug_on_insert` (the BEFORE-INSERT trigger) calls the **one-argument** `generate_entity_slug(name)`, which has **no parent awareness at all**. Every newly inserted child gets a flat slug.
+- There are **two overloads** of `generate_entity_slug`. Only the two-argument one is parent-aware, and it hardcodes `parent_type = 'brand' AND current_type = 'product'` — so `place → food` is excluded in SQL even though the TypeScript registry allows it.
+- The two-argument overload resolves `parent_id` by **looking the row up by id**, which cannot work during a BEFORE INSERT (the row isn't there yet). It is effectively an after-the-fact repair function, not a creation rule.
+- Result today: creating "Classic Burger" under Truffles yields `classic-burger`; a second one under Joe's Burgers yields `classic-burger-1`. Meaningless URLs, and `fix_duplicate_slugs` would then try to strip that `-1` suffix and collide.
+- Only `setEntityParent` (`entityHierarchyService.ts:216`) uses the correct `buildHierarchicalSlug`. No client creation path uses it — `enhancedEntityService`, `entityCreationService`, `entityProductService`, `recommendation/entityOperations`, and the admin `CreateEntityDialog` all rely on the flat trigger.
 
-- `subjectSelection.ts` exports `resolveQuestionnaireKind`, `mapCanonicalToLegacyCategory`, `deriveSubjectPrefill`.
-- `ReviewForm.tsx` separates questionnaire kind from the persisted canonical category, and `subjectOrigin` decides which is written — reopening and re-saving an old review cannot rewrite its stored category.
-- `_shared/reviewCategoryBuckets.ts` exists with idempotent normalization, reverse expansion, null-on-unknown; parity enforced by `reviewCategoryBucketParity.test.ts`.
-- Telemetry allowlists extracted to `log-search-funnel/allowlists.ts`; only `hadResults` and clamped `queryLength` accepted.
-- Step 2 Next is already disabled without a subject; `review_subject_step_shown/selected/skipped/attached_late` all fire.
-- `getReviewCategory` no longer exists anywhere — already retired.
-- Suite green: 27 files / 358 tests. Build log: `build OK`.
+So enforcing required subjects now would be building on sand, and Codex's reorder is right.
 
-Deferred leftover, cleaned up in this phase: `steps/StepTwo.tsx` and `reviews/CategorySelector.tsx` are unreferenced by the review flow (StepTwo is the only consumer of that CategorySelector; the admin CategorySelector is a different component and stays).
+## On your entity-creation question
 
-## The one real decision in 2.2
+Reuse the existing creation engine; do not build a second one. But do not embed the full admin dialog in the review form either — a reviewer adding a burger should not fill in website, contact, images and taxonomy. The split: **one shared creation service and one shared slug/duplicate rule, two UIs** (full in Explore/Admin, minimal in the review form). That work is Phase 2.3, and it depends on 2.2 landing first.
 
-Your roadmap says the free-text-only path is removed *only once creation covers every type* — and creation coverage is Phase 2.4 (dish-under-place). So a hard block today would trap anyone whose subject isn't in the database yet.
+## New roadmap
 
-So 2.2 makes the subject **required by default with one deliberate, tracked escape hatch**, not an equal-weight "Skip for now" button:
+| Phase | Scope |
+|---|---|
+| 2.2 (next) | Parent-aware hierarchical slugs — DB + shared client rule. No visible UX change. |
+| 2.3 | Shared creation contract + lightweight "Add something new" in the review form, incl. dish-under-place. |
+| 2.4 | Subject required for new reviews; remove "Skip for now". |
+| 2.5 | Wizard simplification; delete `StepTwo.tsx`, `CategorySelector.tsx`, redundant Step 3 fields. |
+| separate | V4 `?tab=children` deep-link (Phase 1 polish). |
 
-- The neutral ghost "Skip for now" button is gone.
-- In its place, an underlined text link "I can't find what I'm reviewing" that only appears **after a search has run and returned no results** — never as a default first-screen option.
-- Choosing it opens a short confirm: "Without a subject this review won't appear on any entity page or count toward its rating. Continue anyway?" → Continue / Keep searching.
-- Continuing logs `review_subject_skipped` exactly as today (no telemetry change) and proceeds to Step 3 unchanged.
-- A single constant `REQUIRE_REVIEW_SUBJECT` controls whether the escape hatch exists at all. Phase 2.4 flips it to hard-required once creation covers every type — a one-line change, no rewrite.
+`StepTwo.tsx` and `CategorySelector.tsx` stay untouched until 2.5 — they are unreferenced by the review flow but deleting them mid-sequence buys nothing and loses a rollback path.
 
-Legacy and edit paths are untouched: an existing entity-less review stays fully readable and editable, and editing it never forces a subject.
+## Phase 2.2 scope
 
-## What changes for the user
+**Rule: Option A — hierarchical slug for every entity with a `parent_id`.** `parent_id` is a generic edge; duplicating the TypeScript offering registry in SQL would need a migration per new pair, which Phase 0 explicitly ruled against. Any parent qualifies its child's slug.
 
-- Creating a review: the subject step is now effectively mandatory; you must search and pick something.
-- If nothing matches, you get an honest explanation of what you lose before you continue without one.
-- Editing an old review with no subject: unchanged, no new blocking, and the "attach a subject" path still works and still logs `review_subject_attached_late`.
-- Entity-page reviews: unchanged — the subject is pre-filled and locked as it is today.
+**Migration**
+- Drop the confusing one-argument `generate_entity_slug(name)` overload after repointing its callers, so a single function owns the rule.
+- Make the parent-aware function take the parent id explicitly instead of re-reading the row, and remove the `brand`/`product` hardcoding: any non-null parent with a non-empty slug qualifies.
+- Rewrite `generate_entity_slug_on_insert` to pass `NEW.parent_id`, so a parented insert behaves exactly like create-then-reparent. Existing behaviour preserved: a caller-supplied non-empty `slug` is still respected untouched.
+- Keep the existing collision loop and the `entity_slug_history` check, so old URLs still resolve and a genuine duplicate under the same parent gets a deterministic `-2`.
+- Fix `fix_duplicate_slugs`: it currently strips `-N` suffixes using the non-parent-aware path and could reintroduce collisions. Restrict it to entities without a parent, or route it through the parent-aware function.
+- **No backfill of existing rows.** Existing slugs keep resolving; renaming child URLs retroactively would churn indexed URLs for no user benefit.
 
-## Technical plan
+**Client**
+- Route every creation path (`enhancedEntityService`, `entityCreationService`, `entityProductService`, `recommendation/entityOperations`, admin `CreateEntityDialog`) through a single helper that, when a `parent_id` is supplied, either uses `buildHierarchicalSlug` or leaves `slug` empty and lets the now-correct trigger own it. One rule, one place — the goal is that no creation path can produce a flat child slug.
+- Keep `setEntityParent` as-is; it already matches the rule.
 
-**2.2.1 Subject requirement in `ReviewForm.tsx`**
-- Add `REQUIRE_REVIEW_SUBJECT` (module constant, documented as the 2.4 flip point).
-- Replace `handleSubjectSkip` with `handleSubjectSkipConfirmed`, called only from the confirm dialog; it keeps the existing `logFunnel({ event: 'review_subject_skipped' })` call and `handleNext()`.
-- `isNextDisabled()` case 2 stays `!selectedSubject`.
-- Guard submit: for a **new, non-edit** review, if `REQUIRE_REVIEW_SUBJECT` is on and there is neither a `selectedSubject` nor an acknowledged skip, block submit with a toast pointing back to Step 2. This closes the step-indicator route around Step 2 (`handleStepClick` allows jumping to completed steps).
-- `handleStepClick` may not mark Step 2 complete unless a subject is selected or the skip was acknowledged.
+**Decisions recorded in this phase**
+- Parent renamed: the child's canonical slug may be regenerated, the old slug goes to `entity_slug_history` and redirects. No automatic mass rename in 2.2.
+- Parent deleted (`ON DELETE SET NULL`): the orphan keeps its hierarchical slug and stays resolvable; it is **not** silently re-slugged to flat. Orphan cleanup stays a later admin flow.
+- Same-named child twice under one parent: duplicate detection first, deterministic suffix only as a fallback.
 
-**2.2.2 `SubjectSelectStep.tsx`**
-- Drop the always-visible ghost "Skip for now"; add the conditional "I can't find what I'm reviewing" link, shown only when a search has completed with zero results (needs the step to expose a `hasSearchedWithNoResults` signal from the selector's result state, which it already renders an empty state for).
-- Add the confirm dialog (existing `AlertDialog` primitive) with the consequence copy above.
-- Copy stays consistent with project terminology — "experience"/"recommending", no "post".
+**Tests**
+- Extend `entitySlug.test.ts` (unit): `place → food`, `brand → product`, and a non-registered parent pair all produce parent-qualified slugs; same name under different parents cannot collide.
+- SQL verification against the live database after the migration: insert a child under two different parents in a transaction and confirm both slugs are parent-qualified and distinct, then roll back.
 
-**2.2.3 Dead-code removal**
-- Delete `src/components/profile/reviews/steps/StepTwo.tsx` and `src/components/profile/reviews/CategorySelector.tsx`.
-- Confirm zero remaining references before deleting; the admin `CategorySelector` is untouched.
+**Not in 2.2:** dish-creation UI, review-form changes, removing Skip, required subjects, questionnaire changes, backfills, `entity_id NOT NULL`, new registry pairs (`place → service`, `professional → service`, `place → product` are approved deliberately in 2.3, not now).
 
-**2.2.4 Tests** (new `src/components/profile/reviews/__tests__/subjectRequirement.test.ts`, registered in `vitest.config.ts`)
-- Pure helper extracted for the rule (`canSubmitReview({ isEditMode, selectedSubject, skipAcknowledged, requireSubject })`) so it's testable without rendering:
-  - new review + no subject + no acknowledgement → blocked.
-  - new review + subject → allowed.
-  - new review + acknowledged skip → allowed while the flag permits it; blocked when the flag is flipped to hard-required.
-  - edit mode + entity-less legacy review → always allowed.
-  - entity-page origin → allowed.
-- Existing `subjectSelection` and parity suites must stay green.
+## Main risk
 
-Verification: full Vitest run, `tsgo --noEmit`, and a clean build log before reporting.
-
-## Out of scope (stays on the roadmap)
-
-- 2.3 parent-aware slug DB migration, incl. whether hierarchical slugs apply to any `parent_id` or only registered offering pairs.
-- 2.4 lightweight dish-under-place creation, and the flip to hard-required.
-- 2.5 wizard collapse and removal of now-redundant Step 3 fields.
-- Config-driven questionnaires / `generic` questionnaire kind (Phase 3).
-- V4 `?tab=children` deep-link (separate Phase 1 polish patch).
-- Any Supabase migration, backfill, or `entity_id NOT NULL`.
+The migration touches a function every entity insert runs through. Mitigation: preserve the caller-supplied-slug early return exactly, change only the empty-slug path, and verify with a rolled-back transaction before reporting.
