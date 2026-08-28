@@ -4260,6 +4260,10 @@ export type Database = {
             }[]
           }
         | { Args: { similarity_threshold?: number }; Returns: number }
+      entity_slug_is_taken: {
+        Args: { candidate: string; exclude_entity_id?: string }
+        Returns: boolean
+      }
       fix_duplicate_slugs: { Args: never; Returns: number }
       fuzzy_match_entity: {
         Args: { target_name: string; threshold?: number }
@@ -4276,7 +4280,16 @@ export type Database = {
       }
       generate_entity_slug:
         | { Args: { name: string }; Returns: string }
-        | { Args: { entity_id?: string; name: string }; Returns: string }
+        | { Args: { entity_id: string; name: string }; Returns: string }
+      generate_entity_slug_v2: {
+        Args: {
+          current_entity_id?: string
+          name: string
+          parent_id?: string
+          requested_slug?: string
+        }
+        Returns: string
+      }
       get_admin_analytics: {
         Args: never
         Returns: {
@@ -5010,6 +5023,7 @@ export type Database = {
         Args: { _key: string; _reason?: string; _value: Json }
         Returns: Json
       }
+      slugify_entity_name: { Args: { input_name: string }; Returns: string }
       sync_mux_post_mappings: {
         Args: { p_content_id: string; p_items: Json }
         Returns: Json
@@ -5046,6 +5060,7 @@ export type Database = {
         Args: { p_review_id: string; p_user_id: string }
         Returns: boolean
       }
+      unaccent: { Args: { "": string }; Returns: string }
       update_all_trending_scores: { Args: never; Returns: number }
       update_comment: {
         Args: {
