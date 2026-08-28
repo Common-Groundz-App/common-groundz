@@ -83,7 +83,7 @@ export const createEntityQuick = async (
         place_id: externalData.api_ref // Ensure place_id is set for Google Places entities
       },
       created_by: user.id,
-      slug,
+      
     };
 
     // Quick database INSERT only

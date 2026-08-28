@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { Entity, EntityType } from '@/services/recommendation/types';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
-import { buildHierarchicalSlug, slugifyEntityName } from '@/services/entitySlug';
+
 
 export interface EntityWithChildren extends Omit<Entity, 'metadata'> {
   children?: Entity[];
