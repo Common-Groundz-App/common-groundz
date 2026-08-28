@@ -9,9 +9,19 @@
  * Plain TypeScript, no React, no Supabase.
  */
 
-/** Slugify a display name: lowercase, alphanumerics and single dashes. */
+/**
+ * Slugify a display name: NFKD transliteration, lowercase, alphanumerics and
+ * single dashes.
+ *
+ * This is the canonical contract, mirrored in Postgres by
+ * `public.slugify_entity_name()` (which uses `unaccent`). Any change here must
+ * be made there too — `entitySlug.test.ts` pins the shared fixtures.
+ * "Café Déjà Vu" -> "cafe-deja-vu", "Joe's Burgers" -> "joes-burgers".
+ */
 export function slugifyEntityName(name: string | null | undefined): string {
   return (name ?? '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '') // strip combining diacritical marks
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/\s+/g, '-')

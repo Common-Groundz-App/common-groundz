@@ -185,81 +185,30 @@ export const getEntityWithChildren = async (entityId: string): Promise<EntityWit
   }
 };
 
+/**
+ * Attach, reparent or detach a child entity.
+ *
+ * The slug is deliberately NOT sent: `update_entity_slug` (BEFORE UPDATE) owns
+ * it and always overwrote whatever the client supplied here. Attaching or
+ * reparenting re-qualifies the slug under the new parent and records the old
+ * one in `entity_slug_history`; detaching preserves the child's existing URL.
+ */
 export const setEntityParent = async (childId: string, parentId: string | null): Promise<void> => {
-  // If setting a parent, regenerate the child's slug to be hierarchical
-  if (parentId) {
-    // Fetch parent entity to get its slug
-    const { data: parent, error: parentError } = await supabase
-      .from('entities')
-      .select('slug, name')
-      .eq('id', parentId)
-      .single();
+  const { error } = await supabase
+    .from('entities')
+    .update({ parent_id: parentId })
+    .eq('id', childId);
 
-    if (parentError) {
-      console.error('Error fetching parent entity for slug generation:', parentError);
-      throw parentError;
-    }
-
-    // Fetch child entity to get its current name
-    const { data: child, error: childError } = await supabase
-      .from('entities')
-      .select('name, slug')
-      .eq('id', childId)
-      .single();
-
-    if (childError) {
-      console.error('Error fetching child entity:', childError);
-      throw childError;
-    }
-
-    // Generate hierarchical slug
-    const newHierarchicalSlug = buildHierarchicalSlug(parent, child);
-
-    // Update entity with parent_id and new hierarchical slug
-    const { error } = await supabase
-      .from('entities')
-      .update({ 
-        parent_id: parentId,
-        slug: newHierarchicalSlug
-      })
-      .eq('id', childId);
-
-    if (error) {
-      console.error('Error setting entity parent and updating slug:', error);
-      throw error;
-    }
-    
-    console.log(`✅ Updated entity ${childId} with parent ${parentId} and hierarchical slug: ${newHierarchicalSlug}`);
-  } else {
-    // Removing parent, regenerate slug to be non-hierarchical
-    const { data: child, error: childError } = await supabase
-      .from('entities')
-      .select('name')
-      .eq('id', childId)
-      .single();
-
-    if (childError) {
-      console.error('Error fetching child entity:', childError);
-      throw childError;
-    }
-
-    const newSlug = slugifyEntityName(child.name);
-
-    const { error } = await supabase
-      .from('entities')
-      .update({ 
-        parent_id: parentId,
-        slug: newSlug
-      })
-      .eq('id', childId);
-
-    if (error) {
-      console.error('Error removing entity parent:', error);
-      throw error;
-    }
-    
-    console.log(`✅ Updated entity ${childId} removed parent and updated slug to: ${newSlug}`);
+  if (error) {
+    console.error('Error updating entity parent:', error);
+    throw error;
   }
+
+  console.log(
+    parentId
+      ? `✅ Entity ${childId} attached to parent ${parentId}; slug re-qualified by the database`
+      : `✅ Entity ${childId} detached from its parent; slug preserved`
+  );
 };
 
 export const getParentEntity = async (childId: string): Promise<Entity | null> => {
