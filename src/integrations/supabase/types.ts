@@ -5060,7 +5060,6 @@ export type Database = {
         Args: { p_review_id: string; p_user_id: string }
         Returns: boolean
       }
-      unaccent: { Args: { "": string }; Returns: string }
       update_all_trending_scores: { Args: never; Returns: number }
       update_comment: {
         Args: {
