@@ -1,65 +1,91 @@
-# Phase 2.2 — Parent-aware slug foundation (final plan) + revised Phase 2 roadmap
+# Phase 2.2 — Parent-aware slug foundation (final, corrections incorporated)
 
-## Where I land
+## My position on the feedback
 
-Codex and ChatGPT agree with each other and with me on the substance; ChatGPT's two adjustments are the right ones and are now folded in:
+All four corrections are right and are folded in. On parent rename I agree with ChatGPT's Strategy B, and not just for safety: a child slug is a **stable identifier minted at creation**, not a derived view of its parent's current name. Cascading would mutate potentially hundreds of indexed URLs because someone fixed a typo in a restaurant name, and every one of those becomes a redirect hop. Provider renames are common; child URL churn should not be. So: **parent rename never touches descendant slugs in 2.2**, and a deliberate cascade stays an unmade decision.
 
-1. **No speculative registry pairs.** 2.3 ships `place → food` (and `brand → product`, which already exists in production). `place → service`, `professional → service`, `place → product` are product decisions, not plumbing — they wait.
-2. **No pre-emptive "shared creation contract" refactor.** 2.2 *audits* the existing creation services and answers one question: can the review form call them with a minimal payload safely? Refactor only if the answer is no.
+I also found two things neither review could have known, both of which matter more than any of the four corrections.
 
-Your observation is exactly right, and the database confirms the cause.
+## Two additional findings (verified against the live database)
 
-## Verified findings (queried, not assumed)
+**1. The TypeScript and SQL slugifiers do not agree.** `slugifyEntityName` *deletes* disallowed characters; the SQL `regexp_replace(name, '[^a-zA-Z0-9]+', '-')` *replaces* them with a dash. For "Joe's Burgers":
 
-- The BEFORE-INSERT trigger `generate_entity_slug_on_insert` calls the **one-argument** `generate_entity_slug(name)`, which has **no parent awareness at all**. Every newly inserted child gets a flat slug.
-- There are **two overloads** of `generate_entity_slug`. Only the two-argument one is parent-aware, and it hardcodes `parent_type = 'brand' AND current_type = 'product'` — which is precisely why only brand/product URLs look like `skin1004/madagascar-...`.
-- That overload resolves `parent_id` by looking the row up **by id**, so it cannot work during a BEFORE INSERT (the row doesn't exist yet). It is an after-the-fact repair function, not a creation rule.
-- Consequence today: "Classic Burger" under Truffles becomes `classic-burger`; a second under Joe's Burgers becomes `classic-burger-1`. Meaningless URLs — and `fix_duplicate_slugs` then tries to strip that `-1`, which can collide.
-- Only `setEntityParent` (`entityHierarchyService.ts:216`) uses the correct `buildHierarchicalSlug`. No creation path does: `enhancedEntityService`, `entityCreationService`, `entityProductService`, `recommendation/entityOperations` and the admin `CreateEntityDialog` all depend on the flat trigger.
-- **Compatibility check on Option A:** the only parented pair that exists in the database is `brand → product` (39 rows, 7 already hierarchical). No other hierarchy exists, so making the rule generic cannot break an existing one. That is the verification ChatGPT asked for, and it passes.
+```text
+TypeScript  → joes-burgers
+SQL         → joe-s-burgers   (confirmed by query)
+```
 
-## Revised Phase 2 roadmap
+So today the same entity gets a different slug depending on whether it was created (SQL trigger) or reparented (`setEntityParent`, TypeScript). That silently breaks the "insert-with-parent and later reparent produce consistent slugs" requirement both reviews asked for, and it makes any client-side preview wrong. **2.2 must align the two into one normalization rule** — I'd move SQL to the TypeScript behaviour (apostrophes deleted, not dashed) since it produces the cleaner URL, apply it to new slugs only, and cover it with a parity test in the same spirit as the existing review-bucket parity test.
+
+**2. The history collision check is NULL-unsafe.** In the parent-aware overload the guard is `h.entity_id != generate_entity_slug.entity_id`. When `entity_id` is NULL (every insert-time call) that comparison is NULL, the `EXISTS` is false, and **`entity_slug_history` is effectively not checked at all** — a new entity can take a slug that an old URL still redirects from. There are 9 history rows today, so the blast radius is small now and grows with every rename. Fix with `IS DISTINCT FROM` / an explicit null branch.
+
+## Final invariant (contradiction resolved)
+
+**The database trigger is the creation-time authority.** Standard creation paths omit `slug` entirely. `buildHierarchicalSlug` stays, but only for previews, reparenting and tests — it no longer decides a persisted slug on ordinary creation.
+
+Caller-supplied slugs, stated precisely:
+
+| Case | Behaviour |
+|---|---|
+| No parent, no slug | Generate from name |
+| No parent, slug supplied | Respect after normalization + uniqueness |
+| Parent, no slug | Generate `parentSlug-childName` |
+| Parent, slug already correctly qualified | Accept after validation |
+| Parent, flat or wrongly qualified slug | Qualify it under the parent — never persist as given |
+
+So the honest claim is: *no normal application creation path can accidentally emit a flat child slug, and an explicit override for a parented entity is qualified rather than trusted blindly.* Trusted admin/import overrides remain possible only for parentless entities.
+
+## Migration scope
+
+- Create the new parent-aware generator taking the parent id **explicitly** (a new function, since changing a signature is not a `CREATE OR REPLACE`), preserving `SECURITY DEFINER`, `SET search_path`, ownership and grants exactly as the current functions have them.
+- Rewrite `generate_entity_slug_on_insert` to pass `NEW.parent_id`, and to qualify a supplied slug per the table above instead of returning early on any non-empty slug.
+- Remove the `parent_type = 'brand' AND current_type = 'product'` hardcoding — any non-null parent with a non-empty slug qualifies. SQL stays semantics-free; the TypeScript registry keeps deciding which relationships a *user* may create.
+- Align the SQL normalization with `slugifyEntityName` (new slugs only).
+- Fix the NULL-unsafe `entity_slug_history` comparison.
+- Keep the collision loop; `-2` remains last-resort protection, not the duplicate strategy.
+- Fix `fix_duplicate_slugs`, which currently strips `-N` through the non-parent-aware path: restrict it to parentless entities or route it through the new generator.
+- **Do not drop** the one-argument `generate_entity_slug(name)` overload in this migration. Audit every database-side consumer first — triggers, SQL functions, RPCs, edge functions, maintenance jobs, `fix_duplicate_slugs`, `migrate_to_hierarchical_slugs`, `preview_hierarchical_migration`. If the audit proves zero consumers it can go in a later isolated migration; until then it becomes a thin wrapper delegating with `parent_id = NULL`.
+- **No backfill.** The 39 existing `brand → product` children (only 7 already hierarchical) keep their slugs and URLs.
+
+## Recorded behaviour after 2.2
+
+```text
+Interstellar                        → interstellar
+Truffles / Classic Burger           → truffles-classic-burger
+Joe's Burgers / Classic Burger      → joes-burgers-classic-burger
+reparent Truffles → Joe's Burgers   → new qualified slug, old slug in history
+delete Truffles (SET NULL)          → child keeps truffles-classic-burger
+rename Truffles → Truffles Cafe     → child slug UNCHANGED (no cascade)
+```
+
+## Client scope
+
+- Ordinary creation paths (`enhancedEntityService`, `entityCreationService`, `entityProductService`, `recommendation/entityOperations`, admin `CreateEntityDialog`) stop sending a computed child slug and let the trigger own it.
+- `setEntityParent` keeps using `buildHierarchicalSlug` — valid once the two normalizers agree.
+
+## Creation-service audit (deliverable, no refactor)
+
+A written answer covering: which service Phase 2.3 should call; its minimum payload; whether it accepts `parent_id` at insert time; duplicate detection; creation source and moderation/data-quality metadata; permission enforcement server-side; and whether it returns the created canonical entity immediately. Refactor only if the answer is "it can't do this safely".
+
+## Tests and verification
+
+- Extend `entitySlug.test.ts`: `place → food`, `brand → product`, unregistered parent pair; same name under different parents cannot collide.
+- New SQL↔TypeScript slug parity test over a fixture set including apostrophes, ampersands, accents and multiple spaces.
+- Rolled-back transaction against the live database: same-named child under two parents (both qualified, distinct); parentless supplied slug respected; parented flat slug gets qualified; a slug matching an existing history row is not reused.
+- Full Vitest run, `tsgo --noEmit`, clean build log.
+
+Then stop and report the migration verification plus the creation-service audit before Phase 2.3.
+
+## Phase 2 roadmap (unchanged)
 
 | Phase | Scope |
 |---|---|
-| **2.2 (next)** | Parent-aware hierarchical slugs, generic over any `parent_id`. Creation-service audit, no refactor. No visible UX change. "Skip for now" stays. |
-| 2.3 | "Can't find it? → Add something new" inside Step 2: standalone entities + `place → food` and `brand → product` offerings. Duplicate detection before creation, draft preserved, auto-select on success. Reuses existing creation services. |
-| 2.4 | Subject required for new reviews; remove "Skip for now"; submit-time guard. Legacy entity-less reviews stay readable and editable. Still no `entity_id NOT NULL`. |
-| 2.5 | Cleanup only: delete `StepTwo.tsx`, `CategorySelector.tsx`, the Step 3 entity-selection fallback, obsolete handlers and compatibility branches; collapse/reorder steps. |
-| separate | V4 `?tab=children` deep-link (Phase 1 polish). |
-
-Cleanup stays in 2.5 deliberately — no behaviour change and file deletion in the same phase.
-
-## Phase 2.2 scope
-
-**Rule: any entity with a valid `parent_id` gets a parent-qualified slug.** SQL stays semantics-free; the TypeScript relationship registry keeps deciding which relationships a *user* may create. That split is what makes a new pair a registry row instead of a migration.
-
-**Migration**
-- Repoint callers off the one-argument `generate_entity_slug(name)` overload and drop it, so one function owns the rule.
-- Change the parent-aware function to take the parent id **explicitly** rather than re-reading the row, and remove the `brand`/`product` hardcoding: any non-null parent with a non-empty slug qualifies its child.
-- Rewrite `generate_entity_slug_on_insert` to pass `NEW.parent_id`, so inserting with a parent and reparenting later produce identical slugs. Unchanged: a caller-supplied non-empty `slug` is still respected untouched.
-- Keep the existing collision loop and the `entity_slug_history` lookup, so old URLs keep resolving and a genuine same-parent duplicate still gets a deterministic `-2` as a **last resort**, not as the duplicate strategy.
-- Fix `fix_duplicate_slugs`, which currently strips `-N` via the non-parent-aware path: restrict it to parentless entities or route it through the parent-aware function.
-- **No backfill.** The 32 existing flat brand/product children keep their slugs and URLs; retroactively renaming indexed URLs buys the user nothing.
-
-**Client**
-- Route every creation path (`enhancedEntityService`, `entityCreationService`, `entityProductService`, `recommendation/entityOperations`, admin `CreateEntityDialog`) through one helper: with a `parent_id`, either use `buildHierarchicalSlug` or leave `slug` empty and let the now-correct trigger own it. The goal is that no creation path *can* emit a flat child slug.
-- `setEntityParent` already matches the rule and stays as-is.
-
-**Creation-service audit (deliverable, not a refactor)**
-A short written answer to: which service is the safest single entry point for review-form creation; what its minimum required payload is; whether it enforces duplicate detection, moderation status and creation source server-side; and whether a `parent_id` can be passed at insert time. If it already supports a minimal payload, 2.3 calls it directly.
-
-**Recorded decisions**
-- Parent renamed: the child's canonical slug may be regenerated, the old slug lands in `entity_slug_history` and redirects. No mass rename in 2.2.
-- Parent deleted (`ON DELETE SET NULL`): the orphan keeps its hierarchical slug and stays resolvable — never silently flattened. Orphan cleanup is a later admin flow.
-- Same name twice under one parent: duplicate detection first (2.3 wires the UI), suffix only as fallback.
-
-**Tests**
-- Extend `entitySlug.test.ts`: `place → food`, `brand → product`, and an unregistered parent pair all produce parent-qualified slugs; the same name under different parents cannot collide.
-- Post-migration SQL verification in a rolled-back transaction: insert the same-named child under two different parents and confirm both slugs are parent-qualified and distinct; confirm a caller-supplied slug is still honoured.
-
-**Not in 2.2:** any review-form change, dish-creation UI, removing Skip, required subjects, questionnaire changes, backfills, `entity_id NOT NULL`, new registry pairs.
+| **2.2 (this)** | Parent-aware slugs + normalization parity. No UX change; "Skip for now" stays. |
+| 2.3 | "Can't find it? → Add something new" in Step 2: standalone entities plus `place → food` and `brand → product` only. Duplicate detection before creation, review draft preserved, auto-select on success, reuses existing services. No speculative registry pairs. |
+| 2.4 | Subject required for new reviews; remove Skip; submit-time guard. Legacy entity-less reviews stay readable and editable. No `entity_id NOT NULL`. |
+| 2.5 | Cleanup: delete `StepTwo.tsx`, `CategorySelector.tsx`, the Step 3 fallback, obsolete handlers; collapse/reorder steps. |
+| separate | V4 `?tab=children` deep-link. |
 
 ## Main risk
 
-The migration sits on the path of every entity insert. Mitigation: preserve the caller-supplied-slug early return byte-for-byte, change only the empty-slug branch, and verify with a rolled-back transaction plus the unit suite before reporting.
+The trigger runs on every entity insert. Mitigation: the parentless-with-supplied-slug path stays byte-identical in behaviour, changes are confined to the parented and empty-slug branches, the old overload survives as a wrapper, and everything is verified in a rolled-back transaction before reporting.
