@@ -17,6 +17,24 @@ Consequences folded into scope:
 - `update_entity_slug` is in scope and must route through `generate_entity_slug_v2` with `current_entity_id` and `parent_id` passed separately.
 - Its Case 1 also fires on **name change**, so a renamed child re-qualifies under its parent and records history. Renaming a *parent* still touches only the parent's own row — no descendant cascade exists and none is added.
 - Its Case 2 (direct slug edit) preserves the supplied slug with **no availability check at all** — the same history-stealing loophole ChatGPT identified on the insert path. Same fix, same place.
+- ChatGPT caught a genuine self-contradiction in the previous draft: `ON DELETE SET NULL` is an `UPDATE` on the child row, so deleting a parent fires this trigger with `parent_id` going non-null → NULL. Case 1 would have regenerated `truffles-classic-burger` into `classic-burger` — breaking the live URL the same draft promised to keep. Corrected below.
+
+## Trigger contract (authoritative table)
+
+Codex is right that the branch behaviour is only unambiguous once `requested_slug` is pinned per branch. The two reviews disagree on exactly one row — detach — and I'm taking ChatGPT's side there: URL stability outranks structural tidiness, and it is the only reading that survives `ON DELETE SET NULL`.
+
+| Trigger branch | `requested_slug` | Result |
+|---|---|---|
+| Insert, no slug supplied | `NULL` | generate (qualified if parented) |
+| Insert, slug supplied | `NEW.slug` | supplied-slug rules below |
+| Child name changed, parent unchanged | `NULL` | regenerate under current parent, history |
+| Attach: `NULL → parent` | `NULL` | qualify under new parent, history |
+| Reparent: parent A → parent B | `NULL` | re-qualify under B, history |
+| **Detach: parent → `NULL`** | **n/a** | **early return — slug preserved byte-for-byte, no history row** |
+| Slug cleared to `NULL`/`''` | `NULL` | regenerate from name + current parent, history |
+| Direct non-empty slug edit, name and parent unchanged | `NEW.slug` | supplied-slug rules below |
+
+Detach must be an explicit early return placed **before** the `parent_id IS DISTINCT FROM` branch, not merely "pass NULL and hope" — passing `requested_slug = NEW.slug` there would instead let a detached child's hierarchical slug be re-validated and possibly suffixed. Returning early is the only branch that touches nothing. A future deliberate "detach and reissue URL" action can be an explicit operation; it must never be a side effect of a parent deletion.
 
 ## Supplied-slug contract — normalization separated from availability
 
@@ -72,7 +90,7 @@ A child can never collapse to its parent's slug.
 - Add `generate_entity_slug_v2` with the signature above; preserve `SECURITY DEFINER`, `SET search_path`, ownership and grants exactly as the current functions have them (a new signature is a new function, not a `CREATE OR REPLACE`).
 - Enable `unaccent`; apply the canonical normalization to newly generated slugs only.
 - Rewrite `generate_entity_slug_on_insert` to pass `NEW.parent_id` and apply the supplied-slug table.
-- Rewrite `update_entity_slug` to call v2 with both ids in Cases 1 and 3, and to add the missing availability validation in Case 2. History recording stays as-is.
+- Rewrite `update_entity_slug` to implement the trigger contract table exactly: both ids passed separately, `requested_slug` per the table, the detach early-return, and the missing availability validation on direct slug edits.
 - Remove the `parent_type = 'brand' AND current_type = 'product'` hardcoding — any non-null parent with a non-empty slug qualifies. SQL stays free of provider/offering semantics; the TypeScript registry alone governs which relationships a user may create.
 - Fix `fix_duplicate_slugs` (currently strips `-N` through the non-parent-aware path): restrict to parentless entities or route through v2.
 - **Do not drop** the one-argument `generate_entity_slug(name)`. Audit every database-side consumer first — triggers, SQL functions, RPCs, edge functions, maintenance jobs, `fix_duplicate_slugs`, `migrate_to_hierarchical_slugs`, `preview_hierarchical_migration`. Until that is clean it becomes a thin wrapper delegating with NULL ids.
@@ -89,9 +107,11 @@ Café + Cafe under one parent       → ...-cafe and ...-cafe-2
 reparent to Joe's Burgers          → re-qualified, old slug in history
 rename Truffles → Truffles Cafe    → children UNCHANGED (no cascade)
 delete Truffles (SET NULL)         → child keeps truffles-classic-burger
+detach child manually              → child keeps truffles-classic-burger
+attach parentless child            → classic-burger → truffles-classic-burger
 ```
 
-A slug is a durable identifier minted at creation, not a live rendering of the hierarchy — hence no descendant cascade on parent rename. Reparenting the child *is* structural, so it re-qualifies and keeps history.
+Precise contract: **a child URL is stable across ancestor rename and ancestor deletion, but may change when the child itself is renamed or reparented — with `entity_slug_history` preserving the old URL.** Not "a durable identifier minted at creation"; that wording was wrong, since the plan does regenerate on the child's own rename.
 
 ## Client scope
 
@@ -116,7 +136,8 @@ Live database, in a rolled-back transaction:
 - `NEW.id` is populated during BEFORE INSERT, so the empty-name fallback is deterministic;
 - "Café" and "Cafe" under the same parent → `-cafe` and `-cafe-2`; under different parents → no collision;
 - `unaccent` resolves inside the `SECURITY DEFINER` / restricted `search_path` context;
-- update paths: rename, reparent, unparent (`parent_id → NULL`), direct slug edit — each produces the expected slug, records history, and never self-collides into `-2`.
+- update paths: rename, attach (`NULL → parent`), reparent (A → B), detach (`parent → NULL`), cleared slug, direct slug edit — one test per branch of the trigger contract table, each asserting the resulting slug, the `requested_slug` semantics, history rows, and no self-collision into `-2`;
+- **actually `DELETE` a parent** with the `ON DELETE SET NULL` FK and assert the surviving child's `parent_id` became `NULL` while its `slug` is byte-for-byte unchanged and no history row was written.
 
 Then full Vitest run, `tsgo --noEmit`, clean build log — and stop with the migration verification plus the creation-service audit before Phase 2.3.
 
