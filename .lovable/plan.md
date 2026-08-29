@@ -114,9 +114,9 @@ Provenance reuses whatever mechanism creation already uses — `create-brand-ent
 
 Add `review_subject_create_opened`, `review_subject_created` (type, provider attached yes/no, duplicate-warning shown yes/no), `review_subject_create_failed`, `review_subject_duplicate_resolved` to `log-search-funnel/allowlists.ts`. These numbers decide when 2.4 can require a subject.
 
-**9. Brand edge-function slug cleanup**
+**9. Brand edge-function slug cleanup — moved out of this phase**
 
-Delete the manual slug counter loop and the `slug` field on insert; keep its `23505` handling and its duplicate/website checks untouched.
+Both reviews are right: `create-brand-entity` is not on the review quick-create path, so removing its slug loop here only adds regression surface. It becomes a separate small patch after the RPC is proven.
 
 ## One thing I'd add on top of both reviews
 
