@@ -86,20 +86,20 @@ Add `review_subject_create_opened`, `review_subject_created` (type, provider att
 
 **9. Brand edge-function slug cleanup**
 
-Delete the manual slug loop and the `23505` retry in `create-brand-entity`; leave its duplicate/website checks alone.
+Delete the manual slug counter loop and the `slug` field on insert. **Keep** its `23505` handling — that branch becomes the shared conflict-resolution pattern described in step 6, not something to remove. Its duplicate/website checks are untouched.
 
-## Two things I'd add on top of both reviews
+## One thing I'd add on top of both reviews
 
-- **A concurrency test, not just a code path.** The server-side dedupe guard is the one piece that can't be verified by clicking. Two near-simultaneous "Classic Burger at Truffles" creates must yield one entity and two successful selections. Worth an explicit test because the global unique slug index would otherwise surface as a raw `23505` in the user's face.
-- **The provider search must be existing-only and must not nest creation.** If a user is adding a dish at a restaurant that isn't in the database either, they get one clear message and the option to add the place first — not a recursive create-inside-create. That keeps the flow finite and the draft safe.
+- **Say plainly what the duplicate classifier does when it is unsure.** Every candidate must land in exactly one class, and the default for anything not provably exact is *possible match*. A misclassified fuzzy candidate as "exact" is worse than the reverse: it silently blocks a legitimate distinct entity ("Classic Burger" vs "Classic Cheese Burger") with no escape hatch. So the exact class is a short, enumerated list of identity keys — API ref, or parent+type+normalized name, or type+normalized name with no distinguishing signal — and everything else is fuzzy by construction. This gets unit-tested directly on the classifier, separate from the concurrency test.
 
 ## Explicitly unchanged
 
-Four wizard steps. "Skip for now" stays (removed in 2.4). No `entity_id NOT NULL`, no migration, no Step 3 fallback removal, no questionnaire redesign, no legacy component deletion, no changes to composer creation, existing reviews, or recommendation categories. External API results stay `existingOnly` in review mode.
+Four wizard steps. "Skip for now" stays (removed in 2.4) — it is also the fallback while `search-or-create` is still being proven. No `entity_id NOT NULL`, no migration, no Step 3 fallback removal, no questionnaire redesign, no legacy component deletion, no changes to composer creation, existing reviews, or recommendation categories. No new registry pairs. External API results stay `existingOnly` in review mode.
 
 ## Acceptance criteria
 
-Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is a deliberate choice; invalid pairs are refused by the registry; duplicates are surfaced before insert and resolved server-side under concurrency; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, failure and success; Skip still available; composer unchanged.
+Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is standalone with no pair assertion; `service` quick-create is absent and no code asserts it needs a provider; invalid pairs are refused by the registry; exact duplicates offer only "Review this" while fuzzy ones offer both actions; two concurrent identical creates yield one entity and two successful selections with no `23505` in the UI; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, mode-switch, failure and success; Skip still available; composer unchanged.
+
 
 ## Files touched
 
