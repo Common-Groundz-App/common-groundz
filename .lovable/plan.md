@@ -67,18 +67,44 @@ Two corrections to my previous draft, both blocking:
 
 *The `23505` recovery was guarding an error that mostly won't fire.* I confirmed `generate_entity_slug_v2` resolves collisions itself with a counter suffix. So two concurrent "Classic Burger at Truffles" creates do not reliably collide — they most likely become `truffles-classic-burger` and `truffles-classic-burger-2`, two rows, no error, exactly the duplicate dishes the provider/offering architecture exists to prevent. Catching `23505` cannot make offering creation race-safe.
 
-*The fix: one atomic server-side create-or-resolve.* A new SECURITY DEFINER RPC, `create_entity_subject(name, type, parent_id, metadata)`, owns the exact-identity boundary:
+*The fix: one atomic server-side create-or-resolve.* A new SECURITY DEFINER RPC owns the exact-identity boundary. Identity inputs are explicit parameters, not smuggled inside metadata, since they are real columns:
 
 ```text
-lock  pg_advisory_xact_lock(hashtext(parent_id || type || normalized_name))
-check exact existing match
-      found → return (entity, created = false)
-      none  → insert → return (entity, created = true)
+create_entity_subject(
+  p_name, p_type, p_parent_id,
+  p_api_source, p_api_ref, p_website_url,
+  p_metadata  -- whitelisted keys only
+)
+
+authenticate  auth.uid() present, else reject
+validate      canonical type; approved pair; bounded input sizes
+lock          pg_advisory_xact_lock(<64-bit key>)
+check         exact existing match
+              found → return (entity, created = false)
+              none  → insert → return (entity, created = true)
 ```
 
 All inside one transaction. B waits on A's lock, then finds A's row and returns it. Result: one entity, both callers get the same id — the acceptance criterion actually holds rather than being asserted. No new `UNIQUE(parent_id, type, normalized_name)` constraint: that needs a canonical normalized-name column, null-parent partial semantics, and a backfill decision over existing data — schema policy well beyond this phase. The advisory lock is targeted and reversible.
 
+The lock key is a 64-bit digest of a delimiter-joined tuple (`parent_id || '\x1f' || canonical_type || '\x1f' || normalized_name`), not a 32-bit `hashtext` of concatenated strings, so distinct identities can't collide into one lock or blur across field boundaries.
+
 The lock is only taken where identity is well-defined (an offering under a provider). Standalone name-only creation takes no lock and is never force-merged.
+
+**6b. The RPC is a security boundary, not a convenience wrapper**
+
+This is the blocking correction both reviews converge on, and I agree with it. `assertValidOfferingPair()` is TypeScript: it protects the UI, not the database. A SECURITY DEFINER function that accepts `type` and `parent_id` must independently enforce the contract it exposes, because anyone with the anon key can call it directly.
+
+Enforced in SQL, inside the function:
+
+- **Auth required** — `auth.uid()` must be present; otherwise reject. No anonymous catalog writes through this path.
+- **Server owns provenance** — `created_by = auth.uid()`, `metadata.created_from = 'review_form'`, and moderation/approval fields are set by the function and merged *last*, so caller metadata can never override them. Caller metadata is whitelisted to a small set of harmless descriptive keys; anything else is dropped rather than merged.
+- **Canonical type** — must be one of the 15 canonical types, and one of the types this phase actually exposes for quick-create.
+- **Parentless** — allowed only for the standalone types this phase supports (including standalone product). Parentless `food` is rejected.
+- **Parented** — the parent row is loaded and must exist, be active (not soft-deleted), and form an approved pair: `place → food` or `brand → product`. Every other combination is rejected.
+- **Bounded inputs** — name length, website/API ref length, metadata size all capped.
+- **Hardened surface** — explicit owner, pinned `search_path`, `REVOKE ... FROM PUBLIC` and `GRANT EXECUTE TO authenticated` only — the same discipline used for the Phase 2.2 slug helpers.
+
+The SQL allow-list duplicates two pairs from the registry, deliberately: the database does not need to understand provider/offering semantics in general, only the creation capability this RPC exposes. A parity test asserts the SQL pairs and the production registry cannot drift apart silently.
 
 *Exact identity, tightened, and defined in exactly one place.* Codex is right that a helper under `src/` is invisible to a deployed edge function, so "one predicate" was aspirational. The predicate lives server-side only:
 
