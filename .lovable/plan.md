@@ -9,7 +9,7 @@
 
 Leftovers, none blocking, each scheduled:
 
-1. `supabase/functions/create-brand-entity/index.ts` still runs its own slug counter loop and passes `slug` on insert. Redundant now (brands are parentless, and the trigger validates a supplied slug), removed in 2.3 since the function is in scope anyway.
+1. `supabase/functions/create-brand-entity/index.ts` still runs its own slug counter loop and passes `slug` on insert. Redundant now, but it is not on the review path — moved out of 2.3 into its own small patch after the new RPC is proven.
 2. `src/utils/slugMigration.ts` / `slugMigrationPreview.ts` — parent-unaware admin backfill tools, retired in 2.5.
 3. `steps/StepTwo.tsx` and `CategorySelector.tsx` still unreferenced from 2.1, deleted in 2.5.
 
@@ -67,18 +67,44 @@ Two corrections to my previous draft, both blocking:
 
 *The `23505` recovery was guarding an error that mostly won't fire.* I confirmed `generate_entity_slug_v2` resolves collisions itself with a counter suffix. So two concurrent "Classic Burger at Truffles" creates do not reliably collide — they most likely become `truffles-classic-burger` and `truffles-classic-burger-2`, two rows, no error, exactly the duplicate dishes the provider/offering architecture exists to prevent. Catching `23505` cannot make offering creation race-safe.
 
-*The fix: one atomic server-side create-or-resolve.* A new SECURITY DEFINER RPC, `create_entity_subject(name, type, parent_id, metadata)`, owns the exact-identity boundary:
+*The fix: one atomic server-side create-or-resolve.* A new SECURITY DEFINER RPC owns the exact-identity boundary. Identity inputs are explicit parameters, not smuggled inside metadata, since they are real columns:
 
 ```text
-lock  pg_advisory_xact_lock(hashtext(parent_id || type || normalized_name))
-check exact existing match
-      found → return (entity, created = false)
-      none  → insert → return (entity, created = true)
+create_entity_subject(
+  p_name, p_type, p_parent_id,
+  p_api_source, p_api_ref, p_website_url,
+  p_metadata  -- whitelisted keys only
+)
+
+authenticate  auth.uid() present, else reject
+validate      canonical type; approved pair; bounded input sizes
+lock          pg_advisory_xact_lock(<64-bit key>)
+check         exact existing match
+              found → return (entity, created = false)
+              none  → insert → return (entity, created = true)
 ```
 
 All inside one transaction. B waits on A's lock, then finds A's row and returns it. Result: one entity, both callers get the same id — the acceptance criterion actually holds rather than being asserted. No new `UNIQUE(parent_id, type, normalized_name)` constraint: that needs a canonical normalized-name column, null-parent partial semantics, and a backfill decision over existing data — schema policy well beyond this phase. The advisory lock is targeted and reversible.
 
+The lock key is a 64-bit digest of a delimiter-joined tuple (`parent_id || '\x1f' || canonical_type || '\x1f' || normalized_name`), not a 32-bit `hashtext` of concatenated strings, so distinct identities can't collide into one lock or blur across field boundaries.
+
 The lock is only taken where identity is well-defined (an offering under a provider). Standalone name-only creation takes no lock and is never force-merged.
+
+**6b. The RPC is a security boundary, not a convenience wrapper**
+
+This is the blocking correction both reviews converge on, and I agree with it. `assertValidOfferingPair()` is TypeScript: it protects the UI, not the database. A SECURITY DEFINER function that accepts `type` and `parent_id` must independently enforce the contract it exposes, because anyone with the anon key can call it directly.
+
+Enforced in SQL, inside the function:
+
+- **Auth required** — `auth.uid()` must be present; otherwise reject. No anonymous catalog writes through this path.
+- **Server owns provenance** — `created_by = auth.uid()`, `metadata.created_from = 'review_form'`, and moderation/approval fields are set by the function and merged *last*, so caller metadata can never override them. Caller metadata is whitelisted to a small set of harmless descriptive keys; anything else is dropped rather than merged.
+- **Canonical type** — must be one of the 15 canonical types, and one of the types this phase actually exposes for quick-create.
+- **Parentless** — allowed only for the standalone types this phase supports (including standalone product). Parentless `food` is rejected.
+- **Parented** — the parent row is loaded and must exist, be active (not soft-deleted), and form an approved pair: `place → food` or `brand → product`. Every other combination is rejected.
+- **Bounded inputs** — name length, website/API ref length, metadata size all capped.
+- **Hardened surface** — explicit owner, pinned `search_path`, `REVOKE ... FROM PUBLIC` and `GRANT EXECUTE TO authenticated` only — the same discipline used for the Phase 2.2 slug helpers.
+
+The SQL allow-list duplicates two pairs from the registry, deliberately: the database does not need to understand provider/offering semantics in general, only the creation capability this RPC exposes. A parity test asserts the SQL pairs and the production registry cannot drift apart silently.
 
 *Exact identity, tightened, and defined in exactly one place.* Codex is right that a helper under `src/` is invisible to a deployed edge function, so "one predicate" was aspirational. The predicate lives server-side only:
 
@@ -114,9 +140,9 @@ Provenance reuses whatever mechanism creation already uses — `create-brand-ent
 
 Add `review_subject_create_opened`, `review_subject_created` (type, provider attached yes/no, duplicate-warning shown yes/no), `review_subject_create_failed`, `review_subject_duplicate_resolved` to `log-search-funnel/allowlists.ts`. These numbers decide when 2.4 can require a subject.
 
-**9. Brand edge-function slug cleanup**
+**9. Brand edge-function slug cleanup — moved out of this phase**
 
-Delete the manual slug counter loop and the `slug` field on insert; keep its `23505` handling and its duplicate/website checks untouched.
+Both reviews are right: `create-brand-entity` is not on the review quick-create path, so removing its slug loop here only adds regression surface. It becomes a separate small patch after the RPC is proven.
 
 ## One thing I'd add on top of both reviews
 
@@ -128,11 +154,11 @@ Four wizard steps. "Skip for now" stays (removed in 2.4) — it is also the fall
 
 ## Acceptance criteria
 
-Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is standalone with no pair assertion; `service` quick-create is absent and no code asserts it needs a provider; invalid pairs are refused by the registry; exact matches offer only "Review this" while possible matches offer both actions; standalone name-only matches are never exact; website/API matches never merge incompatible types; **two concurrent "Classic Burger at Truffles" creates produce exactly one row and return the same id to both callers**; an unrecognized unique-constraint violation fails loudly instead of resolving; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, mode-switch, failure and success; Skip still available; composer unchanged.
+Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is standalone with no pair assertion; `service` quick-create is absent and no code asserts it needs a provider; **the RPC itself rejects unapproved pairs (place → book, movie → food, professional → product), parentless food, deleted or wrong-type parents, and anonymous callers — verified by direct RPC calls that bypass the UI**; **caller-supplied `created_by`, moderation status or `created_from` cannot override server-set values**; **a parity test asserts the SQL allow-list matches the TypeScript registry**; exact matches offer only "Review this" while possible matches offer both actions; standalone name-only matches are never exact; website/API matches never merge incompatible types; **two concurrent "Classic Burger at Truffles" creates produce exactly one row and return the same id to both callers**; an unrecognized unique-constraint violation fails loudly instead of resolving; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, mode-switch, failure and success; Skip still available; composer unchanged.
 
 ## Files touched
 
-New migration for `create_entity_subject` (advisory-locked create-or-resolve) and the SQL normalized-name helper. New `supabase/functions/_shared/exactIdentity.ts`. `steps/SubjectSelectStep.tsx`, new `steps/SubjectQuickCreate.tsx`, `ReviewForm.tsx`, `enhancedEntityService.ts` (routes review-subject creation through the RPC), `supabase/functions/check-entity-duplicates/index.ts` (exact/possible classification), `supabase/functions/log-search-funnel/allowlists.ts`, `supabase/functions/create-brand-entity/index.ts`.
+New migration for `create_entity_subject` (advisory-locked create-or-resolve, hardened as below) and the SQL normalized-name helper. New `supabase/functions/_shared/exactIdentity.ts`. `steps/SubjectSelectStep.tsx`, new `steps/SubjectQuickCreate.tsx`, `ReviewForm.tsx`, `enhancedEntityService.ts` (routes review-subject creation through the RPC), `supabase/functions/check-entity-duplicates/index.ts` (exact/possible classification), `supabase/functions/log-search-funnel/allowlists.ts`. `create-brand-entity/index.ts` is **not** touched in this phase.
 
 
 ## Out of scope
