@@ -15,9 +15,9 @@ Leftovers, none blocking, each scheduled:
 
 ## Creation-service audit (the thing both reviews asked for first)
 
-`src/services/enhancedEntityService.ts` is the path to reuse. `createEntityQuick` already sets `created_by` from the session, sends no slug, and returns the inserted row immediately; `entities_enforce_creation` enforces `created_by` server-side and `approval_status` defaults apply. One small refactor is needed and nothing more: an optional `parentId` argument passed through to the insert. No review-only persistence service.
+`src/services/enhancedEntityService.ts` is the module to reuse. `createEntityQuick` already sets `created_by` from the session, sends no slug, and returns the inserted row; `entities_enforce_creation` enforces `created_by` server-side and `approval_status` defaults apply. Review-subject creation calls the new `create_entity_subject` RPC from inside this same service rather than inserting directly, so there is still one creation module and no review-only persistence layer.
 
-`CreateEntityDialog` (admin) stays out of the review flow. `check-entity-duplicates` already exists as an edge function and is the server-side guard for step 6 below.
+`CreateEntityDialog` (admin) stays out of the review flow. `check-entity-duplicates` provides advisory preflight candidates only — the RPC in step 6 is the authority.
 
 ## What Phase 2.3 builds
 
