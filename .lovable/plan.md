@@ -97,7 +97,7 @@ Delete the manual slug counter loop and the `slug` field on insert. **Keep** its
 
 ## One thing I'd add on top of both reviews
 
-- **Say plainly what the duplicate classifier does when it is unsure.** Every candidate must land in exactly one class, and the default for anything not provably exact is *possible match*. A misclassified fuzzy candidate as "exact" is worse than the reverse: it silently blocks a legitimate distinct entity ("Classic Burger" vs "Classic Cheese Burger") with no escape hatch. So the exact class is a short, enumerated list of identity keys — API ref, or parent+type+normalized name, or type+normalized name with no distinguishing signal — and everything else is fuzzy by construction. This gets unit-tested directly on the classifier, separate from the concurrency test.
+- **Test the predicate directly, and test that both callers use it.** `isExactIdentityMatch` gets its own unit tests (same api_ref → exact; same website → exact; same dish under same place → exact; two "Central Cafe" places → possible; "Classic Burger" vs "Classic Cheese Burger" → possible). Separately, assert that recovery routes through the same helper rather than its own inline comparison — that shared call is the entire safeguard, and it is the kind of thing a later refactor quietly duplicates. Plus a test that an unrecognized constraint violation propagates as a failure instead of a fake success.
 
 ## Explicitly unchanged
 
@@ -105,7 +105,8 @@ Four wizard steps. "Skip for now" stays (removed in 2.4) — it is also the fall
 
 ## Acceptance criteria
 
-Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is standalone with no pair assertion; `service` quick-create is absent and no code asserts it needs a provider; invalid pairs are refused by the registry; exact duplicates offer only "Review this" while fuzzy ones offer both actions; two concurrent identical creates yield one entity and two successful selections with no `23505` in the UI; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, mode-switch, failure and success; Skip still available; composer unchanged.
+Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is standalone with no pair assertion; `service` quick-create is absent and no code asserts it needs a provider; invalid pairs are refused by the registry; exact matches offer only "Review this" while possible matches offer both actions; standalone name-only matches are never exact; two concurrent "Classic Burger at Truffles" creates yield one dish and the same id to both with no `23505` in the UI; an unrecognized unique-constraint violation fails loudly instead of resolving; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, mode-switch, failure and success; Skip still available; composer unchanged.
+
 
 
 ## Files touched
