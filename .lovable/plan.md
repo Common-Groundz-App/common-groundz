@@ -34,15 +34,24 @@ Opens a drawer/modal over the review form. `ReviewForm` state (rating, title, te
 
 **2. Path A — standalone entity**
 
-Canonical types that can safely exist parentless: `place`, `book`, `movie`, `tv_show`, `course`, `app`, `game`, `event`, `brand`, `professional`, `experience`, `others`. Fields: type + name. Nothing else.
+Canonical types offered parentless: `place`, `book`, `movie`, `tv_show`, `course`, `app`, `game`, `event`, `brand`, `professional`, `experience`, `others`. Fields: type + name. Nothing else.
+
+`service` is deliberately **not offered** in this phase. That is a UI omission, not a model claim — nothing in the code will encode "a service must have a provider". Its relationship semantics (`place → service`, `professional → service`) stay undecided, and the registry gains no new pairs.
 
 **3. Path B — offering under a provider**
 
-Only the two approved registry pairs this phase: `place → food` and `brand → product`. No `place → service`, `professional → service`, or `place → product` — those are product decisions, not plumbing.
+Only the two approved registry pairs this phase: `place → food` and `brand → product`. No `place → service`, `professional → service`, or `place → product`.
 
-Food flow: `Add a dish → Where is it offered? [existing-only place search] → What's it called? → Create and continue`. Provider is **required** for `food`; no orphan dish can be created through the review form. For `product`, the brand is optional and the UI says so explicitly ("I don't know the brand") rather than inventing a placeholder brand.
+Food flow: `Add a dish → Where is it offered? [existing-only place search] → What's it called? → Create and continue`. Provider is **required** for `food`; no orphan dish can be created through the review form.
 
-Every pair goes through `assertValidOfferingPair()` from `entityRelationshipRegistry.ts`. `parent_id` is set at insert; the Phase 2.2 trigger produces `truffles-classic-burger`. The client never computes or sends a slug.
+`product` is two different creations, not one with an optional field:
+- Brand selected → offering creation, `assertValidOfferingPair('brand','product')`, `parent_id` set, hierarchical slug.
+- "I don't know the brand" → **standalone** product creation, `parent_id` null, and the pair assertion is not called at all (there is no relationship to validate). No placeholder brand is ever invented.
+
+Provider not found: no nested dialog. The same drawer switches sequentially from offering mode to standalone place creation, then returns to the dish form with the new place preselected — one drawer, a state change, and the review draft untouched throughout.
+
+`parent_id` is set at insert; the Phase 2.2 trigger produces `truffles-classic-burger`. The client never computes or sends a slug.
+
 
 **4. Auto-select through the real handler**
 
@@ -52,16 +61,24 @@ On success the created entity is fed into `handleSubjectChange` — the same aut
 
 Type comes from `parseEntityType`; unparseable blocks creation. No falling back to `product` or `place`.
 
-**6. Duplicate detection before insert, with a server-side guard**
+**6. Duplicates: two classes, and a create path that cannot lose a race**
 
-- Standalone: canonical type + normalized name (+ website/API ref when present).
-- Offering: `parent_id` + offering type + normalized name — scoped to the chosen provider, so "Classic Burger" at two restaurants is not a duplicate.
-- UI shows `This may already exist: Classic Burger at Truffles` with `[Review this instead]` (selects the existing entity) and `[Create anyway]`.
-- A UI check alone loses races, so the final check runs server-side immediately before insert via `check-entity-duplicates`; a same-parent same-name collision returns the existing entity instead of inserting.
+My earlier wording — "the final check runs server-side immediately before insert" — was wrong. Moving a check into an edge function does not make check-then-insert atomic; two callers can both read "none" and both proceed. Corrected design:
+
+*Classification.* `check-entity-duplicates` returns candidates split into two classes:
+- **Exact identity** — same `api_source`+`api_ref`, or (offering) same `parent_id` + type + normalized name, or (standalone) same type + normalized name with no distinguishing website/ref. UI: `Classic Burger at Truffles already exists.` with a single action `[Review this]`. **No "Create anyway."**
+- **Possible match** — fuzzy name, same name different website, variant/edition, same product name under a different brand. UI: `This might already exist.` with `[Use existing]` and `[Create anyway]`.
+
+*Atomicity.* The insert itself is the arbiter, not the preflight. Take the smaller, honest route: `createEntityQuick` attempts the insert and catches the expected `23505`; on conflict it re-resolves the winner by canonical type + `parent_id` + normalized name and returns `{ entity, created: false }`. Callers get a normal successful selection; a raw Postgres error never reaches the UI. `create-brand-entity` already does exactly this for brands (its `23505`/slug branch), so this is an existing, proven pattern rather than a new architecture. The preflight stays, purely as friendly UX ahead of time.
+
+Normalized name uses the existing `normalizeBrandName` (NFKD, alphanumeric-only) so client and server agree on what "same name" means.
+
+*Test.* Two near-simultaneous "Classic Burger at Truffles" creates must yield exactly one entity, both callers receiving that same id, no `23505` surfaced. This is the one guarantee that cannot be verified by clicking, so it gets an explicit test.
 
 **7. Provenance and moderation**
 
-Record creator id, `creation_source: 'review_form'`, default moderation status, the provider relationship, and any external ref. Creating from a review grants no privileges. Explicit rule: an abandoned review still leaves the created entity in the catalog — it is a contribution, not a draft artifact.
+Provenance reuses whatever mechanism creation already uses — `create-brand-entity` stores `metadata.auto_created` / `metadata.created_from_product_url`, and existing entities carry `metadata.created_from_url`, so the review surface records `metadata.created_from = 'review_form'` in that same metadata contract rather than inventing a column. Also recorded: creator id (already enforced server-side by `entities_enforce_creation`), default moderation status, the provider relationship, any external ref. Creating from a review grants no privileges. Explicit rule: an abandoned review still leaves the created entity in the catalog — it is a contribution, not a draft artifact.
+
 
 **8. Telemetry**
 
@@ -69,20 +86,20 @@ Add `review_subject_create_opened`, `review_subject_created` (type, provider att
 
 **9. Brand edge-function slug cleanup**
 
-Delete the manual slug loop and the `23505` retry in `create-brand-entity`; leave its duplicate/website checks alone.
+Delete the manual slug counter loop and the `slug` field on insert. **Keep** its `23505` handling — that branch becomes the shared conflict-resolution pattern described in step 6, not something to remove. Its duplicate/website checks are untouched.
 
-## Two things I'd add on top of both reviews
+## One thing I'd add on top of both reviews
 
-- **A concurrency test, not just a code path.** The server-side dedupe guard is the one piece that can't be verified by clicking. Two near-simultaneous "Classic Burger at Truffles" creates must yield one entity and two successful selections. Worth an explicit test because the global unique slug index would otherwise surface as a raw `23505` in the user's face.
-- **The provider search must be existing-only and must not nest creation.** If a user is adding a dish at a restaurant that isn't in the database either, they get one clear message and the option to add the place first — not a recursive create-inside-create. That keeps the flow finite and the draft safe.
+- **Say plainly what the duplicate classifier does when it is unsure.** Every candidate must land in exactly one class, and the default for anything not provably exact is *possible match*. A misclassified fuzzy candidate as "exact" is worse than the reverse: it silently blocks a legitimate distinct entity ("Classic Burger" vs "Classic Cheese Burger") with no escape hatch. So the exact class is a short, enumerated list of identity keys — API ref, or parent+type+normalized name, or type+normalized name with no distinguishing signal — and everything else is fuzzy by construction. This gets unit-tested directly on the classifier, separate from the concurrency test.
 
 ## Explicitly unchanged
 
-Four wizard steps. "Skip for now" stays (removed in 2.4). No `entity_id NOT NULL`, no migration, no Step 3 fallback removal, no questionnaire redesign, no legacy component deletion, no changes to composer creation, existing reviews, or recommendation categories. External API results stay `existingOnly` in review mode.
+Four wizard steps. "Skip for now" stays (removed in 2.4) — it is also the fallback while `search-or-create` is still being proven. No `entity_id NOT NULL`, no migration, no Step 3 fallback removal, no questionnaire redesign, no legacy component deletion, no changes to composer creation, existing reviews, or recommendation categories. No new registry pairs. External API results stay `existingOnly` in review mode.
 
 ## Acceptance criteria
 
-Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is a deliberate choice; invalid pairs are refused by the registry; duplicates are surfaced before insert and resolved server-side under concurrency; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, failure and success; Skip still available; composer unchanged.
+Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is standalone with no pair assertion; `service` quick-create is absent and no code asserts it needs a provider; invalid pairs are refused by the registry; exact duplicates offer only "Review this" while fuzzy ones offer both actions; two concurrent identical creates yield one entity and two successful selections with no `23505` in the UI; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, mode-switch, failure and success; Skip still available; composer unchanged.
+
 
 ## Files touched
 
