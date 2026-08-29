@@ -61,16 +61,24 @@ On success the created entity is fed into `handleSubjectChange` — the same aut
 
 Type comes from `parseEntityType`; unparseable blocks creation. No falling back to `product` or `place`.
 
-**6. Duplicate detection before insert, with a server-side guard**
+**6. Duplicates: two classes, and a create path that cannot lose a race**
 
-- Standalone: canonical type + normalized name (+ website/API ref when present).
-- Offering: `parent_id` + offering type + normalized name — scoped to the chosen provider, so "Classic Burger" at two restaurants is not a duplicate.
-- UI shows `This may already exist: Classic Burger at Truffles` with `[Review this instead]` (selects the existing entity) and `[Create anyway]`.
-- A UI check alone loses races, so the final check runs server-side immediately before insert via `check-entity-duplicates`; a same-parent same-name collision returns the existing entity instead of inserting.
+My earlier wording — "the final check runs server-side immediately before insert" — was wrong. Moving a check into an edge function does not make check-then-insert atomic; two callers can both read "none" and both proceed. Corrected design:
+
+*Classification.* `check-entity-duplicates` returns candidates split into two classes:
+- **Exact identity** — same `api_source`+`api_ref`, or (offering) same `parent_id` + type + normalized name, or (standalone) same type + normalized name with no distinguishing website/ref. UI: `Classic Burger at Truffles already exists.` with a single action `[Review this]`. **No "Create anyway."**
+- **Possible match** — fuzzy name, same name different website, variant/edition, same product name under a different brand. UI: `This might already exist.` with `[Use existing]` and `[Create anyway]`.
+
+*Atomicity.* The insert itself is the arbiter, not the preflight. Take the smaller, honest route: `createEntityQuick` attempts the insert and catches the expected `23505`; on conflict it re-resolves the winner by canonical type + `parent_id` + normalized name and returns `{ entity, created: false }`. Callers get a normal successful selection; a raw Postgres error never reaches the UI. `create-brand-entity` already does exactly this for brands (its `23505`/slug branch), so this is an existing, proven pattern rather than a new architecture. The preflight stays, purely as friendly UX ahead of time.
+
+Normalized name uses the existing `normalizeBrandName` (NFKD, alphanumeric-only) so client and server agree on what "same name" means.
+
+*Test.* Two near-simultaneous "Classic Burger at Truffles" creates must yield exactly one entity, both callers receiving that same id, no `23505` surfaced. This is the one guarantee that cannot be verified by clicking, so it gets an explicit test.
 
 **7. Provenance and moderation**
 
-Record creator id, `creation_source: 'review_form'`, default moderation status, the provider relationship, and any external ref. Creating from a review grants no privileges. Explicit rule: an abandoned review still leaves the created entity in the catalog — it is a contribution, not a draft artifact.
+Provenance reuses whatever mechanism creation already uses — `create-brand-entity` stores `metadata.auto_created` / `metadata.created_from_product_url`, and existing entities carry `metadata.created_from_url`, so the review surface records `metadata.created_from = 'review_form'` in that same metadata contract rather than inventing a column. Also recorded: creator id (already enforced server-side by `entities_enforce_creation`), default moderation status, the provider relationship, any external ref. Creating from a review grants no privileges. Explicit rule: an abandoned review still leaves the created entity in the catalog — it is a contribution, not a draft artifact.
+
 
 **8. Telemetry**
 
