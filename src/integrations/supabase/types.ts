@@ -4233,6 +4233,18 @@ export type Database = {
         }
         Returns: Json
       }
+      create_entity_subject: {
+        Args: {
+          p_api_ref?: string
+          p_api_source?: string
+          p_metadata?: Json
+          p_name: string
+          p_parent_id?: string
+          p_type: string
+          p_website_url?: string
+        }
+        Returns: Json
+      }
       create_storage_open_policy: {
         Args: { bucket_id: string }
         Returns: boolean
@@ -4950,6 +4962,7 @@ export type Database = {
           updated_count: number
         }[]
       }
+      normalize_identity_name: { Args: { input_name: string }; Returns: string }
       notification_allowed: {
         Args: { _category: string; _user_id: string }
         Returns: boolean
