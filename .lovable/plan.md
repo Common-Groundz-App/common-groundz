@@ -116,25 +116,24 @@ Add `review_subject_create_opened`, `review_subject_created` (type, provider att
 
 **9. Brand edge-function slug cleanup**
 
-Delete the manual slug counter loop and the `slug` field on insert. **Keep** its `23505` handling — that branch becomes the shared conflict-resolution pattern described in step 6, not something to remove. Its duplicate/website checks are untouched.
+Delete the manual slug counter loop and the `slug` field on insert; keep its `23505` handling and its duplicate/website checks untouched.
 
 ## One thing I'd add on top of both reviews
 
-- **Test the predicate directly, and test that both callers use it.** `isExactIdentityMatch` gets its own unit tests (same api_ref → exact; same website → exact; same dish under same place → exact; two "Central Cafe" places → possible; "Classic Burger" vs "Classic Cheese Burger" → possible). Separately, assert that recovery routes through the same helper rather than its own inline comparison — that shared call is the entire safeguard, and it is the kind of thing a later refactor quietly duplicates. Plus a test that an unrecognized constraint violation propagates as a failure instead of a fake success.
+- **Prove the lock, don't assume it.** The advisory lock is now the single thing standing between this feature and duplicate dishes, so it needs a real concurrency test, not a unit test with a mocked client: two overlapping `create_entity_subject` calls for the same parent+type+name, asserting one row in `entities` and the same id returned twice, plus `created = true` exactly once. Alongside that, direct tests of `exactIdentity.ts` (same api_ref with matching type → exact; same api_ref with conflicting type → integrity error, not merge; same website different type → possible; same dish under same place → exact; two "Central Cafe" places → possible; "Classic Burger" vs "Classic Cheese Burger" → possible), a SQL/Deno parity test on the predicate, and a test that an unrecognized constraint violation propagates as failure instead of fake success.
 
 ## Explicitly unchanged
 
-Four wizard steps. "Skip for now" stays (removed in 2.4) — it is also the fallback while `search-or-create` is still being proven. No `entity_id NOT NULL`, no migration, no Step 3 fallback removal, no questionnaire redesign, no legacy component deletion, no changes to composer creation, existing reviews, or recommendation categories. No new registry pairs. External API results stay `existingOnly` in review mode.
+Four wizard steps. "Skip for now" stays (removed in 2.4) — it is also the fallback while `search-or-create` is still being proven. No `entity_id NOT NULL`, no `UNIQUE(parent_id, type, normalized_name)`, no data migration, no Step 3 fallback removal, no questionnaire redesign, no legacy component deletion, no changes to composer creation, existing reviews, or recommendation categories. No new registry pairs. External API results stay `existingOnly` in review mode.
 
 ## Acceptance criteria
 
-Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is standalone with no pair assertion; `service` quick-create is absent and no code asserts it needs a provider; invalid pairs are refused by the registry; exact matches offer only "Review this" while possible matches offer both actions; standalone name-only matches are never exact; two concurrent "Classic Burger at Truffles" creates yield one dish and the same id to both with no `23505` in the UI; an unrecognized unique-constraint violation fails loudly instead of resolving; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, mode-switch, failure and success; Skip still available; composer unchanged.
-
-
+Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is standalone with no pair assertion; `service` quick-create is absent and no code asserts it needs a provider; invalid pairs are refused by the registry; exact matches offer only "Review this" while possible matches offer both actions; standalone name-only matches are never exact; website/API matches never merge incompatible types; **two concurrent "Classic Burger at Truffles" creates produce exactly one row and return the same id to both callers**; an unrecognized unique-constraint violation fails loudly instead of resolving; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, mode-switch, failure and success; Skip still available; composer unchanged.
 
 ## Files touched
 
-`steps/SubjectSelectStep.tsx`, new `steps/SubjectQuickCreate.tsx`, `ReviewForm.tsx`, `enhancedEntityService.ts` (`createEntityQuick` parent arg), `supabase/functions/check-entity-duplicates/index.ts` (offering-scoped check), `supabase/functions/log-search-funnel/allowlists.ts`, `supabase/functions/create-brand-entity/index.ts`.
+New migration for `create_entity_subject` (advisory-locked create-or-resolve) and the SQL normalized-name helper. New `supabase/functions/_shared/exactIdentity.ts`. `steps/SubjectSelectStep.tsx`, new `steps/SubjectQuickCreate.tsx`, `ReviewForm.tsx`, `enhancedEntityService.ts` (routes review-subject creation through the RPC), `supabase/functions/check-entity-duplicates/index.ts` (exact/possible classification), `supabase/functions/log-search-funnel/allowlists.ts`, `supabase/functions/create-brand-entity/index.ts`.
+
 
 ## Out of scope
 
