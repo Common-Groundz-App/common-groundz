@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { X, Check } from 'lucide-react';
+import { X, Check, PlusCircle } from 'lucide-react';
 import { UnifiedEntitySelector } from '@/components/feed/UnifiedEntitySelector';
 import { EntityAdapter } from '@/components/profile/circles/types';
 import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import SubjectQuickCreate from './SubjectQuickCreate';
+import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 
 interface SubjectSelectStepProps {
   /** The currently chosen subject, if any. */
@@ -35,6 +37,9 @@ const SubjectSelectStep = ({
   contextLine,
   isResolvingContext = false,
 }: SubjectSelectStepProps) => {
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const { log: logFunnel } = useSearchFunnel();
+
   return (
     <div className="flex flex-col py-6 px-2 sm:px-4 space-y-5 w-full">
       <div className="text-center space-y-1">
@@ -92,15 +97,35 @@ const SubjectSelectStep = ({
       )}
 
       {!subject && !disabled && (
-        <div className="text-center">
-          <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
-            Skip for now
+        <div className="text-center space-y-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setQuickCreateOpen(true)}
+          >
+            <PlusCircle className="h-4 w-4 mr-1.5" />
+            Can't find it? Add something new
           </Button>
-          <p className="mt-1 text-xs text-muted-foreground">
-            You can still write your review and type the name yourself.
-          </p>
+          <div>
+            <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
+              Skip for now
+            </Button>
+            <p className="mt-1 text-xs text-muted-foreground">
+              You can still write your review and type the name yourself.
+            </p>
+          </div>
         </div>
       )}
+
+      <SubjectQuickCreate
+        open={quickCreateOpen}
+        onOpenChange={setQuickCreateOpen}
+        onCreated={(entity) => onSubjectChange(entity)}
+        logEvent={(event, payload) =>
+          logFunnel({ event, source: 'review_form', ...payload } as any)
+        }
+      />
 
       {disabled && subject && (
         <p className="text-center text-sm text-muted-foreground">

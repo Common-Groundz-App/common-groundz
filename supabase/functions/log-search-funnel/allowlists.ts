@@ -18,6 +18,11 @@ export const ALLOWED_EVENTS = new Set([
   "review_subject_skipped",
   "review_subject_attached_late",
   "review_submitted",
+  // Phase 2.3 — quick-create subject drawer inside the review form.
+  "subject_create_started",
+  "subject_create_completed",
+  "subject_create_duplicate_exact",
+  "subject_create_duplicate_possible",
 ]);
 
 export const ALLOWED_SOURCES = new Set([
