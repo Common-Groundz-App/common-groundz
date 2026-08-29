@@ -1,74 +1,93 @@
-# Phase 2.2 verification + Phase 2.3 — Safe subject creation ("Add the dish")
+# Phase 2.2 verification + Phase 2.3 — "Can't find it? Add something new"
 
 ## Phase 2.2 status: complete and correct
 
-Verified this turn:
-
-- The database is the slug authority. `generate_entity_slug_v2(name, current_entity_id, parent_id, requested_slug)` exists with the `requested_slug` branch; `generate_entity_slug_on_insert` and `update_entity_slug` are the only creation/rename paths.
-- Client cleanup landed: `createEntityQuick` no longer manufactures a slug (explicit comment at `enhancedEntityService.ts:53`), `setEntityParent` sends only `parent_id` and documents attach/reparent/detach behaviour.
-- `slugifyEntityName` carries NFKD transliteration for parity with `public.slugify_entity_name`; parity fixtures are pinned in `entitySlug.test.ts`.
+- The database is the slug authority: `generate_entity_slug_v2(name, current_entity_id, parent_id, requested_slug)` plus the insert and update triggers are the only creation/rename paths.
+- Client cleanup landed: `createEntityQuick` no longer manufactures a slug, `setEntityParent` sends only `parent_id`.
+- `slugifyEntityName` has NFKD transliteration for parity with `public.slugify_entity_name`, fixtures pinned in `entitySlug.test.ts`.
 - Full suite green: 27 files, 359 tests.
 
-Three leftovers exist. None of them break Phase 2.2, and each is scheduled rather than silently ignored:
+Leftovers, none blocking, each scheduled:
 
-1. `supabase/functions/create-brand-entity/index.ts` still runs its own `baseSlug` + counter loop and passes `slug` on insert. The trigger now validates that supplied slug, so it is redundant, not wrong. Brands are parentless, so no hierarchy risk. Removing the loop belongs to Phase 2.3 because that function is touched by the creation work anyway.
-2. `src/utils/slugMigration.ts` and `src/utils/slugMigrationPreview.ts` are parent-unaware client slug generators, kept as admin/backfill tools. They must not be reachable from user flows; retirement is Phase 2.5 cleanup.
-3. `steps/StepTwo.tsx` and `CategorySelector.tsx` remain unreferenced from Phase 2.1, also Phase 2.5 cleanup.
+1. `supabase/functions/create-brand-entity/index.ts` still runs its own slug counter loop and passes `slug` on insert. Redundant now (brands are parentless, and the trigger validates a supplied slug), removed in 2.3 since the function is in scope anyway.
+2. `src/utils/slugMigration.ts` / `slugMigrationPreview.ts` — parent-unaware admin backfill tools, retired in 2.5.
+3. `steps/StepTwo.tsx` and `CategorySelector.tsx` still unreferenced from 2.1, deleted in 2.5.
 
-## Phase 2.3 goal
+## Creation-service audit (the thing both reviews asked for first)
 
-Today Step 2 runs `externalResultPolicy="existingOnly"` with `allowInlineCreate={false}`, so a user reviewing a dish that isn't in the database has only "Skip for now". Phase 2.3 gives that user a safe, narrow way to create the subject — a provider-anchored offering ("Add this dish at a place") plus a plain standalone create — so Phase 2.4 can finally require a subject.
+`src/services/enhancedEntityService.ts` is the path to reuse. `createEntityQuick` already sets `created_by` from the session, sends no slug, and returns the inserted row immediately; `entities_enforce_creation` enforces `created_by` server-side and `approval_status` defaults apply. One small refactor is needed and nothing more: an optional `parentId` argument passed through to the insert. No review-only persistence service.
 
-Scope is the review wizard's Step 2 and the creation service behind it. No questionnaire changes, no Step 3/4 changes, no category-derivation changes.
+`CreateEntityDialog` (admin) stays out of the review flow. `check-entity-duplicates` already exists as an edge function and is the server-side guard for step 6 below.
 
-## What gets built
+## What Phase 2.3 builds
 
-**1. A dedicated quick-create sheet, not the admin dialog**
+**1. Entry point replaces the dead end**
 
-New `SubjectQuickCreate` (in `components/profile/reviews/steps/`), opened from Step 2 when the search has ≥3 characters and returns nothing. Fields only:
+Step 2 currently offers only "Skip for now" when search finds nothing. Add:
 
-- Name (prefilled from the search query)
-- Type — a short picker limited to canonical types, defaulting from what the user searched
-- Provider — shown only when the chosen type is a registry offering type (`food`, `product`, `service`); a small existing-only place/brand search. Required for `food`, optional otherwise.
-- Create button
+```text
+Can't find what you're reviewing?
+[ Add something new ]
+```
 
-No image upload, no metadata, no description. The admin `CreateEntityDialog` stays untouched and out of the review flow.
+Opens a drawer/modal over the review form. `ReviewForm` state (rating, title, text, media, date, visibility, current step, search query) is untouched on open, cancel, failure and success — the drawer is a sibling of the wizard, never a remount.
 
-**2. Registry-validated creation**
+**2. Path A — standalone entity**
 
-The provider/offering pair is checked with `assertValidOfferingPair()` from `entityRelationshipRegistry.ts` before insert. An unregistered pair is refused with a plain message, never silently downgraded to a parentless entity.
+Canonical types that can safely exist parentless: `place`, `book`, `movie`, `tv_show`, `course`, `app`, `game`, `event`, `brand`, `professional`, `experience`, `others`. Fields: type + name. Nothing else.
 
-**3. `parent_id` on quick create**
+**3. Path B — offering under a provider**
 
-`createEntityQuick` gains an optional third argument for the parent entity id, passed straight through to the insert. It still sends no slug — the insert trigger builds `parentSlug-childSlug` and guarantees uniqueness. This is the Phase 2.2 payoff: two "Classic Burger" dishes under different restaurants no longer collide.
+Only the two approved registry pairs this phase: `place → food` and `brand → product`. No `place → service`, `professional → service`, or `place → product` — those are product decisions, not plumbing.
 
-**4. Step 2 wiring**
+Food flow: `Add a dish → Where is it offered? [existing-only place search] → What's it called? → Create and continue`. Provider is **required** for `food`; no orphan dish can be created through the review form. For `product`, the brand is optional and the UI says so explicitly ("I don't know the brand") rather than inventing a placeholder brand.
 
-`SubjectSelectStep` keeps `existingOnly` for external API results (unchanged, still no accidental Google Places writes) but gains an explicit "Can't find it? Add it" affordance that opens the sheet. A successful create selects the new entity as the subject immediately and runs the existing parent-context lookup, so the confirmation line reads "Dish at Toit" straight away.
+Every pair goes through `assertValidOfferingPair()` from `entityRelationshipRegistry.ts`. `parent_id` is set at insert; the Phase 2.2 trigger produces `truffles-classic-burger`. The client never computes or sends a slug.
 
-"Skip for now" stays in this phase. It is removed in 2.4, once creation has been exercised.
+**4. Auto-select through the real handler**
 
-**5. Telemetry**
+On success the created entity is fed into `handleSubjectChange` — the same authoritative path an existing search result takes — so canonical category, `questionnaireKind`, `foodName`, venue/parent context, step completion, recents and telemetry all derive exactly as today. Never set `entityId` by hand.
 
-Extend the existing `log-search-funnel` review-subject events with `subject_create_opened`, `subject_created` (type, whether a provider was attached), and `subject_create_failed`. This is how we judge readiness for 2.4.
+**5. Type resolution**
 
-**6. Brand edge-function slug cleanup**
+Type comes from `parseEntityType`; unparseable blocks creation. No falling back to `product` or `place`.
 
-Delete the manual slug loop and the `23505` retry in `create-brand-entity`, letting the insert trigger own the slug. Keep the duplicate/website checks exactly as they are.
+**6. Duplicate detection before insert, with a server-side guard**
 
-## Guardrails
+- Standalone: canonical type + normalized name (+ website/API ref when present).
+- Offering: `parent_id` + offering type + normalized name — scoped to the chosen provider, so "Classic Burger" at two restaurants is not a duplicate.
+- UI shows `This may already exist: Classic Burger at Truffles` with `[Review this instead]` (selects the existing entity) and `[Create anyway]`.
+- A UI check alone loses races, so the final check runs server-side immediately before insert via `check-entity-duplicates`; a same-parent same-name collision returns the existing entity instead of inserting.
 
-- Users can only create entities from the review flow through this narrow sheet; the admin dialog remains admin-only.
-- Type comes from `parseEntityType`; an unparseable type blocks creation rather than defaulting to `product` or `place`.
-- Nothing writes `slug` from the client.
-- Existing reviews being edited are unaffected — creation is only reachable when no subject is selected and `subjectOrigin` is `user-selected`.
+**7. Provenance and moderation**
 
-## Technical notes
+Record creator id, `creation_source: 'review_form'`, default moderation status, the provider relationship, and any external ref. Creating from a review grants no privileges. Explicit rule: an abandoned review still leaves the created entity in the catalog — it is a contribution, not a draft artifact.
 
-- Touched: `SubjectSelectStep.tsx`, new `SubjectQuickCreate.tsx`, `enhancedEntityService.ts` (`createEntityQuick` parent arg), `ReviewForm.tsx` (subject-created handler + telemetry), `supabase/functions/log-search-funnel` allowlist, `supabase/functions/create-brand-entity/index.ts`.
-- No migration required — the Phase 2.2 trigger already handles parented inserts.
-- Tests: registry rejection of an invalid pair; `createEntityQuick` sends `parent_id` and never `slug`; a created subject becomes the active subject with a derived canonical category; the type picker rejects unknown types.
+**8. Telemetry**
+
+Add `review_subject_create_opened`, `review_subject_created` (type, provider attached yes/no, duplicate-warning shown yes/no), `review_subject_create_failed`, `review_subject_duplicate_resolved` to `log-search-funnel/allowlists.ts`. These numbers decide when 2.4 can require a subject.
+
+**9. Brand edge-function slug cleanup**
+
+Delete the manual slug loop and the `23505` retry in `create-brand-entity`; leave its duplicate/website checks alone.
+
+## Two things I'd add on top of both reviews
+
+- **A concurrency test, not just a code path.** The server-side dedupe guard is the one piece that can't be verified by clicking. Two near-simultaneous "Classic Burger at Truffles" creates must yield one entity and two successful selections. Worth an explicit test because the global unique slug index would otherwise surface as a raw `23505` in the user's face.
+- **The provider search must be existing-only and must not nest creation.** If a user is adding a dish at a restaurant that isn't in the database either, they get one clear message and the option to add the place first — not a recursive create-inside-create. That keeps the flow finite and the draft safe.
+
+## Explicitly unchanged
+
+Four wizard steps. "Skip for now" stays (removed in 2.4). No `entity_id NOT NULL`, no migration, no Step 3 fallback removal, no questionnaire redesign, no legacy component deletion, no changes to composer creation, existing reviews, or recommendation categories. External API results stay `existingOnly` in review mode.
+
+## Acceptance criteria
+
+Existing subject search still works; standalone creation works; food creation requires a place and produces a hierarchical slug from the trigger; product-under-brand works and brand-less product is a deliberate choice; invalid pairs are refused by the registry; duplicates are surfaced before insert and resolved server-side under concurrency; success auto-selects via `handleSubjectChange`; the draft survives open, cancel, failure and success; Skip still available; composer unchanged.
+
+## Files touched
+
+`steps/SubjectSelectStep.tsx`, new `steps/SubjectQuickCreate.tsx`, `ReviewForm.tsx`, `enhancedEntityService.ts` (`createEntityQuick` parent arg), `supabase/functions/check-entity-duplicates/index.ts` (offering-scoped check), `supabase/functions/log-search-funnel/allowlists.ts`, `supabase/functions/create-brand-entity/index.ts`.
 
 ## Out of scope
 
-Requiring a subject (2.4). Removing `StepTwo`/`CategorySelector`/`slugMigration` (2.5). Questionnaire configuration (Phase 3). Image or metadata enrichment for created subjects. Menu ingestion. Concept/cuisine multi-classification.
+Requiring a subject (2.4). Legacy cleanup (2.5). Config-driven questionnaires (Phase 3). Image/metadata enrichment for created subjects, menu ingestion, cuisine/concept multi-classification.
