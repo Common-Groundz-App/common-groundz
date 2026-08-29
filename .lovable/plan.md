@@ -61,25 +61,48 @@ On success the created entity is fed into `handleSubjectChange` — the same aut
 
 Type comes from `parseEntityType`; unparseable blocks creation. No falling back to `product` or `place`.
 
-**6. Duplicates: one exact-identity predicate, shared by classifier and conflict recovery**
+**6. Duplicates: server-side authority, and one atomic create-or-resolve for exact identities**
 
-Moving a check into an edge function does not make check-then-insert atomic; two callers can both read "none" and both proceed. So the insert is the arbiter — but only for conflicts whose identity is actually well-defined.
+Two corrections to my previous draft, both blocking:
 
-*One predicate, two callers.* A single `isExactIdentityMatch(candidate, input)` helper is the only definition of "exact", used by both the preflight classifier and the post-conflict recovery. They can never disagree, because there is nothing to disagree with. Exact identity is a short enumerated list, strongest first:
+*The `23505` recovery was guarding an error that mostly won't fire.* I confirmed `generate_entity_slug_v2` resolves collisions itself with a counter suffix. So two concurrent "Classic Burger at Truffles" creates do not reliably collide — they most likely become `truffles-classic-burger` and `truffles-classic-burger-2`, two rows, no error, exactly the duplicate dishes the provider/offering architecture exists to prevent. Catching `23505` cannot make offering creation race-safe.
 
-1. same `api_source` + `api_ref` (both non-null)
-2. same normalized `website_url`
-3. offering only: same `parent_id` + canonical type + normalized name
+*The fix: one atomic server-side create-or-resolve.* A new SECURITY DEFINER RPC, `create_entity_subject(name, type, parent_id, metadata)`, owns the exact-identity boundary:
 
-Everything else is **possible**, by construction. Notably, standalone type + normalized name is *not* exact: two restaurants called Central Cafe, two books titled "It", a remake sharing a title, two professionals with the same name, a recurring event are all legitimately distinct. Since quick-create collects only type and name, a standalone name match can never be more than a suggestion.
+```text
+lock  pg_advisory_xact_lock(hashtext(parent_id || type || normalized_name))
+check exact existing match
+      found → return (entity, created = false)
+      none  → insert → return (entity, created = true)
+```
 
-*UI per class.* Exact → `Classic Burger at Truffles already exists.` with a single action `[Review this]`, no "Create anyway". Possible → `This might already exist.` with `[Use existing]` and `[Create anyway]`.
+All inside one transaction. B waits on A's lock, then finds A's row and returns it. Result: one entity, both callers get the same id — the acceptance criterion actually holds rather than being asserted. No new `UNIQUE(parent_id, type, normalized_name)` constraint: that needs a canonical normalized-name column, null-parent partial semantics, and a backfill decision over existing data — schema policy well beyond this phase. The advisory lock is targeted and reversible.
 
-*Conflict recovery, constraint-aware.* `entities` has three unique indexes — `entities_slug_key`, `entities_api_source_ref_idx` (partial, api_source+api_ref), `entities_website_url_idx` (partial, live rows). A `23505` is therefore not self-evidently a duplicate race. Recovery: read the violated constraint name from the error, and only for those three attempt resolution; look up the intended row and accept it **only if `isExactIdentityMatch` agrees**. If the constraint is unrecognized, or nothing resolves, or the resolved row fails the predicate, surface a real failure — never fabricate success. One bounded retry with short backoff covers the slug case where the trigger's collision suffix needs a second pass.
+The lock is only taken where identity is well-defined (an offering under a provider). Standalone name-only creation takes no lock and is never force-merged.
 
-Normalized name uses the existing `normalizeBrandName` (NFKD, alphanumeric-only) so client and server agree on what "same name" means.
+*Exact identity, tightened, and defined in exactly one place.* Codex is right that a helper under `src/` is invisible to a deployed edge function, so "one predicate" was aspirational. The predicate lives server-side only:
 
-*Concurrency guarantee, scoped honestly.* The strong "one entity, both callers succeed" guarantee applies where identity is well-defined: two simultaneous "Classic Burger at Truffles" creates yield exactly one dish and the same id to both, no `23505` in the UI. For standalone name-only creation there is no forced merge — the system cannot know whether two same-named places are duplicates, so it warns and lets the user decide.
+- `supabase/functions/_shared/exactIdentity.ts` — used by `check-entity-duplicates` for classification. The client never implements it.
+- The same rules expressed in SQL inside `create_entity_subject` for the locked recheck.
+
+Both are server-side and both get parity tests, the same arrangement already used for `brand_normalize.ts` and its browser mirror.
+
+Rules, with type compatibility required (a brand and a product sharing `example.com` are not the same thing):
+
+1. same `api_source` + `api_ref`, both non-null, **and compatible canonical type** — a type conflict here is a data-integrity signal, reported, not silently merged
+2. same normalized `website_url` **and same canonical type**
+3. offering: same `parent_id` + same canonical type + same normalized name
+
+Everything else is **possible**, by construction. Standalone type + normalized name is explicitly not exact: two places called Central Cafe, two books titled "It", a remake, two professionals with the same name, a recurring event are all legitimately distinct, and quick-create collects only type and name.
+
+*UI per class.* Exact → `Classic Burger at Truffles already exists.` with a single `[Review this]`, no "Create anyway". Possible → `This might already exist.` with `[Use existing]` and `[Create anyway]`.
+
+*Preflight is advisory only.* `check-entity-duplicates` still runs for friendly UX before creation, but it decides nothing; the RPC is the authority.
+
+*Residual errors fail safely.* The client keeps a small allowlist of recognized constraints (`entities_slug_key`, `entities_api_source_ref_idx`, `entities_website_url_idx`), read from the structured constraint field rather than parsed from a message. On a recognized conflict, bounded retry through the RPC. On an unrecognized constraint, or nothing resolving, surface a real failure — never fabricate success.
+
+Normalized name uses the existing `normalizeBrandName` (NFKD, alphanumeric-only), mirrored in SQL, so the RPC and the classifier agree on what "same name" means.
+
 
 
 **7. Provenance and moderation**
