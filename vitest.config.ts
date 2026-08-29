@@ -48,6 +48,7 @@ const nodeIncludes = [
   'src/services/__tests__/entityRelationshipRegistry.test.ts',
   'src/components/profile/reviews/__tests__/subjectSelection.test.ts',
   'src/components/profile/reviews/__tests__/reviewCategoryBucketParity.test.ts',
+  'src/services/__tests__/offeringPairParity.test.ts',
 ];
 
 

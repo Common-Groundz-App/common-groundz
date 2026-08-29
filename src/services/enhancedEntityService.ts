@@ -4,6 +4,7 @@ import { Database } from '@/integrations/supabase/types';
 import { Entity } from '@/services/recommendation/types';
 import { saveExternalImageToStorage } from '@/utils/imageUtils';
 import { cachedPhotoService } from './cachedPhotoService';
+import { parseEntityType, type CanonicalEntityType } from '@/services/entityType';
 
 
 export interface EnhancedEntityData {
@@ -749,4 +750,94 @@ export const queueEntityForEnrichment = async (entityId: string, priority: numbe
     console.error('Error queuing entity for enrichment:', error);
     return false;
   }
+};
+
+// =============================================================================
+// Phase 2.3 — Safe Subject Creation
+// =============================================================================
+// Single canonical creation path for review subjects. ALL exact-identity
+// duplicate resolution happens server-side inside `create_entity_subject`
+// (atomic: advisory lock + recheck + insert in one transaction). The client
+// only: (1) validates input, (2) distinguishes identity/slug conflicts (which
+// the RPC resolves internally — retry is a safety valve for concurrent races
+// that surface as constraint errors) from REAL failures (which fail loudly).
+
+export interface CreateEntitySubjectInput {
+  name: string;
+  type: CanonicalEntityType;
+  parentId?: string | null;
+  apiSource?: string | null;
+  apiRef?: string | null;
+  websiteUrl?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateEntitySubjectResult {
+  entity: Entity;
+  /** false when an exact duplicate existed and was reused. */
+  created: boolean;
+}
+
+/**
+ * The ONLY unique-constraint names the recovery path recognizes (read from
+ * PostgREST error details). ANY other 23505 is a real failure and rethrows.
+ */
+const RECOGNIZED_DUPLICATE_CONSTRAINTS = [
+  'entities_slug_key',
+  'idx_entities_slug_unique',
+  'entities_api_identity_idx',
+  'entities_website_url_unique',
+  'entities_unique_normalized_name',
+  'entities_unique_place_name_location',
+] as const;
+
+const isRecognizedDuplicateConflict = (error: any): boolean => {
+  if (!error || error.code !== '23505') return false;
+  const haystack = `${error.message ?? ''} ${error.details ?? ''} ${error.hint ?? ''}`;
+  return RECOGNIZED_DUPLICATE_CONSTRAINTS.some((c) => haystack.includes(c));
+};
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export const createEntitySubject = async (
+  input: CreateEntitySubjectInput,
+): Promise<CreateEntitySubjectResult> => {
+  const canonicalType = parseEntityType(input.type);
+  if (!canonicalType) {
+    throw new Error(`Unparseable entity type: ${String(input.type)}`);
+  }
+  const name = input.name.trim();
+  if (!name) throw new Error('A name is required.');
+
+  const payload = {
+    p_name: name,
+    p_type: canonicalType,
+    p_parent_id: input.parentId ?? null,
+    p_api_source: input.apiSource ?? null,
+    p_api_ref: input.apiRef ?? null,
+    p_website_url: input.websiteUrl ?? null,
+    p_metadata: (input.metadata ?? {}) as any,
+  };
+
+  let lastError: any = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data, error } = await supabase.rpc('create_entity_subject', payload);
+    if (!error && data) {
+      const row = data as { created?: boolean; entity?: Entity };
+      if (!row.entity?.id) throw new Error('Creation returned no entity.');
+      return { entity: row.entity, created: row.created === true };
+    }
+    lastError = error;
+    if (isRecognizedDuplicateConflict(error)) {
+      // Rare race between the RPC's advisory-locked recheck and another
+      // writer. The RPC resolves duplicates internally; a bounded retry lets
+      // the next call see the committed row and reuse it.
+      if (attempt < 2) await wait(250 * (attempt + 1));
+      continue;
+    }
+    // Anything else — including 23505 on an unrecognized constraint or the
+    // RPC's type-conflict guard — is a real failure. Fail loudly.
+    break;
+  }
+  throw new Error(lastError?.message ?? 'Could not create the subject. Please try again.');
 };

@@ -3,6 +3,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isNonAdminEntityCreationEnabled } from '../_shared/feature_flags.ts';
+import { classifyEntity, type DuplicateClass } from '../_shared/exactIdentity.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -62,6 +63,8 @@ interface Candidate {
   parent_name: string | null;
   score: number;
   reasons: string[];
+  /** Phase 2.3 — server-side exact-identity classification ('full' mode only). */
+  classification?: DuplicateClass;
 }
 
 serve(async (req) => {
@@ -137,7 +140,9 @@ serve(async (req) => {
 
 
     const collected = new Map<string, Candidate>();
+    const rawById = new Map<string, any>();
     const add = (row: any, score: number, reason: string) => {
+      rawById.set(row.id, row);
       const ex = collected.get(row.id);
       if (ex) {
         ex.score = Math.max(ex.score, score);
@@ -281,6 +286,16 @@ serve(async (req) => {
     const candidates = Array.from(collected.values())
       .sort((a, b) => b.score - a.score)
       .slice(0, 6);
+
+    // Phase 2.3 — advisory classification per candidate. The authoritative
+    // recheck at create time lives in SQL (create_entity_subject); this only
+    // tells the UI which candidates block vs warn.
+    for (const c of candidates) {
+      const raw = rawById.get(c.id);
+      c.classification = raw
+        ? (classifyEntity({ name, type, parentId, apiSource, apiRef, websiteUrl: body.websiteUrl }, raw) ?? 'possible')
+        : 'possible';
+    }
 
     return new Response(JSON.stringify({ candidates }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
