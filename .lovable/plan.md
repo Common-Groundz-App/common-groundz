@@ -61,19 +61,26 @@ On success the created entity is fed into `handleSubjectChange` — the same aut
 
 Type comes from `parseEntityType`; unparseable blocks creation. No falling back to `product` or `place`.
 
-**6. Duplicates: two classes, and a create path that cannot lose a race**
+**6. Duplicates: one exact-identity predicate, shared by classifier and conflict recovery**
 
-My earlier wording — "the final check runs server-side immediately before insert" — was wrong. Moving a check into an edge function does not make check-then-insert atomic; two callers can both read "none" and both proceed. Corrected design:
+Moving a check into an edge function does not make check-then-insert atomic; two callers can both read "none" and both proceed. So the insert is the arbiter — but only for conflicts whose identity is actually well-defined.
 
-*Classification.* `check-entity-duplicates` returns candidates split into two classes:
-- **Exact identity** — same `api_source`+`api_ref`, or (offering) same `parent_id` + type + normalized name, or (standalone) same type + normalized name with no distinguishing website/ref. UI: `Classic Burger at Truffles already exists.` with a single action `[Review this]`. **No "Create anyway."**
-- **Possible match** — fuzzy name, same name different website, variant/edition, same product name under a different brand. UI: `This might already exist.` with `[Use existing]` and `[Create anyway]`.
+*One predicate, two callers.* A single `isExactIdentityMatch(candidate, input)` helper is the only definition of "exact", used by both the preflight classifier and the post-conflict recovery. They can never disagree, because there is nothing to disagree with. Exact identity is a short enumerated list, strongest first:
 
-*Atomicity.* The insert itself is the arbiter, not the preflight. Take the smaller, honest route: `createEntityQuick` attempts the insert and catches the expected `23505`; on conflict it re-resolves the winner by canonical type + `parent_id` + normalized name and returns `{ entity, created: false }`. Callers get a normal successful selection; a raw Postgres error never reaches the UI. `create-brand-entity` already does exactly this for brands (its `23505`/slug branch), so this is an existing, proven pattern rather than a new architecture. The preflight stays, purely as friendly UX ahead of time.
+1. same `api_source` + `api_ref` (both non-null)
+2. same normalized `website_url`
+3. offering only: same `parent_id` + canonical type + normalized name
+
+Everything else is **possible**, by construction. Notably, standalone type + normalized name is *not* exact: two restaurants called Central Cafe, two books titled "It", a remake sharing a title, two professionals with the same name, a recurring event are all legitimately distinct. Since quick-create collects only type and name, a standalone name match can never be more than a suggestion.
+
+*UI per class.* Exact → `Classic Burger at Truffles already exists.` with a single action `[Review this]`, no "Create anyway". Possible → `This might already exist.` with `[Use existing]` and `[Create anyway]`.
+
+*Conflict recovery, constraint-aware.* `entities` has three unique indexes — `entities_slug_key`, `entities_api_source_ref_idx` (partial, api_source+api_ref), `entities_website_url_idx` (partial, live rows). A `23505` is therefore not self-evidently a duplicate race. Recovery: read the violated constraint name from the error, and only for those three attempt resolution; look up the intended row and accept it **only if `isExactIdentityMatch` agrees**. If the constraint is unrecognized, or nothing resolves, or the resolved row fails the predicate, surface a real failure — never fabricate success. One bounded retry with short backoff covers the slug case where the trigger's collision suffix needs a second pass.
 
 Normalized name uses the existing `normalizeBrandName` (NFKD, alphanumeric-only) so client and server agree on what "same name" means.
 
-*Test.* Two near-simultaneous "Classic Burger at Truffles" creates must yield exactly one entity, both callers receiving that same id, no `23505` surfaced. This is the one guarantee that cannot be verified by clicking, so it gets an explicit test.
+*Concurrency guarantee, scoped honestly.* The strong "one entity, both callers succeed" guarantee applies where identity is well-defined: two simultaneous "Classic Burger at Truffles" creates yield exactly one dish and the same id to both, no `23505` in the UI. For standalone name-only creation there is no forced merge — the system cannot know whether two same-named places are duplicates, so it warns and lets the user decide.
+
 
 **7. Provenance and moderation**
 
