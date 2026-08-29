@@ -132,7 +132,7 @@ Existing subject search still works; standalone creation works; food creation re
 
 ## Files touched
 
-New migration for `create_entity_subject` (advisory-locked create-or-resolve) and the SQL normalized-name helper. New `supabase/functions/_shared/exactIdentity.ts`. `steps/SubjectSelectStep.tsx`, new `steps/SubjectQuickCreate.tsx`, `ReviewForm.tsx`, `enhancedEntityService.ts` (routes review-subject creation through the RPC), `supabase/functions/check-entity-duplicates/index.ts` (exact/possible classification), `supabase/functions/log-search-funnel/allowlists.ts`, `supabase/functions/create-brand-entity/index.ts`.
+New migration for `create_entity_subject` (advisory-locked create-or-resolve, hardened as below) and the SQL normalized-name helper. New `supabase/functions/_shared/exactIdentity.ts`. `steps/SubjectSelectStep.tsx`, new `steps/SubjectQuickCreate.tsx`, `ReviewForm.tsx`, `enhancedEntityService.ts` (routes review-subject creation through the RPC), `supabase/functions/check-entity-duplicates/index.ts` (exact/possible classification), `supabase/functions/log-search-funnel/allowlists.ts`. `create-brand-entity/index.ts` is **not** touched in this phase.
 
 
 ## Out of scope
