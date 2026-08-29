@@ -34,15 +34,24 @@ Opens a drawer/modal over the review form. `ReviewForm` state (rating, title, te
 
 **2. Path A — standalone entity**
 
-Canonical types that can safely exist parentless: `place`, `book`, `movie`, `tv_show`, `course`, `app`, `game`, `event`, `brand`, `professional`, `experience`, `others`. Fields: type + name. Nothing else.
+Canonical types offered parentless: `place`, `book`, `movie`, `tv_show`, `course`, `app`, `game`, `event`, `brand`, `professional`, `experience`, `others`. Fields: type + name. Nothing else.
+
+`service` is deliberately **not offered** in this phase. That is a UI omission, not a model claim — nothing in the code will encode "a service must have a provider". Its relationship semantics (`place → service`, `professional → service`) stay undecided, and the registry gains no new pairs.
 
 **3. Path B — offering under a provider**
 
-Only the two approved registry pairs this phase: `place → food` and `brand → product`. No `place → service`, `professional → service`, or `place → product` — those are product decisions, not plumbing.
+Only the two approved registry pairs this phase: `place → food` and `brand → product`. No `place → service`, `professional → service`, or `place → product`.
 
-Food flow: `Add a dish → Where is it offered? [existing-only place search] → What's it called? → Create and continue`. Provider is **required** for `food`; no orphan dish can be created through the review form. For `product`, the brand is optional and the UI says so explicitly ("I don't know the brand") rather than inventing a placeholder brand.
+Food flow: `Add a dish → Where is it offered? [existing-only place search] → What's it called? → Create and continue`. Provider is **required** for `food`; no orphan dish can be created through the review form.
 
-Every pair goes through `assertValidOfferingPair()` from `entityRelationshipRegistry.ts`. `parent_id` is set at insert; the Phase 2.2 trigger produces `truffles-classic-burger`. The client never computes or sends a slug.
+`product` is two different creations, not one with an optional field:
+- Brand selected → offering creation, `assertValidOfferingPair('brand','product')`, `parent_id` set, hierarchical slug.
+- "I don't know the brand" → **standalone** product creation, `parent_id` null, and the pair assertion is not called at all (there is no relationship to validate). No placeholder brand is ever invented.
+
+Provider not found: no nested dialog. The same drawer switches sequentially from offering mode to standalone place creation, then returns to the dish form with the new place preselected — one drawer, a state change, and the review draft untouched throughout.
+
+`parent_id` is set at insert; the Phase 2.2 trigger produces `truffles-classic-burger`. The client never computes or sends a slug.
+
 
 **4. Auto-select through the real handler**
 
