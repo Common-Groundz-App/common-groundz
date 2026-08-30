@@ -34,6 +34,8 @@ export interface FunnelPayload {
   /** Raw query — hashed locally, never transmitted. */
   query?: string;
   entityType?: string;
+  /** Stored review category, used only for divergence telemetry. */
+  category?: string;
   candidateIndex?: number;
   diagnostics?: {
     latencyMs?: number;
