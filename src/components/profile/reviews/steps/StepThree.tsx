@@ -1,13 +1,11 @@
 
-import React, { useState, ChangeEvent, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import EntitySearch from '@/components/recommendations/EntitySearch';
 import { Entity } from '@/services/recommendation/types';
 import { EntityPreviewCard } from '@/components/common/EntityPreviewCard';
-import { Book, Clapperboard, MapPin, ShoppingBag, Navigation, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+
 import { useLocation } from '@/contexts/LocationContext';
 import { LocationAccessPrompt } from '@/components/profile/reviews/LocationAccessPrompt';
 import { MediaUploader } from '@/components/media/MediaUploader';
@@ -21,14 +19,11 @@ interface StepThreeProps {
   onTitleChange: (value: string) => void;
   venue: string;
   onVenueChange: (value: string) => void;
-  entityId: string;
-  onEntitySelect: (entity: Entity) => void;
   selectedEntity: Entity | null;
   selectedMedia: MediaItem[];
   onMediaAdd: (media: MediaItem) => void;
   onMediaRemove: (mediaUrl: string) => void;
   isUploading: boolean;
-  disableEntityChange?: boolean; // Prop to disable entity change
   disableEntityFields?: boolean; // Prop to disable entity field editing
 }
 
@@ -38,17 +33,13 @@ const StepThree = ({
   onTitleChange,
   venue,
   onVenueChange,
-  entityId,
-  onEntitySelect,
   selectedEntity,
   selectedMedia,
   onMediaAdd,
   onMediaRemove,
   isUploading,
-  disableEntityChange = false, // Default to false for backward compatibility
   disableEntityFields = false // Default to false for backward compatibility
 }: StepThreeProps) => {
-  const [showEntitySearch, setShowEntitySearch] = useState(!selectedEntity);
   const [processedEntity, setProcessedEntity] = useState<Entity | null>(null);
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   
@@ -120,17 +111,6 @@ const StepThree = ({
     localStorage.setItem('locationPromptLastSkipped', Date.now().toString());
   };
   
-  const getCategoryIcon = () => {
-    switch(category) {
-      case 'food': return <MapPin className="h-5 w-5 text-brand-orange" />;
-      case 'movie': return <Clapperboard className="h-5 w-5 text-brand-orange" />;
-      case 'book': return <Book className="h-5 w-5 text-brand-orange" />;
-      case 'place': return <MapPin className="h-5 w-5 text-brand-orange" />;
-      case 'product': return <ShoppingBag className="h-5 w-5 text-brand-orange" />;
-      default: return <MapPin className="h-5 w-5 text-brand-orange" />;
-    }
-  };
-  
   const getMainFieldLabel = () => {
     switch(category) {
       case 'food': return "What did you eat?";
@@ -151,80 +131,6 @@ const StepThree = ({
       case 'product': return "Brand";
       default: return "Venue";
     }
-  };
-  
-  const getEntitySearchType = () => {
-    switch(category) {
-      case 'food': return "place";
-      case 'movie': return "movie";
-      case 'book': return "book";
-      case 'place': return "place";
-      case 'product': return "product";
-      default: return "place";
-    }
-  };
-  
-  // New function to get appropriate search label
-  const getSearchLabel = () => {
-    if(category === 'food') {
-      return "place"; // Show "Search for place" instead of "Search for food"
-    }
-    return category;
-  };
-  
-  // Handler for selecting an entity from search
-  const handleEntitySelection = (entity: Entity) => {
-    console.log("Selected entity in StepThree:", entity);
-    
-    // Process the image URL if it exists
-    if (entity.image_url) {
-      console.log("Entity image URL before processing:", entity.image_url);
-      entity.image_url = ensureHttps(entity.image_url);
-      console.log("Entity image URL after processing:", entity.image_url);
-    } else {
-      console.log("Selected entity has no image URL");
-    }
-    
-    // Pass the entity to parent component
-    onEntitySelect(entity);
-    
-    // For food category, explicitly handle restaurant name vs address
-    if (category === 'food') {
-      console.log("Food category: Setting venue to entity name", entity.name);
-      
-      // IMPORTANT: When it's food category and Google Places result, 
-      // always use the name for the venue (restaurant name)
-      if (entity.api_source === 'google_places') {
-        onVenueChange(entity.name);
-      } else {
-        // For non-Google Places sources, fall back to venue or name
-        onVenueChange(entity.venue || entity.name || '');
-      }
-      
-      // Do not update title for food category
-    } else if (category === 'place') {
-      // For place category, set name as title
-      onTitleChange(entity.name);
-      
-      // For Google Places, use formatted address as venue
-      if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
-        console.log("Using Google Places formatted_address for venue:", entity.metadata.formatted_address);
-        onVenueChange(entity.metadata.formatted_address);
-      } else {
-        // For non-Google Places or if no formatted address, use venue field
-        onVenueChange(entity.venue || '');
-      }
-    } else {
-      // For other categories, update title with entity name
-      onTitleChange(entity.name);
-      
-      // Update venue if available
-      if (entity.venue) {
-        onVenueChange(entity.venue);
-      }
-    }
-    
-    setShowEntitySearch(false);
   };
   
   // Get location button state
@@ -272,33 +178,15 @@ const StepThree = ({
         />
       )}
       
-      {/* Entity search/preview */}
-      {selectedEntity && processedEntity && !showEntitySearch ? (
+      {/* Subject preview — read-only. The subject is chosen once in Step 2;
+          Step 3 only shows what this review is about. */}
+      {selectedEntity && processedEntity && (
         <EntityPreviewCard
           entity={processedEntity}
           type={category}
-          onChange={() => !disableEntityChange && setShowEntitySearch(true)}
-          disableChange={disableEntityChange} // Pass the disableChange prop to EntityPreviewCard
+          onChange={() => { /* subject changes happen in Step 2 only */ }}
+          disableChange
         />
-      ) : (
-        <div className="p-4 border border-dashed border-brand-orange/30 rounded-lg bg-gradient-to-b from-transparent to-accent/5 transition-all duration-300 hover:border-brand-orange/50">
-          <div className="flex justify-between items-center mb-2">
-            <Label className="flex items-center gap-2 font-medium">
-              <span className="p-1.5 rounded-full bg-brand-orange/10">
-                {getCategoryIcon()}
-              </span>
-              <span>Search for {getSearchLabel()}</span>
-            </Label>
-          </div>
-          
-          <EntitySearch 
-            type={getEntitySearchType() as any}
-            onSelect={handleEntitySelection}
-          />
-          <p className="text-xs text-muted-foreground mt-2 italic">
-            Can't find what you're looking for? Just fill in the details below
-          </p>
-        </div>
       )}
       
       <div className="grid md:grid-cols-2 gap-6">

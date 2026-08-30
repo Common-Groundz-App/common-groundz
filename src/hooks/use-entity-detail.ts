@@ -8,6 +8,18 @@ import {
   getEntityStats 
 } from '@/services/entityService';
 import { Entity } from '@/services/recommendation/types';
+import { subjectRelationFromKnownEntity } from '@/services/reviewSubjectRelation';
+
+/**
+ * Phase 2.5A — every review returned for this page is by definition about the
+ * entity the page already resolved, so its display type comes from that
+ * entity, not from a stale stored category.
+ */
+const attachPageEntityRelation = (reviews: any[], entity: Entity) =>
+  reviews.map((review) => ({
+    ...review,
+    subjectRelation: subjectRelationFromKnownEntity(entity.type as unknown as string),
+  }));
 
 export const useEntityDetail = (slugOrId: string) => {
   const { user } = useAuth();
@@ -72,7 +84,7 @@ export const useEntityDetail = (slugOrId: string) => {
 
         // Update all state at once after parallel fetch
         setRecommendations(entityRecommendations);
-        setReviews(entityReviews);
+        setReviews(attachPageEntityRelation(entityReviews, entityData));
         setStats(entityStats);
         
       } catch (err) {
@@ -107,7 +119,7 @@ export const useEntityDetail = (slugOrId: string) => {
       ]);
 
       setRecommendations(refreshedRecommendations);
-      setReviews(refreshedReviews);
+      setReviews(attachPageEntityRelation(refreshedReviews, entity));
       setStats(refreshedStats);
     } catch (err) {
       console.error('Error refreshing entity data:', err);

@@ -2,6 +2,28 @@
 import { supabase } from '@/integrations/supabase/client';
 import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileService';
 import { Review } from './types';
+import { resolveSubjectRelation, type SubjectLookupOutcome, type SubjectRelationRow } from '@/services/reviewSubjectRelation';
+
+/**
+ * Batch-load the entities referenced by a set of reviews, keeping the outcome
+ * explicit so a failed query can never masquerade as "subject missing".
+ */
+async function loadSubjectEntities(reviews: { entity_id?: string }[]): Promise<SubjectLookupOutcome> {
+  const entityIds = reviews.filter((r) => r.entity_id).map((r) => r.entity_id) as string[];
+  if (entityIds.length === 0) return { attempted: false };
+
+  const { data, error } = await supabase
+    .from('entities')
+    .select('id, name, type, image_url, is_deleted')
+    .in('id', entityIds);
+
+  if (error) {
+    console.error('Error fetching review subject entities:', error);
+    return { attempted: true, failed: true };
+  }
+
+  return { attempted: true, failed: false, rows: (data || []) as SubjectRelationRow[] };
+}
 
 // Fetch complete review data including AI summary fields and latest rating
 export const fetchReviewWithSummary = async (reviewId: string): Promise<Review | null> => {
@@ -102,22 +124,8 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
     const reviewsWithProfiles = await attachProfilesToEntities(reviews);
 
     const reviewIds = reviews.map(r => r.id);
-    const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
-
-    // Get entities if any exist
-    let entities = [];
-    if (entityIds.length > 0) {
-      const { data: entitiesData, error: entitiesError } = await supabase
-        .from('entities')
-        .select('id, name, type, image_url')
-        .in('id', entityIds);
-
-      if (entitiesError) {
-        console.error('Error fetching entities:', entitiesError);
-      } else {
-        entities = entitiesData || [];
-      }
-    }
+    const subjectOutcome = await loadSubjectEntities(reviews);
+    const entities = subjectOutcome.attempted && !subjectOutcome.failed && 'rows' in subjectOutcome ? subjectOutcome.rows : [];
 
     // Get interaction data if user is logged in
     let likeData = [];
@@ -153,6 +161,7 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
           type: entity.type,
           image_url: entity.image_url
         } : undefined,
+        subjectRelation: resolveSubjectRelation(review.entity_id, subjectOutcome),
         comment_count: 0,
         isLiked: likeData.some(like => like.review_id === review.id),
         likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0
@@ -188,22 +197,8 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
     const reviewsWithProfiles = await attachProfilesToEntities(reviews);
 
     const reviewIds = reviews.map(r => r.id);
-    const entityIds = reviews.filter(r => r.entity_id).map(r => r.entity_id);
-
-    // Get entities if any exist
-    let entities = [];
-    if (entityIds.length > 0) {
-      const { data: entitiesData, error: entitiesError } = await supabase
-        .from('entities')
-        .select('id, name, type, image_url')
-        .in('id', entityIds);
-
-      if (entitiesError) {
-        console.error('Error fetching entities:', entitiesError);
-      } else {
-        entities = entitiesData || [];
-      }
-    }
+    const subjectOutcome = await loadSubjectEntities(reviews);
+    const entities = subjectOutcome.attempted && !subjectOutcome.failed && 'rows' in subjectOutcome ? subjectOutcome.rows : [];
 
     // Get interaction data if user is logged in
     let likeData = [];
@@ -239,6 +234,7 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
           type: entity.type,
           image_url: entity.image_url
         } : undefined,
+        subjectRelation: resolveSubjectRelation(review.entity_id, subjectOutcome),
         comment_count: 0,
         isLiked: likeData.some(like => like.review_id === review.id),
         likes: likeCounts.find(count => count.review_id === review.id)?.like_count || 0

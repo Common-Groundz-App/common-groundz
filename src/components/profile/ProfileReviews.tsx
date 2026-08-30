@@ -1,11 +1,12 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import EmptyReviews from './reviews/EmptyReviews';
 import { useReviews } from '@/hooks/use-reviews';
 import ReviewCard from './reviews/ReviewCard';
 import ReviewForm from './reviews/ReviewForm';
 import ReviewFilters from './reviews/ReviewFilters';
 import { useAuth } from '@/contexts/AuthContext';
+import { resolveReviewDisplayType, displayTypeValue } from './reviews/reviewDisplayType';
 
 interface ProfileReviewsProps {
   profileUserId: string;
@@ -32,12 +33,29 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
     await refreshReviews();
   }, [refreshReviews]);
 
+  // Phase 2.5A — one resolved display type per row, shared by the filter chips
+  // and the card badges. Verified canonical/legacy types only; rows with a
+  // failed or unattempted subject lookup keep their stored category. Never
+  // invents a type for rows that have none.
+  const resolvedReviews = React.useMemo(() => {
+    if (!reviews) return [];
+    return reviews.map((review) => ({
+      review,
+      resolvedType: displayTypeValue(
+        resolveReviewDisplayType({
+          entityId: review.entity_id,
+          category: review.category,
+          subjectRelation: review.subjectRelation,
+        })
+      ),
+    }));
+  }, [reviews]);
+
   // Filter and sort reviews
   const filteredReviews = React.useMemo(() => {
-    if (!reviews) return [];
-    
-    return reviews
-      .filter(item => !activeFilter || item.category === activeFilter)
+    return resolvedReviews
+      .filter(({ resolvedType }) => !activeFilter || resolvedType === activeFilter)
+      .map(({ review }) => review)
       .sort((a, b) => {
         if (sortBy === 'latest') {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -48,13 +66,20 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
         }
         return 0;
       });
-  }, [reviews, activeFilter, sortBy]);
+  }, [resolvedReviews, activeFilter, sortBy]);
 
-  // Extract unique categories from reviews
+  // Extract unique resolved types for the filter chips
   const categories = React.useMemo(() => {
-    if (!reviews || reviews.length === 0) return [];
-    return [...new Set(reviews.map(item => item.category))];
-  }, [reviews]);
+    return [...new Set(resolvedReviews.map(({ resolvedType }) => resolvedType).filter((t) => !!t))] as string[];
+  }, [resolvedReviews]);
+
+  // Reset a stale selection after the resolved set changes (e.g. the review
+  // powering a chip was deleted or its subject was unlinked).
+  useEffect(() => {
+    if (activeFilter && !categories.includes(activeFilter)) {
+      setActiveFilter(null);
+    }
+  }, [categories, activeFilter]);
 
   const clearFilters = () => {
     setActiveFilter(null);

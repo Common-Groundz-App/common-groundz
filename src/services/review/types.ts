@@ -1,5 +1,6 @@
 
 import { MediaItem } from '@/types/media';
+import type { SubjectRelation } from '@/services/reviewSubjectRelation';
 
 // Base review interface
 export interface Review {
@@ -25,6 +26,8 @@ export interface Review {
   created_at: string;
   updated_at: string;
   user_id: string;
+  /** Phase 2.5A — how the subject relation was resolved (see reviewSubjectRelation). */
+  subjectRelation?: SubjectRelation;
 }
 
 // Data for creating a new review

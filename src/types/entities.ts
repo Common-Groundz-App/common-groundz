@@ -5,6 +5,7 @@
 
 import { WithUserProfile, InteractionData, EntityReference, CommentMetadata, Timestamps, Visibility, MediaItem } from './common';
 import { Entity, RecommendationCategory } from '@/services/recommendation/types';
+import type { SubjectRelation } from '@/services/reviewSubjectRelation';
 
 // Base recommendation with user profile
 export interface RecommendationWithUser extends WithUserProfile, InteractionData, Timestamps {
@@ -48,6 +49,8 @@ export interface ReviewWithUser extends WithUserProfile, InteractionData, Timest
   latest_rating?: number;
   media?: MediaItem[];
   ai_summary?: string;
+  /** Phase 2.5A — how the subject relation was resolved (see reviewSubjectRelation). */
+  subjectRelation?: SubjectRelation;
 }
 
 // Base comment with user profile
