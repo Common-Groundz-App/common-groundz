@@ -655,6 +655,18 @@ const ReviewForm = ({
   const handleFormSubmit = async () => {
     if (!requireAuth({ action: 'review', surface: 'review_form', entityId, entityName: contentName || foodName })) return;
     
+    // Phase 2.4 — new reviews and linked edits must have a real subject.
+    if (!allowsMissingSubject(requirement) && !entityId) {
+      toast({
+        title: 'Subject required',
+        description: 'Choose what you\'re reviewing before publishing.',
+        variant: 'destructive'
+      });
+      setCurrentStep(2);
+      setIsSubmitting(false);
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
