@@ -12,7 +12,7 @@ Labelled **2.5A**. Wizard consolidation is deferred to an explicit 2.5B decision
 - `profile/reviews/ReviewCard.tsx` reads `review.category` in four places (badge label, badge colour, fallback image, image alt).
 - **The plan's earlier read-path target was wrong.** `src/hooks/reviews/use-reviews-fetch.ts` imports `fetchUserReviews` from `@/services/reviewService.ts`, which contains its **own duplicate implementation** (line 256) — not the one in `src/services/review/fetch.ts`. `fetchUserRecommendations` (line 340) is a third copy with the same entity select. Editing `review/fetch.ts` alone would not affect Profile → Reviews or its filter chips.
 - **Failed lookup is currently indistinguishable from absence.** `reviewService.ts` lines 286-291: on `entitiesError` it logs and leaves `entities = []`, then maps `entity: entity ? {...} : undefined`. A transient error therefore looks identical to "subject deleted".
-- **A real `not-loaded` producer exists.** `entityService.ts` `fetchEntityReviews` sets `entity: undefined, // Entity not included in select` (line 322), and both `EntityDetail.tsx` and `EntityDetailV2.tsx` render the profile `ReviewCard` from it.
+- **`fetchEntityReviews` deliberately omits the entity** (`entityService.ts` line 322: `entity: undefined, // Entity not included in select`), and both `EntityDetail.tsx` and `EntityDetailV2.tsx` render the profile `ReviewCard` from it — **but those pages already hold the resolved entity** via `useEntityDetail`, so no extra query is needed to resolve their display type.
 - All three entity selects (`reviewService.ts` 284 and 372) are `id, name, type, image_url` — no `is_deleted`.
 - `src/components/admin/CategorySelector.tsx` is a different component used by `CreateEntityDialog`. Untouched.
 
@@ -106,7 +106,7 @@ Note: if RLS hides soft-deleted rows, a successful query simply cannot return th
   - `entitiesError` set → all linked rows get `{ status: 'failed' }`.
   - success → matched row → `{ status: 'resolved', type, isDeleted }`; unmatched → `{ status: 'absent' }`.
 
-**`src/services/entityService.ts` — `fetchEntityReviews`.** It deliberately does not select the entity. Replace the bare `entity: undefined` with an honest `{ status: 'not-loaded' }` relation. No new query is added — entity-page cards continue to show their stored category label via the `legacy` branch, matching today's behaviour, and are never mislabelled `unavailable`.
+**Entity pages use the already-resolved page entity.** `fetchEntityReviews` keeps its current select (no new DB query) and emits `{ status: 'not-loaded' }` instead of a bare `undefined`. Then in the entity-detail hook layer (`use-entity-detail.ts`, `use-entity-detail-cached.ts`, `use-entity-data-cache.ts`), where `entityData` is already fetched, each returned review's relation is upgraded to `{ status: 'resolved', type: entityData.type, isDeleted: false }` before the reviews reach the page. This is not a lookup — it is the same entity the page already resolved — so it is honest, and it eliminates the case where a legacy `category = 'food'` review renders "Food" on a Place entity page.
 
 **`src/services/review/fetch.ts`.** Not on the live profile path, but it exports the same symbol names through `review/index.ts`. Give it the same relation mapping so the two copies cannot drift and a future import swap is safe.
 
@@ -127,7 +127,15 @@ A card never breaks or hides because the relation was unloaded or failed.
 
 - Compute each review's display type **once** in a single memo, keyed by review id, and use that one result for both chip generation and filter comparison.
 - Chips list only `canonical` / `legacy` types; `unavailable` and `unknown` rows are excluded from chips but stay visible when no filter is active.
-- If `activeFilter` is no longer present in the recomputed chip list (after a refresh or a relation resolving differently), clear it, so the screen never silently shows zero rows.
+- **Stale-filter reset happens in an effect, never inside the memo or during render.** If `activeFilter` disappears from the recomputed chip list (after a refresh or a relation resolving differently), a `useEffect` keyed on `[activeFilter, categories]` calls `setActiveFilter(null)` — the screen never silently shows zero rows and no state is set during render:
+
+```ts
+const displayTypesById = useMemo(/* per-review resolution */);
+const categories = useMemo(/* chips from displayTypesById */);
+useEffect(() => {
+  if (activeFilter && !categories.includes(activeFilter)) setActiveFilter(null);
+}, [activeFilter, categories]);
+```
 
 ### 7. Tests
 
@@ -150,6 +158,7 @@ A card never breaks or hides because the relation was unloaded or failed.
 - Step 3 has no entity search and no second subject state machine; `handleSubjectChange` is the only path. `ensureHttps()` preserved.
 - `handleEntitySelect`, `disableEntityChange`, `disableEntityFields` removed.
 - A failed or unattempted entity lookup never renders a review as "unavailable".
+- Entity-page review cards resolve their type from the page's already-fetched entity — no extra query, no stale stored-category badge under a known subject.
 - No code path produces `others` as a fallback; unrecognised legacy categories produce no badge.
 - Filter chips and badges derive from one shared per-review resolution; a stale active filter self-clears.
 - No database object created, altered, or written. No stored `category` changes.
