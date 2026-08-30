@@ -127,7 +127,15 @@ A card never breaks or hides because the relation was unloaded or failed.
 
 - Compute each review's display type **once** in a single memo, keyed by review id, and use that one result for both chip generation and filter comparison.
 - Chips list only `canonical` / `legacy` types; `unavailable` and `unknown` rows are excluded from chips but stay visible when no filter is active.
-- If `activeFilter` is no longer present in the recomputed chip list (after a refresh or a relation resolving differently), clear it, so the screen never silently shows zero rows.
+- **Stale-filter reset happens in an effect, never inside the memo or during render.** If `activeFilter` disappears from the recomputed chip list (after a refresh or a relation resolving differently), a `useEffect` keyed on `[activeFilter, categories]` calls `setActiveFilter(null)` — the screen never silently shows zero rows and no state is set during render:
+
+```ts
+const displayTypesById = useMemo(/* per-review resolution */);
+const categories = useMemo(/* chips from displayTypesById */);
+useEffect(() => {
+  if (activeFilter && !categories.includes(activeFilter)) setActiveFilter(null);
+}, [activeFilter, categories]);
+```
 
 ### 7. Tests
 
