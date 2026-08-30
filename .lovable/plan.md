@@ -48,7 +48,7 @@ Inputs: `isEditMode`, `originalEntityId` (scoped to the loaded review id), `isFr
 
 ## Not in scope
 
-No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked and stay editable). No `UPDATE` guards at all. No component deletions, no questionnaire rework, no new provider relationships for `service`.
+No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked and stay editable). No broad `UPDATE` guard — only the narrow transition rules below. No component deletions, no questionnaire rework, no new provider relationships for `service`.
 
 ## Technical plan
 
@@ -57,7 +57,21 @@ No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked
 
 2. **Migration**
    - `create_entity_subject`: add `service` to the standalone allow-list and drop the blanket `service` rejection, keeping every other guard byte-for-byte (auth, bounds, API-pair rule, offering allow-list, advisory lock, empty-normalized-name rule). `service` stays parentless-only.
-   - `BEFORE INSERT` trigger on `public.reviews` — `SECURITY DEFINER`, owner `postgres`, pinned `search_path` — rejecting: `entity_id IS NULL`; a missing or `is_deleted` subject; and `category <> entity.type`. Clear, human-readable exception messages. `INSERT` only.
+   - `BEFORE INSERT OR UPDATE` trigger on `public.reviews` — `SECURITY DEFINER`, owner `postgres`, pinned `search_path`, `EXECUTE` revoked from `anon`/`authenticated`/`public` (trigger functions need no direct grant). Clear, human-readable exception messages.
+
+   **INSERT:** `entity_id` must be present, the subject must exist and not be `is_deleted`, and `NEW.category IS DISTINCT FROM v_entity.type::text` must be false — the null-safe operator, so a `NULL`/blank category cannot slip through SQL three-valued logic.
+
+   **UPDATE (transition-aware):**
+   | Before | After | Behaviour |
+   | --- | --- | --- |
+   | `entity_id` set | `entity_id` null | reject — a linked review can never become unlinked |
+   | null | null | allow — legacy rows stay editable |
+   | null | set | validate: active subject + `category IS NOT DISTINCT FROM entity.type` |
+   | set | different subject | validate: active subject + matching canonical category |
+   | set (legacy mismatch) | same subject, same category, other fields change | allow untouched |
+   | set (legacy mismatch) | `category` changed | new pair must be consistent |
+
+   Restated: validation fires only when `entity_id` or `category` actually changes (`IS DISTINCT FROM` on both `OLD`/`NEW` pairs); otherwise the row passes through so the 17 legacy mismatched rows keep updating unrelated fields.
 
 3. **`SubjectSelectStep.tsx`**
    Replace `onSkip` with a `requirement` prop. The unlinked affordance renders only for `legacy-optional`, labelled "Continue without linking" with the explanatory line. For `required`, the create button is the only fallback and the empty-state copy points at it.
@@ -69,7 +83,7 @@ No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked
    - Remove `handleSubjectSkip`; emit `review_subject_legacy_unlinked` only when a legacy edit saves still unlinked, and `review_subject_type_divergence` if a new linked review's category ever differs from its subject type.
 
 5. **Service-level guards**
-   `createReview` in **both** `src/services/reviewService.ts` and `src/services/review/core.ts`: throw on a missing/blank `entity_id`, and throw when `category` doesn't match the referenced entity's canonical type. `updateReview` untouched.
+   `createReview` in **both** `src/services/reviewService.ts` and `src/services/review/core.ts`: throw on a missing/blank `entity_id`, and throw when `category` doesn't match the referenced entity's canonical type. `updateReview` stays permissive in the client — the narrow linked→null rejection lives in the DB trigger, so it can't be bypassed by a direct call.
 
 6. **Quick-create service copy**
    Service placeholder/example text describes the service itself ("e.g. Haircut, AC repair"), never the provider.
@@ -85,14 +99,16 @@ No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked
    - Stale-`originalEntityId` regression: legacy unlinked review → linked review in one mounted instance.
    - Next gating, submit guard, both service guards (null entity **and** category mismatch).
    - **15-type canonical-category test:** for every canonical type, a new review persists `category === subject.type` while `questionnaireKind` may still be the legacy bucket.
+   - **Trigger transition matrix** through an authenticated path: insert with null category rejected; linked→null update rejected; null→null update allowed; legacy mismatched row updating only `description` allowed; legacy row attaching a subject with a mismatched category rejected.
    - Step 3 title derivation for all 15 types. Full suite green.
 
 ## Acceptance criteria
 
 - No application path creates a new review with `entity_id = NULL`: only `reviewService.ts` and `review/core.ts` insert into `reviews` (no RPC, edge function, or migration does) — both guarded, trigger as backstop.
-- Every new linked review satisfies `category = subject.type`; divergence is a bug.
+- Every new linked review satisfies `category = subject.type`; divergence is a bug. All comparisons use `IS DISTINCT FROM`, so a null category never passes.
+- A linked review can never be saved unlinked, including via a direct `updateReview` call.
 - Every type quick-create offers is accepted by the RPC (Service parity fixed).
-- Legacy unlinked rows remain editable and savable, unchanged.
+- Legacy unlinked rows remain editable and savable, and legacy mismatched linked rows can still update unrelated fields.
 - The trigger accepts a normal authenticated insert of a valid subject (RLS-safe), verified through the app path.
 
 ## Manual verification
