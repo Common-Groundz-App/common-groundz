@@ -158,6 +158,7 @@ useEffect(() => {
 - Step 3 has no entity search and no second subject state machine; `handleSubjectChange` is the only path. `ensureHttps()` preserved.
 - `handleEntitySelect`, `disableEntityChange`, `disableEntityFields` removed.
 - A failed or unattempted entity lookup never renders a review as "unavailable".
+- Entity-page review cards resolve their type from the page's already-fetched entity — no extra query, no stale stored-category badge under a known subject.
 - No code path produces `others` as a fallback; unrecognised legacy categories produce no badge.
 - Filter chips and badges derive from one shared per-review resolution; a stale active filter self-clears.
 - No database object created, altered, or written. No stored `category` changes.
