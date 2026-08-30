@@ -817,8 +817,8 @@ const ReviewForm = ({
     
     switch (currentStep) {
       case 1: return rating === 0;
-      // Step 2: Next requires a subject. Users without one use "Skip for now".
-      case 2: return !selectedSubject;
+      // Step 2: Next requires a subject unless this is a legacy-optional edit.
+      case 2: return !allowsMissingSubject(requirement) && !selectedSubject;
       case 3: 
         if (category === 'food') return !foodName;
         return !contentName;
