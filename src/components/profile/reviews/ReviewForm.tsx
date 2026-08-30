@@ -18,6 +18,11 @@ import {
   resolveQuestionnaireKind,
   type LegacyReviewCategory,
 } from './subjectSelection';
+import {
+  subjectRequirement,
+  allowsMissingSubject,
+  type SubjectRequirement,
+} from './reviewSubjectPolicy';
 import { getParentEntity } from '@/services/entityHierarchyService';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 
@@ -137,13 +142,32 @@ const ReviewForm = ({
   const [entityId, setEntityId] = useState(review?.entity_id || entity?.id || '');
   const [description, setDescription] = useState(review?.description || '');
   
+  // Flag to determine if the form was opened from an entity page.
+  // Declared early because the subject requirement policy depends on it.
+  const isFromEntityPage = !!entity && !isEditMode;
+  
+  /**
+   * Phase 2.4 — the original persisted entity_id for the review being edited,
+   * scoped to the loaded review id. This prevents a mounted form from carrying
+   * a previous review's legacy status into a different review.
+   */
+  const [originalEntityId, setOriginalEntityId] = useState<string | null>(
+    review?.entity_id ?? null
+  );
+  const [originalReviewId, setOriginalReviewId] = useState<string | null>(
+    review?.id ?? null
+  );
+  
+  const requirement: SubjectRequirement = subjectRequirement({
+    isEditMode,
+    originalEntityId,
+    isFromEntityPage,
+  });
+  
   // Updated media handling
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   
-  // Flag to determine if the form was opened from an entity page
-  const isFromEntityPage = !!entity && !isEditMode;
-
   // Step 2 subject (Phase 2.0). Pre-filled when opened from an entity page.
   const [selectedSubject, setSelectedSubject] = useState<EntityAdapter | null>(
     entity ? { id: entity.id, name: entity.name, type: entity.type, venue: entity.venue, image_url: entity.image_url, description: entity.description, metadata: entity.metadata } : null
@@ -285,7 +309,7 @@ const ReviewForm = ({
       if (!isEditMode) {
         resetForm();
       }
-    } else if (isEditMode && review) {
+  } else if (isEditMode && review) {
       // Update with new data structure - cleanly separate title and subtitle
       setRating(review.rating);
       // The stored value may be a legacy bucket OR (post-2.1) a canonical type.
@@ -295,6 +319,10 @@ const ReviewForm = ({
       setCategory(loadedKind);
       setCanonicalCategory(null);
       setSubjectOrigin('loaded');
+      
+      // Scope originalEntityId to the loaded review id.
+      setOriginalReviewId(review.id);
+      setOriginalEntityId(review.entity_id ?? null);
       
       // For food category, use the main title field for the food name
       if (loadedKind === 'food') {
@@ -347,6 +375,8 @@ const ReviewForm = ({
     setVisibility('public');
     setFoodTags([]);
     setSelectedEntity(null);
+    setOriginalEntityId(null);
+    setOriginalReviewId(null);
     setCurrentStep(1);
     setCompletedSteps([]);
     setHasUnsavedChanges(false);
@@ -576,6 +606,15 @@ const ReviewForm = ({
       return;
     }
     
+    if (currentStep === 2 && !allowsMissingSubject(requirement) && !selectedSubject) {
+      toast({
+        title: 'Subject required',
+        description: 'Choose what you\'re reviewing before continuing.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     if (currentStep === 3) {
       // Validate based on category
       if (category === 'food' && !foodName) {
@@ -616,6 +655,17 @@ const ReviewForm = ({
   
   const handleFormSubmit = async () => {
     if (!requireAuth({ action: 'review', surface: 'review_form', entityId, entityName: contentName || foodName })) return;
+    
+    // Phase 2.4 — new reviews and linked edits must have a real subject.
+    if (!allowsMissingSubject(requirement) && !entityId) {
+      toast({
+        title: 'Subject required',
+        description: 'Choose what you\'re reviewing before publishing.',
+        variant: 'destructive'
+      });
+      setCurrentStep(2);
+      return;
+    }
     
     setIsSubmitting(true);
     
@@ -709,6 +759,25 @@ const ReviewForm = ({
         });
         resetForm();
       }
+
+      // Phase 2.4 telemetry.
+      if (isEditMode && allowsMissingSubject(requirement) && !entityId) {
+        logFunnel({ event: 'review_subject_legacy_unlinked', source: 'review_form' });
+      }
+      if (
+        !isEditMode &&
+        entityId &&
+        canonicalCategory &&
+        persistedCategory !== canonicalCategory
+      ) {
+        logFunnel({
+          event: 'review_subject_type_divergence',
+          source: 'review_form',
+          entityType: canonicalCategory,
+          category: persistedCategory,
+        });
+      }
+
       logFunnel({
         event: 'review_submitted',
         source: 'review_form',
@@ -737,10 +806,9 @@ const ReviewForm = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, currentStep]);
 
-  // Explicit skip of subject selection — logged so we can see how often people
-  // review something we can't link yet.
-  const handleSubjectSkip = () => {
-    logFunnel({ event: 'review_subject_skipped', source: 'review_form' });
+  // Legacy unlinked reviews may continue without a subject.
+  const handleContinueWithoutSubject = () => {
+    logFunnel({ event: 'review_subject_legacy_unlinked', source: 'review_form' });
     handleNext();
   };
 
@@ -750,8 +818,8 @@ const ReviewForm = ({
     
     switch (currentStep) {
       case 1: return rating === 0;
-      // Step 2: Next requires a subject. Users without one use "Skip for now".
-      case 2: return !selectedSubject;
+      // Step 2: Next requires a subject unless this is a legacy-optional edit.
+      case 2: return !allowsMissingSubject(requirement) && !selectedSubject;
       case 3: 
         if (category === 'food') return !foodName;
         return !contentName;
@@ -832,7 +900,10 @@ const ReviewForm = ({
                   subject={selectedSubject}
                   onSubjectChange={handleSubjectChange}
                   disabled={isFromEntityPage}
-                  onSkip={handleSubjectSkip}
+                  requirement={requirement}
+                  onContinueWithoutSubject={
+                    allowsMissingSubject(requirement) ? handleContinueWithoutSubject : undefined
+                  }
                   contextLine={subjectContextLine}
                   isResolvingContext={isResolvingSubjectContext}
                 />

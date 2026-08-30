@@ -15,12 +15,14 @@ export type FunnelEvent =
   | 'candidate_pick'
   | 'review_opened'
   | 'entity_created'
-  // Phase 2.1 — review subject selection (Step 2 of the review wizard).
+  // Phase 2.1 / 2.4 — review subject selection (Step 2 of the review wizard).
   | 'review_subject_step_shown'
   | 'review_subject_selected'
-  | 'review_subject_skipped'
   | 'review_subject_attached_late'
-  | 'review_submitted';
+  | 'review_submitted'
+  // Phase 2.4 — subject requirement enforcement telemetry.
+  | 'review_subject_legacy_unlinked'
+  | 'review_subject_type_divergence';
 
 export type FunnelSource = 'search' | 'existing_match' | 'review_form';
 
@@ -32,6 +34,8 @@ export interface FunnelPayload {
   /** Raw query — hashed locally, never transmitted. */
   query?: string;
   entityType?: string;
+  /** Stored review category, used only for divergence telemetry. */
+  category?: string;
   candidateIndex?: number;
   diagnostics?: {
     latencyMs?: number;

@@ -7,6 +7,10 @@ import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import SubjectQuickCreate from './SubjectQuickCreate';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
+import {
+  type SubjectRequirement,
+  allowsMissingSubject,
+} from '../reviewSubjectPolicy';
 
 interface SubjectSelectStepProps {
   /** The currently chosen subject, if any. */
@@ -15,8 +19,10 @@ interface SubjectSelectStepProps {
   onSubjectChange: (subject: EntityAdapter | null) => void;
   /** Locked when the review was opened from an entity page. */
   disabled?: boolean;
-  /** Skips subject selection — the subject stays optional in this phase. */
-  onSkip: () => void;
+  /** How strict the subject requirement is for this form instance. */
+  requirement: SubjectRequirement;
+  /** Called when a legacy-optional review chooses to continue unlinked. */
+  onContinueWithoutSubject?: () => void;
   /** Async parent-context line for offerings (e.g. "Dish at Toit"). */
   contextLine?: string | null;
   isResolvingContext?: boolean;
@@ -33,7 +39,8 @@ const SubjectSelectStep = ({
   subject,
   onSubjectChange,
   disabled = false,
-  onSkip,
+  requirement,
+  onContinueWithoutSubject,
   contextLine,
   isResolvingContext = false,
 }: SubjectSelectStepProps) => {
@@ -107,14 +114,16 @@ const SubjectSelectStep = ({
             <PlusCircle className="h-4 w-4 mr-1.5" />
             Can't find it? Add something new
           </Button>
-          <div>
-            <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
-              Skip for now
-            </Button>
-            <p className="mt-1 text-xs text-muted-foreground">
-              You can still write your review and type the name yourself.
-            </p>
-          </div>
+          {allowsMissingSubject(requirement) && onContinueWithoutSubject && (
+            <div>
+              <Button type="button" variant="ghost" size="sm" onClick={onContinueWithoutSubject}>
+                Continue without linking
+              </Button>
+              <p className="mt-1 text-xs text-muted-foreground">
+                You can keep this older review unlinked and continue editing it.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

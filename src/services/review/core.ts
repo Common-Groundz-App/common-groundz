@@ -5,6 +5,14 @@ import { Review, ReviewCreateData, ReviewUpdateData } from './types';
 // Create a new review
 export const createReview = async (reviewData: ReviewCreateData): Promise<Review> => {
   try {
+    // Phase 2.4 — client-side guard before DB trigger rejects it.
+    if (!reviewData.entity_id) {
+      throw new Error('A review must be linked to a subject.');
+    }
+    if (!reviewData.category) {
+      throw new Error('Category is required when a subject is linked.');
+    }
+
     const { data, error } = await supabase
       .from('reviews')
       .insert(reviewData)
@@ -26,6 +34,14 @@ export const createReview = async (reviewData: ReviewCreateData): Promise<Review
 // Update an existing review
 export const updateReview = async (reviewId: string, updates: ReviewUpdateData): Promise<Review> => {
   try {
+    // Phase 2.4 — client-side guard for linked updates.
+    if (updates.entity_id === '') {
+      throw new Error('A review may not be unlinked from its subject.');
+    }
+    if (updates.entity_id && !updates.category) {
+      throw new Error('Category is required when a subject is linked.');
+    }
+
     const { data, error } = await supabase
       .from('reviews')
       .update({ ...updates, updated_at: new Date().toISOString() })

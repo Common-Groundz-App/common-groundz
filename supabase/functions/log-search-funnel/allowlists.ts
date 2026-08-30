@@ -12,12 +12,14 @@ export const ALLOWED_EVENTS = new Set([
   "candidate_pick",
   "review_opened",
   "entity_created",
-  // Review subject selection (Phase 2.1)
+  // Review subject selection (Phase 2.1 / 2.4)
   "review_subject_step_shown",
   "review_subject_selected",
-  "review_subject_skipped",
   "review_subject_attached_late",
   "review_submitted",
+  // Phase 2.4 — subject requirement enforcement telemetry.
+  "review_subject_legacy_unlinked",
+  "review_subject_type_divergence",
   // Phase 2.3 — quick-create subject drawer inside the review form.
   "subject_create_started",
   "subject_create_completed",

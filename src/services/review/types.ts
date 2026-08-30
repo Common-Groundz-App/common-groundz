@@ -51,6 +51,7 @@ export interface ReviewUpdateData {
   category?: string;
   rating?: number;
   venue?: string;
+  entity_id?: string;
   visibility?: 'public' | 'private' | 'circle_only';
   experience_date?: string;
   status?: string;
