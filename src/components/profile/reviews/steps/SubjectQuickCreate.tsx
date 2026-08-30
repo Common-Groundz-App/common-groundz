@@ -350,7 +350,13 @@ const SubjectQuickCreate: React.FC<SubjectQuickCreateProps> = ({
               <Label htmlFor="quick-create-name">Name</Label>
               <Input
                 id="quick-create-name"
-                placeholder={subjectType === 'food' ? 'e.g. Classic Burger' : `e.g. ${TYPE_LABELS[subjectType]} name`}
+                placeholder={
+                  subjectType === 'food'
+                    ? 'e.g. Classic Burger'
+                    : subjectType === 'service'
+                    ? 'e.g. Haircut, plumbing repair, tax consultation'
+                    : `e.g. ${TYPE_LABELS[subjectType]} name`
+                }
                 value={name}
                 onChange={(e) => { setName(e.target.value); setDuplicates(null); }}
                 autoFocus
