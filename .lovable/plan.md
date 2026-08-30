@@ -99,14 +99,16 @@ No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked
    - Stale-`originalEntityId` regression: legacy unlinked review → linked review in one mounted instance.
    - Next gating, submit guard, both service guards (null entity **and** category mismatch).
    - **15-type canonical-category test:** for every canonical type, a new review persists `category === subject.type` while `questionnaireKind` may still be the legacy bucket.
+   - **Trigger transition matrix** through an authenticated path: insert with null category rejected; linked→null update rejected; null→null update allowed; legacy mismatched row updating only `description` allowed; legacy row attaching a subject with a mismatched category rejected.
    - Step 3 title derivation for all 15 types. Full suite green.
 
 ## Acceptance criteria
 
 - No application path creates a new review with `entity_id = NULL`: only `reviewService.ts` and `review/core.ts` insert into `reviews` (no RPC, edge function, or migration does) — both guarded, trigger as backstop.
-- Every new linked review satisfies `category = subject.type`; divergence is a bug.
+- Every new linked review satisfies `category = subject.type`; divergence is a bug. All comparisons use `IS DISTINCT FROM`, so a null category never passes.
+- A linked review can never be saved unlinked, including via a direct `updateReview` call.
 - Every type quick-create offers is accepted by the RPC (Service parity fixed).
-- Legacy unlinked rows remain editable and savable, unchanged.
+- Legacy unlinked rows remain editable and savable, and legacy mismatched linked rows can still update unrelated fields.
 - The trigger accepts a normal authenticated insert of a valid subject (RLS-safe), verified through the app path.
 
 ## Manual verification
