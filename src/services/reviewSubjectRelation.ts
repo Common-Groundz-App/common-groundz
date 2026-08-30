@@ -36,6 +36,9 @@ export interface SubjectRelationRow {
   id: string;
   type?: string | null;
   is_deleted?: boolean | null;
+  /** Present when the loader selected display fields for the entity card. */
+  name?: string | null;
+  image_url?: string | null;
 }
 
 /**
