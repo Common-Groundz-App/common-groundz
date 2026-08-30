@@ -48,7 +48,7 @@ Inputs: `isEditMode`, `originalEntityId` (scoped to the loaded review id), `isFr
 
 ## Not in scope
 
-No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked and stay editable). No `UPDATE` guards at all. No component deletions, no questionnaire rework, no new provider relationships for `service`.
+No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked and stay editable). No broad `UPDATE` guard — only the narrow transition rules below. No component deletions, no questionnaire rework, no new provider relationships for `service`.
 
 ## Technical plan
 
