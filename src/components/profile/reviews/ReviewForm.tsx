@@ -663,7 +663,6 @@ const ReviewForm = ({
         variant: 'destructive'
       });
       setCurrentStep(2);
-      setIsSubmitting(false);
       return;
     }
     
