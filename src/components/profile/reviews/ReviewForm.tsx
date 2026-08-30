@@ -142,6 +142,10 @@ const ReviewForm = ({
   const [entityId, setEntityId] = useState(review?.entity_id || entity?.id || '');
   const [description, setDescription] = useState(review?.description || '');
   
+  // Flag to determine if the form was opened from an entity page.
+  // Declared early because the subject requirement policy depends on it.
+  const isFromEntityPage = !!entity && !isEditMode;
+  
   /**
    * Phase 2.4 — the original persisted entity_id for the review being edited,
    * scoped to the loaded review id. This prevents a mounted form from carrying
@@ -164,9 +168,6 @@ const ReviewForm = ({
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   
-  // Flag to determine if the form was opened from an entity page
-  const isFromEntityPage = !!entity && !isEditMode;
-
   // Step 2 subject (Phase 2.0). Pre-filled when opened from an entity page.
   const [selectedSubject, setSelectedSubject] = useState<EntityAdapter | null>(
     entity ? { id: entity.id, name: entity.name, type: entity.type, venue: entity.venue, image_url: entity.image_url, description: entity.description, metadata: entity.metadata } : null
