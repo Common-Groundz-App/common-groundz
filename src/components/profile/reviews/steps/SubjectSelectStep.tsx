@@ -21,6 +21,8 @@ interface SubjectSelectStepProps {
   disabled?: boolean;
   /** How strict the subject requirement is for this form instance. */
   requirement: SubjectRequirement;
+  /** Called when a legacy-optional review chooses to continue unlinked. */
+  onContinueWithoutSubject?: () => void;
   /** Async parent-context line for offerings (e.g. "Dish at Toit"). */
   contextLine?: string | null;
   isResolvingContext?: boolean;
