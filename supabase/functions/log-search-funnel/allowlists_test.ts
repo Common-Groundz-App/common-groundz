@@ -13,9 +13,10 @@ Deno.test("review subject events are accepted", () => {
     const e of [
       "review_subject_step_shown",
       "review_subject_selected",
-      "review_subject_skipped",
       "review_subject_attached_late",
       "review_submitted",
+      "review_subject_legacy_unlinked",
+      "review_subject_type_divergence",
     ]
   ) {
     assertEquals(ALLOWED_EVENTS.has(e), true, e);
