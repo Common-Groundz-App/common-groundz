@@ -758,6 +758,25 @@ const ReviewForm = ({
         });
         resetForm();
       }
+
+      // Phase 2.4 telemetry.
+      if (isEditMode && allowsMissingSubject(requirement) && !entityId) {
+        logFunnel({ event: 'review_subject_legacy_unlinked', source: 'review_form' });
+      }
+      if (
+        !isEditMode &&
+        entityId &&
+        canonicalCategory &&
+        persistedCategory !== canonicalCategory
+      ) {
+        logFunnel({
+          event: 'review_subject_type_divergence',
+          source: 'review_form',
+          entityType: canonicalCategory,
+          category: persistedCategory,
+        });
+      }
+
       logFunnel({
         event: 'review_submitted',
         source: 'review_form',
