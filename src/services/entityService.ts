@@ -4,6 +4,7 @@ import { attachProfilesToEntities } from '@/services/enhancedUnifiedProfileServi
 import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
 import { MediaItem } from '@/types/common';
 import { resolveSlugWithHistory } from '@/services/entityRedirectService';
+import { SUBJECT_RELATION_NOT_LOADED } from '@/services/reviewSubjectRelation';
 
 export interface EntityFetchResult {
   entity: Entity | null;
@@ -323,6 +324,9 @@ export const fetchEntityReviews = async (
         venue: rev.venue,
         entity_id: rev.entity_id,
         entity: undefined, // Entity not included in select
+        // Honest relation state: this loader never queries entities. The
+        // entity-page hooks upgrade this to the page's already-known entity.
+        subjectRelation: SUBJECT_RELATION_NOT_LOADED,
         experience_date: rev.experience_date,
         has_timeline: rev.has_timeline,
         timeline_count: rev.timeline_count,

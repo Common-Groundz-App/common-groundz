@@ -522,51 +522,7 @@ const ReviewForm = ({
     }
   };
 
-  // Handle entity selection, ensuring type compatibility
-  const handleEntitySelect = (entity: any) => {
-    console.log("Entity selected in ReviewForm:", entity);
-    
-    // Process the entity to ensure type compatibility
-    const processedEntity = { ...entity };
-    
-    // Convert string type to EntityType if needed
-    if (typeof processedEntity.type === 'string') {
-      // Keep the original value when it is not a canonical type: never coerce to `product`.
-      processedEntity.type = mapStringToEntityType(processedEntity.type) ?? processedEntity.type;
-    }
-    
-    setSelectedEntity(processedEntity as RecommendationEntity);
-    setEntityId(entity.id);
-    
-    // For food category, handle differently
-    if (category === 'food') {
-      console.log("Food category in ReviewForm");
-      
-      // For Google Places, always use the name as restaurant name, never address
-      if (entity.api_source === 'google_places') {
-        console.log("Using Google Places source: setting venue to name only:", entity.name);
-        setVenue(entity.name);
-      } else {
-        // For other sources, use venue or fallback to name
-        setVenue(entity.venue || entity.name || '');
-      }
-    } else if (category === 'place') {
-      // For place category, use name as contentName but formatted address as venue
-      setContentName(entity.name);
-      
-      if (entity.api_source === 'google_places' && entity.metadata?.formatted_address) {
-        console.log("Using Google Places formatted_address for venue:", entity.metadata.formatted_address);
-        setVenue(entity.metadata.formatted_address);
-      } else {
-        // For non-Google Place sources or if no formatted address
-        setVenue(entity.venue || '');
-      }
-    } else {
-      // For other categories, set contentName from entity
-      if (entity.name) setContentName(entity.name);
-      if (entity.venue) setVenue(entity.venue);
-    }
-  };
+  
 
   
   // Handle step navigation by clicking on step indicators
@@ -917,13 +873,11 @@ const ReviewForm = ({
                   venue={venue}
                   onVenueChange={setVenue}
                   entityId={entityId}
-                  onEntitySelect={handleEntitySelect}
                   selectedEntity={selectedEntity}
                   selectedMedia={selectedMedia}
                   onMediaAdd={handleAddMedia}
                    onMediaRemove={handleRemoveMedia}
                    isUploading={isUploading}
-                   disableEntityChange={isFromEntityPage || !!selectedSubject}
                    disableEntityFields={isFromEntityPage || !!selectedSubject}
 
                 />

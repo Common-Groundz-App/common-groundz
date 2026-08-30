@@ -35,6 +35,7 @@ import { RatingEvolutionDisplay } from './RatingEvolutionDisplay';
 import { getEntityTypeLabel, getEntityTypeFallbackImage, getCanonicalType } from '@/services/entityTypeHelpers';
 import { EntityType } from '@/services/recommendation/types';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
+import { resolveReviewDisplayType, displayTypeValue } from './reviewDisplayType';
 
 interface ReviewCardProps {
   review: Review;
@@ -123,12 +124,21 @@ const ReviewCard = ({
     return hasUserMediaArray;
   }, [review.media, hideEntityFallbacks, mediaItems.length]);
   
-  // Get a fallback image using canonical helper
+  // Phase 2.5A — strict display type. Never invented, never coerced to `others`:
+  // a failed or unattempted subject lookup degrades to the stored category.
+  const displayType = resolveReviewDisplayType({
+    entityId: review.entity_id,
+    category: review.category,
+    subjectRelation: review.subjectRelation,
+  });
+  const resolvedType = displayTypeValue(displayType);
+
+  // Get a fallback image using canonical helper — only ever with a verified type.
   const getFallbackImage = (): string => {
     if (entityImageUrl) {
       return entityImageUrl;
     }
-    return getEntityTypeFallbackImage(review.category);
+    return resolvedType ? getEntityTypeFallbackImage(resolvedType) : '/placeholder.svg';
   };
   
   const getBadgeColor = (category: string) => {
@@ -398,14 +408,14 @@ const ReviewCard = ({
               </div>
             )}
             
-            {/* Compact Category Badge - Only show if different from entity type */}
-            {review.category && (
+            {/* Type badge — only when there is a verified type to show */}
+            {resolvedType && (
               <div className="mb-2">
                 <Badge 
-                  className={cn("text-xs py-0 px-2 h-5 font-normal", getBadgeColor(review.category))} 
+                  className={cn("text-xs py-0 px-2 h-5 font-normal", getBadgeColor(resolvedType))} 
                   variant="outline"
                 >
-                  {getEntityTypeLabel(review.category)}
+                  {getEntityTypeLabel(resolvedType)}
                 </Badge>
               </div>
             )}
@@ -598,9 +608,9 @@ const ReviewCard = ({
             </h3>
             
             <div className="flex flex-wrap gap-2 mt-1">
-              {review.category && (
-                <Badge className={cn("font-normal", getBadgeColor(review.category))} variant="outline">
-                  {getEntityTypeLabel(review.category)}
+              {resolvedType && (
+                <Badge className={cn("font-normal", getBadgeColor(resolvedType))} variant="outline">
+                  {getEntityTypeLabel(resolvedType)}
                 </Badge>
               )}
               
@@ -662,9 +672,9 @@ const ReviewCard = ({
               <div className="rounded-md overflow-hidden relative bg-gray-50 mt-2 mb-3 h-48">
                 <ImageWithFallback
                   src={getFallbackImage()}
-                  alt={`${review.title} - ${review.category || 'Review'}`}
+                  alt={`${review.title} - ${resolvedType ? getEntityTypeLabel(resolvedType) : 'Review'}`}
                   className="w-full h-full object-cover"
-                  fallbackSrc={review.category ? getEntityTypeFallbackImage(review.category) : undefined}
+                  fallbackSrc={resolvedType ? getEntityTypeFallbackImage(resolvedType) : undefined}
                 />
               </div>
             </div>

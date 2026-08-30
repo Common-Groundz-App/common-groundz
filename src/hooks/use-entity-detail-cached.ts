@@ -4,6 +4,18 @@ import { fetchEntityBySlug, fetchEntityRecommendations, fetchEntityReviews, getE
 import { Entity } from '@/services/recommendation/types';
 import { RecommendationWithUser, ReviewWithUser } from '@/types/entities';
 import { useAuth } from '@/contexts/AuthContext';
+import { subjectRelationFromKnownEntity } from '@/services/reviewSubjectRelation';
+
+/**
+ * Phase 2.5A — reviews rendered on an entity page are by definition about the
+ * entity the page already resolved, so their display type comes from that
+ * entity rather than a stale stored category.
+ */
+const attachPageEntityRelation = (reviews: ReviewWithUser[], entity: Entity): ReviewWithUser[] =>
+  reviews.map((review) => ({
+    ...review,
+    subjectRelation: subjectRelationFromKnownEntity(entity.type as unknown as string),
+  }));
 
 export interface EntityStats {
   recommendationCount: number;
@@ -68,7 +80,7 @@ export const useEntityDetailCached = (slug: string): EntityDetailData => {
       return {
         entity,
         recommendations,
-        reviews,
+        reviews: attachPageEntityRelation(reviews, entity),
         stats,
         redirectToSlug
       };
