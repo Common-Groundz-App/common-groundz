@@ -70,7 +70,7 @@ const ProfileReviews = ({ profileUserId, isOwnProfile }: ProfileReviewsProps) =>
 
   // Extract unique resolved types for the filter chips
   const categories = React.useMemo(() => {
-    return [...new Set(resolvedReviews.map(({ resolvedType }) => resolvedType).filter((t): t is string => !!t))];
+    return [...new Set(resolvedReviews.map(({ resolvedType }) => resolvedType).filter((t) => !!t))] as string[];
   }, [resolvedReviews]);
 
   // Reset a stale selection after the resolved set changes (e.g. the review

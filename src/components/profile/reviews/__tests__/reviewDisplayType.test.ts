@@ -11,9 +11,9 @@ describe('resolveReviewDisplayType', () => {
     const result = resolveReviewDisplayType({
       entityId: 'ent-1',
       category: 'product',
-      subjectRelation: { status: 'resolved', type: 'dish', isDeleted: false },
+      subjectRelation: { status: 'resolved', type: 'food', isDeleted: false },
     });
-    expect(result).toEqual({ kind: 'canonical', type: 'dish' });
+    expect(result).toEqual({ kind: 'canonical', type: 'food' });
   });
 
   it('falls back to a verified stored category when the subject lookup failed', () => {
@@ -82,7 +82,7 @@ describe('resolveReviewDisplayType', () => {
   });
 
   it('displayTypeValue only surfaces canonical and legacy types', () => {
-    expect(displayTypeValue({ kind: 'canonical', type: 'dish' })).toBe('dish');
+    expect(displayTypeValue({ kind: 'canonical', type: 'food' })).toBe('dish');
     expect(displayTypeValue({ kind: 'legacy', type: 'book' })).toBe('book');
     expect(displayTypeValue({ kind: 'unavailable' })).toBeNull();
     expect(displayTypeValue({ kind: 'unknown' })).toBeNull();

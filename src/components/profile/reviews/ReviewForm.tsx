@@ -872,7 +872,6 @@ const ReviewForm = ({
                   onTitleChange={category === 'food' ? setFoodName : setContentName}
                   venue={venue}
                   onVenueChange={setVenue}
-                  entityId={entityId}
                   selectedEntity={selectedEntity}
                   selectedMedia={selectedMedia}
                   onMediaAdd={handleAddMedia}
