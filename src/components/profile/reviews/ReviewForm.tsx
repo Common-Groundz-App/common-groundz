@@ -308,7 +308,7 @@ const ReviewForm = ({
       if (!isEditMode) {
         resetForm();
       }
-    } else if (isEditMode && review) {
+  } else if (isEditMode && review) {
       // Update with new data structure - cleanly separate title and subtitle
       setRating(review.rating);
       // The stored value may be a legacy bucket OR (post-2.1) a canonical type.
@@ -318,6 +318,10 @@ const ReviewForm = ({
       setCategory(loadedKind);
       setCanonicalCategory(null);
       setSubjectOrigin('loaded');
+      
+      // Scope originalEntityId to the loaded review id.
+      setOriginalReviewId(review.id);
+      setOriginalEntityId(review.entity_id ?? null);
       
       // For food category, use the main title field for the food name
       if (loadedKind === 'food') {
