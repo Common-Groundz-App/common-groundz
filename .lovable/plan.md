@@ -83,7 +83,7 @@ No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked
    - Remove `handleSubjectSkip`; emit `review_subject_legacy_unlinked` only when a legacy edit saves still unlinked, and `review_subject_type_divergence` if a new linked review's category ever differs from its subject type.
 
 5. **Service-level guards**
-   `createReview` in **both** `src/services/reviewService.ts` and `src/services/review/core.ts`: throw on a missing/blank `entity_id`, and throw when `category` doesn't match the referenced entity's canonical type. `updateReview` untouched.
+   `createReview` in **both** `src/services/reviewService.ts` and `src/services/review/core.ts`: throw on a missing/blank `entity_id`, and throw when `category` doesn't match the referenced entity's canonical type. `updateReview` stays permissive in the client — the narrow linked→null rejection lives in the DB trigger, so it can't be bypassed by a direct call.
 
 6. **Quick-create service copy**
    Service placeholder/example text describes the service itself ("e.g. Haircut, AC repair"), never the provider.
