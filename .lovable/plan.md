@@ -57,7 +57,21 @@ No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked
 
 2. **Migration**
    - `create_entity_subject`: add `service` to the standalone allow-list and drop the blanket `service` rejection, keeping every other guard byte-for-byte (auth, bounds, API-pair rule, offering allow-list, advisory lock, empty-normalized-name rule). `service` stays parentless-only.
-   - `BEFORE INSERT` trigger on `public.reviews` — `SECURITY DEFINER`, owner `postgres`, pinned `search_path` — rejecting: `entity_id IS NULL`; a missing or `is_deleted` subject; and `category <> entity.type`. Clear, human-readable exception messages. `INSERT` only.
+   - `BEFORE INSERT OR UPDATE` trigger on `public.reviews` — `SECURITY DEFINER`, owner `postgres`, pinned `search_path`, `EXECUTE` revoked from `anon`/`authenticated`/`public` (trigger functions need no direct grant). Clear, human-readable exception messages.
+
+   **INSERT:** `entity_id` must be present, the subject must exist and not be `is_deleted`, and `NEW.category IS DISTINCT FROM v_entity.type::text` must be false — the null-safe operator, so a `NULL`/blank category cannot slip through SQL three-valued logic.
+
+   **UPDATE (transition-aware):**
+   | Before | After | Behaviour |
+   | --- | --- | --- |
+   | `entity_id` set | `entity_id` null | reject — a linked review can never become unlinked |
+   | null | null | allow — legacy rows stay editable |
+   | null | set | validate: active subject + `category IS NOT DISTINCT FROM entity.type` |
+   | set | different subject | validate: active subject + matching canonical category |
+   | set (legacy mismatch) | same subject, same category, other fields change | allow untouched |
+   | set (legacy mismatch) | `category` changed | new pair must be consistent |
+
+   Restated: validation fires only when `entity_id` or `category` actually changes (`IS DISTINCT FROM` on both `OLD`/`NEW` pairs); otherwise the row passes through so the 17 legacy mismatched rows keep updating unrelated fields.
 
 3. **`SubjectSelectStep.tsx`**
    Replace `onSkip` with a `requirement` prop. The unlinked affordance renders only for `legacy-optional`, labelled "Continue without linking" with the explanatory line. For `required`, the create button is the only fallback and the empty-state copy points at it.
