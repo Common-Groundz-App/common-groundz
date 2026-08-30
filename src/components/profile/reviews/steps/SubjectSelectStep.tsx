@@ -37,7 +37,7 @@ const SubjectSelectStep = ({
   subject,
   onSubjectChange,
   disabled = false,
-  onSkip,
+  requirement,
   contextLine,
   isResolvingContext = false,
 }: SubjectSelectStepProps) => {
