@@ -374,6 +374,8 @@ const ReviewForm = ({
     setVisibility('public');
     setFoodTags([]);
     setSelectedEntity(null);
+    setOriginalEntityId(null);
+    setOriginalReviewId(null);
     setCurrentStep(1);
     setCompletedSteps([]);
     setHasUnsavedChanges(false);
