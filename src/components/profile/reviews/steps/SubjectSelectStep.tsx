@@ -7,6 +7,10 @@ import { getEntityTypeLabel } from '@/services/entityTypeHelpers';
 import { getOptimalEntityImageUrl } from '@/utils/entityImageUtils';
 import SubjectQuickCreate from './SubjectQuickCreate';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
+import {
+  type SubjectRequirement,
+  allowsMissingSubject,
+} from '../reviewSubjectPolicy';
 
 interface SubjectSelectStepProps {
   /** The currently chosen subject, if any. */
@@ -15,8 +19,8 @@ interface SubjectSelectStepProps {
   onSubjectChange: (subject: EntityAdapter | null) => void;
   /** Locked when the review was opened from an entity page. */
   disabled?: boolean;
-  /** Skips subject selection — the subject stays optional in this phase. */
-  onSkip: () => void;
+  /** How strict the subject requirement is for this form instance. */
+  requirement: SubjectRequirement;
   /** Async parent-context line for offerings (e.g. "Dish at Toit"). */
   contextLine?: string | null;
   isResolvingContext?: boolean;
