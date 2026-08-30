@@ -12,7 +12,7 @@ Labelled **2.5A**. Wizard consolidation is deferred to an explicit 2.5B decision
 - `profile/reviews/ReviewCard.tsx` reads `review.category` in four places (badge label, badge colour, fallback image, image alt).
 - **The plan's earlier read-path target was wrong.** `src/hooks/reviews/use-reviews-fetch.ts` imports `fetchUserReviews` from `@/services/reviewService.ts`, which contains its **own duplicate implementation** (line 256) — not the one in `src/services/review/fetch.ts`. `fetchUserRecommendations` (line 340) is a third copy with the same entity select. Editing `review/fetch.ts` alone would not affect Profile → Reviews or its filter chips.
 - **Failed lookup is currently indistinguishable from absence.** `reviewService.ts` lines 286-291: on `entitiesError` it logs and leaves `entities = []`, then maps `entity: entity ? {...} : undefined`. A transient error therefore looks identical to "subject deleted".
-- **A real `not-loaded` producer exists.** `entityService.ts` `fetchEntityReviews` sets `entity: undefined, // Entity not included in select` (line 322), and both `EntityDetail.tsx` and `EntityDetailV2.tsx` render the profile `ReviewCard` from it.
+- **`fetchEntityReviews` deliberately omits the entity** (`entityService.ts` line 322: `entity: undefined, // Entity not included in select`), and both `EntityDetail.tsx` and `EntityDetailV2.tsx` render the profile `ReviewCard` from it — **but those pages already hold the resolved entity** via `useEntityDetail`, so no extra query is needed to resolve their display type.
 - All three entity selects (`reviewService.ts` 284 and 372) are `id, name, type, image_url` — no `is_deleted`.
 - `src/components/admin/CategorySelector.tsx` is a different component used by `CreateEntityDialog`. Untouched.
 
@@ -106,7 +106,7 @@ Note: if RLS hides soft-deleted rows, a successful query simply cannot return th
   - `entitiesError` set → all linked rows get `{ status: 'failed' }`.
   - success → matched row → `{ status: 'resolved', type, isDeleted }`; unmatched → `{ status: 'absent' }`.
 
-**`src/services/entityService.ts` — `fetchEntityReviews`.** It deliberately does not select the entity. Replace the bare `entity: undefined` with an honest `{ status: 'not-loaded' }` relation. No new query is added — entity-page cards continue to show their stored category label via the `legacy` branch, matching today's behaviour, and are never mislabelled `unavailable`.
+**Entity pages use the already-resolved page entity.** `fetchEntityReviews` keeps its current select (no new DB query) and emits `{ status: 'not-loaded' }` instead of a bare `undefined`. Then in the entity-detail hook layer (`use-entity-detail.ts`, `use-entity-detail-cached.ts`, `use-entity-data-cache.ts`), where `entityData` is already fetched, each returned review's relation is upgraded to `{ status: 'resolved', type: entityData.type, isDeleted: false }` before the reviews reach the page. This is not a lookup — it is the same entity the page already resolved — so it is honest, and it eliminates the case where a legacy `category = 'food'` review renders "Food" on a Place entity page.
 
 **`src/services/review/fetch.ts`.** Not on the live profile path, but it exports the same symbol names through `review/index.ts`. Give it the same relation mapping so the two copies cannot drift and a future import swap is safe.
 
