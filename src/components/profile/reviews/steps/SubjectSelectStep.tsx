@@ -111,14 +111,16 @@ const SubjectSelectStep = ({
             <PlusCircle className="h-4 w-4 mr-1.5" />
             Can't find it? Add something new
           </Button>
-          <div>
-            <Button type="button" variant="ghost" size="sm" onClick={onSkip}>
-              Skip for now
-            </Button>
-            <p className="mt-1 text-xs text-muted-foreground">
-              You can still write your review and type the name yourself.
-            </p>
-          </div>
+          {allowsMissingSubject(requirement) && (
+            <div>
+              <Button type="button" variant="ghost" size="sm" onClick={onContinueWithoutSubject}>
+                Continue without linking
+              </Button>
+              <p className="mt-1 text-xs text-muted-foreground">
+                You can keep this older review unlinked and continue editing it.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
