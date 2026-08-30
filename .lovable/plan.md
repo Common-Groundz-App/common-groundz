@@ -1,90 +1,111 @@
-# Phase 3 — Type-aware review questionnaire (retire the five legacy buckets)
+# Phase 3 — Config-driven review questionnaire (final plan)
 
-## Where we are
+## My read on the two reviews
 
-Phases 2.0–2.5A made the *subject* honest: every new review is linked to a real
-entity, and display badges read the entity's canonical type. But the **form
-itself** still runs on the five legacy buckets. Confirmed in code today:
+Both agree on the same architecture, and it matches what I proposed: canonical
+`entity.type` → questionnaire registry → sections/fields, with no `if (category
+=== 'food')` left in the wizard. The differences worth keeping:
 
-- `ReviewForm.tsx` branches on `category === 'food'` for the title field, the
-  `food_tags` metadata, and step validation (lines 506, 576, 630, 659, 780, 871).
-- `StepThree.tsx` hardcodes five emoji/label/placeholder ladders
-  (`category === 'food' ? … : 'movie' ? … : 'book' ? … : 'place' ? … : product`)
-  and gates location on `place | food` only.
-- `StepFour.tsx` renders `FoodTagSelector` only when `category === 'food'`.
+- **Codex is right on sequencing and safety**: build the registry + renderer at
+  behaviour parity first (3A), verify all 15 types, and only then add new
+  questions. Its two hardest rules are things my plan under-specified:
+  namespaced/versioned answers (`metadata.questionnaire.{version,type,answers}`)
+  and **not asking for entity facts** — no "What did you eat?", "Product name",
+  "Director", "Brand", "Address" once a subject is selected.
+- **ChatGPT is right on content**: its per-type questions ("Would you order it
+  again?", "Rewatch?", "Worth the time?") are decision-useful and on-brand
+  (transitions, reuse intent) in a way Codex's context-only matrix is not. So we
+  use Codex's structure with ChatGPT's question set as the 3B input.
 
-So a review of a `service`, `course`, `app`, `professional`, or any of the other
-canonical types falls into the "product" ladder and is asked product questions.
-Phase 3 fixes that: **the questions come from the subject's canonical type, from
-one registry, not from `if` chains.**
+Where I differ from both: 3A must not be a pure refactor. Two current fields are
+actively wrong once a subject is mandatory (`foodName` / `contentName` asking for
+the subject's own name, and `venue` asking for the parent that the hierarchy
+already knows), so 3A removes those questions rather than faithfully porting
+them.
 
-## Goal
+**Food tags stay.** `FoodTagSelector` (curated chips + custom tag input) is good
+UI and keeps its hardcoded food vocabulary. In 3A it becomes the renderer for the
+`tags` field kind, wired only into the `food` questionnaire — same component,
+same options, same `metadata.food_tags` storage. No other type gets tags in 3A.
 
-One declarative questionnaire registry keyed by the 15 canonical entity types.
-Steps 3 and 4 render from it. No component contains a per-category `if` chain.
+## Phase 3.0 — Audit (already done, recorded here)
 
-## Phase 3.0 — Registry foundation (this phase)
+Current Step 3 / Step 4 fields and where they live:
 
-### 1. The registry
+| Field | Step | Common or type-specific | Persisted to | Phase 3 verdict |
+|---|---|---|---|---|
+| Rating | 1 | common | `reviews.rating` | keep as-is |
+| Subject (entity) | 2 | common | `reviews.entity_id` + `category` | keep as-is |
+| `foodName` / `contentName` ("What did you eat?", "Movie title"…) | 3 | five-bucket branch | `reviews.title` | **retire as a question**; title derives from the subject |
+| `venue` ("Restaurant name", "Director/Studio", "Author", "Address", "Brand") | 3 | five-bucket branch | `reviews.venue` | **retire as a question**; show parent/provider context read-only, keep column written from subject context |
+| Media | 3 | common | review media | keep |
+| Location prompt (`place`/`food` only) | 3 | type-specific | none (permission) | registry flag `showLocationPrompt` |
+| Review headline | 4 | common | `reviews.subtitle` | keep |
+| Your thoughts | 4 | common | `reviews.description` | keep |
+| Experience date | 4 | common | `reviews.experience_date` | keep |
+| Food tags | 4 | type-specific (`food`) | `metadata.food_tags` | keep component + storage, driven by registry |
+| Visibility | 4 | common | `reviews.visibility` | keep |
 
-New `src/components/profile/reviews/questionnaire/registry.ts`:
+Legacy branching to remove: `ReviewForm.tsx` lines ~506, 576–590, 630, 659, 780,
+871 (`category === 'food'`), the `foodName`/`contentName` pair, `StepThree`'s
+five emoji/label/placeholder ladders and `getMainFieldLabel` /
+`getSecondaryFieldLabel`, and `StepFour`'s `category === 'food'` gate.
 
-- A `QuestionnaireField` descriptor: `key`, `label`, `inputType`
-  (`text | textarea | tags | rating | enum | date | location`), `placeholder`,
-  `maxLength`, `required`, `storage` (`title | metadata.<k>`).
-- A `QuestionnaireSpec` per canonical type: `titleLabel`, `titlePlaceholder`,
-  `contextLabel` (the "who made this" line), `icon`, `showLocation`,
-  `fields: QuestionnaireField[]`.
-- `getQuestionnaireSpec(type: CanonicalEntityType): QuestionnaireSpec` with an
-  explicit entry for all 15 types — no `product` default, matching the existing
-  taxonomy rule. An unknown/unresolved type yields a deliberately minimal
-  generic spec flagged as such, never a coerced `product` spec.
+Edit-mode behaviour that must not regress: `subjectOrigin` ('none' | 'loaded' |
+'entity-page' | 'user-selected') still decides whether `reviews.category` is
+rewritten on save, and legacy unlinked reviews still open and save.
 
-Specs are seeded from what the current form asks, then extended per type
-(e.g. `service`/`professional` → who performed it, how long it took;
-`course` → format, completion; `food` keeps `food_tags`).
+## Phase 3A — Registry + renderer at behaviour parity (implement now, then stop)
 
-### 2. Resolve the type from the subject, not from the bucket
+1. **Registry** — `src/components/profile/reviews/questionnaire/registry.ts`:
+   declarative data only, no React. Explicit entry for **all 15** canonical
+   types; no `default: product`, no fallback to `others`. Shape:
+   `{ type, subjectLabel, showLocationPrompt, sections: [{ id, title, fields: [{ id, kind, label, placeholder, helperText, required, options }] }] }`
+   with `kind` in `text | textarea | select | multi-select | tags | date | rating | visibility | media`.
+   An unresolvable subject type gets a named `generic` config (common fields
+   only), flagged as generic — never a product config.
+2. **Renderer** — a `QuestionnaireSection` component that maps `kind` → control
+   and knows nothing about entity types. `tags` renders `FoodTagSelector`
+   (unchanged) with the field's options.
+3. **Wire Step 3 / Step 4** to the registry; delete the label ladders and the
+   food conditionals. Step 3 keeps the read-only subject preview and adds the
+   parent/provider context line already computed by `getParentEntity`.
+4. **Subject-derived values**: `reviews.title` comes from the selected subject's
+   name; `reviews.venue` from the resolved parent/provider (unchanged for legacy
+   unlinked reviews, which keep their stored values).
+5. **Validation** from the registry (`required` fields, structured errors,
+   focus the first invalid field) replacing the `foodName` vs `contentName`
+   checks. Rating (Step 1) and subject (Step 2) rules stay exactly as Phase 2.4
+   left them.
+6. **Tests**: registry completeness across all 15 types; no config resolves to
+   product/others by fallback; food config still yields the tag selector with
+   the current vocabulary; validation blocks/allows per config; edit-mode
+   `subjectOrigin` persistence unchanged.
 
-The wizard already knows the selected subject. `resolveReviewDisplayType`
-(Phase 2.5A) already returns an honest canonical type. Phase 3 reuses it as the
-questionnaire key, with the same honesty rules: failed/absent lookups fall back
-to the generic spec, never to `product`.
+**Stop here for your manual verification of all 15 types before 3B.**
 
-### 3. Render Step 3 / Step 4 from the spec
+## Phase 3B — Content matrix (after 3A verification)
 
-- `StepThree.tsx`: replace the emoji/label/placeholder ladders with values from
-  the spec; location block shows when `spec.showLocation`.
-- `StepFour.tsx`: replace the `food` conditional with a generic field renderer
-  loop over `spec.fields` (`FoodTagSelector` becomes the `tags` input for the
-  food spec, not a hardcoded branch).
-- `ReviewForm.tsx`: title state, validation, and the metadata bundle are driven
-  by the spec's fields instead of `category === 'food'` checks.
+Encode ChatGPT's per-type questions, all **optional** in v1 (rating + subject
+remain the only required inputs). No question that duplicates entity metadata
+(director, author, brand, manufacturer, address, organizer). Food keeps its tag
+system and gains the offering-aware framing ("Classic Burger at Truffles").
+The exact matrix comes back to you for approval before coding.
 
-### 4. Storage stays compatible
+## Phase 3C — Versioned answers, legacy compatibility, cleanup
 
-- `reviews.category` keeps storing the canonical type (Phase 2.1 behaviour).
-- Extra answers go into the existing `metadata` JSONB under their field key, so
-  no migration is needed and existing `food_tags` rows keep rendering.
-- Legacy reviews (bucket values, unlinked subjects) render exactly as today.
+- Answers stored namespaced: `metadata.questionnaire = { version: 1, type, answers }`.
+  Existing `metadata.food_tags` and provenance keys are preserved at the root.
+- A review without `metadata.questionnaire.version` opens in legacy
+  compatibility mode — read, never silently rewritten. Deliberate subject
+  replacement switches it to the current questionnaire for the new type.
+- Remove `questionnaireKind` / the five legacy buckets from new-review paths.
+  `reviews.category` stays (backend consumers depend on it).
 
-### 5. Tests
+## Out of scope
 
-- Registry completeness test: every canonical type has a spec; no spec falls
-  back to `product`.
-- Spec resolution tests for resolved / failed / absent subject relations.
-- Validation test: required title fields per spec block "Next".
-
-## Explicitly out of scope
-
-- Phase 2.5B manual remediation of legacy unlinked reviews — skipped per your
-  call.
-- Any data backfill or rewrite of existing `reviews.category` values.
-- Visual redesign of the wizard (layout/sections refinement is the final step,
-  after the content model is right).
-
-## Technical notes
-
-Files touched: new `questionnaire/registry.ts` (+ tests), `StepThree.tsx`,
-`StepFour.tsx`, `ReviewForm.tsx`, and a small helper reusing
-`reviewDisplayType.ts`. No SQL, no edge functions, no schema change.
+- Phase 2.5B legacy remediation — deferred, as you asked.
+- Any wizard layout redesign or 3-vs-4-step decision (that comes after 3C, once
+  real section and field counts are known).
+- Any DB migration or per-answer column; no data backfill.
+- Deleting or genericising `FoodTagSelector`.
