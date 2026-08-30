@@ -899,7 +899,10 @@ const ReviewForm = ({
                   subject={selectedSubject}
                   onSubjectChange={handleSubjectChange}
                   disabled={isFromEntityPage}
-                  onSkip={handleSubjectSkip}
+                  requirement={requirement}
+                  onContinueWithoutSubject={
+                    allowsMissingSubject(requirement) ? handleContinueWithoutSubject : undefined
+                  }
                   contextLine={subjectContextLine}
                   isResolvingContext={isResolvingSubjectContext}
                 />
