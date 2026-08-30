@@ -805,10 +805,9 @@ const ReviewForm = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, currentStep]);
 
-  // Explicit skip of subject selection — logged so we can see how often people
-  // review something we can't link yet.
-  const handleSubjectSkip = () => {
-    logFunnel({ event: 'review_subject_skipped', source: 'review_form' });
+  // Legacy unlinked reviews may continue without a subject.
+  const handleContinueWithoutSubject = () => {
+    logFunnel({ event: 'review_subject_legacy_unlinked', source: 'review_form' });
     handleNext();
   };
 
