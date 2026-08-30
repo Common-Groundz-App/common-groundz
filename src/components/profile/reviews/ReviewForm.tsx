@@ -18,6 +18,11 @@ import {
   resolveQuestionnaireKind,
   type LegacyReviewCategory,
 } from './subjectSelection';
+import {
+  subjectRequirement,
+  allowsMissingSubject,
+  type SubjectRequirement,
+} from './reviewSubjectPolicy';
 import { getParentEntity } from '@/services/entityHierarchyService';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 
