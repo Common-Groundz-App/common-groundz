@@ -125,7 +125,7 @@ export const fetchUserReviews = async (currentUserId: string | null, profileUser
 
     const reviewIds = reviews.map(r => r.id);
     const subjectOutcome = await loadSubjectEntities(reviews);
-    const entities = subjectOutcome.attempted && !subjectOutcome.failed ? subjectOutcome.rows : [];
+    const entities = subjectOutcome.attempted && !subjectOutcome.failed && 'rows' in subjectOutcome ? subjectOutcome.rows : [];
 
     // Get interaction data if user is logged in
     let likeData = [];
@@ -198,7 +198,7 @@ export const fetchUserRecommendations = async (currentUserId: string | null, pro
 
     const reviewIds = reviews.map(r => r.id);
     const subjectOutcome = await loadSubjectEntities(reviews);
-    const entities = subjectOutcome.attempted && !subjectOutcome.failed ? subjectOutcome.rows : [];
+    const entities = subjectOutcome.attempted && !subjectOutcome.failed && 'rows' in subjectOutcome ? subjectOutcome.rows : [];
 
     // Get interaction data if user is logged in
     let likeData = [];

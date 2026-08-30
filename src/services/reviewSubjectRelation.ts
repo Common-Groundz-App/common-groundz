@@ -61,8 +61,9 @@ export function resolveSubjectRelation(
   outcome: SubjectLookupOutcome
 ): SubjectRelation {
   if (!entityId) return SUBJECT_RELATION_NOT_LOADED;
-  if (!outcome.attempted || outcome.failed) return SUBJECT_RELATION_FAILED;
-  if (!('rows' in outcome)) return SUBJECT_RELATION_NOT_LOADED;
+  if (!outcome.attempted) return SUBJECT_RELATION_NOT_LOADED;
+  if (outcome.failed) return SUBJECT_RELATION_FAILED;
+  if (!('rows' in outcome)) return SUBJECT_RELATION_FAILED;
 
   const row = outcome.rows.find((candidate) => candidate.id === entityId);
   if (!row) return SUBJECT_RELATION_ABSENT;
