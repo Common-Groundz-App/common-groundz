@@ -605,6 +605,15 @@ const ReviewForm = ({
       return;
     }
     
+    if (currentStep === 2 && !allowsMissingSubject(requirement) && !selectedSubject) {
+      toast({
+        title: 'Subject required',
+        description: 'Choose what you\'re reviewing before continuing.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     if (currentStep === 3) {
       // Validate based on category
       if (category === 'food' && !foodName) {
