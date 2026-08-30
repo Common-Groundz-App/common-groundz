@@ -1,36 +1,37 @@
-# Phase 2.4 — Every new review has a real subject (revised, final)
+# Phase 2.4 — Every new review has a real subject (final)
 
-Phase 2.3 is verified complete. Both review rounds are now folded in. I checked each new claim against the live database and the form code rather than accepting it — two of them changed the plan materially, and one recommendation I'm declining with evidence.
+Phase 2.3 is verified complete. This revision folds in all three review rounds.
 
-## Corrections accepted
+## The type-consistency correction — accepted, my objection was wrong
 
-**1. The Service mismatch is real — I was wrong.** I read the live `create_entity_subject` definition. It contains:
+I declined `reviews.category = entity.type` enforcement on the strength of 17 mismatched live rows. That reasoning doesn't hold, for exactly the reason both reviewers gave, and I confirmed it in the code:
 
-```sql
-IF v_type = 'service' THEN
-  RAISE EXCEPTION 'service subjects cannot be created here' USING ERRCODE = '22023';
-END IF;
+`ReviewForm.tsx` (lines 663-668) already implements the Phase 2.1 contract:
+
+```ts
+const canonicalWins =
+  subjectOrigin === 'user-selected' || (subjectOrigin === 'entity-page' && !isEditMode);
+const persistedCategory = canonicalWins && canonicalCategory ? canonicalCategory : /* legacy */;
 ```
 
-and its standalone allow-list is `place, book, movie, tv_show, course, app, game, event, brand, professional, experience, product, others` — no `service`. Meanwhile `SubjectQuickCreate` renders a button for all 15 canonical types. Today that path fails at the RPC; once Skip is removed it becomes a dead end.
+So a deliberately chosen subject already persists the **canonical entity type**, while `questionnaireKind` keeps using the legacy 5-bucket mapping for the Step 3/4 UI. A Course review persists `category = 'course'` and renders product-shaped questions. The 17 old rows (`food` on a `place`, `product` on a `brand`) are pre-Phase-2.1 data that a `BEFORE INSERT`-only trigger never touches, and no backfill runs. Enforcing consistency on new inserts is therefore safe and is the point of Phase 2.1.
 
-**Decision: option A — support standalone Service.** A service (a salon, a plumber, a repair shop) is a legitimate review subject, and the fix is one line in the same migration this phase already needs. It adds **no** provider relationship: `service` becomes creatable only with `parent_id = NULL`. Frontend and RPC then agree.
+**Revised:** the trigger and the service boundary enforce `reviews.category = referenced entity.type` on **INSERT only**. `review_subject_type_divergence` telemetry stays, but as a regression signal — divergence on a new review is a bug, not accepted behaviour.
 
-**2. One invariant, not two.** Subject absence is permitted **only** for `legacy-optional`. `required` and `locked` both demand an entity id. Expressed once in the policy module as `allowsMissingSubject(requirement)` (true only for `legacy-optional`), consumed by both the Next gate and the submit guard, so a malformed entity-page context is caught in the form rather than falling through to a database error.
+## Other corrections accepted
 
-**3. `originalEntityId` is scoped to the loaded review.** `ReviewForm` stays mounted across close/reopen and across switching reviews, so a plain `useState` initialiser would leak the previous review's legacy status. It is keyed on the loaded review id and recomputed whenever that id (or create/edit mode) changes — a stale `null` must never make a linked review editable-unlinked.
+- **Trigger hardening.** The trigger function queries `public.entities`, so it is `SECURITY DEFINER`, owned by `postgres`, with a pinned `search_path`, matching the discipline of `create_entity_subject`. It must be tested through a normal authenticated insert, not just service-role SQL, so an RLS-invisible row can never cause a false rejection. The existing FK stays; the trigger adds the null rule, the not-soft-deleted rule, and the type-consistency rule.
+- **Service copy.** A `service` entity is the service itself — "Haircut", "AC repair", "Screen replacement", "Home deep cleaning" — not the provider (a salon is a `place`, a plumber is a `professional`). Quick-create placeholder and helper copy use service examples so the distinction is right before provider relationships arrive later.
+- **Category assertions in the manual checks**, not just "the RPC accepts it".
 
-**4. Copy: "Continue without linking."** With explanatory text: "You can keep this older review unlinked and continue editing it." The actual save is still on the final step, so "Save without linking" would have been misleading.
+## Confirmed earlier corrections
 
-**5. `isFromEntityPage` semantics — verified, and the matrix changes because of it.** Line 145 of `ReviewForm.tsx` is `const isFromEntityPage = !!entity && !isEditMode;`. So "edit from an entity page" is genuinely **not detectable** with today's props, and today's edit flow already lets the user change the subject. Rather than invent a new lock, the matrix drops that row: `hasEntityContext = !!entity` is introduced for clarity, `locked` means `isFromEntityPage` (new + entity context), and edits are governed purely by `originalEntityId`. This is the honest description of existing behaviour and avoids a silent UX change in a phase that is meant to be about one invariant.
-
-**6. Trigger also rejects soft-deleted subjects.** A non-null `entity_id` pointing at `is_deleted = true` is not a valid subject.
-
-## Declined, with data
-
-**Type-consistency (`reviews.category = entity.type`) at the creation boundary.** I queried the live rows: of 50 linked reviews, **17 already disagree** — 12 are `category = 'food'` on a `place` entity and 5 are `category = 'product'` on a `brand` entity. Those are exactly the legacy provider-review shapes that Phase 2.2/2.3 introduced the hierarchy to replace, and the legacy Step 3/4 questionnaire still derives `category` through the bucket mapping rather than copying the type. A hard check in the trigger or service would therefore reject writes the current questionnaire legitimately produces, and it would fail with a confusing error rather than teaching the user anything.
-
-Instead: log `review_subject_type_divergence` (enumerated types only, no text) when a new review's category doesn't equal its subject's canonical type. That gives real numbers on whether divergence still happens on *new* rows, and Phase 2.5 — which owns the questionnaire cleanup — can enforce it with evidence instead of a guess.
+- **Service parity.** The live `create_entity_subject` explicitly raises `service subjects cannot be created here` and omits `service` from its standalone list, while `SubjectQuickCreate` offers all 15 types. Decision: allow **parentless** `service` in the RPC. No `place → service` or `professional → service` relationship is added.
+- **One invariant.** `allowsMissingSubject(requirement)` is true only for `legacy-optional`; `required` and `locked` both demand an entity id. Shared by the Next gate and the submit guard.
+- **`originalEntityId` scoped to the loaded review id**, so a mounted form can't carry a previous review's legacy status.
+- **Copy: "Continue without linking"** — "You can keep this older review unlinked and continue editing it."
+- **`isFromEntityPage` is `!!entity && !isEditMode`**, so "edit from an entity page" isn't detectable today and isn't invented here. `hasEntityContext = !!entity` is introduced for clarity; edits are governed purely by `originalEntityId`.
+- **Cleanup deferred to 2.5** — `CategorySelector.tsx` and `steps/StepTwo.tsx` stay untouched.
 
 ---
 
@@ -47,7 +48,7 @@ Inputs: `isEditMode`, `originalEntityId` (scoped to the loaded review id), `isFr
 
 ## Not in scope
 
-No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked and must stay editable). No `UPDATE` guard. No component deletions and no questionnaire rework — Phase 2.5. No new provider relationships for `service`.
+No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked and stay editable). No `UPDATE` guards at all. No component deletions, no questionnaire rework, no new provider relationships for `service`.
 
 ## Technical plan
 
@@ -55,35 +56,44 @@ No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked
    `subjectRequirement({ isEditMode, originalEntityId, isFromEntityPage })` → `'required' | 'legacy-optional' | 'locked'`, plus `allowsMissingSubject(requirement)`. No React, no network.
 
 2. **Migration**
-   - Add `service` to the standalone allow-list in `create_entity_subject` and remove the blanket `service` rejection, keeping every other guard (auth, bounds, API-pair rule, offering allow-list, advisory lock, empty-normalized-name rule) byte-for-byte intact. `service` remains parentless-only.
-   - `BEFORE INSERT` trigger on `public.reviews`: reject when `entity_id IS NULL`, and reject when it references a missing or `is_deleted` entity. `INSERT` only.
+   - `create_entity_subject`: add `service` to the standalone allow-list and drop the blanket `service` rejection, keeping every other guard byte-for-byte (auth, bounds, API-pair rule, offering allow-list, advisory lock, empty-normalized-name rule). `service` stays parentless-only.
+   - `BEFORE INSERT` trigger on `public.reviews` — `SECURITY DEFINER`, owner `postgres`, pinned `search_path` — rejecting: `entity_id IS NULL`; a missing or `is_deleted` subject; and `category <> entity.type`. Clear, human-readable exception messages. `INSERT` only.
 
 3. **`SubjectSelectStep.tsx`**
    Replace `onSkip` with a `requirement` prop. The unlinked affordance renders only for `legacy-optional`, labelled "Continue without linking" with the explanatory line. For `required`, the create button is the only fallback and the empty-state copy points at it.
 
 4. **`ReviewForm.tsx`**
-   - Introduce `hasEntityContext = !!entity`; keep `isFromEntityPage` as-is.
+   - Introduce `hasEntityContext = !!entity`; leave `isFromEntityPage` as-is.
    - Track `originalEntityId` keyed on the loaded review id.
-   - Next gate and submit guard both call `allowsMissingSubject(requirement)`. Blocking submit returns to Step 2 with human copy: "Choose what you're reviewing before publishing."
-   - Remove `handleSubjectSkip`; emit `review_subject_legacy_unlinked` only when a legacy edit saves still unlinked.
+   - Next gate and submit guard both call `allowsMissingSubject(requirement)`. Blocked submit returns to Step 2: "Choose what you're reviewing before publishing."
+   - Remove `handleSubjectSkip`; emit `review_subject_legacy_unlinked` only when a legacy edit saves still unlinked, and `review_subject_type_divergence` if a new linked review's category ever differs from its subject type.
 
 5. **Service-level guards**
-   `createReview` in **both** `src/services/reviewService.ts` and `src/services/review/core.ts` throws on a missing/blank `entity_id`. `updateReview` untouched, so legacy rows stay editable.
+   `createReview` in **both** `src/services/reviewService.ts` and `src/services/review/core.ts`: throw on a missing/blank `entity_id`, and throw when `category` doesn't match the referenced entity's canonical type. `updateReview` untouched.
 
-6. **Telemetry**
+6. **Quick-create service copy**
+   Service placeholder/example text describes the service itself ("e.g. Haircut, AC repair"), never the provider.
+
+7. **Telemetry**
    Add `review_subject_legacy_unlinked` and `review_subject_type_divergence` to `supabase/functions/log-search-funnel/allowlists.ts`. Keep `review_subject_skipped` accepted for older clients; the new UI stops emitting it. No query or review text.
 
-7. **Step 3 derivation sweep**
-   Confirm no `required` path reaches Step 3 with an empty `contentName` / `foodName`, across the questionnaire mappings covering all 15 canonical types. Where selection leaves the legacy field blank, derive it from the subject at selection time. **Venue stays editable** — `StepThree` applies `readOnly` to the name field only.
+8. **Step 3 derivation sweep**
+   Confirm no `required` path reaches Step 3 with an empty `contentName` / `foodName`, across the mappings covering all 15 canonical types; derive from the subject where blank. **Venue stays editable** — `StepThree` applies `readOnly` to the name field only.
 
-8. **Tests**
-   Policy matrix (all four rows) and `allowsMissingSubject`, stale-`originalEntityId` regression (legacy review → linked review in one mounted instance), Next-gating, submit guard, both service guards, and a mapping sweep proving every canonical type yields a non-empty Step 3 title. Full suite green.
+9. **Tests**
+   - Policy matrix (all four rows) and `allowsMissingSubject`.
+   - Stale-`originalEntityId` regression: legacy unlinked review → linked review in one mounted instance.
+   - Next gating, submit guard, both service guards (null entity **and** category mismatch).
+   - **15-type canonical-category test:** for every canonical type, a new review persists `category === subject.type` while `questionnaireKind` may still be the legacy bucket.
+   - Step 3 title derivation for all 15 types. Full suite green.
 
 ## Acceptance criteria
 
-- No application path creates a new review with `entity_id = NULL`: audited — only `reviewService.ts` and `review/core.ts` insert into `reviews` (no RPC, edge function, or migration does) — both guarded, with the trigger as backstop.
-- Every type offered by quick-create is accepted by the RPC (Service parity fixed).
-- Legacy unlinked reviews remain editable and savable.
+- No application path creates a new review with `entity_id = NULL`: only `reviewService.ts` and `review/core.ts` insert into `reviews` (no RPC, edge function, or migration does) — both guarded, trigger as backstop.
+- Every new linked review satisfies `category = subject.type`; divergence is a bug.
+- Every type quick-create offers is accepted by the RPC (Service parity fixed).
+- Legacy unlinked rows remain editable and savable, unchanged.
+- The trigger accepts a normal authenticated insert of a valid subject (RLS-safe), verified through the app path.
 
 ## Manual verification
 
@@ -91,11 +101,12 @@ No `NOT NULL` on `reviews.entity_id`, no backfill (27 of 77 reviews are unlinked
 2. Search something nonexistent → create it → auto-selects → Next enables.
 3. Edit a legacy unlinked review → "Continue without linking" appears; saving unlinked works.
 4. Edit a linked review → no unlinked option.
-5. Open a legacy unlinked review, close, then open a linked review without reloading → the linked one is subject-required (stale-state check).
+5. Open a legacy unlinked review, close, open a linked review without reloading → subject-required (stale-state check).
 6. Review from an entity page → locked, unchanged.
-7. **Brand → product:** create "Sony", then "WH-1000XM6" → review attaches to the **product**.
-8. **Place → dish:** create "Truffles", then "Classic Burger" → venue context resolves → review attaches to the **food** entity.
-9. **Standalone service:** pick Service, name it, create → no provider step, RPC accepts, review attaches to the new service entity.
-10. Submitted rows all carry a non-null `entity_id`.
+7. **Brand → product:** "Sony" then "WH-1000XM6" → `entity_id` = the product, `category = 'product'`.
+8. **Place → dish:** "Truffles" then "Classic Burger" → venue context resolves → `entity_id` = the food entity, `category = 'food'`.
+9. **Standalone service:** create "Haircut" → no provider step, `parent_id = NULL`, `type = 'service'`, review saves with `category = 'service'`.
+10. **Course:** select a course subject → product-shaped Step 3, saved `category = 'course'`.
+11. All submitted rows carry a non-null `entity_id`.
 
 Stop for verification after 2.4; cleanup and questionnaire work land in 2.5.
