@@ -142,6 +142,24 @@ const ReviewForm = ({
   const [entityId, setEntityId] = useState(review?.entity_id || entity?.id || '');
   const [description, setDescription] = useState(review?.description || '');
   
+  /**
+   * Phase 2.4 — the original persisted entity_id for the review being edited,
+   * scoped to the loaded review id. This prevents a mounted form from carrying
+   * a previous review's legacy status into a different review.
+   */
+  const [originalEntityId, setOriginalEntityId] = useState<string | null>(
+    review?.entity_id ?? null
+  );
+  const [originalReviewId, setOriginalReviewId] = useState<string | null>(
+    review?.id ?? null
+  );
+  
+  const requirement: SubjectRequirement = subjectRequirement({
+    isEditMode,
+    originalEntityId,
+    isFromEntityPage,
+  });
+  
   // Updated media handling
   const [selectedMedia, setSelectedMedia] = useState<MediaItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
