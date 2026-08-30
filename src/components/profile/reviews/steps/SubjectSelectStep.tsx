@@ -114,7 +114,7 @@ const SubjectSelectStep = ({
             <PlusCircle className="h-4 w-4 mr-1.5" />
             Can't find it? Add something new
           </Button>
-          {allowsMissingSubject(requirement) && (
+          {allowsMissingSubject(requirement) && onContinueWithoutSubject && (
             <div>
               <Button type="button" variant="ghost" size="sm" onClick={onContinueWithoutSubject}>
                 Continue without linking
