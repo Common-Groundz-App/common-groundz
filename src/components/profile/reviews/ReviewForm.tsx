@@ -491,7 +491,9 @@ const ReviewForm = ({
         if (id !== subjectRequestRef.current) return;
         if (parent?.name) {
           setResolvedProviderName(parent.name);
-          const context = getOfferingContextLine(canonicalType as any);
+          // Registry-driven pair label ("Dish at …"); unregistered pairs stay generic.
+          const context = getOfferingContextLine(parent.type, canonicalType);
+
           setSubjectContextLine(
             context ? `${context.singular} ${context.verb} ${parent.name}` : `Part of ${parent.name}`,
           );
