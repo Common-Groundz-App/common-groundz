@@ -77,29 +77,65 @@ Naming note to document in code: `reviews.title` = subject identity,
    with no knowledge of entity types. `tags` + `tagSet: 'food'` routes to the
    existing `FoodTagSelector` (unchanged file, unchanged vocabulary, unchanged
    `metadata.food_tags` contract). No other `tagSet` exists yet.
+   **Scope discipline:** the `kind` union is declared broadly, but 3A implements
+   only the controls current behaviour actually exercises (the food tag path, plus
+   `text`/`textarea` primitives). `select` / `multi-select` land in 3C when the
+   approved matrix needs them — no unused form engine built ahead of 3B.
 4. **Identity cleanup under `subjectOrigin`**:
    | Context | title / venue |
    |---|---|
-   | new linked review | derive title from subject; venue from resolved provider |
+   | new linked review | derive title from subject; venue per the snapshot policy below |
    | existing review, subject untouched (`loaded`) | preserve stored values |
    | existing review, subject deliberately replaced (`user-selected`) | derive from the new subject |
    | legacy unlinked | preserve, remain editable |
    Provider/parent context comes from `entityRelationshipRegistry` +
    `getParentEntity`, not a `food` conditional, so product-under-brand works too.
-5. **Metadata safety** — food tags save via a merge (`{ ...existing, food_tags }`)
-   so provenance and unrelated keys survive an edit. No `metadata.questionnaire`
-   yet.
-6. **Validation** driven by the registry's `required` flags, returning structured
+5. **Canonical `reviews.venue` snapshot policy** (explicit, and separate from the
+   questionnaire — `reviews.venue` is still read outside the form, e.g.
+   `entitySidebarLogic.ts` uses `entity.venue`, and `subjectSelection.ts` already
+   derives it per subject shape):
+   | Subject context | value written on a new / relinked review |
+   |---|---|
+   | offering with a resolved provider | provider name |
+   | `place` with a useful location/address | subject venue/address |
+   | any other standalone canonical type | left empty |
+   | untouched existing review | preserve stored venue |
+   | legacy unlinked review | preserve, stays editable |
+   Author, director, brand and manufacturer are **no longer written to
+   `reviews.venue`** — those are entity facts and stay on the entity. The policy
+   lives in one helper next to the registry, with a per-type test row.
+6. **Metadata safety** — food tags save via a merge, guarded by a plain-object
+   check (`existing && typeof existing === 'object' && !Array.isArray(existing)`)
+   so arrays/strings/numbers/null never get spread, and provenance plus unrelated
+   keys survive an edit. No `metadata.questionnaire` yet.
+7. **Validation** driven by the registry's `required` flags, returning structured
    errors and focusing the first invalid field, replacing the
    `foodName`/`contentName` checks. Step 1 rating and Step 2 subject rules stay
    exactly as Phase 2.4 left them.
-7. **Unchanged in 3A**: four steps, step order, wizard layout, no new questions,
+8. **Invalid linked subject blocks the wizard** — an unparseable type on a linked
+   subject is an *unusable subject*, not an empty questionnaire. That resolution
+   mode participates in step navigation and submit validation: Next and Submit are
+   blocked with the inline error, and the user is pointed back to Step 2 to pick a
+   valid subject. It must never be a questionnaire with zero required fields that
+   silently saves.
+9. **Compatibility-state boundary (3A vs 3D)** — in 3A, canonical linked flows no
+   longer render or validate name/venue inputs, and `reviews.title` is written
+   through the single identity-persistence helper. The old `foodName` /
+   `contentName` / `venue` state may survive internally **only** on the
+   legacy-unlinked edit path, and `questionnaireKind` may still load old behaviour
+   but must not select a questionnaire for a canonical type. 3D renames that state
+   to an explicitly named legacy-unlinked adapter and deletes the rest. No
+   ambiguous `foodName`/`contentName` variable drives a canonical save in the
+   interim.
+10. **Unchanged in 3A**: four steps, step order, wizard layout, no new questions,
    `reviews.category` semantics, legacy unlinked editing.
-8. **Tests**: 15 explicit configs; no fallback to product/others/generic for a
+11. **Tests**: 15 explicit configs; no fallback to product/others/generic for a
    linked subject; legacy-unlinked mode selected only when `entity_id` is null;
-   food config yields the existing tag UI with its current chips; title/venue
-   derivation table above, one case each; metadata merge preserves foreign keys;
-   registry validation blocks/allows correctly.
+   food config yields the existing tag UI with its current chips; title derivation
+   table above, one case each; venue snapshot policy per type; invalid linked
+   subject blocks navigation and submit; metadata merge preserves foreign keys and
+   refuses to spread non-objects; registry validation blocks/allows correctly.
+
 
 **Then stop for your manual verification across all 15 types.**
 
