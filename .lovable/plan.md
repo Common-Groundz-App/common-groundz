@@ -1,111 +1,148 @@
-# Phase 3 — Config-driven review questionnaire (final plan)
+# Phase 3 — Config-driven review questionnaire (final plan, revised)
 
-## My read on the two reviews
+## My verdict on the three inputs
 
-Both agree on the same architecture, and it matches what I proposed: canonical
-`entity.type` → questionnaire registry → sections/fields, with no `if (category
-=== 'food')` left in the wizard. The differences worth keeping:
+Both critiques are right on the points where they disagree with me, and I accept
+all of them. Specifically:
 
-- **Codex is right on sequencing and safety**: build the registry + renderer at
-  behaviour parity first (3A), verify all 15 types, and only then add new
-  questions. Its two hardest rules are things my plan under-specified:
-  namespaced/versioned answers (`metadata.questionnaire.{version,type,answers}`)
-  and **not asking for entity facts** — no "What did you eat?", "Product name",
-  "Director", "Brand", "Address" once a subject is selected.
-- **ChatGPT is right on content**: its per-type questions ("Would you order it
-  again?", "Rewatch?", "Worth the time?") are decision-useful and on-brand
-  (transitions, reuse intent) in a way Codex's context-only matrix is not. So we
-  use Codex's structure with ChatGPT's question set as the 3B input.
+- **Common controls must stay outside the registry** (both raised it). My draft
+  listed `rating | media | date | visibility` as field kinds while also saying
+  those controls stay in Steps 1/3/4 — two owners for one control. Dropped.
+- **`kind: 'tags'` must not mean "FoodTagSelector"** (ChatGPT). The registry
+  names a vocabulary (`tagSet: 'food'`); the renderer maps that to the existing
+  component. And Codex is factually right that my "renders with the field's
+  options" line was impossible: `FoodTagSelector` takes only
+  `selectedTags/onAddTag/onRemoveTag` and owns its 13 curated chips. It stays
+  exactly as-is, untouched.
+- **No generic fallback for a linked-but-unparseable subject type** (Codex).
+  That is an invariant failure after Phase 2.4, not a presentation case. Generic
+  mode exists only for legacy *unlinked* reviews.
+- **Title/venue derivation must follow `subjectOrigin`** (Codex). My draft said
+  "title comes from the subject" flatly, which would silently rewrite historical
+  linked reviews on a plain re-save — exactly what Phase 2.1 protects against.
+- **Versioned answer contract before any new question ships** (both). Correct;
+  otherwise the first new question lands in a home we then move.
 
-Where I differ from both: 3A must not be a pure refactor. Two current fields are
-actively wrong once a subject is mandatory (`foodName` / `contentName` asking for
-the subject's own name, and `venue` asking for the parent that the hierarchy
-already knows), so 3A removes those questions rather than faithfully porting
-them.
+Where I keep my own position: 3A is *not* pure behaviour parity. Asking "What
+did you eat?" after the user picked "Classic Burger at Truffles", and asking for
+a restaurant/brand/author the hierarchy already knows, are the bugs Phase 2
+created. 3A removes those questions — under the `subjectOrigin` guard above.
 
-**Food tags stay.** `FoodTagSelector` (curated chips + custom tag input) is good
-UI and keeps its hardcoded food vocabulary. In 3A it becomes the renderer for the
-`tags` field kind, wired only into the `food` questionnaire — same component,
-same options, same `metadata.food_tags` storage. No other type gets tags in 3A.
+One thing neither raised, and I verified it today: `ReviewForm` builds
+`metadata = category === 'food' ? { food_tags: foodTags } : undefined` and passes
+it straight to `updateReview`, which does a plain column update. So a food edit
+**overwrites the whole `metadata` JSONB**, dropping provenance and any other
+keys. 3A fixes that by merging.
 
-## Phase 3.0 — Audit (already done, recorded here)
+## Phase 3.0 — Audit (done, recorded)
 
-Current Step 3 / Step 4 fields and where they live:
-
-| Field | Step | Common or type-specific | Persisted to | Phase 3 verdict |
+| Field | Step | Common / type-specific | Persisted | Verdict |
 |---|---|---|---|---|
-| Rating | 1 | common | `reviews.rating` | keep as-is |
-| Subject (entity) | 2 | common | `reviews.entity_id` + `category` | keep as-is |
-| `foodName` / `contentName` ("What did you eat?", "Movie title"…) | 3 | five-bucket branch | `reviews.title` | **retire as a question**; title derives from the subject |
-| `venue` ("Restaurant name", "Director/Studio", "Author", "Address", "Brand") | 3 | five-bucket branch | `reviews.venue` | **retire as a question**; show parent/provider context read-only, keep column written from subject context |
-| Media | 3 | common | review media | keep |
-| Location prompt (`place`/`food` only) | 3 | type-specific | none (permission) | registry flag `showLocationPrompt` |
-| Review headline | 4 | common | `reviews.subtitle` | keep |
-| Your thoughts | 4 | common | `reviews.description` | keep |
-| Experience date | 4 | common | `reviews.experience_date` | keep |
-| Food tags | 4 | type-specific (`food`) | `metadata.food_tags` | keep component + storage, driven by registry |
-| Visibility | 4 | common | `reviews.visibility` | keep |
+| Rating | 1 | common | `reviews.rating` | stays in the shell |
+| Subject | 2 | common | `entity_id` + `category` | stays (Phase 2.4 rules) |
+| `foodName` / `contentName` | 3 | 5-bucket branch | `reviews.title` | retired as a question; derived per `subjectOrigin` |
+| `venue` (Restaurant/Director/Author/Address/Brand) | 3 | 5-bucket branch | `reviews.venue` | retired as a question; provider context displayed from hierarchy |
+| Media | 3 | common | review media | stays in the shell |
+| Location permission prompt | 3 | `place`/`food` | none | registry flag `showLocationPrompt` |
+| Headline | 4 | common | `reviews.subtitle` | stays in the shell |
+| Your thoughts | 4 | common | `reviews.description` | stays in the shell |
+| Experience date | 4 | common | `experience_date` | stays in the shell |
+| Food tags | 4 | type-specific | `metadata.food_tags` | registry-declared, existing component, merged save |
+| Visibility | 4 | common | `visibility` | stays in the shell |
 
-Legacy branching to remove: `ReviewForm.tsx` lines ~506, 576–590, 630, 659, 780,
-871 (`category === 'food'`), the `foodName`/`contentName` pair, `StepThree`'s
-five emoji/label/placeholder ladders and `getMainFieldLabel` /
-`getSecondaryFieldLabel`, and `StepFour`'s `category === 'food'` gate.
+Legacy branching to remove from new-review paths: `ReviewForm` lines ~506, 576–590,
+630, 659, 780, 871; the `foodName`/`contentName` pair; `StepThree`'s
+`getMainFieldLabel` / `getSecondaryFieldLabel` and its emoji ladders;
+`StepFour`'s `category === 'food'` gate.
 
-Edit-mode behaviour that must not regress: `subjectOrigin` ('none' | 'loaded' |
-'entity-page' | 'user-selected') still decides whether `reviews.category` is
-rewritten on save, and legacy unlinked reviews still open and save.
+Naming note to document in code: `reviews.title` = subject identity,
+`reviews.subtitle` = the user's headline.
 
-## Phase 3A — Registry + renderer at behaviour parity (implement now, then stop)
+## Phase 3A — Registry + renderer + safe identity cleanup (implement now)
 
-1. **Registry** — `src/components/profile/reviews/questionnaire/registry.ts`:
-   declarative data only, no React. Explicit entry for **all 15** canonical
-   types; no `default: product`, no fallback to `others`. Shape:
-   `{ type, subjectLabel, showLocationPrompt, sections: [{ id, title, fields: [{ id, kind, label, placeholder, helperText, required, options }] }] }`
-   with `kind` in `text | textarea | select | multi-select | tags | date | rating | visibility | media`.
-   An unresolvable subject type gets a named `generic` config (common fields
-   only), flagged as generic — never a product config.
-2. **Renderer** — a `QuestionnaireSection` component that maps `kind` → control
-   and knows nothing about entity types. `tags` renders `FoodTagSelector`
-   (unchanged) with the field's options.
-3. **Wire Step 3 / Step 4** to the registry; delete the label ladders and the
-   food conditionals. Step 3 keeps the read-only subject preview and adds the
-   parent/provider context line already computed by `getParentEntity`.
-4. **Subject-derived values**: `reviews.title` comes from the selected subject's
-   name; `reviews.venue` from the resolved parent/provider (unchanged for legacy
-   unlinked reviews, which keep their stored values).
-5. **Validation** from the registry (`required` fields, structured errors,
-   focus the first invalid field) replacing the `foodName` vs `contentName`
-   checks. Rating (Step 1) and subject (Step 2) rules stay exactly as Phase 2.4
-   left them.
-6. **Tests**: registry completeness across all 15 types; no config resolves to
-   product/others by fallback; food config still yields the tag selector with
-   the current vocabulary; validation blocks/allows per config; edit-mode
-   `subjectOrigin` persistence unchanged.
+1. **Registry** `src/components/profile/reviews/questionnaire/registry.ts` —
+   declarative data, no React. Explicit entry for **all 15** canonical types.
+   No `default → product`, no `→ others`. Shape:
+   `{ type, subjectLabel, showLocationPrompt, sections: [{ id, title, description?, fields: [{ id, kind, label, placeholder?, helperText?, required, options?, tagSet? }] }] }`
+   with `kind` limited to type-specific inputs: `text | textarea | select | multi-select | tags`.
+   Common controls are **not** in the registry.
+2. **Resolution modes**, explicit and separate:
+   - linked + parseable canonical type → that type's config;
+   - **legacy unlinked** review → a named `legacyUnlinked` config (no invented
+     type-specific questions);
+   - linked + unparseable type → **invariant failure**: type-specific sections
+     are suppressed and a controlled inline error is shown; never a generic or
+     product config.
+3. **Renderer** — a `QuestionnaireSection` component mapping `kind` → control,
+   with no knowledge of entity types. `tags` + `tagSet: 'food'` routes to the
+   existing `FoodTagSelector` (unchanged file, unchanged vocabulary, unchanged
+   `metadata.food_tags` contract). No other `tagSet` exists yet.
+4. **Identity cleanup under `subjectOrigin`**:
+   | Context | title / venue |
+   |---|---|
+   | new linked review | derive title from subject; venue from resolved provider |
+   | existing review, subject untouched (`loaded`) | preserve stored values |
+   | existing review, subject deliberately replaced (`user-selected`) | derive from the new subject |
+   | legacy unlinked | preserve, remain editable |
+   Provider/parent context comes from `entityRelationshipRegistry` +
+   `getParentEntity`, not a `food` conditional, so product-under-brand works too.
+5. **Metadata safety** — food tags save via a merge (`{ ...existing, food_tags }`)
+   so provenance and unrelated keys survive an edit. No `metadata.questionnaire`
+   yet.
+6. **Validation** driven by the registry's `required` flags, returning structured
+   errors and focusing the first invalid field, replacing the
+   `foodName`/`contentName` checks. Step 1 rating and Step 2 subject rules stay
+   exactly as Phase 2.4 left them.
+7. **Unchanged in 3A**: four steps, step order, wizard layout, no new questions,
+   `reviews.category` semantics, legacy unlinked editing.
+8. **Tests**: 15 explicit configs; no fallback to product/others/generic for a
+   linked subject; legacy-unlinked mode selected only when `entity_id` is null;
+   food config yields the existing tag UI with its current chips; title/venue
+   derivation table above, one case each; metadata merge preserves foreign keys;
+   registry validation blocks/allows correctly.
 
-**Stop here for your manual verification of all 15 types before 3B.**
+**Then stop for your manual verification across all 15 types.**
 
-## Phase 3B — Content matrix (after 3A verification)
+## Phase 3B — Content matrix + answer schema approval (no UI code)
 
-Encode ChatGPT's per-type questions, all **optional** in v1 (rating + subject
-remain the only required inputs). No question that duplicates entity metadata
-(director, author, brand, manufacturer, address, organizer). Food keeps its tag
-system and gains the offering-aware framing ("Classic Burger at Truffles").
-The exact matrix comes back to you for approval before coding.
+Full 15-type matrix in the decision-useful style you preferred — "Would you
+order/buy/watch it again?", "Would you recommend it?", "What stood out?", "Best
+for whom?" — not platform/format metadata. Every new question optional in v1;
+rating and subject remain the only required inputs. Nothing that duplicates
+entity facts (director, author, brand, address, organizer). Delivered together
+with the frozen answer schema:
 
-## Phase 3C — Versioned answers, legacy compatibility, cleanup
+```json
+{ "questionnaire": { "version": 1, "type": "course",
+  "answers": { "would_recommend": "yes", "worth_the_time": "yes" } } }
+```
 
-- Answers stored namespaced: `metadata.questionnaire = { version: 1, type, answers }`.
-  Existing `metadata.food_tags` and provenance keys are preserved at the root.
-- A review without `metadata.questionnaire.version` opens in legacy
-  compatibility mode — read, never silently rewritten. Deliberate subject
-  replacement switches it to the current questionnaire for the new type.
-- Remove `questionnaireKind` / the five legacy buckets from new-review paths.
-  `reviews.category` stays (backend consumers depend on it).
+`metadata.food_tags` and provenance keys stay at the root — not migrated just
+because Phase 3 exists.
 
-## Out of scope
+## Phase 3C — Implement questions against versioned persistence (one slice)
 
-- Phase 2.5B legacy remediation — deferred, as you asked.
-- Any wizard layout redesign or 3-vs-4-step decision (that comes after 3C, once
-  real section and field counts are known).
-- Any DB migration or per-answer column; no data backfill.
-- Deleting or genericising `FoodTagSelector`.
+Render, persist, load, and validate the approved fields in the same phase, with:
+unknown future answer keys preserved untouched; unrelated metadata merged;
+reviews without `questionnaire.version` opening in legacy compatibility and never
+silently converted; deliberate subject replacement switching to the current
+questionnaire for the new type.
+
+## Phase 3D — Legacy cleanup
+
+Remove `questionnaireKind` and the five-bucket branches from new-review paths,
+drop obsolete `foodName`/`contentName` state, keep only the narrow
+legacy-unlinked adapter, and confirm backend consumers of `reviews.category` are
+unaffected. `reviews.category` itself stays.
+
+## After Phase 3 — layout refinement (and revisit 2.5B)
+
+Only once real section and field counts exist: 3-vs-4 steps, section merging,
+progressive disclosure, mobile polish.
+
+## Out of scope throughout
+
+Phase 2.5B remediation; any DB migration, new column, or backfill; deleting,
+genericising, or restyling `FoodTagSelector`; new provider/offering
+relationships added just to feed a form field; storing React components in the
+registry.
