@@ -4,11 +4,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
-import FoodTagSelector from '@/components/profile/reviews/FoodTagSelector';
 import DateSelector from '@/components/profile/reviews/DateSelector';
+import QuestionnaireSections, {
+  type QuestionnaireAnswers,
+} from '@/components/profile/reviews/questionnaire/QuestionnaireSections';
+import type { QuestionnaireConfig } from '@/components/profile/reviews/questionnaire/registry';
 
 interface StepFourProps {
-  category: string;
+  /** Registry config for the resolved questionnaire (type-specific sections). */
+  config: QuestionnaireConfig;
+  answers: QuestionnaireAnswers;
+  onAddTag: (fieldId: string, tag: string) => void;
+  onRemoveTag: (fieldId: string, tag: string) => void;
+  onAnswerTextChange: (fieldId: string, value: string) => void;
   title: string;
   onTitleChange: (value: string) => void;
   description: string;
@@ -17,13 +25,14 @@ interface StepFourProps {
   onExperienceDateChange: (date: Date) => void;
   visibility: "public" | "circle_only" | "private";
   onVisibilityChange: (value: "public" | "circle_only" | "private") => void;
-  foodTags: string[];
-  onAddFoodTag: (tag: string) => void;
-  onRemoveFoodTag: (tag: string) => void;
 }
 
 const StepFour = ({
-  category,
+  config,
+  answers,
+  onAddTag,
+  onRemoveTag,
+  onAnswerTextChange,
   title,
   onTitleChange,
   description,
@@ -32,9 +41,6 @@ const StepFour = ({
   onExperienceDateChange,
   visibility,
   onVisibilityChange,
-  foodTags,
-  onAddFoodTag,
-  onRemoveFoodTag
 }: StepFourProps) => {
   return (
     <div className="w-full space-y-8 py-2">
@@ -85,20 +91,14 @@ const StepFour = ({
         />
       </div>
       
-      {/* Food tags (only for food category) */}
-      {category === 'food' && (
-        <div className="space-y-2">
-          <Label className="flex items-center gap-2 font-medium">
-            <span className="text-lg">🏷️</span>
-            <span>Food tags</span>
-          </Label>
-          <FoodTagSelector
-            selectedTags={foodTags}
-            onAddTag={onAddFoodTag}
-            onRemoveTag={onRemoveFoodTag}
-          />
-        </div>
-      )}
+      {/* Type-specific sections, driven by the questionnaire registry. */}
+      <QuestionnaireSections
+        config={config}
+        answers={answers}
+        onAddTag={onAddTag}
+        onRemoveTag={onRemoveTag}
+        onTextChange={onAnswerTextChange}
+      />
       
       {/* Visibility */}
       <div className="space-y-2">

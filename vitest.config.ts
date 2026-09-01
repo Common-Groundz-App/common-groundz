@@ -49,6 +49,8 @@ const nodeIncludes = [
   'src/components/profile/reviews/__tests__/subjectSelection.test.ts',
   'src/components/profile/reviews/__tests__/reviewCategoryBucketParity.test.ts',
   'src/components/profile/reviews/__tests__/reviewSubjectPolicy.test.ts',
+  'src/components/profile/reviews/__tests__/questionnaireResolution.test.ts',
+
   'src/services/__tests__/offeringPairParity.test.ts',
 ];
 
