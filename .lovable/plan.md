@@ -1,101 +1,134 @@
 # Phase 3B — Question matrix + frozen answer schema (approval only, no UI code)
 
 Phase 3A shipped the registry, the resolver, identity derivation and the safe
-metadata merge, but every canonical type still has `sections: []` except food.
-3B decides **what to ask** and **how answers are stored**, so 3C can implement
-one slice without moving the storage home afterwards.
+metadata merge, but every canonical type except food still has `sections: []`.
+3B locks **what we ask** and **how answers are stored**, so 3C implements one
+slice without moving the storage home afterwards.
 
-**No code ships in this phase.** Deliverable = this approved matrix + schema.
-Implementation is 3C.
+**No code ships in this phase.** Deliverable = the approved matrix + schema.
 
-## Rules the matrix obeys
+## Shape every type follows
 
-- Rating (Step 1) and subject (Step 2) stay the only required inputs. **Every
-  question below is optional in v1.**
-- Decision-useful questions only: would you do it again, would you recommend it,
-  what stood out, who is it for. No platform/format/metadata trivia.
-- Nothing that duplicates an entity fact (director, author, brand, address,
-  organizer, price, cuisine) — those live on the entity, not on a review.
-- Max 3 type-specific questions per type, one section per type, so Step 4 does
-  not become a form wall.
-- Shared question ids are reused across types on purpose (`would_again`,
-  `would_recommend`, `stood_out`, `best_for`) so answers stay comparable and a
-  deliberate subject change keeps meaning where the ids overlap.
+Four slots, same order everywhere, wording changes per type:
 
-## Shared answer vocabularies
+1. **Would you recommend it?** — Yes / Maybe / No
+2. **Repeat intent** (type-specific wording) — Yes / Maybe / No
+3. **What stood out?** — tag chips with a curated per-type vocabulary + custom tags
+4. **One extra high-value question** — value, worth-the-time, trust, or none
 
-- `yesno`: `yes` | `no` | `unsure`
-- `stood_out`: short free text (single line, 120 chars)
-- `best_for`: short free text (single line, 120 chars)
+Rating (Step 1) and subject (Step 2) remain the only required inputs. **Every
+question here is optional in v1.** Nothing duplicates an entity fact (director,
+author, brand, address, organizer, price).
+
+## Universal answer controls
+
+| Control | Display | Stored codes |
+|---|---|---|
+| `yesmaybeno` | Yes / Maybe / No | `yes` / `maybe` / `no` |
+| `value` | Not worth it / Okay / Worth it / Great value | `not_worth_it` / `okay` / `worth_it` / `great_value` |
+| `worth_time` | Yes / Mostly / No | `yes` / `mostly` / `no` |
+| `trust` | Low / Medium / High | `low` / `medium` / `high` |
+| `solves_problem` | Yes / Partly / No | `yes` / `partly` / `no` |
+| `tags` | chip grid + custom tag input | array of strings |
+
+Display wording never becomes the stored value, so copy can change later without
+breaking aggregation.
 
 ## The 15-type matrix
 
-| Type | Section title | Q1 | Q2 | Q3 |
+| Type | Recommend | Repeat intent (`would_again`) | Tags (`stood_out`) | Extra |
 |---|---|---|---|---|
-| food | What you ate | food tags (existing, unchanged) | `would_again` — "Would you order it again?" | `best_for` — "Best for whom?" |
-| place | Your visit | `would_again` — "Would you go back?" | `best_for` — "Who is this place best for?" | `stood_out` — "What stood out?" |
-| product | Using it | `would_again` — "Would you buy it again?" | `worth_the_money` — "Worth the money?" | `stood_out` — "What stood out?" |
-| brand | Your take | `would_recommend` — "Would you recommend this brand?" | `stood_out` — "What do they get right?" | — |
-| movie | Watching it | `would_recommend` — "Would you recommend it?" | `best_for` — "Best for whom?" | `stood_out` — "What stayed with you?" |
-| tv_show | Watching it | `would_recommend` — "Would you recommend it?" | `finished_it` — "Did you finish it?" | `best_for` — "Best for whom?" |
-| book | Reading it | `would_recommend` — "Would you recommend it?" | `finished_it` — "Did you finish it?" | `best_for` — "Best for whom?" |
-| game | Playing it | `would_recommend` — "Would you recommend it?" | `still_playing` — "Still playing it?" | `best_for` — "Best for whom?" |
-| app | Using it | `still_using` — "Still using it?" | `worth_the_money` — "Worth paying for?" | `stood_out` — "What does it do well?" |
-| course | Was it worth it | `worth_the_time` — "Worth the time?" | `would_recommend` — "Would you recommend it?" | `best_for` — "Best for whom?" |
-| service | Your experience | `would_again` — "Would you use them again?" | `worth_the_money` — "Worth the money?" | `stood_out` — "What stood out?" |
-| professional | Working with them | `would_again` — "Would you go back to them?" | `would_recommend` — "Would you recommend them?" | `best_for` — "Best for whom?" |
-| event | Being there | `would_again` — "Would you attend again?" | `best_for` — "Best for whom?" | `stood_out` — "What stood out?" |
-| experience | Doing it | `would_again` — "Would you do it again?" | `best_for` — "Best for whom?" | `stood_out` — "What stood out?" |
-| others | Your take | `would_recommend` — "Would you recommend it?" | `stood_out` — "What stood out?" | — |
+| food | Would you recommend it? | Would you order it again? | existing Food Tags, unchanged | `value` |
+| place | Would you recommend this place? | Would you go back? | place vocab | `best_for` tags |
+| product | Would you recommend it? | Would you buy it again? | product vocab | `value` |
+| brand | Would you recommend this brand? | Would you buy from them again? | brand vocab | `trust` |
+| movie | Would you recommend it? | Would you rewatch it? | movie vocab | — |
+| tv_show | Would you recommend it? | Would you watch more of it? | tv vocab | `worth_time` |
+| book | Would you recommend it? | Would you read it again? | book vocab | `worth_time` |
+| game | Would you recommend it? | Would you play it again? | game vocab | `worth_time` |
+| app | Would you recommend it? | Would you keep using it? | app vocab | `solves_problem` |
+| course | Would you recommend it? | Would you take another course from them? | course vocab | `worth_time` |
+| service | Would you recommend it? | Would you use this service again? | service vocab | `value` |
+| professional | Would you recommend them? | Would you work with them again? | professional vocab | `trust` |
+| event | Would you recommend it? | Would you attend again? | event vocab | `worth_time` |
+| experience | Would you recommend it? | Would you do it again? | experience vocab | `worth_time` |
+| others | Would you recommend it? | Would you choose it again? | generic vocab (custom-tag first) | — |
 
 `legacy_unlinked` keeps **zero** type-specific questions — unchanged from 3A.
 
-Field kinds used: `tags` (food only, existing component), `select` (`yesno`
-vocabularies), `text` (`stood_out`, `best_for`). No `multi-select` is needed yet,
-so 3C does not build it.
+## Curated tag vocabularies (locked here, verbatim)
+
+- **food** — unchanged: Spicy, Sweet, Savory, Vegetarian, Vegan, Gluten-Free, Dairy-Free, Non-Veg, Dessert, Breakfast, Lunch, Dinner, Value for Money
+- **place** — Great ambience, Good service, Clean, Peaceful, Lively, Crowded, Beautiful, Convenient, Well maintained, Good location, Good value, Premium, Family-friendly, Date-friendly, Solo-friendly
+- **place best_for** — Friends, Family, Couples, Solo, Groups, Work, Quick visit, Special occasion, Relaxing
+- **product** — High quality, Easy to use, Durable, Reliable, Well designed, Premium feel, Good performance, Feature-rich, Convenient, Good value, Overpriced, Poor quality, Hard to use
+- **brand** — Consistent quality, Trustworthy, Good design, Good customer service, Innovative, Good value, Premium, Reliable, Wide selection, Sustainable, Overpriced, Inconsistent, Poor support
+- **movie** — Story, Acting, Characters, Visuals, Cinematography, Music, Direction, Writing, Action, Comedy, Emotion, Suspense, World-building, Ending
+- **tv_show** — Story, Characters, Acting, Writing, Visuals, Music, Comedy, Suspense, World-building, Pacing, Character development, Ending
+- **book** — Story, Writing, Characters, Ideas, World-building, Emotion, Humour, Research, Practical insights, Easy to read, Thought-provoking, Page-turner
+- **game** — Gameplay, Story, Graphics, World, Characters, Combat, Exploration, Multiplayer, Progression, Sound/music, Replayability, Creativity, Difficulty
+- **app** — Easy to use, Useful, Fast, Reliable, Well designed, Feature-rich, Simple, Customizable, Innovative, Good value, Too many ads, Buggy, Confusing, Expensive
+- **course** — Practical, Well explained, Well structured, Engaging, Beginner-friendly, In-depth, Actionable, Good examples, Good exercises, Good instructor, Up to date, Too basic, Too advanced, Too theoretical
+- **service** — High quality, Fast, Reliable, Professional, Convenient, Responsive, Thorough, Good communication, Punctual, Good value, Expensive, Slow, Poor communication, Unreliable
+- **professional** — Knowledgeable, Professional, Reliable, Clear communication, Responsive, Patient, Trustworthy, Punctual, Empathetic, Detail-oriented, Efficient, Creative, Good listener
+- **event** — Well organized, Great atmosphere, Great speakers, Great performances, Good crowd, Good venue, Good activities, Networking, Informative, Entertaining, Unique, Poor organization, Overcrowded
+- **experience** — Unique, Fun, Exciting, Relaxing, Memorable, Well organized, Beautiful, Educational, Challenging, Beginner-friendly, Worth the money, Overrated, Crowded
+- **others** — High quality, Useful, Easy, Reliable, Good value, Unique, Convenient, Enjoyable, Disappointing
+
+Every vocabulary allows custom tags, exactly like the food selector does today.
+Emoji per chip is optional and presentation-only; only the food set has emoji now.
 
 ## Frozen answer schema (v1)
 
-Answers live under a single versioned key on `reviews.metadata`. `food_tags` and
+Answers live under one versioned key on `reviews.metadata`. `food_tags` and
 provenance keys stay at the root — not migrated just because Phase 3 exists.
 
 ```json
 {
-  "food_tags": ["spicy"],
+  "food_tags": ["Spicy"],
   "questionnaire": {
     "version": 1,
     "type": "course",
-    "answers": { "worth_the_time": "yes", "would_recommend": "yes" }
+    "answers": {
+      "would_recommend": "yes",
+      "would_again": "maybe",
+      "stood_out": ["Practical", "Good instructor"],
+      "worth_time": "yes"
+    }
   }
 }
 ```
 
 Contract rules, frozen here so 3C only implements them:
 
-1. `version` is a monotonically increasing integer. A review without
-   `questionnaire.version` opens in legacy compatibility and is never silently
-   converted.
-2. `type` records the canonical type the answers were given for. If the subject
-   is deliberately replaced with a different type, the form switches to the new
-   type's questions; unrecognised answer keys are **preserved untouched**, never
-   dropped.
-3. Unknown / future answer keys are always preserved on save (forward
-   compatibility) — writes merge into `answers`, they never replace it.
-4. Empty answers are omitted rather than stored as `""` or `null`, so an
-   untouched question leaves no trace.
-5. Only ids declared in the registry are ever *written*; anything else present is
-   read-only ballast that survives.
-6. No DB migration, no new column, no backfill — `metadata` JSONB already exists.
+1. Answer **ids** are shared across types (`would_recommend`, `would_again`,
+   `stood_out`, `value`, `worth_time`, `trust`, `solves_problem`, `best_for`) so
+   the data aggregates across the whole catalogue.
+2. Food keeps writing its chips to root `metadata.food_tags` — it is **not**
+   duplicated into `answers.stood_out`. Every other type writes `stood_out`.
+3. `version` is a monotonically increasing integer. A review with no
+   `questionnaire.version` opens in legacy compatibility, never silently converted.
+4. `type` records the canonical type the answers were given for. On a deliberate
+   subject change the form switches to the new type's questions; answers whose ids
+   still exist carry over, unknown ids are **preserved untouched**, never dropped.
+5. Writes merge into `answers`; they never replace the object.
+6. Empty answers are omitted, not stored as `""` / `null` / `[]`.
+7. No DB migration, no new column, no backfill — `metadata` JSONB already exists.
 
-## What 3C will then do (for context, not approved here)
+## Technical notes for 3C (not built in 3B)
 
-Render these fields through the existing `QuestionnaireSections` renderer,
-implement `select` + `text` controls, persist via `mergeReviewMetadata` under the
-schema above, load answers back on edit, and add per-type tests including the
-type-change preservation case.
+- `FoodTagSelector` hardcodes its 13 chips and takes only
+  `selectedTags/onAddTag/onRemoveTag`, so 3C needs a **generic chip selector**
+  built on the same visual pattern, driven by a vocabulary from the registry.
+  Food stays routed to the existing untouched component; `tagSet` grows from
+  `'food'` to the 17 named vocabularies above.
+- The registry's `kind` union gains no new members: `select` covers all four
+  scale controls (each with its own `options` codes), `tags` covers chips.
+- Validation stays as 3A left it — no new required fields, so `required: false`
+  everywhere.
 
-## Out of scope in 3B
+## Out of scope
 
-Any UI code, any registry edit, any migration, changing `FoodTagSelector`,
-Phase 2.5B remediation, step/layout restructuring (that is the post-Phase-3
-refinement step).
+Any UI code or registry edit in this phase; conditional questions (paid-game
+value, per-profession `best_for`); making any question required; step/layout
+restructuring; Phase 2.5B remediation; changing `FoodTagSelector`.
