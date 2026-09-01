@@ -296,30 +296,14 @@ const ReviewForm = ({
       setSubjectOrigin('entity-page');
       if (canonical) setCategory(mapCanonicalToLegacyCategory(canonical));
 
-      
-      // IMPORTANT: Handle the foodName vs contentName differently based on category
-      if (entity.type.toLowerCase() === 'food') {
-        // For food entity, leave the foodName empty since it's what the user ate
-        // and set the venue to the restaurant name
-        setFoodName(''); // Don't set food name - user needs to specify what they ate
-        setVenue(entity.name || ''); // Use entity name as the restaurant name
-      } else if (entity.type.toLowerCase() === 'place') {
-        // For place entity, set the contentName to the place name
-        setContentName(entity.name || '');
-        
-        // For venue/location field, prefer formatted_address from metadata if entity originated from Google Places
-        if (entity.metadata?.formatted_address) {
-          setVenue(entity.metadata.formatted_address || '');
-        } else {
-          setVenue(entity.venue || '');
-        }
-      } else {
-        // For other categories, use name as contentName
-        setContentName(entity.name || '');
-        setVenue(entity.venue || '');
-      }
-      
       setEntityId(entity.id);
+
+      // Provider context for the venue snapshot, resolved from the hierarchy.
+      setResolvedProviderName(null);
+      setSubjectContextLine(null);
+      if (canonical && isOfferingType(canonical)) {
+        resolveProviderContext(entity.id, canonical);
+      }
 
       // Only auto-complete step 2 since we have an entity
       // Step 1 (rating) is still required
@@ -327,6 +311,7 @@ const ReviewForm = ({
         setCompletedSteps(prev => [...prev, 2]);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entity, isOpen, isEditMode, completedSteps]);
   
   // Track form changes
@@ -339,16 +324,15 @@ const ReviewForm = ({
     const hasChanges = 
       (rating > 0) || 
       (reviewTitle !== '') || 
-      (foodName !== '') || 
-      (contentName !== '') || 
-      (venue !== '') || 
+      (legacyTitle !== '') || 
+      (legacyVenue !== '') || 
       (description !== '') || 
       (selectedMedia.length > 0) || 
       (foodTags.length > 0) ||
       (entityId !== '');
       
     setHasUnsavedChanges(hasChanges);
-  }, [isOpen, rating, reviewTitle, foodName, contentName, venue, description, selectedMedia, foodTags, entityId]);
+  }, [isOpen, rating, reviewTitle, legacyTitle, legacyVenue, description, selectedMedia, foodTags, entityId]);
   
   // Reset form on close or when switching to a different review in edit mode
   useEffect(() => {
@@ -359,9 +343,11 @@ const ReviewForm = ({
   } else if (isEditMode && review) {
       // Update with new data structure - cleanly separate title and subtitle
       setRating(review.rating);
-      // The stored value may be a legacy bucket OR (post-2.1) a canonical type.
-      // Either way it only resolves the questionnaire kind here; the stored
-      // value itself is preserved on save unless the subject is changed.
+      /**
+       * The stored value may be a legacy bucket OR (post-2.1) a canonical type.
+       * It only resolves the legacy persistence bucket here — Phase 3A selects
+       * the questionnaire from the SUBJECT, never from this value.
+       */
       const loadedKind = resolveQuestionnaireKind(review.category) ?? 'product';
       setCategory(loadedKind);
       setCanonicalCategory(null);
@@ -371,24 +357,18 @@ const ReviewForm = ({
       setOriginalReviewId(review.id);
       setOriginalEntityId(review.entity_id ?? null);
       
-      // For food category, use the main title field for the food name
-      if (loadedKind === 'food') {
-
-        setFoodName(review.title || '');
-        setContentName(''); // Clear the other category field
-      } else {
-        // For other categories, use the main title for the content name
-        setContentName(review.title || '');
-        setFoodName(''); // Clear the food category field
-      }
+      // Legacy-unlinked compatibility state only; ignored for linked reviews.
+      setLegacyTitle(review.title || '');
+      setLegacyVenue(review.venue || '');
       
       // Always use subtitle field for the review title/headline
       setReviewTitle(review.subtitle || '');
       
-      setVenue(review.venue || '');
       setEntityId(review.entity_id || '');
       setDescription(review.description || '');
       setVisibility((review.visibility as "public" | "circle_only" | "private") || "public");
+      setResolvedProviderName(null);
+      setSubjectContextLine(null);
       
       if (review.experience_date) {
         setExperienceDate(new Date(review.experience_date));
@@ -412,9 +392,8 @@ const ReviewForm = ({
     setSubjectOrigin('none');
 
     setReviewTitle('');
-    setFoodName('');
-    setContentName('');
-    setVenue('');
+    setLegacyTitle('');
+    setLegacyVenue('');
     setEntityId('');
     setDescription('');
     setSelectedMedia([]);
@@ -422,12 +401,16 @@ const ReviewForm = ({
     setVisibility('public');
     setFoodTags([]);
     setSelectedEntity(null);
+    setSelectedSubject(null);
+    setResolvedProviderName(null);
+    setSubjectContextLine(null);
     setOriginalEntityId(null);
     setOriginalReviewId(null);
     setCurrentStep(1);
     setCompletedSteps([]);
     setHasUnsavedChanges(false);
   };
+
   
   const handleClose = () => {
     if (hasUnsavedChanges) {
