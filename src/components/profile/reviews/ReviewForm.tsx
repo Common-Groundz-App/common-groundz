@@ -474,6 +474,39 @@ const ReviewForm = ({
   };
   
   /**
+   * Resolves the provider (parent) of an offering subject, e.g. the restaurant
+   * behind a dish. Read-only context: it feeds the Step 3 context line and the
+   * persisted venue snapshot, and is never an editable review question.
+   * Stale responses are discarded via the request guard.
+   */
+  const resolveProviderContext = (
+    subjectId: string,
+    canonicalType: string,
+    requestId?: number,
+  ) => {
+    const id = requestId ?? ++subjectRequestRef.current;
+    setIsResolvingSubjectContext(true);
+    getParentEntity(subjectId)
+      .then((parent) => {
+        if (id !== subjectRequestRef.current) return;
+        if (parent?.name) {
+          setResolvedProviderName(parent.name);
+          const context = getOfferingContextLine(canonicalType as any);
+          setSubjectContextLine(
+            context ? `${context.singular} ${context.verb} ${parent.name}` : `Part of ${parent.name}`,
+          );
+        }
+      })
+      .catch((err) => console.error('Subject parent lookup failed:', err))
+      .finally(() => {
+        if (id === subjectRequestRef.current) {
+          setIsResolvingSubjectContext(false);
+        }
+      });
+  };
+  
+
+  /**
    * Step 2 subject selection (Phase 2.0).
    *
    * The subject is authoritative: it derives the legacy `category` and every
