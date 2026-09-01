@@ -524,33 +524,16 @@ const ReviewForm = ({
     });
 
 
-    // Step 3 fields come from the subject, not from the previous category.
-    setFoodName(prefill.foodName);
-    setContentName(prefill.contentName);
-    if (prefill.venue) setVenue(prefill.venue);
-
+    setResolvedProviderName(null);
     setSubjectContextLine(null);
 
-    // Offerings (dishes etc.) get their venue from the parent place. Resolved
-    // asynchronously; stale responses are discarded.
-    if (prefill.category === 'food') {
-      setIsResolvingSubjectContext(true);
-      getParentEntity(subject.id)
-        .then((parent) => {
-          if (requestId !== subjectRequestRef.current) return;
-          if (parent?.name) {
-            setVenue(parent.name);
-            setSubjectContextLine(`Dish at ${parent.name}`);
-          }
-        })
-        .catch((err) => console.error('Subject parent lookup failed:', err))
-        .finally(() => {
-          if (requestId === subjectRequestRef.current) {
-            setIsResolvingSubjectContext(false);
-          }
-        });
+    // Offerings (dishes, courses, services…) take their provider from the
+    // parent entity, resolved from the registry rather than a food special case.
+    if (isOfferingType(prefill.canonicalType)) {
+      resolveProviderContext(subject.id, prefill.canonicalType, requestId);
     }
   };
+
 
   
 
