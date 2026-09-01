@@ -25,6 +25,19 @@ import {
 } from './reviewSubjectPolicy';
 import { getParentEntity } from '@/services/entityHierarchyService';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
+import { isOfferingType, getOfferingContextLine } from '@/services/entityRelationshipRegistry';
+import {
+  LEGACY_UNLINKED_QUESTIONNAIRE,
+} from './questionnaire/registry';
+import {
+  resolveQuestionnaire,
+  blocksSubmission,
+  invalidSubjectMessage,
+} from './questionnaire/resolve';
+import { resolveReviewIdentity } from './questionnaire/identityPersistence';
+import { mergeReviewMetadata } from './questionnaire/metadata';
+import type { QuestionnaireAnswers } from './questionnaire/QuestionnaireSections';
+
 
 // Import step components
 import StepOne from './steps/StepOne';
