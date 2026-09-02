@@ -1,134 +1,169 @@
-# Phase 3B — Question matrix + frozen answer schema (approval only, no UI code)
+# Phase 3B — Questionnaire specification (decision 1: recommendation intent)
 
-Phase 3A shipped the registry, the resolver, identity derivation and the safe
-metadata merge, but every canonical type except food still has `sections: []`.
-3B locks **what we ask** and **how answers are stored**, so 3C implements one
-slice without moving the storage home afterwards.
+I agree with Codex's four gates and its simplified matrix. This revision resolves
+gate 1 first, as you asked, then folds in gates 2–4. **No UI code ships in 3B.**
 
-**No code ships in this phase.** Deliverable = the approved matrix + schema.
+## How recommending actually works today (verified)
 
-## Shape every type follows
+`reviews.is_recommended` is **not** a user choice. Two triggers on `reviews`, both
+`BEFORE INSERT OR UPDATE`, recompute it on every write:
 
-Four slots, same order everywhere, wording changes per type:
+- `trigger_auto_recommend_review` → `auto_recommend_review()` — `rating >= 4`
+- `auto_recommend_review_timeline_aware_trigger` → `auto_recommend_review_timeline_aware()`
+  — `COALESCE(latest_rating, rating) >= 4`
 
-1. **Would you recommend it?** — Yes / Maybe / No
-2. **Repeat intent** (type-specific wording) — Yes / Maybe / No
-3. **What stood out?** — tag chips with a curated per-type vocabulary + custom tags
-4. **One extra high-value question** — value, worth-the-time, trust, or none
+Both also recompute `trust_score`. The timeline-aware one runs on any update; the
+older one on rating updates. So the rule is exactly: **effective rating ≥ 4 ⇒
+recommended**, re-evaluated forever, including when a timeline update lowers the
+rating.
 
-Rating (Step 1) and subject (Step 2) remain the only required inputs. **Every
-question here is optional in v1.** Nothing duplicates an entity fact (director,
-author, brand, address, organizer, price).
+Consequences found:
 
-## Universal answer controls
+- `convertReviewToRecommendation` (duplicated in `services/review/core.ts` and
+  `services/reviewService.ts`, exposed via `use-reviews.ts` → `ProfileReviews`
+  "Convert" action) writes `is_recommended: true` — and that same UPDATE's trigger
+  immediately overwrites it from the rating. On a 3-star review the button shows a
+  success toast and changes nothing.
+- Live data agrees: 77 reviews, 58 recommended, **0** rows where
+  `is_recommended` disagrees with effective rating ≥ 4, in either direction.
+- Consumers reading the column: `get_recommendation_count`,
+  `get_circle_recommendation_count`, `entityRecommendationService`,
+  `review/fetch.ts`, `reviewService.ts`, `enhancedDiscoveryService`,
+  `enhancedExploreService`, `entityService`, `smart-assistant`.
+- The separate legacy `recommendations` table is unrelated and untouched here;
+  `get_network_entity_recommendations` derives its own `rating >= 4` flag from it.
 
-| Control | Display | Stored codes |
+So there is no data conflict to repair — there is a **derived column** and a
+**button that lies**.
+
+## Decision: keep the column, change its source of truth, retire the button
+
+`is_recommended` stays as the indexed compatibility signal every feed already
+reads. What changes is precedence: the explicit answer wins when the user gave
+one; the rating rule remains the fallback so nothing regresses for the other 77
+existing reviews and every review made outside the new questionnaire.
+
+| `answers.would_recommend` | `is_recommended` |
+|---|---|
+| `yes` | `true` |
+| `maybe` | `false` |
+| `no` | `false` |
+| unanswered / no `questionnaire` key | current rule: `COALESCE(latest_rating, rating) >= 4` |
+
+Reasons for this over the alternatives:
+
+- **Not "keep as-is".** Once we ask "Would you recommend it?", a stored `no` on a
+  4-star review that feeds show as recommended is a trust bug, and Common Groundz
+  is a trust product. Rating and recommending are genuinely different signals.
+- **Not "retire the column".** It is read by 6 services, 2 RPCs and an edge
+  function, and it is the only fast filter for circle recommendation counts.
+  Replacing it with JSONB reads would be a performance and blast-radius disaster
+  for zero user-visible gain.
+- **Not "derive the column purely from the answer".** Every question is optional,
+  so a pure-answer column would silently zero out recommendation counts across the
+  whole catalogue the day 3C ships. The fallback prevents that.
+- `maybe` maps to `false` deliberately: the boolean means "would actively
+  recommend". The `maybe` nuance survives in `answers`, which is where
+  aggregation and future "mixed signal" UI should read it.
+
+Timeline behaviour: while `would_recommend` is unanswered, a timeline update that
+drops the effective rating below 4 still flips the flag, exactly as today. Once
+answered, later rating changes no longer override the stated intent — the user is
+asked again in the edit form instead.
+
+**Retire the Convert action** in 3C: delete both `convertReviewToRecommendation`
+copies, the `convertToRecommendation` hook member and the `onConvert` prop on
+`ReviewCard`/`ProfileReviews`. It cannot work under the triggers, and the
+questionnaire answer becomes the honest way to express the same intent.
+
+Implementation shape for 3C (specified here, built there): one migration replaces
+the two overlapping triggers with a single `BEFORE INSERT OR UPDATE` function that
+reads `NEW.metadata -> 'questionnaire' -> 'answers' ->> 'would_recommend'` and
+applies the table above, keeping the `trust_score` recompute. Dropping the
+duplicate trigger is part of the fix, not a side quest.
+
+## Gate 2 — stable stored values, never labels (accepted)
+
+Registry options are `{ value, label }`; only `value` is persisted.
+
+| Field id | Stored values | Labels |
 |---|---|---|
-| `yesmaybeno` | Yes / Maybe / No | `yes` / `maybe` / `no` |
-| `value` | Not worth it / Okay / Worth it / Great value | `not_worth_it` / `okay` / `worth_it` / `great_value` |
-| `worth_time` | Yes / Mostly / No | `yes` / `mostly` / `no` |
-| `trust` | Low / Medium / High | `low` / `medium` / `high` |
-| `solves_problem` | Yes / Partly / No | `yes` / `partly` / `no` |
-| `tags` | chip grid + custom tag input | array of strings |
+| `would_recommend` | `yes` / `maybe` / `no` | Yes / Maybe / No |
+| `would_again` | `yes` / `maybe` / `no` | Yes / Maybe / No |
+| `value` | `poor` / `fair` / `good` / `excellent` | Not worth it / Okay / Worth it / Great value |
+| `worth_time` | `yes` / `mostly` / `no` | Yes / Mostly / No |
+| `trust` | `low` / `medium` / `high` | Low / Medium / High |
+| `solves_problem` | `yes` / `partly` / `no` | Yes / Partly / No |
+| `portion` | `small` / `just_right` / `large` | Small / Just right / Large |
+| `stood_out` / `best_for` | snake_case tag ids | curated labels (+ emoji, optional) |
 
-Display wording never becomes the stored value, so copy can change later without
-breaking aggregation.
+Unanswered fields are **omitted** from `answers` — never `""`, `null` or `[]`.
+No default is preselected, so unanswered stays distinct from the middle option.
+Re-tapping the selected option clears it.
 
-## The 15-type matrix
+## Gate 3 — reuse the interaction, not the component (accepted)
 
-| Type | Recommend | Repeat intent (`would_again`) | Tags (`stood_out`) | Extra |
-|---|---|---|---|---|
-| food | Would you recommend it? | Would you order it again? | existing Food Tags, unchanged | `value` |
-| place | Would you recommend this place? | Would you go back? | place vocab | `best_for` tags |
-| product | Would you recommend it? | Would you buy it again? | product vocab | `value` |
-| brand | Would you recommend this brand? | Would you buy from them again? | brand vocab | `trust` |
-| movie | Would you recommend it? | Would you rewatch it? | movie vocab | — |
-| tv_show | Would you recommend it? | Would you watch more of it? | tv vocab | `worth_time` |
-| book | Would you recommend it? | Would you read it again? | book vocab | `worth_time` |
-| game | Would you recommend it? | Would you play it again? | game vocab | `worth_time` |
-| app | Would you recommend it? | Would you keep using it? | app vocab | `solves_problem` |
-| course | Would you recommend it? | Would you take another course from them? | course vocab | `worth_time` |
-| service | Would you recommend it? | Would you use this service again? | service vocab | `value` |
-| professional | Would you recommend them? | Would you work with them again? | professional vocab | `trust` |
-| event | Would you recommend it? | Would you attend again? | event vocab | `worth_time` |
-| experience | Would you recommend it? | Would you do it again? | experience vocab | `worth_time` |
-| others | Would you recommend it? | Would you choose it again? | generic vocab (custom-tag first) | — |
+`CuratedTagSelector` becomes the shared visual primitive; `FoodTagSelector`
+becomes a thin wrapper that keeps its 13 tags, emojis, custom input, Plus button,
+Enter behaviour, styling and `metadata.food_tags` storage **byte-identically**.
+Other types get their own vocabularies through the primitive.
 
-`legacy_unlinked` keeps **zero** type-specific questions — unchanged from 3A.
-
-## Curated tag vocabularies (locked here, verbatim)
-
-- **food** — unchanged: Spicy, Sweet, Savory, Vegetarian, Vegan, Gluten-Free, Dairy-Free, Non-Veg, Dessert, Breakfast, Lunch, Dinner, Value for Money
-- **place** — Great ambience, Good service, Clean, Peaceful, Lively, Crowded, Beautiful, Convenient, Well maintained, Good location, Good value, Premium, Family-friendly, Date-friendly, Solo-friendly
-- **place best_for** — Friends, Family, Couples, Solo, Groups, Work, Quick visit, Special occasion, Relaxing
-- **product** — High quality, Easy to use, Durable, Reliable, Well designed, Premium feel, Good performance, Feature-rich, Convenient, Good value, Overpriced, Poor quality, Hard to use
-- **brand** — Consistent quality, Trustworthy, Good design, Good customer service, Innovative, Good value, Premium, Reliable, Wide selection, Sustainable, Overpriced, Inconsistent, Poor support
-- **movie** — Story, Acting, Characters, Visuals, Cinematography, Music, Direction, Writing, Action, Comedy, Emotion, Suspense, World-building, Ending
-- **tv_show** — Story, Characters, Acting, Writing, Visuals, Music, Comedy, Suspense, World-building, Pacing, Character development, Ending
-- **book** — Story, Writing, Characters, Ideas, World-building, Emotion, Humour, Research, Practical insights, Easy to read, Thought-provoking, Page-turner
-- **game** — Gameplay, Story, Graphics, World, Characters, Combat, Exploration, Multiplayer, Progression, Sound/music, Replayability, Creativity, Difficulty
-- **app** — Easy to use, Useful, Fast, Reliable, Well designed, Feature-rich, Simple, Customizable, Innovative, Good value, Too many ads, Buggy, Confusing, Expensive
-- **course** — Practical, Well explained, Well structured, Engaging, Beginner-friendly, In-depth, Actionable, Good examples, Good exercises, Good instructor, Up to date, Too basic, Too advanced, Too theoretical
-- **service** — High quality, Fast, Reliable, Professional, Convenient, Responsive, Thorough, Good communication, Punctual, Good value, Expensive, Slow, Poor communication, Unreliable
-- **professional** — Knowledgeable, Professional, Reliable, Clear communication, Responsive, Patient, Trustworthy, Punctual, Empathetic, Detail-oriented, Efficient, Creative, Good listener
-- **event** — Well organized, Great atmosphere, Great speakers, Great performances, Good crowd, Good venue, Good activities, Networking, Informative, Entertaining, Unique, Poor organization, Overcrowded
-- **experience** — Unique, Fun, Exciting, Relaxing, Memorable, Well organized, Beautiful, Educational, Challenging, Beginner-friendly, Worth the money, Overrated, Crowded
-- **others** — High quality, Useful, Easy, Reliable, Good value, Unique, Convenient, Enjoyable, Disappointing
-
-Every vocabulary allows custom tags, exactly like the food selector does today.
-Emoji per chip is optional and presentation-only; only the food set has emoji now.
-
-## Frozen answer schema (v1)
-
-Answers live under one versioned key on `reviews.metadata`. `food_tags` and
-provenance keys stay at the root — not migrated just because Phase 3 exists.
+Curated ids and custom text are stored separately so analytics can tell them
+apart:
 
 ```json
 {
   "food_tags": ["Spicy"],
   "questionnaire": {
     "version": 1,
-    "type": "course",
+    "type": "movie",
     "answers": {
       "would_recommend": "yes",
       "would_again": "maybe",
-      "stood_out": ["Practical", "Good instructor"],
-      "worth_time": "yes"
+      "stood_out": { "selected": ["story", "cinematography"], "custom": ["Great practical effects"] }
     }
   }
 }
 ```
 
-Contract rules, frozen here so 3C only implements them:
+Tag rules: max 5 combined selected + custom, max 3 custom, max 40 chars each,
+trimmed, case-insensitively deduplicated, never blank; the cap is shown before it
+is hit. Food is exempt — its existing behaviour does not change.
 
-1. Answer **ids** are shared across types (`would_recommend`, `would_again`,
-   `stood_out`, `value`, `worth_time`, `trust`, `solves_problem`, `best_for`) so
-   the data aggregates across the whole catalogue.
-2. Food keeps writing its chips to root `metadata.food_tags` — it is **not**
-   duplicated into `answers.stood_out`. Every other type writes `stood_out`.
-3. `version` is a monotonically increasing integer. A review with no
-   `questionnaire.version` opens in legacy compatibility, never silently converted.
-4. `type` records the canonical type the answers were given for. On a deliberate
-   subject change the form switches to the new type's questions; answers whose ids
-   still exist carry over, unknown ids are **preserved untouched**, never dropped.
-5. Writes merge into `answers`; they never replace the object.
-6. Empty answers are omitted, not stored as `""` / `null` / `[]`.
-7. No DB migration, no new column, no backfill — `metadata` JSONB already exists.
+## Gate 4 — final v1 matrix, overlaps removed (accepted)
 
-## Technical notes for 3C (not built in 3B)
+| Type | Repeat intent | Extra |
+|---|---|---|
+| food | Order again? | `portion` (no `value` — Food Tags already carry "Value for Money") |
+| place | Go back? | `best_for` (family/couples/solo removed from its `stood_out`) |
+| product | Buy again? | `value` (value tags removed from `stood_out`) |
+| brand | Buy from them again? | `trust` |
+| movie | Rewatch? | — |
+| tv_show | Watch more? | `worth_time` |
+| book | Read again? | `worth_time` |
+| game | Play again? | `worth_time` |
+| app | Keep using? | `solves_problem` |
+| course | — (provider-dependent wording dropped) | `worth_time` + `best_for` |
+| service | Use again? | `value` |
+| professional | Work with them again? | `trust` |
+| event | Attend again? | `worth_time` |
+| experience | Do again? | `worth_time` |
+| others | Choose again? | — |
 
-- `FoodTagSelector` hardcodes its 13 chips and takes only
-  `selectedTags/onAddTag/onRemoveTag`, so 3C needs a **generic chip selector**
-  built on the same visual pattern, driven by a vocabulary from the registry.
-  Food stays routed to the existing untouched component; `tagSet` grows from
-  `'food'` to the 17 named vocabularies above.
-- The registry's `kind` union gains no new members: `select` covers all four
-  scale controls (each with its own `options` codes), `tags` covers chips.
-- Validation stays as 3A left it — no new required fields, so `required: false`
-  everywhere.
+Every type also gets `would_recommend` and `stood_out`. `legacy_unlinked` gets
+none of this. Vocabularies stay balanced — each set carries a few high-signal
+negative tags (Crowded, Buggy, Slow pacing, Too basic…); `professional` uses
+behaviour-only negatives (Slow to respond, Unclear communication, Missed
+deadlines) and no character or misconduct labels.
+
+## Remaining 3B deliverable
+
+The one thing still open is the **verbatim tag id + label + emoji + sentiment
+table for the 14 non-food vocabularies**, reviewed separately as Codex suggests.
+I'll bring that as the final 3B artefact once you approve the contracts above.
 
 ## Out of scope
 
-Any UI code or registry edit in this phase; conditional questions (paid-game
-value, per-profession `best_for`); making any question required; step/layout
-restructuring; Phase 2.5B remediation; changing `FoodTagSelector`.
+Any UI code or registry edit in 3B; the trigger migration (3C); touching the
+legacy `recommendations` table; conditional questions; making anything required;
+step/layout restructuring; Phase 2.5B.
