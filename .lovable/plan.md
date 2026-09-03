@@ -1,62 +1,54 @@
-# Phase 3C (v3) — reviewer corrections + LIFO timeline deletion
+# Phase 3C (v4) — LIFO undo as an atomic RPC
 
-All six corrections (ChatGPT's two, Codex's four) are adopted; they close real
-data-integrity gaps and none of them changes the architecture. Delivery stays
-Stage 0 → verify → Stage 1 → verify → Stage 2 → verify → Stage 3 → verify.
+Both corrections are right and are folded in. Codex's point about the enforcement
+mechanism is the important one: a general `DELETE` policy plus a row-level "is this
+the newest row?" trigger is not a safe LIFO API — a single
+`DELETE FROM review_updates WHERE review_id = ...` is evaluated row by row, and
+"newest" is re-checked per row, so the statement shape decides the outcome. Their
+`current_user` warning is also correct: inside a `SECURITY DEFINER` function
+`current_user` is the *owner*, so an ordinary caller would look privileged. LIFO
+therefore becomes one authenticated RPC with no direct delete path at all.
 
-**Verified before writing this:** across the whole `src/` tree, `review_updates`
-is only ever **selected** and **inserted** — there is no edit or delete path in
-any user or admin surface (the delete control on `TimelineReviewCard` deletes the
-parent *review*, not an update). So append-only is not an accidental product
-change; it is the behaviour that already ships. The DB policies were simply wider
-than the product.
-
-**On your LIFO idea — yes, and it's better than plain immutability.** Append-only
-history is right, but "I fat-fingered my last update" is a real need, and
-last-in-first-out undo satisfies it without letting anyone rewrite the middle of a
-narrative. It is also cheap to enforce honestly: deleting only the newest row means
-the recomputed `latest_rating` / latest intent / `timeline_count` / `trust_score`
-are always the state that existed one step earlier, so there is no reconstruction
-guesswork. Adopted as the product contract:
-
-- Owner may delete **only the newest** update on their own review; deleting the 3rd
-  of 5 requires deleting the 5th, then the 4th.
-- No `UPDATE` on `review_updates` for anyone but the privileged path — a changed
-  opinion is a new event, not a rewritten one.
-- Deleting a row that carried recommendation intent (including an `auto` reset)
-  restores whatever intent the previous state resolved to. That is the correct
-  meaning of undo.
-- Stage 1 adds the DB rule; the *UI* affordance (delete on the last entry only)
-  ships in Stage 3 with the rest of the timeline work.
+Also agreed: recomputation must run **after** the row is gone (or explicitly exclude
+it), and every timeline mutation on a review must serialize against that review.
+This is now scope-complete — no further product additions to 3C.
 
 ## Roadmap additions (Stage 0 writes these)
 
-- Timeline history is append-only with owner LIFO undo of the newest entry.
+- Timeline history is append-only; the owner may undo only the newest entry, via an
+  atomic RPC.
 - Forward-compatibility contract: unknown questionnaire data is never rendered and
   never destroyed by unrelated saves.
 - Legacy category-mismatch reviews stay in compatibility mode until the subject is
   deliberately reselected.
 
+## Verified facts behind this plan
+
+- Across `src/`, `review_updates` is only ever **selected** and **inserted** — no
+  edit or delete path exists in any user or admin surface (the delete on
+  `TimelineReviewCard` removes the parent *review*). Append-only is already the
+  shipped behaviour; the DB policies were merely wider than the product.
+- Current policies do allow owner `UPDATE` and owner `DELETE`, and INSERT checks only
+  `auth.uid() = user_id` — never review ownership. Both get closed in Stage 1.
+
 ## Stage 0 — close 3B properly (docs only, no code)
 
-1. **Rewrite `docs/phase-3b-tag-vocabularies.md`** — the shipped file still contains
-   `story`, `acting`, `writing`, `gameplay` marked `positive`. Codex is right that
-   Stage 2 must not consume it verbatim. Bare aspects marked positive become
+1. **Rewrite `docs/phase-3b-tag-vocabularies.md`** — the shipped file still marks
+   `story`, `acting`, `writing`, `gameplay` as `positive`. Bare aspects become
    evaluative: `compelling_story`, `strong_acting`, `striking_cinematography`,
    `strong_writing`, `memorable_characters`, `engaging_gameplay`, `good_service`,
    `very_clean`, `convenient_location`, `good_value`, `high_quality`,
    `great_packaging`, `strong_ending`, `great_with_friends`, `solid_build`.
    Preference-dependent traits (slow burn, crowded, challenging, fast paced) stay
    plain aspects marked `neutral`. `rude_service` → `unhelpful_service`. `best_for`
-   entries carry explicit `sentiment: 'neutral'` in data.
+   entries carry explicit `sentiment: 'neutral'`.
 2. **The four flagged entries**: movie `subtitles_needed` → `memorable_visuals`;
    brand `fast_delivery` → `wide_range`; professional `missed_deadlines` →
    `didnt_follow_through`; experience `good_guide` → `well_organised`.
-3. **Tag identity is composite** — `(type, field id, tag id)`. Cross-type
-   aggregation requires an explicit shared-definitions map, never string reuse.
-4. **Food is excluded from generic `stood_out`.** Food = `would_recommend` +
-   `repeat_intent` + existing Food Tags (`metadata.food_tags`) + `portion`. Never
-   two tag fields on one food review.
+3. **Tag identity is composite** — `(type, field id, tag id)`; cross-type
+   aggregation needs an explicit shared-definitions map, never string reuse.
+4. **Food is excluded from generic `stood_out`**: `would_recommend` +
+   `repeat_intent` + existing Food Tags (`metadata.food_tags`) + `portion`.
 5. Roadmap corrections: Phase 2.5B is *optional wizard consolidation*; Phase 3D's
    full cleanup scope restored (`questionnaireKind`, five-bucket branches, obsolete
    `foodName`/`contentName` state, versioning scaffolding, `is_converted` decision).
@@ -65,39 +57,49 @@ guesswork. Adopted as the product contract:
 
 Freeze tag ids only after this file is corrected and the lint test passes.
 
-## Stage 1 — database and resolver foundation
+## Stage 1 — database foundation (no new UI)
 
-One migration, no new UI:
+One migration:
 
 - `review_updates.would_recommend text NULL`,
   `CHECK (would_recommend IN ('yes','maybe','no','auto'))`, partial index on
   `(review_id, created_at DESC, id DESC) WHERE would_recommend IS NOT NULL`.
-- **INSERT authorization**: authenticated **and** `user_id = auth.uid()` **and** the
-  parent `review_id` belongs to a review owned by `auth.uid()`.
-- **Server-owned chronology (Codex #4a):** "database-assigned" is not enough while
-  clients can send a value. A `BEFORE INSERT` trigger **overwrites**
-  `created_at`/`updated_at` with `now()` unconditionally, so callers cannot
-  backdate an event to outrank the true latest one.
-- **Append-only + LIFO undo, enforced in a trigger** (RLS picks rows, it cannot
-  compare OLD/NEW):
-  - `BEFORE UPDATE` — rejected for non-privileged callers, always.
-  - `BEFORE DELETE` — allowed only when the row is the newest for its
-    `review_id` (`ORDER BY created_at DESC, id DESC LIMIT 1`), evaluated inside the
-    statement's transaction. Otherwise a clear "only your latest update can be
-    removed" error.
-  - **Privileged bypass is defined precisely (Codex #4b):** bypass is granted by
-    `current_user`/role membership (`service_role`, or a `postgres`-owned
-    maintenance function) — never by caller-supplied metadata, a session GUC set by
-    the client, or a row column.
-  - **Every** deletion — LIFO or privileged — recomputes `latest_rating`,
-    `timeline_count`, `has_timeline`, `trust_score` and the resolved
-    `is_recommended` **in the same transaction**, via one shared recompute function
-    that both paths call.
-- **Two functions, not one:** a *pure* decision function
+- **INSERT authorization**: authenticated, `user_id = auth.uid()`, **and** the parent
+  review owned by `auth.uid()`.
+- **Server-owned chronology**: a `BEFORE INSERT` trigger overwrites
+  `created_at`/`updated_at` with `now()` unconditionally, so no caller can backdate
+  an event to outrank the true latest one.
+- **No ordinary `UPDATE`, no ordinary `DELETE`.** Both policies are dropped, and a
+  guard trigger rejects any non-privileged attempt as a backstop. A changed opinion
+  is a new event.
+- **Owner LIFO undo = one atomic RPC**, `delete_latest_review_update(p_review_id,
+  p_expected_update_id)`, `SECURITY DEFINER`, pinned `search_path`:
+  1. authenticate from `auth.uid()` (never a passed-in user id) and verify review
+     ownership;
+  2. `pg_advisory_xact_lock` on the review id (same convention as
+     `create_entity_subject`) — **all** timeline mutations for that review take this
+     lock, so inserts, undos and recomputation serialize per review while different
+     reviews stay independent;
+  3. resolve the current newest update (`ORDER BY created_at DESC, id DESC LIMIT 1`);
+  4. require it to equal `p_expected_update_id`, else return a **conflict** result
+     instead of deleting whatever became newest;
+  5. delete exactly that one row (`WHERE id = ...`, single row);
+  6. **after** the delete, call the shared recompute function;
+  7. commit — all of it in one transaction.
+- **Privileged maintenance RPC** for arbitrary abuse removal: authorised by explicit
+  role membership checked *outside* any `SECURITY DEFINER` boundary (or reserved for
+  `service_role` callers), never by `current_user` inside a definer function, never
+  by caller-supplied metadata. It takes the same lock and the same post-delete
+  recompute path.
+- **One shared recompute function** — `latest_rating`, `timeline_count`,
+  `has_timeline`, `trust_score`, resolved `is_recommended` — called by the insert
+  trigger and by both delete RPCs, always after the mutation, so it never observes a
+  row that is on its way out.
+- **Two resolver functions**: a *pure* decision function
   `(original envelope, latest intent event, effective rating) → intent | source |
   is_recommended` with no queries, plus a review-aware wrapper owning the
-  deterministic lookup. The trigger calls the wrapper. TypeScript mirrors the split
-  (`lookupLatestRecommendationIntent(reviewId)` → pure resolver).
+  deterministic lookup. TypeScript mirrors the split
+  (`lookupLatestRecommendationIntent(reviewId)` → pure resolver), sharing one fixture.
 - **Strict envelope extraction**: object, `version = 1`, `type` equals the review's
   canonical `category`, `answers` object, `would_recommend` exactly
   `yes`/`maybe`/`no`; anything else → `COALESCE(latest_rating, rating) >= 4`.
@@ -105,14 +107,18 @@ One migration, no new UI:
   older timeline-stats trigger; keep one recommendation trigger plus the enhanced
   timeline-stats trigger. Trust scoring preserved, not redesigned.
 
-Acceptance: whole-dataset before/after snapshot of all 77 reviews shows zero drift
-in `is_recommended`, `trust_score`, `latest_rating`, `timeline_count`; fixtures for
-insert / unrelated edit / rating edit / timeline insert / metadata-only edit; old
-clients omitting `would_recommend` still insert; legitimate owner inserts pass;
-stranger inserts, backdated `created_at`, any `UPDATE`, and mid-history `DELETE` are
-all denied; newest-row delete succeeds and rolls stats back exactly one step;
-privileged mid-history delete recomputes correctly; shared fixture green in both
-Vitest and the SQL/Deno runner; Supabase types regenerated.
+Acceptance: whole-dataset before/after snapshot of all 77 reviews shows zero drift in
+`is_recommended`, `trust_score`, `latest_rating`, `timeline_count`; direct `UPDATE`
+and direct `DELETE` (single-row and `WHERE review_id = ...` bulk) both denied;
+stranger insert and backdated `created_at` denied; old clients omitting
+`would_recommend` still insert; RPC undo of the newest row rolls derived state back
+exactly one step; stale `p_expected_update_id` returns conflict and deletes nothing;
+**concurrency fixtures** for insert-vs-undo and two simultaneous undos on the same
+review (one wins, one conflicts, aggregates stay consistent) and for mutations on two
+different reviews proceeding in parallel; undo of an `auto` row restores the previous
+explicit intent; undo of the last remaining update restores the original answer as
+authoritative; privileged mid-history removal recomputes identically; shared fixture
+green in Vitest and the SQL/Deno runner; Supabase types regenerated.
 
 ## Stage 2 — review questionnaire (UI + persistence)
 
@@ -122,22 +128,21 @@ Vitest and the SQL/Deno runner; Supabase types regenerated.
   untouched and exempt from the caps.
 - **Version-selection policy:** new review → v1; existing review with a valid v1
   envelope → v1; existing review with no envelope → compatibility mode, questions
-  offered as optional and **no envelope written unless the user actually answers
-  something**; subject deliberately replaced → fresh v1 for the new subject.
-- **Legacy category mismatch (Codex #1):** where `reviews.category` disagrees with
-  the linked entity's canonical type (e.g. `category = food`, entity `place`), an
-  envelope built from the entity type would be permanently ignored by strict
-  validation (`place !== food`). Such reviews therefore **stay in compatibility mode
-  and are not offered v1 questions at all**; they become eligible only when the user
-  deliberately reselects the subject, which canonicalises `category`. Answering one
-  optional field never silently rewrites `category`.
-- **Reset boundary is `entity_id`, not canonical type (Codex #2):** answers describe
-  a specific subject, so replacing Movie A with Movie B discards the envelope even
-  though the vocabulary is identical. Same for product→product, food→food,
-  place→place, brand→brand, professional→professional. `metadata.food_tags` is
-  cleared on a food-subject swap too.
-- **Render-vs-persist separation (both reviewers):** the form never renders what it
-  doesn't understand, and never destroys it either.
+  optional and **no envelope written unless the user actually answers something**;
+  subject deliberately replaced → fresh v1.
+- **Legacy category mismatch:** where `reviews.category` disagrees with the linked
+  entity's canonical type (e.g. `category = food`, entity `place`), an envelope built
+  from the entity type would be permanently ignored by strict validation. Those
+  reviews stay in compatibility mode and are offered **no** v1 questions; they become
+  eligible only when the user deliberately reselects the subject, which canonicalises
+  `category`. Answering one optional field never rewrites `category`.
+- **Reset boundary is `entity_id`, not canonical type:** replacing Movie A with Movie
+  B discards the envelope even though the vocabulary matches. Same for
+  product→product, food→food, place→place, brand→brand, professional→professional.
+  On any subject change, **subject-specific root metadata is cleared too**
+  (`metadata.food_tags`) while unrelated root metadata is preserved.
+- **Render-vs-persist separation:** the form never renders what it doesn't
+  understand, and never destroys it either.
 
   | Stored state | Behaviour |
   |---|---|
@@ -153,26 +158,33 @@ Vitest and the SQL/Deno runner; Supabase types regenerated.
 
 Acceptance: all 15 types render their frozen matrix; food shows exactly one tag
 field; round-trip save/reload; forward-compatibility tests proving
-`some_future_field` and `some_future_tag` survive an unrelated headline edit and
-survive an edit to a *different* questionnaire field; legacy review edited without
-answering stores no envelope; mismatched-category review is offered no questions;
-subject swap within the same type clears answers and food tags; registry lint test
-asserts unique `snake_case` ids with declared sentiment per vocabulary.
+`some_future_field` and `some_future_tag` survive both an unrelated headline edit and
+an edit to a *different* questionnaire field; legacy review edited without answering
+stores no envelope; mismatched-category review is offered no questions; subject swap
+within the same type clears answers and food tags; registry lint test asserts unique
+`snake_case` ids with declared sentiment per vocabulary.
 
-## Stage 3 — timeline intent, LIFO delete UI, dead-action cleanup
+## Stage 3 — timeline intent, Undo UI, dead-action cleanup
 
-"Would you still recommend it?" with the resolved current state and its source in
-plain words, three unselected options, "Use my rating instead" (`auto`), untouched =
-no change, divergence nudge that never rewrites the answer, honest copy when the
-resolve query fails. Adds the **delete control on the newest timeline entry only**,
-with copy explaining the LIFO rule, plus removal of the Convert action from both
-`ReviewCard` layouts and its hook/service wiring. `is_converted` is decided in 3D.
+- "Would you still recommend it?" with the resolved current state and its source in
+  plain words, three unselected options, "Use my rating instead" (`auto`), untouched
+  = no change, divergence nudge that never rewrites the answer, honest copy when the
+  resolve query fails.
+- **Undo latest update** (not "Delete") on the newest entry only, calling
+  `delete_latest_review_update({ reviewId, expectedUpdateId })`. On conflict the UI
+  refreshes and says the timeline changed and to review the latest update before
+  undoing it — it never silently removes whatever became newest after the dialog
+  opened. Older entries explain: timeline history is chronological, undo newer
+  updates first.
+- Remove the Convert action from both `ReviewCard` layouts plus its hook/service
+  wiring. `is_converted` is decided in 3D.
 
 ## Technical notes
 
-- Migration objects: column, check, partial index, INSERT policy replacement,
-  chronology trigger, append-only/LIFO guard trigger, shared recompute function,
-  pure resolver, review-aware wrapper, consolidated triggers.
+- Migration objects: column, check, partial index, INSERT policy replacement, drop of
+  UPDATE/DELETE policies, chronology trigger, mutation guard trigger, per-review
+  advisory lock convention, shared recompute function, owner LIFO RPC, privileged
+  maintenance RPC, pure resolver, review-aware wrapper, consolidated triggers.
 - Files: `docs/phase-3b-tag-vocabularies.md`, `roadmap.md`,
   `questionnaire/registry.ts`, `QuestionnaireSections.tsx`, new
   `CuratedTagSelector.tsx`, new `recommendationIntent.ts` + shared fixture,
