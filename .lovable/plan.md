@@ -70,12 +70,29 @@ A deliberate `auto` reset resolves to `rating_inferred`; the reset event itself
 stays in `review_updates`, so the distinction is recoverable without a column.
 Revisit persisting a source column only when a real query needs it.
 
+UI honesty rule: if the timeline query fails, the form must **not** claim the state
+came from the original answer or the rating. Show "couldn't resolve your current
+recommendation" while still rendering the materialized `is_recommended` status.
+
 ## Timeline evolution of intent
 
 `review_updates` gains `would_recommend text NULL` with
 `CHECK (would_recommend IN ('yes','maybe','no','auto'))` — a real column, mirroring
 how `review_updates.rating` already works. Plus a partial index on
-`(review_id, created_at DESC) WHERE would_recommend IS NOT NULL`.
+`(review_id, created_at DESC, id DESC) WHERE would_recommend IS NOT NULL`.
+
+### "Latest" has exactly one definition
+
+`ORDER BY created_at DESC, id DESC LIMIT 1`, used verbatim in the SQL resolver, the
+TypeScript resolver, the fixture cases and the timeline UI. `id` is only a
+tie-breaker for identical timestamps, never a chronology claim.
+
+Chronology must not be client-controllable, or precedence becomes forgeable:
+`created_at` is assigned by the database default and clients cannot supply or
+change it, and intent-bearing timeline rows are immutable — a change of mind is a
+new event, never an edit of an old one. The current UPDATE policy on
+`review_updates` (`auth.uid() = user_id`, no column restriction) would let an owner
+rewrite `created_at` and reorder their own intent history; 3C closes that.
 
 Event semantics, frozen:
 
@@ -132,11 +149,42 @@ is a JSON object; `would_recommend` is exactly `yes`, `maybe` or `no`. Absent,
 malformed, unsupported-version or type-mismatched envelopes fall back to the rating
 rule. An arbitrary string is **never** read as `false`.
 
-## One resolver, two implementations, one fixture
+## Timeline intent is a security-sensitive write (verified gap)
+
+Inserting a `review_updates` row will now change another table's
+`reviews.is_recommended`, so authorization matters at the **database** boundary, not
+in the form.
+
+Verified today: the INSERT policy on `review_updates` is
+`WITH CHECK (auth.uid() = user_id)` **only** — it never checks that the user owns
+the referenced review. And `update_review_timeline_stats_enhanced` takes the latest
+rating from any row with that `review_id` regardless of author. So a signed-in user
+can already append an update to a stranger's review and move its `latest_rating`,
+`timeline_count`, `trust_score` and therefore `is_recommended`. Adding intent to
+that column turns an existing hole into a direct recommendation-forgery path.
+
+3C must therefore, in the same migration: require `review_id` to belong to a review
+owned by `auth.uid()` in the INSERT policy; restrict UPDATE so `created_at`,
+`review_id`, `user_id` and `would_recommend` cannot be rewritten (intent events
+immutable); and cover both with tests that attempt the forgery and expect a denial.
+This is a pre-existing bug being fixed alongside, not scope creep — the feature is
+unsafe to ship without it.
+
+## One resolver, two implementations, one executable fixture
 
 Precedence will exist in SQL (trigger) and TypeScript (form copy, and later
-analytics). To stop them drifting, the truth table lives in a **single JSON fixture
-file** that both the Deno/SQL test and the Vitest suite read. Frozen cases:
+analytics). Postgres can't read a repo file, so parity is enforced by a harness,
+not by hoping two suites agree:
+
+```text
+shared fixture (TS/JSON, canonical truth table)
+        |-- Vitest       -> TypeScript resolver
+        |-- Deno harness -> calls the SQL resolver per case against the database
+```
+
+Fixture cases are **ordered event objects** with explicit ids and timestamps, so
+"auto then no" is encoded rather than described in prose. Frozen cases:
+
 
 | timeline | original | effective rating | intent | isRecommended | source |
 |---|---|---|---|---|---|
@@ -171,10 +219,16 @@ trust scoring         : preserved as-is, tested separately
 - Keep `update_review_timeline_stats_enhanced`, drop the older
   `update_review_timeline_stats`; the enhanced one's second no-op UPDATE becomes
   unnecessary once the consolidated trigger reads intent directly.
-- Trust scoring is **not** redesigned. Codex's caution is accepted: rather than
-  copying `calculate_trust_score(NEW.id)` blindly into a BEFORE INSERT context,
-  3C captures current `trust_score` values for a sample of reviews before and after
-  the migration and asserts they are unchanged.
+- Trust scoring is **not** redesigned. Copying `calculate_trust_score(NEW.id)` into
+  a BEFORE INSERT context is not automatically behaviour-preserving — the row does
+  not exist yet — so 3C proves preservation two ways:
+  1. **Whole-dataset comparison, not a sample.** With 77 reviews there is no reason
+     to sample: snapshot `trust_score`, `latest_rating`, `timeline_count` and
+     `is_recommended` for **every** review before the migration and assert each is
+     byte-identical after, since no review currently has explicit intent.
+  2. **Controlled trigger fixtures** covering initial insert, unrelated review edit,
+     rating edit, timeline insertion, and a recommendation-only metadata edit —
+     asserting the resulting values, not the number of redundant recalculations.
 - Recommendation counts, `latest_rating` behaviour and timeline counts are
   regression-tested, not just eyeballed.
 
