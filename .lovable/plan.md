@@ -70,12 +70,29 @@ A deliberate `auto` reset resolves to `rating_inferred`; the reset event itself
 stays in `review_updates`, so the distinction is recoverable without a column.
 Revisit persisting a source column only when a real query needs it.
 
+UI honesty rule: if the timeline query fails, the form must **not** claim the state
+came from the original answer or the rating. Show "couldn't resolve your current
+recommendation" while still rendering the materialized `is_recommended` status.
+
 ## Timeline evolution of intent
 
 `review_updates` gains `would_recommend text NULL` with
 `CHECK (would_recommend IN ('yes','maybe','no','auto'))` — a real column, mirroring
 how `review_updates.rating` already works. Plus a partial index on
-`(review_id, created_at DESC) WHERE would_recommend IS NOT NULL`.
+`(review_id, created_at DESC, id DESC) WHERE would_recommend IS NOT NULL`.
+
+### "Latest" has exactly one definition
+
+`ORDER BY created_at DESC, id DESC LIMIT 1`, used verbatim in the SQL resolver, the
+TypeScript resolver, the fixture cases and the timeline UI. `id` is only a
+tie-breaker for identical timestamps, never a chronology claim.
+
+Chronology must not be client-controllable, or precedence becomes forgeable:
+`created_at` is assigned by the database default and clients cannot supply or
+change it, and intent-bearing timeline rows are immutable — a change of mind is a
+new event, never an edit of an old one. The current UPDATE policy on
+`review_updates` (`auth.uid() = user_id`, no column restriction) would let an owner
+rewrite `created_at` and reorder their own intent history; 3C closes that.
 
 Event semantics, frozen:
 
