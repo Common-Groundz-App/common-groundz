@@ -219,10 +219,16 @@ trust scoring         : preserved as-is, tested separately
 - Keep `update_review_timeline_stats_enhanced`, drop the older
   `update_review_timeline_stats`; the enhanced one's second no-op UPDATE becomes
   unnecessary once the consolidated trigger reads intent directly.
-- Trust scoring is **not** redesigned. Codex's caution is accepted: rather than
-  copying `calculate_trust_score(NEW.id)` blindly into a BEFORE INSERT context,
-  3C captures current `trust_score` values for a sample of reviews before and after
-  the migration and asserts they are unchanged.
+- Trust scoring is **not** redesigned. Copying `calculate_trust_score(NEW.id)` into
+  a BEFORE INSERT context is not automatically behaviour-preserving — the row does
+  not exist yet — so 3C proves preservation two ways:
+  1. **Whole-dataset comparison, not a sample.** With 77 reviews there is no reason
+     to sample: snapshot `trust_score`, `latest_rating`, `timeline_count` and
+     `is_recommended` for **every** review before the migration and assert each is
+     byte-identical after, since no review currently has explicit intent.
+  2. **Controlled trigger fixtures** covering initial insert, unrelated review edit,
+     rating edit, timeline insertion, and a recommendation-only metadata edit —
+     asserting the resulting values, not the number of redundant recalculations.
 - Recommendation counts, `latest_rating` behaviour and timeline counts are
   regression-tested, not just eyeballed.
 
