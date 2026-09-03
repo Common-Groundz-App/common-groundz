@@ -1,121 +1,189 @@
-# Phase 3B — Questionnaire specification (v3: recommendation intent + timeline)
+# Phase 3B — Questionnaire specification (v4: recommendation intent frozen)
 
-I accept all of Codex's additions (envelope validation, explicit timeline policy,
-trust-score safety, `repeat_intent` rename, tag sentiment metadata) and ChatGPT's
-precedence framing. This revision also makes recommendation intent **evolve with
-timeline updates**, as you asked. **No UI code and no migration ship in 3B.**
+Both reviews converge except on one point, and I've adjudicated it below.
+**No UI code and no migration ship in 3B.**
 
 ## Verified current behaviour
 
 `reviews.is_recommended` is fully derived. Two `BEFORE INSERT OR UPDATE` triggers
-on `reviews` recompute it on every write:
+on `reviews` recompute it on every write — `trigger_auto_recommend_review`
+(`rating >= 4`) and `auto_recommend_review_timeline_aware_trigger`
+(`COALESCE(latest_rating, rating) >= 4`) — and both also recompute `trust_score`.
+Two triggers on `review_updates` overlap too: `update_review_timeline_stats`
+(count + trust) and `update_review_timeline_stats_enhanced` (count +
+`latest_rating` + trust, then a second no-op UPDATE purely to force recommendation
+re-evaluation).
 
-- `trigger_auto_recommend_review` → `rating >= 4`
-- `auto_recommend_review_timeline_aware_trigger` → `COALESCE(latest_rating, rating) >= 4`
+Data: 77 reviews, 58 recommended, **0** rows disagreeing with effective
+rating ≥ 4 in either direction.
 
-Both also recompute `trust_score`. Two triggers on `review_updates` overlap as
-well: `update_review_timeline_stats` (count + trust) and
-`update_review_timeline_stats_enhanced` (count + `latest_rating` + trust, then a
-second no-op UPDATE purely to force recommendation re-evaluation).
-
-Data: 77 reviews, 58 recommended, **0** rows disagreeing with effective rating ≥ 4
-in either direction. The rule has no exceptions in production.
-
-**The "Convert to Recommendation" action** is the dropdown item in
-`ReviewCard.tsx` (lines 320 and 561, upload-cloud icon), inside the "..." menu,
-shown only on your own profile's Reviews tab and only while `is_converted` is
-false. It writes `is_recommended: true`, which the same UPDATE's trigger reverts
-from the rating, and it never sets `is_converted`, so it never hides. It is
-retired in 3C: delete both `convertReviewToRecommendation` copies, the
-`convertToRecommendation` hook member, the `onConvert` prop and both menu items.
+**Convert to Recommendation** is the upload-cloud dropdown item in
+`ReviewCard.tsx` (lines 320, 561), in the "..." menu, rendered only when you're on
+your own profile's Reviews tab, own the review, `ProfileReviews` passed
+`onConvert`, and `is_converted` is false. It writes only `is_recommended: true` —
+reverted by the trigger in the same UPDATE — creates no `recommendations` row, and
+never sets `is_converted`, so it can't hide. Retired in 3C.
 
 ## Recommendation-intent precedence (frozen)
 
-One authoritative chain, evaluated newest-first:
-
 ```text
-1. latest valid timeline answer   (review_updates.would_recommend)   AUTHORITATIVE
-2. original questionnaire answer  (metadata.questionnaire...)        AUTHORITATIVE
-3. COALESCE(latest_rating, rating) >= 4                              INFERRED FALLBACK
+1. latest timeline intent event (review_updates.would_recommend, newest by created_at)
+     yes | maybe | no  -> AUTHORITATIVE
+     auto              -> discard all earlier explicit intent, use rating
+2. original questionnaire answer (valid envelope only) -> AUTHORITATIVE
+3. COALESCE(latest_rating, rating) >= 4                -> INFERRED FALLBACK
 ```
 
-Answer → flag: `yes` → `true`; `maybe` → `false`; `no` → `false`. `maybe` keeps
-its nuance in the stored answer; the boolean means "would actively recommend".
+Flag mapping: `yes` → `true`; `maybe` → `false`; `no` → `false`. `maybe` keeps its
+nuance in the stored answer; the boolean means "would actively recommend".
 
-Rationale: rating answers "how good was it", recommending answers "should someone
-else choose it" — 3 stars/"yes, great for beginners" and 4 stars/"maybe, far too
-expensive" are both real and currently unrepresentable. Keeping the rating rule as
-the fallback is what stops recommendation counts collapsing on launch day, since
-every question is optional and 77 existing reviews have no answer at all.
+Rating answers "how good was it"; recommending answers "should someone else choose
+it". 3 stars/"yes, great for beginners" and 4 stars/"maybe, far too expensive" are
+both real and currently unrepresentable. The rating rule staying as the fallback is
+what keeps recommendation counts intact on launch day — every question is optional
+and all 77 existing reviews have no answer.
 
-`reviews.is_recommended` stays as the indexed compatibility signal for its 6
-service consumers, 2 RPCs and the smart-assistant function — nothing starts
-reading JSONB in a feed query.
+`reviews.is_recommended` remains the indexed compatibility signal for its 6 service
+consumers, 2 RPCs and the smart-assistant function. No feed query starts reading
+JSONB.
 
-New column `reviews.recommendation_source` (`'explicit' | 'inferred'`, written by
-the same trigger) so analytics and future ranking can weight stated intent above
-inferred intent instead of treating them as one signal.
+### Adjudicated: no cached source columns in v1 (ChatGPT's position)
 
-## Timeline evolution of intent (your requirement, specified)
+Codex proposed caching `recommendation_intent` + `recommendation_source`. Declined
+for v1: that is two more columns to keep synchronized against metadata edits,
+timeline inserts, subject/category changes and future questionnaire versions, and
+**no current query filters or groups by source**. `is_recommended` earns its
+persistence because real feed queries filter on it; source does not yet.
 
-`review_updates` gains `would_recommend text` (nullable, constrained to
-`yes|maybe|no`) — deliberately a real column, not JSONB, mirroring how
-`review_updates.rating` already works.
+Codex's *precision* point is adopted as resolver output instead of storage —
+`explicit | inferred` is too coarse for the UI copy we need:
 
-- The timeline update form gains one optional control: **"Would you still
-  recommend it?" — Yes / Maybe / No**, with the current resolved status shown
-  beside it ("Currently: recommending" / "not recommending", and whether that came
-  from your answer or from your rating).
-- Left blank, the update changes nothing about intent: the chain above simply
-  falls through to the previous answer, or to the rating if there was never one.
-- The resolver picks the **latest non-null** `would_recommend` across
-  `review_updates` by `created_at` — the identical pattern
-  `update_review_timeline_stats_enhanced` already uses for `latest_rating`.
-- A user can revise intent as many times as the journey needs; that is the
-  longitudinal-experience moat working as intended.
-- Clearing intent: the review editor may set `would_recommend` back to unanswered.
-  A cleared original answer plus no timeline answer restores rating-derived
-  behaviour immediately. Timeline entries are append-only, so clearing there means
-  a new update with an explicit current answer, not editing history.
-- Nudge, not inference: when a timeline update drops the effective rating below 4
-  while an explicit `yes` stands, the form highlights the still-recommend question
-  (unanswered, never preselected). We ask rather than silently overriding.
-- Stated intent is never overridden by a later rating change. That is a deliberate
-  choice with a test, not a side effect of trigger ordering.
+```text
+resolveRecommendationIntent(review, timelineIntentEvents) -> {
+  intent:        'yes' | 'maybe' | 'no' | null,   // null = never stated
+  isRecommended: boolean,
+  source:        'timeline_explicit' | 'review_explicit' | 'rating_inferred',
+}
+```
 
-## Envelope validation (accepted, strict)
+A deliberate `auto` reset resolves to `rating_inferred`; the reset event itself
+stays in `review_updates`, so the distinction is recoverable without a column.
+Revisit persisting a source column only when a real query needs it.
 
-The explicit answer overrides the fallback **only** when all hold:
+## Timeline evolution of intent
 
-- `metadata.questionnaire` is a JSON object
-- `version` is an integer in the supported set (v1: exactly `1`)
-- `type` strictly equals the review's canonical `category`
-- `answers` is a JSON object
-- `would_recommend` is exactly `yes`, `maybe` or `no`
+`review_updates` gains `would_recommend text NULL` with
+`CHECK (would_recommend IN ('yes','maybe','no','auto'))` — a real column, mirroring
+how `review_updates.rating` already works. Plus a partial index on
+`(review_id, created_at DESC) WHERE would_recommend IS NOT NULL`.
 
-Absent, malformed, unsupported-version or type-mismatched envelopes fall back to
-the rating rule. An arbitrary string is **never** read as `false`. The same strict
-check applies to `review_updates.would_recommend` (a DB check constraint there
-makes it cheap).
+Event semantics, frozen:
 
-## Trigger consolidation requirements (accepted)
+| Latest timeline event | Result |
+|---|---|
+| `yes` | explicitly recommending |
+| `maybe` | explicit, not counted as recommending |
+| `no` | explicitly not recommending |
+| `auto` | earlier explicit intent discarded; effective rating decides |
+| no intent value on this update | current resolved intent and source preserved |
 
-One `BEFORE INSERT OR UPDATE` trigger on `reviews` replaces both existing
-recommendation triggers — the old two are dropped in the same migration so
-execution order stops mattering. `trust_score` computation is **carried over
-verbatim** (`calculate_trust_score(NEW.id)`); trust scoring is not redesigned
-here, and it gets its own regression test. The redundant
-`update_review_timeline_stats` / `..._enhanced` pair on `review_updates` is
-flagged for the same migration: keep the enhanced one, drop the older one, and its
-second no-op UPDATE becomes unnecessary once the consolidated trigger reads intent
-directly.
+Because timeline events are strictly newer than the original answer, an `auto`
+event also neutralises the questionnaire answer. Conversely, clearing the original
+answer in the review editor does **not** restore inference when a later timeline
+`yes`/`maybe`/`no` exists — the timeline answer still wins. Getting back to
+inference after stating timeline intent requires an `auto` event; that is the only
+mechanism, deliberately.
+
+Timeline form presentation:
+
+```text
+Would you still recommend it?
+
+Currently: Yes — from your last timeline update
+[ Yes ]  [ Maybe ]  [ No ]
+
+Leave unanswered to keep your current recommendation.   [ Use rating automatically ]
+```
+
+When the state is inferred: `Currently: Recommending — inferred from your 4.5 rating`.
+
+Submission semantics:
+
+- untouched → field omitted; intent and source unchanged
+- `Yes`/`Maybe`/`No` → append that explicit intent
+- "Use rating automatically" → append `auto`
+- re-tap the selected value → back to untouched/omitted, **not** `auto`
+
+Current state is always displayed, never preselected, so "current state", "new
+statement", "no statement" and "deliberate return to inference" stay four distinct
+things.
+
+Divergence nudge only, never inference: when an update drops the effective rating
+below 4 while an explicit `yes` stands, show
+`Your rating is now 2.5, but your latest answer is still Yes. Update it?` and leave
+the control unselected. Someone can still recommend something they enjoyed less.
+
+## Envelope validation (strict)
+
+The questionnaire answer overrides the fallback **only** when all hold:
+`metadata.questionnaire` is a JSON object; `version` is in the supported set (v1:
+exactly `1`); `type` strictly equals the review's canonical `category`; `answers`
+is a JSON object; `would_recommend` is exactly `yes`, `maybe` or `no`. Absent,
+malformed, unsupported-version or type-mismatched envelopes fall back to the rating
+rule. An arbitrary string is **never** read as `false`.
+
+## One resolver, two implementations, one fixture
+
+Precedence will exist in SQL (trigger) and TypeScript (form copy, and later
+analytics). To stop them drifting, the truth table lives in a **single JSON fixture
+file** that both the Deno/SQL test and the Vitest suite read. Frozen cases:
+
+| timeline | original | effective rating | intent | isRecommended | source |
+|---|---|---|---|---|---|
+| `no` | `yes` | 5 | no | false | timeline_explicit |
+| — | `yes` | 2 | yes | true | review_explicit |
+| — | `maybe` | 5 | maybe | false | review_explicit |
+| — | — | 5 | null | true | rating_inferred |
+| — | — | 3 | null | false | rating_inferred |
+| `auto` | `yes` | 5 | null | true | rating_inferred |
+| `auto` | `yes` | 2 | null | false | rating_inferred |
+| `auto` then `no` | `yes` | 5 | no | false | timeline_explicit |
+| `no` then `auto` | `yes` | 5 | null | true | rating_inferred |
+| — | malformed envelope (`yes`) | 5 | null | true | rating_inferred |
+| — | wrong `type` (`yes`) | 3 | null | false | rating_inferred |
+| — | `version: 999` (`yes`) | 5 | null | true | rating_inferred |
+
+## Trigger consolidation (narrow, behaviour-preserving)
+
+Architecture for 3C:
+
+```text
+pure SQL resolver(metadata, latest timeline intent, effective rating)
+        -> intent, source, is_recommended
+review trigger        : applies resolver output only
+timeline stats trigger: latest_rating + counts, then one review recomputation
+trust scoring         : preserved as-is, tested separately
+```
+
+- Both existing recommendation triggers on `reviews` are dropped in the same
+  migration, so execution order stops mattering, and the resolver must not depend
+  on trigger names or ordering.
+- Keep `update_review_timeline_stats_enhanced`, drop the older
+  `update_review_timeline_stats`; the enhanced one's second no-op UPDATE becomes
+  unnecessary once the consolidated trigger reads intent directly.
+- Trust scoring is **not** redesigned. Codex's caution is accepted: rather than
+  copying `calculate_trust_score(NEW.id)` blindly into a BEFORE INSERT context,
+  3C captures current `trust_score` values for a sample of reviews before and after
+  the migration and asserts they are unchanged.
+- Recommendation counts, `latest_rating` behaviour and timeline counts are
+  regression-tested, not just eyeballed.
 
 ## Field IDs and stored values (frozen)
 
 | Field id | Stored values | Labels |
 |---|---|---|
 | `would_recommend` | `yes` / `maybe` / `no` | Yes / Maybe / No |
-| `repeat_intent` (renamed from `would_again`) | `yes` / `maybe` / `no` | per-type: Order again? / Go back? / Buy again? / Rewatch? / Keep using? / Attend again? … |
+| `repeat_intent` | `yes` / `maybe` / `no` | per-type: Order again? / Go back? / Buy again? / Rewatch? / Keep using? / Attend again? … |
 | `value` | `poor` / `fair` / `good` / `excellent` | Not worth it / Okay / Worth it / Great value |
 | `worth_time` | `yes` / `mostly` / `no` | Yes / Mostly / No |
 | `trust` | `low` / `medium` / `high` | Low / Medium / High |
@@ -123,22 +191,19 @@ directly.
 | `portion` | `small` / `just_right` / `large` | Small / Just right / Large |
 | `stood_out`, `best_for` | snake_case tag ids | curated labels |
 
-Unanswered fields are omitted from `answers` — never `""`, `null`, `[]`. Nothing
-is preselected, so unanswered stays distinct from the middle option; re-tapping
-the selected option clears it.
+Unanswered fields are omitted from `answers` — never `""`, `null`, `[]`. Nothing is
+preselected; re-tapping the selected option clears it.
 
-## Tags (accepted)
+## Tags
 
 `CuratedTagSelector` is the shared primitive; `FoodTagSelector` becomes a thin
 wrapper preserving its 13 tags, emojis, custom input, Plus button, Enter key,
-styling and `metadata.food_tags` byte-identically, and is exempt from the new cap.
+styling and `metadata.food_tags` byte-identically, exempt from the new cap.
 
-Sentiment is registry metadata, never stored:
+Sentiment is registry metadata, never stored —
 `{ value: 'slow_pacing', label: 'Slow pacing', emoji: '🐢', sentiment: 'negative' }`
-with `sentiment: 'positive' | 'neutral' | 'negative'` — `neutral` matters for
-preference-dependent tags (crowded, challenging, fast-paced).
-
-Curated ids and custom text stored separately:
+with `positive | neutral | negative`; `neutral` matters for preference-dependent
+tags (crowded, challenging, fast-paced).
 
 ```json
 {
@@ -154,9 +219,9 @@ Curated ids and custom text stored separately:
 }
 ```
 
-Limits: 5 combined selected + custom, max 3 custom, 40 chars each, Unicode-
-normalized (NFC) and trimmed before case-insensitive dedupe while preserving the
-user's original casing, never blank.
+Limits: 5 combined selected + custom, max 3 custom, 40 chars each, NFC-normalized
+and trimmed before case-insensitive dedupe while preserving the user's casing,
+never blank.
 
 ## Final v1 matrix
 
@@ -185,15 +250,21 @@ high-signal negatives; `professional` uses behaviour-only negatives (Slow to
 respond, Unclear communication, Missed deadlines) — never character or misconduct
 labels.
 
+## Also noted for 3D cleanup
+
+`reviews.is_converted` becomes vestigial once Convert is retired — it gates only
+that menu item and is never written. 3D decides between dropping the column and
+documenting it as legacy; 3C just stops reading it.
+
 ## What closes 3B
 
 The verbatim **tag id + label + emoji + sentiment table for the 14 non-food
 vocabularies**, delivered as the final 3B artefact once you approve the contracts
 above. Then 3C ships UI + persistence + the trigger/column migration together,
-tested across all 15 types and the timeline cases.
+verified across all 15 types and every fixture row.
 
 ## Out of scope
 
 Any UI code, registry edit or migration in 3B; the legacy `recommendations` table;
-redesigning trust scoring; conditional questions; making anything required;
-step/layout restructuring; Phase 2.5B.
+redesigning trust scoring; persisting intent/source columns; conditional questions;
+making anything required; step/layout restructuring; Phase 2.5B.
