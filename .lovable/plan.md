@@ -1,94 +1,138 @@
-# Phase 3C — Ship the questionnaire (implementation)
+# Phase 3C (v2) — reviewer corrections folded in
 
-Phase 3B froze the contracts (recommendation-intent precedence, field ids, stored
-values, tag vocabularies in `docs/phase-3b-tag-vocabularies.md`). 3C implements them.
-This is the largest phase so far — it touches the database, the review wizard, the
-timeline form and the review card — so it ships in **three ordered stages**, each
-independently verifiable and safe to stop at.
+Both reviews are right on every substantive point, and all of them are adopted.
+The architecture doesn't change; the delivery boundary, the DB enforcement
+mechanism and the vocabulary semantics do. Phase 3B does **not** close until the
+vocabulary is corrected, because the tag ids become immutable the moment real
+answers exist.
 
-## Stage 1 — Database foundation and safety
+Verified while reviewing: `review_updates` today has owner `UPDATE` **and owner
+`DELETE`** policies (`auth.uid() = user_id`), and INSERT only checks
+`auth.uid() = user_id` — never review ownership. So "append-only" is not true today
+in either direction, and Codex's delete case is real, not hypothetical.
 
-Nothing user-visible changes. One migration:
+## Stage 0 — close 3B properly (docs only, no code)
 
-- Add `review_updates.would_recommend text NULL` with
-  `CHECK (would_recommend IN ('yes','maybe','no','auto'))`, plus a partial index on
+1. **Vocabulary semantics.** Bare aspect tags marked `positive` become evaluative
+   ids + labels: `compelling_story`, `strong_acting`, `striking_cinematography`,
+   `strong_writing`, `memorable_characters`, `engaging_gameplay`, `good_service`,
+   `very_clean`, `convenient_location`, `good_value`, `high_quality`,
+   `great_packaging`, `strong_ending`, `great_with_friends`, `solid_build`. Anything
+   genuinely preference-dependent stays a plain aspect marked `neutral`. Id/label
+   mismatches are fixed (`rude_service` → `unhelpful_service`). `best_for` entries
+   get explicit `sentiment: 'neutral'` in data rather than a prose note.
+2. **The four flagged entries** (I agree with all four): movie `subtitles_needed` →
+   `memorable_visuals`; brand `fast_delivery` → `wide_range`; professional
+   `missed_deadlines` → `didnt_follow_through` (generalises past deadline-shaped
+   professions while staying behaviour-only); experience `good_guide` →
+   `well_organised`.
+3. **Tag identity is composite**: `(questionnaire type, field id, tag id)`. Nothing
+   aggregates across types on string reuse alone; a genuinely shared concept must be
+   declared once in a shared-definitions map and referenced.
+4. **Food is excluded from generic `stood_out`.** Food Tags *are* food's
+   "what stood out" in v1 (`metadata.food_tags`, existing selector). Food gets
+   `would_recommend` + `repeat_intent` + `portion` only — never two tag fields, never
+   the same selection persisted twice.
+5. **Roadmap corrections**: Phase 2.5B is *optional wizard consolidation* (semantic
+   step ids, Subject → Review → Publish, rating merged into Review, entity-page flow
+   skipping the locked subject stage) — legacy-unlinked remediation is a separate
+   deferred item. Phase 3D's scope is restored in full: remove `questionnaireKind`,
+   the five-bucket UI branches, obsolete `foodName`/`contentName` state and
+   post-versioning compatibility scaffolding; keep only the narrow legacy-unlinked
+   adapter; confirm backend category bucketing intact; decide on `is_converted`.
+6. **Wording fix**: `FoodTagSelector` must be **regression-identical in behaviour,
+   vocabulary, styling and persistence** — not "byte-identical source", which is
+   self-contradictory once the file is refactored.
+
+Freeze 3B after this. Then Stage 1 → verify → Stage 2 → verify → Stage 3 → verify.
+
+## Stage 1 — database and resolver foundation (independently deployable)
+
+No new UI is exposed. One migration:
+
+- `review_updates.would_recommend text NULL`,
+  `CHECK (would_recommend IN ('yes','maybe','no','auto'))`, partial index on
   `(review_id, created_at DESC, id DESC) WHERE would_recommend IS NOT NULL`.
-- **Fix the verified authorization gap** (pre-existing, unsafe to ship intent
-  without it): the INSERT policy on `review_updates` only checks
-  `auth.uid() = user_id`, never that the referenced review belongs to the user — so
-  anyone signed in can already append an update to a stranger's review and move its
-  `latest_rating`, `timeline_count`, `trust_score` and `is_recommended`. New policy
-  requires the review to be owned by `auth.uid()`, and UPDATE is restricted so
-  `review_id`, `user_id`, `created_at` and `would_recommend` cannot be rewritten
-  (intent events are immutable — a change of mind is a new row).
-- Add the pure SQL resolver: `(metadata, latest timeline intent, effective rating)`
-  → `intent`, `source`, `is_recommended`, using
-  `ORDER BY created_at DESC, id DESC LIMIT 1` verbatim, and strict envelope
-  validation (object, `version = 1`, `type` equals the review's category, `answers`
-  object, `would_recommend` exactly `yes`/`maybe`/`no`) — anything else falls back
-  to `COALESCE(latest_rating, rating) >= 4`.
-- Consolidate the overlapping triggers: keep one review-side recommendation trigger
-  that applies resolver output, keep `update_review_timeline_stats_enhanced`, drop
-  the older duplicates. Trust-score logic is preserved verbatim.
+- **INSERT authorization**: require `auth.uid() = user_id` **and** that
+  `review_id` belongs to a review owned by `auth.uid()`. `created_at` stays
+  database-assigned.
+- **Append-only enforced by a `BEFORE UPDATE`/`BEFORE DELETE` trigger, not by RLS.**
+  RLS chooses rows, it cannot compare `OLD` to `NEW`. For v1 ordinary users get no
+  mutation of timeline history at all: any `UPDATE` or `DELETE` on `review_updates`
+  is rejected with a clear message (an admin/service path may still remove abuse and
+  then recomputes review stats). This also removes the stale-cache class of bug
+  Codex flagged — an editable or deletable authoritative row would silently
+  desynchronise `latest_rating`, `is_recommended` and `trust_score`.
+- **Two functions, not one.** A *pure* decision function takes
+  `(original envelope, latest intent event, effective rating)` and returns
+  `intent | source | is_recommended` with no queries. A separate review-aware
+  wrapper owns the deterministic lookup
+  (`ORDER BY created_at DESC, id DESC LIMIT 1`) and calls the pure one. The trigger
+  calls the wrapper. TypeScript mirrors the same split.
+- **Strict envelope extraction**: object, `version = 1`, `type` equals the review's
+  canonical `category`, `answers` object, `would_recommend` exactly
+  `yes`/`maybe`/`no`; anything else falls back to `COALESCE(latest_rating, rating) >= 4`.
+- **Trigger consolidation**: drop both overlapping recommendation triggers on
+  `reviews` and the older `update_review_timeline_stats`; keep one recommendation
+  trigger applying resolver output and the enhanced timeline-stats trigger. Trust
+  scoring is preserved, not redesigned.
 
-Verification before and after: snapshot `is_recommended` and `trust_score` for
-**every** review (all 77) and assert they are byte-identical, since no review has
-explicit intent yet; plus controlled fixtures for initial insert, unrelated edit,
-rating edit, timeline insert, and a metadata-only edit. Forgery attempts (append to
-someone else's review, rewrite an intent row) must be denied.
+Stage 1 acceptance: no existing row changes `is_recommended`, `trust_score`,
+`latest_rating` or `timeline_count` (whole-dataset before/after snapshot, all 77
+reviews); controlled fixtures for insert, unrelated edit, rating edit, timeline
+insert and metadata-only edit; old clients omitting `would_recommend` still insert
+successfully; legitimate owner inserts are not blocked; forgery attempts (stranger's
+review, rewriting or deleting an intent row) are denied; shared fixture harness
+green in both Vitest and the Deno/SQL runner; generated Supabase types regenerated.
 
-## Stage 2 — Questions in the review wizard
+## Stage 2 — review questionnaire (UI + persistence)
 
-- New `CuratedTagSelector` primitive: chip grid with emoji + label, custom entry
-  (Plus button and Enter key), 5 combined / max 3 custom / 40 chars, NFC-normalized
-  trim then case-insensitive dedupe preserving the user's casing.
-- `FoodTagSelector` stays byte-identical and exempt from the new caps — food keeps
-  its 13 tags and `metadata.food_tags`.
-- New `choice` field kind rendered as a segmented single-select: nothing
-  preselected, re-tapping the selected option clears it, so "unanswered" and
-  "neutral answer" stay distinct.
-- Populate all 15 registry entries with the frozen matrix: every type gets
-  `would_recommend` + `stood_out`, plus per-type repeat intent and one extra
-  (`value`, `worth_time`, `trust`, `solves_problem`, `portion`, `best_for`) exactly
-  as frozen. `legacy_unlinked` gets none of it. All questions optional.
-- Persist under `metadata.questionnaire = { version: 1, type, answers }`, merged
-  through the existing `mergeReviewMetadata` so provenance and unrelated keys
-  survive. Unanswered fields are omitted — never `""`, `null` or `[]`.
-- TypeScript resolver mirroring the SQL one, both driven by a single shared fixture
-  (the frozen 12-case truth table): Vitest runs it against the TS resolver, a Deno
-  harness runs the same cases against the SQL resolver.
+- Corrected registry vocabularies for the 14 non-food types; `choice` control
+  (nothing preselected, re-tap clears); `CuratedTagSelector` (5 combined / max 3
+  custom / 40 chars / NFC-trim then case-insensitive dedupe preserving casing);
+  `FoodTagSelector` regression-identical and exempt from the caps.
+- **Questionnaire-version policy (was missing, now explicit):** new review → v1;
+  existing review with a valid v1 envelope → v1; existing review with no
+  questionnaire metadata → legacy compatibility, questions shown as an *optional
+  addition* and **no envelope written unless the user actually answers something**;
+  existing review whose subject is deliberately replaced → fresh v1 for the new
+  type. Editing an unrelated field never silently converts a legacy review.
+- **Subject-switch reset (new acceptance criterion):** changing the subject's
+  canonical type before submit, or in edit mode, discards answers and tag ids that
+  don't belong to the new type's vocabulary — movie tag ids must never land in a
+  book envelope. Unknown/stale ids encountered on load are dropped from the rendered
+  state rather than re-saved.
+- Persistence via `metadata.questionnaire = { version: 1, type, answers }` merged
+  through `mergeReviewMetadata`; unanswered keys omitted entirely.
 
-## Stage 3 — Intent over time, and cleanup of the dead action
+Acceptance: all 15 types render their frozen matrix; food shows exactly one tag
+field; save/reload round-trips; a legacy review edited without answering stores no
+envelope; subject-switch cases covered; a registry lint test asserts every tag id is
+unique `snake_case` within its vocabulary and declares a sentiment.
 
-- Timeline update form gains "Would you still recommend it?" showing current state
-  and source in words (`Yes — from your last timeline update` /
-  `Recommending — inferred from your 4.5 rating`), three unselected options, and a
-  "Use rating automatically" action that appends `auto`. Untouched submits omit the
-  field and change nothing.
-- Divergence nudge only, never inference: when an update drops the effective rating
-  below 4 while an explicit `Yes` stands, prompt to revisit — but never change the
-  answer automatically.
-- If the timeline query fails, say "couldn't resolve your current recommendation"
-  rather than claiming a source, while still showing the stored status.
-- Retire the "Convert to Recommendation" menu item in `ReviewCard` — verified dead
-  (its only write is reverted by the trigger in the same statement, it creates no
-  recommendation row, and it never sets `is_converted` so it can't hide itself).
-  3C stops reading `is_converted`; 3D decides whether to drop the column.
+## Stage 3 — timeline intent and dead-action cleanup
+
+Unchanged from v1: "Would you still recommend it?" with resolved current state and
+source in words, three unselected options, `auto` reset, untouched = no change,
+divergence nudge that never rewrites the answer, honest copy when the resolve query
+fails, and removal of the Convert action from both `ReviewCard` layouts plus its
+hook/service wiring. `is_converted` is not dropped here — 3D decides.
 
 ## Technical notes
 
-- Migration: `review_updates` column + partial index + policies, SQL resolver
-  function, trigger consolidation. No changes to reserved schemas.
-- Files: `questionnaire/registry.ts` (15 entries + vocabularies),
-  `QuestionnaireSections.tsx` (new `choice` and generic `tags` kinds), new
-  `CuratedTagSelector.tsx`, new `recommendationIntent.ts` resolver, `ReviewForm.tsx`,
-  `steps/StepThree.tsx` / `StepFour.tsx`, `ReviewTimelineViewer.tsx`,
-  `services/review/timeline.ts` (intent argument), `ReviewCard.tsx`,
+- Migration objects: column, check, partial index, INSERT policy replacement,
+  append-only guard trigger, pure resolver, review-aware wrapper, consolidated
+  triggers.
+- Files: `docs/phase-3b-tag-vocabularies.md`, `roadmap.md`,
+  `questionnaire/registry.ts`, `QuestionnaireSections.tsx`, new
+  `CuratedTagSelector.tsx`, new `recommendationIntent.ts` + shared fixture,
+  `ReviewForm.tsx`, `steps/StepThree.tsx`, `steps/StepFour.tsx`,
+  `ReviewTimelineViewer.tsx`, `services/review/timeline.ts`, `ReviewCard.tsx`,
   `ProfileReviews.tsx`.
-- `reviews.is_recommended` stays the indexed compatibility signal; no feed query
-  starts reading JSONB, and no cached `recommendation_source` column is added.
+- `reviews.is_recommended` stays the indexed compatibility signal; no cached
+  source/intent columns.
 
 ## Out of scope
 
-Aggregated tag insights on entity pages, analytics on intent, Phase 2.5B legacy
-remediation, and any redesign of trust scoring.
+Aggregation of tags on entity pages, intent analytics, trust-score redesign,
+Phase 2.5B, dropping `is_converted`.
