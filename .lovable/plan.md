@@ -149,11 +149,42 @@ is a JSON object; `would_recommend` is exactly `yes`, `maybe` or `no`. Absent,
 malformed, unsupported-version or type-mismatched envelopes fall back to the rating
 rule. An arbitrary string is **never** read as `false`.
 
-## One resolver, two implementations, one fixture
+## Timeline intent is a security-sensitive write (verified gap)
+
+Inserting a `review_updates` row will now change another table's
+`reviews.is_recommended`, so authorization matters at the **database** boundary, not
+in the form.
+
+Verified today: the INSERT policy on `review_updates` is
+`WITH CHECK (auth.uid() = user_id)` **only** — it never checks that the user owns
+the referenced review. And `update_review_timeline_stats_enhanced` takes the latest
+rating from any row with that `review_id` regardless of author. So a signed-in user
+can already append an update to a stranger's review and move its `latest_rating`,
+`timeline_count`, `trust_score` and therefore `is_recommended`. Adding intent to
+that column turns an existing hole into a direct recommendation-forgery path.
+
+3C must therefore, in the same migration: require `review_id` to belong to a review
+owned by `auth.uid()` in the INSERT policy; restrict UPDATE so `created_at`,
+`review_id`, `user_id` and `would_recommend` cannot be rewritten (intent events
+immutable); and cover both with tests that attempt the forgery and expect a denial.
+This is a pre-existing bug being fixed alongside, not scope creep — the feature is
+unsafe to ship without it.
+
+## One resolver, two implementations, one executable fixture
 
 Precedence will exist in SQL (trigger) and TypeScript (form copy, and later
-analytics). To stop them drifting, the truth table lives in a **single JSON fixture
-file** that both the Deno/SQL test and the Vitest suite read. Frozen cases:
+analytics). Postgres can't read a repo file, so parity is enforced by a harness,
+not by hoping two suites agree:
+
+```text
+shared fixture (TS/JSON, canonical truth table)
+        |-- Vitest       -> TypeScript resolver
+        |-- Deno harness -> calls the SQL resolver per case against the database
+```
+
+Fixture cases are **ordered event objects** with explicit ids and timestamps, so
+"auto then no" is encoded rather than described in prose. Frozen cases:
+
 
 | timeline | original | effective rating | intent | isRecommended | source |
 |---|---|---|---|---|---|
