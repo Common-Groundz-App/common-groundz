@@ -12,9 +12,11 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
   about whether the story was good; `compelling_story` does. Any tag marked
   `positive` must carry the judgement in the id and the label itself.
 - **`sentiment`** (`positive | neutral | negative`) is registry metadata only —
-  never persisted in `metadata.questionnaire`. `neutral` is for
-  preference-dependent traits (crowded, challenging, slow burn, fast-paced) that are
-  a plus for some readers and a minus for others.
+  never persisted in `metadata.questionnaire`. `neutral` is reserved for traits that
+  are a genuine plus for some people and a minus for others (crowded, challenging,
+  slow burn, fast-paced, premium pricing, subscription required). Friction that
+  nobody prefers is `negative` even when mild (hard to find, limited range, hard to
+  book) — it is a drawback, not a matter of taste.
 - **Tag identity is composite: `(type, field id, tag id)`.** The same string in two
   vocabularies is two distinct tags. Cross-type aggregation requires an explicit
   shared-definitions map, never string reuse.
@@ -26,8 +28,12 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 - Every vocabulary carries a few high-signal negatives — a wall of praise chips is
   useless as decision evidence.
 - **`food` has no generic `stood_out`.** Food Tags (13 existing tags,
-  `metadata.food_tags`) already are food's "what stood out"; food asks
-  `would_recommend` + `repeat_intent` + Food Tags + `portion` and nothing else.
+  `metadata.food_tags`) already are food's "what stood out". Food has **no
+  additional type-specific questionnaire fields** beyond `would_recommend`,
+  `repeat_intent`, the existing Food Tags and `portion`. The common review-shell
+  fields (rating, headline, thoughts, media, experience date, visibility) still
+  apply to food exactly as they do to every other type.
+
 
 ## `stood_out` vocabularies
 
