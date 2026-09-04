@@ -118,7 +118,7 @@ action goes away.
 
 - Unit tests for the new intent option constant (values match the DB check constraint's
   allowed set) and for the source-copy helper across all three sources, the `intent: null`
-  case, and the `unavailable` timeline state (no provenance claim).
+  case, the failed/loading state, and the known-partial state (both: no provenance claim).
 - Payload tests for the three states: chip selected → that value; question skipped → column
   omitted / `NULL`; chip selected then tapped again → omitted / `NULL`; reset action → `auto`.
 - Regression coverage for the corrected precedence, driven through the existing resolver:
@@ -126,12 +126,14 @@ action goes away.
   `intent: null` / `rating_inferred`.
 - Per-entry display test: `NULL` renders no recommendation statement, `auto` renders the reset
   wording.
+- A test asserting `fetchReviewUpdates` issues no `range`/`limit`, so the completeness flag the
+  source copy relies on stays true.
 - Undo status mapping tested for all three RPC statuses, including that a `conflict` triggers
-  a refetch and no optimistic removal.
+  a refetch and no optimistic removal, and that the parent review is refreshed in all three.
 - Full Vitest run plus a build check.
 - Explicitly reported as UNVERIFIED, not substituted: the browser → supabase-js → RLS hop
   (external Supabase, no obtainable test session) and the Stage 1 concurrency/real-session
-  carry-overs.
+  carry-overs. Unit and build results are never described as covering them.
 
 ## Technical notes
 
