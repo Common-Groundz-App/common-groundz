@@ -125,13 +125,16 @@ action goes away.
 
 ## Technical notes
 
-- `review_updates.would_recommend` allows `yes | maybe | no | auto` and is nullable; existing
-  rows stay null and keep resolving through the ordering function, which filters nulls out.
+- `review_updates.would_recommend` allows `yes | maybe | no | auto` and is nullable; `NULL`
+  means "this update made no recommendation statement" and the SQL ordering function filters
+  those rows out. No migration is required for Stage 3.
 - Ordering for "latest" and "newest entry" is `created_at DESC, id DESC` everywhere — the same
   ordering the SQL function, the TS mirror, and the undo RPC use.
 - `created_at` is server-owned (client value overwritten by the BEFORE INSERT trigger), so the
   UI must refetch after insert rather than trusting a locally constructed row.
-- Roadmap: Stage 3 items get ticked only for what the tests above actually prove.
+- `roadmap.md` is updated at implementation time: the Stage 3 line is reworded to the corrected
+  semantics (explicit reset action, not a skipped question), and items are ticked only for what
+  the tests above actually prove.
 
 ## Stop point
 
