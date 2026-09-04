@@ -39,19 +39,29 @@ Stage 1 is strictly database, security and resolver work — no questionnaire UI
 - Drop the three permissive write policies. Replace with a single INSERT policy
   `TO authenticated`: `user_id = auth.uid()` **and** the parent review is owned by
   `auth.uid()`. No ordinary UPDATE or DELETE policy exists at all.
-- **Table-level privilege boundary, not a flag.** `REVOKE UPDATE, DELETE ON
-  public.review_updates FROM anon, authenticated` (and PUBLIC). Ordinary roles then
-  lack the SQL privilege entirely, so a direct `UPDATE`/`DELETE` fails on privileges
-  before RLS is even consulted. The `SECURITY DEFINER` RPCs run as the function owner,
-  which retains the privilege — that is the capability boundary, and it cannot be
+- **Table-level privilege boundary, not a flag — Option A (strict RPC-only).**
+  `REVOKE UPDATE, DELETE ON public.review_updates FROM PUBLIC, anon, authenticated,
+  service_role`. No client-facing role — **including `service_role`** — holds the SQL
+  privilege, so a direct `UPDATE`/`DELETE` fails on privileges before RLS is even
+  consulted. Both RPCs are `SECURITY DEFINER` owned by `postgres`, which retains the
+  privilege; that owner capability is the only deletion path, and it cannot be
   manufactured by a client under any session state.
+  Rationale for Option A over "service_role is a trusted bypass": every deletion must
+  run the shared lock + post-delete recompute, and a future backend script deleting a
+  timeline row directly would silently leave `latest_rating`, `timeline_count`,
+  `has_timeline`, `trust_score` and `is_recommended` stale. The invariant is worth
+  more than the convenience. Nothing in `src/` or in any edge function currently
+  updates or deletes `review_updates`, so this revoke breaks no existing caller.
 - **The session-level/GUC guard flag is removed from the design.** A client-settable
   custom setting is not a capability and must never authorize a privileged mutation.
   The owner RPC (`authenticated` grant) and the maintenance RPC (`service_role` grant)
   are the only reachable mutation surfaces; there is no bypass path to guard.
   Defense-in-depth comes from privileges + absent policies, both of which are
   enforced by the database and unaffected by session variables.
-- SELECT stays as-is (timelines are publicly readable, matching reviews).
+- `INSERT` and `SELECT` privileges are unchanged: `service_role` keeps `INSERT`
+  and `SELECT`, `authenticated` keeps `INSERT` (policy-gated) and `SELECT`, `anon`
+  keeps `SELECT`. Timelines stay publicly readable, matching reviews.
+
 
 
 ### 3. Migration — server-owned chronology
@@ -152,11 +162,35 @@ server-generated. Old clients omitting `would_recommend` still insert successful
 
 **Privilege.** `anon` and `authenticated` cannot execute the recompute function, the
 lock helper, the resolver internals or the maintenance RPC; only `authenticated`
-reaches the undo RPC and only `service_role` reaches maintenance.
+reaches the undo RPC and only `service_role` reaches maintenance. **Option A proof:**
+`service_role` cannot directly `UPDATE` or `DELETE` `review_updates`, but can execute
+the maintenance RPC successfully.
 
-Finally: regenerate `src/integrations/supabase/types.ts`, then **stop** and report the
-migration, parity, authorization, privilege, resolver, recompute and concurrency
-results before Stage 2 begins.
+### 10. The Stage 1 report (then stop)
+
+Regenerate `src/integrations/supabase/types.ts`, then **stop** and report, as separate
+sections:
+
+1. migration filename and every database object created, altered or dropped;
+2. whole-dataset before/after values, plus any pre-existing inconsistency discovered
+   (reported, never silently repaired);
+3. final policy + table-grant matrix by role;
+4. final function-execution grant matrix by role;
+5. owner/non-owner authorization and direct-mutation denial results (including the
+   `service_role` direct-mutation denial and guessed-GUC test);
+6. server-owned chronology results;
+7. LIFO, stale-ID conflict and deterministic tie-break results;
+8. same-review and cross-review concurrency results;
+9. recompute and trigger-recursion results;
+10. shared-fixture results in both Vitest and the SQL/Deno runner;
+11. the regenerated Supabase type diff;
+12. confirmation that no Stage 2 questionnaire UI or persistence work was included.
+
+Any check that cannot be executed in this environment is reported as **unverified**,
+never presented as passing. No acceptance test is dropped because it is awkward to
+automate — the concurrency, role-privilege and whole-dataset parity checks are part of
+the deliverable.
+
 
 ### 9. Three additions of my own
 
