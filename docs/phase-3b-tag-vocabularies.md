@@ -309,3 +309,17 @@ Ids repeated across types (`easy_to_use`, `crowded`, `worth_the_price`,
 convenient for readers but carry **no** cross-type meaning on their own: identity
 stays `(type, field id, tag id)`, and any deliberate cross-type rollup must be
 declared in the shared-definitions map.
+
+## Freeze and validation
+
+- **Stage 0 freezes this specification manually.** No docs validator exists and none
+  will be built: this file is the source of truth as written, from the moment Stage 0
+  is declared complete.
+- **Stage 2 proves the implementation matches it.** A registry lint test lands with
+  the registry entries and asserts the shipped vocabularies match **this** document
+  exactly — every tag id, every sentiment, and the per-type tag count in each
+  heading.
+- **Any divergence found by that test is a Stage 2 implementation bug**, not a licence
+  to edit this file. Changing a shipped id requires a data migration and an explicit
+  new decision; labels and emojis remain freely reworded.
+
