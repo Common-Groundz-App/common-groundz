@@ -1,25 +1,33 @@
-# Phase 3B — curated tag vocabularies (frozen)
+# Phase 3B — curated tag vocabularies (frozen, Stage 0 corrected)
 
 Specification only. No registry edit, no component, no migration lands in 3B; Phase
-3C consumes this document verbatim.
+3C Stage 2 consumes **this** corrected document — never the pre-Stage-0 revision.
 
 ## Rules that apply to every vocabulary
 
 - **`value` is the stored code**, lowercase `snake_case`, immutable once shipped.
   Labels and emojis are presentation and may be reworded freely without a data
   migration. Nothing ever stores a label.
+- **Positive tags are evaluative, not bare aspects.** Selecting "Story" says nothing
+  about whether the story was good; `compelling_story` does. Any tag marked
+  `positive` must carry the judgement in the id and the label itself.
 - **`sentiment`** (`positive | neutral | negative`) is registry metadata only —
   never persisted in `metadata.questionnaire`. `neutral` is for
-  preference-dependent traits (crowded, challenging, slow-paced) that are a plus
-  for some readers and a minus for others.
+  preference-dependent traits (crowded, challenging, slow burn, fast-paced) that are
+  a plus for some readers and a minus for others.
+- **Tag identity is composite: `(type, field id, tag id)`.** The same string in two
+  vocabularies is two distinct tags. Cross-type aggregation requires an explicit
+  shared-definitions map, never string reuse.
 - **Selection caps** (`CuratedTagSelector`): 5 combined selected + custom, max 3
   custom, 40 chars each, NFC-normalized and trimmed before case-insensitive dedupe
   while preserving the user's casing, never blank. `FoodTagSelector` is exempt and
-  keeps its current behaviour byte-identically.
+  stays **regression-identical in behaviour, vocabulary, styling and persistence**.
 - **No preselection.** Unanswered is omitted from `answers`, never `[]`.
 - Every vocabulary carries a few high-signal negatives — a wall of praise chips is
   useless as decision evidence.
-- `food` is unchanged and not restated here (13 existing tags, `metadata.food_tags`).
+- **`food` has no generic `stood_out`.** Food Tags (13 existing tags,
+  `metadata.food_tags`) already are food's "what stood out"; food asks
+  `would_recommend` + `repeat_intent` + Food Tags + `portion` and nothing else.
 
 ## `stood_out` vocabularies
 
@@ -27,29 +35,29 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 
 | value | label | emoji | sentiment |
 |---|---|---|---|
-| `ambience` | Ambience | 🕯️ | positive |
-| `service` | Service | 🙌 | positive |
-| `cleanliness` | Cleanliness | ✨ | positive |
-| `location` | Location | 📍 | positive |
-| `value` | Value | 💰 | positive |
-| `staff_knowledge` | Helpful staff | 💡 | positive |
+| `great_ambience` | Great ambience | 🕯️ | positive |
+| `good_service` | Good service | 🙌 | positive |
+| `very_clean` | Very clean | ✨ | positive |
+| `convenient_location` | Convenient location | 📍 | positive |
+| `good_value` | Good value | 💰 | positive |
+| `helpful_staff` | Helpful staff | 💡 | positive |
 | `quiet` | Quiet | 🤫 | neutral |
 | `crowded` | Crowded | 👥 | neutral |
 | `hard_to_find` | Hard to find | 🧭 | neutral |
 | `long_wait` | Long wait | ⏳ | negative |
 | `overpriced` | Overpriced | 💸 | negative |
 | `poor_upkeep` | Poorly maintained | 🧹 | negative |
-| `rude_service` | Unhelpful service | 🙃 | negative |
+| `unhelpful_service` | Unhelpful service | 🙃 | negative |
 
 ### product (12) — value moves to the `value` question, so no value tags here
 
 | value | label | emoji | sentiment |
 |---|---|---|---|
-| `build_quality` | Build quality | 🔨 | positive |
+| `solid_build` | Solid build | 🔨 | positive |
 | `easy_to_use` | Easy to use | 👌 | positive |
 | `works_as_described` | Works as described | ✅ | positive |
 | `durable` | Durable | 🛡️ | positive |
-| `design` | Design | 🎨 | positive |
+| `great_design` | Great design | 🎨 | positive |
 | `packaging` | Packaging | 📦 | neutral |
 | `learning_curve` | Takes getting used to | 📈 | neutral |
 | `bulky` | Bulky | 🧱 | neutral |
@@ -63,10 +71,10 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | value | label | emoji | sentiment |
 |---|---|---|---|
 | `consistent_quality` | Consistent quality | 🎯 | positive |
-| `support` | Good support | 🎧 | positive |
+| `good_support` | Good support | 🎧 | positive |
 | `honest_claims` | Honest claims | 🤝 | positive |
 | `easy_returns` | Easy returns | ↩️ | positive |
-| `fast_delivery` | Fast delivery | 🚚 | positive |
+| `wide_range` | Wide range | 🧺 | positive |
 | `premium_pricing` | Premium pricing | 💎 | neutral |
 | `limited_range` | Limited range | 📉 | neutral |
 | `inconsistent_quality` | Inconsistent quality | 🎲 | negative |
@@ -77,15 +85,15 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 
 | value | label | emoji | sentiment |
 |---|---|---|---|
-| `story` | Story | 📖 | positive |
-| `acting` | Acting | 🎭 | positive |
-| `cinematography` | Cinematography | 🎥 | positive |
-| `soundtrack` | Soundtrack | 🎵 | positive |
-| `direction` | Direction | 🎬 | positive |
-| `ending` | Ending | 🏁 | positive |
+| `compelling_story` | Compelling story | 📖 | positive |
+| `strong_acting` | Strong acting | 🎭 | positive |
+| `striking_cinematography` | Striking cinematography | 🎥 | positive |
+| `great_soundtrack` | Great soundtrack | 🎵 | positive |
+| `strong_direction` | Strong direction | 🎬 | positive |
+| `strong_ending` | Strong ending | 🏁 | positive |
+| `memorable_visuals` | Memorable visuals | 🖼️ | positive |
 | `slow_pacing` | Slow pacing | 🐢 | neutral |
 | `heavy_themes` | Heavy themes | 🌧️ | neutral |
-| `subtitles_needed` | Best with subtitles | 💬 | neutral |
 | `predictable` | Predictable | 🔮 | negative |
 | `weak_writing` | Weak writing | ✍️ | negative |
 | `overhyped` | Overhyped | 📣 | negative |
@@ -94,8 +102,8 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 
 | value | label | emoji | sentiment |
 |---|---|---|---|
-| `story` | Story | 📖 | positive |
-| `acting` | Acting | 🎭 | positive |
+| `compelling_story` | Compelling story | 📖 | positive |
+| `strong_acting` | Strong acting | 🎭 | positive |
 | `binge_worthy` | Binge-worthy | 🍿 | positive |
 | `strong_start` | Strong start | 🚀 | positive |
 | `strong_finish` | Sticks the landing | 🏁 | positive |
@@ -110,8 +118,8 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 
 | value | label | emoji | sentiment |
 |---|---|---|---|
-| `writing` | Writing | ✍️ | positive |
-| `characters` | Characters | 🧑‍🤝‍🧑 | positive |
+| `strong_writing` | Strong writing | ✍️ | positive |
+| `memorable_characters` | Memorable characters | 🧑‍🤝‍🧑 | positive |
 | `insightful` | Insightful | 💡 | positive |
 | `practical` | Practical | 🛠️ | positive |
 | `hard_to_put_down` | Hard to put down | 🔖 | positive |
@@ -126,12 +134,12 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 
 | value | label | emoji | sentiment |
 |---|---|---|---|
-| `gameplay` | Gameplay | 🎮 | positive |
-| `story` | Story | 📖 | positive |
-| `visuals` | Visuals | 🖼️ | positive |
-| `sound_design` | Sound design | 🎧 | positive |
+| `engaging_gameplay` | Engaging gameplay | 🎮 | positive |
+| `compelling_story` | Compelling story | 📖 | positive |
+| `striking_visuals` | Striking visuals | 🖼️ | positive |
+| `great_sound_design` | Great sound design | 🎧 | positive |
 | `replayable` | Replayable | 🔄 | positive |
-| `multiplayer` | Great with friends | 🧑‍🤝‍🧑 | positive |
+| `great_with_friends` | Great with friends | 🧑‍🤝‍🧑 | positive |
 | `challenging` | Challenging | ⚔️ | neutral |
 | `long_playtime` | Long playtime | ⏱️ | neutral |
 | `steep_learning_curve` | Steep learning curve | 📈 | neutral |
@@ -180,8 +188,8 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | `quality_work` | Quality work | 🏅 | positive |
 | `clear_pricing` | Clear pricing | 🧾 | positive |
 | `good_communication` | Good communication | 💬 | positive |
-| `tidy` | Left it tidy | 🧽 | positive |
-| `booking_ease` | Easy to book | 📅 | positive |
+| `left_it_tidy` | Left it tidy | 🧽 | positive |
+| `easy_to_book` | Easy to book | 📅 | positive |
 | `limited_availability` | Limited availability | 🗓️ | neutral |
 | `delayed` | Delayed | 🐌 | negative |
 | `surprise_charges` | Surprise charges | 💸 | negative |
@@ -202,7 +210,7 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | `hard_to_book` | Hard to book | 🗓️ | neutral |
 | `slow_to_respond` | Slow to respond | 🐢 | negative |
 | `unclear_communication` | Unclear communication | 🌫️ | negative |
-| `missed_deadlines` | Missed deadlines | 📆 | negative |
+| `didnt_follow_through` | Didn't follow through | 📆 | negative |
 
 ### event (11)
 
@@ -225,7 +233,7 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | value | label | emoji | sentiment |
 |---|---|---|---|
 | `memorable` | Memorable | 🌟 | positive |
-| `good_guide` | Good guide | 🧭 | positive |
+| `well_organised` | Well organised | 🧭 | positive |
 | `felt_safe` | Felt safe | 🦺 | positive |
 | `scenic` | Scenic | 🏞️ | positive |
 | `worth_the_price` | Worth the price | 💰 | positive |
@@ -240,8 +248,8 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 
 | value | label | emoji | sentiment |
 |---|---|---|---|
-| `quality` | Quality | 🏅 | positive |
-| `value` | Value | 💰 | positive |
+| `high_quality` | High quality | 🏅 | positive |
+| `good_value` | Good value | 💰 | positive |
 | `easy_to_use` | Easy to use | 👌 | positive |
 | `good_support` | Good support | 🎧 | positive |
 | `as_described` | As described | ✅ | positive |
@@ -252,42 +260,46 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 
 ## `best_for` vocabularies
 
-Only `place` and `course` declare `best_for`. Same caps and rules; audience tags are
-`neutral` throughout — an audience fit is never praise or criticism.
+Only `place` and `course` declare `best_for`. Same caps and rules; every audience
+tag carries `sentiment: 'neutral'` explicitly in the registry data — an audience fit
+is never praise or criticism.
 
 ### place (8)
 
-| value | label | emoji |
-|---|---|---|
-| `solo` | Solo | 🚶 |
-| `couples` | Couples | 💞 |
-| `family` | Family | 👨‍👩‍👧 |
-| `friends` | Friends | 🧑‍🤝‍🧑 |
-| `kids` | Kids | 🧒 |
-| `work` | Working | 💻 |
-| `celebrations` | Celebrations | 🎂 |
-| `quick_stop` | A quick stop | ⏱️ |
+| value | label | emoji | sentiment |
+|---|---|---|---|
+| `solo` | Solo | 🚶 | neutral |
+| `couples` | Couples | 💞 | neutral |
+| `family` | Family | 👨‍👩‍👧 | neutral |
+| `friends` | Friends | 🧑‍🤝‍🧑 | neutral |
+| `kids` | Kids | 🧒 | neutral |
+| `work` | Working | 💻 | neutral |
+| `celebrations` | Celebrations | 🎂 | neutral |
+| `quick_stop` | A quick stop | ⏱️ | neutral |
 
 ### course (6)
 
-| value | label | emoji |
-|---|---|---|
-| `complete_beginners` | Complete beginners | 🌱 |
-| `some_experience` | Some experience | 📗 |
-| `advanced` | Advanced learners | 🎓 |
-| `career_switchers` | Career switchers | 🔀 |
-| `interview_prep` | Interview prep | 🎯 |
-| `refresher` | A refresher | 🔁 |
+| value | label | emoji | sentiment |
+|---|---|---|---|
+| `complete_beginners` | Complete beginners | 🌱 | neutral |
+| `some_experience` | Some experience | 📗 | neutral |
+| `advanced` | Advanced learners | 🎓 | neutral |
+| `career_switchers` | Career switchers | 🔀 | neutral |
+| `interview_prep` | Interview prep | 🎯 | neutral |
+| `refresher` | A refresher | 🔁 | neutral |
 
 ## Overlap removed (deliberate, per the frozen matrix)
 
 - `product.stood_out` drops all value/price praise — the `value` question owns it.
-- `food` gains no `value` question because "Value for Money" is already a food tag.
+- `food` has no `stood_out` at all and no `value` question — Food Tags already cover
+  both ("Value for Money" is an existing food tag).
 - `place.stood_out` drops family/couples/solo — `best_for` owns audience.
 - `course.stood_out` drops "worth the time" — the `worth_time` question owns it.
 - `brand` and `professional` drop trust praise — the `trust` question owns it.
 - `app` drops "solves my problem" — the `solves_problem` question owns it.
 
-Repeated ids across types (`value`, `easy_to_use`, `crowded`, `worth_the_price`,
-`story`, `buggy`) are intentional: identical meaning, so cross-type aggregation of a
-tag id stays sound.
+Ids repeated across types (`easy_to_use`, `crowded`, `worth_the_price`,
+`compelling_story`, `strong_acting`, `buggy`, `good_support`, `well_organised`) are
+convenient for readers but carry **no** cross-type meaning on their own: identity
+stays `(type, field id, tag id)`, and any deliberate cross-type rollup must be
+declared in the shared-definitions map.
