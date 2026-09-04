@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      _stage1_closeout_results: {
+        Row: {
+          check_name: string
+          detail: string | null
+          id: number
+          recorded_at: string
+          status: string
+        }
+        Insert: {
+          check_name: string
+          detail?: string | null
+          id?: number
+          recorded_at?: string
+          status: string
+        }
+        Update: {
+          check_name?: string
+          detail?: string | null
+          id?: number
+          recorded_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       admin_actions: {
         Row: {
           action_type: string
