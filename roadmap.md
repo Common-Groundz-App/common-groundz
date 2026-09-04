@@ -39,6 +39,17 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
       deleted row count, so a lost race returns `not_found`, never a false `deleted`
 - [ ] Trigger consolidation with whole-dataset and concurrency regression checks
 - [ ] Explicitly assert RLS is enabled on `review_updates` in the authorization tests
+- [ ] Test-harness rules: no `SET ROLE` inside a `SECURITY DEFINER` harness (role/privilege
+      denial must be attempted from a real session running as that role); one correctly
+      typed scalar `SELECT ... INTO` per assertion; direct UPDATE/DELETE inside the harness
+      is labelled test-only fixture manipulation; chronology asserts the client value did
+      not survive *and* the replacement lies between a captured test start and
+      `clock_timestamp()`; the harness and its results table are dropped once evidence is
+      captured, so no permanent privileged surface remains
+- [ ] Advisory-lock concurrency (insert vs undo, undo vs undo, maintenance vs undo, two
+      different reviews) requires independent parallel sessions — never reported as passing
+      on the strength of the single-session self-test
+
 - [ ] Regenerate Supabase types
 
 
