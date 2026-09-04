@@ -10,11 +10,15 @@
  * public.resolve_review_recommendation and reports mismatches plus the case
  * count, so a truncated or silently skipped fixture fails instead of passing.
  *
+ * A lock file is also written so CI can detect drift in the shared fixture
+ * without re-running the SQL harness.
+ *
  * Usage:  node scripts/build-recommendation-parity-sql.mjs
  * Then run the printed statement as the postgres role (EXECUTE on the resolver
  * is intentionally postgres-only).
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -23,18 +27,38 @@ const fixturePath = resolve(
   here,
   '../src/services/review/__fixtures__/recommendationTruthTable.json',
 );
-const fixture = JSON.parse(readFileSync(fixturePath, 'utf8'));
+const fixtureRaw = readFileSync(fixturePath, 'utf8');
+const fixture = JSON.parse(fixtureRaw);
 
 if (fixture.resolverCases.length !== fixture.expectedResolverCaseCount) {
   throw new Error(
     `Fixture case count mismatch: ${fixture.resolverCases.length} vs declared ${fixture.expectedResolverCaseCount}`,
   );
 }
+if (fixture.orderingCases.length !== fixture.expectedOrderingCaseCount) {
+  throw new Error(
+    `Ordering case count mismatch: ${fixture.orderingCases.length} vs declared ${fixture.expectedOrderingCaseCount}`,
+  );
+}
+
+const hash = createHash('sha256').update(fixtureRaw).digest('hex');
+const lock = {
+  contractVersion: fixture.contractVersion,
+  sha256: hash,
+  expectedResolverCaseCount: fixture.expectedResolverCaseCount,
+  expectedOrderingCaseCount: fixture.expectedOrderingCaseCount,
+  generatedAt: new Date().toISOString(),
+};
+writeFileSync(
+  resolve(here, '../src/services/review/__fixtures__/recommendationTruthTable.lock.json'),
+  JSON.stringify(lock, null, 2) + '\n',
+);
 
 // Only the fields the SQL resolver takes, so the payload stays small; the
 // values themselves are untouched fixture data.
 const payload = {
   declared: fixture.expectedResolverCaseCount,
+  sha256: hash,
   cases: fixture.resolverCases.map((c, i) => ({
     i,
     e: c.envelope,
@@ -47,7 +71,8 @@ const payload = {
 
 const literal = JSON.stringify(payload).replaceAll("'", "''");
 
-process.stdout.write(`with fixture as (select '${literal}'::jsonb f),
+process.stdout.write(`-- recommendation parity; fixture sha256 ${hash}
+with fixture as (select '${literal}'::jsonb f),
 cases as (
   select (c->>'i')::int idx,
          case when jsonb_typeof(c->'e')='null' then null else c->'e' end env,
