@@ -107,4 +107,10 @@ Stage 3 items only: the "Would you still recommend it?" timeline question, `auto
 
 ## Report and stop
 
+Two reports, two stops:
+
+1. **Stage 1 close-out report** after Step 0 — resolver + shared-fixture parity, concurrency results from real parallel sessions, the real role-session privilege matrix, roadmap/verification-doc updates, and any item still UNVERIFIED. Work pauses here for your review; Stage 2 does not begin on an incomplete Stage 1.
+2. **Stage 2 report** after Steps 1–4 — registry lint output, test results including the end-to-end materialization test, and confirmation that no Stage 3 timeline UI was included. Stage 3 does not begin until you review it.
+
+
 Stage 2 ends with a report: Stage 1 close-out results (including anything still UNVERIFIED), registry lint output, test results, and confirmation that no Stage 3 timeline UI was included. Stage 3 does not begin until you review it.
