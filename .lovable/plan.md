@@ -33,8 +33,10 @@ action goes away.
   - **Untouched / cleared / skipped → SQL `NULL`** (column omitted). The update makes no
     recommendation statement; the previous non-null timeline intent stays authoritative.
   - **Yes / Maybe / No → explicit timeline statement.**
-  - **"Use my rating instead" → `auto`.** Only this deliberate action neutralizes earlier
-    explicit intent, resolving to `{ intent: null, source: 'rating_inferred' }`.
+  - **"Base recommendation on rating" → `auto`.** Only this deliberate action neutralizes
+    earlier explicit intent, resolving to `{ intent: null, source: 'rating_inferred' }`.
+    (The label says "rating" because the resolver uses the effective rating —
+    `latest_rating` when present, otherwise `rating`.)
 - Tapping a selected chip again clears back to unanswered → `NULL`. It must never become `auto`.
 - The column is already nullable and the SQL ordering function already filters nulls out, so
   no migration is needed.
