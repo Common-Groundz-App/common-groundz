@@ -17,6 +17,7 @@
  *   rendered by the existing `FoodTagSelector` (unchanged).
  */
 import { CANONICAL_ENTITY_TYPES, type CanonicalEntityType } from '@/services/entityType';
+import type { CuratedTagSet } from './vocabularies';
 
 /**
  * Field kinds the registry may declare. The renderer implements the kinds that
