@@ -150,5 +150,10 @@ action goes away.
 
 ## Stop point
 
-Implement Stage 3 only. Report the changes and every verification result separately, naming
-any check that could not be executed, then stop for review before Phase 3D.
+Implement Stage 3 only, then stop before Phase 3D. The report will list: files and identifiers
+changed; the final `addReviewUpdate` signature and payload behaviour; evidence that skipped and
+cleared answers omit the column and that only the reset sends `auto`; source-copy tests
+including unavailable and partial data; per-entry `NULL`/`auto` display tests; undo status,
+refetch and parent-review-refresh tests; every removed Convert identifier plus confirmation no
+call sites remain; full Vitest and build results; the remaining UNVERIFIED integration and
+concurrency items; and confirmation that Phase 3D was not started.
