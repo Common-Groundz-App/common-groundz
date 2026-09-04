@@ -64,25 +64,29 @@ action goes away.
 - Read the answer through the existing `resolveRecommendationForReview` wrapper (the TS mirror
   of the SQL resolver) — never by re-deriving a rule locally, and never by trusting a
   hand-written threshold.
-- **No N+1.** Source copy is shown only on surfaces that already hold the review's timeline
-  events (the timeline viewer / review detail). No per-card timeline query is added to feeds or
-  profile grids; those surfaces keep their existing recommendation display untouched until the
-  data can be supplied by an existing efficient query.
-- **Failure-aware and completeness-aware.** The helper takes an explicit provenance-knowledge
-  flag, not a "did something load" boolean. It may claim a source only when the caller has
-  authoritative knowledge of the latest non-null timeline intent — meaning the caller holds the
-  review's *complete* timeline history, or was given that latest intent event separately.
-  A partial page is not enough: twenty loaded `NULL` rows do not overrule an unloaded older
-  `no`, and treating them as such would print a confident lie.
-  When the fetch failed, is still loading, or is known-partial, the UI renders the
-  DB-materialized `is_recommended` with no provenance claim at all.
-  Today `fetchReviewUpdates` selects every row for the review with no range or limit, so the
-  viewer's data is complete — the flag is set from that fact explicitly (and a test asserts the
-  fetch is unpaginated), so that adding pagination later fails loudly instead of silently
-  degrading the copy into a lie.
+- **Provenance comes from a dedicated latest-intent query, not from the visible list.**
+  A new service call selects the single newest intent-bearing row:
+  `where review_id = ? and would_recommend is not null order by created_at desc, id desc limit 1`.
+  It returns three distinct states — `found` (with the event), `none` (no intent-bearing row
+  exists), and `error`. This replaces the earlier "the loaded array is the whole history"
+  assumption, which was unsafe: PostgREST enforces a server-side max-rows cap, so a response can
+  be truncated even though the client called neither `.limit()` nor `.range()`. With a `LIMIT 1`
+  lookup, completeness of the visible list stops mattering for correctness.
+- **Deterministic ordering fix.** `fetchReviewUpdates` currently orders by `created_at` only.
+  Add `id` descending as the secondary order so the visible list, the SQL resolver, the TS mirror
+  and the undo RPC all agree on which entry is newest when timestamps tie.
+- **Failure-aware.** Source copy may be claimed only on the `found`/`none` states. On `error`
+  (or while loading) the UI renders the DB-materialized `is_recommended` with no provenance claim
+  at all — never "from your original answer" or "inferred from your rating", because an unread
+  timeline event may be the authoritative one.
+- **No N+1.** Both the timeline fetch and this lookup happen only on surfaces that open a single
+  review (the timeline viewer / review detail). No per-card query is added to feeds or profile
+  grids; those surfaces keep their existing recommendation display untouched.
 - Per-entry display inside the viewer is literal, not resolved: `yes|maybe|no` show the recorded
-  answer, `auto` shows the reset wording, and `NULL` shows nothing — a null row must never look
-  like it made a statement.
+  answer, `auto` shows event wording ("Recommendation based on rating" — distinct from the
+  action label "Base recommendation on rating", so an old entry doesn't read like a button), and
+  `NULL` shows nothing — a null row must never look like it made a statement.
+
 
 ## Step 4 — undo latest update
 
