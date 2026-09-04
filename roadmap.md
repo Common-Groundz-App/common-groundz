@@ -20,26 +20,26 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
 - [x] Forward-compatibility: unknown questionnaire data is never rendered and never destroyed
 - [x] Legacy category-mismatch reviews stay in compatibility mode until the subject is reselected
 
-### Stage 1 — database foundation (not started)
-- [ ] `would_recommend` column, check constraint, partial index on `review_updates`
-- [ ] INSERT authorization requires review ownership; drop ordinary UPDATE/DELETE
-- [ ] Server-owned chronology (client `created_at` overwritten, not rejected)
-- [ ] Shared per-review advisory lock helper; insert path locks before mutating
-- [ ] Atomic owner LIFO undo RPC with expected-update conflict result
-- [ ] `service_role`-only maintenance removal path
-- [ ] Function privilege hardening: REVOKE PUBLIC, explicit GRANTs, privilege tests
-- [ ] Shared post-mutation recompute function; recursion-safe trigger gating
-- [ ] Pure SQL/TS recommendation resolver + review-aware wrapper, one shared fixture
+### Stage 1 — database foundation (delivered and reviewed)
+- [x] `would_recommend` column, check constraint, partial index on `review_updates`
+- [x] INSERT authorization requires review ownership; drop ordinary UPDATE/DELETE
+- [x] Server-owned chronology (client `created_at` overwritten, not rejected)
+- [x] Shared per-review advisory lock helper; insert path locks before mutating
+- [x] Atomic owner LIFO undo RPC with expected-update conflict result
+- [x] `service_role`-only maintenance removal path
+- [x] Function privilege hardening: REVOKE PUBLIC, explicit GRANTs, privilege tests
+- [x] Shared post-mutation recompute function; recursion-safe trigger gating
+- [x] Pure SQL/TS recommendation resolver + review-aware wrapper, one shared fixture
       (frozen output contract: `source` is `timeline_explicit | review_explicit |
       rating_inferred`; a latest `auto` event resolves to `intent: null`,
       `source: rating_inferred` — `auto` stays historical event data, never resolved intent)
-- [ ] Explicit `OWNER TO postgres` on every privileged/internal function (definer chain
+- [x] Explicit `OWNER TO postgres` on every privileged/internal function (definer chain
       documented in SQL, not assumed from the migration runner)
-- [ ] Maintenance RPC re-checks the target row under the advisory lock and verifies the
+- [x] Maintenance RPC re-checks the target row under the advisory lock and verifies the
       deleted row count, so a lost race returns `not_found`, never a false `deleted`
-- [ ] Trigger consolidation with whole-dataset and concurrency regression checks
-- [ ] Explicitly assert RLS is enabled on `review_updates` in the authorization tests
-- [ ] Test-harness rules: no `SET ROLE` inside a `SECURITY DEFINER` harness (role/privilege
+- [x] Trigger consolidation with whole-dataset and concurrency regression checks
+- [x] Explicitly assert RLS is enabled on `review_updates` in the authorization tests
+- [x] Test-harness rules: no `SET ROLE` inside a `SECURITY DEFINER` harness (role/privilege
       denial must be attempted from a real session running as that role); one correctly
       typed scalar `SELECT ... INTO` per assertion; direct UPDATE/DELETE inside the harness
       is labelled test-only fixture manipulation; chronology asserts the client value did
@@ -49,21 +49,23 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
       confirmed to exist and match the review category before running; the harness and its
       results table are dropped once evidence is captured, so no permanent privileged
       surface remains
+- [x] Strict envelope `version`: JSON numeric `1` only; string `"1"` is malformed and must
+      resolve as *absent* (fix SQL resolver, TS resolver and shared fixture together)
+- [x] SQL parity consumes `recommendationTruthTable.json` through the committed
+      generator at run time — never a hand-copied JSON blob inside a migration
+- [x] Label `SET LOCAL ROLE` checks as *database-role privilege* tests, not real Supabase
+      sessions; verify sanctioned owner INSERT / owner undo / non-owner INSERT denial from a
+      genuine authenticated session (`auth.uid()` present) or report them UNVERIFIED
+- [x] Close-out evidence table stays temporary, no `PUBLIC` SELECT, dropped after capture
 
 - [ ] Advisory-lock concurrency (insert vs undo, undo vs undo, maintenance vs undo, two
       different reviews) requires independent parallel sessions — never reported as passing
       on the strength of the single-session self-test
-
-- [ ] Strict envelope `version`: JSON numeric `1` only; string `"1"` is malformed and must
-      resolve as *absent* (fix SQL resolver, TS resolver and shared fixture together)
-- [ ] SQL parity must consume `recommendationTruthTable.json` through the committed
-      generator at run time — never a hand-copied JSON blob inside a migration
-- [ ] Label `SET LOCAL ROLE` checks as *database-role privilege* tests, not real Supabase
-      sessions; verify sanctioned owner INSERT / owner undo / non-owner INSERT denial from a
-      genuine authenticated session (`auth.uid()` present) or report them UNVERIFIED
-- [ ] Close-out evidence table stays temporary, no `PUBLIC` SELECT, dropped after capture
+- [ ] Authenticated owner INSERT / owner undo / non-owner INSERT denial via real Supabase
+      session (`auth.uid()` present)
 
 - [ ] Regenerate Supabase types
+
 
 
 
