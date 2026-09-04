@@ -12,9 +12,11 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
   about whether the story was good; `compelling_story` does. Any tag marked
   `positive` must carry the judgement in the id and the label itself.
 - **`sentiment`** (`positive | neutral | negative`) is registry metadata only —
-  never persisted in `metadata.questionnaire`. `neutral` is for
-  preference-dependent traits (crowded, challenging, slow burn, fast-paced) that are
-  a plus for some readers and a minus for others.
+  never persisted in `metadata.questionnaire`. `neutral` is reserved for traits that
+  are a genuine plus for some people and a minus for others (crowded, challenging,
+  slow burn, fast-paced, premium pricing, subscription required). Friction that
+  nobody prefers is `negative` even when mild (hard to find, limited range, hard to
+  book) — it is a drawback, not a matter of taste.
 - **Tag identity is composite: `(type, field id, tag id)`.** The same string in two
   vocabularies is two distinct tags. Cross-type aggregation requires an explicit
   shared-definitions map, never string reuse.
@@ -26,8 +28,12 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 - Every vocabulary carries a few high-signal negatives — a wall of praise chips is
   useless as decision evidence.
 - **`food` has no generic `stood_out`.** Food Tags (13 existing tags,
-  `metadata.food_tags`) already are food's "what stood out"; food asks
-  `would_recommend` + `repeat_intent` + Food Tags + `portion` and nothing else.
+  `metadata.food_tags`) already are food's "what stood out". Food has **no
+  additional type-specific questionnaire fields** beyond `would_recommend`,
+  `repeat_intent`, the existing Food Tags and `portion`. The common review-shell
+  fields (rating, headline, thoughts, media, experience date, visibility) still
+  apply to food exactly as they do to every other type.
+
 
 ## `stood_out` vocabularies
 
@@ -43,7 +49,7 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | `helpful_staff` | Helpful staff | 💡 | positive |
 | `quiet` | Quiet | 🤫 | neutral |
 | `crowded` | Crowded | 👥 | neutral |
-| `hard_to_find` | Hard to find | 🧭 | neutral |
+| `hard_to_find` | Hard to find | 🧭 | negative |
 | `long_wait` | Long wait | ⏳ | negative |
 | `overpriced` | Overpriced | 💸 | negative |
 | `poor_upkeep` | Poorly maintained | 🧹 | negative |
@@ -76,7 +82,7 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | `easy_returns` | Easy returns | ↩️ | positive |
 | `wide_range` | Wide range | 🧺 | positive |
 | `premium_pricing` | Premium pricing | 💎 | neutral |
-| `limited_range` | Limited range | 📉 | neutral |
+| `limited_range` | Limited range | 📉 | negative |
 | `inconsistent_quality` | Inconsistent quality | 🎲 | negative |
 | `slow_support` | Slow support | 🐢 | negative |
 | `misleading_claims` | Misleading claims | 🚩 | negative |
@@ -207,7 +213,7 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | `thorough` | Thorough | 🔍 | positive |
 | `respects_time` | Respects your time | ⏰ | positive |
 | `direct_style` | Very direct | ➡️ | neutral |
-| `hard_to_book` | Hard to book | 🗓️ | neutral |
+| `hard_to_book` | Hard to book | 🗓️ | negative |
 | `slow_to_respond` | Slow to respond | 🐢 | negative |
 | `unclear_communication` | Unclear communication | 🌫️ | negative |
 | `didnt_follow_through` | Didn't follow through | 📆 | negative |
@@ -303,3 +309,17 @@ Ids repeated across types (`easy_to_use`, `crowded`, `worth_the_price`,
 convenient for readers but carry **no** cross-type meaning on their own: identity
 stays `(type, field id, tag id)`, and any deliberate cross-type rollup must be
 declared in the shared-definitions map.
+
+## Freeze and validation
+
+- **Stage 0 freezes this specification manually.** No docs validator exists and none
+  will be built: this file is the source of truth as written, from the moment Stage 0
+  is declared complete.
+- **Stage 2 proves the implementation matches it.** A registry lint test lands with
+  the registry entries and asserts the shipped vocabularies match **this** document
+  exactly — every tag id, every sentiment, and the per-type tag count in each
+  heading.
+- **Any divergence found by that test is a Stage 2 implementation bug**, not a licence
+  to edit this file. Changing a shipped id requires a data migration and an explicit
+  new decision; labels and emojis remain freely reworded.
+

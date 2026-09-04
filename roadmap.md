@@ -10,7 +10,8 @@
 
 ## Phase 3C — implementation
 
-### Stage 0 — freeze the data contract (docs only)
+### Stage 0 — freeze the data contract (docs only) — FROZEN
+Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registry lint must match it exactly.
 - [x] Evaluative tag ids/labels; preference-dependent traits stay neutral
 - [x] Tag identity is composite `(type, field id, tag id)`; no global ontology
 - [x] Food excluded from generic `stood_out` (Food Tags already fill that role)
