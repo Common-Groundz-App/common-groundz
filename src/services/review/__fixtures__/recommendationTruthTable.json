@@ -1,0 +1,267 @@
+{
+  "contractVersion": 1,
+  "note": "Single source of truth for recommendation resolution. Consumed directly by the Vitest suite (src/services/review/__tests__/recommendationResolver.test.ts) AND by the SQL harness, which feeds every resolverCase to public.resolve_review_recommendation and compares the same expected values. Never hand-copy these cases into a SQL VALUES list.",
+  "expectedResolverCaseCount": 24,
+  "expectedOrderingCaseCount": 8,
+  "resolverCases": [
+    {
+      "name": "no envelope, no timeline, high rating -> inferred recommended",
+      "envelope": null,
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 4.5,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": true }
+    },
+    {
+      "name": "no envelope, no timeline, low rating -> inferred not recommended",
+      "envelope": null,
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 3.5,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": false }
+    },
+    {
+      "name": "rating exactly at the threshold -> recommended",
+      "envelope": null,
+      "category": "product",
+      "latestIntent": null,
+      "effectiveRating": 4,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": true }
+    },
+    {
+      "name": "null rating is treated as 0, not as recommended",
+      "envelope": null,
+      "category": "product",
+      "latestIntent": null,
+      "effectiveRating": null,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": false }
+    },
+    {
+      "name": "envelope yes beats a low rating",
+      "envelope": { "version": 1, "type": "movie", "answers": { "would_recommend": "yes" } },
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 1,
+      "expected": { "intent": "yes", "source": "review_explicit", "isRecommended": true }
+    },
+    {
+      "name": "envelope no beats a high rating",
+      "envelope": { "version": 1, "type": "movie", "answers": { "would_recommend": "no" } },
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 5,
+      "expected": { "intent": "no", "source": "review_explicit", "isRecommended": false }
+    },
+    {
+      "name": "envelope maybe is explicit but not a recommendation",
+      "envelope": { "version": 1, "type": "place", "answers": { "would_recommend": "maybe" } },
+      "category": "place",
+      "latestIntent": null,
+      "effectiveRating": 5,
+      "expected": { "intent": "maybe", "source": "review_explicit", "isRecommended": false }
+    },
+    {
+      "name": "envelope version 2 is unsupported -> absent, falls back to rating",
+      "envelope": { "version": 2, "type": "movie", "answers": { "would_recommend": "no" } },
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 5,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": true }
+    },
+    {
+      "name": "envelope version as text \"1\" is accepted (SQL compares ->> as text)",
+      "envelope": { "version": "1", "type": "movie", "answers": { "would_recommend": "no" } },
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 5,
+      "expected": { "intent": "no", "source": "review_explicit", "isRecommended": false }
+    },
+    {
+      "name": "envelope type mismatch -> compatibility mode, never read",
+      "envelope": { "version": 1, "type": "food", "answers": { "would_recommend": "no" } },
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 5,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": true }
+    },
+    {
+      "name": "envelope answers missing -> absent",
+      "envelope": { "version": 1, "type": "movie" },
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 2,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": false }
+    },
+    {
+      "name": "envelope answers is an array, not an object -> absent",
+      "envelope": { "version": 1, "type": "movie", "answers": ["yes"] },
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 2,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": false }
+    },
+    {
+      "name": "garbage would_recommend value -> absent, never false",
+      "envelope": { "version": 1, "type": "movie", "answers": { "would_recommend": "sure" } },
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 5,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": true }
+    },
+    {
+      "name": "would_recommend null inside a valid envelope -> absent",
+      "envelope": { "version": 1, "type": "movie", "answers": { "would_recommend": null } },
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 1,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": false }
+    },
+    {
+      "name": "envelope is a JSON array -> absent",
+      "envelope": [1, 2, 3],
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 4,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": true }
+    },
+    {
+      "name": "envelope is a JSON string -> absent",
+      "envelope": "questionnaire",
+      "category": "movie",
+      "latestIntent": null,
+      "effectiveRating": 1,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": false }
+    },
+    {
+      "name": "timeline yes beats an envelope no",
+      "envelope": { "version": 1, "type": "movie", "answers": { "would_recommend": "no" } },
+      "category": "movie",
+      "latestIntent": "yes",
+      "effectiveRating": 1,
+      "expected": { "intent": "yes", "source": "timeline_explicit", "isRecommended": true }
+    },
+    {
+      "name": "timeline no beats an envelope yes",
+      "envelope": { "version": 1, "type": "movie", "answers": { "would_recommend": "yes" } },
+      "category": "movie",
+      "latestIntent": "no",
+      "effectiveRating": 5,
+      "expected": { "intent": "no", "source": "timeline_explicit", "isRecommended": false }
+    },
+    {
+      "name": "timeline maybe is explicit, not recommended",
+      "envelope": null,
+      "category": "book",
+      "latestIntent": "maybe",
+      "effectiveRating": 5,
+      "expected": { "intent": "maybe", "source": "timeline_explicit", "isRecommended": false }
+    },
+    {
+      "name": "latest auto discards the envelope answer and falls back to rating (high)",
+      "envelope": { "version": 1, "type": "movie", "answers": { "would_recommend": "no" } },
+      "category": "movie",
+      "latestIntent": "auto",
+      "effectiveRating": 4.5,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": true }
+    },
+    {
+      "name": "latest auto with a low rating -> not recommended",
+      "envelope": { "version": 1, "type": "movie", "answers": { "would_recommend": "yes" } },
+      "category": "movie",
+      "latestIntent": "auto",
+      "effectiveRating": 2,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": false }
+    },
+    {
+      "name": "latest auto with a null rating -> not recommended",
+      "envelope": null,
+      "category": "movie",
+      "latestIntent": "auto",
+      "effectiveRating": null,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": false }
+    },
+    {
+      "name": "null category with a typed envelope -> absent (no category to match)",
+      "envelope": { "version": 1, "type": "movie", "answers": { "would_recommend": "yes" } },
+      "category": null,
+      "latestIntent": null,
+      "effectiveRating": 1,
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": false }
+    },
+    {
+      "name": "food envelope with extra answers resolves on would_recommend only",
+      "envelope": {
+        "version": 1,
+        "type": "food",
+        "answers": { "would_recommend": "yes", "portion": "generous", "repeat_intent": "yes" }
+      },
+      "category": "food",
+      "latestIntent": null,
+      "effectiveRating": 1,
+      "expected": { "intent": "yes", "source": "review_explicit", "isRecommended": true }
+    }
+  ],
+  "orderingCases": [
+    {
+      "name": "no updates -> null",
+      "updates": [],
+      "expected": null
+    },
+    {
+      "name": "updates without intent are ignored",
+      "updates": [
+        { "id": "00000000-0000-4000-8000-000000000001", "created_at": "2026-01-01T00:00:00Z", "would_recommend": null }
+      ],
+      "expected": null
+    },
+    {
+      "name": "newest created_at wins regardless of array order",
+      "updates": [
+        { "id": "00000000-0000-4000-8000-000000000001", "created_at": "2026-01-01T00:00:00Z", "would_recommend": "no" },
+        { "id": "00000000-0000-4000-8000-000000000002", "created_at": "2026-03-01T00:00:00Z", "would_recommend": "yes" },
+        { "id": "00000000-0000-4000-8000-000000000003", "created_at": "2026-02-01T00:00:00Z", "would_recommend": "maybe" }
+      ],
+      "expected": "yes"
+    },
+    {
+      "name": "identical timestamps tie-break on id DESC",
+      "updates": [
+        { "id": "00000000-0000-4000-8000-00000000000a", "created_at": "2026-01-01T00:00:00Z", "would_recommend": "no" },
+        { "id": "00000000-0000-4000-8000-00000000000b", "created_at": "2026-01-01T00:00:00Z", "would_recommend": "yes" }
+      ],
+      "expected": "yes"
+    },
+    {
+      "name": "identical timestamps tie-break is stable when reversed",
+      "updates": [
+        { "id": "00000000-0000-4000-8000-00000000000b", "created_at": "2026-01-01T00:00:00Z", "would_recommend": "yes" },
+        { "id": "00000000-0000-4000-8000-00000000000a", "created_at": "2026-01-01T00:00:00Z", "would_recommend": "no" }
+      ],
+      "expected": "yes"
+    },
+    {
+      "name": "a newer auto is returned as auto, not skipped for an older explicit intent",
+      "updates": [
+        { "id": "00000000-0000-4000-8000-000000000001", "created_at": "2026-01-01T00:00:00Z", "would_recommend": "yes" },
+        { "id": "00000000-0000-4000-8000-000000000002", "created_at": "2026-02-01T00:00:00Z", "would_recommend": "auto" }
+      ],
+      "expected": "auto"
+    },
+    {
+      "name": "an older auto does not override a newer explicit intent",
+      "updates": [
+        { "id": "00000000-0000-4000-8000-000000000001", "created_at": "2026-01-01T00:00:00Z", "would_recommend": "auto" },
+        { "id": "00000000-0000-4000-8000-000000000002", "created_at": "2026-02-01T00:00:00Z", "would_recommend": "no" }
+      ],
+      "expected": "no"
+    },
+    {
+      "name": "intent-bearing rows are selected past null rows",
+      "updates": [
+        { "id": "00000000-0000-4000-8000-000000000003", "created_at": "2026-05-01T00:00:00Z", "would_recommend": null },
+        { "id": "00000000-0000-4000-8000-000000000002", "created_at": "2026-02-01T00:00:00Z", "would_recommend": "maybe" }
+      ],
+      "expected": "maybe"
+    }
+  ]
+}

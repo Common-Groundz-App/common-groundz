@@ -52,6 +52,7 @@ const nodeIncludes = [
   'src/components/profile/reviews/__tests__/questionnaireResolution.test.ts',
 
   'src/services/__tests__/offeringPairParity.test.ts',
+  'src/services/review/__tests__/recommendationResolver.test.ts',
 ];
 
 
