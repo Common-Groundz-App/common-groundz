@@ -68,10 +68,18 @@ action goes away.
   events (the timeline viewer / review detail). No per-card timeline query is added to feeds or
   profile grids; those surfaces keep their existing recommendation display untouched until the
   data can be supplied by an existing efficient query.
-- **Failure-aware.** The helper takes an explicit timeline-availability state
-  (`loaded | unavailable`). When the timeline fetch failed or has not loaded, it renders the
-  DB-materialized `is_recommended` with no provenance claim — never "from your original answer"
-  or "inferred from your rating", because an unread timeline event may be the authoritative one.
+- **Failure-aware and completeness-aware.** The helper takes an explicit provenance-knowledge
+  flag, not a "did something load" boolean. It may claim a source only when the caller has
+  authoritative knowledge of the latest non-null timeline intent — meaning the caller holds the
+  review's *complete* timeline history, or was given that latest intent event separately.
+  A partial page is not enough: twenty loaded `NULL` rows do not overrule an unloaded older
+  `no`, and treating them as such would print a confident lie.
+  When the fetch failed, is still loading, or is known-partial, the UI renders the
+  DB-materialized `is_recommended` with no provenance claim at all.
+  Today `fetchReviewUpdates` selects every row for the review with no range or limit, so the
+  viewer's data is complete — the flag is set from that fact explicitly (and a test asserts the
+  fetch is unpaginated), so that adding pagination later fails loudly instead of silently
+  degrading the copy into a lie.
 - Per-entry display inside the viewer is literal, not resolved: `yes|maybe|no` show the recorded
   answer, `auto` shows the reset wording, and `NULL` shows nothing — a null row must never look
   like it made a statement.
