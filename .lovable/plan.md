@@ -101,18 +101,63 @@ fixture so SQL and TS cannot drift. Source is derived on demand, never cached.
 - Privilege tests assert `anon` and `authenticated` cannot call the internals or the
   maintenance path.
 
-### 8. Verification before Stage 2 starts
-- Whole-dataset drift check: resolved `is_recommended` matches the stored column for
-  every existing review (expected: 0 deviations, since no `would_recommend` data
-  exists yet).
-- Authorization: insert onto someone else's review fails; direct UPDATE/DELETE fails.
-- LIFO: undoing the newest succeeds; undoing the 3rd of 5 returns `conflict`;
-  stale `p_expected_update_id` returns `conflict`.
-- Recompute: deleting the only update sets `has_timeline = false`, `timeline_count = 0`,
-  `latest_rating = null`, and `is_recommended` back to the rating rule.
-- Chronology: a client-supplied `created_at` does not survive.
-- Privilege: internals unreachable from `anon`/`authenticated`.
-- Regenerate `src/integrations/supabase/types.ts` after the migration.
+### 8. Verification before Stage 2 starts (v5 coverage restored)
+
+**Whole-dataset before/after parity.** Snapshot every existing review
+(`review_id, is_recommended, trust_score, latest_rating, timeline_count,
+has_timeline`) immediately before the migration and again after, and prove **zero**
+differences. Deploying the migration must not touch a single existing row.
+
+**Stage 1 is not a backfill.** The known sticky `has_timeline` rows are repaired only
+when a later timeline mutation recomputes that review. Any pre-existing inconsistency
+found by the snapshot is **reported, not silently corrected**; repairing historical
+data would be a separate, explicit decision.
+
+**Resolver parity.** Resolved `is_recommended` matches the stored column for every
+existing review (expected 0 deviations — no `would_recommend` data exists yet), and
+the shared truth-table fixture is green in both Vitest and the SQL/Deno runner.
+
+**Deterministic ordering.** A fixture with two timeline rows sharing an identical
+`created_at` proves the SQL resolver, the TypeScript resolver and the LIFO undo all
+select the same row under `created_at DESC, id DESC`.
+
+**Authorization.**
+- Insert onto another user's review is denied.
+- Direct `UPDATE` is denied; direct single-row `DELETE` is denied; bulk
+  `DELETE ... WHERE review_id = ...` is denied.
+- A test sets plausible guessed guard settings (e.g. `set_config` of any
+  timeline-looking custom GUC) and proves it still cannot perform a direct
+  `UPDATE`/`DELETE` — the privilege boundary is unaffected by session state.
+
+**LIFO.** Undoing the newest returns `deleted` and rolls derived state back exactly one
+step; undoing the 3rd of 5 returns `conflict`; a stale `p_expected_update_id` returns
+`conflict` with the current `latestUpdateId` and deletes nothing; undoing an `auto` row
+restores the previous explicit intent; undoing the last remaining update makes the
+original envelope answer authoritative again.
+
+**Concurrency** (the reason the advisory lock exists):
+- insert vs undo on the same review — serialized, aggregates consistent;
+- two simultaneous undos on the same review — one `deleted`, one `conflict`;
+- maintenance removal vs owner undo on the same review — serialized, consistent;
+- mutations on two different reviews — proceed in parallel, no cross-blocking.
+
+**Recompute.** Deleting the only update sets `has_timeline = false`,
+`timeline_count = 0`, `latest_rating = null` and `is_recommended` back to the rating
+rule; deleting the latest *rated* update falls `latest_rating` back to the previous
+rated update (or null); an unrelated-column update on `reviews` produces exactly one
+recomputation (no recursion).
+
+**Chronology.** A client-supplied `created_at` does not survive; the persisted value is
+server-generated. Old clients omitting `would_recommend` still insert successfully.
+
+**Privilege.** `anon` and `authenticated` cannot execute the recompute function, the
+lock helper, the resolver internals or the maintenance RPC; only `authenticated`
+reaches the undo RPC and only `service_role` reaches maintenance.
+
+Finally: regenerate `src/integrations/supabase/types.ts`, then **stop** and report the
+migration, parity, authorization, privilege, resolver, recompute and concurrency
+results before Stage 2 begins.
+
 
 ## Out of scope for Stage 1
 
