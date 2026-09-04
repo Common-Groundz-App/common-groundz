@@ -64,25 +64,29 @@ action goes away.
 - Read the answer through the existing `resolveRecommendationForReview` wrapper (the TS mirror
   of the SQL resolver) — never by re-deriving a rule locally, and never by trusting a
   hand-written threshold.
-- **No N+1.** Source copy is shown only on surfaces that already hold the review's timeline
-  events (the timeline viewer / review detail). No per-card timeline query is added to feeds or
-  profile grids; those surfaces keep their existing recommendation display untouched until the
-  data can be supplied by an existing efficient query.
-- **Failure-aware and completeness-aware.** The helper takes an explicit provenance-knowledge
-  flag, not a "did something load" boolean. It may claim a source only when the caller has
-  authoritative knowledge of the latest non-null timeline intent — meaning the caller holds the
-  review's *complete* timeline history, or was given that latest intent event separately.
-  A partial page is not enough: twenty loaded `NULL` rows do not overrule an unloaded older
-  `no`, and treating them as such would print a confident lie.
-  When the fetch failed, is still loading, or is known-partial, the UI renders the
-  DB-materialized `is_recommended` with no provenance claim at all.
-  Today `fetchReviewUpdates` selects every row for the review with no range or limit, so the
-  viewer's data is complete — the flag is set from that fact explicitly (and a test asserts the
-  fetch is unpaginated), so that adding pagination later fails loudly instead of silently
-  degrading the copy into a lie.
+- **Provenance comes from a dedicated latest-intent query, not from the visible list.**
+  A new service call selects the single newest intent-bearing row:
+  `where review_id = ? and would_recommend is not null order by created_at desc, id desc limit 1`.
+  It returns three distinct states — `found` (with the event), `none` (no intent-bearing row
+  exists), and `error`. This replaces the earlier "the loaded array is the whole history"
+  assumption, which was unsafe: PostgREST enforces a server-side max-rows cap, so a response can
+  be truncated even though the client called neither `.limit()` nor `.range()`. With a `LIMIT 1`
+  lookup, completeness of the visible list stops mattering for correctness.
+- **Deterministic ordering fix.** `fetchReviewUpdates` currently orders by `created_at` only.
+  Add `id` descending as the secondary order so the visible list, the SQL resolver, the TS mirror
+  and the undo RPC all agree on which entry is newest when timestamps tie.
+- **Failure-aware.** Source copy may be claimed only on the `found`/`none` states. On `error`
+  (or while loading) the UI renders the DB-materialized `is_recommended` with no provenance claim
+  at all — never "from your original answer" or "inferred from your rating", because an unread
+  timeline event may be the authoritative one.
+- **No N+1.** Both the timeline fetch and this lookup happen only on surfaces that open a single
+  review (the timeline viewer / review detail). No per-card query is added to feeds or profile
+  grids; those surfaces keep their existing recommendation display untouched.
 - Per-entry display inside the viewer is literal, not resolved: `yes|maybe|no` show the recorded
-  answer, `auto` shows the reset wording, and `NULL` shows nothing — a null row must never look
-  like it made a statement.
+  answer, `auto` shows event wording ("Recommendation based on rating" — distinct from the
+  action label "Base recommendation on rating", so an old entry doesn't read like a button), and
+  `NULL` shows nothing — a null row must never look like it made a statement.
+
 
 ## Step 4 — undo latest update
 
@@ -118,16 +122,22 @@ action goes away.
 
 - Unit tests for the new intent option constant (values match the DB check constraint's
   allowed set) and for the source-copy helper across all three sources, the `intent: null`
-  case, the failed/loading state, and the known-partial state (both: no provenance claim).
+  case, and the `error`/loading state (no provenance claim).
 - Payload tests for the three states: chip selected → that value; question skipped → column
   omitted / `NULL`; chip selected then tapped again → omitted / `NULL`; reset action → `auto`.
 - Regression coverage for the corrected precedence, driven through the existing resolver:
   `no` then `NULL` still resolves `no` / `timeline_explicit`; `no` then `auto` resolves
   `intent: null` / `rating_inferred`.
-- Per-entry display test: `NULL` renders no recommendation statement, `auto` renders the reset
-  wording.
-- A test asserting `fetchReviewUpdates` issues no `range`/`limit`, so the completeness flag the
-  source copy relies on stays true.
+- Per-entry display test: `NULL` renders no recommendation statement, `auto` renders the event
+  wording (not the action label).
+- Latest-intent lookup tests, replacing the withdrawn "no range/limit means complete" test:
+  the query filters nulls, orders `created_at DESC, id DESC` with `LIMIT 1`, breaks equal
+  timestamps deterministically, maps its three outcomes (`found` / `none` / `error`) distinctly,
+  and yields the same answer regardless of how much of the visible timeline is loaded
+  (pagination independence).
+- Ordering test: `fetchReviewUpdates` orders by `created_at` then `id`, both descending, and the
+  entry the UI offers Undo on is the first item under that canonical ordering — not whatever
+  array order arrived.
 - Undo status mapping tested for all three RPC statuses, including that a `conflict` triggers
   a refetch and no optimistic removal, and that the parent review is refreshed in all three.
 - Full Vitest run plus a build check.
@@ -141,12 +151,15 @@ action goes away.
   means "this update made no recommendation statement" and the SQL ordering function filters
   those rows out. No migration is required for Stage 3.
 - Ordering for "latest" and "newest entry" is `created_at DESC, id DESC` everywhere — the same
-  ordering the SQL function, the TS mirror, and the undo RPC use.
+  ordering the SQL function, the TS mirror, and the undo RPC use. The visible-list query is
+  corrected to include the `id` tie-break as part of this step.
+- Provenance never depends on how many timeline rows the client happens to hold: it comes from a
+  `LIMIT 1` lookup, so a PostgREST row cap cannot turn a truncated page into a false claim.
 - `created_at` is server-owned (client value overwritten by the BEFORE INSERT trigger), so the
   UI must refetch after insert rather than trusting a locally constructed row.
 - `roadmap.md` is updated at implementation time: the Stage 3 line is reworded to the corrected
-  semantics (explicit reset action, not a skipped question), and items are ticked only for what
-  the tests above actually prove.
+  semantics (explicit reset action, not a skipped question) and gains the latest-intent lookup and
+  ordering-tie-break items; items are ticked only for what the tests above actually prove.
 
 ## Stop point
 
