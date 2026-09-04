@@ -35,14 +35,12 @@ import {
   invalidSubjectMessage,
 } from './questionnaire/resolve';
 import { resolveReviewIdentity } from './questionnaire/identityPersistence';
-import { mergeReviewMetadata } from './questionnaire/metadata';
+import { buildReviewMetadataForSave } from './questionnaire/saveMetadata';
 import type { QuestionnaireAnswers } from './questionnaire/QuestionnaireSections';
 import {
-  buildQuestionnairePatch,
   hydrateQuestionnaireAnswers,
   isQuestionnaireWritable,
   readQuestionnaireEnvelope,
-  QUESTIONNAIRE_METADATA_KEY,
   type EnvelopeRead,
 } from './questionnaire/envelope';
 import type { CuratedTagAnswer } from './questionnaire/curatedTagInput';
