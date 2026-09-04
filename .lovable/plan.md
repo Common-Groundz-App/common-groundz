@@ -80,11 +80,15 @@ action goes away.
   `delete_latest_review_update(p_review_id, p_expected_update_id)`, which is already granted
   to `authenticated` and enforces ownership, takes the per-review advisory lock, and returns
   one of three statuses.
-- Map statuses to UX: `deleted` → success + refetch; `conflict` → "this is no longer the
-  newest update" + refetch (the RPC also returns the real newest id); `not_found` → the
-  entry is already gone + refetch.
+- Map statuses to UX: `deleted` → success + refetch; `conflict` → neutral copy, "A newer
+  update exists, so this one can no longer be undone" + refetch (the RPC also returns the real
+  newest id); `not_found` → the entry is already gone + refetch. No wording implies another
+  person added the newer entry — timeline INSERT is owner-scoped.
 - The action appears only on the newest entry, only for the review owner, and only through
   `requireAuth()` as the first statement of the handler. Confirmation dialog before firing.
+- All three outcomes also refresh the parent review, not just the entry list: the RPC calls
+  `recompute_review_timeline_state`, so `is_recommended`, `latest_rating`, `timeline_count`,
+  `has_timeline` and `trust_score` can all have changed.
 - Nothing else may delete timeline entries: no direct client `DELETE` is added, matching the
   Stage 1 privilege posture.
 
@@ -103,9 +107,15 @@ action goes away.
 ## Tests and verification
 
 - Unit tests for the new intent option constant (values match the DB check constraint's
-  allowed set) and for the source-copy helper across all three sources plus the
-  `intent: null` case.
-- A test asserting "not sure yet" and "question skipped" both send `auto`.
+  allowed set) and for the source-copy helper across all three sources, the `intent: null`
+  case, and the `unavailable` timeline state (no provenance claim).
+- Payload tests for the three states: chip selected → that value; question skipped → column
+  omitted / `NULL`; chip selected then tapped again → omitted / `NULL`; reset action → `auto`.
+- Regression coverage for the corrected precedence, driven through the existing resolver:
+  `no` then `NULL` still resolves `no` / `timeline_explicit`; `no` then `auto` resolves
+  `intent: null` / `rating_inferred`.
+- Per-entry display test: `NULL` renders no recommendation statement, `auto` renders the reset
+  wording.
 - Undo status mapping tested for all three RPC statuses, including that a `conflict` triggers
   a refetch and no optimistic removal.
 - Full Vitest run plus a build check.
