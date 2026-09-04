@@ -54,7 +54,17 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
       different reviews) requires independent parallel sessions — never reported as passing
       on the strength of the single-session self-test
 
+- [ ] Strict envelope `version`: JSON numeric `1` only; string `"1"` is malformed and must
+      resolve as *absent* (fix SQL resolver, TS resolver and shared fixture together)
+- [ ] SQL parity must consume `recommendationTruthTable.json` through the committed
+      generator at run time — never a hand-copied JSON blob inside a migration
+- [ ] Label `SET LOCAL ROLE` checks as *database-role privilege* tests, not real Supabase
+      sessions; verify sanctioned owner INSERT / owner undo / non-owner INSERT denial from a
+      genuine authenticated session (`auth.uid()` present) or report them UNVERIFIED
+- [ ] Close-out evidence table stays temporary, no `PUBLIC` SELECT, dropped after capture
+
 - [ ] Regenerate Supabase types
+
 
 
 ### Stage 2 — questionnaire UI + persistence (not started)
