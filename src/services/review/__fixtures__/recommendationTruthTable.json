@@ -69,13 +69,14 @@
       "expected": { "intent": null, "source": "rating_inferred", "isRecommended": true }
     },
     {
-      "name": "envelope version as text \"1\" is accepted (SQL compares ->> as text)",
+      "name": "envelope version as text '1' is malformed -> absent, falls back to rating",
       "envelope": { "version": "1", "type": "movie", "answers": { "would_recommend": "no" } },
       "category": "movie",
       "latestIntent": null,
       "effectiveRating": 5,
-      "expected": { "intent": "no", "source": "review_explicit", "isRecommended": false }
+      "expected": { "intent": null, "source": "rating_inferred", "isRecommended": true }
     },
+
     {
       "name": "envelope type mismatch -> compatibility mode, never read",
       "envelope": { "version": 1, "type": "food", "answers": { "would_recommend": "no" } },

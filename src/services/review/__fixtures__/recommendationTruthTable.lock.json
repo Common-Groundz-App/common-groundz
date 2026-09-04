@@ -1,0 +1,7 @@
+{
+  "contractVersion": 1,
+  "sha256": "ba7594aa05f6ccd53c19a8b9078b4dcad42716f8bc56c937b14e5ca140ad935c",
+  "expectedResolverCaseCount": 24,
+  "expectedOrderingCaseCount": 8,
+  "generatedAt": "2026-09-04T08:54:45.908Z"
+}

@@ -104,10 +104,11 @@ function readEnvelopeIntent(
   category: string | null | undefined,
 ): RecommendationIntent | null {
   if (!isPlainObject(envelope)) return null;
-  // Mirrors SQL's `(p_envelope->>'version') = '1'`, which is a text comparison:
-  // both the number 1 and the string "1" satisfy it.
+  // Mirrors SQL's strict numeric-version check:
+  // jsonb_typeof(p_envelope->'version') = 'number' AND (p_envelope->>'version')::numeric = 1
+  // A string "1" is malformed and must be treated as absent, never as a valid v1 answer.
   const version = envelope.version;
-  if (version !== 1 && version !== '1') return null;
+  if (typeof version !== 'number' || version !== 1) return null;
   if (typeof envelope.type !== 'string' || !category) return null;
   if (envelope.type !== category) return null;
   if (!isPlainObject(envelope.answers)) return null;
@@ -115,6 +116,7 @@ function readEnvelopeIntent(
   const candidate = envelope.answers.would_recommend;
   return isExplicitIntent(candidate) ? candidate : null;
 }
+
 
 /**
  * Pure resolver — precedence: latest timeline intent, then the review's own
