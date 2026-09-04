@@ -92,4 +92,4 @@ No Stage 3 work: no "Would you still recommend it?" timeline control, no undo-la
 
 ## Report and stop
 
-Stage 2 ends with a report: registry lint output, test results including the end-to-end materialization test, confirmation that no Stage 3 timeline UI was included, and the two Stage 1 items still UNVERIFIED. Stage 3 does not begin until you review it.
+Stage 2 ends with a report: registry lint output, unit test results, the end-to-end database materialization results (case by case, with the read-back `is_recommended` values and fixture cleanup confirmation), confirmation that no Stage 3 timeline UI was included, and the two Stage 1 items still UNVERIFIED. Stage 3 does not begin until you review it.
