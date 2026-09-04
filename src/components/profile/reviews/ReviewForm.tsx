@@ -35,14 +35,12 @@ import {
   invalidSubjectMessage,
 } from './questionnaire/resolve';
 import { resolveReviewIdentity } from './questionnaire/identityPersistence';
-import { mergeReviewMetadata } from './questionnaire/metadata';
+import { buildReviewMetadataForSave } from './questionnaire/saveMetadata';
 import type { QuestionnaireAnswers } from './questionnaire/QuestionnaireSections';
 import {
-  buildQuestionnairePatch,
   hydrateQuestionnaireAnswers,
   isQuestionnaireWritable,
   readQuestionnaireEnvelope,
-  QUESTIONNAIRE_METADATA_KEY,
   type EnvelopeRead,
 } from './questionnaire/envelope';
 import type { CuratedTagAnswer } from './questionnaire/curatedTagInput';
@@ -819,48 +817,23 @@ const ReviewForm = ({
     
     try {
       /**
-       * Phase 3A — metadata is MERGED, never replaced. Writing a fresh object
-       * here used to wipe provenance and every other stored key on a food edit.
-       * Non-object stored values are ignored rather than spread.
+       * Phase 3C Stage 2 — the metadata object is built by the one shared save
+       * helper, so verification harnesses exercise this exact code path.
        */
-      const hasFoodTagsField = questionnaireConfig.sections.some((s) =>
-        s.fields.some((f) => f.id === 'food_tags'),
-      );
+      const { metadata } = buildReviewMetadataForSave({
+        storedMetadata: review?.metadata,
+        config: questionnaireConfig,
+        category: persistedCategory,
+        questionnaireWritable,
+        effectiveEnvelope,
+        storedEnvelope,
+        choices: choiceAnswers,
+        curated: curatedAnswers,
+        touchedFieldIds: touchedQuestionnaireFields,
+        foodTags,
+        questionnaireReset,
+      });
 
-      /**
-       * Field-level dirty patching. Untouched keys — including fields this
-       * build cannot render — are carried through byte-identical; clearing the
-       * last answer removes the envelope entirely.
-       */
-      const envelopePatch = questionnaireWritable
-        ? buildQuestionnairePatch({
-            read: effectiveEnvelope,
-            category: persistedCategory,
-            config: questionnaireConfig,
-            choices: choiceAnswers,
-            curated: curatedAnswers,
-            touchedFieldIds: touchedQuestionnaireFields,
-          })
-        : ({ action: 'none' } as const);
-
-      const metadataPatch: Record<string, unknown> = {};
-      if (hasFoodTagsField) metadataPatch.food_tags = foodTags;
-      if (envelopePatch.action === 'write') {
-        metadataPatch[QUESTIONNAIRE_METADATA_KEY] = envelopePatch.envelope;
-      }
-
-      const removeKeys: string[] = [];
-      if (envelopePatch.action === 'remove') removeKeys.push(QUESTIONNAIRE_METADATA_KEY);
-      if (questionnaireReset) {
-        if (storedEnvelope.status !== 'absent') removeKeys.push(QUESTIONNAIRE_METADATA_KEY);
-        if (!hasFoodTagsField) removeKeys.push('food_tags');
-      }
-
-      const metadata = mergeReviewMetadata(
-        review?.metadata,
-        Object.keys(metadataPatch).length > 0 ? metadataPatch : undefined,
-        removeKeys,
-      );
       
       // Convert Date to ISO string for API submission
       const formattedExperienceDate = experienceDate ? experienceDate.toISOString() : undefined;
