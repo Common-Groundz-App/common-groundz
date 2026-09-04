@@ -158,6 +158,21 @@ Finally: regenerate `src/integrations/supabase/types.ts`, then **stop** and repo
 migration, parity, authorization, privilege, resolver, recompute and concurrency
 results before Stage 2 begins.
 
+### 9. Three additions of my own
+
+- **Insert-path privilege check for the new column.** `would_recommend` must be
+  writable by the ordinary insert path (Stage 3 sends it), so the column-level grant is
+  verified explicitly — a table-level `REVOKE UPDATE` must not accidentally break
+  inserts that include it.
+- **Client callers left untouched but audited.** `addReviewUpdate` in
+  `src/services/review/timeline.ts` is the only insert path in the app; Stage 1 changes
+  no signature, but a test asserts it still succeeds for the review owner and now fails
+  for a non-owner. No other `src/` code writes `review_updates`.
+- **Roadmap bookkeeping.** `roadmap.md` Stage 1 checkboxes are updated to name the
+  privilege-boundary decision (table-level REVOKE, no GUC guard) and the
+  parity/concurrency acceptance set, so the frozen contract is recorded where the next
+  session will read it.
+
 
 ## Out of scope for Stage 1
 
