@@ -1,4 +1,7 @@
-# Stage 2 — questionnaire UI + persistence (with a Stage 1 close-out first)
+# Stage 1 close-out (delivered and reviewed first), then Stage 2 — questionnaire UI + persistence
+
+**Execution order is a hard boundary.** Step 0 is delivered on its own, reported, and stops for your review. Stage 2 Steps 1–4 begin only after you approve that report. If any required Stage 1 check cannot actually be executed, Stage 2 does not start — the report says so and waits for your decision.
+
 
 ## Is Stage 1 complete?
 
@@ -16,19 +19,22 @@ Open items (must not be reported as passing):
 3. **Real role-session privilege denial** was inferred from grants, not attempted from actual `anon` / `authenticated` / `service_role` sessions.
 4. `roadmap.md` Stage 1 checkboxes are still unticked.
 
-So Stage 2 starts with a short close-out, then the questionnaire work.
+So Stage 1 is closed out and reported first; Stage 2 is a separate delivery.
 
 ---
 
-## Step 0 — Stage 1 close-out
+## Step 0 — Stage 1 close-out (standalone delivery, stop for review)
 
 - `src/services/review/recommendationResolver.ts`, mirroring the SQL decision function exactly:
+
   - `lookupLatestRecommendationIntent(updates)` — **ordering only**, `created_at DESC, id DESC`, returns the newest event whose `would_recommend` is non-null (or `null`).
   - `resolveReviewRecommendation(envelope, category, latestTimelineIntent, effectiveRating)` → `{ intent, isRecommended, source }`, `source` in `timeline_explicit | review_explicit | rating_inferred`. Precedence: timeline intent → envelope answer → rating. Strict envelope validation (version exactly `1`, `type` strictly equal to the review's canonical category, `answers` a plain object, `would_recommend` exactly `yes|maybe|no`); malformed/unsupported = **absent**, never `false`; `maybe` → `false`; a latest `auto` resolves to `intent: null, source: rating_inferred`. Rating inference uses the same effective rating the SQL side uses (`COALESCE(latest_rating, rating) >= 4`, null → false) — the threshold and null handling are asserted, not assumed.
 - **Literal single fixture, no duplication:** `src/services/review/__fixtures__/recommendationTruthTable.json` is the one machine-readable source. Vitest imports it directly; the SQL/Deno harness reads the same file and feeds each case to the SQL resolver, comparing against the same expected values. No hand-copied `VALUES` list anywhere. A case count assertion on both sides makes a silently-skipped file a failure.
 - Concurrency: run the four documented races (insert vs undo, undo vs undo, maintenance vs undo, two different reviews) from parallel independent sessions and record results. If parallel sessions cannot be established, it stays explicitly UNVERIFIED — not quietly passed.
 - Role-session verification from **real sessions**, not from grants: `anon` and `authenticated` direct `UPDATE`/`DELETE`/`TRUNCATE` denied; `service_role` direct `UPDATE`/`DELETE` **denied** while `service_role` executing the maintenance RPC **succeeds** (the Option A boundary claim is unproven without this pair).
-- Stage 1 is marked complete in `roadmap.md` **only** for the items actually proven; anything that cannot be executed stays unticked and is listed as UNVERIFIED in `docs/verification/phase-3c-stage1-selftest.md`.
+- `roadmap.md` Stage 1 boxes are ticked **only** for items actually proven from real sessions; anything unexecutable stays unticked and is listed as UNVERIFIED in `docs/verification/phase-3c-stage1-selftest.md`.
+- **Stop here.** Report Step 0 results — resolver + fixture parity output, concurrency results, the role-session matrix, and any UNVERIFIED item — and wait for approval before Step 1.
+
 
 
 ---
@@ -52,15 +58,17 @@ Extend `questionnaire/registry.ts` — pure data only:
 
 ## Step 3 — persistence
 
-- `metadata.questionnaire = { version: 1, type: <canonical category>, answers: { … } }`, merged via the existing `mergeReviewMetadata` — never replacing the column.
+- `metadata.questionnaire = { version: 1, type: <reviews.category>, answers: { … } }`, merged via the existing `mergeReviewMetadata` — never replacing the column.
+- **Envelope type follows the DB contract, not a display resolver.** The DB validates `metadata.questionnaire.type === reviews.category`, so the client uses that exact value. For a normal linked review the linked entity's canonical type must also equal `reviews.category`; when it does not, the review is in compatibility mode and the client **never creates or updates** a v1 envelope. After a deliberate subject replacement, `reviews.category` is recanonicalized from the new subject and the envelope uses that category. React validation and SQL validation therefore cannot disagree.
 - Unanswered fields are **omitted** from `answers` — never `""`, `null` or `[]`. `stood_out` / `best_for` persist as `{ selected: [...], custom: [...] }`, omitting empty arrays.
 - `would_recommend` is written into the envelope only; the DB trigger derives `is_recommended`. No client-side recommendation writes.
-- **Version-selection policy:** a stored envelope is read only when `version === 1` and `type` equals the review's canonical category. A legacy category-mismatch review renders in compatibility mode — its envelope is never rendered and never destroyed; it is carried through untouched until the subject is reselected.
+- **Version-selection policy:** a stored envelope is read only when `version === 1` and its `type` matches as above. A mismatched envelope is never rendered and never destroyed; it is carried through untouched until the subject is reselected.
 - **No-envelope legacy edit (restored contract):** an existing linked review with a valid canonical subject and **no** `metadata.questionnaire` is offered the v1 questions, but an unrelated save (headline, thoughts, media, rating, visibility) leaves the envelope **absent**. The envelope is created only once at least one questionnaire answer is supplied.
-- **Field-level dirty tracking, not whole-object rewrite:** persistence patches `answers` field by field. A field the user never touched is written back byte-identical, including values this build cannot render (future fields, unknown tag ids). A field the user **did** edit is rewritten from its sanitized visible values — so a stale unknown tag inside an edited field can genuinely be replaced or cleared. Never replace the whole `answers` object.
+- **Field-level dirty tracking, not whole-object rewrite:** persistence patches `answers` field by field. A field the user never touched is written back byte-identical, including values this build cannot render (future fields, unknown tag ids). A field the user **did** edit is rewritten from its visible values — so a stale unknown tag inside an edited field can genuinely be replaced or cleared. Never replace the whole `answers` object.
+- **Caps govern creation and modification, not passive viewing.** Existing stored values are grandfathered: a stored custom tag longer than the cap is displayed and preserved **intact**, never visually truncated, and a field already holding more values than the cap renders **all** of its recognized values. While a field is over cap, the "add" affordance is disabled with an explanatory hint until the user reduces it; any state the user actually edits must satisfy the current caps before it can be saved. New input always enforces 5 total / 3 custom / 40 characters. Unknown tag ids remain unrendered but preserved unless that exact field is deliberately rewritten. Nothing is silently dropped because it predates a cap.
 - **Clearing:** clearing the last remaining answer **removes** `metadata.questionnaire` entirely rather than leaving `{ version, type, answers: {} }` — absent keeps its honest meaning "no questionnaire was answered". Removal only applies when no untouched/unknown field remains; if one does, it is preserved and the envelope stays.
 - **Reset on subject change:** any `entity_id` change clears the questionnaire envelope and known subject-specific metadata (`food_tags`), and **preserves unrelated root metadata and provenance** untouched.
-- **Read-time sanitization:** stored custom tags exceeding the caps (length, count) are truncated for display without mutating storage until that field is edited.
+
 
 ## Step 4 — wizard wiring
 
@@ -79,9 +87,12 @@ Stage 3 items only: the "Would you still recommend it?" timeline question, `auto
 - Persistence: envelope shape per type; unanswered fields omitted; merge preserves unrelated metadata; version/type mismatch → compatibility mode, envelope preserved.
 - **No-envelope regression:** legacy review with no `metadata.questionnaire`, headline-only edit → `metadata.questionnaire` remains **absent**.
 - **Field-level dirty state:** untouched field carrying an unknown tag survives an edit to a *different* field; editing that same field replaces/clears the unknown tag; clearing the last answer removes the envelope; an untouched unknown field keeps the envelope alive.
+- **Grandfathered over-cap data:** 6 stored selected tags → all six render and survive; 4 stored custom tags → an edit to a *different* field preserves all four; a stored 60-character custom tag is displayed and re-saved byte-identical; while over cap, adding is blocked; once the user edits that field, the resulting state must satisfy the current caps to save.
 - `entity_id` change clears the envelope and `food_tags` while unrelated root metadata and provenance survive.
+- **End-to-end materialization (crosses UI → metadata → trigger → column):** saving `would_recommend` through the real review persistence path sets `reviews.is_recommended` correctly; changing it updates the flag; clearing it falls back to rating inference; a timeline event overrides the envelope; a latest `auto` returns the review to rating inference. This runs against the database, not a mock, so a metadata write that fails to fire the trigger cannot pass.
 - Step 0 close-out: the one JSON truth table green in both Vitest and the SQL harness with identical output and matching case counts.
 - `bunx vitest run` + typecheck green.
+
 
 ## Manual acceptance (you)
 
@@ -95,5 +106,11 @@ Stage 3 items only: the "Would you still recommend it?" timeline question, `auto
 
 
 ## Report and stop
+
+Two reports, two stops:
+
+1. **Stage 1 close-out report** after Step 0 — resolver + shared-fixture parity, concurrency results from real parallel sessions, the real role-session privilege matrix, roadmap/verification-doc updates, and any item still UNVERIFIED. Work pauses here for your review; Stage 2 does not begin on an incomplete Stage 1.
+2. **Stage 2 report** after Steps 1–4 — registry lint output, test results including the end-to-end materialization test, and confirmation that no Stage 3 timeline UI was included. Stage 3 does not begin until you review it.
+
 
 Stage 2 ends with a report: Stage 1 close-out results (including anything still UNVERIFIED), registry lint output, test results, and confirmation that no Stage 3 timeline UI was included. Stage 3 does not begin until you review it.
