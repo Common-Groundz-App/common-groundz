@@ -1,17 +1,17 @@
-# Phase 3C (v4) — LIFO undo as an atomic RPC
+# Phase 3C (v5) — final: RPC undo + privilege hardening
 
-Both corrections are right and are folded in. Codex's point about the enforcement
-mechanism is the important one: a general `DELETE` policy plus a row-level "is this
-the newest row?" trigger is not a safe LIFO API — a single
-`DELETE FROM review_updates WHERE review_id = ...` is evaluated row by row, and
-"newest" is re-checked per row, so the statement shape decides the outcome. Their
-`current_user` warning is also correct: inside a `SECURITY DEFINER` function
-`current_user` is the *owner*, so an ordinary caller would look privileged. LIFO
-therefore becomes one authenticated RPC with no direct delete path at all.
+Both rounds of review are right and everything is folded in. This is the final
+architecture — both reviewers now approve it; the remaining notes are Stage 1
+acceptance guardrails, not redesigns.
 
-Also agreed: recomputation must run **after** the row is gone (or explicitly exclude
-it), and every timeline mutation on a review must serialize against that review.
-This is now scope-complete — no further product additions to 3C.
+Why the earlier enforcement shape was wrong (kept for the record): a general
+`DELETE` policy plus a row-level "newest?" trigger is not a safe LIFO API — a
+single `DELETE ... WHERE review_id = ...` is evaluated row by row and "newest" is
+re-checked per row, so statement shape decides the outcome. And `current_user`
+inside a `SECURITY DEFINER` function is the function's *owner*, so privilege checks
+based on it would misidentify ordinary callers as privileged. LIFO is therefore one
+authenticated RPC, recomputation always runs after the mutation, and every timeline
+mutation on a review serializes against that review.
 
 ## Roadmap additions (Stage 0 writes these)
 
@@ -66,35 +66,52 @@ One migration:
   `(review_id, created_at DESC, id DESC) WHERE would_recommend IS NOT NULL`.
 - **INSERT authorization**: authenticated, `user_id = auth.uid()`, **and** the parent
   review owned by `auth.uid()`.
-- **Server-owned chronology**: a `BEFORE INSERT` trigger overwrites
-  `created_at`/`updated_at` with `now()` unconditionally, so no caller can backdate
-  an event to outrank the true latest one.
+- **Server-owned chronology (overwrite, not rejection — Codex):** a `BEFORE INSERT`
+  trigger **replaces** `created_at`/`updated_at` with `now()` unconditionally; a
+  caller-supplied value is ignored rather than causing an error. Acceptance tests
+  assert the *persisted* timestamp is server-generated.
 - **No ordinary `UPDATE`, no ordinary `DELETE`.** Both policies are dropped, and a
   guard trigger rejects any non-privileged attempt as a backstop. A changed opinion
   is a new event.
+- **One shared lock helper, one key derivation (Codex):** a single private function
+  derives the advisory lock key from the review UUID, used identically by the insert
+  trigger, the owner RPC and the maintenance RPC. No two namespaces or hash
+  functions. `pg_advisory_xact_lock` (same convention as `create_entity_subject`).
+- **The INSERT path takes the lock too, before it mutates (both reviewers):** the
+  insert trigger acquires the per-review lock *before* inserting and holds it through
+  recomputation. Inserts, undos and recomputation serialize per review; different
+  reviews stay independent.
 - **Owner LIFO undo = one atomic RPC**, `delete_latest_review_update(p_review_id,
   p_expected_update_id)`, `SECURITY DEFINER`, pinned `search_path`:
   1. authenticate from `auth.uid()` (never a passed-in user id) and verify review
      ownership;
-  2. `pg_advisory_xact_lock` on the review id (same convention as
-     `create_entity_subject`) — **all** timeline mutations for that review take this
-     lock, so inserts, undos and recomputation serialize per review while different
-     reviews stay independent;
+  2. acquire the shared per-review lock;
   3. resolve the current newest update (`ORDER BY created_at DESC, id DESC LIMIT 1`);
-  4. require it to equal `p_expected_update_id`, else return a **conflict** result
-     instead of deleting whatever became newest;
+  4. require it to equal `p_expected_update_id`;
   5. delete exactly that one row (`WHERE id = ...`, single row);
   6. **after** the delete, call the shared recompute function;
   7. commit — all of it in one transaction.
-- **Privileged maintenance RPC** for arbitrary abuse removal: authorised by explicit
-  role membership checked *outside* any `SECURITY DEFINER` boundary (or reserved for
-  `service_role` callers), never by `current_user` inside a definer function, never
-  by caller-supplied metadata. It takes the same lock and the same post-delete
-  recompute path.
+  It returns a **typed result** `{ status: 'deleted' | 'conflict' | 'not_found',
+  deletedUpdateId?, latestUpdateId? }`; authorization failures remain real database
+  errors, not disguised conflicts, so Stage 3's refresh behaviour is deterministic.
+- **Privileged maintenance RPC** for arbitrary abuse removal: executable **only by
+  `service_role`**, stated explicitly in the migration and enforced by `GRANT` — no
+  role-membership heuristics, no `current_user` checks inside a definer function, no
+  caller-supplied flags. Same lock, same post-delete recompute path.
+- **Function privilege hardening (Codex, blocks Stage 1 completion):** every
+  SECURITY DEFINER and internal helper gets `REVOKE ALL ... FROM PUBLIC` (and from
+  `anon`/`authenticated`) immediately after creation; execution is then granted
+  *only* where intended — the undo RPC to `authenticated`, the maintenance RPC to
+  `service_role`, and internal helpers (recompute, wrapper, lock helper) to **no
+  caller-facing role** at all, so the RPCs are the only mutation surface. Privilege
+  tests assert anonymous and authenticated sessions cannot call the internal
+  functions directly.
 - **One shared recompute function** — `latest_rating`, `timeline_count`,
   `has_timeline`, `trust_score`, resolved `is_recommended` — called by the insert
-  trigger and by both delete RPCs, always after the mutation, so it never observes a
-  row that is on its way out.
+  trigger and by both delete RPCs, always after the mutation. It is
+  **recursion-safe**: since recomputation writes to `reviews`, the recommendation
+  trigger is gated (column-of-interest filtering) so the write cannot re-trigger
+  recomputation into a loop; "calculate" and "write" responsibilities stay split.
 - **Two resolver functions**: a *pure* decision function
   `(original envelope, latest intent event, effective rating) → intent | source |
   is_recommended` with no queries, plus a review-aware wrapper owning the
@@ -110,15 +127,24 @@ One migration:
 Acceptance: whole-dataset before/after snapshot of all 77 reviews shows zero drift in
 `is_recommended`, `trust_score`, `latest_rating`, `timeline_count`; direct `UPDATE`
 and direct `DELETE` (single-row and `WHERE review_id = ...` bulk) both denied;
-stranger insert and backdated `created_at` denied; old clients omitting
-`would_recommend` still insert; RPC undo of the newest row rolls derived state back
-exactly one step; stale `p_expected_update_id` returns conflict and deletes nothing;
+stranger insert denied; a client-supplied `created_at` is **overwritten** (test
+asserts the persisted value is server-generated); old clients omitting
+`would_recommend` still insert; **both the insert trigger and the undo RPC hold the
+same per-review lock from the same shared key helper before mutating** (asserted
+explicitly); RPC undo of the newest row rolls derived state back exactly one step and
+returns `status: 'deleted'`; stale `p_expected_update_id` returns `status:
+'conflict'` with the current `latestUpdateId` and deletes nothing;
 **concurrency fixtures** for insert-vs-undo and two simultaneous undos on the same
 review (one wins, one conflicts, aggregates stay consistent) and for mutations on two
 different reviews proceeding in parallel; undo of an `auto` row restores the previous
 explicit intent; undo of the last remaining update restores the original answer as
-authoritative; privileged mid-history removal recomputes identically; shared fixture
-green in Vitest and the SQL/Deno runner; Supabase types regenerated.
+authoritative; privileged mid-history removal recomputes identically; **privilege
+tests** prove anon/authenticated cannot execute the recompute, wrapper, lock or
+maintenance functions, and that only `authenticated` reaches the undo RPC while only
+`service_role` reaches maintenance; recompute-on-recompute recursion is absent
+(trigger gating verified by an unrelated-column update producing exactly one
+recomputation); shared fixture green in Vitest and the SQL/Deno runner; Supabase
+types regenerated.
 
 ## Stage 2 — review questionnaire (UI + persistence)
 
@@ -182,9 +208,13 @@ within the same type clears answers and food tags; registry lint test asserts un
 ## Technical notes
 
 - Migration objects: column, check, partial index, INSERT policy replacement, drop of
-  UPDATE/DELETE policies, chronology trigger, mutation guard trigger, per-review
-  advisory lock convention, shared recompute function, owner LIFO RPC, privileged
-  maintenance RPC, pure resolver, review-aware wrapper, consolidated triggers.
+  UPDATE/DELETE policies, chronology trigger, mutation guard trigger, shared lock-key
+  helper, shared recompute function, owner LIFO RPC, privileged maintenance RPC, pure
+  resolver, review-aware wrapper, consolidated triggers, and `REVOKE`/`GRANT`
+  statements for every function.
+- Delivery: Stage 0 frozen and verified first, then each stage deployed and verified
+  separately — after Stage 1, the migration, whole-dataset parity, authorization,
+  privilege and concurrency results are reported before Stage 2 begins.
 - Files: `docs/phase-3b-tag-vocabularies.md`, `roadmap.md`,
   `questionnaire/registry.ts`, `QuestionnaireSections.tsx`, new
   `CuratedTagSelector.tsx`, new `recommendationIntent.ts` + shared fixture,
