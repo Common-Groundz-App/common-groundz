@@ -76,18 +76,23 @@ Stage 3 items only: the "Would you still recommend it?" timeline question, `auto
 - Registry lint vs the frozen doc (ids, sentiments, counts, per-type field sets).
 - `CuratedTagSelector` caps, custom dedupe/normalization, blank rejection; FoodTagSelector regression suite unchanged and uncapped.
 - Choice chips: no preselection, re-tap clears.
-- Persistence: envelope shape per type; omission of unanswered fields; merge preserves unrelated metadata; version/type mismatch → compatibility mode, envelope preserved; `entity_id` change resets answers and `food_tags`; unknown tag ids not rendered but not destroyed.
-- Stage 0 close-out: shared truth table green in Vitest and SQL with identical output.
+- Persistence: envelope shape per type; unanswered fields omitted; merge preserves unrelated metadata; version/type mismatch → compatibility mode, envelope preserved.
+- **No-envelope regression:** legacy review with no `metadata.questionnaire`, headline-only edit → `metadata.questionnaire` remains **absent**.
+- **Field-level dirty state:** untouched field carrying an unknown tag survives an edit to a *different* field; editing that same field replaces/clears the unknown tag; clearing the last answer removes the envelope; an untouched unknown field keeps the envelope alive.
+- `entity_id` change clears the envelope and `food_tags` while unrelated root metadata and provenance survive.
+- Step 0 close-out: the one JSON truth table green in both Vitest and the SQL harness with identical output and matching case counts.
 - `bunx vitest run` + typecheck green.
 
 ## Manual acceptance (you)
 
 1. New review for a movie, product, place, food, course and `others` → correct questions and repeat-intent wording per type; food shows Food Tags + portion and no generic "What stood out".
-2. Answer nothing → submit succeeds; stored metadata contains no empty questionnaire keys.
+2. Answer nothing → submit succeeds; stored metadata contains no questionnaire key at all.
 3. Answer, save, reopen → answers restored exactly; unrelated metadata intact.
-4. Change the subject mid-form → answers and food tags cleared.
-5. Edit a legacy review whose category no longer matches its subject → compatibility mode, saves without losing stored data.
-6. Recommendation flag still follows the frozen precedence (envelope beats rating).
+4. Change the subject mid-form → questionnaire and food tags cleared, everything else intact.
+5. Edit an older review, change only the headline → no questionnaire metadata appears.
+6. Edit a legacy review whose category no longer matches its subject → compatibility mode, saves without losing stored data.
+7. Recommendation flag still follows the frozen precedence (envelope beats rating; timeline beats envelope).
+
 
 ## Report and stop
 
