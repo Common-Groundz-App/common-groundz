@@ -22,11 +22,14 @@ So Stage 2 starts with a short close-out, then the questionnaire work.
 
 ## Step 0 — Stage 1 close-out
 
-- `src/services/review/recommendationResolver.ts`: pure `resolveReviewRecommendation(envelope, category, effectiveRating)` returning `{ intent, source }` with `source` in `timeline_explicit | review_explicit | rating_inferred`, plus `lookupLatestRecommendationIntent(updates)` ordering by `created_at DESC, id DESC`. Strict envelope validation (version exactly `1`, `type` strictly equal to the review category, `answers` a plain object, `would_recommend` exactly `yes|maybe|no`); malformed = absent, never `false`; `maybe` → `false`; a latest `auto` resolves to `intent: null, source: rating_inferred`.
-- One shared fixture file (`recommendationTruthTable.ts`) consumed by a Vitest suite and by the same-cases SQL check, so both sides prove identical output. No behaviour change to the DB.
+- `src/services/review/recommendationResolver.ts`, mirroring the SQL decision function exactly:
+  - `lookupLatestRecommendationIntent(updates)` — **ordering only**, `created_at DESC, id DESC`, returns the newest event whose `would_recommend` is non-null (or `null`).
+  - `resolveReviewRecommendation(envelope, category, latestTimelineIntent, effectiveRating)` → `{ intent, isRecommended, source }`, `source` in `timeline_explicit | review_explicit | rating_inferred`. Precedence: timeline intent → envelope answer → rating. Strict envelope validation (version exactly `1`, `type` strictly equal to the review's canonical category, `answers` a plain object, `would_recommend` exactly `yes|maybe|no`); malformed/unsupported = **absent**, never `false`; `maybe` → `false`; a latest `auto` resolves to `intent: null, source: rating_inferred`. Rating inference uses the same effective rating the SQL side uses (`COALESCE(latest_rating, rating) >= 4`, null → false) — the threshold and null handling are asserted, not assumed.
+- **Literal single fixture, no duplication:** `src/services/review/__fixtures__/recommendationTruthTable.json` is the one machine-readable source. Vitest imports it directly; the SQL/Deno harness reads the same file and feeds each case to the SQL resolver, comparing against the same expected values. No hand-copied `VALUES` list anywhere. A case count assertion on both sides makes a silently-skipped file a failure.
 - Concurrency: run the four documented races (insert vs undo, undo vs undo, maintenance vs undo, two different reviews) from parallel independent sessions and record results. If parallel sessions cannot be established, it stays explicitly UNVERIFIED — not quietly passed.
-- Role-session denial: attempt direct `UPDATE`/`DELETE`/`TRUNCATE` as real `anon` and `authenticated` sessions and record the errors.
-- Tick `roadmap.md` Stage 1, appending the concurrency and role-session evidence to the verification doc.
+- Role-session verification from **real sessions**, not from grants: `anon` and `authenticated` direct `UPDATE`/`DELETE`/`TRUNCATE` denied; `service_role` direct `UPDATE`/`DELETE` **denied** while `service_role` executing the maintenance RPC **succeeds** (the Option A boundary claim is unproven without this pair).
+- Stage 1 is marked complete in `roadmap.md` **only** for the items actually proven; anything that cannot be executed stays unticked and is listed as UNVERIFIED in `docs/verification/phase-3c-stage1-selftest.md`.
+
 
 ---
 
