@@ -127,15 +127,24 @@ One migration:
 Acceptance: whole-dataset before/after snapshot of all 77 reviews shows zero drift in
 `is_recommended`, `trust_score`, `latest_rating`, `timeline_count`; direct `UPDATE`
 and direct `DELETE` (single-row and `WHERE review_id = ...` bulk) both denied;
-stranger insert and backdated `created_at` denied; old clients omitting
-`would_recommend` still insert; RPC undo of the newest row rolls derived state back
-exactly one step; stale `p_expected_update_id` returns conflict and deletes nothing;
+stranger insert denied; a client-supplied `created_at` is **overwritten** (test
+asserts the persisted value is server-generated); old clients omitting
+`would_recommend` still insert; **both the insert trigger and the undo RPC hold the
+same per-review lock from the same shared key helper before mutating** (asserted
+explicitly); RPC undo of the newest row rolls derived state back exactly one step and
+returns `status: 'deleted'`; stale `p_expected_update_id` returns `status:
+'conflict'` with the current `latestUpdateId` and deletes nothing;
 **concurrency fixtures** for insert-vs-undo and two simultaneous undos on the same
 review (one wins, one conflicts, aggregates stay consistent) and for mutations on two
 different reviews proceeding in parallel; undo of an `auto` row restores the previous
 explicit intent; undo of the last remaining update restores the original answer as
-authoritative; privileged mid-history removal recomputes identically; shared fixture
-green in Vitest and the SQL/Deno runner; Supabase types regenerated.
+authoritative; privileged mid-history removal recomputes identically; **privilege
+tests** prove anon/authenticated cannot execute the recompute, wrapper, lock or
+maintenance functions, and that only `authenticated` reaches the undo RPC while only
+`service_role` reaches maintenance; recompute-on-recompute recursion is absent
+(trigger gating verified by an unrelated-column update producing exactly one
+recomputation); shared fixture green in Vitest and the SQL/Deno runner; Supabase
+types regenerated.
 
 ## Stage 2 — review questionnaire (UI + persistence)
 
