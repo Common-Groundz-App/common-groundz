@@ -19,13 +19,14 @@ Open items (must not be reported as passing):
 3. **Real role-session privilege denial** was inferred from grants, not attempted from actual `anon` / `authenticated` / `service_role` sessions.
 4. `roadmap.md` Stage 1 checkboxes are still unticked.
 
-So Stage 2 starts with a short close-out, then the questionnaire work.
+So Stage 1 is closed out and reported first; Stage 2 is a separate delivery.
 
 ---
 
-## Step 0 — Stage 1 close-out
+## Step 0 — Stage 1 close-out (standalone delivery, stop for review)
 
 - `src/services/review/recommendationResolver.ts`, mirroring the SQL decision function exactly:
+
   - `lookupLatestRecommendationIntent(updates)` — **ordering only**, `created_at DESC, id DESC`, returns the newest event whose `would_recommend` is non-null (or `null`).
   - `resolveReviewRecommendation(envelope, category, latestTimelineIntent, effectiveRating)` → `{ intent, isRecommended, source }`, `source` in `timeline_explicit | review_explicit | rating_inferred`. Precedence: timeline intent → envelope answer → rating. Strict envelope validation (version exactly `1`, `type` strictly equal to the review's canonical category, `answers` a plain object, `would_recommend` exactly `yes|maybe|no`); malformed/unsupported = **absent**, never `false`; `maybe` → `false`; a latest `auto` resolves to `intent: null, source: rating_inferred`. Rating inference uses the same effective rating the SQL side uses (`COALESCE(latest_rating, rating) >= 4`, null → false) — the threshold and null handling are asserted, not assumed.
 - **Literal single fixture, no duplication:** `src/services/review/__fixtures__/recommendationTruthTable.json` is the one machine-readable source. Vitest imports it directly; the SQL/Deno harness reads the same file and feeds each case to the SQL resolver, comparing against the same expected values. No hand-copied `VALUES` list anywhere. A case count assertion on both sides makes a silently-skipped file a failure.
