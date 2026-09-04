@@ -14,8 +14,8 @@ action goes away.
 1. **"Would you still recommend it?"** in the add-update form of the timeline viewer —
    three chips: Yes / Maybe / No. Nothing is preselected, and leaving it alone means the
    update makes no recommendation statement at all.
-2. **A separate "Use my rating instead" reset** for the deliberate case of discarding an
-   earlier explicit answer and going back to rating inference.
+2. **A separate "Base recommendation on rating" reset** for the deliberate case of discarding
+   an earlier explicit answer and going back to rating inference.
 3. **Honest source copy** on the review, so the displayed answer never lies about where it
    came from: an explicit timeline answer reads as the reviewer's latest word, an
    explicit answer on the review itself reads as their original answer, and a
