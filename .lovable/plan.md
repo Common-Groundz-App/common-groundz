@@ -151,12 +151,15 @@ action goes away.
   means "this update made no recommendation statement" and the SQL ordering function filters
   those rows out. No migration is required for Stage 3.
 - Ordering for "latest" and "newest entry" is `created_at DESC, id DESC` everywhere — the same
-  ordering the SQL function, the TS mirror, and the undo RPC use.
+  ordering the SQL function, the TS mirror, and the undo RPC use. The visible-list query is
+  corrected to include the `id` tie-break as part of this step.
+- Provenance never depends on how many timeline rows the client happens to hold: it comes from a
+  `LIMIT 1` lookup, so a PostgREST row cap cannot turn a truncated page into a false claim.
 - `created_at` is server-owned (client value overwritten by the BEFORE INSERT trigger), so the
   UI must refetch after insert rather than trusting a locally constructed row.
 - `roadmap.md` is updated at implementation time: the Stage 3 line is reworded to the corrected
-  semantics (explicit reset action, not a skipped question), and items are ticked only for what
-  the tests above actually prove.
+  semantics (explicit reset action, not a skipped question) and gains the latest-intent lookup and
+  ordering-tie-break items; items are ticked only for what the tests above actually prove.
 
 ## Stop point
 
