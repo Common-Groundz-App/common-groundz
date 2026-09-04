@@ -162,11 +162,35 @@ server-generated. Old clients omitting `would_recommend` still insert successful
 
 **Privilege.** `anon` and `authenticated` cannot execute the recompute function, the
 lock helper, the resolver internals or the maintenance RPC; only `authenticated`
-reaches the undo RPC and only `service_role` reaches maintenance.
+reaches the undo RPC and only `service_role` reaches maintenance. **Option A proof:**
+`service_role` cannot directly `UPDATE` or `DELETE` `review_updates`, but can execute
+the maintenance RPC successfully.
 
-Finally: regenerate `src/integrations/supabase/types.ts`, then **stop** and report the
-migration, parity, authorization, privilege, resolver, recompute and concurrency
-results before Stage 2 begins.
+### 10. The Stage 1 report (then stop)
+
+Regenerate `src/integrations/supabase/types.ts`, then **stop** and report, as separate
+sections:
+
+1. migration filename and every database object created, altered or dropped;
+2. whole-dataset before/after values, plus any pre-existing inconsistency discovered
+   (reported, never silently repaired);
+3. final policy + table-grant matrix by role;
+4. final function-execution grant matrix by role;
+5. owner/non-owner authorization and direct-mutation denial results (including the
+   `service_role` direct-mutation denial and guessed-GUC test);
+6. server-owned chronology results;
+7. LIFO, stale-ID conflict and deterministic tie-break results;
+8. same-review and cross-review concurrency results;
+9. recompute and trigger-recursion results;
+10. shared-fixture results in both Vitest and the SQL/Deno runner;
+11. the regenerated Supabase type diff;
+12. confirmation that no Stage 2 questionnaire UI or persistence work was included.
+
+Any check that cannot be executed in this environment is reported as **unverified**,
+never presented as passing. No acceptance test is dropped because it is awkward to
+automate — the concurrency, role-privilege and whole-dataset parity checks are part of
+the deliverable.
+
 
 ### 9. Three additions of my own
 
