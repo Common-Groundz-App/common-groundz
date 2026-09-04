@@ -14,8 +14,8 @@ action goes away.
 1. **"Would you still recommend it?"** in the add-update form of the timeline viewer —
    three chips: Yes / Maybe / No. Nothing is preselected, and leaving it alone means the
    update makes no recommendation statement at all.
-2. **A separate "Use my rating instead" reset** for the deliberate case of discarding an
-   earlier explicit answer and going back to rating inference.
+2. **A separate "Base recommendation on rating" reset** for the deliberate case of discarding
+   an earlier explicit answer and going back to rating inference.
 3. **Honest source copy** on the review, so the displayed answer never lies about where it
    came from: an explicit timeline answer reads as the reviewer's latest word, an
    explicit answer on the review itself reads as their original answer, and a
@@ -33,8 +33,10 @@ action goes away.
   - **Untouched / cleared / skipped → SQL `NULL`** (column omitted). The update makes no
     recommendation statement; the previous non-null timeline intent stays authoritative.
   - **Yes / Maybe / No → explicit timeline statement.**
-  - **"Use my rating instead" → `auto`.** Only this deliberate action neutralizes earlier
-    explicit intent, resolving to `{ intent: null, source: 'rating_inferred' }`.
+  - **"Base recommendation on rating" → `auto`.** Only this deliberate action neutralizes
+    earlier explicit intent, resolving to `{ intent: null, source: 'rating_inferred' }`.
+    (The label says "rating" because the resolver uses the effective rating —
+    `latest_rating` when present, otherwise `rating`.)
 - Tapping a selected chip again clears back to unanswered → `NULL`. It must never become `auto`.
 - The column is already nullable and the SQL ordering function already filters nulls out, so
   no migration is needed.
@@ -66,10 +68,18 @@ action goes away.
   events (the timeline viewer / review detail). No per-card timeline query is added to feeds or
   profile grids; those surfaces keep their existing recommendation display untouched until the
   data can be supplied by an existing efficient query.
-- **Failure-aware.** The helper takes an explicit timeline-availability state
-  (`loaded | unavailable`). When the timeline fetch failed or has not loaded, it renders the
-  DB-materialized `is_recommended` with no provenance claim — never "from your original answer"
-  or "inferred from your rating", because an unread timeline event may be the authoritative one.
+- **Failure-aware and completeness-aware.** The helper takes an explicit provenance-knowledge
+  flag, not a "did something load" boolean. It may claim a source only when the caller has
+  authoritative knowledge of the latest non-null timeline intent — meaning the caller holds the
+  review's *complete* timeline history, or was given that latest intent event separately.
+  A partial page is not enough: twenty loaded `NULL` rows do not overrule an unloaded older
+  `no`, and treating them as such would print a confident lie.
+  When the fetch failed, is still loading, or is known-partial, the UI renders the
+  DB-materialized `is_recommended` with no provenance claim at all.
+  Today `fetchReviewUpdates` selects every row for the review with no range or limit, so the
+  viewer's data is complete — the flag is set from that fact explicitly (and a test asserts the
+  fetch is unpaginated), so that adding pagination later fails loudly instead of silently
+  degrading the copy into a lie.
 - Per-entry display inside the viewer is literal, not resolved: `yes|maybe|no` show the recorded
   answer, `auto` shows the reset wording, and `NULL` shows nothing — a null row must never look
   like it made a statement.
@@ -108,7 +118,7 @@ action goes away.
 
 - Unit tests for the new intent option constant (values match the DB check constraint's
   allowed set) and for the source-copy helper across all three sources, the `intent: null`
-  case, and the `unavailable` timeline state (no provenance claim).
+  case, the failed/loading state, and the known-partial state (both: no provenance claim).
 - Payload tests for the three states: chip selected → that value; question skipped → column
   omitted / `NULL`; chip selected then tapped again → omitted / `NULL`; reset action → `auto`.
 - Regression coverage for the corrected precedence, driven through the existing resolver:
@@ -116,12 +126,14 @@ action goes away.
   `intent: null` / `rating_inferred`.
 - Per-entry display test: `NULL` renders no recommendation statement, `auto` renders the reset
   wording.
+- A test asserting `fetchReviewUpdates` issues no `range`/`limit`, so the completeness flag the
+  source copy relies on stays true.
 - Undo status mapping tested for all three RPC statuses, including that a `conflict` triggers
-  a refetch and no optimistic removal.
+  a refetch and no optimistic removal, and that the parent review is refreshed in all three.
 - Full Vitest run plus a build check.
 - Explicitly reported as UNVERIFIED, not substituted: the browser → supabase-js → RLS hop
   (external Supabase, no obtainable test session) and the Stage 1 concurrency/real-session
-  carry-overs.
+  carry-overs. Unit and build results are never described as covering them.
 
 ## Technical notes
 
@@ -138,5 +150,10 @@ action goes away.
 
 ## Stop point
 
-Implement Stage 3 only. Report the changes and every verification result separately, naming
-any check that could not be executed, then stop for review before Phase 3D.
+Implement Stage 3 only, then stop before Phase 3D. The report will list: files and identifiers
+changed; the final `addReviewUpdate` signature and payload behaviour; evidence that skipped and
+cleared answers omit the column and that only the reset sends `auto`; source-copy tests
+including unavailable and partial data; per-entry `NULL`/`auto` display tests; undo status,
+refetch and parent-review-refresh tests; every removed Convert identifier plus confirmation no
+call sites remain; full Vitest and build results; the remaining UNVERIFIED integration and
+concurrency items; and confirmation that Phase 3D was not started.
