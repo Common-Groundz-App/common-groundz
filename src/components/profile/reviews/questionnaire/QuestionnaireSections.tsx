@@ -14,13 +14,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import FoodTagSelector from '@/components/profile/reviews/FoodTagSelector';
+import ChoiceChips from './ChoiceChips';
+import CuratedTagSelector from './CuratedTagSelector';
+import type { CuratedTagAnswer } from './curatedTagInput';
 import type { QuestionnaireConfig, QuestionnaireField } from './registry';
 
 export interface QuestionnaireAnswers {
-  /** Tag values keyed by field id (today: `food_tags`). */
+  /** Food tag values keyed by field id (`food_tags` only). Unchanged contract. */
   tags: Record<string, string[]>;
   /** Text values keyed by field id. */
   text: Record<string, string>;
+  /** `single-choice` values keyed by field id. Absent === unanswered. */
+  choices: Record<string, string>;
+  /** Curated tag answers (`stood_out` / `best_for`) keyed by field id. */
+  curated: Record<string, CuratedTagAnswer>;
 }
 
 export interface QuestionnaireSectionsProps {
@@ -29,6 +36,8 @@ export interface QuestionnaireSectionsProps {
   onAddTag: (fieldId: string, tag: string) => void;
   onRemoveTag: (fieldId: string, tag: string) => void;
   onTextChange: (fieldId: string, value: string) => void;
+  onChoiceChange: (fieldId: string, value: string | undefined) => void;
+  onCuratedChange: (fieldId: string, value: CuratedTagAnswer) => void;
 }
 
 const FieldRenderer: React.FC<{
@@ -37,18 +46,42 @@ const FieldRenderer: React.FC<{
   onAddTag: (fieldId: string, tag: string) => void;
   onRemoveTag: (fieldId: string, tag: string) => void;
   onTextChange: (fieldId: string, value: string) => void;
-}> = ({ field, answers, onAddTag, onRemoveTag, onTextChange }) => {
+  onChoiceChange: (fieldId: string, value: string | undefined) => void;
+  onCuratedChange: (fieldId: string, value: CuratedTagAnswer) => void;
+}> = ({ field, answers, onAddTag, onRemoveTag, onTextChange, onChoiceChange, onCuratedChange }) => {
   switch (field.kind) {
     case 'tags': {
-      if (field.tagSet !== 'food') return null;
+      if (!field.tagSet) return null;
+      if (field.tagSet === 'food') {
+        return (
+          <FoodTagSelector
+            selectedTags={answers.tags[field.id] ?? []}
+            onAddTag={(tag) => onAddTag(field.id, tag)}
+            onRemoveTag={(tag) => onRemoveTag(field.id, tag)}
+          />
+        );
+      }
       return (
-        <FoodTagSelector
-          selectedTags={answers.tags[field.id] ?? []}
-          onAddTag={(tag) => onAddTag(field.id, tag)}
-          onRemoveTag={(tag) => onRemoveTag(field.id, tag)}
+        <CuratedTagSelector
+          tagSet={field.tagSet}
+          label={field.label}
+          helperText={field.helperText}
+          value={answers.curated[field.id] ?? { selected: [], custom: [] }}
+          onChange={(next) => onCuratedChange(field.id, next)}
         />
       );
     }
+    case 'single-choice':
+      return (
+        <ChoiceChips
+          fieldId={field.id}
+          label={field.label}
+          helperText={field.helperText}
+          options={field.options ?? []}
+          value={answers.choices[field.id]}
+          onChange={(value) => onChoiceChange(field.id, value)}
+        />
+      );
     case 'text':
       return (
         <div className="space-y-2">
@@ -94,6 +127,8 @@ const QuestionnaireSections: React.FC<QuestionnaireSectionsProps> = ({
   onAddTag,
   onRemoveTag,
   onTextChange,
+  onChoiceChange,
+  onCuratedChange,
 }) => {
   if (config.sections.length === 0) return null;
 
@@ -117,6 +152,8 @@ const QuestionnaireSections: React.FC<QuestionnaireSectionsProps> = ({
                 onAddTag={onAddTag}
                 onRemoveTag={onRemoveTag}
                 onTextChange={onTextChange}
+                onChoiceChange={onChoiceChange}
+                onCuratedChange={onCuratedChange}
               />
             ))}
           </div>

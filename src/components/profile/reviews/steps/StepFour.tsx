@@ -9,6 +9,7 @@ import QuestionnaireSections, {
   type QuestionnaireAnswers,
 } from '@/components/profile/reviews/questionnaire/QuestionnaireSections';
 import type { QuestionnaireConfig } from '@/components/profile/reviews/questionnaire/registry';
+import type { CuratedTagAnswer } from '@/components/profile/reviews/questionnaire/curatedTagInput';
 
 interface StepFourProps {
   /** Registry config for the resolved questionnaire (type-specific sections). */
@@ -17,6 +18,8 @@ interface StepFourProps {
   onAddTag: (fieldId: string, tag: string) => void;
   onRemoveTag: (fieldId: string, tag: string) => void;
   onAnswerTextChange: (fieldId: string, value: string) => void;
+  onAnswerChoiceChange: (fieldId: string, value: string | undefined) => void;
+  onAnswerCuratedChange: (fieldId: string, value: CuratedTagAnswer) => void;
   title: string;
   onTitleChange: (value: string) => void;
   description: string;
@@ -33,6 +36,8 @@ const StepFour = ({
   onAddTag,
   onRemoveTag,
   onAnswerTextChange,
+  onAnswerChoiceChange,
+  onAnswerCuratedChange,
   title,
   onTitleChange,
   description,
@@ -98,6 +103,8 @@ const StepFour = ({
         onAddTag={onAddTag}
         onRemoveTag={onRemoveTag}
         onTextChange={onAnswerTextChange}
+        onChoiceChange={onAnswerChoiceChange}
+        onCuratedChange={onAnswerCuratedChange}
       />
       
       {/* Visibility */}
