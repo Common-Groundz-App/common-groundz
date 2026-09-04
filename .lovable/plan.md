@@ -87,9 +87,12 @@ Stage 3 items only: the "Would you still recommend it?" timeline question, `auto
 - Persistence: envelope shape per type; unanswered fields omitted; merge preserves unrelated metadata; version/type mismatch → compatibility mode, envelope preserved.
 - **No-envelope regression:** legacy review with no `metadata.questionnaire`, headline-only edit → `metadata.questionnaire` remains **absent**.
 - **Field-level dirty state:** untouched field carrying an unknown tag survives an edit to a *different* field; editing that same field replaces/clears the unknown tag; clearing the last answer removes the envelope; an untouched unknown field keeps the envelope alive.
+- **Grandfathered over-cap data:** 6 stored selected tags → all six render and survive; 4 stored custom tags → an edit to a *different* field preserves all four; a stored 60-character custom tag is displayed and re-saved byte-identical; while over cap, adding is blocked; once the user edits that field, the resulting state must satisfy the current caps to save.
 - `entity_id` change clears the envelope and `food_tags` while unrelated root metadata and provenance survive.
+- **End-to-end materialization (crosses UI → metadata → trigger → column):** saving `would_recommend` through the real review persistence path sets `reviews.is_recommended` correctly; changing it updates the flag; clearing it falls back to rating inference; a timeline event overrides the envelope; a latest `auto` returns the review to rating inference. This runs against the database, not a mock, so a metadata write that fails to fire the trigger cannot pass.
 - Step 0 close-out: the one JSON truth table green in both Vitest and the SQL harness with identical output and matching case counts.
 - `bunx vitest run` + typecheck green.
+
 
 ## Manual acceptance (you)
 
