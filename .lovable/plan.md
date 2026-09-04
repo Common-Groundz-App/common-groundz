@@ -34,15 +34,25 @@ Stage 1 is strictly database, security and resolver work — no questionnaire UI
 - Partial index on `(review_id, created_at DESC, id DESC) WHERE would_recommend IS NOT NULL`
   for the latest-intent lookup.
 
-### 2. Migration — authorization
+### 2. Migration — authorization (corrected: no session flag anywhere)
+
 - Drop the three permissive write policies. Replace with a single INSERT policy
   `TO authenticated`: `user_id = auth.uid()` **and** the parent review is owned by
-  `auth.uid()`. No ordinary UPDATE or DELETE policy exists at all — the only delete
-  path is the owner RPC below, the only maintenance path is `service_role`.
+  `auth.uid()`. No ordinary UPDATE or DELETE policy exists at all.
+- **Table-level privilege boundary, not a flag.** `REVOKE UPDATE, DELETE ON
+  public.review_updates FROM anon, authenticated` (and PUBLIC). Ordinary roles then
+  lack the SQL privilege entirely, so a direct `UPDATE`/`DELETE` fails on privileges
+  before RLS is even consulted. The `SECURITY DEFINER` RPCs run as the function owner,
+  which retains the privilege — that is the capability boundary, and it cannot be
+  manufactured by a client under any session state.
+- **The session-level/GUC guard flag is removed from the design.** A client-settable
+  custom setting is not a capability and must never authorize a privileged mutation.
+  The owner RPC (`authenticated` grant) and the maintenance RPC (`service_role` grant)
+  are the only reachable mutation surfaces; there is no bypass path to guard.
+  Defense-in-depth comes from privileges + absent policies, both of which are
+  enforced by the database and unaffected by session variables.
 - SELECT stays as-is (timelines are publicly readable, matching reviews).
-- A guard trigger blocks any UPDATE/DELETE that is not performed by the sanctioned
-  RPCs (session-level flag set inside those definer functions), so a future policy
-  mistake cannot silently reopen mid-timeline edits.
+
 
 ### 3. Migration — server-owned chronology
 - `BEFORE INSERT` trigger overwrites `created_at` and `updated_at` with `now()`.
