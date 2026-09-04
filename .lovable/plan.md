@@ -39,19 +39,29 @@ Stage 1 is strictly database, security and resolver work — no questionnaire UI
 - Drop the three permissive write policies. Replace with a single INSERT policy
   `TO authenticated`: `user_id = auth.uid()` **and** the parent review is owned by
   `auth.uid()`. No ordinary UPDATE or DELETE policy exists at all.
-- **Table-level privilege boundary, not a flag.** `REVOKE UPDATE, DELETE ON
-  public.review_updates FROM anon, authenticated` (and PUBLIC). Ordinary roles then
-  lack the SQL privilege entirely, so a direct `UPDATE`/`DELETE` fails on privileges
-  before RLS is even consulted. The `SECURITY DEFINER` RPCs run as the function owner,
-  which retains the privilege — that is the capability boundary, and it cannot be
+- **Table-level privilege boundary, not a flag — Option A (strict RPC-only).**
+  `REVOKE UPDATE, DELETE ON public.review_updates FROM PUBLIC, anon, authenticated,
+  service_role`. No client-facing role — **including `service_role`** — holds the SQL
+  privilege, so a direct `UPDATE`/`DELETE` fails on privileges before RLS is even
+  consulted. Both RPCs are `SECURITY DEFINER` owned by `postgres`, which retains the
+  privilege; that owner capability is the only deletion path, and it cannot be
   manufactured by a client under any session state.
+  Rationale for Option A over "service_role is a trusted bypass": every deletion must
+  run the shared lock + post-delete recompute, and a future backend script deleting a
+  timeline row directly would silently leave `latest_rating`, `timeline_count`,
+  `has_timeline`, `trust_score` and `is_recommended` stale. The invariant is worth
+  more than the convenience. Nothing in `src/` or in any edge function currently
+  updates or deletes `review_updates`, so this revoke breaks no existing caller.
 - **The session-level/GUC guard flag is removed from the design.** A client-settable
   custom setting is not a capability and must never authorize a privileged mutation.
   The owner RPC (`authenticated` grant) and the maintenance RPC (`service_role` grant)
   are the only reachable mutation surfaces; there is no bypass path to guard.
   Defense-in-depth comes from privileges + absent policies, both of which are
   enforced by the database and unaffected by session variables.
-- SELECT stays as-is (timelines are publicly readable, matching reviews).
+- `INSERT` and `SELECT` privileges are unchanged: `service_role` keeps `INSERT`
+  and `SELECT`, `authenticated` keeps `INSERT` (policy-gated) and `SELECT`, `anon`
+  keeps `SELECT`. Timelines stay publicly readable, matching reviews.
+
 
 
 ### 3. Migration — server-owned chronology
