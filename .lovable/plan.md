@@ -55,17 +55,21 @@ Extend `questionnaire/registry.ts` — pure data only:
 - `metadata.questionnaire = { version: 1, type: <canonical category>, answers: { … } }`, merged via the existing `mergeReviewMetadata` — never replacing the column.
 - Unanswered fields are **omitted** from `answers` — never `""`, `null` or `[]`. `stood_out` / `best_for` persist as `{ selected: [...], custom: [...] }`, omitting empty arrays.
 - `would_recommend` is written into the envelope only; the DB trigger derives `is_recommended`. No client-side recommendation writes.
-- **Version-selection policy:** a stored envelope is read only when `version === 1` and `type` equals the review's canonical category. A legacy category-mismatch review renders in compatibility mode — its unknown envelope is never rendered and never destroyed; it is carried through untouched until the subject is reselected.
-- **Reset on subject change:** any `entity_id` change clears questionnaire answers and subject-specific metadata (including `food_tags`) so answers can never describe the previous subject.
-- Render-vs-persist separation: unknown fields/tags in a stored envelope are dropped from render but preserved on write.
+- **Version-selection policy:** a stored envelope is read only when `version === 1` and `type` equals the review's canonical category. A legacy category-mismatch review renders in compatibility mode — its envelope is never rendered and never destroyed; it is carried through untouched until the subject is reselected.
+- **No-envelope legacy edit (restored contract):** an existing linked review with a valid canonical subject and **no** `metadata.questionnaire` is offered the v1 questions, but an unrelated save (headline, thoughts, media, rating, visibility) leaves the envelope **absent**. The envelope is created only once at least one questionnaire answer is supplied.
+- **Field-level dirty tracking, not whole-object rewrite:** persistence patches `answers` field by field. A field the user never touched is written back byte-identical, including values this build cannot render (future fields, unknown tag ids). A field the user **did** edit is rewritten from its sanitized visible values — so a stale unknown tag inside an edited field can genuinely be replaced or cleared. Never replace the whole `answers` object.
+- **Clearing:** clearing the last remaining answer **removes** `metadata.questionnaire` entirely rather than leaving `{ version, type, answers: {} }` — absent keeps its honest meaning "no questionnaire was answered". Removal only applies when no untouched/unknown field remains; if one does, it is preserved and the envelope stays.
+- **Reset on subject change:** any `entity_id` change clears the questionnaire envelope and known subject-specific metadata (`food_tags`), and **preserves unrelated root metadata and provenance** untouched.
+- **Read-time sanitization:** stored custom tags exceeding the caps (length, count) are truncated for display without mutating storage until that field is edited.
 
 ## Step 4 — wizard wiring
 
-`ReviewForm` holds a single `answers` object keyed by field id (replacing the ad-hoc `foodTags` state path for non-food types; food keeps its existing `metadata.food_tags` contract). Questions render in Step 3 under the registry order. All questions stay **optional** — nothing new blocks submission.
+Generic Phase 3 questionnaire answers live in one `answers` state object on `ReviewForm`, keyed by field id; the existing Food Tags keep their current dedicated state and `metadata.food_tags` persistence path unchanged. Questions render in the **existing** `StepFour` → `QuestionnaireSections` location (verified: `StepFour.tsx` is where the registry sections render today) — Stage 2 expands that section and does **not** relocate anything between steps; wizard-layout restructuring stays deferred to Phase 2.5B. All questions stay **optional**: `StepNavigation` and the submit gates are untouched. Chips are real toggle buttons with `aria-pressed`, keyboard operable, and wrap on narrow viewports.
 
 ## Out of scope for Stage 2
 
-Stage 3 items only: the "Would you still recommend it?" timeline question, `auto` reset, source copy, "Undo latest update" UI, and retiring the Convert action. No Phase 3D cleanup.
+Stage 3 items only: the "Would you still recommend it?" timeline question, `auto` reset, source copy, "Undo latest update" UI, and retiring the Convert action. No Phase 3D cleanup. No React code ever writes `reviews.is_recommended` — the form writes the answer, the DB resolver owns the materialized flag.
+
 
 ## Tests
 
