@@ -47,7 +47,34 @@ Extend `questionnaire/registry.ts` — pure data, no React, no network:
 - Generic questionnaire answers live in one `answers` state object on the review form, hydrated from the stored envelope on open and reset on `entity_id` change.
 - `QuestionnaireSections` keeps rendering from its existing location in `StepFour.tsx` — no step is moved or renumbered.
 - Save path routes through the Step 3 patch builder, so create and edit share one code path.
-- Tests: registry lint, `CuratedTagSelector` cap/dedupe/grandfathering behaviour, choice-chip clearing, and an end-to-end materialization test (answers → merged metadata → resolver output) that proves envelope-over-rating precedence without touching Stage 3 timeline UI.
+- Unit tests: registry lint, `CuratedTagSelector` cap/dedupe/grandfathering behaviour, choice-chip clearing, and the patch builder's omit/dirty-tracking/clearing rules.
+
+## Step 5 — end-to-end database materialization test (not a TypeScript-only test)
+
+A TypeScript resolver test proves nothing about the integration Stage 2 actually introduces. The test must run the real path:
+
+```text
+questionnaire answer (persistence layer, not a hand-written JSON blob)
+  -> reviews.metadata.questionnaire saved through the real review save path
+  -> PostgreSQL trigger runs
+  -> query reviews.is_recommended back from the database
+  -> assert final stored state
+```
+
+Cases, each against a deliberately conflicting rating so the envelope must be what decides:
+1. rating 1 + `would_recommend: yes` → `is_recommended = true`
+2. rating 5 + `would_recommend: no` → `is_recommended = false`
+3. rating 5 + `would_recommend: maybe` → `is_recommended = false`
+4. clear `would_recommend` (other answers remain) → answer removed from the envelope, rating fallback → `is_recommended = true`
+5. clear the final questionnaire answer → `metadata.questionnaire` absent entirely, rating fallback still correct
+6. unrelated edit (headline only) on a review that never had an envelope → `metadata.questionnaire` still absent, `is_recommended` still rating-inferred
+
+Additional assertions on the same fixtures:
+- The stored envelope's shape is read back and asserted against the SQL resolver's strictness: `version` is JSON numeric `1` (not `"1"`), `type` equals `reviews.category`, `answers` is an object, and unrelated root metadata keys survive each save byte-identical.
+- Timeline precedence is **not** retested here — Stage 1 covers it. This test proves only that the new metadata-writing path feeds the existing database machinery correctly.
+- Disposable fixture reviews, deleted afterwards, with a post-run assertion that no fixture rows remain.
+- If the harness cannot execute against the real database, the result is reported UNVERIFIED — never substituted with a resolver-only test that is then described as end-to-end.
+
 
 ## Explicitly out of scope
 
