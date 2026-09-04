@@ -77,7 +77,7 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
 - [ ] Over-cap stored tags are grandfathered on read (caps govern creation/modification, not passive viewing)
 - [ ] Reset answers and subject-specific metadata on any `entity_id` change
 - [ ] Render-vs-persist separation with forward-compatibility tests (unknown field ids / future versions preserved, never rendered)
-- [ ] End-to-end materialization test: envelope built by the real TS builder → stored row → `is_recommended` resolved by the Stage 1 SQL resolver
+- [ ] End-to-end materialization test — must run through the ONE shared save helper (`buildReviewMetadataForSave`), assert in SQL, and clean up by fixture id only: envelope built by the real TS builder → stored row → `is_recommended` resolved by the Stage 1 SQL resolver
 
 
 ### Stage 3 — timeline intent + cleanup (not started)
