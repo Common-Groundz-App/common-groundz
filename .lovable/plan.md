@@ -72,29 +72,45 @@ One migration:
 - **No ordinary `UPDATE`, no ordinary `DELETE`.** Both policies are dropped, and a
   guard trigger rejects any non-privileged attempt as a backstop. A changed opinion
   is a new event.
+- **One shared lock helper, one key derivation (Codex):** a single private function
+  derives the advisory lock key from the review UUID, used identically by the insert
+  trigger, the owner RPC and the maintenance RPC. No two namespaces or hash
+  functions. `pg_advisory_xact_lock` (same convention as `create_entity_subject`).
+- **The INSERT path takes the lock too, before it mutates (both reviewers):** the
+  insert trigger acquires the per-review lock *before* inserting and holds it through
+  recomputation. Inserts, undos and recomputation serialize per review; different
+  reviews stay independent.
 - **Owner LIFO undo = one atomic RPC**, `delete_latest_review_update(p_review_id,
   p_expected_update_id)`, `SECURITY DEFINER`, pinned `search_path`:
   1. authenticate from `auth.uid()` (never a passed-in user id) and verify review
      ownership;
-  2. `pg_advisory_xact_lock` on the review id (same convention as
-     `create_entity_subject`) — **all** timeline mutations for that review take this
-     lock, so inserts, undos and recomputation serialize per review while different
-     reviews stay independent;
+  2. acquire the shared per-review lock;
   3. resolve the current newest update (`ORDER BY created_at DESC, id DESC LIMIT 1`);
-  4. require it to equal `p_expected_update_id`, else return a **conflict** result
-     instead of deleting whatever became newest;
+  4. require it to equal `p_expected_update_id`;
   5. delete exactly that one row (`WHERE id = ...`, single row);
   6. **after** the delete, call the shared recompute function;
   7. commit — all of it in one transaction.
-- **Privileged maintenance RPC** for arbitrary abuse removal: authorised by explicit
-  role membership checked *outside* any `SECURITY DEFINER` boundary (or reserved for
-  `service_role` callers), never by `current_user` inside a definer function, never
-  by caller-supplied metadata. It takes the same lock and the same post-delete
-  recompute path.
+  It returns a **typed result** `{ status: 'deleted' | 'conflict' | 'not_found',
+  deletedUpdateId?, latestUpdateId? }`; authorization failures remain real database
+  errors, not disguised conflicts, so Stage 3's refresh behaviour is deterministic.
+- **Privileged maintenance RPC** for arbitrary abuse removal: executable **only by
+  `service_role`**, stated explicitly in the migration and enforced by `GRANT` — no
+  role-membership heuristics, no `current_user` checks inside a definer function, no
+  caller-supplied flags. Same lock, same post-delete recompute path.
+- **Function privilege hardening (Codex, blocks Stage 1 completion):** every
+  SECURITY DEFINER and internal helper gets `REVOKE ALL ... FROM PUBLIC` (and from
+  `anon`/`authenticated`) immediately after creation; execution is then granted
+  *only* where intended — the undo RPC to `authenticated`, the maintenance RPC to
+  `service_role`, and internal helpers (recompute, wrapper, lock helper) to **no
+  caller-facing role** at all, so the RPCs are the only mutation surface. Privilege
+  tests assert anonymous and authenticated sessions cannot call the internal
+  functions directly.
 - **One shared recompute function** — `latest_rating`, `timeline_count`,
   `has_timeline`, `trust_score`, resolved `is_recommended` — called by the insert
-  trigger and by both delete RPCs, always after the mutation, so it never observes a
-  row that is on its way out.
+  trigger and by both delete RPCs, always after the mutation. It is
+  **recursion-safe**: since recomputation writes to `reviews`, the recommendation
+  trigger is gated (column-of-interest filtering) so the write cannot re-trigger
+  recomputation into a loop; "calculate" and "write" responsibilities stay split.
 - **Two resolver functions**: a *pure* decision function
   `(original envelope, latest intent event, effective rating) → intent | source |
   is_recommended` with no queries, plus a review-aware wrapper owning the
