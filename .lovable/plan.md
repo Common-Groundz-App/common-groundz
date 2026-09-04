@@ -122,16 +122,22 @@ action goes away.
 
 - Unit tests for the new intent option constant (values match the DB check constraint's
   allowed set) and for the source-copy helper across all three sources, the `intent: null`
-  case, the failed/loading state, and the known-partial state (both: no provenance claim).
+  case, and the `error`/loading state (no provenance claim).
 - Payload tests for the three states: chip selected → that value; question skipped → column
   omitted / `NULL`; chip selected then tapped again → omitted / `NULL`; reset action → `auto`.
 - Regression coverage for the corrected precedence, driven through the existing resolver:
   `no` then `NULL` still resolves `no` / `timeline_explicit`; `no` then `auto` resolves
   `intent: null` / `rating_inferred`.
-- Per-entry display test: `NULL` renders no recommendation statement, `auto` renders the reset
-  wording.
-- A test asserting `fetchReviewUpdates` issues no `range`/`limit`, so the completeness flag the
-  source copy relies on stays true.
+- Per-entry display test: `NULL` renders no recommendation statement, `auto` renders the event
+  wording (not the action label).
+- Latest-intent lookup tests, replacing the withdrawn "no range/limit means complete" test:
+  the query filters nulls, orders `created_at DESC, id DESC` with `LIMIT 1`, breaks equal
+  timestamps deterministically, maps its three outcomes (`found` / `none` / `error`) distinctly,
+  and yields the same answer regardless of how much of the visible timeline is loaded
+  (pagination independence).
+- Ordering test: `fetchReviewUpdates` orders by `created_at` then `id`, both descending, and the
+  entry the UI offers Undo on is the first item under that canonical ordering — not whatever
+  array order arrived.
 - Undo status mapping tested for all three RPC statuses, including that a `conflict` triggers
   a refetch and no optimistic removal, and that the parent review is refreshed in all three.
 - Full Vitest run plus a build check.
