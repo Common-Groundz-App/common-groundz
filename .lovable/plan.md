@@ -66,9 +66,10 @@ One migration:
   `(review_id, created_at DESC, id DESC) WHERE would_recommend IS NOT NULL`.
 - **INSERT authorization**: authenticated, `user_id = auth.uid()`, **and** the parent
   review owned by `auth.uid()`.
-- **Server-owned chronology**: a `BEFORE INSERT` trigger overwrites
-  `created_at`/`updated_at` with `now()` unconditionally, so no caller can backdate
-  an event to outrank the true latest one.
+- **Server-owned chronology (overwrite, not rejection — Codex):** a `BEFORE INSERT`
+  trigger **replaces** `created_at`/`updated_at` with `now()` unconditionally; a
+  caller-supplied value is ignored rather than causing an error. Acceptance tests
+  assert the *persisted* timestamp is server-generated.
 - **No ordinary `UPDATE`, no ordinary `DELETE`.** Both policies are dropped, and a
   guard trigger rejects any non-privileged attempt as a backstop. A changed opinion
   is a new event.
