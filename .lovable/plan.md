@@ -32,7 +32,9 @@ So Stage 1 is closed out and reported first; Stage 2 is a separate delivery.
 - **Literal single fixture, no duplication:** `src/services/review/__fixtures__/recommendationTruthTable.json` is the one machine-readable source. Vitest imports it directly; the SQL/Deno harness reads the same file and feeds each case to the SQL resolver, comparing against the same expected values. No hand-copied `VALUES` list anywhere. A case count assertion on both sides makes a silently-skipped file a failure.
 - Concurrency: run the four documented races (insert vs undo, undo vs undo, maintenance vs undo, two different reviews) from parallel independent sessions and record results. If parallel sessions cannot be established, it stays explicitly UNVERIFIED — not quietly passed.
 - Role-session verification from **real sessions**, not from grants: `anon` and `authenticated` direct `UPDATE`/`DELETE`/`TRUNCATE` denied; `service_role` direct `UPDATE`/`DELETE` **denied** while `service_role` executing the maintenance RPC **succeeds** (the Option A boundary claim is unproven without this pair).
-- Stage 1 is marked complete in `roadmap.md` **only** for the items actually proven; anything that cannot be executed stays unticked and is listed as UNVERIFIED in `docs/verification/phase-3c-stage1-selftest.md`.
+- `roadmap.md` Stage 1 boxes are ticked **only** for items actually proven from real sessions; anything unexecutable stays unticked and is listed as UNVERIFIED in `docs/verification/phase-3c-stage1-selftest.md`.
+- **Stop here.** Report Step 0 results — resolver + fixture parity output, concurrency results, the role-session matrix, and any UNVERIFIED item — and wait for approval before Step 1.
+
 
 
 ---
