@@ -18,10 +18,15 @@ export function isPlainMetadataObject(value: unknown): value is ReviewMetadata {
 export function mergeReviewMetadata(
   existing: unknown,
   patch: ReviewMetadata | undefined,
+  /**
+   * Keys to DELETE from the merged result. Needed because "absent" is a real,
+   * meaningful state for `questionnaire` and `food_tags` — a merge alone can
+   * never express removal.
+   */
+  removeKeys: readonly string[] = [],
 ): ReviewMetadata | undefined {
   const base = isPlainMetadataObject(existing) ? { ...existing } : {};
-  if (!patch || Object.keys(patch).length === 0) {
-    return Object.keys(base).length > 0 ? base : undefined;
-  }
-  return { ...base, ...patch };
+  const merged = patch ? { ...base, ...patch } : base;
+  for (const key of removeKeys) delete merged[key];
+  return Object.keys(merged).length > 0 ? merged : undefined;
 }

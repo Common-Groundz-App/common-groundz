@@ -69,11 +69,16 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
 
 
 
-### Stage 2 — questionnaire UI + persistence (not started)
-- [ ] Registry entries + `CuratedTagSelector`; Food Tags untouched
-- [ ] Version-selection and legacy category-mismatch policy
+### Stage 2 — questionnaire UI + persistence (in progress)
+- [ ] Registry entries for all 15 canonical types + `CuratedTagSelector`; Food Tags untouched
+- [ ] Curated vocabularies live in one module; registry lint test proves parity with the approved matrix doc
+- [ ] Envelope written as `metadata.questionnaire` with numeric `version: 1`, `type` = `reviews.category` (never a display resolver)
+- [ ] Field-level dirty patching: only answered fields are written; clearing the last answer removes the envelope
+- [ ] Over-cap stored tags are grandfathered on read (caps govern creation/modification, not passive viewing)
 - [ ] Reset answers and subject-specific metadata on any `entity_id` change
-- [ ] Render-vs-persist separation with forward-compatibility tests
+- [ ] Render-vs-persist separation with forward-compatibility tests (unknown field ids / future versions preserved, never rendered)
+- [ ] End-to-end materialization test: envelope built by the real TS builder → stored row → `is_recommended` resolved by the Stage 1 SQL resolver
+
 
 ### Stage 3 — timeline intent + cleanup (not started)
 - [ ] "Would you still recommend it?" with `auto` reset and honest source copy
