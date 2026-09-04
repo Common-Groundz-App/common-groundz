@@ -12,24 +12,32 @@ action goes away.
 ## What the user will see
 
 1. **"Would you still recommend it?"** in the add-update form of the timeline viewer —
-   four options: Yes / Maybe / No / Not sure yet. Nothing is preselected.
-2. **Honest source copy** on the review, so the displayed answer never lies about where it
+   three chips: Yes / Maybe / No. Nothing is preselected, and leaving it alone means the
+   update makes no recommendation statement at all.
+2. **A separate "Use my rating instead" reset** for the deliberate case of discarding an
+   earlier explicit answer and going back to rating inference.
+3. **Honest source copy** on the review, so the displayed answer never lies about where it
    came from: an explicit timeline answer reads as the reviewer's latest word, an
    explicit answer on the review itself reads as their original answer, and a
    rating-derived answer is labelled as inferred from the rating.
-3. **"Undo latest update"** on the newest timeline entry only, owner only, with a clear
-   message when someone else's newer entry (or a concurrent undo) has moved the target.
-4. **No more "Convert to Recommendation"** menu item anywhere.
+4. **"Undo latest update"** on the newest timeline entry only, owner only, with neutral
+   copy when a newer update has moved the target.
+5. **No more "Convert to Recommendation"** menu item anywhere.
 
-## Step 1 — record intent when adding a timeline update
+## Step 1 — record intent when adding a timeline update (frozen omission semantics)
 
-- Extend `addReviewUpdate` with an explicit `wouldRecommend` argument typed as
-  `'yes' | 'maybe' | 'no' | 'auto'`, written straight to `review_updates.would_recommend`.
-- "Not sure yet" writes `auto`. This is the reset: `auto` is stored as historical event data
-  and the frozen resolver contract turns a latest `auto` into
-  `{ intent: null, source: 'rating_inferred' }`, i.e. the review falls back to its rating.
-- Omitting the question entirely also writes `auto`, so every update carries an explicit
-  event value and there is no null-vs-auto ambiguity in new rows.
+- Extend `addReviewUpdate` with an optional `wouldRecommend?: 'yes' | 'maybe' | 'no' | 'auto' | null`
+  argument written to `review_updates.would_recommend`.
+- Three distinct states, exactly as frozen — this is the correction to the previous draft,
+  which wrongly collapsed "skipped" into `auto`:
+  - **Untouched / cleared / skipped → SQL `NULL`** (column omitted). The update makes no
+    recommendation statement; the previous non-null timeline intent stays authoritative.
+  - **Yes / Maybe / No → explicit timeline statement.**
+  - **"Use my rating instead" → `auto`.** Only this deliberate action neutralizes earlier
+    explicit intent, resolving to `{ intent: null, source: 'rating_inferred' }`.
+- Tapping a selected chip again clears back to unanswered → `NULL`. It must never become `auto`.
+- The column is already nullable and the SQL ordering function already filters nulls out, so
+  no migration is needed.
 - The client never writes `reviews.is_recommended`. Materialization stays with the Stage 1
   DB path (`review_updates_after_insert` → `recompute_review_timeline_state`).
 
@@ -37,9 +45,12 @@ action goes away.
 
 - Reuse the existing `ChoiceChips` renderer from the questionnaire (same unanswered/answered
   semantics, same tap-to-clear) inside `ReviewTimelineViewer`'s add-update form, directly
-  under the rating control.
-- The four options and their labels live in one exported constant next to the resolver types,
-  so the copy has a single source and cannot drift from the stored values.
+  under the rating control, with the three explicit options only.
+- The reset is a distinct, clearly labelled control next to the chips — not a fourth chip —
+  because it means something categorically different from an answer. Choosing it deselects any
+  chip; choosing a chip clears the reset.
+- Options, labels and reset copy live in one exported constant next to the resolver types, so
+  the wording has a single source and cannot drift from the stored values.
 - Existing behaviour of the form is otherwise untouched: comment still required, rating still
   optional, media flow unchanged.
 
@@ -51,8 +62,17 @@ action goes away.
 - Read the answer through the existing `resolveRecommendationForReview` wrapper (the TS mirror
   of the SQL resolver) — never by re-deriving a rule locally, and never by trusting a
   hand-written threshold.
-- Show it where a review already displays its recommendation state, and show each timeline
-  entry's own recorded answer inside the viewer.
+- **No N+1.** Source copy is shown only on surfaces that already hold the review's timeline
+  events (the timeline viewer / review detail). No per-card timeline query is added to feeds or
+  profile grids; those surfaces keep their existing recommendation display untouched until the
+  data can be supplied by an existing efficient query.
+- **Failure-aware.** The helper takes an explicit timeline-availability state
+  (`loaded | unavailable`). When the timeline fetch failed or has not loaded, it renders the
+  DB-materialized `is_recommended` with no provenance claim — never "from your original answer"
+  or "inferred from your rating", because an unread timeline event may be the authoritative one.
+- Per-entry display inside the viewer is literal, not resolved: `yes|maybe|no` show the recorded
+  answer, `auto` shows the reset wording, and `NULL` shows nothing — a null row must never look
+  like it made a statement.
 
 ## Step 4 — undo latest update
 
@@ -60,11 +80,15 @@ action goes away.
   `delete_latest_review_update(p_review_id, p_expected_update_id)`, which is already granted
   to `authenticated` and enforces ownership, takes the per-review advisory lock, and returns
   one of three statuses.
-- Map statuses to UX: `deleted` → success + refetch; `conflict` → "this is no longer the
-  newest update" + refetch (the RPC also returns the real newest id); `not_found` → the
-  entry is already gone + refetch.
+- Map statuses to UX: `deleted` → success + refetch; `conflict` → neutral copy, "A newer
+  update exists, so this one can no longer be undone" + refetch (the RPC also returns the real
+  newest id); `not_found` → the entry is already gone + refetch. No wording implies another
+  person added the newer entry — timeline INSERT is owner-scoped.
 - The action appears only on the newest entry, only for the review owner, and only through
   `requireAuth()` as the first statement of the handler. Confirmation dialog before firing.
+- All three outcomes also refresh the parent review, not just the entry list: the RPC calls
+  `recompute_review_timeline_state`, so `is_recommended`, `latest_rating`, `timeline_count`,
+  `has_timeline` and `trust_score` can all have changed.
 - Nothing else may delete timeline entries: no direct client `DELETE` is added, matching the
   Stage 1 privilege posture.
 
@@ -83,9 +107,15 @@ action goes away.
 ## Tests and verification
 
 - Unit tests for the new intent option constant (values match the DB check constraint's
-  allowed set) and for the source-copy helper across all three sources plus the
-  `intent: null` case.
-- A test asserting "not sure yet" and "question skipped" both send `auto`.
+  allowed set) and for the source-copy helper across all three sources, the `intent: null`
+  case, and the `unavailable` timeline state (no provenance claim).
+- Payload tests for the three states: chip selected → that value; question skipped → column
+  omitted / `NULL`; chip selected then tapped again → omitted / `NULL`; reset action → `auto`.
+- Regression coverage for the corrected precedence, driven through the existing resolver:
+  `no` then `NULL` still resolves `no` / `timeline_explicit`; `no` then `auto` resolves
+  `intent: null` / `rating_inferred`.
+- Per-entry display test: `NULL` renders no recommendation statement, `auto` renders the reset
+  wording.
 - Undo status mapping tested for all three RPC statuses, including that a `conflict` triggers
   a refetch and no optimistic removal.
 - Full Vitest run plus a build check.
@@ -95,13 +125,16 @@ action goes away.
 
 ## Technical notes
 
-- `review_updates.would_recommend` allows `yes | maybe | no | auto` and is nullable; existing
-  rows stay null and keep resolving through the ordering function, which filters nulls out.
+- `review_updates.would_recommend` allows `yes | maybe | no | auto` and is nullable; `NULL`
+  means "this update made no recommendation statement" and the SQL ordering function filters
+  those rows out. No migration is required for Stage 3.
 - Ordering for "latest" and "newest entry" is `created_at DESC, id DESC` everywhere — the same
   ordering the SQL function, the TS mirror, and the undo RPC use.
 - `created_at` is server-owned (client value overwritten by the BEFORE INSERT trigger), so the
   UI must refetch after insert rather than trusting a locally constructed row.
-- Roadmap: Stage 3 items get ticked only for what the tests above actually prove.
+- `roadmap.md` is updated at implementation time: the Stage 3 line is reworded to the corrected
+  semantics (explicit reset action, not a skipped question), and items are ticked only for what
+  the tests above actually prove.
 
 ## Stop point
 
