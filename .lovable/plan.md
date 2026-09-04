@@ -1,17 +1,17 @@
-# Phase 3C (v4) — LIFO undo as an atomic RPC
+# Phase 3C (v5) — final: RPC undo + privilege hardening
 
-Both corrections are right and are folded in. Codex's point about the enforcement
-mechanism is the important one: a general `DELETE` policy plus a row-level "is this
-the newest row?" trigger is not a safe LIFO API — a single
-`DELETE FROM review_updates WHERE review_id = ...` is evaluated row by row, and
-"newest" is re-checked per row, so the statement shape decides the outcome. Their
-`current_user` warning is also correct: inside a `SECURITY DEFINER` function
-`current_user` is the *owner*, so an ordinary caller would look privileged. LIFO
-therefore becomes one authenticated RPC with no direct delete path at all.
+Both rounds of review are right and everything is folded in. This is the final
+architecture — both reviewers now approve it; the remaining notes are Stage 1
+acceptance guardrails, not redesigns.
 
-Also agreed: recomputation must run **after** the row is gone (or explicitly exclude
-it), and every timeline mutation on a review must serialize against that review.
-This is now scope-complete — no further product additions to 3C.
+Why the earlier enforcement shape was wrong (kept for the record): a general
+`DELETE` policy plus a row-level "newest?" trigger is not a safe LIFO API — a
+single `DELETE ... WHERE review_id = ...` is evaluated row by row and "newest" is
+re-checked per row, so statement shape decides the outcome. And `current_user`
+inside a `SECURITY DEFINER` function is the function's *owner*, so privilege checks
+based on it would misidentify ordinary callers as privileged. LIFO is therefore one
+authenticated RPC, recomputation always runs after the mutation, and every timeline
+mutation on a review serializes against that review.
 
 ## Roadmap additions (Stage 0 writes these)
 
