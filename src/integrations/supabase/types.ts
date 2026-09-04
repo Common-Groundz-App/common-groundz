@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      _stage1_test_results: {
+        Row: {
+          check_name: string
+          created_at: string
+          detail: string | null
+          id: number
+          result: string
+        }
+        Insert: {
+          check_name: string
+          created_at?: string
+          detail?: string | null
+          id?: number
+          result: string
+        }
+        Update: {
+          check_name?: string
+          created_at?: string
+          detail?: string | null
+          id?: number
+          result?: string
+        }
+        Relationships: []
+      }
       admin_actions: {
         Row: {
           action_type: string
@@ -4069,6 +4093,7 @@ export type Database = {
       }
     }
     Functions: {
+      _stage1_selftest: { Args: never; Returns: undefined }
       add_comment: {
         Args: {
           p_content: string
