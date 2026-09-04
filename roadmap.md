@@ -30,8 +30,17 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
 - [ ] Function privilege hardening: REVOKE PUBLIC, explicit GRANTs, privilege tests
 - [ ] Shared post-mutation recompute function; recursion-safe trigger gating
 - [ ] Pure SQL/TS recommendation resolver + review-aware wrapper, one shared fixture
+      (frozen output contract: `source` is `timeline_explicit | review_explicit |
+      rating_inferred`; a latest `auto` event resolves to `intent: null`,
+      `source: rating_inferred` — `auto` stays historical event data, never resolved intent)
+- [ ] Explicit `OWNER TO postgres` on every privileged/internal function (definer chain
+      documented in SQL, not assumed from the migration runner)
+- [ ] Maintenance RPC re-checks the target row under the advisory lock and verifies the
+      deleted row count, so a lost race returns `not_found`, never a false `deleted`
 - [ ] Trigger consolidation with whole-dataset and concurrency regression checks
+- [ ] Explicitly assert RLS is enabled on `review_updates` in the authorization tests
 - [ ] Regenerate Supabase types
+
 
 ### Stage 2 — questionnaire UI + persistence (not started)
 - [ ] Registry entries + `CuratedTagSelector`; Food Tags untouched
