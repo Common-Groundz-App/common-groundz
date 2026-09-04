@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public._stage1_closeout_results;
