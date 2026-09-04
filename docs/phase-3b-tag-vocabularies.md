@@ -49,7 +49,7 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | `helpful_staff` | Helpful staff | 💡 | positive |
 | `quiet` | Quiet | 🤫 | neutral |
 | `crowded` | Crowded | 👥 | neutral |
-| `hard_to_find` | Hard to find | 🧭 | neutral |
+| `hard_to_find` | Hard to find | 🧭 | negative |
 | `long_wait` | Long wait | ⏳ | negative |
 | `overpriced` | Overpriced | 💸 | negative |
 | `poor_upkeep` | Poorly maintained | 🧹 | negative |
@@ -82,7 +82,7 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | `easy_returns` | Easy returns | ↩️ | positive |
 | `wide_range` | Wide range | 🧺 | positive |
 | `premium_pricing` | Premium pricing | 💎 | neutral |
-| `limited_range` | Limited range | 📉 | neutral |
+| `limited_range` | Limited range | 📉 | negative |
 | `inconsistent_quality` | Inconsistent quality | 🎲 | negative |
 | `slow_support` | Slow support | 🐢 | negative |
 | `misleading_claims` | Misleading claims | 🚩 | negative |
@@ -213,7 +213,7 @@ Specification only. No registry edit, no component, no migration lands in 3B; Ph
 | `thorough` | Thorough | 🔍 | positive |
 | `respects_time` | Respects your time | ⏰ | positive |
 | `direct_style` | Very direct | ➡️ | neutral |
-| `hard_to_book` | Hard to book | 🗓️ | neutral |
+| `hard_to_book` | Hard to book | 🗓️ | negative |
 | `slow_to_respond` | Slow to respond | 🐢 | negative |
 | `unclear_communication` | Unclear communication | 🌫️ | negative |
 | `didnt_follow_through` | Didn't follow through | 📆 | negative |
