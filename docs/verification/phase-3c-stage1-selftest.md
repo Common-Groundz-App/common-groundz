@@ -52,3 +52,63 @@ This is a functional self-test only. It does NOT verify:
 - RLS enabled on `review_updates`.
 - Fixture cleaned up.
 - **UNVERIFIED:** advisory-lock concurrency.
+
+# Phase 3C — Stage 1 close-out verification (supplemental)
+
+Run: 2026-09-04 after reviewer corrections.
+
+Harness: temporary `public._stage1_closeout_results` table with RLS and a restrictive
+policy, created by the migration runner, read back, then dropped. No permanent privileged
+surface remains.
+
+## Corrections applied before this close-out
+1. Strict envelope `version`: only the JSON number `1` is valid. `"version": "1"` is now
+   treated as malformed and resolves as *absent* (falls back to rating inference), in both
+   the SQL resolver and the TypeScript resolver.
+2. Shared fixture is the single file
+   `src/services/review/__fixtures__/recommendationTruthTable.json`. The SQL harness payload
+   is generated at run time by `scripts/build-recommendation-parity-sql.mjs`; a lock file
+   `recommendationTruthTable.lock.json` records the fixture SHA-256 so drift can be detected.
+3. Role checks are explicitly labelled as *database-role privilege* tests (`SET LOCAL ROLE`
+   at the top level of a migration session), not genuine Supabase authenticated sessions with
+   JWT claims and `auth.uid()`. The latter are reported as **UNVERIFIED** below.
+
+## Results
+
+### SQL/TS shared truth table parity
+- Fixture SHA-256: `ba7594aa05f6ccd53c19a8b9078b4dcad42716f8bc56c937b14e5ca140ad935c`
+- Cases executed: 24, declared: 24
+- Mismatches: 0
+- Status: **PASS**
+
+### Database-role privilege matrix (direct table mutations)
+All attempted from `anon`, `authenticated` and `service_role` via `SET LOCAL ROLE` against a
+throwaway fixture row in `review_updates`:
+
+| Check | Result |
+|-------|--------|
+| anon direct UPDATE | denied (42501) |
+| anon direct DELETE | denied (42501) |
+| anon TRUNCATE | denied (42501) |
+| authenticated direct UPDATE | denied (42501) |
+| authenticated direct DELETE | denied (42501) |
+| authenticated TRUNCATE | denied (42501) |
+| service_role direct UPDATE | denied (42501) |
+| service_role direct DELETE | denied (42501) |
+| fixture row survived all denied statements | PASS |
+| service_role maintenance RPC (`admin_delete_review_update`) | deleted |
+| maintenance RPC removed exactly the fixture row | PASS |
+| authenticated maintenance RPC | denied (42501) |
+| fixture cleaned up | PASS |
+
+### Remaining UNVERIFIED
+- Authenticated owner INSERT into `review_updates` via a real Supabase session (`auth.uid()`
+  present).
+- Authenticated owner "undo latest update" via a real Supabase session.
+- Authenticated non-owner INSERT denial via a real Supabase session.
+- Advisory-lock concurrency races (insert-vs-undo, undo-vs-undo, maintenance-vs-undo,
+  two different reviews) with independent parallel sessions.
+
+These require genuine authenticated Supabase client sessions or parallel database sessions
+and are not covered by the single-session migration harness.
+
