@@ -1,4 +1,7 @@
-# Stage 2 — questionnaire UI + persistence (with a Stage 1 close-out first)
+# Stage 1 close-out (delivered and reviewed first), then Stage 2 — questionnaire UI + persistence
+
+**Execution order is a hard boundary.** Step 0 is delivered on its own, reported, and stops for your review. Stage 2 Steps 1–4 begin only after you approve that report. If any required Stage 1 check cannot actually be executed, Stage 2 does not start — the report says so and waits for your decision.
+
 
 ## Is Stage 1 complete?
 
