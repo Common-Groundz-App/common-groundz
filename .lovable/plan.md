@@ -22,11 +22,14 @@ So Stage 2 starts with a short close-out, then the questionnaire work.
 
 ## Step 0 — Stage 1 close-out
 
-- `src/services/review/recommendationResolver.ts`: pure `resolveReviewRecommendation(envelope, category, effectiveRating)` returning `{ intent, source }` with `source` in `timeline_explicit | review_explicit | rating_inferred`, plus `lookupLatestRecommendationIntent(updates)` ordering by `created_at DESC, id DESC`. Strict envelope validation (version exactly `1`, `type` strictly equal to the review category, `answers` a plain object, `would_recommend` exactly `yes|maybe|no`); malformed = absent, never `false`; `maybe` → `false`; a latest `auto` resolves to `intent: null, source: rating_inferred`.
-- One shared fixture file (`recommendationTruthTable.ts`) consumed by a Vitest suite and by the same-cases SQL check, so both sides prove identical output. No behaviour change to the DB.
+- `src/services/review/recommendationResolver.ts`, mirroring the SQL decision function exactly:
+  - `lookupLatestRecommendationIntent(updates)` — **ordering only**, `created_at DESC, id DESC`, returns the newest event whose `would_recommend` is non-null (or `null`).
+  - `resolveReviewRecommendation(envelope, category, latestTimelineIntent, effectiveRating)` → `{ intent, isRecommended, source }`, `source` in `timeline_explicit | review_explicit | rating_inferred`. Precedence: timeline intent → envelope answer → rating. Strict envelope validation (version exactly `1`, `type` strictly equal to the review's canonical category, `answers` a plain object, `would_recommend` exactly `yes|maybe|no`); malformed/unsupported = **absent**, never `false`; `maybe` → `false`; a latest `auto` resolves to `intent: null, source: rating_inferred`. Rating inference uses the same effective rating the SQL side uses (`COALESCE(latest_rating, rating) >= 4`, null → false) — the threshold and null handling are asserted, not assumed.
+- **Literal single fixture, no duplication:** `src/services/review/__fixtures__/recommendationTruthTable.json` is the one machine-readable source. Vitest imports it directly; the SQL/Deno harness reads the same file and feeds each case to the SQL resolver, comparing against the same expected values. No hand-copied `VALUES` list anywhere. A case count assertion on both sides makes a silently-skipped file a failure.
 - Concurrency: run the four documented races (insert vs undo, undo vs undo, maintenance vs undo, two different reviews) from parallel independent sessions and record results. If parallel sessions cannot be established, it stays explicitly UNVERIFIED — not quietly passed.
-- Role-session denial: attempt direct `UPDATE`/`DELETE`/`TRUNCATE` as real `anon` and `authenticated` sessions and record the errors.
-- Tick `roadmap.md` Stage 1, appending the concurrency and role-session evidence to the verification doc.
+- Role-session verification from **real sessions**, not from grants: `anon` and `authenticated` direct `UPDATE`/`DELETE`/`TRUNCATE` denied; `service_role` direct `UPDATE`/`DELETE` **denied** while `service_role` executing the maintenance RPC **succeeds** (the Option A boundary claim is unproven without this pair).
+- Stage 1 is marked complete in `roadmap.md` **only** for the items actually proven; anything that cannot be executed stays unticked and is listed as UNVERIFIED in `docs/verification/phase-3c-stage1-selftest.md`.
+
 
 ---
 
@@ -52,35 +55,44 @@ Extend `questionnaire/registry.ts` — pure data only:
 - `metadata.questionnaire = { version: 1, type: <canonical category>, answers: { … } }`, merged via the existing `mergeReviewMetadata` — never replacing the column.
 - Unanswered fields are **omitted** from `answers` — never `""`, `null` or `[]`. `stood_out` / `best_for` persist as `{ selected: [...], custom: [...] }`, omitting empty arrays.
 - `would_recommend` is written into the envelope only; the DB trigger derives `is_recommended`. No client-side recommendation writes.
-- **Version-selection policy:** a stored envelope is read only when `version === 1` and `type` equals the review's canonical category. A legacy category-mismatch review renders in compatibility mode — its unknown envelope is never rendered and never destroyed; it is carried through untouched until the subject is reselected.
-- **Reset on subject change:** any `entity_id` change clears questionnaire answers and subject-specific metadata (including `food_tags`) so answers can never describe the previous subject.
-- Render-vs-persist separation: unknown fields/tags in a stored envelope are dropped from render but preserved on write.
+- **Version-selection policy:** a stored envelope is read only when `version === 1` and `type` equals the review's canonical category. A legacy category-mismatch review renders in compatibility mode — its envelope is never rendered and never destroyed; it is carried through untouched until the subject is reselected.
+- **No-envelope legacy edit (restored contract):** an existing linked review with a valid canonical subject and **no** `metadata.questionnaire` is offered the v1 questions, but an unrelated save (headline, thoughts, media, rating, visibility) leaves the envelope **absent**. The envelope is created only once at least one questionnaire answer is supplied.
+- **Field-level dirty tracking, not whole-object rewrite:** persistence patches `answers` field by field. A field the user never touched is written back byte-identical, including values this build cannot render (future fields, unknown tag ids). A field the user **did** edit is rewritten from its sanitized visible values — so a stale unknown tag inside an edited field can genuinely be replaced or cleared. Never replace the whole `answers` object.
+- **Clearing:** clearing the last remaining answer **removes** `metadata.questionnaire` entirely rather than leaving `{ version, type, answers: {} }` — absent keeps its honest meaning "no questionnaire was answered". Removal only applies when no untouched/unknown field remains; if one does, it is preserved and the envelope stays.
+- **Reset on subject change:** any `entity_id` change clears the questionnaire envelope and known subject-specific metadata (`food_tags`), and **preserves unrelated root metadata and provenance** untouched.
+- **Read-time sanitization:** stored custom tags exceeding the caps (length, count) are truncated for display without mutating storage until that field is edited.
 
 ## Step 4 — wizard wiring
 
-`ReviewForm` holds a single `answers` object keyed by field id (replacing the ad-hoc `foodTags` state path for non-food types; food keeps its existing `metadata.food_tags` contract). Questions render in Step 3 under the registry order. All questions stay **optional** — nothing new blocks submission.
+Generic Phase 3 questionnaire answers live in one `answers` state object on `ReviewForm`, keyed by field id; the existing Food Tags keep their current dedicated state and `metadata.food_tags` persistence path unchanged. Questions render in the **existing** `StepFour` → `QuestionnaireSections` location (verified: `StepFour.tsx` is where the registry sections render today) — Stage 2 expands that section and does **not** relocate anything between steps; wizard-layout restructuring stays deferred to Phase 2.5B. All questions stay **optional**: `StepNavigation` and the submit gates are untouched. Chips are real toggle buttons with `aria-pressed`, keyboard operable, and wrap on narrow viewports.
 
 ## Out of scope for Stage 2
 
-Stage 3 items only: the "Would you still recommend it?" timeline question, `auto` reset, source copy, "Undo latest update" UI, and retiring the Convert action. No Phase 3D cleanup.
+Stage 3 items only: the "Would you still recommend it?" timeline question, `auto` reset, source copy, "Undo latest update" UI, and retiring the Convert action. No Phase 3D cleanup. No React code ever writes `reviews.is_recommended` — the form writes the answer, the DB resolver owns the materialized flag.
+
 
 ## Tests
 
 - Registry lint vs the frozen doc (ids, sentiments, counts, per-type field sets).
 - `CuratedTagSelector` caps, custom dedupe/normalization, blank rejection; FoodTagSelector regression suite unchanged and uncapped.
 - Choice chips: no preselection, re-tap clears.
-- Persistence: envelope shape per type; omission of unanswered fields; merge preserves unrelated metadata; version/type mismatch → compatibility mode, envelope preserved; `entity_id` change resets answers and `food_tags`; unknown tag ids not rendered but not destroyed.
-- Stage 0 close-out: shared truth table green in Vitest and SQL with identical output.
+- Persistence: envelope shape per type; unanswered fields omitted; merge preserves unrelated metadata; version/type mismatch → compatibility mode, envelope preserved.
+- **No-envelope regression:** legacy review with no `metadata.questionnaire`, headline-only edit → `metadata.questionnaire` remains **absent**.
+- **Field-level dirty state:** untouched field carrying an unknown tag survives an edit to a *different* field; editing that same field replaces/clears the unknown tag; clearing the last answer removes the envelope; an untouched unknown field keeps the envelope alive.
+- `entity_id` change clears the envelope and `food_tags` while unrelated root metadata and provenance survive.
+- Step 0 close-out: the one JSON truth table green in both Vitest and the SQL harness with identical output and matching case counts.
 - `bunx vitest run` + typecheck green.
 
 ## Manual acceptance (you)
 
 1. New review for a movie, product, place, food, course and `others` → correct questions and repeat-intent wording per type; food shows Food Tags + portion and no generic "What stood out".
-2. Answer nothing → submit succeeds; stored metadata contains no empty questionnaire keys.
+2. Answer nothing → submit succeeds; stored metadata contains no questionnaire key at all.
 3. Answer, save, reopen → answers restored exactly; unrelated metadata intact.
-4. Change the subject mid-form → answers and food tags cleared.
-5. Edit a legacy review whose category no longer matches its subject → compatibility mode, saves without losing stored data.
-6. Recommendation flag still follows the frozen precedence (envelope beats rating).
+4. Change the subject mid-form → questionnaire and food tags cleared, everything else intact.
+5. Edit an older review, change only the headline → no questionnaire metadata appears.
+6. Edit a legacy review whose category no longer matches its subject → compatibility mode, saves without losing stored data.
+7. Recommendation flag still follows the frozen precedence (envelope beats rating; timeline beats envelope).
+
 
 ## Report and stop
 
