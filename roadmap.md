@@ -43,9 +43,13 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
       denial must be attempted from a real session running as that role); one correctly
       typed scalar `SELECT ... INTO` per assertion; direct UPDATE/DELETE inside the harness
       is labelled test-only fixture manipulation; chronology asserts the client value did
-      not survive *and* the replacement lies between a captured test start and
-      `clock_timestamp()`; the harness and its results table are dropped once evidence is
-      captured, so no permanent privileged surface remains
+      not survive *and* that the stored value equals `transaction_timestamp()` — the trigger
+      uses `now()` (transaction start), so comparing against a later `clock_timestamp()`
+      captured inside the harness produces false failures; fixture user/entity ids are
+      confirmed to exist and match the review category before running; the harness and its
+      results table are dropped once evidence is captured, so no permanent privileged
+      surface remains
+
 - [ ] Advisory-lock concurrency (insert vs undo, undo vs undo, maintenance vs undo, two
       different reviews) requires independent parallel sessions — never reported as passing
       on the strength of the single-session self-test
