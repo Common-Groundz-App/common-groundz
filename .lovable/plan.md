@@ -208,9 +208,13 @@ within the same type clears answers and food tags; registry lint test asserts un
 ## Technical notes
 
 - Migration objects: column, check, partial index, INSERT policy replacement, drop of
-  UPDATE/DELETE policies, chronology trigger, mutation guard trigger, per-review
-  advisory lock convention, shared recompute function, owner LIFO RPC, privileged
-  maintenance RPC, pure resolver, review-aware wrapper, consolidated triggers.
+  UPDATE/DELETE policies, chronology trigger, mutation guard trigger, shared lock-key
+  helper, shared recompute function, owner LIFO RPC, privileged maintenance RPC, pure
+  resolver, review-aware wrapper, consolidated triggers, and `REVOKE`/`GRANT`
+  statements for every function.
+- Delivery: Stage 0 frozen and verified first, then each stage deployed and verified
+  separately — after Stage 1, the migration, whole-dataset parity, authorization,
+  privilege and concurrency results are reported before Stage 2 begins.
 - Files: `docs/phase-3b-tag-vocabularies.md`, `roadmap.md`,
   `questionnaire/registry.ts`, `QuestionnaireSections.tsx`, new
   `CuratedTagSelector.tsx`, new `recommendationIntent.ts` + shared fixture,
