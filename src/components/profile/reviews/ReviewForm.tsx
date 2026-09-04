@@ -37,6 +37,16 @@ import {
 import { resolveReviewIdentity } from './questionnaire/identityPersistence';
 import { mergeReviewMetadata } from './questionnaire/metadata';
 import type { QuestionnaireAnswers } from './questionnaire/QuestionnaireSections';
+import {
+  buildQuestionnairePatch,
+  hydrateQuestionnaireAnswers,
+  isQuestionnaireWritable,
+  readQuestionnaireEnvelope,
+  QUESTIONNAIRE_METADATA_KEY,
+  type EnvelopeRead,
+} from './questionnaire/envelope';
+import type { CuratedTagAnswer } from './questionnaire/curatedTagInput';
+import type { QuestionnaireConfig } from './questionnaire/registry';
 
 
 // Import step components
@@ -219,11 +229,85 @@ const ReviewForm = ({
     resolution.mode === 'invalid' ? LEGACY_UNLINKED_QUESTIONNAIRE : resolution.config;
   const invalidMessage = invalidSubjectMessage(resolution);
   
+  /**
+   * Phase 3C Stage 2 — questionnaire answers.
+   *
+   * `choiceAnswers` / `curatedAnswers` are the RENDERABLE state; the stored
+   * envelope stays the source of truth for anything this build cannot render.
+   * `touchedQuestionnaireFields` drives field-level dirty patching: a field the
+   * user never touched is written back byte-identical on save.
+   */
+  const [choiceAnswers, setChoiceAnswers] = useState<Record<string, string>>({});
+  const [curatedAnswers, setCuratedAnswers] = useState<Record<string, CuratedTagAnswer>>({});
+  const [touchedQuestionnaireFields, setTouchedQuestionnaireFields] = useState<Set<string>>(
+    () => new Set(),
+  );
+  /** Set when the subject changes: the previously stored envelope no longer applies. */
+  const [questionnaireReset, setQuestionnaireReset] = useState(false);
+
+  /**
+   * What this save will write to `reviews.category` (Phase 2.1 rules). The
+   * envelope's `type` must equal exactly this value, because that is what the
+   * database validates against — never a display resolver.
+   */
+  const canonicalWins =
+    subjectOrigin === 'user-selected' || (subjectOrigin === 'entity-page' && !isEditMode);
+  const persistedCategory =
+    canonicalWins && canonicalCategory
+      ? canonicalCategory
+      : (isEditMode && review?.category ? review.category : category);
+
+  /** The envelope currently stored on the row, read strictly (numeric v1, type match). */
+  const storedEnvelope: EnvelopeRead = React.useMemo(
+    () =>
+      isEditMode && review
+        ? readQuestionnaireEnvelope(review.metadata, review.category)
+        : { status: 'absent' },
+    [isEditMode, review],
+  );
+  /** After a subject change the old envelope is discarded rather than patched. */
+  const effectiveEnvelope: EnvelopeRead = questionnaireReset ? { status: 'absent' } : storedEnvelope;
+
+  /**
+   * Compatibility mode: the stored category and the linked subject's canonical
+   * type disagree, so no v1 envelope may be created or updated. The questions
+   * are simply not offered; stored data is left untouched.
+   */
+  const questionnaireWritable = isQuestionnaireWritable(
+    persistedCategory,
+    resolution.mode === 'canonical' ? resolution.type : null,
+  );
+
+  /** In compatibility mode only the envelope-backed fields are withheld. */
+  const renderedConfig: QuestionnaireConfig = React.useMemo(() => {
+    if (questionnaireWritable) return questionnaireConfig;
+    const sections = questionnaireConfig.sections
+      .map((section) => ({
+        ...section,
+        fields: section.fields.filter((f) => f.kind === 'tags' && f.tagSet === 'food'),
+      }))
+      .filter((section) => section.fields.length > 0);
+    return { ...questionnaireConfig, sections };
+  }, [questionnaireConfig, questionnaireWritable]);
+
   const questionnaireAnswers: QuestionnaireAnswers = React.useMemo(
-    () => ({ tags: { food_tags: foodTags }, text: {} }),
-    [foodTags],
+    () => ({
+      tags: { food_tags: foodTags },
+      text: {},
+      choices: choiceAnswers,
+      curated: curatedAnswers,
+    }),
+    [foodTags, choiceAnswers, curatedAnswers],
   );
   
+  const markQuestionnaireTouched = (fieldId: string) =>
+    setTouchedQuestionnaireFields((prev) => {
+      if (prev.has(fieldId)) return prev;
+      const next = new Set(prev);
+      next.add(fieldId);
+      return next;
+    });
+
   const handleAddAnswerTag = (fieldId: string, tag: string) => {
     if (fieldId !== 'food_tags') return;
     setFoodTags((prev) => (prev.includes(tag) ? prev : [...prev, tag]));
@@ -232,8 +316,33 @@ const ReviewForm = ({
     if (fieldId !== 'food_tags') return;
     setFoodTags((prev) => prev.filter((t) => t !== tag));
   };
-  // No text answers exist until the Phase 3B matrix is approved.
+  // No text answers exist in the v1 matrix.
   const handleAnswerTextChange = (_fieldId: string, _value: string) => {};
+
+  const handleAnswerChoiceChange = (fieldId: string, value: string | undefined) => {
+    markQuestionnaireTouched(fieldId);
+    setChoiceAnswers((prev) => {
+      const next = { ...prev };
+      if (value === undefined) delete next[fieldId];
+      else next[fieldId] = value;
+      return next;
+    });
+  };
+
+  const handleAnswerCuratedChange = (fieldId: string, value: CuratedTagAnswer) => {
+    markQuestionnaireTouched(fieldId);
+    setCuratedAnswers((prev) => ({ ...prev, [fieldId]: value }));
+  };
+
+  /** Hydrate the renderable answers from the stored envelope. */
+  useEffect(() => {
+    if (questionnaireReset) return;
+    const hydrated = hydrateQuestionnaireAnswers(storedEnvelope, questionnaireConfig);
+    setChoiceAnswers(hydrated.choices);
+    setCuratedAnswers(hydrated.curated);
+    setTouchedQuestionnaireFields(new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storedEnvelope, questionnaireConfig, isOpen]);
 
   
   // Initialize media from legacy image_url or new media array - but only in edit mode or when we have review data
@@ -376,6 +485,7 @@ const ReviewForm = ({
       if (review.metadata?.food_tags) {
         setFoodTags(review.metadata.food_tags);
       }
+      setQuestionnaireReset(false);
       
       // Set all steps to completed in edit mode
       setCompletedSteps([1, 2, 3, 4]);
@@ -400,6 +510,10 @@ const ReviewForm = ({
     setExperienceDate(undefined);
     setVisibility('public');
     setFoodTags([]);
+    setChoiceAnswers({});
+    setCuratedAnswers({});
+    setTouchedQuestionnaireFields(new Set());
+    setQuestionnaireReset(false);
     setSelectedEntity(null);
     setSelectedSubject(null);
     setResolvedProviderName(null);
@@ -515,6 +629,19 @@ const ReviewForm = ({
    * Step 3 field. Unlike `handleEntitySelect` below, it never reads the stale
    * `category` state — the category is computed FROM the subject.
    */
+  /**
+   * Any `entity_id` change clears the questionnaire envelope and the known
+   * subject-specific metadata (`food_tags`). Unrelated root metadata and
+   * provenance are untouched.
+   */
+  const resetQuestionnaireAnswers = () => {
+    setChoiceAnswers({});
+    setCuratedAnswers({});
+    setTouchedQuestionnaireFields(new Set());
+    setFoodTags([]);
+    setQuestionnaireReset(true);
+  };
+
   const handleSubjectChange = (subject: EntityAdapter | null) => {
     subjectRequestRef.current += 1;
     const requestId = subjectRequestRef.current;
@@ -527,6 +654,7 @@ const ReviewForm = ({
       setIsResolvingSubjectContext(false);
       setCanonicalCategory(null);
       setSubjectOrigin(isEditMode ? 'loaded' : 'none');
+      resetQuestionnaireAnswers();
       return;
     }
 
@@ -540,6 +668,8 @@ const ReviewForm = ({
       });
       return;
     }
+
+    if (subject.id !== entityId) resetQuestionnaireAnswers();
 
     setSelectedSubject(subject);
     setCategory(prefill.category);
@@ -693,11 +823,43 @@ const ReviewForm = ({
        * here used to wipe provenance and every other stored key on a food edit.
        * Non-object stored values are ignored rather than spread.
        */
+      const hasFoodTagsField = questionnaireConfig.sections.some((s) =>
+        s.fields.some((f) => f.id === 'food_tags'),
+      );
+
+      /**
+       * Field-level dirty patching. Untouched keys — including fields this
+       * build cannot render — are carried through byte-identical; clearing the
+       * last answer removes the envelope entirely.
+       */
+      const envelopePatch = questionnaireWritable
+        ? buildQuestionnairePatch({
+            read: effectiveEnvelope,
+            category: persistedCategory,
+            config: questionnaireConfig,
+            choices: choiceAnswers,
+            curated: curatedAnswers,
+            touchedFieldIds: touchedQuestionnaireFields,
+          })
+        : ({ action: 'none' } as const);
+
+      const metadataPatch: Record<string, unknown> = {};
+      if (hasFoodTagsField) metadataPatch.food_tags = foodTags;
+      if (envelopePatch.action === 'write') {
+        metadataPatch[QUESTIONNAIRE_METADATA_KEY] = envelopePatch.envelope;
+      }
+
+      const removeKeys: string[] = [];
+      if (envelopePatch.action === 'remove') removeKeys.push(QUESTIONNAIRE_METADATA_KEY);
+      if (questionnaireReset) {
+        if (storedEnvelope.status !== 'absent') removeKeys.push(QUESTIONNAIRE_METADATA_KEY);
+        if (!hasFoodTagsField) removeKeys.push('food_tags');
+      }
+
       const metadata = mergeReviewMetadata(
         review?.metadata,
-        questionnaireConfig.sections.some((s) => s.fields.some((f) => f.id === 'food_tags'))
-          ? { food_tags: foodTags }
-          : undefined,
+        Object.keys(metadataPatch).length > 0 ? metadataPatch : undefined,
+        removeKeys,
       );
       
       // Convert Date to ISO string for API submission
@@ -756,13 +918,6 @@ const ReviewForm = ({
        *    re-saving an old review never rewrites its category;
        *  - otherwise the questionnaire bucket (subject-less new review).
        */
-      const canonicalWins =
-        subjectOrigin === 'user-selected' || (subjectOrigin === 'entity-page' && !isEditMode);
-      const persistedCategory =
-        canonicalWins && canonicalCategory
-          ? canonicalCategory
-          : (isEditMode && review?.category ? review.category : category);
-
       
       if (isEditMode && review) {
         await updateReview(review.id, {
@@ -968,11 +1123,13 @@ const ReviewForm = ({
               
               {currentStep === 4 && (
                 <StepFour
-                  config={questionnaireConfig}
+                  config={renderedConfig}
                   answers={questionnaireAnswers}
                   onAddTag={handleAddAnswerTag}
                   onRemoveTag={handleRemoveAnswerTag}
                   onAnswerTextChange={handleAnswerTextChange}
+                  onAnswerChoiceChange={handleAnswerChoiceChange}
+                  onAnswerCuratedChange={handleAnswerCuratedChange}
                   title={reviewTitle}
                   onTitleChange={setReviewTitle}
                   description={description}
