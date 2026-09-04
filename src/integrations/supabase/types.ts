@@ -3086,6 +3086,7 @@ export type Database = {
           review_id: string
           updated_at: string
           user_id: string
+          would_recommend: string | null
         }
         Insert: {
           comment: string
@@ -3096,6 +3097,7 @@ export type Database = {
           review_id: string
           updated_at?: string
           user_id: string
+          would_recommend?: string | null
         }
         Update: {
           comment?: string
@@ -3106,6 +3108,7 @@ export type Database = {
           review_id?: string
           updated_at?: string
           user_id?: string
+          would_recommend?: string | null
         }
         Relationships: [
           {
@@ -4076,6 +4079,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      admin_delete_review_update: {
+        Args: { p_update_id: string }
+        Returns: Json
+      }
       admin_moderate_entity: {
         Args: {
           _action: string
@@ -4252,6 +4259,10 @@ export type Database = {
       delete_comment: {
         Args: { p_comment_id: string; p_item_type: string; p_user_id: string }
         Returns: boolean
+      }
+      delete_latest_review_update: {
+        Args: { p_expected_update_id: string; p_review_id: string }
+        Returns: Json
       }
       delete_post_like: {
         Args: { p_post_id: string; p_user_id: string }
@@ -4847,6 +4858,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      lookup_latest_recommendation_intent: {
+        Args: { p_review_id: string }
+        Returns: string
+      }
       mark_all_notifications_as_read: { Args: never; Returns: number }
       mark_notifications_as_read: {
         Args: { notification_ids: string[] }
@@ -4996,7 +5011,24 @@ export type Database = {
         Returns: number
       }
       prune_search_rate_limits: { Args: never; Returns: undefined }
+      recompute_review_timeline_state: {
+        Args: { p_review_id: string }
+        Returns: undefined
+      }
       repair_hashtag_relationships: { Args: never; Returns: Json }
+      resolve_review_recommendation: {
+        Args: {
+          p_category: string
+          p_effective_rating: number
+          p_envelope: Json
+          p_latest_intent: string
+        }
+        Returns: Json
+      }
+      review_timeline_lock_key: {
+        Args: { p_review_id: string }
+        Returns: number
+      }
       run_duplicate_detection: {
         Args: never
         Returns: {
