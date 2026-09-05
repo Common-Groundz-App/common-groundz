@@ -67,7 +67,18 @@ Every remaining `food / movie / book / place / product` usage is classified REMO
 Justification from this audit: `steps/StepThree.tsx` and `steps/StepFour.tsx` no longer reference `category`; the questionnaire comes from `resolveQuestionnaire`. The `category` state survives only as a fallback for a subject-less new review, which `subjectRequirement` already forbids (`required` for new profile/global reviews, `locked` from an entity page).
 
 - Delete `category` / `setCategory`, its initialiser and all four assignments in `ReviewForm.tsx`.
-- `persistedCategory` becomes: the canonical type when the user deliberately chose the subject, otherwise the review's already-stored raw category, untouched. The remaining unreachable case must **block the save with an explicit error** — never invent `'food'` or `'product'`.
+- `persistedCategory` follows this frozen truth table — canonical authority is **not** limited to manually picked subjects, so a new review opened from an entity page keeps writing that entity's canonical type exactly as it does today:
+
+| Case | Written to `reviews.category` |
+| --- | --- |
+| New review, subject picked in the form (`user-selected`) | canonical subject type |
+| New review opened from an entity page (`entity-page`, locked/preselected) | canonical subject type — no re-selection required |
+| New review with no valid subject | **block submission** with an explicit error; never invent `'food'` / `'product'` |
+| Edit, subject deliberately changed or re-selected | canonical new subject type, and subject-specific questionnaire data is cleared |
+| Edit, subject unchanged (`loaded`) | stored raw category preserved byte-identical |
+| Edit, legacy-unlinked | stored raw category preserved byte-identical |
+
+This is exactly today's `canonicalWins = subjectOrigin === 'user-selected' || (subjectOrigin === 'entity-page' && !isEditMode)` rule, written down so removing the fallback state cannot change it.
 - Delete `resolveQuestionnaireKind`, `LEGACY_REVIEW_CATEGORIES`, `isLegacyReviewCategory`.
 
 ### 3D.4 — remove the whole `SubjectPrefill` adapter, not just two fields
