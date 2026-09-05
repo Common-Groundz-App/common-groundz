@@ -19,8 +19,6 @@ import type { CanonicalEntityType } from '@/services/entityType';
 /** The five coarse search/filter buckets. */
 export type ReviewBucket = 'food' | 'movie' | 'book' | 'place' | 'product';
 
-/** @deprecated Legacy alias kept for the Deno parity mirror's naming. */
-export type LegacyReviewCategory = ReviewBucket;
 
 /**
  * Project a canonical entity type onto its search/filter bucket.
