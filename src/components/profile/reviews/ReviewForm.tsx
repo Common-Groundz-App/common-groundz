@@ -811,6 +811,22 @@ const ReviewForm = ({
       return;
     }
     
+    /**
+     * Phase 3D — the category truth table must resolve to a real value. This is
+     * unreachable in practice (a new review always has a selected or locked
+     * subject, an edit always has a stored category), and it is deliberately a
+     * hard block rather than an invented `'food'` / `'product'` fallback.
+     */
+    if (!persistedCategory) {
+      toast({
+        title: "We can't publish this review yet",
+        description: 'Choose what you\'re reviewing before publishing.',
+        variant: 'destructive'
+      });
+      setCurrentStep(2);
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
