@@ -171,11 +171,11 @@ describe('questionnaire version contract is permanent', () => {
   it('accepts the numeric current version', () => {
     expect(QUESTIONNAIRE_VERSION).toBe(1);
     const read = readQuestionnaireEnvelope(envelope(1), 'place');
-    expect(read.status).toBe('v1');
+    expect(read.status).toBe('valid');
   });
 
-  it('treats a string version as absent, never as v1', () => {
-    expect(readQuestionnaireEnvelope(envelope('1'), 'place').status).toBe('absent');
+  it('treats a string version as incompatible, never as v1', () => {
+    expect(readQuestionnaireEnvelope(envelope('1'), 'place').status).toBe('incompatible');
   });
 
   it('marks a future version incompatible and preserves it', () => {
