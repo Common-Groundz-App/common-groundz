@@ -115,20 +115,25 @@ export const addReviewUpdate = async (
   wouldRecommend?: WouldRecommendValue,
 ): Promise<boolean> => {
   try {
+    // Shaped to match the generated `review_updates` Insert row: `rating` is
+    // omitted rather than sent as null, and `media` is stored as JSON.
     const insert: {
       review_id: string;
       user_id: string;
-      rating: number | null;
+      rating?: number;
       comment: string;
-      media: unknown;
-      would_recommend?: WouldRecommendValue;
+      media?: Json;
+      would_recommend?: string;
     } = {
       review_id: reviewId,
       user_id: userId,
-      rating: rating,
       comment: comment,
-      media: (media || []) as unknown
+      media: (media || []) as unknown as Json,
     };
+
+    if (rating !== null && rating !== undefined) {
+      insert.rating = rating;
+    }
 
     // Only write the column when the user made an explicit statement.
     // `null` / `undefined` means "no recommendation statement" and the column
