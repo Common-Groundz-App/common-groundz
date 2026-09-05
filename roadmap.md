@@ -96,11 +96,12 @@ type or mapping; surviving five-bucket logic is documented as search/filter comp
 
 - [x] 3D.0 Generated types reconciled; duplicate stale Phase 3D roadmap block removed
 - [x] 3D.1 Repo-wide five-bucket audit, every occurrence classified REMOVE / KEEP / DEFER
-- [ ] 3D.2 REOPENED — bucket mapping moved to `src/services/reviewCategoryBuckets.ts` and
-      documented as a search/filter projection, but the Deno-mirror parity test still lived
-      inside `src/components/profile/reviews/__tests__`, making the import invariant false.
-      Fix: merge the parity test into `src/services/__tests__/reviewCategoryBuckets.test.ts`,
-      delete the old file, keep the strong invariant.
+- [x] 3D.2 Bucket mapping lives in `src/services/reviewCategoryBuckets.ts` and is documented as a
+      search/filter projection. The Deno-mirror parity cases were merged into
+      `src/services/__tests__/reviewCategoryBuckets.test.ts` and the old
+      `src/components/profile/reviews/__tests__/reviewCategoryBucketParity.test.ts` deleted, so the
+      strong invariant holds literally: nothing under the review-authoring tree references the
+      five-bucket module (grep: 0 hits in `src/components/profile/reviews`).
 - [x] 3D.3 Form-level five-bucket state removed; `reviews.category` truth table extracted to
       `categoryPersistence.ts` and unit-tested; unresolvable case blocks the save
 - [x] 3D.4 `SubjectPrefill` / `deriveSubjectPrefill` / `SubjectLike` removed, `subjectSelection.ts`
@@ -108,13 +109,14 @@ type or mapping; surviving five-bucket logic is documented as search/filter comp
 - [x] 3D.5 Questionnaire versioning and forward compatibility — permanent contract, not scaffolding
 - [x] 3D.6 `reviews.is_converted` audited (no DB view, function, RPC, edge-function or client
       consumer); documented as deprecated historical column, unused client field removed
-- [ ] 3D.7 REOPENED — acceptance case 7 (same-type subject replacement resets subject-specific
-      answers) had no named test. Fix: persistence-layer test via `buildReviewMetadataForSave`
-      plus behaviour-layer `ReviewForm` component tests with distinct same-type ids
-      (product→product and food→food).
+- [x] 3D.7 Acceptance case 7 (same-type subject replacement resets subject-specific answers) now
+      has named tests: persistence-layer cases through `buildReviewMetadataForSave` in
+      `phase3dCompatibility.test.ts`, plus behaviour-layer `ReviewFormSubjectReset.test.tsx`
+      driving the real form (product→product and food→food, each with a distinct same-type id and
+      an identical-id no-reset mirror).
 - [x] 3D.8 Stale alias and import audit
-- [ ] Full Vitest suite, `tsgo --noEmit` and production build — re-run after the reopened
-      items above are re-closed
+- [x] Full Vitest suite (38 files / 633 tests), `tsgo --noEmit` clean and production build green
+      after the reopened items were re-closed
 
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
