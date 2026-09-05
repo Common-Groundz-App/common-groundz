@@ -402,7 +402,6 @@ const ReviewForm = ({
       const canonical = parseEntityType(entity.type);
       setCanonicalCategory(canonical);
       setSubjectOrigin('entity-page');
-      if (canonical) setCategory(mapCanonicalToLegacyCategory(canonical));
 
       setEntityId(entity.id);
 
