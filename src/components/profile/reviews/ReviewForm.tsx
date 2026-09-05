@@ -109,16 +109,15 @@ const ReviewForm = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   /**
-   * Phase 2.1 — two separate ideas that used to share one `category` field:
+   * Phase 3D — there is only ONE category idea left: `canonicalCategory`, the
+   * real canonical entity type of the linked subject. It is what gets PERSISTED
+   * to `reviews.category` whenever the subject is authoritative. The old
+   * five-bucket `category` state (questionnaire kind) is gone: Steps 3/4 come
+   * from the questionnaire registry via `resolveQuestionnaire`.
    *
-   *  - `category`          → questionnaire kind. One of the five legacy buckets.
-   *                          Drives Steps 3/4 UI ONLY. Unchanged behaviour.
-   *  - `canonicalCategory` → the real canonical entity type of the subject.
-   *                          This is what gets PERSISTED to `reviews.category`
-   *                          when the user deliberately chose the subject.
-   *
-   * `subjectOrigin` decides which one is written on save, so merely opening and
-   * re-saving an old review can never silently rewrite its stored category.
+   * `subjectOrigin` decides whether the canonical type or the stored raw value
+   * is written on save, so merely opening and re-saving an old review can never
+   * silently rewrite its stored category.
    */
   type SubjectOrigin = 'none' | 'loaded' | 'entity-page' | 'user-selected';
 
@@ -135,12 +134,6 @@ const ReviewForm = ({
 
   // Form data
   const [rating, setRating] = useState(review?.rating || 0);
-  // Questionnaire kind (five legacy buckets) — never persisted directly unless
-  // the review has no deliberately chosen subject.
-  const [category, setCategory] = useState<LegacyReviewCategory>(
-    resolveQuestionnaireKind(review?.category) ??
-    (initialCanonical ? mapCanonicalToLegacyCategory(initialCanonical) : 'food')
-  );
 
   
   /**
