@@ -16,7 +16,12 @@ export interface Review {
   entity_id?: string;
   visibility: 'public' | 'private' | 'circle_only';
   status: string;
-  is_converted: boolean;
+  /**
+   * NOTE (Phase 3D): `reviews.is_converted` is a deprecated historical
+   * compatibility column — do not read, do not write. It is retained in the
+   * database only to avoid an unnecessary destructive migration; conversion is
+   * already proven by `recommendation_id`. Deliberately absent from this type.
+   */
   recommendation_id?: string;
   experience_date?: string;
   media?: any;

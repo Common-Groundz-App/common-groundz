@@ -64,7 +64,11 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
 - [ ] Authenticated owner INSERT / owner undo / non-owner INSERT denial via real Supabase
       session (`auth.uid()` present)
 
-- [ ] Regenerate Supabase types
+- [x] Supabase generated types reconciled (Phase 3D.0): the checked-in
+      `src/integrations/supabase/types.ts` already carries `review_updates.would_recommend`
+      and the Stage 1 RPCs (`delete_latest_review_update`, `recompute_review_timeline_state`,
+      `resolve_review_recommendation`, `lookup_latest_recommendation_intent`) — the unchecked
+      item was stale bookkeeping, not a stale file
 
 ### Stage 2 — questionnaire UI + persistence (delivered and reviewed)
 - [x] Registry entries for all 15 canonical types + `CuratedTagSelector`; Food Tags untouched
@@ -86,14 +90,24 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
 - [x] Regression tests for `no`+`null` vs `no`+`auto` resolver outcomes
 - [x] Vitest + production build green
 
-## Phase 3D — NOT STARTED
-- Do not begin until explicitly requested.
-- [ ] "Undo latest update" on the newest entry only, with conflict handling
-- [ ] Retire the Convert action and its wiring
+## Phase 3D — cleanup (delivered)
+Close-out invariant: no review-authoring or questionnaire module depends on a five-bucket
+type or mapping; surviving five-bucket logic is documented as search/filter compatibility only.
 
-## Phase 3D — cleanup (not started)
-- [ ] Remove `questionnaireKind`, five-bucket branches, `foodName`/`contentName`, versioning scaffolding
-- [ ] Audit and decide on `reviews.is_converted`
+- [x] 3D.0 Generated types reconciled; duplicate stale Phase 3D roadmap block removed
+- [x] 3D.1 Repo-wide five-bucket audit, every occurrence classified REMOVE / KEEP / DEFER
+- [x] 3D.2 Bucket mapping moved to `src/services/reviewCategoryBuckets.ts`, documented as a
+      search/filter projection; parity test and mapping unit tests repointed
+- [x] 3D.3 Form-level five-bucket state removed; `reviews.category` truth table extracted to
+      `categoryPersistence.ts` and unit-tested; unresolvable case blocks the save
+- [x] 3D.4 `SubjectPrefill` / `deriveSubjectPrefill` / `SubjectLike` removed, `subjectSelection.ts`
+      deleted; `legacyTitle` / `legacyVenue` legacy-unlinked adapter kept
+- [x] 3D.5 Questionnaire versioning and forward compatibility — permanent contract, not scaffolding
+- [x] 3D.6 `reviews.is_converted` audited (no DB view, function, RPC, edge-function or client
+      consumer); documented as deprecated historical column, unused client field removed
+- [x] 3D.7 Explicit compatibility regression acceptance tests
+- [x] 3D.8 Stale alias and import audit
+- [x] Full Vitest suite, `tsgo --noEmit` and production build green
 
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)

@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { CANONICAL_ENTITY_TYPES } from '@/services/entityType';
-import { mapCanonicalToLegacyCategory } from '../subjectSelection';
+import { mapCanonicalToLegacyCategory } from '@/services/reviewCategoryBuckets';
 import {
   CANONICAL_TO_BUCKET,
   REVIEW_BUCKETS,

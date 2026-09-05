@@ -1,7 +1,7 @@
 // Phase 2.1 — Deno mirror of the frontend review-category bucket mapping.
 //
 // Source of truth for AUTHORING is the frontend:
-//   src/components/profile/reviews/subjectSelection.ts::mapCanonicalToLegacyCategory
+//   src/services/reviewCategoryBuckets.ts::mapCanonicalToLegacyCategory
 // Edge functions cannot import from `src/` (only paths under supabase/functions
 // deploy), so this file mirrors it. The mirror is NOT free-floating: a Vitest
 // contract test asserts, for every canonical type, that this file and the

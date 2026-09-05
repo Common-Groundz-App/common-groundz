@@ -10,19 +10,22 @@ import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
-import { parseEntityType, type CanonicalEntityType } from '@/services/entityType';
-import { EntityAdapter } from '@/components/profile/circles/types';
 import {
-  deriveSubjectPrefill,
-  mapCanonicalToLegacyCategory,
-  resolveQuestionnaireKind,
-  type LegacyReviewCategory,
-} from './subjectSelection';
+  parseEntityType,
+  parseEntityTypeAtBoundary,
+  type CanonicalEntityType,
+} from '@/services/entityType';
+import { EntityAdapter } from '@/components/profile/circles/types';
 import {
   subjectRequirement,
   allowsMissingSubject,
   type SubjectRequirement,
 } from './reviewSubjectPolicy';
+import {
+  canonicalCategoryWins,
+  resolvePersistedCategory,
+  type SubjectOrigin,
+} from './categoryPersistence';
 import { getParentEntity } from '@/services/entityHierarchyService';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 import { isOfferingType, getOfferingContextLine } from '@/services/entityRelationshipRegistry';
@@ -111,18 +114,17 @@ const ReviewForm = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   /**
-   * Phase 2.1 — two separate ideas that used to share one `category` field:
+   * Phase 3D — there is only ONE category idea left: `canonicalCategory`, the
+   * real canonical entity type of the linked subject. It is what gets PERSISTED
+   * to `reviews.category` whenever the subject is authoritative. The old
+   * five-bucket `category` state (questionnaire kind) is gone: Steps 3/4 come
+   * from the questionnaire registry via `resolveQuestionnaire`.
    *
-   *  - `category`          → questionnaire kind. One of the five legacy buckets.
-   *                          Drives Steps 3/4 UI ONLY. Unchanged behaviour.
-   *  - `canonicalCategory` → the real canonical entity type of the subject.
-   *                          This is what gets PERSISTED to `reviews.category`
-   *                          when the user deliberately chose the subject.
-   *
-   * `subjectOrigin` decides which one is written on save, so merely opening and
-   * re-saving an old review can never silently rewrite its stored category.
+   * `subjectOrigin` decides whether the canonical type or the stored raw value
+   * is written on save, so merely opening and re-saving an old review can never
+   * silently rewrite its stored category.
    */
-  type SubjectOrigin = 'none' | 'loaded' | 'entity-page' | 'user-selected';
+  
 
   const initialCanonical = entity ? parseEntityType(entity.type) : null;
 
@@ -137,12 +139,6 @@ const ReviewForm = ({
 
   // Form data
   const [rating, setRating] = useState(review?.rating || 0);
-  // Questionnaire kind (five legacy buckets) — never persisted directly unless
-  // the review has no deliberately chosen subject.
-  const [category, setCategory] = useState<LegacyReviewCategory>(
-    resolveQuestionnaireKind(review?.category) ??
-    (initialCanonical ? mapCanonicalToLegacyCategory(initialCanonical) : 'food')
-  );
 
   
   /**
@@ -244,16 +240,19 @@ const ReviewForm = ({
   const [questionnaireReset, setQuestionnaireReset] = useState(false);
 
   /**
-   * What this save will write to `reviews.category` (Phase 2.1 rules). The
-   * envelope's `type` must equal exactly this value, because that is what the
-   * database validates against — never a display resolver.
+   * What this save will write to `reviews.category` — the frozen Phase 3D truth
+   * table, implemented once in `categoryPersistence.ts` and unit-tested there.
+   * The envelope's `type` must equal exactly this value, because that is what
+   * the database validates against — never a display resolver. There is no
+   * invented fallback: an unresolvable case blocks submission instead.
    */
-  const canonicalWins =
-    subjectOrigin === 'user-selected' || (subjectOrigin === 'entity-page' && !isEditMode);
-  const persistedCategory =
-    canonicalWins && canonicalCategory
-      ? canonicalCategory
-      : (isEditMode && review?.category ? review.category : category);
+  const canonicalWins = canonicalCategoryWins(subjectOrigin, isEditMode);
+  const persistedCategory: string | null = resolvePersistedCategory({
+    subjectOrigin,
+    isEditMode,
+    canonicalCategory,
+    storedCategory: review?.category,
+  });
 
   /** The envelope currently stored on the row, read strictly (numeric v1, type match). */
   const storedEnvelope: EnvelopeRead = React.useMemo(
@@ -401,7 +400,6 @@ const ReviewForm = ({
       const canonical = parseEntityType(entity.type);
       setCanonicalCategory(canonical);
       setSubjectOrigin('entity-page');
-      if (canonical) setCategory(mapCanonicalToLegacyCategory(canonical));
 
       setEntityId(entity.id);
 
@@ -451,12 +449,10 @@ const ReviewForm = ({
       // Update with new data structure - cleanly separate title and subtitle
       setRating(review.rating);
       /**
-       * The stored value may be a legacy bucket OR (post-2.1) a canonical type.
-       * It only resolves the legacy persistence bucket here — Phase 3A selects
-       * the questionnaire from the SUBJECT, never from this value.
+       * The stored category is never re-interpreted on load: it is preserved
+       * verbatim on save unless the user deliberately re-selects the subject.
+       * The questionnaire comes from the SUBJECT, never from this value.
        */
-      const loadedKind = resolveQuestionnaireKind(review.category) ?? 'product';
-      setCategory(loadedKind);
       setCanonicalCategory(null);
       setSubjectOrigin('loaded');
       
@@ -495,7 +491,7 @@ const ReviewForm = ({
   
   const resetForm = () => {
     setRating(0);
-    setCategory('food');
+    
     setCanonicalCategory(null);
     setSubjectOrigin('none');
 
@@ -621,11 +617,12 @@ const ReviewForm = ({
   
 
   /**
-   * Step 2 subject selection (Phase 2.0).
+   * Step 2 subject selection (Phase 2.0, simplified in Phase 3D).
    *
-   * The subject is authoritative: it derives the legacy `category` and every
-   * Step 3 field. Unlike `handleEntitySelect` below, it never reads the stale
-   * `category` state — the category is computed FROM the subject.
+   * The subject is authoritative: its canonical type is parsed directly with the
+   * STRICT boundary parser and is what gets persisted. There is no five-bucket
+   * prefill adapter any more — Step 3/4 fields come from the questionnaire
+   * registry, and the venue snapshot from `identityPersistence`.
    */
   /**
    * Any `entity_id` change clears the questionnaire envelope and the known
@@ -656,8 +653,8 @@ const ReviewForm = ({
       return;
     }
 
-    const prefill = deriveSubjectPrefill(subject);
-    if (!prefill.canonicalType || !prefill.category) {
+    const canonicalType = parseEntityTypeAtBoundary(subject.type);
+    if (!canonicalType) {
       // Unknown/unparseable type — never coerced to `others` or `product`.
       toast({
         title: "We can't use this one yet",
@@ -670,20 +667,19 @@ const ReviewForm = ({
     if (subject.id !== entityId) resetQuestionnaireAnswers();
 
     setSelectedSubject(subject);
-    setCategory(prefill.category);
     // The canonical type is what will be persisted, because the user picked it.
-    setCanonicalCategory(prefill.canonicalType);
+    setCanonicalCategory(canonicalType);
     setSubjectOrigin('user-selected');
     setEntityId(subject.id);
     setSelectedEntity({
       ...(subject as any),
-      type: prefill.canonicalType as unknown as EntityType,
+      type: canonicalType as unknown as EntityType,
     } as RecommendationEntity);
 
     logFunnel({
       event: isEditMode ? 'review_subject_attached_late' : 'review_subject_selected',
       source: 'review_form',
-      entityType: prefill.canonicalType,
+      entityType: canonicalType,
     });
 
 
@@ -692,8 +688,8 @@ const ReviewForm = ({
 
     // Offerings (dishes, courses, services…) take their provider from the
     // parent entity, resolved from the registry rather than a food special case.
-    if (isOfferingType(prefill.canonicalType)) {
-      resolveProviderContext(subject.id, prefill.canonicalType, requestId);
+    if (isOfferingType(canonicalType)) {
+      resolveProviderContext(subject.id, canonicalType, requestId);
     }
   };
 
@@ -807,6 +803,22 @@ const ReviewForm = ({
       toast({
         title: "We can't review this subject",
         description: 'Go back and pick a different one.',
+        variant: 'destructive'
+      });
+      setCurrentStep(2);
+      return;
+    }
+    
+    /**
+     * Phase 3D — the category truth table must resolve to a real value. This is
+     * unreachable in practice (a new review always has a selected or locked
+     * subject, an edit always has a stored category), and it is deliberately a
+     * hard block rather than an invented `'food'` / `'product'` fallback.
+     */
+    if (!persistedCategory) {
+      toast({
+        title: "We can't publish this review yet",
+        description: 'Choose what you\'re reviewing before publishing.',
         variant: 'destructive'
       });
       setCurrentStep(2);
