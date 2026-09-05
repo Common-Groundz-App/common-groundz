@@ -76,8 +76,18 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
 - [x] Render-vs-persist separation with forward-compatibility tests (unknown field ids / future versions preserved, never rendered)
 - [x] End-to-end materialization test — runs through the ONE shared save helper (`buildReviewMetadataForSave`), asserts in SQL, and cleans up by fixture id only
 
-### Stage 3 — timeline intent + cleanup (in progress)
-- [ ] "Would you still recommend it?" with `auto` reset and honest source copy
+### Stage 3 — timeline intent + cleanup (delivered and reviewed)
+- [x] "Would you still recommend it?" with `auto` reset and honest source copy
+- [x] `addReviewUpdate` accepts `yes | maybe | no | auto | null`; skipped/cleared → column omitted; only explicit reset writes `auto`
+- [x] `ChoiceChips` in `ReviewTimelineViewer` with re-tap-to-clear semantics
+- [x] Honest source-copy helper: provenance claims only when caller has complete timeline history
+- [x] Atomic owner-only LIFO undo wrapper around `delete_latest_review_update`, refetches parent review
+- [x] Removed Convert-to-recommendation call sites and wiring (action was already a silent no-op due to trigger)
+- [x] Regression tests for `no`+`null` vs `no`+`auto` resolver outcomes
+- [x] Vitest + production build green
+
+## Phase 3D — NOT STARTED
+- Do not begin until explicitly requested.
 - [ ] "Undo latest update" on the newest entry only, with conflict handling
 - [ ] Retire the Convert action and its wiring
 
