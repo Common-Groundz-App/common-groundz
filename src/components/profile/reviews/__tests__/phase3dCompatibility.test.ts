@@ -19,6 +19,63 @@ import {
 } from '../questionnaire/envelope';
 import { resolveReviewIdentity, deriveVenueSnapshot } from '../questionnaire/identityPersistence';
 import { subjectRequirement, allowsMissingSubject } from '../reviewSubjectPolicy';
+import { buildReviewMetadataForSave } from '../questionnaire/saveMetadata';
+import { getQuestionnaireConfig } from '../questionnaire/registry';
+
+describe('same-type subject replacement reset — persistence layer', () => {
+  const foodConfig = getQuestionnaireConfig('food');
+  const storedMetadata = {
+    provenance: { source: 'import-2024' },
+    food_tags: ['spicy'],
+    questionnaire: {
+      version: 1,
+      type: 'food',
+      answers: { would_recommend: 'yes', repeat_intent: 'yes', portion: 'generous' },
+    },
+  };
+
+  it('clears the envelope and food_tags while unrelated metadata survives byte-identical', () => {
+    const { metadata } = buildReviewMetadataForSave({
+      storedMetadata,
+      config: foodConfig,
+      category: 'food',
+      questionnaireWritable: true,
+      // What the form has after resetQuestionnaireAnswers(): nothing answered.
+      effectiveEnvelope: { status: 'absent' },
+      storedEnvelope: readQuestionnaireEnvelope(storedMetadata, 'food'),
+      choices: {},
+      curated: {},
+      touchedFieldIds: new Set(),
+      foodTags: [],
+      questionnaireReset: true,
+    });
+
+    expect(metadata).toBeDefined();
+    expect(metadata).not.toHaveProperty('questionnaire');
+    expect(metadata).not.toHaveProperty('food_tags');
+    expect(metadata!.provenance).toEqual({ source: 'import-2024' });
+  });
+
+  it('leaves the stored envelope and food_tags untouched when the subject did not change', () => {
+    const { metadata } = buildReviewMetadataForSave({
+      storedMetadata,
+      config: foodConfig,
+      category: 'food',
+      questionnaireWritable: true,
+      effectiveEnvelope: readQuestionnaireEnvelope(storedMetadata, 'food'),
+      storedEnvelope: readQuestionnaireEnvelope(storedMetadata, 'food'),
+      choices: {},
+      curated: {},
+      touchedFieldIds: new Set(),
+      foodTags: [],
+      questionnaireReset: false,
+    });
+
+    expect(metadata!.questionnaire).toEqual(storedMetadata.questionnaire);
+    expect(metadata!.food_tags).toEqual(['spicy']);
+    expect(metadata!.provenance).toEqual({ source: 'import-2024' });
+  });
+});
 
 describe('category persistence truth table', () => {
   it('new review with a subject picked in the form writes the canonical type', () => {
