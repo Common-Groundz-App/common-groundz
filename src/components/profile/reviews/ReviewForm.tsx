@@ -493,7 +493,7 @@ const ReviewForm = ({
   
   const resetForm = () => {
     setRating(0);
-    setCategory('food');
+    
     setCanonicalCategory(null);
     setSubjectOrigin('none');
 
