@@ -21,6 +21,11 @@ import {
   allowsMissingSubject,
   type SubjectRequirement,
 } from './reviewSubjectPolicy';
+import {
+  canonicalCategoryWins,
+  resolvePersistedCategory,
+  type SubjectOrigin,
+} from './categoryPersistence';
 import { getParentEntity } from '@/services/entityHierarchyService';
 import { useSearchFunnel } from '@/hooks/useSearchFunnel';
 import { isOfferingType, getOfferingContextLine } from '@/services/entityRelationshipRegistry';
