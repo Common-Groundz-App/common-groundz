@@ -42,6 +42,12 @@ action goes away.
   no migration is needed.
 - The client never writes `reviews.is_recommended`. Materialization stays with the Stage 1
   DB path (`review_updates_after_insert` → `recompute_review_timeline_state`).
+- **Post-insert refresh invariant.** A successful insert never derives authoritative state from
+  the submitted payload and never refetches only the timeline. It refetches all three: (1) the
+  timeline list, (2) the latest-intent lookup (whose result can change `none`→`found` or
+  between values, independently of the visible list), and (3) the parent review, because the
+  recompute can have changed `is_recommended`, `latest_rating`, `timeline_count`, `has_timeline`
+  and `trust_score`. This is the same contract the undo path already follows.
 
 ## Step 2 — the question in the timeline viewer
 
@@ -140,6 +146,9 @@ action goes away.
   array order arrived.
 - Undo status mapping tested for all three RPC statuses, including that a `conflict` triggers
   a refetch and no optimistic removal, and that the parent review is refreshed in all three.
+- A test asserting the post-insert refresh invariant: after a successful `addReviewUpdate`,
+  the timeline list, the latest-intent lookup and the parent review are all refetched — never
+  the timeline alone.
 - Full Vitest run plus a build check.
 - Explicitly reported as UNVERIFIED, not substituted: the browser → supabase-js → RLS hop
   (external Supabase, no obtainable test session) and the Stage 1 concurrency/real-session
@@ -155,8 +164,9 @@ action goes away.
   corrected to include the `id` tie-break as part of this step.
 - Provenance never depends on how many timeline rows the client happens to hold: it comes from a
   `LIMIT 1` lookup, so a PostgREST row cap cannot turn a truncated page into a false claim.
-- `created_at` is server-owned (client value overwritten by the BEFORE INSERT trigger), so the
-  UI must refetch after insert rather than trusting a locally constructed row.
+- `created_at` is server-owned (client value overwritten by the BEFORE INSERT trigger), so after
+  insert the UI refetches per the invariant in Step 1 rather than trusting a locally constructed
+  row.
 - `roadmap.md` is updated at implementation time: the Stage 3 line is reworded to the corrected
   semantics (explicit reset action, not a skipped question) and gains the latest-intent lookup and
   ordering-tie-break items; items are ticked only for what the tests above actually prove.
