@@ -451,12 +451,10 @@ const ReviewForm = ({
       // Update with new data structure - cleanly separate title and subtitle
       setRating(review.rating);
       /**
-       * The stored value may be a legacy bucket OR (post-2.1) a canonical type.
-       * It only resolves the legacy persistence bucket here — Phase 3A selects
-       * the questionnaire from the SUBJECT, never from this value.
+       * The stored category is never re-interpreted on load: it is preserved
+       * verbatim on save unless the user deliberately re-selects the subject.
+       * The questionnaire comes from the SUBJECT, never from this value.
        */
-      const loadedKind = resolveQuestionnaireKind(review.category) ?? 'product';
-      setCategory(loadedKind);
       setCanonicalCategory(null);
       setSubjectOrigin('loaded');
       
