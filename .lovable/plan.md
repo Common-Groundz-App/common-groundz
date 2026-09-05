@@ -53,11 +53,16 @@ Two layers, because the requirement spans form state and what gets persisted:
   and empty answers. Assert the envelope key and `food_tags` are removed, and that unrelated
   root metadata survives byte-identical. Assert the mirror case `questionnaireReset: false`
   with untouched answers leaves the stored envelope intact.
-- **Behaviour layer** (component test, `ReviewForm`, same-type swap): with a product subject
-  selected and questionnaire answers/food tags present, select a *different* product entity and
-  assert the visible questionnaire answers and food tags are cleared; then re-select the
-  *identical* entity id and assert nothing is cleared. This is what proves the acceptance case,
-  since the rule is per-subject, not per-type.
+- **Behaviour layer** (component test, `ReviewForm`, same-type swaps). Split by questionnaire
+  type because `food_tags` renders only in the food config (confirmed in the registry:
+  `FOOD_TAGS_SECTION` is referenced solely by the `food` entry):
+  - *product → product*: with answers on a product subject, select a **different** product
+    entity (distinct id, same type) — generic choices and curated tags clear; then re-select
+    the **identical** entity id — nothing clears.
+  - *food → food*: the same pair, asserting food tags, the food choice fields and curated
+    answers clear on a distinct id and stay on the identical id.
+  Both use distinct ids of the same canonical type, proving the rule is per-subject-id, not
+  per-type.
 
 ### 3. Reopen, then re-close the bookkeeping
 
