@@ -472,6 +472,24 @@ const ReviewForm = ({
       setReviewTitle(review.subtitle || '');
       
       setEntityId(review.entity_id || '');
+      /**
+       * Hydrate the Step 2 subject from the stored link. Without this, editing a
+       * linked review showed an empty subject picker and blocked Next until the
+       * user re-picked the subject — which then cleared their answers.
+       */
+      setSelectedSubject(
+        review.entity_id && review.entity
+          ? {
+              id: review.entity_id,
+              name: review.entity.name,
+              type: review.entity.type,
+              venue: (review.entity as any).venue,
+              image_url: (review.entity as any).image_url,
+              description: (review.entity as any).description,
+              metadata: (review.entity as any).metadata,
+            } as EntityAdapter
+          : null,
+      );
       setDescription(review.description || '');
       setVisibility((review.visibility as "public" | "circle_only" | "private") || "public");
       setResolvedProviderName(null);
