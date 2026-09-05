@@ -1,7 +1,7 @@
 /**
  * Phase 3D — the bucket projection lives in its own module now, explicitly
- * separated from review authoring. These tests moved here from the deleted
- * `subjectSelection.test.ts`.
+ * separated from review authoring. These mapping cases were relocated here from
+ * the review-authoring tree when that module's tests were retired.
  *
  * The `frontend ↔ Deno bucket mapping parity` block below was merged in from
  * the deleted `src/components/profile/reviews/__tests__/
