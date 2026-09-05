@@ -64,7 +64,11 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
 - [ ] Authenticated owner INSERT / owner undo / non-owner INSERT denial via real Supabase
       session (`auth.uid()` present)
 
-- [ ] Regenerate Supabase types
+- [x] Supabase generated types reconciled (Phase 3D.0): the checked-in
+      `src/integrations/supabase/types.ts` already carries `review_updates.would_recommend`
+      and the Stage 1 RPCs (`delete_latest_review_update`, `recompute_review_timeline_state`,
+      `resolve_review_recommendation`, `lookup_latest_recommendation_intent`) — the unchecked
+      item was stale bookkeeping, not a stale file
 
 ### Stage 2 — questionnaire UI + persistence (delivered and reviewed)
 - [x] Registry entries for all 15 canonical types + `CuratedTagSelector`; Food Tags untouched
