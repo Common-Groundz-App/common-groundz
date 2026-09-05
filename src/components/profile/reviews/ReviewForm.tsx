@@ -380,16 +380,20 @@ const ReviewForm = ({
       }
       
       setSelectedEntity(processedEntity as RecommendationEntity);
-    } else if (entity && !selectedEntity) {
+    } else if (entity) {
       // Convert provided entity to expected format
       const entityToUse: any = {
         ...entity,
         type: mapStringToEntityType(entity.type as any) ?? entity.type
       };
-      
-      setSelectedEntity(entityToUse);
+
+      // Functional update so `selectedEntity` stays OUT of the dependency list:
+      // every run allocates a fresh object, so depending on it re-triggered the
+      // effect forever (an unbounded render loop in the edit modal).
+      setSelectedEntity((current) => current ?? entityToUse);
     }
-  }, [review, isEditMode, entity, selectedEntity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [review, isEditMode, entity]);
 
   
   // Ensure proper initialization when entity is provided
