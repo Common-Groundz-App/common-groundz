@@ -164,8 +164,9 @@ action goes away.
   corrected to include the `id` tie-break as part of this step.
 - Provenance never depends on how many timeline rows the client happens to hold: it comes from a
   `LIMIT 1` lookup, so a PostgREST row cap cannot turn a truncated page into a false claim.
-- `created_at` is server-owned (client value overwritten by the BEFORE INSERT trigger), so the
-  UI must refetch after insert rather than trusting a locally constructed row.
+- `created_at` is server-owned (client value overwritten by the BEFORE INSERT trigger), so after
+  insert the UI refetches per the invariant in Step 1 rather than trusting a locally constructed
+  row.
 - `roadmap.md` is updated at implementation time: the Stage 3 line is reworded to the corrected
   semantics (explicit reset action, not a skipped question) and gains the latest-intent lookup and
   ordering-tie-break items; items are ticked only for what the tests above actually prove.
