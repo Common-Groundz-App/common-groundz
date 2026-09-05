@@ -146,6 +146,9 @@ action goes away.
   array order arrived.
 - Undo status mapping tested for all three RPC statuses, including that a `conflict` triggers
   a refetch and no optimistic removal, and that the parent review is refreshed in all three.
+- A test asserting the post-insert refresh invariant: after a successful `addReviewUpdate`,
+  the timeline list, the latest-intent lookup and the parent review are all refetched — never
+  the timeline alone.
 - Full Vitest run plus a build check.
 - Explicitly reported as UNVERIFIED, not substituted: the browser → supabase-js → RLS hop
   (external Supabase, no obtainable test session) and the Stage 1 concurrency/real-session
