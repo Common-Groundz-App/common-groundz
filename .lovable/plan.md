@@ -119,6 +119,9 @@ Named acceptance tests, not assumed coverage:
 7. Replacing the subject with a different subject of the same type still resets subject-specific answers.
 8. `resolveQuestionnaire` returns a registry config directly for all 15 canonical types.
 9. Venue snapshot behaviour stays as tested in `identityPersistence` after the prefill adapter is gone (Google formatted address preferred; food venue comes from the provider lookup, never the dish name).
+10. New review launched from an entity page with a locked subject saves successfully and writes the entity's canonical type — without the user re-selecting the subject.
+11. A category/type-mismatch review that deliberately re-selects its subject leaves compatibility mode, re-canonicalizes `reviews.category` from the new subject, and clears the old subject-specific questionnaire data.
+12. One case per row of the 3D.3 truth table: new user-selected, new entity-page, untouched linked edit, deliberately re-linked edit, legacy-unlinked edit, and invalid/subject-less new review.
 
 ### 3D.8 — stale alias and import audit
 
