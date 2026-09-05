@@ -48,7 +48,6 @@ const nodeIncludes = [
   'src/services/__tests__/entityRelationshipRegistry.test.ts',
   'src/services/__tests__/reviewCategoryBuckets.test.ts',
   'src/components/profile/reviews/__tests__/phase3dCompatibility.test.ts',
-  'src/components/profile/reviews/__tests__/reviewCategoryBucketParity.test.ts',
   'src/components/profile/reviews/__tests__/reviewSubjectPolicy.test.ts',
   'src/components/profile/reviews/__tests__/questionnaireResolution.test.ts',
 
@@ -93,6 +92,7 @@ export default defineConfig({
             'src/hooks/useDockCorrection.test.tsx',
             'src/components/media/MuxOwnerHint.test.tsx',
             'src/components/profile/reviews/__tests__/ReviewTimelineViewer.test.tsx',
+            'src/components/profile/reviews/__tests__/ReviewFormSubjectReset.test.tsx',
           ],
         },
       },
