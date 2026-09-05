@@ -210,3 +210,74 @@ as risk:
 
 - No database migration, no column drops, no historical backfill.
 - Phase 2.5B (wizard consolidation) remains deferred and was **not started**.
+
+---
+
+## Close-out gap closures (second pass)
+
+Two leftovers were found by a re-audit and closed without weakening any
+invariant.
+
+### 1. Parity test moved out of the review-authoring tree
+
+`src/components/profile/reviews/__tests__/reviewCategoryBucketParity.test.ts`
+imported the five-bucket compatibility module, which contradicted the 3D.2
+invariant. All six parity cases were merged verbatim into
+`src/services/__tests__/reviewCategoryBuckets.test.ts` and the old file deleted;
+`vitest.config.ts` updated accordingly. The invariant was kept as written.
+
+```
+$ rg -ln "reviewCategoryBuckets" src/components/profile/reviews
+NONE
+```
+
+Remaining references are the service module itself, its service-level test, the
+Deno mirror `supabase/functions/_shared/reviewCategoryBuckets.ts` and its two
+edge-function consumers (search/filter compatibility layer) — no review-authoring
+or questionnaire production module.
+
+### 2. Same-type subject replacement — real reset behaviour tested
+
+Acceptance case 7 is proven at two levels, not by an id-comparison helper.
+
+- **Persistence layer** — `phase3dCompatibility.test.ts`:
+  `buildReviewMetadataForSave` with `questionnaireReset: true` removes the
+  questionnaire envelope and empties `food_tags`, while unrelated stored
+  metadata (`provenance`) survives byte-identical. The mirror case (subject
+  unchanged) leaves the envelope and tags exactly as stored.
+- **Behaviour layer** — `src/components/profile/reviews/__tests__/ReviewFormSubjectReset.test.tsx`
+  drives the real `ReviewForm` (SubjectSelectStep → `handleSubjectChange` →
+  `resetQuestionnaireAnswers`) and reads the live answers where they render, in
+  Step Four:
+  - product → a *different* product id clears choice and curated answers;
+  - product → the *identical* id clears nothing;
+  - food → a *different* food id clears choices **and** `food_tags`;
+  - food → the *identical* id keeps both.
+
+### Two production defects surfaced by the behaviour test
+
+- `ReviewForm` populated `selectedEntity` in an effect that also depended on
+  `selectedEntity`; each run allocated a fresh object, so the effect re-triggered
+  itself without bound (an unbounded render loop in the edit modal). Fixed with a
+  functional update and a narrowed dependency list.
+- Editing a linked review never hydrated the Step 2 subject from the stored
+  link, so the subject picker opened empty and "Next" stayed disabled until the
+  user re-picked the subject — which then cleared their answers. The stored
+  subject is now hydrated on load.
+
+A pre-existing typecheck error in `src/services/review/timeline.ts` (the
+`review_updates` insert object did not match the generated Insert row) was also
+fixed: `rating` is omitted rather than sent as `null`, and `media` is typed as
+`Json`.
+
+### Verification (second pass)
+
+| Check | Result |
+| --- | --- |
+| Focused: `reviewCategoryBuckets`, `phase3dCompatibility`, `ReviewFormSubjectReset` | pass |
+| Full Vitest suite | 38 files, **633 tests pass** |
+| `tsgo --noEmit` | clean |
+| Production build | green (`vite build`, exit 0) |
+| Grep audit (3D.2) | 0 hits under `src/components/profile/reviews` |
+
+Phase 3D is complete. Phase 2.5B was **not** started.

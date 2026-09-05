@@ -52,7 +52,9 @@ describe('same-type subject replacement reset — persistence layer', () => {
 
     expect(metadata).toBeDefined();
     expect(metadata).not.toHaveProperty('questionnaire');
-    expect(metadata).not.toHaveProperty('food_tags');
+    // Food renders a food_tags field, so the key stays but is emptied; a build
+    // without that field drops the key outright.
+    expect(metadata!.food_tags).toEqual([]);
     expect(metadata!.provenance).toEqual({ source: 'import-2024' });
   });
 
@@ -67,7 +69,8 @@ describe('same-type subject replacement reset — persistence layer', () => {
       choices: {},
       curated: {},
       touchedFieldIds: new Set(),
-      foodTags: [],
+      // The subject never changed, so the form still holds the loaded tags.
+      foodTags: ['spicy'],
       questionnaireReset: false,
     });
 

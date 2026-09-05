@@ -380,16 +380,20 @@ const ReviewForm = ({
       }
       
       setSelectedEntity(processedEntity as RecommendationEntity);
-    } else if (entity && !selectedEntity) {
+    } else if (entity) {
       // Convert provided entity to expected format
       const entityToUse: any = {
         ...entity,
         type: mapStringToEntityType(entity.type as any) ?? entity.type
       };
-      
-      setSelectedEntity(entityToUse);
+
+      // Functional update so `selectedEntity` stays OUT of the dependency list:
+      // every run allocates a fresh object, so depending on it re-triggered the
+      // effect forever (an unbounded render loop in the edit modal).
+      setSelectedEntity((current) => current ?? entityToUse);
     }
-  }, [review, isEditMode, entity, selectedEntity]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [review, isEditMode, entity]);
 
   
   // Ensure proper initialization when entity is provided
@@ -468,6 +472,24 @@ const ReviewForm = ({
       setReviewTitle(review.subtitle || '');
       
       setEntityId(review.entity_id || '');
+      /**
+       * Hydrate the Step 2 subject from the stored link. Without this, editing a
+       * linked review showed an empty subject picker and blocked Next until the
+       * user re-picked the subject — which then cleared their answers.
+       */
+      setSelectedSubject(
+        review.entity_id && review.entity
+          ? {
+              id: review.entity_id,
+              name: review.entity.name,
+              type: review.entity.type,
+              venue: (review.entity as any).venue,
+              image_url: (review.entity as any).image_url,
+              description: (review.entity as any).description,
+              metadata: (review.entity as any).metadata,
+            } as EntityAdapter
+          : null,
+      );
       setDescription(review.description || '');
       setVisibility((review.visibility as "public" | "circle_only" | "private") || "public");
       setResolvedProviderName(null);
