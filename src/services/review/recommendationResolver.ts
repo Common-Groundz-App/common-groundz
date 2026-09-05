@@ -32,11 +32,34 @@ export type RecommendationSource =
   | 'review_explicit'
   | 'rating_inferred';
 
+/** The three explicit answer options shown in the timeline update form. */
+export const RECOMMENDATION_INTENT_OPTIONS: readonly {
+  value: RecommendationIntent;
+  label: string;
+}[] = [
+  { value: 'yes', label: 'Yes' },
+  { value: 'maybe', label: 'Maybe' },
+  { value: 'no', label: 'No' },
+];
+
+/** Action label for the reset control (something the user does). */
+export const BASE_ON_RATING_ACTION_LABEL = 'Base recommendation on rating';
+
+/** Event label for a historical `auto` row (something that happened). */
+export const BASED_ON_RATING_EVENT_LABEL = 'Recommendation based on rating';
+
 export interface ResolvedRecommendation {
   /** Explicit intent, or null when the answer was inferred from the rating. */
   intent: RecommendationIntent | null;
   source: RecommendationSource;
   isRecommended: boolean;
+}
+
+export interface RecommendationSourceCopy {
+  /** Short, user-facing statement of the resolved recommendation. */
+  statement: string;
+  /** Provenance line — may be empty when provenance is unknown. */
+  provenance: string;
 }
 
 /** Minimal shape needed to order timeline events. */
@@ -187,4 +210,46 @@ export function resolveRecommendationForReview(
     lookupLatestRecommendationIntent(updates),
     effectiveRating,
   );
+}
+
+/**
+ * Maps a resolved recommendation to user-facing copy.
+ *
+ * The caller is responsible for deciding whether it has authoritative knowledge
+ * of the latest timeline intent; this helper only formats. When provenance is
+ * unknown, pass an empty `provenance` string.
+ */
+export function getRecommendationSourceCopy(
+  resolved: ResolvedRecommendation,
+): RecommendationSourceCopy {
+  const statement = resolved.isRecommended
+    ? 'Recommended'
+    : resolved.intent === 'maybe'
+      ? 'Maybe'
+      : 'Not recommended';
+
+  const provenance: Record<RecommendationSource, string> = {
+    timeline_explicit: 'Based on your latest timeline update',
+    review_explicit: 'Based on your original answer',
+    rating_inferred: 'Based on your rating',
+  };
+
+  return {
+    statement,
+    provenance: provenance[resolved.source] ?? '',
+  };
+}
+
+/**
+ * Formats a single timeline entry's stored `would_recommend` value literally.
+ * `NULL` and `undefined` produce no statement at all.
+ */
+export function getTimelineEntryRecommendationCopy(
+  value: TimelineIntentValue | null | undefined,
+): string {
+  if (value === 'yes') return 'Recommended';
+  if (value === 'maybe') return 'Maybe';
+  if (value === 'no') return 'Not recommended';
+  if (value === 'auto') return BASED_ON_RATING_EVENT_LABEL;
+  return '';
 }

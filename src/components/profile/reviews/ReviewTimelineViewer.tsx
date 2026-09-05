@@ -4,12 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Calendar, User, Sparkles, AlertCircle } from 'lucide-react';
+import { Plus, Calendar, User, Sparkles, AlertCircle, Undo2 } from 'lucide-react';
 import { ConnectedRingsRating } from '@/components/ui/connected-rings';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { fetchReviewWithSummary, type Review } from '@/services/reviewService';
-import { fetchReviewUpdates, addReviewUpdate } from '@/services/review/timeline';
+import {
+  addReviewUpdate,
+  deleteLatestReviewUpdate,
+  fetchLatestRecommendationIntent,
+  fetchReviewUpdates,
+  type WouldRecommendValue,
+} from '@/services/review/timeline';
 import { ReviewUpdate } from '@/services/review/types';
 import { formatRelativeDate } from '@/utils/dateUtils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,6 +28,16 @@ import { MediaUploader } from '@/components/media/MediaUploader';
 import { CompactMediaGrid } from '@/components/media/CompactMediaGrid';
 import { MediaItem } from '@/types/media';
 import UsernameLink from '@/components/common/UsernameLink';
+import ChoiceChips from './questionnaire/ChoiceChips';
+import {
+  BASED_ON_RATING_EVENT_LABEL,
+  BASE_ON_RATING_ACTION_LABEL,
+  getRecommendationSourceCopy,
+  getTimelineEntryRecommendationCopy,
+  RECOMMENDATION_INTENT_OPTIONS,
+  resolveRecommendationForReview,
+  type RecommendationIntent,
+} from '@/services/review/recommendationResolver';
 
 interface ReviewTimelineViewerProps {
   isOpen: boolean;
@@ -55,6 +71,10 @@ export const ReviewTimelineViewer = ({
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
   const [lightboxMedia, setLightboxMedia] = useState<MediaItem[]>([]);
+  // Phase 3C — recommendation intent captured with the timeline update
+  const [wouldRecommend, setWouldRecommend] = useState<RecommendationIntent | null>(null);
+  const [baseOnRating, setBaseOnRating] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
 
   const MAX_MEDIA_COUNT = 4;
 
@@ -63,6 +83,7 @@ export const ReviewTimelineViewer = ({
   useEffect(() => {
     if (isOpen) {
       loadTimelineData();
+      loadLatestIntent();
     }
   }, [isOpen, reviewId]);
 
@@ -100,8 +121,87 @@ export const ReviewTimelineViewer = ({
     }
   };
 
+  const loadParentReview = async () => {
+    try {
+      const review = await fetchReviewWithSummary(reviewId);
+      setReviewData(review);
+    } catch (error) {
+      console.error('Error reloading parent review:', error);
+    }
+  };
+
+  /**
+   * Latest intent state is tracked separately from the visible timeline list.
+   * The list is complete today, but if it ever paginates we must not claim
+   * provenance from a partial view.
+   */
+  const [latestIntentStatus, setLatestIntentStatus] = useState<
+    'loading' | 'complete' | 'error'
+  >('loading');
+  const [latestIntentEvent, setLatestIntentEvent] = useState<ReviewUpdate | null>(null);
+
+  const loadLatestIntent = async () => {
+    setLatestIntentStatus('loading');
+    const result = await fetchLatestRecommendationIntent(reviewId);
+    if (result.status === 'found') {
+      setLatestIntentStatus('complete');
+      setLatestIntentEvent(result.event);
+    } else if (result.status === 'none') {
+      setLatestIntentStatus('complete');
+      setLatestIntentEvent(null);
+    } else {
+      setLatestIntentStatus('error');
+      setLatestIntentEvent(null);
+    }
+  };
+
+  const handleIntentChange = (value: string | null) => {
+    if (value === 'yes' || value === 'maybe' || value === 'no') {
+      setWouldRecommend(value);
+      setBaseOnRating(false);
+    } else {
+      setWouldRecommend(null);
+    }
+  };
+
+  const handleResetToRating = () => {
+    setBaseOnRating(prev => {
+      const next = !prev;
+      if (next) setWouldRecommend(null);
+      return next;
+    });
+  };
+
+  const handleUndo = async (updateId: string) => {
+    if (!user) return;
+    setIsUndoing(true);
+    try {
+      const result = await deleteLatestReviewUpdate(reviewId, updateId);
+      if (result === 'deleted') {
+        toast({ title: 'Update undone', description: 'Your timeline update has been removed' });
+        await Promise.all([loadTimelineData(), loadLatestIntent(), loadParentReview()]);
+        if (onTimelineUpdate) onTimelineUpdate();
+      } else if (result === 'conflict') {
+        toast({
+          title: 'Cannot undo',
+          description: 'A newer update exists, so this one can no longer be undone.',
+          variant: 'destructive',
+        });
+        await Promise.all([loadTimelineData(), loadLatestIntent(), loadParentReview()]);
+      } else {
+        throw new Error(result);
+      }
+    } catch (error) {
+      console.error('Error undoing timeline update:', error);
+      toast({ title: 'Error', description: 'Failed to undo update', variant: 'destructive' });
+    } finally {
+      setIsUndoing(false);
+    }
+  };
+
   const handleAddUpdate = async () => {
-    if (!user || !newComment.trim()) {
+    if (!user) return;
+    if (!newComment.trim()) {
       toast({
         title: 'Error',
         description: 'Please add a comment for your update',
@@ -112,7 +212,25 @@ export const ReviewTimelineViewer = ({
 
     setIsSubmitting(true);
     try {
-      const success = await addReviewUpdate(reviewId, user.id, newRating, newComment.trim(), selectedMedia);
+      // Translate the UI state into the exact column value:
+      // - untouched / chip cleared -> undefined (column omitted)
+      // - explicit yes/maybe/no -> that value
+      // - "Base recommendation on rating" -> 'auto'
+      let wouldRecommendValue: WouldRecommendValue | undefined;
+      if (baseOnRating) {
+        wouldRecommendValue = 'auto';
+      } else if (wouldRecommend !== null) {
+        wouldRecommendValue = wouldRecommend;
+      }
+
+      const success = await addReviewUpdate(
+        reviewId,
+        user.id,
+        newRating,
+        newComment.trim(),
+        selectedMedia,
+        wouldRecommendValue,
+      );
       
       if (success) {
         toast({
@@ -124,10 +242,17 @@ export const ReviewTimelineViewer = ({
         setNewRating(null);
         setNewComment('');
         setSelectedMedia([]);
+        setWouldRecommend(null);
+        setBaseOnRating(false);
         setIsAddingUpdate(false);
         
-        // Reload timeline data
-        await loadTimelineData();
+        // Phase 3C: reload timeline, latest intent, AND parent review so the
+        // materialized recommendation state stays consistent.
+        await Promise.all([
+          loadTimelineData(),
+          loadLatestIntent(),
+          loadParentReview(),
+        ]);
         
         // Notify parent component to refresh data
         if (onTimelineUpdate) {
@@ -224,6 +349,17 @@ export const ReviewTimelineViewer = ({
   const showAISummary = shouldShowAISummary();
   const initialReviewName = reviewData?.user?.displayName || reviewData?.user?.username || 'User';
 
+  /**
+   * Source copy is only shown when we have authoritative knowledge of the
+   * latest timeline intent. `fetchLatestRecommendationIntent` is a LIMIT 1
+   * query, so `complete` means the whole timeline was consulted server-side.
+   */
+  const resolvedRecommendation = resolveRecommendationForReview(reviewData, timelineUpdates);
+  const sourceCopy =
+    latestIntentStatus === 'complete'
+      ? getRecommendationSourceCopy(resolvedRecommendation)
+      : { statement: resolvedRecommendation.isRecommended ? 'Recommended' : 'Not recommended', provenance: '' };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-xl">
@@ -253,6 +389,20 @@ export const ReviewTimelineViewer = ({
               {/* AI Summary Section - Now using reusable component */}
               {showAISummary && (
                 <AISummaryCard summary={reviewData.ai_summary} />
+              )}
+
+              {/* Phase 3C — materialized recommendation with provenance */}
+              {reviewData && (
+                <Card className="bg-muted/30 border-muted">
+                  <CardContent className="pt-4">
+                    <div className="text-sm">
+                      <span className="font-medium">{sourceCopy.statement}</span>
+                      {sourceCopy.provenance && (
+                        <span className="text-muted-foreground"> — {sourceCopy.provenance}</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Show message when AI summary should appear but doesn't */}
@@ -337,6 +487,9 @@ export const ReviewTimelineViewer = ({
               {/* Timeline Updates */}
               {timelineUpdates.map((update, index) => {
                 const updateName = update.user?.displayName || update.profiles?.username || 'User';
+                const isNewest = index === 0;
+                const recommendationCopy = getTimelineEntryRecommendationCopy(update.would_recommend);
+                const showUndo = isOwner && isNewest;
                 return (
                 <div key={update.id} className="p-4 border rounded-lg bg-card">
                   <div className="flex items-start gap-3">
@@ -348,7 +501,7 @@ export const ReviewTimelineViewer = ({
                     </Avatar>
                     
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <UsernameLink
                           userId={update.user_id || reviewData?.user_id}
                           username={update.profiles?.username || reviewData?.user?.username}
@@ -359,10 +512,27 @@ export const ReviewTimelineViewer = ({
                         <Badge variant="outline" className="text-xs">
                           Update #{timelineUpdates.length - index}
                         </Badge>
+                        {recommendationCopy && (
+                          <Badge variant="secondary" className="text-xs">
+                            {recommendationCopy}
+                          </Badge>
+                        )}
                         <div className="flex items-center gap-1 text-xs text-muted-foreground">
                           <Calendar className="h-3 w-3" />
                           {formatRelativeDate(update.created_at)}
                         </div>
+                        {showUndo && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs gap-1 ml-auto"
+                            onClick={() => handleUndo(update.id)}
+                            disabled={isUndoing}
+                          >
+                            <Undo2 className="h-3 w-3" />
+                            Undo
+                          </Button>
+                        )}
                       </div>
                       
                       {update.rating && (
@@ -446,6 +616,25 @@ export const ReviewTimelineViewer = ({
                             </span>
                           )}
                         </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <ChoiceChips
+                          fieldId="timeline_would_recommend"
+                          label="Would you still recommend it?"
+                          helperText="Tap again to clear your answer."
+                          options={RECOMMENDATION_INTENT_OPTIONS as readonly { value: string; label: string }[]}
+                          value={baseOnRating ? undefined : (wouldRecommend ?? undefined)}
+                          onChange={handleIntentChange}
+                        />
+                        <Button
+                          type="button"
+                          variant={baseOnRating ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={handleResetToRating}
+                        >
+                          {BASE_ON_RATING_ACTION_LABEL}
+                        </Button>
                       </div>
                       
                       <div className="space-y-2">

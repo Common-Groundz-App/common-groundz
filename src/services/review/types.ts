@@ -67,6 +67,8 @@ export interface ReviewUpdate {
   user_id: string;
   rating: number | null;
   comment: string;
+  /** Phase 3C — recommendation intent recorded with this update. */
+  would_recommend?: 'yes' | 'maybe' | 'no' | 'auto' | null;
   media?: MediaItem[];
   created_at: string;
   updated_at: string;
