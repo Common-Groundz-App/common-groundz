@@ -12,12 +12,7 @@ import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
 import { parseEntityType, type CanonicalEntityType } from '@/services/entityType';
 import { EntityAdapter } from '@/components/profile/circles/types';
-import {
-  deriveSubjectPrefill,
-  mapCanonicalToLegacyCategory,
-  resolveQuestionnaireKind,
-  type LegacyReviewCategory,
-} from './subjectSelection';
+import { parseEntityTypeAtBoundary } from '@/services/entityType';
 import {
   subjectRequirement,
   allowsMissingSubject,
