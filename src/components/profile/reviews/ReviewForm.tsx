@@ -235,26 +235,19 @@ const ReviewForm = ({
   const [questionnaireReset, setQuestionnaireReset] = useState(false);
 
   /**
-   * What this save will write to `reviews.category`. Frozen truth table
-   * (Phase 3D — behaviour identical to Phase 2.1, just without the fallback):
-   *
-   *  | new review, subject picked in the form   → canonical subject type
-   *  | new review opened from an entity page    → canonical subject type
-   *  | new review with no valid subject         → `null` ⇒ save is BLOCKED
-   *  | edit, subject deliberately re-selected   → canonical new subject type
-   *  | edit, subject untouched (`loaded`)       → stored raw category, verbatim
-   *  | edit, legacy-unlinked                    → stored raw category, verbatim
-   *
+   * What this save will write to `reviews.category` — the frozen Phase 3D truth
+   * table, implemented once in `categoryPersistence.ts` and unit-tested there.
    * The envelope's `type` must equal exactly this value, because that is what
    * the database validates against — never a display resolver. There is no
    * invented fallback: an unresolvable case blocks submission instead.
    */
-  const canonicalWins =
-    subjectOrigin === 'user-selected' || (subjectOrigin === 'entity-page' && !isEditMode);
-  const persistedCategory: string | null =
-    canonicalWins && canonicalCategory
-      ? canonicalCategory
-      : (isEditMode && review?.category ? review.category : null);
+  const canonicalWins = canonicalCategoryWins(subjectOrigin, isEditMode);
+  const persistedCategory: string | null = resolvePersistedCategory({
+    subjectOrigin,
+    isEditMode,
+    canonicalCategory,
+    storedCategory: review?.category,
+  });
 
   /** The envelope currently stored on the row, read strictly (numeric v1, type match). */
   const storedEnvelope: EnvelopeRead = React.useMemo(
