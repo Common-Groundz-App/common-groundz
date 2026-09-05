@@ -42,6 +42,12 @@ action goes away.
   no migration is needed.
 - The client never writes `reviews.is_recommended`. Materialization stays with the Stage 1
   DB path (`review_updates_after_insert` → `recompute_review_timeline_state`).
+- **Post-insert refresh invariant.** A successful insert never derives authoritative state from
+  the submitted payload and never refetches only the timeline. It refetches all three: (1) the
+  timeline list, (2) the latest-intent lookup (whose result can change `none`→`found` or
+  between values, independently of the visible list), and (3) the parent review, because the
+  recompute can have changed `is_recommended`, `latest_rating`, `timeline_count`, `has_timeline`
+  and `trust_score`. This is the same contract the undo path already follows.
 
 ## Step 2 — the question in the timeline viewer
 
