@@ -106,9 +106,12 @@ action goes away.
   person added the newer entry — timeline INSERT is owner-scoped.
 - The action appears only on the newest entry, only for the review owner, and only through
   `requireAuth()` as the first statement of the handler. Confirmation dialog before firing.
-- All three outcomes also refresh the parent review, not just the entry list: the RPC calls
+- All three outcomes refresh the same three authoritative pieces of state: (1) the timeline list,
+  (2) the dedicated latest-intent lookup (whose result can flip between values or to `none`
+  independently of the parent review), and (3) the parent review. The RPC calls
   `recompute_review_timeline_state`, so `is_recommended`, `latest_rating`, `timeline_count`,
-  `has_timeline` and `trust_score` can all have changed.
+  `has_timeline` and `trust_score` can all have changed. This is the same triple-refetch
+  contract as a successful insert; nothing is derived from the returned status alone.
 - Nothing else may delete timeline entries: no direct client `DELETE` is added, matching the
   Stage 1 privilege posture.
 
