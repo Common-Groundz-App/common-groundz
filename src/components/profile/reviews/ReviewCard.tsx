@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Heart, MessageCircle, MoreVertical, Pencil, Trash2, UploadCloud, Calendar, Flag, AlertTriangle, ImageIcon, Share, Clock, Plus } from 'lucide-react';
+import { Heart, MessageCircle, MoreVertical, Pencil, Trash2, Calendar, Flag, AlertTriangle, ImageIcon, Share, Clock, Plus } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Review } from '@/services/reviewService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,7 +40,6 @@ import { resolveReviewDisplayType, displayTypeValue } from './reviewDisplayType'
 interface ReviewCardProps {
   review: Review;
   onLike: (id: string) => void;
-  onConvert?: (id: string) => void;
   refreshReviews: () => Promise<void>;
   hideEntityFallbacks?: boolean;
   compact?: boolean;
@@ -51,7 +50,6 @@ interface ReviewCardProps {
 const ReviewCard = ({ 
   review, 
   onLike, 
-  onConvert,
   refreshReviews,
   hideEntityFallbacks = false,
   compact = false,
@@ -195,14 +193,6 @@ const ReviewCard = ({
     }
   };
 
-  const handleConvertClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-    if (onConvert) {
-      onConvert(review.id);
-    }
-  };
-
   const handleStatusChange = async (status: 'published' | 'flagged' | 'deleted') => {
     try {
       await updateReviewStatus(review.id, status);
@@ -314,12 +304,6 @@ const ReviewCard = ({
                       {isOwner && (
                         <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
                           <Pencil className="h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                      )}
-                      
-                      {!review.is_converted && isOwner && onConvert && (
-                        <DropdownMenuItem onClick={handleConvertClick} className="flex items-center gap-2">
-                          <UploadCloud className="h-4 w-4" /> Convert to Recommendation
                         </DropdownMenuItem>
                       )}
                       
@@ -555,12 +539,6 @@ const ReviewCard = ({
                   {isOwner && (
                     <DropdownMenuItem onClick={() => setIsEditing(true)} className="flex items-center gap-2">
                       <Pencil className="h-4 w-4" /> Edit
-                    </DropdownMenuItem>
-                  )}
-                  
-                  {!review.is_converted && isOwner && onConvert && (
-                    <DropdownMenuItem onClick={handleConvertClick} className="flex items-center gap-2">
-                      <UploadCloud className="h-4 w-4" /> Convert to Recommendation
                     </DropdownMenuItem>
                   )}
                   

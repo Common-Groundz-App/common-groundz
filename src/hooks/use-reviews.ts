@@ -6,7 +6,6 @@ import { useAuthPrompt } from '@/hooks/useAuthPrompt';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 import { 
   toggleReviewLike, 
-  convertReviewToRecommendation,
   Review
 } from '@/services/reviewService';
 import { useToast } from '@/hooks/use-toast';
@@ -76,43 +75,11 @@ export const useReviews = ({ profileUserId }: UseReviewsProps) => {
     await refetch();
   }, [refetch]);
 
-  const convertToRecommendation = async (reviewId: string) => {
-    if (!requireAuth({ action: 'recommend', surface: 'review_card' })) return;
-
-    try {
-      const success = await convertReviewToRecommendation(reviewId);
-      
-      if (success) {
-        toast({
-          title: "Review converted",
-          description: "Your review has been converted to a recommendation",
-        });
-        
-        // Refresh data
-        await refreshReviews();
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to convert review to recommendation",
-          variant: "destructive"
-        });
-      }
-    } catch (err) {
-      console.error('Error converting review:', err);
-      toast({
-        title: "Error",
-        description: "Failed to convert review to recommendation",
-        variant: "destructive"
-      });
-    }
-  };
-
   return {
     reviews,
     isLoading,
     error,
     handleLike,
-    refreshReviews,
-    convertToRecommendation
+    refreshReviews
   };
 };

@@ -66,22 +66,28 @@ Vocabulary spec frozen at `docs/phase-3b-tag-vocabularies.md`; Stage 2's registr
 
 - [ ] Regenerate Supabase types
 
+### Stage 2 — questionnaire UI + persistence (delivered and reviewed)
+- [x] Registry entries for all 15 canonical types + `CuratedTagSelector`; Food Tags untouched
+- [x] Curated vocabularies live in one module; registry lint test proves parity with the approved matrix doc
+- [x] Envelope written as `metadata.questionnaire` with numeric `version: 1`, `type` = `reviews.category` (never a display resolver)
+- [x] Field-level dirty patching: only answered fields are written; clearing the last answer removes the envelope
+- [x] Over-cap stored tags are grandfathered on read (caps govern creation/modification, not passive viewing)
+- [x] Reset answers and subject-specific metadata on any `entity_id` change
+- [x] Render-vs-persist separation with forward-compatibility tests (unknown field ids / future versions preserved, never rendered)
+- [x] End-to-end materialization test — runs through the ONE shared save helper (`buildReviewMetadataForSave`), asserts in SQL, and cleans up by fixture id only
 
+### Stage 3 — timeline intent + cleanup (delivered and reviewed)
+- [x] "Would you still recommend it?" with `auto` reset and honest source copy
+- [x] `addReviewUpdate` accepts `yes | maybe | no | auto | null`; skipped/cleared → column omitted; only explicit reset writes `auto`
+- [x] `ChoiceChips` in `ReviewTimelineViewer` with re-tap-to-clear semantics
+- [x] Honest source-copy helper: provenance claims only when caller has complete timeline history
+- [x] Atomic owner-only LIFO undo wrapper around `delete_latest_review_update`, refetches parent review
+- [x] Removed Convert-to-recommendation call sites and wiring (action was already a silent no-op due to trigger)
+- [x] Regression tests for `no`+`null` vs `no`+`auto` resolver outcomes
+- [x] Vitest + production build green
 
-
-### Stage 2 — questionnaire UI + persistence (in progress)
-- [ ] Registry entries for all 15 canonical types + `CuratedTagSelector`; Food Tags untouched
-- [ ] Curated vocabularies live in one module; registry lint test proves parity with the approved matrix doc
-- [ ] Envelope written as `metadata.questionnaire` with numeric `version: 1`, `type` = `reviews.category` (never a display resolver)
-- [ ] Field-level dirty patching: only answered fields are written; clearing the last answer removes the envelope
-- [ ] Over-cap stored tags are grandfathered on read (caps govern creation/modification, not passive viewing)
-- [ ] Reset answers and subject-specific metadata on any `entity_id` change
-- [ ] Render-vs-persist separation with forward-compatibility tests (unknown field ids / future versions preserved, never rendered)
-- [ ] End-to-end materialization test — must run through the ONE shared save helper (`buildReviewMetadataForSave`), assert in SQL, and clean up by fixture id only: envelope built by the real TS builder → stored row → `is_recommended` resolved by the Stage 1 SQL resolver
-
-
-### Stage 3 — timeline intent + cleanup (not started)
-- [ ] "Would you still recommend it?" with `auto` reset and honest source copy
+## Phase 3D — NOT STARTED
+- Do not begin until explicitly requested.
 - [ ] "Undo latest update" on the newest entry only, with conflict handling
 - [ ] Retire the Convert action and its wiring
 

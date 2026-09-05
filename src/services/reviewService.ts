@@ -507,24 +507,3 @@ export const toggleReviewLike = async (reviewId: string, userId: string): Promis
 };
 
 
-export const convertReviewToRecommendation = async (reviewId: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('reviews')
-      .update({ 
-        is_recommended: true,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', reviewId);
-
-    if (error) {
-      console.error('Error converting review to recommendation:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error in convertReviewToRecommendation:', error);
-    return false;
-  }
-};
