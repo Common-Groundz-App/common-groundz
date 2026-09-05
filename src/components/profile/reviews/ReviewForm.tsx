@@ -124,7 +124,7 @@ const ReviewForm = ({
    * is written on save, so merely opening and re-saving an old review can never
    * silently rewrite its stored category.
    */
-  type SubjectOrigin = 'none' | 'loaded' | 'entity-page' | 'user-selected';
+  
 
   const initialCanonical = entity ? parseEntityType(entity.type) : null;
 
