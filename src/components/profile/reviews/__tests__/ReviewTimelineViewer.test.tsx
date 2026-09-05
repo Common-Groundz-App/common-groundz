@@ -50,7 +50,7 @@ vi.mock('@/components/media/MediaUploader', () => ({
 }));
 
 vi.mock('../questionnaire/ChoiceChips', () => ({
-  ChoiceChips: ({ label, options, value, onChange }: {
+  default: ({ label, options, value, onChange }: {
     label: string;
     options: readonly { value: string; label: string }[];
     value?: string;
