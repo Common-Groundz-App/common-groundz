@@ -619,11 +619,12 @@ const ReviewForm = ({
   
 
   /**
-   * Step 2 subject selection (Phase 2.0).
+   * Step 2 subject selection (Phase 2.0, simplified in Phase 3D).
    *
-   * The subject is authoritative: it derives the legacy `category` and every
-   * Step 3 field. Unlike `handleEntitySelect` below, it never reads the stale
-   * `category` state — the category is computed FROM the subject.
+   * The subject is authoritative: its canonical type is parsed directly with the
+   * STRICT boundary parser and is what gets persisted. There is no five-bucket
+   * prefill adapter any more — Step 3/4 fields come from the questionnaire
+   * registry, and the venue snapshot from `identityPersistence`.
    */
   /**
    * Any `entity_id` change clears the questionnaire envelope and the known
@@ -654,8 +655,8 @@ const ReviewForm = ({
       return;
     }
 
-    const prefill = deriveSubjectPrefill(subject);
-    if (!prefill.canonicalType || !prefill.category) {
+    const canonicalType = parseEntityTypeAtBoundary(subject.type);
+    if (!canonicalType) {
       // Unknown/unparseable type — never coerced to `others` or `product`.
       toast({
         title: "We can't use this one yet",
@@ -668,20 +669,19 @@ const ReviewForm = ({
     if (subject.id !== entityId) resetQuestionnaireAnswers();
 
     setSelectedSubject(subject);
-    setCategory(prefill.category);
     // The canonical type is what will be persisted, because the user picked it.
-    setCanonicalCategory(prefill.canonicalType);
+    setCanonicalCategory(canonicalType);
     setSubjectOrigin('user-selected');
     setEntityId(subject.id);
     setSelectedEntity({
       ...(subject as any),
-      type: prefill.canonicalType as unknown as EntityType,
+      type: canonicalType as unknown as EntityType,
     } as RecommendationEntity);
 
     logFunnel({
       event: isEditMode ? 'review_subject_attached_late' : 'review_subject_selected',
       source: 'review_form',
-      entityType: prefill.canonicalType,
+      entityType: canonicalType,
     });
 
 
@@ -690,8 +690,8 @@ const ReviewForm = ({
 
     // Offerings (dishes, courses, services…) take their provider from the
     // parent entity, resolved from the registry rather than a food special case.
-    if (isOfferingType(prefill.canonicalType)) {
-      resolveProviderContext(subject.id, prefill.canonicalType, requestId);
+    if (isOfferingType(canonicalType)) {
+      resolveProviderContext(subject.id, canonicalType, requestId);
     }
   };
 
