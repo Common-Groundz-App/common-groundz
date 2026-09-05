@@ -10,9 +10,12 @@ import { ensureHttps } from '@/utils/urlUtils';
 import { MediaItem } from '@/types/media';
 import { DeleteConfirmationDialog } from '@/components/common/ConfirmationDialog';
 import { mapStringToEntityType } from '@/hooks/feed/api/types';
-import { parseEntityType, type CanonicalEntityType } from '@/services/entityType';
+import {
+  parseEntityType,
+  parseEntityTypeAtBoundary,
+  type CanonicalEntityType,
+} from '@/services/entityType';
 import { EntityAdapter } from '@/components/profile/circles/types';
-import { parseEntityTypeAtBoundary } from '@/services/entityType';
 import {
   subjectRequirement,
   allowsMissingSubject,
