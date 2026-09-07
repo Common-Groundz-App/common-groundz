@@ -1,53 +1,69 @@
-# Original plan audit: what's left, and is it worth doing
+# Phase 4 reset: audit the old standalone recommendations, then retire it in stages
 
-## Verdict
+The reviewers are right and my earlier Phase 4 framing was wrong. Saying "you can't recommend a TV show" was inaccurate: since Phase 3 anyone can recommend any of the fifteen kinds by answering "Would you recommend it?" inside a review. The real limitation applies only to the **old separate "recommendation" post**, which is a different feature with its own table, form, card, likes, comments, saves and notifications. So the enum widening is off the table.
 
-Phases 0 through 3 are done. The only real leftover is **Phase 4 — recommendations taxonomy alignment**, and it is worth doing, because the gap is not cosmetic: recommendations are still limited to five subject kinds while reviews accept all fifteen.
+## What I found (read-only, this turn)
 
-## What I verified on disk / in the database
+Two systems exist side by side:
 
-Phase 1 (done)
-- `entityTypeMapping.ts` no longer exists.
-- Registry-driven labelling is live: `getChildPresentation` is used in `EntityDetailV2`, `EntityTabsContent`, `EntityChildrenCard`, `RelatedEntitiesSection`; the "Featured Products" hardcode is gone, replaced by a registry label with a generic fallback.
-- Offering context line is live via `getOfferingContextLine` in `EntityHeader` and `ReviewForm`.
+- New: a review carries the recommend answer — explicit answer in the review, later answer on the timeline, rating as fallback — resolved into a stored flag on the review.
+- Old: a standalone recommendation post with its own record, its own five-kind category, and its own social interactions.
 
-Phase 2 and 3 (done)
-- Review subject is entity-first, subject creation goes through the provider/offering registry (`SubjectQuickCreate` uses `getProviderTypesFor`), config-driven questionnaires with a generic fallback and a JSON answers envelope are in place, plus the Phase 3C/3D close-out documents and tests.
+Facts from the live database:
 
-Phase 4 (not done)
-- `RecommendationCategory` in `src/services/recommendation/types.ts` still exists with its own vocabulary (`Food, Drink, Movie, Book, Place, Product, Activity, Music, Art, TV, Travel, Brand`), and is still consumed by `entityService.ts`, `hooks/feed/api/recommendations.ts`, `types/entities.ts`.
-- The database column `recommendations.category` is a Postgres enum `recommendation_category` with only five values: `food, movie, book, place, product`.
-- All nine existing rows already store canonical lowercase values (`product` 4, `movie` 2, `food` 2, `place` 1) — so no data migration is needed.
-- The TS enum's capitalised values (`Drink`, `TV`, ...) can never be written to that column, so seven of its twelve members are unreachable dead vocabulary that would fail at insert time.
-- `RecommendationForm` hardcodes the picker to the same five strings; `RecommendationCard` already renders canonical labels through `getCanonicalType` / `getEntityTypeLabel`.
+- 9 standalone recommendations exist. All 9 were written by a **single** account, and the newest is dated **2025-05-20** — over a year old. The feature is effectively dormant.
+- 4 of the 9 are linked to an entity; 5 are not.
+- They carry real social data: 20 likes, 17 comments, 3 saves, and 16 related notifications.
+- 6 of 78 reviews still point at a recommendation record (a historical link).
+- The database category list has only five values (food, movie, book, place, product), and all 9 rows already use correct lowercase values, so no data cleanup is needed.
 
-## Is it worth implementing?
+Where it is still wired into the product:
 
-Yes, and for a product reason rather than tidiness: a user can write a review about a TV show, course, app, game, event, service, professional or experience, but cannot recommend one. Closing Phase 4 makes the recommend flow accept the same fifteen kinds as everything else and removes the last competing vocabulary.
+- Creation is still reachable: the recommend form opens from the entity page (both versions) and from the main compose button on the feed.
+- Reading/rendering: the entity page, a person's profile tab, the recommendation detail view, search results, and notification targets.
+- Server-side: about a dozen database routines mention it — trending scores, reputation, user similarity, "who to follow", personalized entities, network/circle discovery, and the like/comment notification triggers. Several discovery routines appear to reference **both** the old table and the new review flag, which is exactly the double-counting risk the reviewers flagged.
 
-## Proposed Phase 4 work
+## My recommendation
 
-1. Widen the database enum
-   - Add the ten missing canonical values to `recommendation_category` so it mirrors the canonical entity types (`brand, event, service, professional, others, tv_show, course, app, game, experience`).
-   - No row rewrite, no grant change; existing values keep working. Additive only, so it is reversible in practice.
+Retire the standalone recommendation post, in stages, and do not modernise its taxonomy. Reasons:
 
-2. Retire `RecommendationCategory` in TypeScript
-   - Replace it with the canonical `EntityType` string union already used everywhere else.
-   - Delete the two hand-written maps in `entityService.ts` and `hooks/feed/api/recommendations.ts`, parsing through `parseEntityTypeAtBoundary` instead, keeping the existing behaviour that an unparseable legacy value is not silently coerced into `product`.
-   - Update `types/entities.ts` and any type-only references.
+- It duplicates the new model. A review with a positive recommend answer already says "I recommend this", with better evidence (rating, written experience, structured answers, and updates over time).
+- It splits the numbers. If discovery counts both sources, recommendation counts, rankings and trust signals become ambiguous — and some routines already touch both.
+- It is dormant, not load-bearing. One author, nothing new in over a year, five of nine not even attached to an entity.
+- Widening its category list would spend effort making a system we intend to drop better supported, and enum values cannot be cleanly removed later.
 
-3. Recommendation form and filters
-   - Drive the category picker from the canonical type list (and from the picked entity's type when one is selected) instead of the five hardcoded strings, reusing the shared type labels and icons so no component re-declares vocabulary.
-   - Drive `RecommendationFilters` labels from the shared label helper, dropping its local `labels` map.
+Reasons to keep it would be a genuine "recommend without writing a review" job. That is a real product idea, but it should then be rebuilt as a lightweight review, not preserved as a second content model — and today nothing suggests users want it, since only one person ever used it.
 
-4. Tests and checks
-   - Cover: canonical parse at the recommendations boundary, unknown legacy value handling, form default derived from entity type, and a filters label snapshot.
-   - Finish with the full vitest run, `tsgo --noEmit`, and a production build, plus a grep audit confirming no `RecommendationCategory` references remain.
+Nothing is deleted in the first steps, so this is reversible until the very last one.
 
-Out of scope, as in the original plan: the `reviews.category = subject.type` database constraint stays deferred until Phase 2 behaviour has been live for a while.
+## Plan
+
+Step 4.0 — Finish the audit precisely (no code or database changes)
+- For each of the roughly dozen database routines, confirm whether it really reads the old table or merely has "recommendation" in its name, and record which ones mix both sources.
+- List every screen that reads the old records and decide, per screen, whether it should read reviews instead or keep showing history.
+- Confirm what the 9 rows and their 17 comments represent (real user content vs demo data) before deciding whether to keep them visible.
+- Output: a short classification table — new system / legacy but still needed / legacy dead / genuinely separate — written to `docs/verification/phase-4-recommendations-audit.md`.
+
+Step 4.1 — Stop new creation (user-visible, easily reversible)
+- Remove the entry points: the recommend form on both entity pages and in the feed compose menu, replacing them with the review flow on the same subject.
+- Keep the form component and write service in place but unreferenced for one step, so reverting is a one-line change.
+
+Step 4.2 — Make discovery single-source
+- Any routine or query that counts or ranks "recommendations" reads only the review-based flag, so counts stop mixing the two.
+- Anything left reading the old table for discovery is either switched or removed, with before/after counts recorded for the surfaces involved.
+
+Step 4.3 — Preserve history, then remove the code
+- Existing records stay readable at their own detail page (and in profile history if the audit says they are real content), so old links and notifications do not break.
+- Delete the write service, the form, and the old five-value category vocabulary in TypeScript; the read path keeps working from canonical types.
+
+Step 4.4 — Database clean-up, last and separately
+- Only after all consumers are gone: decide per the audit whether to archive the 9 rows and their social data or leave the table read-only in place. No table or type is dropped in this plan.
 
 ## Technical notes
 
-- The enum widening is one migration; because it only adds labels to an existing enum type, it needs no policy or grant changes and touches no rows.
-- Adding values to a Postgres enum cannot run inside the same transaction that then uses them, so the migration only adds values; all reads/writes of the new values ship in the application code afterwards.
-- The canonical list and the provider/offering registry stay the single source of vocabulary; the recommendation components consume it rather than restating it.
+- The old category list stays untouched; the TypeScript enum with its extra invented values (Drink, Activity, Music, Art, TV, Travel, Brand) is dead vocabulary that can never be stored and gets deleted in 4.3.
+- The historical link from a review to a recommendation record is kept; it is only history and nothing reads it for logic.
+- Notification targets that point at recommendation records must keep resolving through 4.3, otherwise old notifications dead-end.
+- Adding to a Postgres enum is additive but not cleanly reversible — another reason not to widen it.
+- Each step ends with the full test suite, a typecheck and a build, and ships independently.
+- Roadmap: Phase 4 is rewritten from "align recommendation taxonomy" to "audit and retire standalone recommendations"; I will record this in `roadmap.md` as the first action once the plan is approved.
