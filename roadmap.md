@@ -118,6 +118,51 @@ type or mapping; surviving five-bucket logic is documented as search/filter comp
 - [x] Full Vitest suite (38 files / 633 tests), `tsgo --noEmit` clean and production build green
       after the reopened items were re-closed
 
+## Phase 4 — retire the standalone recommendation feature
+
+Boundary rule (three separate concepts, never conflated):
+- `reviews.is_recommended` (explicit answer → latest timeline answer → rating fallback) is the **only**
+  endorsement truth. Untouched by Phase 4.
+- `posts.post_type='recommendation'` is an **editorial label** for contextual advice. Kept untouched;
+  it must never contribute to endorsement truth, counts, trust or ranking.
+- The standalone `public.recommendations` record is the retirement target. Identify legacy targets by
+  destination (writes to `public.recommendations`), never by visible label or symbol name.
+
+- [x] 4.0 Read-only audit and design capture — `docs/verification/phase-4-recommendations-audit.md`.
+      Every legacy routine classified by semantic replacement (endorsement / engagement / plumbing /
+      obsolete), every reader inventoried, post-type isolation confirmed, review-post rating source
+      confirmed (`structured_fields.rating`), legacy card anatomy captured in
+      `docs/verification/assets/`. **Gate: nothing removed until reviewed.**
+- [ ] 4.1 Stop legacy creation only — remove the three entry points whose destination is
+      `RecommendationForm`; prove the unified Recommendation post type still creates and still moves
+      no review flag, count or ranking. Legacy form/service left unreferenced for one step
+- [ ] 4.2 Apply the per-consumer decisions: endorsement maths reads only `reviews.is_recommended`;
+      engagement inputs (trending, reputation, similarity, who-to-follow, personalisation, profile and
+      directory counts, feed polling) get their own replacement or removal. Before/after numbers
+      recorded per surface. No mechanical substitution
+- [ ] 4.3 Remove the legacy application layer **and** its dummy data together (notifications point at
+      `/recommendations/:id`, so route and rows go in one step). Clear `reviews.recommendation_id` and
+      `reviews.is_converted` in the same statement. No permanent legacy viewer
+- [ ] 4.4 Verify zero remaining dependencies in code, routines, policies, triggers and indexes
+- [ ] 4.5 Separately approved schema migration: drop the recommendation tables, `recommendation_category`,
+      `reviews.recommendation_id`, `reviews.is_converted`, and the obsolete routines/triggers/policies/indexes
+
+## Phase 5 — the feed card (after Phase 4)
+
+- [ ] 5.0 Prototype the hierarchy on the existing post card — post-type badge top-right in a defined
+      trailing region, timestamp on its own line, real spacing between header / title / rating / body /
+      chips / media / actions. No new shared architecture yet
+- [ ] 5.1 Review across every case (text-only, media-heavy, all six types, long username, long title,
+      many chips, narrow mobile, dark mode). **Gate: agree the card anatomy**
+- [ ] 5.2 Extract `FeedCardShell` only if the prototype earned the abstraction; built fresh from the
+      design notes, never refactored out of the legacy card
+- [ ] 5.3 Per-type slots — `review` → connected rings from that post's own `structured_fields.rating`
+      only (no review lookup, no entity aggregate, no inference, no timeline query); `comparison` →
+      compared entities; `question` → question framing; `recommendation` / `tip` / `experience` → prose,
+      no rating row
+- [ ] 5.4 Responsive, accessibility, dark mode and full check-suite verification
+
 ## Deferred
 - [ ] Phase 2.5B — optional wizard consolidation (semantic step ids, Subject → Review → Publish)
 - [ ] Manual remediation of legacy unlinked reviews
+
