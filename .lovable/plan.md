@@ -1,69 +1,106 @@
-# Phase 4 reset: audit the old standalone recommendations, then retire it in stages
+# Phase 4 reset: audit and retire the old standalone "recommendation post" feature
 
-The reviewers are right and my earlier Phase 4 framing was wrong. Saying "you can't recommend a TV show" was inaccurate: since Phase 3 anyone can recommend any of the fifteen kinds by answering "Would you recommend it?" inside a review. The real limitation applies only to the **old separate "recommendation" post**, which is a different feature with its own table, form, card, likes, comments, saves and notifications. So the enum widening is off the table.
+## Why this plan changed
 
-## What I found (read-only, this turn)
+The original Phase 4 said: widen the standalone recommendation feature's five categories to the canonical fifteen. Both reviewers (ChatGPT and Codex) correctly pointed out that this target is a leftover from before Phase 3. Since Phase 3, recommending is not a separate post type at all — it is an answer inside a review:
 
-Two systems exist side by side:
+1. Explicit answer in the review questionnaire ("Would you recommend it?").
+2. Later answer on the review's timeline ("Would you still recommend it?").
+3. Rating as a fallback when no explicit answer exists.
 
-- New: a review carries the recommend answer — explicit answer in the review, later answer on the timeline, rating as fallback — resolved into a stored flag on the review.
-- Old: a standalone recommendation post with its own record, its own five-kind category, and its own social interactions.
+These resolve to a stored flag (`is_recommended`) on the review itself. That works for all fifteen entity kinds today. So the claim "you cannot recommend a TV show" was wrong — you can, through a review. What you cannot do is create the old separate recommendation post for a TV show. Upgrading that old post type would modernise a system the newer review model has effectively replaced.
 
-Facts from the live database:
+So this plan does NOT widen the old category list. It audits the old feature precisely, then retires it in safe stages.
 
-- 9 standalone recommendations exist. All 9 were written by a **single** account, and the newest is dated **2025-05-20** — over a year old. The feature is effectively dormant.
-- 4 of the 9 are linked to an entity; 5 are not.
-- They carry real social data: 20 likes, 17 comments, 3 saves, and 16 related notifications.
-- 6 of 78 reviews still point at a recommendation record (a historical link).
-- The database category list has only five values (food, movie, book, place, product), and all 9 rows already use correct lowercase values, so no data cleanup is needed.
+## The two systems, side by side
 
-Where it is still wired into the product:
+New system (keep, this is the product):
 
-- Creation is still reachable: the recommend form opens from the entity page (both versions) and from the main compose button on the feed.
-- Reading/rendering: the entity page, a person's profile tab, the recommendation detail view, search results, and notification targets.
-- Server-side: about a dozen database routines mention it — trending scores, reputation, user similarity, "who to follow", personalized entities, network/circle discovery, and the like/comment notification triggers. Several discovery routines appear to reference **both** the old table and the new review flag, which is exactly the double-counting risk the reviewers flagged.
+- Lives on the review: `reviews.is_recommended`, questionnaire answers, timeline events on `review_updates`.
+- Has full precedence logic, undo, tests, and close-out documentation from Phases 3C/3D.
 
-## My recommendation
+Old system (the subject of this plan):
 
-Retire the standalone recommendation post, in stages, and do not modernise its taxonomy. Reasons:
+- A separate `recommendations` table with its own title/description/rating/category/visibility, plus its own likes, comments, saves, notifications, form (`RecommendationForm`), card (`RecommendationCard`), detail page, search result type, and a set of database routines.
+- Its category field is a database enum with only five values: food, movie, book, place, product. The TypeScript enum additionally declares seven values (Drink, Activity, Music, Art, TV, Travel, Brand) that the database can never store — dead vocabulary.
 
-- It duplicates the new model. A review with a positive recommend answer already says "I recommend this", with better evidence (rating, written experience, structured answers, and updates over time).
-- It splits the numbers. If discovery counts both sources, recommendation counts, rankings and trust signals become ambiguous — and some routines already touch both.
-- It is dormant, not load-bearing. One author, nothing new in over a year, five of nine not even attached to an entity.
-- Widening its category list would spend effort making a system we intend to drop better supported, and enum values cannot be cleanly removed later.
+## Audit findings so far (read-only, verified this session)
 
-Reasons to keep it would be a genuine "recommend without writing a review" job. That is a real product idea, but it should then be rebuilt as a lightweight review, not preserved as a second content model — and today nothing suggests users want it, since only one person ever used it.
+Data:
 
-Nothing is deleted in the first steps, so this is reversible until the very last one.
+- 9 recommendation rows exist. All 9 belong to a single account. The newest was created 2025-05-20 — over a year ago. The feature is dormant.
+- 4 of the 9 rows are linked to an entity; 5 are unlinked free-text posts.
+- They carry real social data: 20 likes, 17 comments, 3 saves, and 16 notifications reference them.
+- 6 of the 78 reviews carry a historical `recommendation_id` link.
+- All 9 rows already use correct lowercase canonical-looking category values, so no data migration would ever be needed for the content itself.
 
-## Plan
+Code wiring:
 
-Step 4.0 — Finish the audit precisely (no code or database changes)
-- For each of the roughly dozen database routines, confirm whether it really reads the old table or merely has "recommendation" in its name, and record which ones mix both sources.
-- List every screen that reads the old records and decide, per screen, whether it should read reviews instead or keep showing history.
-- Confirm what the 9 rows and their 17 comments represent (real user content vs demo data) before deciding whether to keep them visible.
-- Output: a short classification table — new system / legacy but still needed / legacy dead / genuinely separate — written to `docs/verification/phase-4-recommendations-audit.md`.
+- Creation is still reachable from three places: both entity detail pages (`EntityDetail`, `EntityDetailV2`) and the feed compose button (`SmartComposerButton`).
+- Reading/rendering: entity pages, profile "recommendations" tab (`ProfileRecommendations`), the recommendation detail view (`RecommendationContentViewer`), search results (`RecommendationResultItem`), notification targets, and the home feed's legacy branch (`FeedItem` still has a recommendation-item path).
+- Server side: roughly a dozen database routines mention recommendations — trending and reputation scoring, user similarity, who-to-follow, personalized entities, network/circle discovery, and like/comment notification triggers. Several discovery routines appear to reference both the old table and the new review flag, which is the double-counting risk.
+- The main entity-recommenders surface (`entityRecommendationService.getEntityRecommendersWithContext`) already reads only reviews with `is_recommended = true` — proof the new model is already the primary source on the entity page.
 
-Step 4.1 — Stop new creation (user-visible, easily reversible)
-- Remove the entry points: the recommend form on both entity pages and in the feed compose menu, replacing them with the review flow on the same subject.
-- Keep the form component and write service in place but unreferenced for one step, so reverting is a one-line change.
+## Decision and reasons
 
-Step 4.2 — Make discovery single-source
-- Any routine or query that counts or ranks "recommendations" reads only the review-based flag, so counts stop mixing the two.
-- Anything left reading the old table for discovery is either switched or removed, with before/after counts recorded for the surfaces involved.
+Recommendation: retire the old standalone recommendation post. Do not upgrade its taxonomy.
 
-Step 4.3 — Preserve history, then remove the code
-- Existing records stay readable at their own detail page (and in profile history if the audit says they are real content), so old links and notifications do not break.
-- Delete the write service, the form, and the old five-value category vocabulary in TypeScript; the read path keeps working from canonical types.
+Why remove rather than keep:
 
-Step 4.4 — Database clean-up, last and separately
-- Only after all consumers are gone: decide per the audit whether to archive the 9 rows and their social data or leave the table read-only in place. No table or type is dropped in this plan.
+1. Duplication. "I recommend this" is already fully expressible via a review, with richer evidence (rating, written experience, structured answers, evolving timeline). Two parallel ways to recommend the same thing will confuse users.
+2. Split metrics. Counts, rankings, trust scores and discovery that read both sources become ambiguous; some already do.
+3. Dormancy. One author ever, nothing new in 15+ months, five of nine not even linked to an entity. It is not load-bearing.
+4. Wasted investment. Widening the category enum spends effort strengthening something we intend to delete, and enum values cannot be cleanly removed afterwards.
+
+The honest case for keeping it: a lightweight "recommend without writing a review" action is a legitimate product idea. If that desire ever becomes real, the right build is a short-form review (the questionnaire already supports minimal answers), not a second content model. Usage data says nobody wants it today.
+
+Safety: nothing is deleted until the final step, and the first two steps are trivially reversible.
+
+## The plan, step by step
+
+### Step 4.0 — Complete the audit (no code or database changes)
+
+- For each of the ~12 database routines, read the function body and record whether it genuinely reads the old table or merely has "recommendation" in its name. Flag every routine that mixes the old table and the review flag in one result.
+- Inventory every screen that reads the old records and decide per screen: switch to review-based data, or keep rendering history.
+- Inspect the 9 rows and their 17 comments: real user content or demo data? This decides whether history stays visible in step 4.3.
+- Output: `docs/verification/phase-4-recommendations-audit.md` with a classification table — NEW SYSTEM / LEGACY BUT REQUIRED / LEGACY DEAD / GENUINELY SEPARATE — one row per consumer, table, routine and component.
+- Gate: the audit must be written before any removal work starts.
+
+### Step 4.1 — Stop new creation (user-visible, reversible)
+
+- Remove the recommend entry points: the form trigger on both entity pages and in the feed compose menu. Where a user would have tapped "Recommend", route them to the review composer on the same subject instead.
+- The `RecommendationForm` component and its write service stay in the codebase, unreferenced, for exactly one step so reverting is a one-line change.
+- Verify: the full test suite, typecheck and build green; the entity page and feed compose menu still offer reviews correctly.
+
+### Step 4.2 — Make discovery single-source
+
+- Every routine/query that counts or ranks "recommendations" for feeds, explore, entity pages, trust or who-to-follow reads only the review flag, never the old table.
+- For each changed routine, record before/after counts for the affected surfaces so nothing silently changes beyond the known 9 rows.
+- Database routine changes go through the migration tool with review, one migration per logical group.
+
+### Step 4.3 — Preserve history, then remove the code
+
+- Existing recommendation records stay readable at their own detail page (and in profile history if the audit says the content is real), so old links, shares and the 16 notifications never dead-end.
+- Delete: `RecommendationForm`, the recommendation create/update/delete service, the legacy feed branch if unused after 4.2, the `RecommendationCategory` TypeScript enum and its hand-written maps (`entityService.ts`, `hooks/feed/api/recommendations.ts`), and any other consumers the audit classifies as LEGACY DEAD.
+- Whatever rendering survives uses the canonical type label helpers already shared across the app.
+- Verify: full suite, typecheck, build, plus a grep audit proving no remaining imports of the deleted modules.
+
+### Step 4.4 — Database clean-up (last, and a separate decision)
+
+- Only after zero consumers remain: decide — based on the 4.0 audit — whether to archive the 9 rows and their likes/comments/saves into a log/backup or leave the table in place read-only.
+- No table, column or enum is dropped inside this plan. Dropping is a future, separately approved migration.
+- The historical `reviews.recommendation_id` link column is kept untouched; it is history and nothing reads it for logic.
 
 ## Technical notes
 
-- The old category list stays untouched; the TypeScript enum with its extra invented values (Drink, Activity, Music, Art, TV, Travel, Brand) is dead vocabulary that can never be stored and gets deleted in 4.3.
-- The historical link from a review to a recommendation record is kept; it is only history and nothing reads it for logic.
-- Notification targets that point at recommendation records must keep resolving through 4.3, otherwise old notifications dead-end.
-- Adding to a Postgres enum is additive but not cleanly reversible — another reason not to widen it.
-- Each step ends with the full test suite, a typecheck and a build, and ships independently.
-- Roadmap: Phase 4 is rewritten from "align recommendation taxonomy" to "audit and retire standalone recommendations"; I will record this in `roadmap.md` as the first action once the plan is approved.
+- The old database enum `recommendation_category` is never widened; Postgres enum additions are additive but not cleanly reversible, which is one more reason not to touch it.
+- Notification targets pointing at recommendation records must keep resolving through step 4.3 — the detail route stays alive until the very end.
+- Each step ships independently and ends with: full Vitest suite, `tsgo --noEmit`, production build, and updated evidence in the audit doc.
+- The canonical type list in `src/services/entityType.ts` and the provider/offering registry remain the single source of vocabulary; surviving surfaces consume them rather than restating category lists.
+- On approval, first action: rewrite the Phase 4 entry in `roadmap.md` from "recommendations taxonomy alignment" to this staged audit-and-retire sequence.
+
+## Explicitly out of scope
+
+- The new review-based recommendation model (Phases 3C/3D) — no changes.
+- Deferred items already on the roadmap (Phase 2.5B wizard consolidation, legacy unlinked review remediation).
+- Dropping any table, column or enum.
