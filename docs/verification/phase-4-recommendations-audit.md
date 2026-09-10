@@ -57,7 +57,9 @@ Naming trap recorded: `get_recommendation_count*` and `get_circle_recommendation
 
 ## Application layer
 
-**Creation entry points (LEGACY DEAD — 4.1):** `src/components/feed/SmartComposerButton.tsx` (opens the legacy form directly and via an `open-recommendation-form` window event), `src/pages/EntityDetail.tsx`, `src/pages/EntityDetailV2.tsx`. All three destinations are `RecommendationForm` → `recommendation/crudOperations.ts` → `public.recommendations`.
+**Creation entry points (LEGACY DEAD — removed in 4.1):** `src/components/feed/SmartComposerButton.tsx` (mounted the legacy form and listened for an `open-recommendation-form` window event), `src/pages/EntityDetail.tsx` and `src/pages/EntityDetailV2.tsx` (mobile "Recommend" button → legacy form). All three destinations were `RecommendationForm` → `recommendation/crudOperations.ts` → `public.recommendations`.
+
+**Live entity page is v4.** `/entity/:slug` resolves through `getEntityPageVersion` and renders `components/entity-v4/EntityV4.tsx`. v4 has **no legacy creation CTA at all** — its header offers Follow and Write Review, and its recommendation surfaces are review-derived counts (`stats.recommendationCount`, `stats.circleRecommendationCount`) plus `EntityRecommendationModal`. So 4.1 changed no v4 CTA. The legacy button existed only in the pre-v4 `EntityDetail` branch and in `EntityDetailV2`; in both, an adjacent Review CTA already existed, so the legacy button was **removed** rather than relabelled — no duplicate review action was introduced, and no new verification capability was invented (`handleAddReview` uses `requireAuth()` only).
 
 **Endorsement-relevant readers (switch to reviews — 4.2):**
 - `src/services/entityService.ts` — `fetchEntityRecommendations`, `calculateEntityRating` (blends legacy ratings into the entity rating), `getEntityStats.recommendationCount`. Consumed by `use-entity-detail.ts`, `use-entity-detail-cached.ts`, `use-entity-data-cache.ts`. `calculateEntityRating` has no remaining caller outside the service.
