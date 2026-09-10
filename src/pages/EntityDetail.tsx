@@ -20,7 +20,7 @@ import ReviewCard from '@/components/profile/reviews/ReviewCard';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { useToast } from '@/hooks/use-toast';
 import ReviewForm from '@/components/profile/reviews/ReviewForm';
-import { useRecommendationUploads } from '@/hooks/recommendations/use-recommendation-uploads';
+
 import NavBarComponent from '@/components/NavBarComponent';
 
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';

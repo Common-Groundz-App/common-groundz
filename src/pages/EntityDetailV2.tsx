@@ -65,9 +65,6 @@ const EntityDetailV2 = () => {
   const { requireAuth } = useAuthPrompt();
   const [activeTab, setActiveTab] = useState('overview');
   const [reviewType, setReviewType] = useState<'product' | 'brand'>('product');
-  const { handleImageUpload } = useRecommendationUploads();
-  
-  const [isRecommendationFormOpen, setIsRecommendationFormOpen] = useState(false);
   const [isReviewFormOpen, setIsReviewFormOpen] = useState(false);
   const [isRefreshingImage, setIsRefreshingImage] = useState(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
@@ -280,17 +277,6 @@ const EntityDetailV2 = () => {
 
   const contextualField = getContextualFieldInfo();
 
-  const handleAddRecommendation = () => {
-    if (!requireAuth({ action: 'recommend', entityName: entity?.name, entityId: entity?.id, surface: 'entity_detail_v2' })) return;
-    
-    // Email verification gate (Phase 2 — UI only)
-    if (!canPerformAction('canCreateRecommendations')) {
-      showVerificationRequired('canCreateRecommendations');
-      return;
-    }
-    
-    setIsRecommendationFormOpen(true);
-  };
 
   const handleAddReview = () => {
     if (!requireAuth({ action: 'review', entityName: entity?.name, entityId: entity?.id, surface: 'entity_detail_v2' })) return;
@@ -315,28 +301,7 @@ const EntityDetailV2 = () => {
     refreshData();
   };
   
-  const handleRecommendationSubmit = async (values: any) => {
-    try {
-      toast({
-        title: "Recommendation added",
-        description: "Your recommendation has been added successfully"
-      });
-      
-      setIsRecommendationFormOpen(false);
-      refreshData();
-      
-      return Promise.resolve();
-    } catch (error) {
-      console.error('Error adding recommendation:', error);
-      toast({
-        title: "Error",
-        description: "Failed to add recommendation",
-        variant: "destructive"
-      });
-      
-      return Promise.reject(error);
-    }
-  };
+  
   
   const handleReviewSubmit = async () => {
     try {
@@ -675,13 +640,7 @@ const EntityDetailV2 = () => {
             <div className="flex flex-col md:flex-row gap-6">
               <div className="flex-1">
                 <div className="flex gap-3 mb-6 md:hidden">
-                  <Button 
-                    onClick={handleAddRecommendation}
-                    className="flex-1 gap-2"
-                  >
-                    <MessageSquareHeart className="h-4 w-4" />
-                    Recommend
-                  </Button>
+                  
                   
                   <Button 
                     onClick={handleAddReview}
@@ -1041,23 +1000,7 @@ const EntityDetailV2 = () => {
         )}
       </div>
       
-      {user && entity && (
-        <RecommendationForm
-          isOpen={isRecommendationFormOpen}
-          onClose={() => setIsRecommendationFormOpen(false)}
-          onSubmit={handleRecommendationSubmit}
-          onImageUpload={handleImageUpload}
-          entity={{
-            id: entity.id,
-            name: entity.name,
-            type: entity.type,
-            venue: entity.venue || '',
-            image_url: entity.image_url || '',
-            description: entity.description || '',
-            metadata: entity.metadata
-          }}
-        />
-      )}
+      
       
       {user && entity && (
         <ReviewForm
