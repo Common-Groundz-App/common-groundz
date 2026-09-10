@@ -114,4 +114,21 @@ Current post card (`post-card-compact-review.png`, `post-card-compact-recommenda
 
 ## Gate
 
-4.0 is delivered. Nothing removed. 4.1 begins only after this audit is reviewed.
+4.0 is delivered and its classifications corrected after review. This document is the deletion authority for 4.2-4.5.
+
+## 4.1 result — legacy creation is off
+
+Delivered 2026-09-10. Scope: creation paths only. No read path, RPC, schema or row was touched.
+
+Removed:
+- `src/pages/EntityDetail.tsx` — mobile "Recommend" button, `handleAddRecommendation`, `handleRecommendationSubmit`, mounted `RecommendationForm`, `useRecommendationUploads` usage. The adjacent Review CTA remains and now occupies the row alone.
+- `src/pages/EntityDetailV2.tsx` — same removals; its "Review" button remains.
+- `src/components/feed/SmartComposerButton.tsx` — `open-recommendation-form` listener, legacy submit handler (the only live `createRecommendation` caller), upload hook and mounted form.
+
+Reachability proof (not textual absence — dormant 4.3 code stays on disk by design):
+- No component in any render path mounts `RecommendationForm`; every former mount site is gone, and no live code dispatches `open-recommendation-form`. The listener inside `RecommendationForm.tsx` itself survives and is unreachable because nothing renders the component.
+- `createRecommendation` is referenced only by `services/recommendation/crudOperations.ts` (its definition), `services/recommendationService.ts` (re-export) and `hooks/recommendations/use-recommendation-actions.ts` — and that hook has no importer anywhere in `src`. No reachable path can insert into `public.recommendations`.
+- Entity pages expose exactly one review CTA each; no duplicate was introduced.
+- The unified composer is unchanged and still offers `post_type='recommendation'`; it still writes only `posts` and `post_entities`.
+
+4.2 begins only after this result is reviewed.

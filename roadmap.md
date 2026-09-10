@@ -133,9 +133,14 @@ Boundary rule (three separate concepts, never conflated):
       obsolete), every reader inventoried, post-type isolation confirmed, review-post rating source
       confirmed (`structured_fields.rating`), legacy card anatomy captured in
       `docs/verification/assets/`. **Gate: nothing removed until reviewed.**
-- [ ] 4.1 Stop legacy creation only — remove the three entry points whose destination is
-      `RecommendationForm`; prove the unified Recommendation post type still creates and still moves
-      no review flag, count or ranking. Legacy form/service left unreferenced for one step
+- [x] 4.1 Stop legacy creation only — audit classifications corrected first (`UserRecommendationCard`
+      and `RecommendationsModal` reclassified as separate features to keep; review post type added to
+      the concept table with composer-write evidence; deletion gate written as "by data dependency,
+      never by name"). Legacy "Recommend" button removed from `EntityDetail` (pre-v4 branch) and
+      `EntityDetailV2` — removed, not relabelled, since both already had a Review CTA beside it. v4
+      needed no change: it has no legacy creation CTA. Dormant listener, submit handler, upload hook
+      and mounted form removed from `SmartComposerButton`. Legacy form/services left on disk and
+      unreachable until 4.3
 - [ ] 4.2 Apply the per-consumer decisions: endorsement maths reads only `reviews.is_recommended`;
       engagement inputs (trending, reputation, similarity, who-to-follow, personalisation, profile and
       directory counts, feed polling) get their own replacement or removal. Before/after numbers
