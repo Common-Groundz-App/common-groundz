@@ -8,11 +8,12 @@ Date: 2026-09-09. Read-only: no code, schema or data was changed in this step.
 | --- | --- | --- |
 | **Review recommend answer** — explicit questionnaire answer → latest timeline answer → rating fallback, materialised in `reviews.is_recommended` | `reviews`, `review_updates`, `resolve_review_recommendation`, `reviews_apply_recommendation`, `lookup_latest_recommendation_intent` | **NEW SYSTEM — the only endorsement truth. Untouched.** |
 | **Recommendation post** — `posts.post_type='recommendation'`, an editorial label for contextual advice ("pair it with X", "only in cold weather") | `posts`, `postUtils.ts`, `EnhancedCreatePostForm`, `PostFeedItem` | **SEPARATE FEATURE — keep, untouched. Must never contribute to endorsement truth, counts, trust or ranking.** |
+| **Review post** — `posts.post_type='review'`, an editorial label for prose about an experience, carrying its own optional `structured_fields.rating` | `posts`, `postUtils.ts`, `EnhancedCreatePostForm`, `PostFeedItem` | **SEPARATE FEATURE — keep, untouched. Its rating is post-local and must never write to or be read as `public.reviews`, entity ratings, endorsement counts or recommendation intent.** |
 | **Standalone recommendation record** — old free-standing "Recommend this entity" object with its own rating, likes, comments, saves, views and detail page | `recommendations`, `recommendation_likes`, `recommendation_comments`, `recommendation_saves`, `recommendation_category` | **LEGACY — retire.** |
 
-Rule to carry forward: **identify legacy targets by destination (writes to `public.recommendations`), never by visible label or symbol name.** "Recommendation" appears in 221 source files, the overwhelming majority of them personalisation, chat, journey and preference code that has nothing to do with the legacy table.
+**Deletion gate (binding for 4.2–4.5):** nothing is removed because its name contains "Recommendation". A file, routine or column is a legacy target only if it reads or writes `public.recommendations` (or its dependent tables). "Recommendation" appears in 221 source files, the overwhelming majority of them personalisation, chat, journey, discovery and preference code that has nothing to do with the legacy table.
 
-Verified isolation of the post type: `postUtils.ts` declares `DatabasePostType` including `'recommendation'`, and the composer writes only to `posts`. No legacy table, RPC or category enum is referenced from the unified composer path.
+Verified isolation of both post types: `postUtils.ts` declares `DatabasePostType` including `'recommendation'` and `'review'`, and the unified composer (`src/components/feed/EnhancedCreatePostForm.tsx`) writes to exactly two destinations — `posts` and `post_entities`. It contains no write to `reviews`, no entity-stat write, no recommendation-intent write and no legacy table, RPC or category enum reference. A review post therefore cannot move `reviews.is_recommended`, endorsement counts, entity ratings or trust; its `structured_fields.rating` is display data on that post alone.
 
 ## Data (live, verified)
 
@@ -56,7 +57,9 @@ Naming trap recorded: `get_recommendation_count*` and `get_circle_recommendation
 
 ## Application layer
 
-**Creation entry points (LEGACY DEAD — 4.1):** `src/components/feed/SmartComposerButton.tsx` (opens the legacy form directly and via an `open-recommendation-form` window event), `src/pages/EntityDetail.tsx`, `src/pages/EntityDetailV2.tsx`. All three destinations are `RecommendationForm` → `recommendation/crudOperations.ts` → `public.recommendations`.
+**Creation entry points (LEGACY DEAD — removed in 4.1):** `src/components/feed/SmartComposerButton.tsx` (mounted the legacy form and listened for an `open-recommendation-form` window event), `src/pages/EntityDetail.tsx` and `src/pages/EntityDetailV2.tsx` (mobile "Recommend" button → legacy form). All three destinations were `RecommendationForm` → `recommendation/crudOperations.ts` → `public.recommendations`.
+
+**Live entity page is v4.** `/entity/:slug` resolves through `getEntityPageVersion` and renders `components/entity-v4/EntityV4.tsx`. v4 has **no legacy creation CTA at all** — its header offers Follow and Write Review, and its recommendation surfaces are review-derived counts (`stats.recommendationCount`, `stats.circleRecommendationCount`) plus `EntityRecommendationModal`. So 4.1 changed no v4 CTA. The legacy button existed only in the pre-v4 `EntityDetail` branch and in `EntityDetailV2`; in both, an adjacent Review CTA already existed, so the legacy button was **removed** rather than relabelled — no duplicate review action was introduced, and no new verification capability was invented (`handleAddReview` uses `requireAuth()` only).
 
 **Endorsement-relevant readers (switch to reviews — 4.2):**
 - `src/services/entityService.ts` — `fetchEntityRecommendations`, `calculateEntityRating` (blends legacy ratings into the entity rating), `getEntityStats.recommendationCount`. Consumed by `use-entity-detail.ts`, `use-entity-detail-cached.ts`, `use-entity-data-cache.ts`. `calculateEntityRating` has no remaining caller outside the service.
@@ -65,7 +68,11 @@ Naming trap recorded: `get_recommendation_count*` and `get_circle_recommendation
 
 **Engagement/analytics readers (own decision, not the review flag — 4.2):** `socialIntelligenceService.ts` (4 legacy queries), `collaborativeFilteringService.ts` (6), `enhancedUnifiedProfileService.ts` (profile counts), `explore/UserDirectoryList.tsx` (activity counts), `feedContentService.ts` (new-content polling).
 
-**LEGACY DEAD (delete — 4.3):** `components/recommendations/RecommendationForm.tsx`, `RecommendationCard.tsx`, `services/recommendation/crudOperations.ts`, `fetchRecommendations.ts`, `fetchRecommendationById.ts`, `interactionOperations.ts`, `imageUpload.ts`, `recommendationService.ts` legacy exports, `hooks/recommendations/*`, `hooks/feed/api/recommendations*`, `hooks/feed/interactions.ts` legacy branch, `components/feed/RecommendationFeedItem.tsx`, `UserRecommendationCard.tsx`, the legacy branch in `components/feed/FeedItem.tsx`, `pages/RecommendationView.tsx` + its route in `App.tsx`, `components/content/RecommendationContentViewer.tsx`, `components/profile/ProfileRecommendations.tsx`, `components/modals/RecommendationsModal.tsx`, `hooks/use-user-interactions-cache.ts` legacy branch, `hooks/notifications/useNotificationTargets.ts` legacy branch, `utils/contentRoutes.ts` `'recommendation'` route, `RecommendationCategory` and its hand-written maps in `services/recommendation/types.ts`, `types/entities.ts`, `hooks/feed/types.ts`, `entityService.ts`.
+**LEGACY DEAD (delete — 4.3):** `components/recommendations/RecommendationForm.tsx`, `RecommendationCard.tsx`, `services/recommendation/crudOperations.ts`, `fetchRecommendations.ts`, `fetchRecommendationById.ts`, `interactionOperations.ts`, `imageUpload.ts`, `recommendationService.ts` legacy exports, `hooks/recommendations/*`, `hooks/feed/api/recommendations*`, `hooks/feed/interactions.ts` legacy branch, `components/feed/RecommendationFeedItem.tsx`, the legacy branch in `components/feed/FeedItem.tsx`, `pages/RecommendationView.tsx` + its route in `App.tsx`, `components/content/RecommendationContentViewer.tsx`, `components/profile/ProfileRecommendations.tsx`, `hooks/use-user-interactions-cache.ts` legacy branch, `hooks/notifications/useNotificationTargets.ts` legacy branch, `utils/contentRoutes.ts` `'recommendation'` route, `RecommendationCategory` and its hand-written maps in `services/recommendation/types.ts`, `types/entities.ts`, `hooks/feed/types.ts`, `entityService.ts`.
+
+**Corrected classifications — SEPARATE FEATURE, KEEP (do not delete):**
+- `src/components/feed/UserRecommendationCard.tsx` — the "people you may want to follow" card. Backed by `userRecommendationService` (`RecommendedUser`, `logUserImpression`), shows mutual-follow proof and a Follow button, rendered by `src/pages/Feed.tsx`. It never touches `public.recommendations`. Only any legacy scoring input inside `userRecommendationService` is in 4.2 scope.
+- `src/components/modals/RecommendationsModal.tsx` — the "Recommended by Your Circle / Similar to X" expansion. Data path: `components/entity-v4/NetworkRecommendations.tsx` → `networkRecommendationService` / `fallbackRecommendationService` (RPCs `get_network_entity_recommendations`, `get_fallback_entity_recommendations`) → modal props → `components/entity/RecommendationEntityCard`. It renders entities, not legacy rows. **Keep it and migrate its backing RPCs to the review flag in 4.2**; it is not a 4.3 deletion target.
 
 **Edge functions with legacy reads:** `unified-search-v2`, `search-all` (legacy search result type), `cleanup-orphan-media`, `cleanup-orphan-media-execute` (legacy `image_url` scan).
 
@@ -107,4 +114,21 @@ Current post card (`post-card-compact-review.png`, `post-card-compact-recommenda
 
 ## Gate
 
-4.0 is delivered. Nothing removed. 4.1 begins only after this audit is reviewed.
+4.0 is delivered and its classifications corrected after review. This document is the deletion authority for 4.2-4.5.
+
+## 4.1 result — legacy creation is off
+
+Delivered 2026-09-10. Scope: creation paths only. No read path, RPC, schema or row was touched.
+
+Removed:
+- `src/pages/EntityDetail.tsx` — mobile "Recommend" button, `handleAddRecommendation`, `handleRecommendationSubmit`, mounted `RecommendationForm`, `useRecommendationUploads` usage. The adjacent Review CTA remains and now occupies the row alone.
+- `src/pages/EntityDetailV2.tsx` — same removals; its "Review" button remains.
+- `src/components/feed/SmartComposerButton.tsx` — `open-recommendation-form` listener, legacy submit handler (the only live `createRecommendation` caller), upload hook and mounted form.
+
+Reachability proof (not textual absence — dormant 4.3 code stays on disk by design):
+- No component in any render path mounts `RecommendationForm`; every former mount site is gone, and no live code dispatches `open-recommendation-form`. The listener inside `RecommendationForm.tsx` itself survives and is unreachable because nothing renders the component.
+- `createRecommendation` is referenced only by `services/recommendation/crudOperations.ts` (its definition), `services/recommendationService.ts` (re-export) and `hooks/recommendations/use-recommendation-actions.ts` — and that hook has no importer anywhere in `src`. No reachable path can insert into `public.recommendations`.
+- Entity pages expose exactly one review CTA each; no duplicate was introduced.
+- The unified composer is unchanged and still offers `post_type='recommendation'`; it still writes only `posts` and `post_entities`.
+
+4.2 begins only after this result is reviewed.
