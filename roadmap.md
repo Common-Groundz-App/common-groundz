@@ -145,15 +145,24 @@ Boundary rule (three separate concepts, never conflated):
       engagement inputs (trending, reputation, similarity, who-to-follow, personalisation, profile and
       directory counts, feed polling) get their own replacement or removal. Before/after numbers
       recorded per surface. No mechanical substitution
-- [ ] 4.2A reviewer corrections before the migration runs: (a) every returned `avg_rating` /
-      `average_rating` averages **all** canonical visible ratings while the endorsement count
-      filters to `is_recommended` — shared selection, not shared filtering; (b) recommender id /
-      username / avatar arrays built from one shared deterministic ordering (`username, id`);
-      (c) `get_entity_recommenders` pagination fully deterministic (`recommended_at DESC NULLS
-      LAST, id ASC`); (d) `has_network_activity` semantics frozen as **endorsement activities**
-      (one person recommending five entities counts 5), comment corrected to match; (e) explicit
-      `OWNER TO postgres` on every touched/new routine, and the new `SECURITY INVOKER` recommender
-      RPC verified under real RLS for anonymous and authenticated callers
+- [x] 4.2A Endorsement-truth migration done: fallback, Circle discovery/rating/counts/activity
+      gate and global counts all read canonical review truth (visibility → canonical row →
+      endorsement), Circle routines identity-enforced, new `get_entity_recommenders` RPC does
+      canonical selection/filter/order/pagination in SQL, client service + circle-rating hook +
+      stale threshold copy updated. Reviewer corrections all applied: (a) averages use **all**
+      canonical visible ratings while counts filter to `is_recommended` — shared selection, not
+      shared filtering; (b) recommender id/username/avatar arrays share one deterministic
+      ordering (`username NULLS LAST, id`); (c) recommender pagination ends in `recommended_at
+      DESC NULLS LAST, user_id ASC`; (d) `has_network_activity` frozen as **endorsement
+      activities** with the comment corrected; (e) `OWNER TO postgres` on every touched/new
+      routine, `PUBLIC` execute revoked, and the new `SECURITY INVOKER` RPC verified under real
+      RLS as `anon` and as `authenticated`. Fixture proof (BEGIN…ROLLBACK, generated ids,
+      deterministic limit, no external trigger side effects): raw recommending rows 3, people
+      recommending 2, average 3.0. Whole-dataset parity unchanged (78 reviews / 58 recommended /
+      same checksum). Evidence: `docs/verification/phase-4-2a-recommendation-truth.md`
+- [ ] 4.2B Intelligence/scoring migration (trending, similarity, influence, reputation,
+      collaborative + social client pipelines). Not started
+
 
 - [ ] 4.3 Remove the legacy application layer **and** its dummy data together (notifications point at
       `/recommendations/:id`, so route and rows go in one step). Clear `reviews.recommendation_id` and
