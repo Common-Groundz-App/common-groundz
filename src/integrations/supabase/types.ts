@@ -228,6 +228,13 @@ export type Database = {
             foreignKeyName: "cached_photos_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "cached_photos_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -381,6 +388,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_entities_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "collection_entities_entity_id_fkey"
@@ -899,6 +913,13 @@ export type Database = {
             foreignKeyName: "entities_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "entities_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -1061,6 +1082,13 @@ export type Database = {
             foreignKeyName: "entity_enrichment_queue_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: true
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "entity_enrichment_queue_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: true
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -1092,6 +1120,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_follows_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "entity_follows_entity_id_fkey"
@@ -1182,6 +1217,13 @@ export type Database = {
             foreignKeyName: "entity_photos_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "entity_photos_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -1233,6 +1275,13 @@ export type Database = {
             foreignKeyName: "entity_products_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "entity_products_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -1269,6 +1318,13 @@ export type Database = {
             foreignKeyName: "entity_saves_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "entity_saves_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -1300,6 +1356,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_slug_history_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "entity_slug_history_entity_id_fkey"
@@ -1383,6 +1446,13 @@ export type Database = {
             foreignKeyName: "entity_suggestions_duplicate_of_entity_id_fkey"
             columns: ["duplicate_of_entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "entity_suggestions_duplicate_of_entity_id_fkey"
+            columns: ["duplicate_of_entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -1392,6 +1462,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_suggestions_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "entity_suggestions_entity_id_fkey"
@@ -1450,6 +1527,13 @@ export type Database = {
             foreignKeyName: "entity_tags_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "entity_tags_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -1500,6 +1584,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entity_views_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "entity_views_entity_id_fkey"
@@ -2102,6 +2193,13 @@ export type Database = {
             foreignKeyName: "photo_cache_sessions_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "photo_cache_sessions_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -2163,6 +2261,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "photo_reports_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "photo_reports_entity_id_fkey"
@@ -2257,6 +2362,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_entities_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "post_entities_entity_id_fkey"
@@ -2394,6 +2506,13 @@ export type Database = {
             foreignKeyName: "post_recommendations_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "post_recommendations_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -2526,6 +2645,13 @@ export type Database = {
             foreignKeyName: "posts_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "posts_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -2605,6 +2731,13 @@ export type Database = {
             foreignKeyName: "product_relationships_entity_a_id_fkey"
             columns: ["entity_a_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "product_relationships_entity_a_id_fkey"
+            columns: ["entity_a_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -2614,6 +2747,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_relationships_entity_b_id_fkey"
+            columns: ["entity_b_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "product_relationships_entity_b_id_fkey"
@@ -2929,6 +3069,13 @@ export type Database = {
             foreignKeyName: "recommendations_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "recommendations_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -3229,6 +3376,13 @@ export type Database = {
             foreignKeyName: "reviews_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "reviews_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -3359,6 +3513,13 @@ export type Database = {
             foreignKeyName: "saved_insights_entity_from_id_fkey"
             columns: ["entity_from_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "saved_insights_entity_from_id_fkey"
+            columns: ["entity_from_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -3368,6 +3529,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_insights_entity_to_id_fkey"
+            columns: ["entity_to_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "saved_insights_entity_to_id_fkey"
@@ -3715,6 +3883,13 @@ export type Database = {
             foreignKeyName: "user_entity_journeys_from_entity_id_fkey"
             columns: ["from_entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "user_entity_journeys_from_entity_id_fkey"
+            columns: ["from_entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -3731,6 +3906,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "entities"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_entity_journeys_to_entity_id_fkey"
+            columns: ["to_entity_id"]
+            isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
           },
           {
             foreignKeyName: "user_entity_journeys_to_entity_id_fkey"
@@ -4009,6 +4191,13 @@ export type Database = {
             foreignKeyName: "user_stuff_entity_id_fkey"
             columns: ["entity_id"]
             isOneToOne: false
+            referencedRelation: "entity_stats_v2"
+            referencedColumns: ["entity_id"]
+          },
+          {
+            foreignKeyName: "user_stuff_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
             referencedRelation: "entity_stats_view"
             referencedColumns: ["entity_id"]
           },
@@ -4058,6 +4247,15 @@ export type Database = {
       }
     }
     Views: {
+      entity_stats_v2: {
+        Row: {
+          average_rating: number | null
+          entity_id: string | null
+          recommendation_count: number | null
+          review_count: number | null
+        }
+        Relationships: []
+      }
       entity_stats_view: {
         Row: {
           average_rating: number | null
@@ -4762,6 +4960,13 @@ export type Database = {
         Args: { p_post_ids: string[]; p_user_id: string }
         Returns: {
           post_id: string
+        }[]
+      }
+      get_user_recommendation_counts_batch: {
+        Args: { p_user_ids: string[] }
+        Returns: {
+          recommendation_count: number
+          user_id: string
         }[]
       }
       get_user_recommendation_likes: {
