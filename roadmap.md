@@ -145,6 +145,16 @@ Boundary rule (three separate concepts, never conflated):
       engagement inputs (trending, reputation, similarity, who-to-follow, personalisation, profile and
       directory counts, feed polling) get their own replacement or removal. Before/after numbers
       recorded per surface. No mechanical substitution
+- [ ] 4.2A reviewer corrections before the migration runs: (a) every returned `avg_rating` /
+      `average_rating` averages **all** canonical visible ratings while the endorsement count
+      filters to `is_recommended` — shared selection, not shared filtering; (b) recommender id /
+      username / avatar arrays built from one shared deterministic ordering (`username, id`);
+      (c) `get_entity_recommenders` pagination fully deterministic (`recommended_at DESC NULLS
+      LAST, id ASC`); (d) `has_network_activity` semantics frozen as **endorsement activities**
+      (one person recommending five entities counts 5), comment corrected to match; (e) explicit
+      `OWNER TO postgres` on every touched/new routine, and the new `SECURITY INVOKER` recommender
+      RPC verified under real RLS for anonymous and authenticated callers
+
 - [ ] 4.3 Remove the legacy application layer **and** its dummy data together (notifications point at
       `/recommendations/:id`, so route and rows go in one step). Clear `reviews.recommendation_id` and
       `reviews.is_converted` in the same statement. No permanent legacy viewer
