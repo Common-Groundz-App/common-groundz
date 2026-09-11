@@ -4564,6 +4564,28 @@ export type Database = {
           username: string
         }[]
       }
+      get_entity_recommenders: {
+        Args: {
+          p_entity_id: string
+          p_limit?: number
+          p_offset?: number
+          p_relationship?: string
+          p_search?: string
+        }
+        Returns: {
+          avatar_url: string
+          effective_rating: number
+          first_name: string
+          id: string
+          is_following: boolean
+          is_mutual: boolean
+          last_name: string
+          latest_rating: number
+          rating: number
+          recommended_at: string
+          username: string
+        }[]
+      }
       get_entity_saves_count: { Args: { p_entity_id: string }; Returns: number }
       get_entity_suggestion_stats: {
         Args: { entity_uuid: string }
@@ -4575,7 +4597,7 @@ export type Database = {
       }
       get_fallback_entity_recommendations: {
         Args: {
-          p_current_user_id: string
+          p_current_user_id?: string
           p_entity_id: string
           p_limit?: number
         }
