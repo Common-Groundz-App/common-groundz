@@ -56,14 +56,21 @@ Checked, and this is a real gap rather than a theoretical one: `reviews` has no 
 So every people-oriented surface must deduplicate rather than assume. **Frozen order of operations — this is the part that must not be improvised:**
 
 ```text
-for each (user_id, entity_id):
-  1. pick the canonical row: latest published review, ORDER BY created_at DESC, id DESC
-  2. apply the surface's visibility rule to that chosen row
-  3. read is_recommended on that chosen row
+per surface, per (user_id, entity_id):
+  1. restrict to published reviews this audience/viewer is authorized to see
+  2. within those visible rows pick the canonical one:
+     ORDER BY created_at DESC NULLS LAST, id DESC
+  3. read is_recommended on that chosen row (endorsement surfaces)
   4. take COALESCE(latest_rating, rating) from that same chosen row
 ```
 
-Never filter to `is_recommended = true` first and then take the newest survivor. If someone's older review said yes and their newer one says no, endorsement-first filtering keeps the stale yes and reports them as a current recommender. Visibility is also applied after selection, so a newer private or circle-only review cannot leave an older public one standing in as the person's current public endorsement. Drafts never supersede the current published row.
+Three things this ordering deliberately gets right:
+
+- **Endorsement is never filtered first.** If someone's older review said yes and their newer one says no, filtering to `is_recommended = true` before selecting would keep the stale yes and report them as a current recommender.
+- **Visibility is applied *before* selection, not after.** Each audience sees the latest opinion available *to that audience*. A newer private review must not silently erase an older public recommendation — that would make visibility a hidden input into public results and open a small side channel. If we ever want "any newer review supersedes older public ones", that is a separate product decision, not Phase 4 cleanup.
+- **`NULLS LAST`** because `created_at` is nullable; without it a null-timestamped row would sort first in Postgres and hijack the canonical position.
+
+Drafts never supersede the current published row.
 
 Consequences:
 
@@ -72,7 +79,17 @@ Consequences:
 - recommender lists show each person once;
 - endorsement and rating always come from the *same* row.
 
-Adding a unique (user_id, entity_id) constraint is not part of this phase — the existing duplicate rows would need reconciling first, and whether one person may hold only one structured review per item is a separate product decision.
+**Shared selection, not shared filtering.** Every surface agrees on which row is canonical; what they do next differs:
+
+| Surface | canonical visible row | then |
+| --- | --- | --- |
+| recommending count / Recommenders / Circle count | yes | require `is_recommended = true` |
+| Circle rating / average rating | yes | use the effective rating regardless of the answer |
+
+Someone who rates 2 rings and answers "no" belongs in the Circle rating but not in "3 recommending". `get_circle_rating` must not quietly become a recommenders-only average.
+
+Adding a unique (user_id, entity_id) constraint is not part of this phase — the existing duplicate rows would need reconciling first, and whether one person may hold only one structured review per item is a separate product decision that also has to answer what happens to each duplicate's likes, timeline updates and media.
+
 
 ### 0e. Every people-oriented surface, not just the three named ones
 
@@ -140,13 +157,13 @@ For `get_aggregated_network_recommendations_discovery`:
 - retain current returned entity/profile fields and ordering unless a field was legacy-only;
 - preserve `NetworkRecommendations`, `RecommendationsModal`, and `RecommendationEntityCard` visually.
 
-Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity, visibility and one-person-one-endorsement issues. Change only routines that fail that audit; record every no-change decision. Counts, ratings, summary and modal must all agree on which reviews qualify.
+Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity, visibility and one-person-one-row issues. Change only routines that fail that audit; record every no-change decision. All of them must agree on **which row is canonical**; they must not all adopt the endorsement filter — `get_circle_rating` keeps averaging every canonical visible row's effective rating, including reviewers who answered "no", per the table in 0d.
 
 ## 3b. Global counts and the Recommenders list (per 0e)
 
 - `get_recommendation_counts_batch` — count distinct endorsing people, and add the missing public-visibility filter for its anonymous callers.
 - `get_recommendation_count` — audited and aligned to the same rule.
-- `getEntityRecommendersWithContext` — canonical selection moved into SQL ahead of limit/offset so pages are stable and each person appears once. Existing filters, sorting and returned fields are preserved.
+- `getEntityRecommendersWithContext` — canonical selection, filtering, ordering and pagination all move into SQL so pages are stable and each person appears once. Existing search/relationship filters, sort priority and returned fields are preserved. If this needs a new RPC, it follows the expand → verify → switch → retire path from 0a and applies public visibility itself.
 
 ## 4. Retire rather than rebuild unused legacy RPCs
 
@@ -174,7 +191,14 @@ This replaces the earlier proposal to modernize dead functions.
 - Verify effective ratings appear after timeline updates.
 - Verify identity mismatch and unauthorized visibility are denied.
 - All three stale explanations from 0b corrected and checked on screen. Frozen wording: "Recommendation uses the reviewer's latest explicit choice when available. Otherwise it's based on their current rating." This stays true for a deliberate reset to rating, which the earlier draft wording wrongly described as never having answered.
-- 0d/0e fixtures pass: duplicate endorsing reviews count once; older yes plus newer no does not count or appear; paginated Recommenders returns stable distinct people; anonymous batch counts expose public reviews only.
+- 0d/0e fixtures pass:
+  - duplicate endorsing reviews of the same item by one person count once and contribute one rating;
+  - older yes plus newer no, within the same visibility scope, does not count or appear;
+  - **older public yes plus newer private no** still shows and counts on the public surface — the private row does not suppress it;
+  - a null `created_at` row never becomes canonical ahead of a timestamped one;
+  - a Circle member who rates low and answers "no" contributes to the Circle rating but not to the recommending count;
+  - paginated Recommenders returns stable, distinct people across pages;
+  - anonymous batch counts expose public reviews only.
 - Prove the surviving paths do not depend on `public.recommendations` in two ways:
   1. dependency/source scan of every active routine and client path;
   2. a transaction-scoped fixture test, rolled back, that invokes them with modern review fixtures while no legacy rows are visible to the query. The real legacy table is never dropped or emptied to prove independence.
