@@ -30,15 +30,7 @@ export const checkForNewContent = async (
 
     const lastCheckISO = new Date(lastCheckTime).toISOString();
     
-    // Check for new recommendations
-    let recsQuery = supabase
-      .from('recommendations')
-      .select('id, created_at')
-      .eq('visibility', 'public')
-      .gt('created_at', lastCheckISO)
-      .order('created_at', { ascending: false });
-    
-    // Check for new posts
+    // Poll the modern feed source. All eligible post types share this table.
     let postsQuery = supabase
       .from('posts')
       .select('id, created_at')
@@ -55,23 +47,16 @@ export const checkForNewContent = async (
       
       if (followingData && followingData.length > 0) {
         const followingIds = followingData.map(f => f.following_id);
-        recsQuery = recsQuery.in('user_id', followingIds);
         postsQuery = postsQuery.in('user_id', followingIds);
       }
     }
 
-    const [{ data: newRecs }, { data: newPosts }] = await Promise.all([
-      recsQuery,
-      postsQuery
-    ]);
-
-    const newRecsCount = newRecs?.length || 0;
+    const { data: newPosts } = await postsQuery;
     const newPostsCount = newPosts?.length || 0;
-    const totalNewCount = newRecsCount + newPostsCount;
 
     return {
-      hasNewContent: totalNewCount > 0,
-      newItemCount: totalNewCount,
+      hasNewContent: newPostsCount > 0,
+      newItemCount: newPostsCount,
       lastCheckTime: Date.now()
     };
   } catch (error) {
