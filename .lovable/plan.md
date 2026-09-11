@@ -23,17 +23,35 @@ Execution boundary: **4.2B.0 only, then stop.** 4.2B.1 is a written contract del
 review as its own artifact. No scoring routine or discovery pipeline changes until it is
 approved.
 
-## 4.2B.0 — visible numbers, migrated as one atomic change
+## 4.2B.0 — visible numbers, migrated with a safe cutover
 
-Every reader of entity statistics changes in the same deployment, or the numbers double:
+A database change and an app/search-function deployment are never truly simultaneous, so the
+cached statistics are cut over additively instead of rewritten in place:
 
-- the cached statistics view (rebuilt: old-record count and old ratings removed, keeping its
-  unique index, its rating index and its hourly refresh job intact)
+1. Build a **new** cached statistics table alongside the existing one, with its own unique index,
+   rating index, grants and refresh job.
+2. Verify its numbers.
+3. Point every reader at the new one.
+4. Confirm no reader is left on the old one.
+5. Leave the old one in place, retired later with the rest of the legacy cleanup.
+
+That way there is never a window where old app code adds a modern count to an already-modern
+cached count and doubles it.
+
+Readers switched in step 3:
+
 - the entity service stats function (its own old-record count removed)
-- the entity rating calculation (old ratings removed)
-- Explore and discovery enrichment (stop adding a cached count to the modern count — use the
-  modern count alone)
-- the batch entity fetch and the search edge function, which read the same view
+- the entity rating calculation (old ratings removed; it consumes the authoritative aggregate
+  instead of re-implementing the selection rule in app code)
+- Explore and discovery enrichment (stop adding a cached count to the modern count — one source)
+- the batch entity fetch
+- the search function, which is deployed separately and is named explicitly in the switch list
+
+**Canonicalise first, then aggregate.** Inside the new aggregate: public + published reviews →
+one current row per person/item (`created_at DESC NULLS LAST, id DESC`) → only then count and
+average. Counting distinct people while averaging every raw row would give a correct review
+count, a correct recommendation count and a wrong average.
+
 
 Frozen meaning for these numbers:
 
