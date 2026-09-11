@@ -33,7 +33,7 @@ Where an active routine's callable contract changes (name, arguments, or returne
 add hardened routine -> verify it alone -> switch callers -> verify live path -> retire old contract
 ```
 
-In-place replacement is allowed only when the externally observable contract stays compatible. The fallback surface loses legacy category/visibility columns and its unused user argument, so it takes the additive route.
+In-place replacement is allowed only when the externally observable contract stays compatible. Confirmed correction: the fallback routine's current contract is eight plain columns (`entity_id`, `entity_name`, `entity_type`, `entity_image_url`, `entity_slug`, `avg_rating`, `recommendation_count`, `display_reason`) — no legacy category/visibility fields; those belonged to other old contracts. So the fallback takes the in-place route: same signature, same return shape, body swapped from old records to reviews. Its unused `p_current_user_id` stays accepted-but-ignored for now and is removed with the contract cleanup in 4.5, avoiding a pointless overload and cutover.
 
 ### 0b. Correct the stale v4 explanations (confirmed on disk)
 
@@ -47,7 +47,7 @@ Layout untouched; wording only. It should say the reviewer's own answer decides 
 
 ### 0c. Fallback is frozen as a global public surface
 
-Confirmed: `get_fallback_entity_recommendations` takes a current-user argument and never uses it; the v4 component passes a user id while the client service passes null. So there is no viewer-specific behavior to preserve, and adding one now would be a new personalization decision that makes the two callers disagree. Frozen meaning for this phase: global, public reviews only, endorsement-based, viewer-independent, excluding only the current entity plus the existing entity-eligibility rules. The unused argument is dropped in the new contract.
+Confirmed: `get_fallback_entity_recommendations` takes a current-user argument and never uses it; the v4 component passes a user id while the client service passes null. So there is no viewer-specific behavior to preserve, and adding one now would be a new personalization decision that makes the two callers disagree. Frozen meaning for this phase: global, public reviews only, endorsement-based, viewer-independent, excluding only the current entity plus the existing entity-eligibility rules. The unused argument remains accepted-but-ignored (no behavior change) and is deleted in 4.5 with the other stale contracts.
 
 
 ## 1. Freeze the authorization matrix
@@ -73,16 +73,16 @@ For every `SECURITY DEFINER` Circle RPC:
 
 ## 2. Migrate the active fallback surface
 
-Rebuild `get_fallback_entity_recommendations` from eligible public reviews:
+Rebuild the **body** of `get_fallback_entity_recommendations` from eligible public reviews, keeping the contract exactly as callers know it (see 0a/0c):
 
 - inclusion/count = `reviews.is_recommended = true`;
 - displayed/ordered rating = `COALESCE(latest_rating, rating)`;
 - `status = 'published'`, linked entity required, deleted entities excluded;
 - public reviews only;
-- exclude the current entity only — no viewer-specific exclusion (see 0c);
-- keep the return shape needed by `NetworkRecommendations` / `RecommendationsModal`, without legacy category or visibility enum fields.
+- exclude the current entity only — no viewer-specific exclusion;
+- same signature and same eight return columns; `p_current_user_id` still accepted and still ignored.
 
-Shipped additively per 0a: new contract first, callers switched, old contract retired only after the live path is verified. Client mapping and generated Supabase types move with the caller switch.
+Because the contract is unchanged, this is a single in-place replacement — no new overload, no caller cutover, no generated-types churn for this routine.
 
 ## 3. Harden the active v4 Circle pipeline without redesigning it
 
