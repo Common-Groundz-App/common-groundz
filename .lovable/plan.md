@@ -49,6 +49,22 @@ Layout untouched; wording only. It should say the reviewer's own answer decides 
 
 Confirmed: `get_fallback_entity_recommendations` takes a current-user argument and never uses it; the v4 component passes a user id while the client service passes null. So there is no viewer-specific behavior to preserve, and adding one now would be a new personalization decision that makes the two callers disagree. Frozen meaning for this phase: global, public reviews only, endorsement-based, viewer-independent, excluding only the current entity plus the existing entity-eligibility rules. The unused argument remains accepted-but-ignored (no behavior change) and is deleted in 4.5 with the other stale contracts.
 
+### 0d. One person, one endorsement — and the database does not enforce it
+
+Checked, and this is a real gap rather than a theoretical one: `reviews` has no unique index on (user_id, entity_id) — only the primary key — and there are already **2** published (person, item) pairs carrying more than one review row.
+
+So every people-oriented surface must deduplicate rather than assume:
+
+- pick exactly **one current eligible review per (user_id, entity_id)** before aggregating, ordered newest-first with a deterministic tie-break on id — the same ordering rule the recommendation resolver already uses for timeline events;
+- counts count **endorsing people**, not review rows;
+- the average rating averages **those same chosen rows only**, so one person with several reviews cannot pull the average either;
+- recommender lists show each person once.
+
+This applies to the fallback count, the Circle/network people counts, recommender lists, and any average shown beside them. Adding a unique constraint is not part of this phase — the existing duplicate rows would have to be reconciled first, which is a data decision, not a migration detail.
+
+Fixture coverage: one person with two eligible endorsing reviews of the same item appears once, counts once, and contributes one rating to the average.
+
+
 
 ## 1. Freeze the authorization matrix
 
@@ -80,6 +96,7 @@ Rebuild the **body** of `get_fallback_entity_recommendations` from eligible publ
 - `status = 'published'`, linked entity required, deleted entities excluded;
 - public reviews only;
 - exclude the current entity only — no viewer-specific exclusion;
+- one chosen review per (user_id, entity_id) per 0d, so the count is people and the average uses only those rows;
 - same signature and same eight return columns; `p_current_user_id` still accepted and still ignored.
 
 Because the contract is unchanged, this is a single in-place replacement — no new overload, no caller cutover, no generated-types churn for this routine.
@@ -92,10 +109,11 @@ For `get_aggregated_network_recommendations_discovery`:
 - replace raw `rating` with effective rating;
 - apply the frozen visibility rule;
 - enforce viewer identity;
+- deduplicate to one chosen review per person per entity per 0d, for both the recommender list and the average;
 - retain current returned entity/profile fields and ordering unless a field was legacy-only;
 - preserve `NetworkRecommendations`, `RecommendationsModal`, and `RecommendationEntityCard` visually.
 
-Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity/visibility issue. Change only routines that fail that audit; record every no-change decision.
+Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity, visibility and one-person-one-endorsement issues. Change only routines that fail that audit; record every no-change decision. Counts, ratings, summary and modal must all agree on which reviews qualify.
 
 ## 4. Retire rather than rebuild unused legacy RPCs
 
@@ -122,7 +140,8 @@ This replaces the earlier proposal to modernize dead functions.
 - Verify the visible v4 surfaces remain: recommending count, Circle count, Recommenders, Circle Contributors and Recommended by Your Circle.
 - Verify effective ratings appear after timeline updates.
 - Verify identity mismatch and unauthorized visibility are denied.
-- All three stale explanations from 0b corrected and checked on screen.
+- All three stale explanations from 0b corrected and checked on screen. Suggested wording: "Recommendation comes from the reviewer's latest recommendation answer. If they haven't answered, their rating is used instead."
+- 0d fixture passes: one person with two eligible endorsing reviews of the same item appears once, counts once, contributes one rating.
 - Prove the surviving paths do not depend on `public.recommendations` in two ways:
   1. dependency/source scan of every active routine and client path;
   2. a transaction-scoped fixture test, rolled back, that invokes them with modern review fixtures while no legacy rows are visible to the query. The real legacy table is never dropped or emptied to prove independence.
