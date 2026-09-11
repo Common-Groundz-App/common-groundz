@@ -78,13 +78,13 @@ Frozen meaning for these numbers:
 
 Verification:
 
-- After rebuilding the cached view, refresh it manually once, then confirm the unique index, the
-  rating index, the SELECT grants and the hourly refresh job are all present exactly once (no
-  duplicate job scheduled), and that every reader returns the expected numbers off the refreshed
-  view.
-- Before/after number for a handful of real items and people, written down, with all six readers
-  named explicitly — including any that need no code change because the view's shape is unchanged.
+- Refresh the new aggregate manually once, then confirm its unique index, rating index, SELECT
+  grants and hourly refresh job each exist exactly once (no duplicate job), and that every reader
+  returns the expected numbers off the refreshed data.
+- Before/after number for a handful of real items and people, written down, with every reader
+  named explicitly — including any that needs no code change.
 - Existing suite, typecheck and build green; audit doc and roadmap updated; then stop.
+
 
 
 ## 4.2B.1 — scoring contract (a document, no code) — approval gate
