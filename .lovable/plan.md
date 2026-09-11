@@ -53,16 +53,43 @@ Confirmed: `get_fallback_entity_recommendations` takes a current-user argument a
 
 Checked, and this is a real gap rather than a theoretical one: `reviews` has no unique index on (user_id, entity_id) — only the primary key — and there are already **2** published (person, item) pairs carrying more than one review row.
 
-So every people-oriented surface must deduplicate rather than assume:
+So every people-oriented surface must deduplicate rather than assume. **Frozen order of operations — this is the part that must not be improvised:**
 
-- pick exactly **one current eligible review per (user_id, entity_id)** before aggregating, ordered newest-first with a deterministic tie-break on id — the same ordering rule the recommendation resolver already uses for timeline events;
+```text
+for each (user_id, entity_id):
+  1. pick the canonical row: latest published review, ORDER BY created_at DESC, id DESC
+  2. apply the surface's visibility rule to that chosen row
+  3. read is_recommended on that chosen row
+  4. take COALESCE(latest_rating, rating) from that same chosen row
+```
+
+Never filter to `is_recommended = true` first and then take the newest survivor. If someone's older review said yes and their newer one says no, endorsement-first filtering keeps the stale yes and reports them as a current recommender. Visibility is also applied after selection, so a newer private or circle-only review cannot leave an older public one standing in as the person's current public endorsement. Drafts never supersede the current published row.
+
+Consequences:
+
 - counts count **endorsing people**, not review rows;
-- the average rating averages **those same chosen rows only**, so one person with several reviews cannot pull the average either;
-- recommender lists show each person once.
+- averages use only the chosen rows, so one person with several reviews cannot pull the average;
+- recommender lists show each person once;
+- endorsement and rating always come from the *same* row.
 
-This applies to the fallback count, the Circle/network people counts, recommender lists, and any average shown beside them. Adding a unique constraint is not part of this phase — the existing duplicate rows would have to be reconciled first, which is a data decision, not a migration detail.
+Adding a unique (user_id, entity_id) constraint is not part of this phase — the existing duplicate rows would need reconciling first, and whether one person may hold only one structured review per item is a separate product decision.
 
-Fixture coverage: one person with two eligible endorsing reviews of the same item appears once, counts once, and contributes one rating to the average.
+### 0e. Every people-oriented surface, not just the three named ones
+
+Confirmed additional surfaces that currently treat one row as one person:
+
+- `get_recommendation_counts_batch` — counts rows with `COUNT(*)` and has **no public-visibility filter** even though anonymous callers can execute it. Both faults fixed here.
+- `get_recommendation_count` — used for an entity's visible count; audited under the same rule.
+- `src/services/entityRecommendationService.ts` (`getEntityRecommendersWithContext`) — selects every matching review row and maps each to a profile, so a person with two endorsed reviews appears twice. Worse, it applies limit/offset to review rows before any dedupe, which makes page sizes unstable. Canonical selection must happen in SQL before limit/offset, not in client code afterwards.
+
+All of these must share one canonical selection with the Circle and fallback surfaces, so the recommending count, Recommenders list, Circle Contributors, Circle counts and fallback cards can never disagree.
+
+Fixture coverage:
+
+- one person, two eligible endorsing reviews of the same item → appears once, counts once, one rating in the average;
+- one person, older review yes and newer review no → does not appear and does not count;
+- paginated Recommenders list returns stable, distinct people.
+
 
 
 
