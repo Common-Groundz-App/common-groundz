@@ -157,13 +157,13 @@ For `get_aggregated_network_recommendations_discovery`:
 - retain current returned entity/profile fields and ordering unless a field was legacy-only;
 - preserve `NetworkRecommendations`, `RecommendationsModal`, and `RecommendationEntityCard` visually.
 
-Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity, visibility and one-person-one-endorsement issues. Change only routines that fail that audit; record every no-change decision. Counts, ratings, summary and modal must all agree on which reviews qualify.
+Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity, visibility and one-person-one-row issues. Change only routines that fail that audit; record every no-change decision. All of them must agree on **which row is canonical**; they must not all adopt the endorsement filter — `get_circle_rating` keeps averaging every canonical visible row's effective rating, including reviewers who answered "no", per the table in 0d.
 
 ## 3b. Global counts and the Recommenders list (per 0e)
 
 - `get_recommendation_counts_batch` — count distinct endorsing people, and add the missing public-visibility filter for its anonymous callers.
 - `get_recommendation_count` — audited and aligned to the same rule.
-- `getEntityRecommendersWithContext` — canonical selection moved into SQL ahead of limit/offset so pages are stable and each person appears once. Existing filters, sorting and returned fields are preserved.
+- `getEntityRecommendersWithContext` — canonical selection, filtering, ordering and pagination all move into SQL so pages are stable and each person appears once. Existing search/relationship filters, sort priority and returned fields are preserved. If this needs a new RPC, it follows the expand → verify → switch → retire path from 0a and applies public visibility itself.
 
 ## 4. Retire rather than rebuild unused legacy RPCs
 
@@ -191,7 +191,14 @@ This replaces the earlier proposal to modernize dead functions.
 - Verify effective ratings appear after timeline updates.
 - Verify identity mismatch and unauthorized visibility are denied.
 - All three stale explanations from 0b corrected and checked on screen. Frozen wording: "Recommendation uses the reviewer's latest explicit choice when available. Otherwise it's based on their current rating." This stays true for a deliberate reset to rating, which the earlier draft wording wrongly described as never having answered.
-- 0d/0e fixtures pass: duplicate endorsing reviews count once; older yes plus newer no does not count or appear; paginated Recommenders returns stable distinct people; anonymous batch counts expose public reviews only.
+- 0d/0e fixtures pass:
+  - duplicate endorsing reviews of the same item by one person count once and contribute one rating;
+  - older yes plus newer no, within the same visibility scope, does not count or appear;
+  - **older public yes plus newer private no** still shows and counts on the public surface — the private row does not suppress it;
+  - a null `created_at` row never becomes canonical ahead of a timestamped one;
+  - a Circle member who rates low and answers "no" contributes to the Circle rating but not to the recommending count;
+  - paginated Recommenders returns stable, distinct people across pages;
+  - anonymous batch counts expose public reviews only.
 - Prove the surviving paths do not depend on `public.recommendations` in two ways:
   1. dependency/source scan of every active routine and client path;
   2. a transaction-scoped fixture test, rolled back, that invokes them with modern review fixtures while no legacy rows are visible to the query. The real legacy table is never dropped or emptied to prove independence.
