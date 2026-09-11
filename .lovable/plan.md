@@ -96,6 +96,7 @@ Rebuild the **body** of `get_fallback_entity_recommendations` from eligible publ
 - `status = 'published'`, linked entity required, deleted entities excluded;
 - public reviews only;
 - exclude the current entity only — no viewer-specific exclusion;
+- one chosen review per (user_id, entity_id) per 0d, so the count is people and the average uses only those rows;
 - same signature and same eight return columns; `p_current_user_id` still accepted and still ignored.
 
 Because the contract is unchanged, this is a single in-place replacement — no new overload, no caller cutover, no generated-types churn for this routine.
@@ -108,10 +109,11 @@ For `get_aggregated_network_recommendations_discovery`:
 - replace raw `rating` with effective rating;
 - apply the frozen visibility rule;
 - enforce viewer identity;
+- deduplicate to one chosen review per person per entity per 0d, for both the recommender list and the average;
 - retain current returned entity/profile fields and ordering unless a field was legacy-only;
 - preserve `NetworkRecommendations`, `RecommendationsModal`, and `RecommendationEntityCard` visually.
 
-Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity/visibility issue. Change only routines that fail that audit; record every no-change decision.
+Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity, visibility and one-person-one-endorsement issues. Change only routines that fail that audit; record every no-change decision. Counts, ratings, summary and modal must all agree on which reviews qualify.
 
 ## 4. Retire rather than rebuild unused legacy RPCs
 
