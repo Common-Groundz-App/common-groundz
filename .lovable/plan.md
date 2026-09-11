@@ -142,6 +142,12 @@ For `get_aggregated_network_recommendations_discovery`:
 
 Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity, visibility and one-person-one-endorsement issues. Change only routines that fail that audit; record every no-change decision. Counts, ratings, summary and modal must all agree on which reviews qualify.
 
+## 3b. Global counts and the Recommenders list (per 0e)
+
+- `get_recommendation_counts_batch` — count distinct endorsing people, and add the missing public-visibility filter for its anonymous callers.
+- `get_recommendation_count` — audited and aligned to the same rule.
+- `getEntityRecommendersWithContext` — canonical selection moved into SQL ahead of limit/offset so pages are stable and each person appears once. Existing filters, sorting and returned fields are preserved.
+
 ## 4. Retire rather than rebuild unused legacy RPCs
 
 Confirm across TypeScript, Edge Functions, SQL-to-SQL calls, triggers and scheduled jobs that these are uncalled:
