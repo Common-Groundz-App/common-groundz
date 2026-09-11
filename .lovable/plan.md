@@ -1,64 +1,78 @@
-# Phase 4.0 / 4.1 verification, then Phase 4.2
+# Phase 4.2 (revised) — disconnect the old records from the app's intelligence
 
-## Verification result — 4.0 and 4.1 are complete, no leftovers
+## Verification first — 4.0 and 4.1 are complete
 
-Checked on disk, not from memory:
+Checked on disk: nothing imports or renders the old creation form, the only path to `createRecommendation` has no live caller, the old "Recommend" button is gone from both pre-v4 entity pages, `SmartComposerButton` offers exactly Post and Review, v4 is untouched, the Recommendation post type still writes only to `posts` + `post_entities`, and the audit carries the corrected classifications plus the "delete by data dependency, never by name" gate. Build green. No leftovers.
 
-- **No reachable path to the old creation form.** `RecommendationForm.tsx` is only referenced by itself; nothing imports it, nothing renders it, and no live code dispatches `open-recommendation-form`. `createRecommendation` is reached only from `use-recommendation-actions.ts`, which has no importer.
-- **The old "Recommend" button is gone** from the pre-v4 `EntityDetail` branch and from `EntityDetailV2`; each page keeps its single existing review action. `SmartComposerButton` now offers exactly Post (to `/create`) and Review.
-- **v4 untouched**, as agreed — it never had a legacy creation button.
-- **The Recommendation post type is untouched** and still writes only to `posts` + `post_entities`.
-- The audit document carries the corrected classifications (suggested-people card and the Circle popup marked keep), the review-post isolation row, the "delete by data dependency, never by name" gate, and the 4.1 result. Roadmap marks 4.0 and 4.1 done.
-- Build is green.
+## What 4.2 does
 
-Nothing from 4.0/4.1 is outstanding. Proceeding to 4.2.
+4.1 stopped people creating old records. 4.2 stops the old records influencing anything the app calculates. Nothing is deleted — old screens, comments, notifications, routes and rows all keep working until 4.3.
 
-## Phase 4.2 — make every consumer read the right source
+Both reviews are accepted. Five corrections to the previous draft:
 
-4.2 changes **calculations only**. No legacy row, table, column or route is deleted (that is 4.3/4.5), and the old read-only screens keep working until then. Each change is applied per consumer with a recorded before/after number — no find-and-replace.
+1. Comment plumbing moves **out of 4.2 into 4.3**. The old detail viewer still passes `itemType="recommendation"`, so removing that branch now would break comment reads on a page we promised keeps working.
+2. Trending is **not** posts-only, and posts must be joined through `post_entities` — an unrelated post cannot move an entity's score.
+3. Social influence stops using average rating as a proxy for influence (see the new calibration section).
+4. Similarity needs a **minimum shared-entity threshold** and deterministic zero-variance handling.
+5. `get_personalized_entities` has zero callers — it is **not rebuilt**; it is recorded dead and dropped in 4.5. Same for `calculate_trending_score` and `increment_comment_count`.
 
-### Step 1 — Endorsement surfaces (the ones users see)
+### Frozen semantics (applies to every routine below)
 
-These currently invent endorsement from the old records, mostly as "rating 4 or more". They must read the review recommend answer instead.
+- **Endorsement** = `reviews.is_recommended`. Never re-derived from a rating threshold.
+- **Current opinion / rating shown or ordered by** = `COALESCE(latest_rating, rating)` — the timeline-aware effective rating, confirmed present on `reviews`.
+- **Eligibility** = published status only, entity not deleted, and an explicit visibility rule per routine (network routines may see circle content, global ones only public).
+- **Editorial Recommendation posts never count as endorsement**, only as activity.
+- Row-multiplying joins count distinct ids.
 
-- `get_network_entity_recommendations` — rebuild on `reviews.is_recommended` for people you follow. It currently returns legacy category/visibility columns in its signature, so it is replaced with a new signature, not patched, and `networkRecommendationService.ts` + the "Recommended by Your Circle" popup are updated to the new shape.
-- `get_fallback_entity_recommendations` — rebuild on `reviews` (`is_recommended`, `latest_rating`, published only) instead of the legacy join.
-- `has_network_recommendations` — two conflicting overloads exist today (one thresholds at rating 4, the other at 3). Collapse to a single signature reading the review flag, and drop the redundant overload so no caller can bind the wrong one.
-- Leave alone, verified already review-based: `has_network_activity`, `get_recommendation_count*`, `get_circle_recommendation_count*`, and both discovery aggregation routines.
+## Step 1 — Endorsement surfaces
 
-Recorded per surface: how many entities each returned before and after, for the same viewer and entity.
+- `get_network_entity_recommendations` — rebuilt: people you follow → their eligible reviews → `is_recommended` true. Inclusion by the flag, rating shown from the effective rating. Its signature still returns legacy category/visibility columns, so it is replaced, not patched.
+- `get_fallback_entity_recommendations` — rebuilt on reviews: endorsement count, then average effective rating, then existing recency/popularity signal. No threshold-as-endorsement.
+- `has_network_recommendations` — two conflicting overloads exist (one thresholds at 4, one at 3, confirmed in the catalogue). Collapse to one signature on the review flag and drop the other explicitly, so no client can bind the stale one.
+- **Security, not an afterthought:** all three run as `SECURITY DEFINER` and take a user id. The rebuilt network routines derive the viewer from `auth.uid()` (or reject a mismatched id), so nobody can inspect another person's circle. Anonymous fallback stays separate. Old signatures dropped, execute grants restated, checked-in generated types refreshed, callers updated in the same change.
+- Untouched, already review-based: `has_network_activity`, `get_recommendation_count*`, `get_circle_recommendation_count*`, both discovery aggregation routines.
 
-### Step 2 — Engagement and taste calculations
+**The v4 surfaces stay exactly as they are** — "7 recommending / 3 from circle", Recommenders, Circle Contributors, Recommended by Your Circle. Only what feeds them changes, and they get *more* correct: "recommends" finally means the person's actual answer, not "gave 4 rings".
 
-These measure activity, not endorsement, so they move to posts/reviews rather than to the recommend flag.
+## Step 2 — Activity and taste
 
-- `calculate_enhanced_trending_score` — replace the legacy-row and legacy-like inputs with posts created in 24h and post likes in 24h. Column naming is left for 4.5.
-- `calculate_social_influence_score` — rebuild from `reviews` (average rating, published count) plus review likes; its "count" means contribution volume.
-- `calculate_user_reputation` — remove only the legacy contribution branch; reviews, posts and entities stay.
-- `calculate_user_similarity` — recompute taste correlation over `reviews.rating` (published). The legacy version returns almost nothing anyway.
-- `get_personalized_entities` — no caller; replace its legacy activity source with posts, or drop it (decide in-step, record which).
-- `calculate_trending_score` (superseded, no caller) and `increment_comment_count` (dead legacy branch) — leave on disk, retire in 4.5 with the rest.
+- `calculate_enhanced_trending_score` — legacy inputs replaced with entity-linked activity: eligible posts linked via `post_entities` in 24h, plus likes on those posts in 24h, plus eligible reviews of the entity and likes on them in 24h. Existing weights and caps kept so ranking doesn't drift for an unrelated reason; the changed inputs are documented in the routine.
+- `calculate_user_similarity` — Pearson over the two users' effective ratings of the *same* entities, eligible reviews only, with a documented minimum overlap below which the answer is "insufficient evidence" rather than a high score, and a fixed result when either side has zero variance. Existing normalisation/overlap penalty kept.
+- `calculate_user_reputation` — remove only the legacy contribution branch. Reviews, posts and entities already count; nothing is added, so nothing double-counts.
+- `get_personalized_entities`, `calculate_trending_score`, `increment_comment_count` — confirmed zero callers (app, edge function, trigger, job). Left untouched, recorded dead, dropped in 4.5.
 
-Recorded: score for a fixed sample of users/entities before and after, so a change of ranking is visible rather than assumed.
+## Step 3 — Social influence, rebuilt around calibration
 
-### Step 3 — Comment plumbing
+Your instinct is right and it is the most interesting change in this phase: a person who rates everything five rings carries no information, and influence should not reward positivity. Average rating is dropped as an input.
 
-`add_comment`, `update_comment`, `delete_comment`, `toggle_comment_like`, `get_comments_with_profiles` each branch on item type. Remove **only** the recommendation branch and the `/recommendations/:id` link minting inside them. The post branch is live and must not regress — post comment create/edit/delete/like is retested explicitly.
+The rebuilt score combines four honest factors:
 
-Old notification rows still pointing at `/recommendations/:id` are left alone here; they are removed in 4.3 together with the route, so no dead link is ever shipped.
+1. **Reach** — followers.
+2. **Contribution volume** — eligible published reviews (named as volume, not "recommendations").
+3. **Engagement received** — likes on those reviews, via a left join so a review with zero likes still counts in the denominator.
+4. **Calibration** — how closely the person's effective rating tracks each entity's consensus.
 
-### Step 4 — Client callers
+Calibration, with the guardrails that make it safe rather than a popularity tax:
 
-Update only the callers whose RPC signature changed (`networkRecommendationService.ts`, `fallbackRecommendationService.ts`, and the Circle popup's card props). The legacy read services (`fetchRecommendations`, `fetchRecommendationById`, `interactionOperations`, `entityService`'s legacy blocks, `socialIntelligenceService`, `collaborativeFilteringService`, `feedContentService`, `enhancedDiscoveryService`, `enhancedUnifiedProfileService`) are **not** touched in 4.2 — they belong to 4.3 with the rows they read.
+- Consensus for an entity **excludes that user's own review**, otherwise everyone is partly compared to themselves.
+- An entity only contributes when it has **enough independent raters**; a two-person entity has no consensus to agree with.
+- Agreement is measured as average absolute distance from consensus, then inverted — so agreeing that something is bad counts exactly as much as agreeing it is good, which is the anti-manipulation property you want.
+- A person needs a **minimum number of qualifying entities** before calibration applies at all; below that the factor is neutral, never punitive.
+- **Rating spread matters too:** a user whose ratings have almost no variance (all fives) gets little calibration credit even if the average lines up, because agreeing by accident is not judgement.
+- Calibration is **capped and modest in weight** — it adjusts influence, it never dominates. Being an early or minority voice on a thinly-rated entity must not be penalised, which is exactly what the independent-rater floor and the neutral fallback prevent.
 
-### Verification before stopping
+Weights and thresholds are proposed with real numbers from the current data during implementation, and the before/after score for a fixed sample of users is recorded so the effect is visible rather than assumed.
 
-- Every rebuilt routine has explicit grants and runs as intended; a signed-in viewer gets results, an anonymous one gets only what policy allows.
-- "Recommended by Your Circle" and the fallback strip still render, now sourced from review answers; before/after counts recorded.
-- Post comments unaffected; Recommendation and Review post types unaffected; `reviews.is_recommended` values unchanged by this phase (whole-table before/after comparison).
-- Full check suite, typecheck and build green.
-- Results appended to `docs/verification/phase-4-recommendations-audit.md`, roadmap ticked, then stop before 4.3.
+## Verification before stopping
+
+- Rebuilt routines: grants explicit, viewer identity enforced, a signed-in viewer gets results, an anonymous one gets only what policy allows, and no routine returns another user's private content.
+- Circle / fallback / trending / similarity / influence: before-and-after numbers for the same fixed viewers and entities, recorded per surface.
+- `reviews.is_recommended` unchanged across the whole table (before/after comparison) — 4.2 must not touch endorsement truth itself.
+- Old detail page, its comments, notifications and route all still work.
+- Recommendation and Review post types unaffected.
+- Generated types refreshed; full check suite, typecheck and build green.
+- Results appended to `docs/verification/phase-4-recommendations-audit.md`, roadmap ticked (including the new calibration item), then stop before 4.3.
 
 ## Out of scope
 
-Deleting legacy rows, tables, columns, routes, screens or the category enum; the Phase 5 card redesign; anything touching the review recommend answer itself.
+Legacy comment plumbing (4.3), deleting rows/routes/screens/enum (4.3–4.5), dead-routine removal (4.5), Phase 5 card work, and any change to how the review recommend answer itself is resolved.
