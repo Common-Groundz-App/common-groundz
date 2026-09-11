@@ -56,14 +56,21 @@ Checked, and this is a real gap rather than a theoretical one: `reviews` has no 
 So every people-oriented surface must deduplicate rather than assume. **Frozen order of operations — this is the part that must not be improvised:**
 
 ```text
-for each (user_id, entity_id):
-  1. pick the canonical row: latest published review, ORDER BY created_at DESC, id DESC
-  2. apply the surface's visibility rule to that chosen row
-  3. read is_recommended on that chosen row
+per surface, per (user_id, entity_id):
+  1. restrict to published reviews this audience/viewer is authorized to see
+  2. within those visible rows pick the canonical one:
+     ORDER BY created_at DESC NULLS LAST, id DESC
+  3. read is_recommended on that chosen row (endorsement surfaces)
   4. take COALESCE(latest_rating, rating) from that same chosen row
 ```
 
-Never filter to `is_recommended = true` first and then take the newest survivor. If someone's older review said yes and their newer one says no, endorsement-first filtering keeps the stale yes and reports them as a current recommender. Visibility is also applied after selection, so a newer private or circle-only review cannot leave an older public one standing in as the person's current public endorsement. Drafts never supersede the current published row.
+Three things this ordering deliberately gets right:
+
+- **Endorsement is never filtered first.** If someone's older review said yes and their newer one says no, filtering to `is_recommended = true` before selecting would keep the stale yes and report them as a current recommender.
+- **Visibility is applied *before* selection, not after.** Each audience sees the latest opinion available *to that audience*. A newer private review must not silently erase an older public recommendation — that would make visibility a hidden input into public results and open a small side channel. If we ever want "any newer review supersedes older public ones", that is a separate product decision, not Phase 4 cleanup.
+- **`NULLS LAST`** because `created_at` is nullable; without it a null-timestamped row would sort first in Postgres and hijack the canonical position.
+
+Drafts never supersede the current published row.
 
 Consequences:
 
@@ -72,7 +79,17 @@ Consequences:
 - recommender lists show each person once;
 - endorsement and rating always come from the *same* row.
 
-Adding a unique (user_id, entity_id) constraint is not part of this phase — the existing duplicate rows would need reconciling first, and whether one person may hold only one structured review per item is a separate product decision.
+**Shared selection, not shared filtering.** Every surface agrees on which row is canonical; what they do next differs:
+
+| Surface | canonical visible row | then |
+| --- | --- | --- |
+| recommending count / Recommenders / Circle count | yes | require `is_recommended = true` |
+| Circle rating / average rating | yes | use the effective rating regardless of the answer |
+
+Someone who rates 2 rings and answers "no" belongs in the Circle rating but not in "3 recommending". `get_circle_rating` must not quietly become a recommenders-only average.
+
+Adding a unique (user_id, entity_id) constraint is not part of this phase — the existing duplicate rows would need reconciling first, and whether one person may hold only one structured review per item is a separate product decision that also has to answer what happens to each duplicate's likes, timeline updates and media.
+
 
 ### 0e. Every people-oriented surface, not just the three named ones
 
