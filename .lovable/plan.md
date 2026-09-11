@@ -140,7 +140,8 @@ This replaces the earlier proposal to modernize dead functions.
 - Verify the visible v4 surfaces remain: recommending count, Circle count, Recommenders, Circle Contributors and Recommended by Your Circle.
 - Verify effective ratings appear after timeline updates.
 - Verify identity mismatch and unauthorized visibility are denied.
-- All three stale explanations from 0b corrected and checked on screen.
+- All three stale explanations from 0b corrected and checked on screen. Suggested wording: "Recommendation comes from the reviewer's latest recommendation answer. If they haven't answered, their rating is used instead."
+- 0d fixture passes: one person with two eligible endorsing reviews of the same item appears once, counts once, contributes one rating.
 - Prove the surviving paths do not depend on `public.recommendations` in two ways:
   1. dependency/source scan of every active routine and client path;
   2. a transaction-scoped fixture test, rolled back, that invokes them with modern review fixtures while no legacy rows are visible to the query. The real legacy table is never dropped or emptied to prove independence.
