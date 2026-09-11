@@ -3,7 +3,7 @@ import { Entity } from '@/services/recommendation/types';
 
 /**
  * Batch fetch entities by IDs in a single query.
- * Also fetches rating stats from entity_stats_view and merges them.
+ * Also fetches rating stats from the canonical review aggregate and merges them.
  * Returns a Map for O(1) lookup by entity ID.
  */
 export const fetchEntitiesByIds = async (
@@ -23,7 +23,7 @@ export const fetchEntitiesByIds = async (
         .in('id', uniqueIds)
         .eq('is_deleted', false),
       supabase
-        .from('entity_stats_view')
+        .from('entity_stats_v2')
         .select('entity_id, average_rating, review_count, recommendation_count')
         .in('entity_id', uniqueIds)
     ]);

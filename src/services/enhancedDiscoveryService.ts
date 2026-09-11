@@ -16,21 +16,12 @@ export class EnhancedDiscoveryService {
       
       // Fetch cached stats from materialized view
       const { data: statsData } = await supabase
-        .from('entity_stats_view')
+        .from('entity_stats_v2')
         .select('entity_id, recommendation_count, review_count, average_rating')
         .in('entity_id', entityIds);
       
       const statsMap = new Map(
         statsData?.map(s => [s.entity_id, s]) || []
-      );
-      
-      // Batch-fetch timeline-aware recommendation counts (85-95% latency reduction)
-      const { data: timelineData } = await supabase.rpc('get_recommendation_counts_batch', {
-        p_entity_ids: entityIds
-      });
-      
-      const timelineCountsMap = new Map(
-        timelineData?.map(t => [t.entity_id, t.recommendation_count]) || []
       );
       
       // Batch-fetch circle counts if authenticated
@@ -45,20 +36,15 @@ export class EnhancedDiscoveryService {
         );
       }
       
-      // Enrich entities with cached + timeline + per-user data
+      // Enrich entities from the single canonical public aggregate plus Circle data.
       return entities.map(entity => {
         const stats = statsMap.get(entity.id);
-        const timelineCount = timelineCountsMap.get(entity.id) || 0;
-        const cachedRecCount = stats?.recommendation_count || 0;
         
         return {
           ...entity,
           averageRating: stats?.average_rating,
           reviewCount: stats?.review_count || 0,
-          // Match legacy behavior: cached recommendations + timeline-aware reviews
-          // The view gives us public recommendations, get_recommendation_counts_batch adds
-          // reviews where is_recommended=true (timeline-aware count)
-          recommendationCount: cachedRecCount + timelineCount,
+          recommendationCount: stats?.recommendation_count || 0,
           circleRecommendationCount: circleCountsMap.get(entity.id) || 0
         };
       });

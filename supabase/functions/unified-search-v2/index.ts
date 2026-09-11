@@ -694,7 +694,7 @@ serve(async (req) => {
       
       const hydratedEntities = await hydrateParents(mergedEntities)
 
-      // Merge aggregated rating stats from entity_stats_view (non-blocking).
+      // Merge canonical public review stats from entity_stats_v2 (non-blocking).
       // Fired as a separate parallel query — NOT a SQL JOIN — so a failure here
       // never blocks the entity payload. Skipped entirely when no entities.
       let entitiesWithStats = hydratedEntities
@@ -702,12 +702,12 @@ serve(async (req) => {
         try {
           const entityIds = hydratedEntities.map((e: any) => e.id)
           const { data: statsRows, error: statsError } = await supabase
-            .from('entity_stats_view')
+            .from('entity_stats_v2')
             .select('entity_id, average_rating, review_count')
             .in('entity_id', entityIds)
 
           if (statsError) {
-            console.warn('⚠️ entity_stats_view query failed, returning entities without stats:', statsError.message)
+            console.warn('⚠️ entity_stats_v2 query failed, returning entities without stats:', statsError.message)
           } else {
             const statsMap = new Map(
               (statsRows ?? []).map((s: any) => [s.entity_id, s])
@@ -722,7 +722,7 @@ serve(async (req) => {
             })
           }
         } catch (statsErr) {
-          console.warn('⚠️ entity_stats_view merge threw, returning entities without stats:', (statsErr as Error).message)
+          console.warn('⚠️ entity_stats_v2 merge threw, returning entities without stats:', (statsErr as Error).message)
         }
       }
 

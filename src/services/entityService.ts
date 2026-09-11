@@ -359,96 +359,26 @@ export const fetchEntityReviews = async (
   }
 };
 
-/**
- * Calculate average rating for an entity from recommendations and reviews
- * Now considers latest timeline updates for dynamic reviews
- */
+/** Read the canonical public rating from the Phase 4.2B.0 aggregate. */
 export const calculateEntityRating = async (entityId: string): Promise<number | null> => {
-  // Get all recommendations for this entity with their ratings
-  const { data: recommendations, error: recError } = await supabase
-    .from('recommendations')
-    .select('rating')
+  const { data, error } = await supabase
+    .from('entity_stats_v2')
+    .select('average_rating')
     .eq('entity_id', entityId)
-    .eq('visibility', 'public');
+    .maybeSingle();
 
-  if (recError) {
-    console.error('Error fetching recommendation ratings:', recError);
+  if (error) {
+    console.error('Error fetching canonical entity rating:', error);
     return null;
   }
 
-  // Get all reviews for this entity
-  const { data: reviews, error: revError } = await supabase
-    .from('reviews')
-    .select('id, rating, has_timeline')
-    .eq('entity_id', entityId)
-    .eq('visibility', 'public');
-
-  if (revError) {
-    console.error('Error fetching review ratings:', revError);
-    return null;
-  }
-
-  if (!reviews || reviews.length === 0) {
-    if (!recommendations || recommendations.length === 0) {
-      return null;
-    }
-    // Only recommendations exist
-    const recRatings = recommendations.map(rec => Number(rec.rating)).filter(rating => !isNaN(rating));
-    if (recRatings.length === 0) return null;
-    const sum = recRatings.reduce((total, rating) => total + rating, 0);
-    return parseFloat((sum / recRatings.length).toFixed(1));
-  }
-
-  // Get timeline updates for reviews that have them
-  const reviewsWithTimeline = reviews.filter(r => r.has_timeline);
-  const timelineReviewIds = reviewsWithTimeline.map(r => r.id);
-  
-  let timelineUpdates: any[] = [];
-  if (timelineReviewIds.length > 0) {
-    const { data: updatesData } = await supabase
-      .from('review_updates')
-      .select('review_id, rating, created_at')
-      .in('review_id', timelineReviewIds)
-      .not('rating', 'is', null)
-      .order('created_at', { ascending: false });
-    
-    timelineUpdates = updatesData || [];
-  }
-
-  // Calculate effective ratings for reviews
-  const effectiveReviewRatings = reviews.map(review => {
-    if (!review.has_timeline) {
-      return Number(review.rating);
-    }
-    
-    // Find the latest timeline update with a rating for this review
-    const latestUpdate = timelineUpdates.find(update => update.review_id === review.id);
-    if (latestUpdate && latestUpdate.rating !== null) {
-      return Number(latestUpdate.rating);
-    }
-    
-    // Fallback to original rating if no timeline updates with ratings
-    return Number(review.rating);
-  }).filter(rating => !isNaN(rating));
-
-  // Combine all ratings
-  const allRatings = [
-    ...(recommendations || []).map(rec => Number(rec.rating)),
-    ...effectiveReviewRatings
-  ].filter(rating => !isNaN(rating));
-
-  // If no ratings, return null
-  if (allRatings.length === 0) {
-    return null;
-  }
-
-  // Calculate average
-  const sum = allRatings.reduce((total, rating) => total + rating, 0);
-  return parseFloat((sum / allRatings.length).toFixed(1));
+  return data?.average_rating === null || data?.average_rating === undefined
+    ? null
+    : Number(data.average_rating);
 };
 
 /**
- * Get entity stats including timeline-aware recommendation counts
+ * Get canonical public entity stats and the viewer's Circle count.
  */
 export const getEntityStats = async (entityId: string, userId: string | null = null): Promise<{
   recommendationCount: number;
@@ -456,35 +386,14 @@ export const getEntityStats = async (entityId: string, userId: string | null = n
   averageRating: number | null;
   circleRecommendationCount: number;
 }> => {
-  // Count recommendations (from old recommendations table)
-  const { count: recommendationCount, error: recError } = await supabase
-    .from('recommendations')
-    .select('*', { count: 'exact', head: true })
+  const { data: stats, error: statsError } = await supabase
+    .from('entity_stats_v2')
+    .select('recommendation_count, review_count, average_rating')
     .eq('entity_id', entityId)
-    .eq('visibility', 'public');
+    .maybeSingle();
 
-  if (recError) {
-    console.error('Error counting recommendations:', recError);
-  }
-
-  // Count reviews
-  const { count: reviewCount, error: revError } = await supabase
-    .from('reviews')
-    .select('*', { count: 'exact', head: true })
-    .eq('entity_id', entityId)
-    .eq('visibility', 'public');
-
-  if (revError) {
-    console.error('Error counting reviews:', revError);
-  }
-
-  // Get timeline-aware recommendation count using database function
-  let timelineRecommendationCount = 0;
-  const { data: recCountData, error: recCountError } = await supabase
-    .rpc('get_recommendation_count', { p_entity_id: entityId });
-  
-  if (!recCountError && recCountData !== null) {
-    timelineRecommendationCount = recCountData;
+  if (statsError) {
+    console.error('Error fetching canonical entity stats:', statsError);
   }
 
   // Get circle recommendation count if user is logged in
@@ -501,13 +410,12 @@ export const getEntityStats = async (entityId: string, userId: string | null = n
     }
   }
 
-  // Get average rating
-  const averageRating = await calculateEntityRating(entityId);
-
   return {
-    recommendationCount: (recommendationCount || 0) + timelineRecommendationCount,
-    reviewCount: reviewCount || 0,
-    averageRating,
+    recommendationCount: stats?.recommendation_count || 0,
+    reviewCount: stats?.review_count || 0,
+    averageRating: stats?.average_rating === null || stats?.average_rating === undefined
+      ? null
+      : Number(stats.average_rating),
     circleRecommendationCount
   };
 };

@@ -88,26 +88,21 @@ export const UserDirectoryList = ({ sortOption }: UserDirectoryListProps) => {
           return;
         }
         
-        // Get recommendation counts - direct query instead of using non-existent RPC
+        // Get public endorsement counts from canonical current reviews.
         const userIds = data.map(user => user.id);
-        let recommendationCountsMap = new Map();
+        let recommendationCountsMap = new Map<string, number>();
         let followerCountsMap = new Map();
         let followingData: any[] = [];
         let mutualCountsMap = new Map<string, number>();
         
-        // Get recommendation counts
         const { data: recommendationData, error: recError } = await supabase
-          .from('recommendations')
-          .select('user_id, id')
-          .in('user_id', userIds);
+          .rpc('get_user_recommendation_counts_batch', { p_user_ids: userIds });
           
         if (recError) {
-          console.error('Error fetching recommendations:', recError);
+          console.error('Error fetching recommendation counts:', recError);
         } else if (recommendationData) {
-          // Count recommendations by user
           recommendationData.forEach(item => {
-            const count = recommendationCountsMap.get(item.user_id) || 0;
-            recommendationCountsMap.set(item.user_id, count + 1);
+            recommendationCountsMap.set(item.user_id, item.recommendation_count);
           });
         }
         
