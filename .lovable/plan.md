@@ -123,7 +123,7 @@ Rebuild the **body** of `get_fallback_entity_recommendations` from eligible publ
 - `status = 'published'`, linked entity required, deleted entities excluded;
 - public reviews only;
 - exclude the current entity only — no viewer-specific exclusion;
-- one chosen review per (user_id, entity_id) per 0d, so the count is people and the average uses only those rows;
+- canonical selection per 0d applied in the frozen order (latest published row, then visibility, then endorsement, rating from that same row);
 - same signature and same eight return columns; `p_current_user_id` still accepted and still ignored.
 
 Because the contract is unchanged, this is a single in-place replacement — no new overload, no caller cutover, no generated-types churn for this routine.
@@ -136,7 +136,7 @@ For `get_aggregated_network_recommendations_discovery`:
 - replace raw `rating` with effective rating;
 - apply the frozen visibility rule;
 - enforce viewer identity;
-- deduplicate to one chosen review per person per entity per 0d, for both the recommender list and the average;
+- apply the 0d canonical selection in the frozen order, for both the recommender list and the average;
 - retain current returned entity/profile fields and ordering unless a field was legacy-only;
 - preserve `NetworkRecommendations`, `RecommendationsModal`, and `RecommendationEntityCard` visually.
 
@@ -167,8 +167,8 @@ This replaces the earlier proposal to modernize dead functions.
 - Verify the visible v4 surfaces remain: recommending count, Circle count, Recommenders, Circle Contributors and Recommended by Your Circle.
 - Verify effective ratings appear after timeline updates.
 - Verify identity mismatch and unauthorized visibility are denied.
-- All three stale explanations from 0b corrected and checked on screen. Suggested wording: "Recommendation comes from the reviewer's latest recommendation answer. If they haven't answered, their rating is used instead."
-- 0d fixture passes: one person with two eligible endorsing reviews of the same item appears once, counts once, contributes one rating.
+- All three stale explanations from 0b corrected and checked on screen. Frozen wording: "Recommendation uses the reviewer's latest explicit choice when available. Otherwise it's based on their current rating." This stays true for a deliberate reset to rating, which the earlier draft wording wrongly described as never having answered.
+- 0d/0e fixtures pass: duplicate endorsing reviews count once; older yes plus newer no does not count or appear; paginated Recommenders returns stable distinct people; anonymous batch counts expose public reviews only.
 - Prove the surviving paths do not depend on `public.recommendations` in two ways:
   1. dependency/source scan of every active routine and client path;
   2. a transaction-scoped fixture test, rolled back, that invokes them with modern review fixtures while no legacy rows are visible to the query. The real legacy table is never dropped or emptied to prove independence.
