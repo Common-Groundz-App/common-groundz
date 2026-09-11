@@ -1,78 +1,157 @@
-# Phase 4.2 (revised) — disconnect the old records from the app's intelligence
+# Phase 4.2A first — recommendation-truth migration
 
-## Verification first — 4.0 and 4.1 are complete
+## Decision
 
-Checked on disk: nothing imports or renders the old creation form, the only path to `createRecommendation` has no live caller, the old "Recommend" button is gone from both pre-v4 entity pages, `SmartComposerButton` offers exactly Post and Review, v4 is untouched, the Recommendation post type still writes only to `posts` + `post_entities`, and the audit carries the corrected classifications plus the "delete by data dependency, never by name" gate. Build green. No leftovers.
+Adopt both reviews. Do **not** implement the prior all-in-one 4.2.
 
-## What 4.2 does
+Split the work:
 
-4.1 stopped people creating old records. 4.2 stops the old records influencing anything the app calculates. Nothing is deleted — old screens, comments, notifications, routes and rows all keep working until 4.3.
+- **4.2A — correctness and security:** disconnect active endorsement surfaces from the old standalone records, preserve the v4 UI, verify, then stop.
+- **4.2B — intelligence formulas:** migrate trending, similarity, influence and reputation only after their behavior is separately frozen and approved.
+- **Calibration experiment:** keep the leave-one-out, confidence-weighted idea, but do not ship it as part of legacy retirement.
 
-Both reviews are accepted. Five corrections to the previous draft:
+This is safer because 4.2A changes where an existing truth comes from; 4.2B changes product ranking and trust policy.
 
-1. Comment plumbing moves **out of 4.2 into 4.3**. The old detail viewer still passes `itemType="recommendation"`, so removing that branch now would break comment reads on a page we promised keeps working.
-2. Trending is **not** posts-only, and posts must be joined through `post_entities` — an unrelated post cannot move an entity's score.
-3. Social influence stops using average rating as a proxy for influence (see the new calibration section).
-4. Similarity needs a **minimum shared-entity threshold** and deterministic zero-variance handling.
-5. `get_personalized_entities` has zero callers — it is **not rebuilt**; it is recorded dead and dropped in 4.5. Same for `calculate_trending_score` and `increment_comment_count`.
+## Important findings added to the plan
 
-### Frozen semantics (applies to every routine below)
+- The v4 `NetworkRecommendations` component does **not** call the older `get_network_entity_recommendations`; it calls `get_aggregated_network_recommendations_discovery`, which already reads published `reviews.is_recommended`.
+- That active aggregated routine still uses raw `reviews.rating`, accepts an arbitrary `p_user_id` inside a `SECURITY DEFINER` function, and has no explicit review-visibility condition. It therefore needs effective-rating, identity and visibility hardening even though its endorsement source is already modern.
+- The active fallback path still calls `get_fallback_entity_recommendations`, which reads the old standalone records.
+- The older `get_network_entity_recommendations` and `has_network_recommendations` client wrappers currently have no external caller. They must not be rebuilt just because their names match; confirm no SQL/Edge Function/scheduled caller, then classify them for 4.5 deletion.
+- The similarity and influence services are live through discovery/personalization, and their client pipelines query the old table directly. Replacing only their RPCs would be incomplete.
+- Trending is invoked through `update_all_trending_scores` by an Edge Function, and its candidate selector also reads the old table. Formula and candidate migration must happen together in 4.2B.
 
-- **Endorsement** = `reviews.is_recommended`. Never re-derived from a rating threshold.
-- **Current opinion / rating shown or ordered by** = `COALESCE(latest_rating, rating)` — the timeline-aware effective rating, confirmed present on `reviews`.
-- **Eligibility** = published status only, entity not deleted, and an explicit visibility rule per routine (network routines may see circle content, global ones only public).
-- **Editorial Recommendation posts never count as endorsement**, only as activity.
-- Row-multiplying joins count distinct ids.
+# Phase 4.2A implementation
 
-## Step 1 — Endorsement surfaces
+## 1. Freeze the authorization matrix
 
-- `get_network_entity_recommendations` — rebuilt: people you follow → their eligible reviews → `is_recommended` true. Inclusion by the flag, rating shown from the effective rating. Its signature still returns legacy category/visibility columns, so it is replaced, not patched.
-- `get_fallback_entity_recommendations` — rebuilt on reviews: endorsement count, then average effective rating, then existing recency/popularity signal. No threshold-as-endorsement.
-- `has_network_recommendations` — two conflicting overloads exist (one thresholds at 4, one at 3, confirmed in the catalogue). Collapse to one signature on the review flag and drop the other explicitly, so no client can bind the stale one.
-- **Security, not an afterthought:** all three run as `SECURITY DEFINER` and take a user id. The rebuilt network routines derive the viewer from `auth.uid()` (or reject a mismatched id), so nobody can inspect another person's circle. Anonymous fallback stays separate. Old signatures dropped, execute grants restated, checked-in generated types refreshed, callers updated in the same change.
-- Untouched, already review-based: `has_network_activity`, `get_recommendation_count*`, `get_circle_recommendation_count*`, both discovery aggregation routines.
+Use one exact rule for every active replacement routine:
 
-**The v4 surfaces stay exactly as they are** — "7 recommending / 3 from circle", Recommenders, Circle Contributors, Recommended by Your Circle. Only what feeds them changes, and they get *more* correct: "recommends" finally means the person's actual answer, not "gave 4 rings".
+| Surface | public review | circle-only review | private review |
+| --- | --- | --- | --- |
+| Anonymous/global fallback | yes | no | no |
+| Signed-in global fallback | yes | no | no |
+| Signed-in viewer's Circle | yes, when author is followed | yes only when the repository's existing Circle authorization rule allows that viewer | no |
+| Review owner-only surface | as needed | as needed | own row only |
 
-## Step 2 — Activity and taste
+Before SQL, identify and reuse the existing Circle authorization rule. Following alone must not silently become permission to read circle-only content unless that is already the product's established rule.
 
-- `calculate_enhanced_trending_score` — legacy inputs replaced with entity-linked activity: eligible posts linked via `post_entities` in 24h, plus likes on those posts in 24h, plus eligible reviews of the entity and likes on them in 24h. Existing weights and caps kept so ranking doesn't drift for an unrelated reason; the changed inputs are documented in the routine.
-- `calculate_user_similarity` — Pearson over the two users' effective ratings of the *same* entities, eligible reviews only, with a documented minimum overlap below which the answer is "insufficient evidence" rather than a high score, and a fixed result when either side has zero variance. Existing normalisation/overlap penalty kept.
-- `calculate_user_reputation` — remove only the legacy contribution branch. Reviews, posts and entities already count; nothing is added, so nothing double-counts.
-- `get_personalized_entities`, `calculate_trending_score`, `increment_comment_count` — confirmed zero callers (app, edge function, trigger, job). Left untouched, recorded dead, dropped in 4.5.
+For every `SECURITY DEFINER` Circle RPC:
 
-## Step 3 — Social influence, rebuilt around calibration
+- derive the viewer from `auth.uid()`, or reject when a retained `p_user_id` differs;
+- authenticated execution only;
+- explicit `search_path`, owner and grants;
+- no reliance on RLS inside the definer body;
+- tests for self, mismatched identity, anonymous call and visibility boundaries.
 
-Your instinct is right and it is the most interesting change in this phase: a person who rates everything five rings carries no information, and influence should not reward positivity. Average rating is dropped as an input.
+## 2. Migrate the active fallback surface
 
-The rebuilt score combines four honest factors:
+Rebuild `get_fallback_entity_recommendations` from eligible public reviews:
 
-1. **Reach** — followers.
-2. **Contribution volume** — eligible published reviews (named as volume, not "recommendations").
-3. **Engagement received** — likes on those reviews, via a left join so a review with zero likes still counts in the denominator.
-4. **Calibration** — how closely the person's effective rating tracks each entity's consensus.
+- inclusion/count = `reviews.is_recommended = true`;
+- displayed/ordered rating = `COALESCE(latest_rating, rating)`;
+- `status = 'published'`, linked entity required, deleted entities excluded;
+- public reviews only;
+- exclude the current entity and entities already reviewed by the signed-in viewer where the existing behavior requires it;
+- keep the return shape needed by `NetworkRecommendations` / `RecommendationsModal`, without legacy category or visibility enum fields.
 
-Calibration, with the guardrails that make it safe rather than a popularity tax:
+Update the fallback client mapping and generated Supabase types in the same deployment unit.
 
-- Consensus for an entity **excludes that user's own review**, otherwise everyone is partly compared to themselves.
-- An entity only contributes when it has **enough independent raters**; a two-person entity has no consensus to agree with.
-- Agreement is measured as average absolute distance from consensus, then inverted — so agreeing that something is bad counts exactly as much as agreeing it is good, which is the anti-manipulation property you want.
-- A person needs a **minimum number of qualifying entities** before calibration applies at all; below that the factor is neutral, never punitive.
-- **Rating spread matters too:** a user whose ratings have almost no variance (all fives) gets little calibration credit even if the average lines up, because agreeing by accident is not judgement.
-- Calibration is **capped and modest in weight** — it adjusts influence, it never dominates. Being an early or minority voice on a thinly-rated entity must not be penalised, which is exactly what the independent-rater floor and the neutral fallback prevent.
+## 3. Harden the active v4 Circle pipeline without redesigning it
 
-Weights and thresholds are proposed with real numbers from the current data during implementation, and the before/after score for a fixed sample of users is recorded so the effect is visible rather than assumed.
+For `get_aggregated_network_recommendations_discovery`:
 
-## Verification before stopping
+- keep `reviews.is_recommended` as the inclusion truth;
+- replace raw `rating` with effective rating;
+- apply the frozen visibility rule;
+- enforce viewer identity;
+- retain current returned entity/profile fields and ordering unless a field was legacy-only;
+- preserve `NetworkRecommendations`, `RecommendationsModal`, and `RecommendationEntityCard` visually.
 
-- Rebuilt routines: grants explicit, viewer identity enforced, a signed-in viewer gets results, an anonymous one gets only what policy allows, and no routine returns another user's private content.
-- Circle / fallback / trending / similarity / influence: before-and-after numbers for the same fixed viewers and entities, recorded per surface.
-- `reviews.is_recommended` unchanged across the whole table (before/after comparison) — 4.2 must not touch endorsement truth itself.
-- Old detail page, its comments, notifications and route all still work.
-- Recommendation and Review post types unaffected.
-- Generated types refreshed; full check suite, typecheck and build green.
-- Results appended to `docs/verification/phase-4-recommendations-audit.md`, roadmap ticked (including the new calibration item), then stop before 4.3.
+Audit the other active v4 Circle RPCs (`has_network_activity`, `get_circle_rating`, `get_circle_recommendation_count*`) for the same identity/visibility issue. Change only routines that fail that audit; record every no-change decision.
 
-## Out of scope
+## 4. Retire rather than rebuild unused legacy RPCs
 
-Legacy comment plumbing (4.3), deleting rows/routes/screens/enum (4.3–4.5), dead-routine removal (4.5), Phase 5 card work, and any change to how the review recommend answer itself is resolved.
+Confirm across TypeScript, Edge Functions, SQL-to-SQL calls, triggers and scheduled jobs that these are uncalled:
+
+- `get_network_entity_recommendations`;
+- both `has_network_recommendations` overloads.
+
+If confirmed, leave them untouched in 4.2A and mark them for deletion in 4.5. If a real caller is found, migrate that complete caller path before classifying the routine.
+
+This replaces the earlier proposal to modernize dead functions.
+
+## 5. Deployment and compatibility contract
+
+- Migration explicitly drops/replaces only changed signatures.
+- Restate execute grants after each replacement.
+- Refresh generated Supabase types; never hand-edit them.
+- Update all callers in the same phase.
+- Do not leave a stale overload that old clients can bind accidentally.
+- Preserve return-column compatibility where practical; if it must change, deploy the replacement routine and caller as one reviewed unit.
+
+## 6. 4.2A verification and stop gate
+
+- Record before/after result counts and representative rows for the same viewer/entity on the v4 Circle and fallback surfaces.
+- Verify the visible v4 surfaces remain: recommending count, Circle count, Recommenders, Circle Contributors and Recommended by Your Circle.
+- Verify effective ratings appear after timeline updates.
+- Verify identity mismatch and unauthorized visibility are denied.
+- Prove the surviving paths do not depend on `public.recommendations` in two ways:
+  1. dependency/source scan of every active routine and client path;
+  2. rollback-only SQL fixture test that invokes them with modern review fixtures while legacy recommendation rows are unavailable/empty, leaving production data unchanged.
+- Whole-table before/after parity for `reviews.is_recommended`; 4.2A consumes truth but never changes it.
+- Old detail page, comments, notifications, route and dummy rows still work.
+- Recommendation and Review post types unchanged.
+- Full tests, typecheck and build pass.
+- Append evidence to the Phase 4 audit, mark **4.2A only** complete in the roadmap, then stop for review before 4.2B.
+
+# Phase 4.2B — specification first, no implementation yet
+
+A separate plan will trace and migrate complete pipelines, not RPCs alone:
+
+- `CollaborativeFilteringService` candidate discovery, exclusion, result selection and similarity RPC;
+- `SocialIntelligenceService` category discovery, candidate/result selection and influence RPC;
+- trending calculator **and** `update_all_trending_scores` candidate selector;
+- conservative removal of the legacy branch from user reputation;
+- dead routines left for 4.5.
+
+Before coding, freeze machine-readable fixtures and exact behavior for:
+
+### Similarity
+
+- effective ratings on the same eligible entities;
+- exact minimum overlap;
+- `NULL` versus `0` for insufficient evidence (including caller behavior);
+- zero-variance result;
+- overlap-confidence weighting and score range.
+
+### Trending
+
+Use three grouped signals to preserve the old 0.5 / 0.3 / 0.2 structure while removing legacy inputs:
+
+- 0.5 recent entity views;
+- 0.3 distinct engagement = post likes + review likes on eligible entity-linked contributions;
+- 0.2 distinct contributions = linked posts + reviews.
+
+Freeze time decay, caps, deduplication and distinct-active-user protection before implementation. Update candidate selection to include views, linked posts, reviews and their engagement — never the old table.
+
+### Influence
+
+For 4.2B retirement work, use a minimal model with documented, approved weights:
+
+- reach;
+- eligible contribution volume;
+- engagement received;
+- **no average-rating/positivity factor**.
+
+Your calibration idea becomes a separately evaluated extension:
+
+```text
+calibration evidence = leave-one-out agreement × consensus confidence
+```
+
+It must freeze and test independent-rater minimum, qualifying-entity minimum, consensus dispersion/polarization, personal rating variance, neutral sparse-data behavior, maximum bonus/penalty and all weights. Evaluate it offline against fixtures for paid all-five behavior, honest minority/contrarian views, polarized entities, early reviewers and sparse users before deciding whether it belongs in production.
+
+## Out of scope for 4.2A
+
+All scoring/ranking redesign, legacy comments, old screens/routes/rows, category enum/schema deletion, dead-routine deletion and Phase 5 cards.
