@@ -39,21 +39,35 @@ Frozen meaning for these numbers:
 
 - **Recommendation count** — distinct people whose current public published review of that item
   recommends it. One number, one source, never a sum of two sources.
-- **Rating population** — distinct people with a current public published review, whatever their
-  recommendation answer.
+- **Review count** — the same population, stated explicitly: distinct people with a current
+  public **published** review of that item, whatever their recommendation answer. Today it is a
+  raw row count and one path doesn't even require "published", so the visible review count can
+  disagree with the average it sits next to. After this change the three numbers share one
+  population: reviewers, reviewers who recommend, and the average over those reviewers.
 - **Average rating** — the average of the effective rating (latest timeline rating, else the
   original) of **all** those current visible reviews, including people who answered "no".
-  Old-record ratings no longer participate.
+  Old-record ratings no longer participate. Never filtered by "recommends".
 - **Explore directory count** — the number of items a person currently publicly recommends,
-  one per person/item, from a batch routine. No private or Circle-only activity on a public
-  directory. The visible wording is checked so it reads as review endorsements.
+  one per person/item, from a batch routine that picks the current review **before** filtering to
+  "recommends", so an older yes cannot survive a newer public no. No private or Circle-only
+  activity on a public directory. The visible wording is checked so it reads as review
+  endorsements.
 - **Feed new-content polling** — the old-record branch is removed. The remaining query polls
-  **all** eligible posts (every post type, not only experiences), keeping public visibility,
-  deleted exclusion, the following-author filter, the last-check boundary and count meaning.
-  Structured reviews are not added here, because this feed does not render them.
+  **all** eligible post types (experience, review post, recommendation post, comparison,
+  question, tip — no special treatment for any), keeping public visibility, deleted exclusion,
+  the following-author filter, the last-check boundary and count meaning. Structured reviews are
+  not added here, because this feed does not render them. Legacy feed *rendering* stays until 4.3.
 
-Evidence: before/after number for a handful of real items and people, written down, plus the
-existing suite, typecheck and build.
+Verification:
+
+- After rebuilding the cached view, refresh it manually once, then confirm the unique index, the
+  rating index, the SELECT grants and the hourly refresh job are all present exactly once (no
+  duplicate job scheduled), and that every reader returns the expected numbers off the refreshed
+  view.
+- Before/after number for a handful of real items and people, written down, with all six readers
+  named explicitly — including any that need no code change because the view's shape is unchanged.
+- Existing suite, typecheck and build green; audit doc and roadmap updated; then stop.
+
 
 ## 4.2B.1 — scoring contract (a document, no code) — approval gate
 
