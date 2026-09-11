@@ -1,0 +1,1 @@
+ALTER FUNCTION public.get_user_recommendation_counts_batch(uuid[]) SECURITY INVOKER;
