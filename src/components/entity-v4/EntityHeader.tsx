@@ -563,9 +563,10 @@ export const EntityHeader: React.FC<EntityHeaderProps> = ({
                           )}
                         </button>
                         <InfoTooltip 
-                          content={`Reviews with 4 or more circles are considered recommendations.
-"From circle" shows how many people you follow have recommended this recently.
-Only recent ratings are counted to keep things current and relevant.`}
+                          content={`Recommendation reflects the reviewer's latest recommendation choice. If they use rating-based recommendation, or haven't made an explicit choice, their current rating is used.
+Each person is counted once, from their most recent public review.
+"From circle" shows how many people you follow currently recommend this.`}
+
                           side="top"
                         />
                       </div>

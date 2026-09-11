@@ -132,7 +132,7 @@ export const TrustSummaryCard: React.FC<TrustSummaryCardProps> = ({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium">Circle Certified</span>
-                <InfoTooltip content="Percentage of people you follow who rated this 4 or more circles." />
+                <InfoTooltip content="Share of people you follow who currently recommend this, based on each person's most recent public review." />
               </div>
               {circleCertifiedDisplay.value === "locked" ? (
                 <Link

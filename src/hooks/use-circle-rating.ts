@@ -66,13 +66,18 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
 
         const followedUserIds = followedUsers.map(f => f.following_id);
 
-        // Get reviews from followed users for contributors display (with latest_rating)
+        // Contributors display: mirror the RPC's canonical rule — public reviews
+        // only, one row per person (newest first), ratings kept regardless of
+        // whether that person recommends.
         const { data: reviews, error: reviewError } = await supabase
           .from('reviews')
-          .select('rating, latest_rating, user_id')
+          .select('rating, latest_rating, user_id, created_at, id')
           .eq('entity_id', entityId)
           .eq('status', 'published')
-          .in('user_id', followedUserIds);
+          .eq('visibility', 'public')
+          .in('user_id', followedUserIds)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false });
 
         if (reviewError) {
           console.error('Error fetching circle reviews:', reviewError);
@@ -81,9 +86,13 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
         // Build contributors with latest ratings
         const contributors: CircleContributor[] = [];
         let ratingCount = 0;
-        
+
         if (reviews) {
+          const seenUserIds = new Set<string>();
           reviews.forEach(review => {
+            if (seenUserIds.has(review.user_id)) return;
+            seenUserIds.add(review.user_id);
+
             const effectiveRating = review.latest_rating || review.rating;
             if (effectiveRating && typeof effectiveRating === 'number') {
               ratingCount++;
@@ -95,6 +104,7 @@ export const useCircleRating = (entityId: string): CircleRatingData => {
             }
           });
         }
+
 
         // Sort contributors by rating (highest first) and limit to top contributors
         const sortedContributors = contributors
