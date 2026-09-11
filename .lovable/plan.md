@@ -23,6 +23,33 @@ This is safer because 4.2A changes where an existing truth comes from; 4.2B chan
 
 # Phase 4.2A implementation
 
+## 0. Three amendments from review (accepted)
+
+### 0a. Deployment safety — expand, switch, verify, contract
+
+Where an active routine's callable contract changes (name, arguments, or returned columns), the old contract is never dropped before the new client path is live:
+
+```text
+add hardened routine -> verify it alone -> switch callers -> verify live path -> retire old contract
+```
+
+In-place replacement is allowed only when the externally observable contract stays compatible. The fallback surface loses legacy category/visibility columns and its unused user argument, so it takes the additive route.
+
+### 0b. Correct the stale v4 explanations (confirmed on disk)
+
+Three places still tell people a rating threshold decides endorsement, which stopped being true in Phase 3C:
+
+- `src/components/entity-v4/EntityHeader.tsx:566` — "Reviews with 4 or more circles are considered recommendations."
+- `src/components/entity-v4/TrustSummaryCard.tsx:135` — "Percentage of people you follow who rated this 4 or more circles."
+- `src/components/content/PostDetailSidebar.tsx:242` — the same threshold sentence.
+
+Layout untouched; wording only. It should say the reviewer's own answer decides it, and the rating is used only when they didn't answer. Making the numbers correct while leaving a false explanation on screen is not acceptable.
+
+### 0c. Fallback is frozen as a global public surface
+
+Confirmed: `get_fallback_entity_recommendations` takes a current-user argument and never uses it; the v4 component passes a user id while the client service passes null. So there is no viewer-specific behavior to preserve, and adding one now would be a new personalization decision that makes the two callers disagree. Frozen meaning for this phase: global, public reviews only, endorsement-based, viewer-independent, excluding only the current entity plus the existing entity-eligibility rules. The unused argument is dropped in the new contract.
+
+
 ## 1. Freeze the authorization matrix
 
 Use one exact rule for every active replacement routine:
@@ -34,7 +61,7 @@ Use one exact rule for every active replacement routine:
 | Signed-in viewer's Circle | yes, when author is followed | yes only when the repository's existing Circle authorization rule allows that viewer | no |
 | Review owner-only surface | as needed | as needed | own row only |
 
-Before SQL, identify and reuse the existing Circle authorization rule. Following alone must not silently become permission to read circle-only content unless that is already the product's established rule.
+**Hard gate before any SQL:** state the exact relationship `circle_only` authorizes, with evidence from this codebase. If no stable rule is already established, Circle aggregation includes public reviews only for this phase. Following alone must not silently become permission to read circle-only content, and a definer routine must never widen visibility on an assumption.
 
 For every `SECURITY DEFINER` Circle RPC:
 
@@ -52,10 +79,10 @@ Rebuild `get_fallback_entity_recommendations` from eligible public reviews:
 - displayed/ordered rating = `COALESCE(latest_rating, rating)`;
 - `status = 'published'`, linked entity required, deleted entities excluded;
 - public reviews only;
-- exclude the current entity and entities already reviewed by the signed-in viewer where the existing behavior requires it;
+- exclude the current entity only — no viewer-specific exclusion (see 0c);
 - keep the return shape needed by `NetworkRecommendations` / `RecommendationsModal`, without legacy category or visibility enum fields.
 
-Update the fallback client mapping and generated Supabase types in the same deployment unit.
+Shipped additively per 0a: new contract first, callers switched, old contract retired only after the live path is verified. Client mapping and generated Supabase types move with the caller switch.
 
 ## 3. Harden the active v4 Circle pipeline without redesigning it
 
@@ -83,12 +110,11 @@ This replaces the earlier proposal to modernize dead functions.
 
 ## 5. Deployment and compatibility contract
 
-- Migration explicitly drops/replaces only changed signatures.
-- Restate execute grants after each replacement.
+- Contract-compatible changes may be replaced in place; contract-breaking ones follow 0a.
+- Restate execute grants after each replacement; revoke default access.
 - Refresh generated Supabase types; never hand-edit them.
-- Update all callers in the same phase.
-- Do not leave a stale overload that old clients can bind accidentally.
-- Preserve return-column compatibility where practical; if it must change, deploy the replacement routine and caller as one reviewed unit.
+- Retire stale overloads once no live client can bind them.
+- Explicit owner and `search_path` on every touched routine.
 
 ## 6. 4.2A verification and stop gate
 
@@ -96,9 +122,10 @@ This replaces the earlier proposal to modernize dead functions.
 - Verify the visible v4 surfaces remain: recommending count, Circle count, Recommenders, Circle Contributors and Recommended by Your Circle.
 - Verify effective ratings appear after timeline updates.
 - Verify identity mismatch and unauthorized visibility are denied.
+- All three stale explanations from 0b corrected and checked on screen.
 - Prove the surviving paths do not depend on `public.recommendations` in two ways:
   1. dependency/source scan of every active routine and client path;
-  2. rollback-only SQL fixture test that invokes them with modern review fixtures while legacy recommendation rows are unavailable/empty, leaving production data unchanged.
+  2. a transaction-scoped fixture test, rolled back, that invokes them with modern review fixtures while no legacy rows are visible to the query. The real legacy table is never dropped or emptied to prove independence.
 - Whole-table before/after parity for `reviews.is_recommended`; 4.2A consumes truth but never changes it.
 - Old detail page, comments, notifications, route and dummy rows still work.
 - Recommendation and Review post types unchanged.
