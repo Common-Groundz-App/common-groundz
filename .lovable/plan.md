@@ -1,97 +1,118 @@
-# Phase 4.2A verification, then Phase 4.2B
+# Phase 4.2A verification, then Phase 4.2B (revised after review)
 
 ## 4.2A verification result — complete, no leftovers in its scope
 
-Checked directly in the database, not from notes:
+Checked in the database, not from notes: every routine 4.2A promised to migrate now contains
+**no** read of the old recommendations table (fallback, active Circle discovery, Circle rating,
+Circle counts single + batch, Circle activity gate, both global count routines). The new
+recommender routine exists with the agreed caller-privileges shape, owned by the database owner
+like every other touched routine. Recorded evidence matches (78 reviews / 58 recommended / same
+checksum; fixture 3 rows → 2 people → average 3.0; 633 tests, clean typecheck and build).
 
-- Every routine 4.2A promised to migrate now contains **no** read of the old recommendations
-  table: fallback recommendations, the active Circle discovery routine, Circle rating,
-  Circle counts (single + batch), the Circle activity gate, and both global count routines.
-- The new recommender routine exists with the agreed shape (caller-privileges, so normal
-  access rules apply) and is owned by the database owner, like every other touched routine.
-- Recorded evidence matches: 78 reviews / 58 recommended / same checksum, fixture proof
-  3 raw rows → 2 people → average 3.0, 633 tests, clean typecheck and build.
+Nothing from 4.2A is outstanding.
 
-Nothing from 4.2A is outstanding. What still reads the old data belongs to 4.2B, 4.3 and 4.5,
-exactly as the roadmap says — and the audit below found one item that was previously listed
-under "counts" but is actually a **visible entity number**, so it moves to the front of 4.2B.
+## Both reviews accepted
 
-## What still reads the old recommendations data (audited this turn)
+All three of ChatGPT's clarifications and all three of Codex's points are folded in below. The
+double-counting risk Codex raised is real and I confirmed it: the cached stats view counts old
+records and mixes their ratings into the average, and Explore/discovery then **add** the modern
+people-based count on top of it. Changing the view alone would inflate every recommendation
+number on Explore and discovery.
 
-Live and user-visible:
+Execution boundary: **4.2B.0 only, then stop.** 4.2B.1 is a written contract delivered for
+review as its own artifact. No scoring routine or discovery pipeline changes until it is
+approved.
 
-1. Entity stats used by the entity page tabs and the post detail sidebar — the
-   "recommendations" number literally counts old rows, and the average rating mixes old
-   ratings in with review ratings.
-2. The Explore user directory — each person's recommendation count is a raw count of old rows.
-3. Feed "new content" polling — asks whether new old-style records appeared.
+## 4.2B.0 — visible numbers, migrated as one atomic change
 
-Live but scoring/discovery (the declared 4.2B core):
+Every reader of entity statistics changes in the same deployment, or the numbers double:
 
-4. Trending score calculation and its candidate selection.
-5. User similarity, social influence, user reputation, "who to follow", personalised entities.
-6. The client discovery pipelines: collaborative filtering, social intelligence, advanced
-   personalisation, and the enhanced discovery service that fans out to them.
+- the cached statistics view (rebuilt: old-record count and old ratings removed, keeping its
+  unique index, its rating index and its hourly refresh job intact)
+- the entity service stats function (its own old-record count removed)
+- the entity rating calculation (old ratings removed)
+- Explore and discovery enrichment (stop adding a cached count to the modern count — use the
+  modern count alone)
+- the batch entity fetch and the search edge function, which read the same view
 
-Dead (no reachable caller — leave for 4.5 with the other retirements):
+Frozen meaning for these numbers:
 
-7. Two network routines still on the old table but called only by unused service functions,
-   plus the old view-increment routine used solely by the legacy service layer.
+- **Recommendation count** — distinct people whose current public published review of that item
+  recommends it. One number, one source, never a sum of two sources.
+- **Rating population** — distinct people with a current public published review, whatever their
+  recommendation answer.
+- **Average rating** — the average of the effective rating (latest timeline rating, else the
+  original) of **all** those current visible reviews, including people who answered "no".
+  Old-record ratings no longer participate.
+- **Explore directory count** — the number of items a person currently publicly recommends,
+  one per person/item, from a batch routine. No private or Circle-only activity on a public
+  directory. The visible wording is checked so it reads as review endorsements.
+- **Feed new-content polling** — the old-record branch is removed. The remaining query polls
+  **all** eligible posts (every post type, not only experiences), keeping public visibility,
+  deleted exclusion, the following-author filter, the last-check boundary and count meaning.
+  Structured reviews are not added here, because this feed does not render them.
 
-## Phase 4.2B — plan
+Evidence: before/after number for a handful of real items and people, written down, plus the
+existing suite, typecheck and build.
 
-Same discipline as 4.2A: freeze the meaning first, migrate per surface, record the number
-before and after, no mechanical find-and-replace.
+## 4.2B.1 — scoring contract (a document, no code) — approval gate
 
-### 4.2B.0 — visible numbers first (items 1–3)
+`docs/verification/phase-4-2b-scoring-contract.md` states, **per signal**, its eligibility rule,
+its counting unit, exact weights, normalisation, caps, thresholds, sparse-data result and
+privacy rule. Signals: trending, similarity, influence, reputation, who-to-follow, personalised
+items. Two rules replace the over-broad defaults from the previous draft:
 
-- Entity recommendation count: drop the old-table count entirely and use the already-migrated
-  people-based count. Average rating: reviews only, one current review per person, effective
-  rating (latest timeline rating when present) — matching the frozen 4.2A selection rule.
-- Explore directory count: count people's published public reviews that currently recommend,
-  one per person/item, via a batch routine rather than per-row client counting.
-- Feed polling: poll experiences (posts) only; the old-record branch is removed.
-- Evidence: before/after number for a handful of real entities and users, written down.
+**Eligibility follows the surface, not one global rule**
+- global/public signals → current public published reviews
+- viewer-specific / Circle signals → current reviews that viewer is authorised to see under the
+  established rule
+- private → never contributes outside owner-only logic, never leaks into a global aggregate
 
-### 4.2B.1 — freeze the scoring contract (docs only, no code)
+**Counting unit is stated per signal, not globally**
+- endorsement / population metrics → distinct people
+- an item's rating population → distinct reviewing people
+- a person's contribution volume → distinct items they reviewed
+- trending contributions → eligible contributions in the window, with explicit dedupe and
+  per-person caps
+- engagement → distinct eligible interaction events, capped per actor
+- reputation volume → that author's own eligible reviews/posts (the author is already one person)
 
-Write `docs/verification/phase-4-2b-scoring-contract.md` stating, per input:
-its replacement source, the exact weights/thresholds, sparse-data behaviour, and privacy rule
-(no per-person data leaves an aggregate). Inputs: trending, similarity, influence, reputation,
-who-to-follow, personalised entities. Gate: agree this before any scoring code changes.
+Also fixed in the contract: **rating and contribution signals are not restricted to endorsing
+reviews.** A two-ring review that says "no" carries real rating and taste information and must
+count for averages, similarity and Circle rating. Only endorsement metrics filter to
+"recommends".
 
-Frozen defaults proposed:
-- Endorsement signal everywhere = canonical current review recommends (public + published,
-  newest row per person/item).
-- Rating signal = effective rating of that same canonical row.
-- Volume signals count people, never rows.
-- Sparse data returns neutral, never a fabricated boost.
-- **Consensus calibration for influence stays out of 4.2B** — it changes ranking meaning and
-  deserves its own experiment with the safeguards we discussed (leave-one-out consensus,
-  minimum independent raters, symmetric treatment of positive and negative agreement,
-  low-variance penalty, modest capped effect). 4.2B only makes influence read review truth.
+Trending weights (views/engagement/contributions) only stay as they are once normalisation or
+caps are defined — otherwise a thousand likes swamps twenty views whatever the coefficients say.
+Consensus calibration for influence stays out of 4.2B entirely; it is a separate experiment with
+the safeguards we agreed (leave-one-out consensus, minimum independent raters, symmetric
+treatment of agreement, low-variance penalty, modest capped effect).
 
-### 4.2B.2 — migrate the scoring routines
+Machine-readable fixtures accompany the contract so 4.2B.2/4.2B.3 are checked against frozen
+expected values rather than re-decided while coding.
 
-For each routine: replace the body only, keep the signature and returned columns, keep owner
-and access rules, then re-measure. Trending needs both its per-entity calculation **and** its
-candidate selection updated in the same step, otherwise entities that only have reviews are
-never considered.
+**Stop here for review.**
 
-### 4.2B.3 — migrate the client discovery pipelines completely
+## 4.2B.2 / 4.2B.3 — not authorised yet
 
-Collaborative filtering, social intelligence, advanced personalisation and enhanced discovery
-each read the old table directly in several places. Each service is migrated as a whole unit
-(all its queries), not partially, so a single pipeline never mixes two sources.
+After approval: migrate each scoring routine body only (signature, returned columns, owner and
+access rules preserved; trending's per-item calculation and its candidate selection in the same
+step), then migrate each client pipeline as a complete unit so no pipeline mixes two sources.
 
-### 4.2B.4 — prove it
+## 4.2B.4 — proof
 
-- Run every migrated surface with the old table effectively empty as the decisive test: any
-  surface that goes blank was still depending on old data.
-- Before/after table per surface in the verification doc.
-- Full test suite, typecheck and build green; roadmap updated; stop before 4.3.
+Production rows stay untouched. Proof uses the 4.2A style: transaction-scoped fixtures or a path
+where old rows are unavailable to the tested surface, so any surface that goes blank is shown to
+still depend on old data. Before/after table per surface, suite + typecheck + build green,
+roadmap updated, stop before 4.3.
 
-## Out of scope for 4.2B
+## Roadmap additions this introduces
 
-Removing the legacy pages, services, route and rows (4.3), the dead routines (4.5), and the
-feed card redesign (Phase 5). Review endorsement truth itself is untouched.
+4.2B.0 becomes "atomic entity-statistics pipeline migration (view + all six readers, no
+double-count)"; 4.2B.1 becomes an approval-gated contract deliverable; 4.2B.2/4.2B.3 are
+explicitly blocked on that approval.
+
+## Out of scope
+
+Removing legacy pages, services, route and rows (4.3), the dead routines (4.5), the feed card
+redesign (Phase 5). Review endorsement truth itself is untouched.
