@@ -190,7 +190,7 @@ This replaces the earlier proposal to modernize dead functions.
 - Verify the visible v4 surfaces remain: recommending count, Circle count, Recommenders, Circle Contributors and Recommended by Your Circle.
 - Verify effective ratings appear after timeline updates.
 - Verify identity mismatch and unauthorized visibility are denied.
-- All three stale explanations from 0b corrected and checked on screen. Frozen wording: "Recommendation uses the reviewer's latest explicit choice when available. Otherwise it's based on their current rating." This stays true for a deliberate reset to rating, which the earlier draft wording wrongly described as never having answered.
+- All three stale explanations from 0b corrected and checked on screen. Frozen wording: "Recommendation reflects the reviewer's latest recommendation choice. If they use rating-based recommendation, or haven't made an explicit choice, their current rating is used." This correctly covers a deliberate "Base recommendation on rating" reset — the earlier drafts wrongly implied an explicit choice could never be deliberately abandoned.
 - 0d/0e fixtures pass:
   - duplicate endorsing reviews of the same item by one person count once and contribute one rating;
   - older yes plus newer no, within the same visibility scope, does not count or appear;
