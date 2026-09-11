@@ -49,6 +49,22 @@ Layout untouched; wording only. It should say the reviewer's own answer decides 
 
 Confirmed: `get_fallback_entity_recommendations` takes a current-user argument and never uses it; the v4 component passes a user id while the client service passes null. So there is no viewer-specific behavior to preserve, and adding one now would be a new personalization decision that makes the two callers disagree. Frozen meaning for this phase: global, public reviews only, endorsement-based, viewer-independent, excluding only the current entity plus the existing entity-eligibility rules. The unused argument remains accepted-but-ignored (no behavior change) and is deleted in 4.5 with the other stale contracts.
 
+### 0d. One person, one endorsement — and the database does not enforce it
+
+Checked, and this is a real gap rather than a theoretical one: `reviews` has no unique index on (user_id, entity_id) — only the primary key — and there are already **2** published (person, item) pairs carrying more than one review row.
+
+So every people-oriented surface must deduplicate rather than assume:
+
+- pick exactly **one current eligible review per (user_id, entity_id)** before aggregating, ordered newest-first with a deterministic tie-break on id — the same ordering rule the recommendation resolver already uses for timeline events;
+- counts count **endorsing people**, not review rows;
+- the average rating averages **those same chosen rows only**, so one person with several reviews cannot pull the average either;
+- recommender lists show each person once.
+
+This applies to the fallback count, the Circle/network people counts, recommender lists, and any average shown beside them. Adding a unique constraint is not part of this phase — the existing duplicate rows would have to be reconciled first, which is a data decision, not a migration detail.
+
+Fixture coverage: one person with two eligible endorsing reviews of the same item appears once, counts once, and contributes one rating to the average.
+
+
 
 ## 1. Freeze the authorization matrix
 
