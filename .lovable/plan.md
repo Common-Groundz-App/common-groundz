@@ -36,7 +36,7 @@ Each score family is its own migration, independently verifiable, with no consum
 | Family | Added in 4.2B.2 | v1 during this phase |
 |---|---|---|
 | Trending | `calculate_entity_trending_score_v2(entity)` (pure, returns the score, **writes nothing**) plus `select_trending_candidates_v2()` and `update_all_trending_scores_v2()` writing to a **new** `entities.trending_score_v2` column | untouched: `trending_score` keeps its old scale and old writer |
-| Influence | `calculate_social_influence_score_v2(user, canonical_type)` writing to a new `social_influence_scores_v2` table on the canonical 15 types | legacy routine and empty table left in place |
+| Influence | `calculate_social_influence_score_v2(user, canonical_type)` — **pure, returns the score**, plus a separate `refresh_social_influence_scores_v2(user)` orchestrator that upserts into a new `social_influence_scores_v2` table on the canonical 15 types | legacy routine and empty table left in place |
 | Similarity | `calculate_user_similarity_v2(a, b)` with NULL for insufficient evidence | legacy routine untouched, so `|| 0` cannot corrupt anything |
 | Personalised items | `get_personalized_entities_v2(user, limit)`, reading `trending_score_v2` | legacy routine untouched |
 | Reputation | `calculate_user_reputation_v2(user)` — returns the score, **does not write** `user_reputation` | legacy writer untouched |
@@ -53,11 +53,24 @@ post↔entity linkage via `post_entities UNION posts.entity_id`; boosts contribu
 |---|---|---|
 | `get_personalized_entities_v2`, `get_who_to_follow_v2` | `SECURITY DEFINER`, but the body **rejects any call where the requested user is not `auth.uid()`** unless the caller is `service_role` | `authenticated`, `service_role` |
 | `calculate_user_similarity_v2` | `SECURITY DEFINER`, public inputs only (public published canonical reviews) | `authenticated`, `service_role` |
-| `calculate_user_reputation_v2`, `calculate_entity_trending_score_v2` | `SECURITY DEFINER`, pure — return a value, write nothing | `authenticated`, `service_role` |
-| `select_trending_candidates_v2`, `update_all_trending_scores_v2`, `calculate_social_influence_score_v2` | `SECURITY DEFINER`, write derived data | **`service_role` only** — not callable by ordinary users |
+| `calculate_user_reputation_v2`, `calculate_entity_trending_score_v2`, `calculate_social_influence_score_v2` | `SECURITY DEFINER`, pure — return a value, write nothing | `authenticated`, `service_role` |
+| `select_trending_candidates_v2`, `update_all_trending_scores_v2`, `refresh_social_influence_scores_v2` | `SECURITY DEFINER`, write derived data | **`service_role` only** |
+
+**Role detection is frozen**: the `service_role` branch is decided from the request JWT role
+(`auth.role() = 'service_role'` / the JWT `role` claim), **never** from `current_user`, `session_user`
+or function ownership — inside a definer function those name the owner, not the caller. Authorization
+fixtures cover all four cases: normal user asking for self (allowed), normal user asking for another
+user (denied), anonymous (denied), `service_role` asking for an arbitrary user (allowed).
 
 `social_influence_scores_v2` gets GRANTs plus RLS in the same migration that creates it: read for
 `authenticated`, writes `service_role` only. Every routine sets an explicit `search_path`.
+
+**The v2 influence cache gets a real producer.** Today the only producer is a browser client
+(`socialIntelligenceService` calls the routine and upserts the row itself), which cannot write a
+service-role table — so without this the new table would silently stay empty. 4.2B.2 adds a
+`refresh-social-influence-v2` Edge Function (service role) that calls the refresh orchestrator, plus a
+one-time backfill for users with eligible contributions. 4.2B.3 puts it on a schedule and switches
+`socialIntelligenceService` to read-only against the v2 table; the client never writes it again.
 
 ## Verification before 4.2B.2 is called done
 
@@ -65,15 +78,19 @@ post↔entity linkage via `post_entities UNION posts.entity_id`; boosts contribu
   production row created, updated or deleted — and record actual vs expected intermediates.
 - **Bootstrap once for every non-deleted entity**, not just the candidate set, so no row is left NULL
   merely for lack of recent activity. `select_trending_candidates_v2()` is for ongoing incremental
-  refresh only. Then show both scales side by side and confirm every v2 value is inside [0, 1.2].
-- Authorization tests: a signed-in user cannot get another user's personalised or who-to-follow rows,
-  and the writer routines refuse non-`service_role` callers.
+  refresh only. Then prove coverage explicitly: **non-deleted entities with NULL `trending_score_v2`
+  after bootstrap = 0**, every value inside [0, 1.2], and both scales shown side by side.
+- Influence backfill: verify every stored `social_influence_scores_v2` category is one of the 15
+  canonical types (measured, not inferred from the signature) and every score is inside [0, 1].
+- Authorization fixtures: the four caller cases above, for both viewer-scoped routines and the
+  service-role writers.
 - Prove no v2 routine reads the legacy records table.
 - Regenerate the Supabase types file so the new column, table and routines are typed.
 - Full test suite, typecheck, production build; write
   `docs/verification/phase-4-2b2-scoring-routines.md`; mark 4.2B.1 and 4.2B.2 in `roadmap.md`.
 
-Hard stop for review after that. No consumer changes and no old-threshold edits in this phase.
+Hard stop for review after that. No consumer changes and no old-threshold edits in this phase; the
+new Edge Function exists but nothing user-facing reads its output yet.
 
 ## 4.2B.3 — switch consumers, one complete pipeline at a time
 
