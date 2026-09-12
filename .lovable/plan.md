@@ -22,9 +22,14 @@ each) and engagement (+0.10). No term reads any rating value. A reviewer averagi
 averaging 5.0 with identical reach, volume and engagement score identically — frozen as a fixture
 invariant.
 
-**Category attribution** (previously undefined): a review's category is its subject item's
-category; a post's category is the category of its linked items, and a post linked to items in
-several categories counts once in each. Posts with no linked item contribute to no category.
+**Category attribution** (previously undefined): the category domain is the **15 canonical entity
+types** — not the five-bucket search/filter projection and not the legacy recommendation-category
+domain. A review's category is its subject item's canonical type; a post's categories are the
+canonical types of its linked items, counted **once per type** even when several linked items share
+that type. A post spanning three types counts once in each, so per-category influence is
+deliberately not additive across categories. Posts with no linked item contribute to no category.
+Existing `social_influence_scores.category` rows on the old domain are recomputed, not translated.
+
 
 Judgment/calibration quality stays out — Influence v2, separate experiment.
 
