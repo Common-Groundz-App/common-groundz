@@ -14,8 +14,13 @@ of v2.
 New definition, all terms bounded, total in [0, 1]:
 
 - reach `min(followers, 1000) / 1000 × 0.35`
-- contribution volume `min(distinct items reviewed + entity-linked posts in category, 100) / 100 × 0.35`
-- engagement received `min(avg likes per contribution, 50) / 50 × 0.30`
+- contribution volume `min(credited contributions in category, 100) / 100 × 0.35`, where credited
+  contributions are counted **per item**: at most 1 canonical review **plus** at most 1 entity-linked
+  post per person/item. Ten posts about one item credit one post, so post volume cannot manufacture
+  influence — and no judgment of the post's content is involved.
+- engagement received `min(avg likes per contribution, 50) / 50 × 0.30`, excluding likes by the
+  contribution's own author
+
 
 The 0.30 previously held by "rating quality" is redistributed to reach and contribution (+0.05
 each) and engagement (+0.10). No term reads any rating value. A reviewer averaging 1.0 and one
