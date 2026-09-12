@@ -14,29 +14,30 @@ of v2.
 New definition, all terms bounded, total in [0, 1]:
 
 - reach `min(followers, 1000) / 1000 × 0.35`
-- contribution volume `min(credited contributions in category, 100) / 100 × 0.35`, where credited
-  contributions are counted **per item**: at most 1 canonical review **plus** at most 1 entity-linked
-  post per person/item. Ten posts about one item credit one post, so post volume cannot manufacture
-  influence — and no judgment of the post's content is involved.
-- engagement received `min(avg likes per contribution, 50) / 50 × 0.30`, excluding likes by the
-  contribution's own author
+- contribution volume `min(|credited set|, 100) / 100 × 0.35`
+- engagement received `min(total likes on the credited set / |credited set|, 50) / 50 × 0.30`,
+  excluding likes by the contribution's own author
 
+**The credited set is defined once and both terms use exactly it** — this removes the ambiguity the
+last review found. For a given author and category, the credited set contains:
 
-The 0.30 previously held by "rating quality" is redistributed to reach and contribution (+0.05
-each) and engagement (+0.10). No term reads any rating value. A reviewer averaging 1.0 and one
-averaging 5.0 with identical reach, volume and engagement score identically — frozen as a fixture
-invariant.
+- one row per `(author, entity)` for the author's canonical published review of that entity, and
+- one row per `(author, entity)` for the author's **earliest eligible** entity-linked post about that
+  entity — a post linked to three product entities yields three product rows (one per entity), and
+  ten posts about one entity yield one row.
 
-**Category attribution** (previously undefined): the category domain is the **15 canonical entity
-types** — not the five-bucket search/filter projection and not the legacy recommendation-category
-domain. A review's category is its subject item's canonical type; a post's categories are the
-canonical types of its linked items, counted **once per type** even when several linked items share
-that type. A post spanning three types counts once in each, so per-category influence is
-deliberately not additive across categories. Posts with no linked item contribute to no category.
-Existing `social_influence_scores.category` rows on the old domain are recomputed, not translated.
+Engagement's numerator counts likes **only on the exact content selected into that set**, and its
+denominator is `|credited set|`, so ten posts about one item can neither inflate volume nor inflate
+the like average. Credited rows with zero likes stay in the denominator.
 
+Per-category influence is deliberately not additive across categories: a post spanning three types
+contributes to all three. Posts with no linked entity contribute to no category. The category domain
+is the **15 canonical entity types** (`src/services/entityType.ts`) — not the five-bucket
+search/filter projection and not the legacy recommendation-category enum. Existing
+`social_influence_scores` rows on the old domain are deleted and recomputed, not translated.
 
 Judgment/calibration quality stays out — Influence v2, separate experiment.
+
 
 ## 2. Trending — normalise, then weight
 
