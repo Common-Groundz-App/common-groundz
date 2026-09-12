@@ -129,23 +129,27 @@ as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
 `contractVersion: 2` adds, alongside the retained similarity cases:
 
 - influence: positivity invariance (avg 1.0 vs 5.0 → identical score), multi-type post attribution
-  counted once per canonical type, uncategorised post excluded, sparse user
+  counted once per canonical type, uncategorised post excluded, ten posts about one item crediting
+  one, self-like on own contribution excluded, sparse user
 - trending: normalised component maths, review+post contribution cap of 2 per person, a timeline
-  update counting once (and not twice with the review), anonymous-view aggregate cap,
-  self-engagement exclusion, entity-creator contribution *included*, negative/over-range
-  popularity and boost inputs clamped, legacy stored score clamped, candidate-selection membership,
-  zero-activity decay
-- personalised: high trending score not overwhelming interest, exact tie-break order,
-  reviewed/saved exclusion, sparse fallback
+  update counting once (and not twice with the review), anonymous-view aggregate cap, entity-page
+  view by a reviewer of that item *counted*, self-like on own review/post excluded, entity-creator
+  contribution *included*, NULL and negative popularity/boost inputs clamped to 0, legacy stored
+  score clamped, post linked via both `post_entities` and `posts.entity_id` counted once,
+  candidate-selection membership, zero-activity decay
+- personalised: high trending score not overwhelming interest, NULL interest score yielding a real
+  score rather than NULL, exact tie-break order, reviewed/saved exclusion, sparse fallback
 - who-to-follow: candidate found by one source but scored on all features, multi-source reason
   priority, 7-day impression exclusion with intermediates, tie-break by id
 - similarity: both users constant at 5, one constant 5 vs one constant 1, both constant at
   different levels; and a NULL-preservation note for callers (`x ?? 0` is forbidden in 4.2B.3)
-- reputation: clamp at 1000, deleted/draft/private exclusion, negative review parity
+- reputation: clamp at 1000, unpublished/private/deleted exclusion using the real predicates,
+  negative review parity
 - privacy: private review never in any global aggregate; Circle-visible review counts only in
   viewer-specific surfaces
 - canonical selection: duplicate rows collapsed inside scoring inputs
 - sparse data returns 0/NULL as specified and is never an error
+
 
 ## 6. Two additions of my own
 
