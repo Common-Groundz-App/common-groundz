@@ -162,10 +162,13 @@ Boundary rule (three separate concepts, never conflated):
       same checksum). Evidence: `docs/verification/phase-4-2a-recommendation-truth.md`
 - [ ] 4.2B Intelligence/scoring migration (trending, similarity, influence, reputation,
       collaborative + social client pipelines). Not started
-- [ ] 4.2B.0 visible-number cutover: additive review-only entity stats; canonicalize before
-      aggregating review/recommendation counts and average rating; switch every reader without
-      double-counting; migrate public directory counts and feed polling; verify explicit owner,
-      idempotent single refresh job, indexes, grants, manual refresh and before/after values; stop
+- [x] 4.2B.0 visible-number cutover: additive review-only entity stats materialized view
+      (`entity_stats_v2`); canonicalize before aggregating; every reader switched without
+      double-counting; directory counts and feed polling migrated; owner, idempotent single
+      refresh job, indexes, grants verified live; zero active readers of old view and zero
+      stats-readers of old records. Evidence: `docs/verification/phase-4-2b0-entity-stats-cutover.md`
+      (49 canonical reviewers / 36 recommending; 633 tests, clean typecheck and build).
+      Deliberately open: legacy record *listing* in search/entity pages, removed in 4.3.
 - [ ] 4.2B.1 scoring contract + machine-readable fixtures (docs only); approval gate before
       4.2B.2 scoring routines or 4.2B.3 client pipelines
 
