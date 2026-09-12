@@ -4983,6 +4983,14 @@ export type Database = {
           reason: string
         }[]
       }
+      get_personalized_entities_v2: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          entity_id: string
+          personalization_score: number
+          reason: string
+        }[]
+      }
       get_post_likes_by_posts: {
         Args: { p_post_ids: string[] }
         Returns: {
