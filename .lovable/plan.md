@@ -17,11 +17,15 @@ score families. This plan finishes 4.2B.2 exactly as frozen, still with no app-v
 
 ## What gets built (each family separately, same rules as trending)
 
-1. **Influence** — new storage table beside the old one, one row per person per item category, with a
-   unique key on that pair, only the 15 approved categories allowed, score kept inside 0–1, internal
-   write access only. Pure calculator that returns a score without writing. Refresh routine that
-   recomputes every eligible person, and also removes rows that no longer qualify (stale cleanup in
-   the new table only — nothing old or source data is ever deleted). One-time full bootstrap.
+1. **Influence** — new storage table beside the old one, one row per person per canonical item type,
+   keyed uniquely on that exact pair (person + canonical type), only the 15 approved types allowed,
+   score kept inside 0–1, internal write access only. Pure calculator that returns a score without
+   writing. Engagement here is the **lifetime** measure from the frozen contract: eligible non-self
+   likes on the exact credited set divided by the size of that set, saturating at an average of 50 —
+   there is **no 24-hour window and no per-actor like cap** in influence; those belong only to
+   trending. Refresh routine recomputes every eligible person and removes rows that no longer qualify
+   (stale cleanup in the new table only — nothing old or source data is ever deleted). One-time full
+   bootstrap.
 2. **Similarity** — new routine returning the frozen result, including "not comparable" instead of
    zero when there is too little shared history.
 3. **Reputation** — new routine on the frozen base/step/clamp values.
@@ -29,9 +33,11 @@ score families. This plan finishes 4.2B.2 exactly as frozen, still with no app-v
    candidate, frozen reason priority, deterministic tie-break.
 5. **Personalised items** — new viewer-scoped routine with the frozen weights, normalisation and
    tie-break.
-6. **Background job** — `refresh-social-influence-v2`, protected at its entry point (signed-in admin
-   or shared internal secret only; never reachable anonymously), deployed but **not** scheduled. A new
-   secret is needed for it.
+6. **Influence refresh endpoint** — `refresh-social-influence-v2`, protected at its entry point
+   (signed-in admin or shared internal secret only; never reachable anonymously), deployed but
+   deliberately **left unscheduled** in this step. Scheduling it is 4.2B.3 work, not B2. A new secret
+   is needed for it.
+
 
 ## Rules kept from the approved spec
 
