@@ -753,6 +753,7 @@ export type Database = {
           specifications: Json | null
           stored_photo_urls: Json | null
           trending_score: number | null
+          trending_score_v2: number
           type: Database["public"]["Enums"]["entity_type"]
           updated_at: string
           user_created: boolean | null
@@ -816,6 +817,7 @@ export type Database = {
           specifications?: Json | null
           stored_photo_urls?: Json | null
           trending_score?: number | null
+          trending_score_v2?: number
           type: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
           user_created?: boolean | null
@@ -879,6 +881,7 @@ export type Database = {
           specifications?: Json | null
           stored_photo_urls?: Json | null
           trending_score?: number | null
+          trending_score_v2?: number
           type?: Database["public"]["Enums"]["entity_type"]
           updated_at?: string
           user_created?: boolean | null
@@ -4344,6 +4347,7 @@ export type Database = {
           specifications: Json | null
           stored_photo_urls: Json | null
           trending_score: number | null
+          trending_score_v2: number
           type: Database["public"]["Enums"]["entity_type"]
           updated_at: string
           user_created: boolean | null
@@ -4361,6 +4365,10 @@ export type Database = {
       }
       admin_pending_entity_count: { Args: never; Returns: number }
       calculate_enhanced_trending_score: {
+        Args: { p_entity_id: string }
+        Returns: number
+      }
+      calculate_entity_trending_score_v2: {
         Args: { p_entity_id: string }
         Returns: number
       }
@@ -5291,6 +5299,7 @@ export type Database = {
           slug: string
         }[]
       }
+      select_trending_candidates_v2: { Args: never; Returns: string[] }
       set_app_flag: {
         Args: { _key: string; _reason?: string; _value: Json }
         Returns: Json
@@ -5333,6 +5342,10 @@ export type Database = {
         Returns: boolean
       }
       update_all_trending_scores: { Args: never; Returns: number }
+      update_all_trending_scores_v2: {
+        Args: { p_bootstrap?: boolean }
+        Returns: number
+      }
       update_comment: {
         Args: {
           p_comment_id: string
