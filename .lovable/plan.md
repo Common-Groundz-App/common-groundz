@@ -14,8 +14,13 @@ of v2.
 New definition, all terms bounded, total in [0, 1]:
 
 - reach `min(followers, 1000) / 1000 × 0.35`
-- contribution volume `min(distinct items reviewed + entity-linked posts in category, 100) / 100 × 0.35`
-- engagement received `min(avg likes per contribution, 50) / 50 × 0.30`
+- contribution volume `min(credited contributions in category, 100) / 100 × 0.35`, where credited
+  contributions are counted **per item**: at most 1 canonical review **plus** at most 1 entity-linked
+  post per person/item. Ten posts about one item credit one post, so post volume cannot manufacture
+  influence — and no judgment of the post's content is involved.
+- engagement received `min(avg likes per contribution, 50) / 50 × 0.30`, excluding likes by the
+  contribution's own author
+
 
 The 0.30 previously held by "rating quality" is redistributed to reach and contribution (+0.05
 each) and engagement (+0.10). No term reads any rating value. A reviewer averaging 1.0 and one
@@ -56,34 +61,55 @@ Cap and input corrections:
 - **Anonymous views are capped in aggregate.** Null-viewer rows count at most
   `min(anon_rows, 2 × identified_capped_views + 50)` and are additionally deduped by
   `(session_id, item)` where a session is recorded. No unbounded input remains.
-- **Self activity is narrowed to self-engagement on one's own content**: an author's likes on their
-  own review or post, and their own views of it, give no credit. Whoever created the item's
-  database row is *not* treated as its owner — their reviews, posts and views count normally.
+- **Self activity is narrowed to what the data can actually express**: `entity_views` records
+  entity-page views only (`entity_id, user_id, session_id, interaction_type, created_at`) and
+  carries no review or post reference, so there is no "self view of a review" to exclude — entity
+  views count under the viewer/session caps for everyone, including people who have reviewed the
+  item. The exclusions that *are* implementable and frozen: a like on one's own review does not
+  count, a like on one's own post does not count. Whoever created the item's database row is **not**
+  treated as its owner; their reviews, posts, likes and views count normally. If per-review or
+  per-post view events are ever introduced, author self-view exclusion is added there, in a later
+  contract version.
 - Final score `(0.3·base_popularity_n + 0.4·velocity + 0.15·geo_n + 0.15·seasonal_n) × age_factor`,
-  with **two-sided clamps** so the [0, 1.2] range is actually guaranteed:
-  `base_popularity_n = clamp(popularity_score, 0, 1000) / 1000`,
-  `geo_n = clamp(geographic_boost, 0, 1)`, `seasonal_n = clamp(seasonal_boost, 0, 1)`,
-  each NULL → 0, `age_factor ∈ {1.0, 1.1, 1.2}` and never NULL. Sources are the existing
-  `entities.popularity_score`, `entities.geographic_boost`, `entities.seasonal_boost` columns
-  (both boosts currently default 0 and are unpopulated, so they contribute 0 until a later phase
-  defines them).
+  with **null-safe two-sided clamps** so the [0, 1.2] range is actually guaranteed:
+  `base_popularity_n = clamp(coalesce(popularity_score, 0), 0, 1000) / 1000`,
+  `geo_n = clamp(coalesce(geographic_boost, 0), 0, 1)`,
+  `seasonal_n = clamp(coalesce(seasonal_boost, 0), 0, 1)`,
+  `age_factor ∈ {1.0, 1.1, 1.2}` and never NULL.
+- **`popularity_score` provenance — audited, and the answer is clean**: `entities.popularity_score`
+  is NULL for all 353 rows and no migration or routine writes it, so no legacy standalone-record
+  value can leak into trending through it. The contract records this evidence and freezes
+  `base_popularity_n = 0` in practice until a later phase defines popularity from modern sources.
+  `geographic_boost` / `seasonal_boost` are likewise unpopulated (default 0) and contribute 0.
+- **Post-to-entity linkage is one frozen normalised relation**, used identically by trending
+  contributions, engagement attribution, influence categories and personalised activity:
+  `SELECT post_id, entity_id FROM post_entities UNION SELECT id, entity_id FROM posts WHERE
+  entity_id IS NOT NULL` — `UNION`, never `UNION ALL`, so a post linked both ways counts once.
+  Backfilling and retiring the legacy column is named as later cleanup, not part of 4.2B.
+- **Review eligibility uses the columns that exist.** `reviews` has no `is_deleted`: eligibility is
+  `status = 'published'` plus `visibility`. `posts` and `entities` do have `is_deleted = false` and
+  keep using it. The shared-rules section of v1 is corrected accordingly — this was a real defect
+  that would have made the 4.2B.2 migration fail.
 - **Candidate selection is defined explicitly**: items with any view, engagement, review, timeline
   update or entity-linked post in the last 24 h, union items whose stored score is non-zero (so
-  decay to 0 is recorded). Full-table scans are not used.
+  decay to 0 is recorded and recomputed until it reaches its true no-activity value). Full-table
+  scans are not used.
 - **Legacy transition**: stored pre-v2 trending scores are on the old unbounded scale. The 4.2B.2
   migration recomputes every stored score in the same transaction that installs the routine, and
   readers clamp defensively (`clamp(stored, 0, 1.2)`), so no old-scale value is ever consumed as a
   v2 normalised value.
 
-
 ## 3. Personalised items — normalise before weighting
 
-- `interest_n = min(interest_score, 5) / 5`
-- `social_n = min(distinct followed reviewers in 30 d, 5) / 5`
-- `trending_n = clamp(stored trending score, 0, 1.2) / 1.2`
-- `score = 0.5·interest_n + 0.3·social_n + 0.2·trending_n`, range [0, 1].
+Every term is null-safe and two-sided clamped, so [0, 1] is guaranteed rather than assumed:
+
+- `interest_n = clamp(coalesce(interest_score, 0), 0, 5) / 5`
+- `social_n = clamp(coalesce(distinct followed reviewers in 30 d, 0), 0, 5) / 5`
+- `trending_n = clamp(coalesce(stored trending score, 0), 0, 1.2) / 1.2`
+- `score = clamp(0.5·interest_n + 0.3·social_n + 0.2·trending_n, 0, 1)`
 - **Deterministic tie-break**: `score DESC, trending_n DESC, item id ASC` — stable across calls, so
   pagination cannot shuffle.
+
 
 Trending can no longer overwhelm personalisation by scale. Reason precedence unchanged
 (interests > follow activity > trending); sparse users fall back to trending-only ranking.
@@ -103,23 +129,27 @@ as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
 `contractVersion: 2` adds, alongside the retained similarity cases:
 
 - influence: positivity invariance (avg 1.0 vs 5.0 → identical score), multi-type post attribution
-  counted once per canonical type, uncategorised post excluded, sparse user
+  counted once per canonical type, uncategorised post excluded, ten posts about one item crediting
+  one, self-like on own contribution excluded, sparse user
 - trending: normalised component maths, review+post contribution cap of 2 per person, a timeline
-  update counting once (and not twice with the review), anonymous-view aggregate cap,
-  self-engagement exclusion, entity-creator contribution *included*, negative/over-range
-  popularity and boost inputs clamped, legacy stored score clamped, candidate-selection membership,
-  zero-activity decay
-- personalised: high trending score not overwhelming interest, exact tie-break order,
-  reviewed/saved exclusion, sparse fallback
+  update counting once (and not twice with the review), anonymous-view aggregate cap, entity-page
+  view by a reviewer of that item *counted*, self-like on own review/post excluded, entity-creator
+  contribution *included*, NULL and negative popularity/boost inputs clamped to 0, legacy stored
+  score clamped, post linked via both `post_entities` and `posts.entity_id` counted once,
+  candidate-selection membership, zero-activity decay
+- personalised: high trending score not overwhelming interest, NULL interest score yielding a real
+  score rather than NULL, exact tie-break order, reviewed/saved exclusion, sparse fallback
 - who-to-follow: candidate found by one source but scored on all features, multi-source reason
   priority, 7-day impression exclusion with intermediates, tie-break by id
 - similarity: both users constant at 5, one constant 5 vs one constant 1, both constant at
   different levels; and a NULL-preservation note for callers (`x ?? 0` is forbidden in 4.2B.3)
-- reputation: clamp at 1000, deleted/draft/private exclusion, negative review parity
+- reputation: clamp at 1000, unpublished/private/deleted exclusion using the real predicates,
+  negative review parity
 - privacy: private review never in any global aggregate; Circle-visible review counts only in
   viewer-specific surfaces
 - canonical selection: duplicate rows collapsed inside scoring inputs
 - sparse data returns 0/NULL as specified and is never an error
+
 
 ## 6. Two additions of my own
 
@@ -129,6 +159,10 @@ as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
   be re-tuned from real data after 4.2B.4 rather than silently edited in SQL.
 - **Every routine records the contract version it implements**, as a comment in the routine body,
   so a future audit can tell a v2 routine from a v1 one without reading the maths.
+- **Every column the contract names is verified to exist** before v2 is frozen — the
+  `reviews.is_deleted` defect is exactly what that check catches, and the contract will carry a
+  short "fields this contract relies on" table so the next review can confirm it at a glance.
+
 
 ## Technical notes
 
