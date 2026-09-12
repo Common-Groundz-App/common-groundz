@@ -169,8 +169,20 @@ Boundary rule (three separate concepts, never conflated):
       stats-readers of old records. Evidence: `docs/verification/phase-4-2b0-entity-stats-cutover.md`
       (49 canonical reviewers / 36 recommending; 633 tests, clean typecheck and build).
       Deliberately open: legacy record *listing* in search/entity pages, removed in 4.3.
-- [ ] 4.2B.1 scoring contract + machine-readable fixtures (docs only); approval gate before
-      4.2B.2 scoring routines or 4.2B.3 client pipelines
+- [x] 4.2B.1 scoring contract + machine-readable fixtures (docs only); contract v2 and 48 fixtures
+      approved and frozen. Evidence: `docs/verification/phase-4-2b-scoring-contract.md`,
+      `docs/verification/phase-4-2b-scoring-fixtures.json`
+- [ ] 4.2B.2 additive v2 scoring build: `trending_score_v2` column + pure scorer + candidate
+      selector + orchestrator; `social_influence_scores_v2` + pure calculator + reconciling refresh
+      orchestrator; similarity/reputation/who-to-follow/personalised v2 routines; secured unscheduled
+      `refresh-social-influence-v2` Edge Function; one-time trending + influence bootstrap; no v1 or
+      consumer changes
+- [ ] 4.2B.3 consumer cutover: switch each pipeline atomically to v2 (trending thresholds rescaled,
+      similarity NULL semantics, influence read-only v2 table), schedule the influence function,
+      remove the browser `setInterval` updater in `backgroundService.ts`
+- [ ] 4.2B.4 dependency proof gate, then retire v1 routines/columns/table (inspect
+      `calculate_trending_hashtags` reference to `calculate_trending_score` first); old-threshold
+      sweep happens here, not before
 
 
 - [ ] 4.3 Remove the legacy application layer **and** its dummy data together (notifications point at
