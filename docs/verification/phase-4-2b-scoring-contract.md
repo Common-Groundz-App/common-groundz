@@ -125,7 +125,11 @@ calculation, used for both per-item scoring and candidate selection.
 
 **Signals, units and caps:**
 
-- **views** — rows in `entity_views` in the window:
+- **views** — qualifying rows in `entity_views` in the window. `entity_views` is a **mixed
+  interaction table**, not a view log: `interaction_type` accepts `view`, `like`, `save`, `click`
+  (and all 603 live rows are `click`). Frozen: a **view** is `interaction_type IN ('view','click')`
+  or NULL — page-level attention. `like` and `save` rows are excluded, because engagement is already
+  its own weighted term and counting them here would double-count the same act.
   - identified viewers: capped at **20 per distinct viewer**;
   - anonymous (null `user_id`) rows: deduped by `(session_id, entity_id)` where a session is
     recorded, then capped in aggregate at `min(anon_rows, 2 × identified_capped_views + 50)`.
