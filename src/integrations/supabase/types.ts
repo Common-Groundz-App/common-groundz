@@ -4476,6 +4476,10 @@ export type Database = {
         Args: { user_a_id: string; user_b_id: string }
         Returns: number
       }
+      calculate_user_similarity_v2: {
+        Args: { p_user_a: string; p_user_b: string }
+        Returns: number
+      }
       check_admin_permission: {
         Args: { required_permission?: string }
         Returns: boolean
