@@ -140,8 +140,11 @@ calculation, used for both per-item scoring and candidate selection.
   intent, comment or media changed) also counts as the review-side contribution, so a living journey
   can re-trend an item — but a new review *or* a timeline update counts once, never both, and several
   edits in the window count once.
-- **engagement** — distinct like events on the item's own reviews and entity-linked posts, capped at
-  **5 per actor per item per window** (explicitly *not* 5 per content row), excluding self-likes.
+- **engagement** — distinct like events on the item's **canonical** reviews and its entity-linked
+  posts, capped at **5 per actor per item per window** (explicitly *not* 5 per content row), excluding
+  self-likes. The review side uses the same canonical `(user_id, entity_id)` selection as
+  contributions: likes on a superseded duplicate review row do **not** count, so duplicate rows
+  cannot inflate engagement.
 
 **Normalise, then weight** — so the coefficients are real percentages:
 
