@@ -59,9 +59,13 @@ Cap and input corrections:
   per-person-per-item review contribution stays 1: a new review *or* a qualifying timeline update
   (rating, intent, comment or media changed) counts once, never both, and multiple edits in the
   window count once. Living journeys therefore re-trend an item, without becoming a spam channel.
+- **Engagement cap scope is per actor, per item, per window** — one actor contributes at most 5
+  qualifying likes to an item in 24 h, no matter how many reviews and posts attached to that item
+  they like. It is explicitly *not* 5 per content row.
 - **Anonymous views are capped in aggregate.** Null-viewer rows count at most
   `min(anon_rows, 2 × identified_capped_views + 50)` and are additionally deduped by
   `(session_id, item)` where a session is recorded. No unbounded input remains.
+
 - **Self activity is narrowed to what the data can actually express**: `entity_views` records
   entity-page views only (`entity_id, user_id, session_id, interaction_type, created_at`) and
   carries no review or post reference, so there is no "self view of a review" to exclude — entity
