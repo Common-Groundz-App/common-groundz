@@ -23,7 +23,10 @@ score families. This plan finishes 4.2B.2 exactly as frozen, still with no app-v
    writing. Engagement here is the **lifetime** measure from the frozen contract: eligible non-self
    likes on the exact credited set divided by the size of that set, saturating at an average of 50 —
    there is **no 24-hour window and no per-actor like cap** in influence; those belong only to
-   trending. Refresh routine recomputes every eligible person and removes rows that no longer qualify
+   trending. Refresh routine's candidate population is **people with current eligible contributions
+   union people who already have a row in the new table** — this union is what lets a person who loses
+   their last eligible contribution still be refreshed. Per-person reconciliation: compute the current
+   eligible type pairs, upsert those, delete that person's new-table rows not in the current set
    (stale cleanup in the new table only — nothing old or source data is ever deleted). One-time full
    bootstrap.
 2. **Similarity** — new routine returning the frozen result, including "not comparable" instead of
@@ -55,7 +58,9 @@ score families. This plan finishes 4.2B.2 exactly as frozen, still with no app-v
 - Replay the frozen fixtures for each family (transaction-scoped, rolled back), comparing to 6 decimals.
 - Prove access rules live: anonymous blocked, ordinary signed-in blocked where required, viewer-scoped
   routines return the requested viewer's view.
-- Prove bootstrap coverage and stale-row cleanup for influence.
+- Prove bootstrap coverage and stale-row cleanup for influence, including the specific case: a person
+  with an existing influence row loses their last eligible contribution, a refresh runs, and the stale
+  row is gone.
 - Confirm no new routine reads the legacy records table.
 - Regenerate the generated database types; run the test suite, type check and build.
 - Write `docs/verification/phase-4-2b2-scoring-routines.md`. 4.2B.2 is only ticked in the roadmap once
