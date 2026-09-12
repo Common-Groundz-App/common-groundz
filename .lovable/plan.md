@@ -159,6 +159,10 @@ as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
   be re-tuned from real data after 4.2B.4 rather than silently edited in SQL.
 - **Every routine records the contract version it implements**, as a comment in the routine body,
   so a future audit can tell a v2 routine from a v1 one without reading the maths.
+- **Every column the contract names is verified to exist** before v2 is frozen — the
+  `reviews.is_deleted` defect is exactly what that check catches, and the contract will carry a
+  short "fields this contract relies on" table so the next review can confirm it at a glance.
+
 
 ## Technical notes
 
