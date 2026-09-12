@@ -1,65 +1,97 @@
-# Phase 4.2B.1 audit result, then 4.2B.2 — scoring routines on contract v2
+# Phase 4.2B.1 close-out, then 4.2B.2 rebuilt as an additive rollout
 
-## 4.2B.1 audit
+Both reviews are right, and the live database backs them up. The maths is approved; the deployment
+plan was the problem. This revision replaces in-place replacement with **additive v2 routines that
+run alongside v1**, so no consumer ever sees a value whose meaning changed under it.
 
-Contract v2 and fixtures are complete and consistent — verified by reading both files:
+## What the audit found (evidence, not assumption)
 
-- `docs/verification/phase-4-2b-scoring-contract.md` (330 lines) covers shared rules, verified field
-  table, saturation constants, trending, influence, reputation, who-to-follow, personalised items,
-  similarity, deployment cutover, and a v1→v2 change log.
-- `docs/verification/phase-4-2b-scoring-fixtures.json` — `contractVersion: 2`, pointing at that
-  document; 48 scenarios: trending 15, influence 9, personalised 7, similarity 7, reputation 4,
-  who-to-follow 3, cross-cutting 3. Every branch the reviews demanded is present, including
-  who-to-follow multi-source reason priority and id tie-break.
-- No code, SQL or routine was touched by 4.2B.1, as intended.
+4.2B.1 is complete: contract v2 (330 lines) and fixtures (`contractVersion: 2`, 48 scenarios across
+trending 15, influence 9, personalised 7, similarity 7, reputation 4, who-to-follow 3, cross-cutting
+3) are committed and consistent. Only bookkeeping remains: `roadmap.md` still shows 4.2B.1 unchecked.
 
-One leftover, bookkeeping only: `roadmap.md` still shows 4.2B.1 unchecked. It gets marked complete
-as the first step below.
+The cutover objections are confirmed:
 
-## 4.2B.2 — migrate the scoring routines
+- **Trending scale really would break readers.** `entities.trending_score` today maxes at 0.48 across
+  86 non-zero rows, and live readers use absolute thresholds against the *old* scale:
+  `discoveryService.ts` filters `.gte('trending_score', 5)`, `fallbackRecommendationService.ts` uses
+  `> 0.5` and `> 0.6`, `searchRanking.ts` and `advancedPersonalizationService.ts` read it raw. "Every
+  reader clamps" was not true.
+- **The orchestrator was missing from the plan.** `update_all_trending_scores()` selects candidates
+  by joining the legacy records table, calls the enhanced routine, and has two live callers:
+  `supabase/functions/update-trending-scores` and `enhancedExploreService.updateAllTrendingScores`.
+- **Similarity has a NULL-destroying caller today**: `calculate-lifestyle-similarity` does
+  `similarityResult || 0`.
+- **Influence is easier than feared**: `social_influence_scores` currently holds **0 rows**, so there
+  is no legacy cache to delete — but `socialIntelligenceService` still reads and writes it on the
+  legacy category domain, so its switch is still a caller-paired change.
+- **Dropping the plain routine is nearly safe**: no app or Edge Function calls
+  `calculate_trending_score`; no trigger and no cron job references it; exactly one database function
+  (`calculate_trending_hashtags`) mentions it and must be inspected before anything is dropped.
 
-Every routine below still reads the old standalone records (confirmed by reading the live function
-bodies). This step rewrites all six to contract v2 and removes the legacy reads, in one migration.
+## 4.2B.2 — build v2 next to v1, change nothing live
 
-| Routine | What it does today | v2 |
+Each score family is its own migration, independently verifiable, with no consumer impact:
+
+| Family | Added in 4.2B.2 | v1 during this phase |
 |---|---|---|
-| `calculate_enhanced_trending_score` | uncapped views + old-record likes + old-record counts, unnormalised | normalised views/engagement/contributions from reviews, timeline updates and entity-linked posts; caps; clamped boosts |
-| `calculate_trending_score` | duplicate legacy trending | dropped; enhanced routine is the only trending calculation |
-| `calculate_social_influence_score` | includes `avg rating / 5`; counts old records | reach 0.35 / volume 0.35 / engagement 0.30 over the single credited set; canonical 15 types |
-| `calculate_user_reputation` | counts old records; counts every published review row | credited reviews canonicalised per item; old-record term removed |
-| `calculate_user_similarity` | ratings from old records; `< 3` overlap returns a shrunken number | public published canonical review ratings; `< 3` shared → NULL; zero-variance branch; overlap confidence |
-| `get_personalized_entities` | raw interest + old-record activity + raw trending | normalised, clamped terms; excludes reviewed/saved items; deterministic tie-break |
-| `get_who_to_follow` | mutual/activity components collapse to 1 for anyone non-zero; activity counts old records | one candidate pool, global max-mutual normalisation, activity from posts + public published canonical reviews, frozen reason priority |
+| Trending | `calculate_entity_trending_score_v2(entity)` (pure, returns the score, **writes nothing**) plus `select_trending_candidates_v2()` and `update_all_trending_scores_v2()` writing to a **new** `entities.trending_score_v2` column | untouched: `trending_score` keeps its old scale and old writer |
+| Influence | `calculate_social_influence_score_v2(user, canonical_type)` writing to a new `social_influence_scores_v2` table on the canonical 15 types | legacy routine and empty table left in place |
+| Similarity | `calculate_user_similarity_v2(a, b)` with NULL for insufficient evidence | legacy routine untouched, so `|| 0` cannot corrupt anything |
+| Personalised items | `get_personalized_entities_v2(user, limit)`, reading `trending_score_v2` | legacy routine untouched |
+| Reputation | `calculate_user_reputation_v2(user)` — returns the score, **does not write** `user_reputation` | legacy writer untouched |
+| Who-to-follow | `get_who_to_follow_v2(user, limit)`, same output columns | legacy routine untouched |
 
-Cutover, as the contract froze it:
+Rules for every v2 routine: legacy records table never read; `reviews` eligibility via
+`status`/`visibility` (there is no `reviews.is_deleted`); posts/entities via `is_deleted = false`;
+post↔entity linkage via `post_entities UNION posts.entity_id`; boosts contribute 0;
+`-- scoring contract v2` comment in each body. Nothing is dropped, deleted or recomputed in place.
 
-- Trending: install the routine and recompute every stored `entities.trending_score` in the **same
-  transaction**; a new candidate-selection helper replaces full-table scans.
-- Influence: delete `social_influence_scores` rows on the legacy category domain in the same
-  transaction, then recompute on canonical types.
-- `geographic_boost` / `seasonal_boost` stay unwritten (contribute 0). `popularity_score` stays NULL,
-  so `base_popularity_n` is 0.
-- Each routine body carries a `-- scoring contract v2` comment.
+## Verification before 4.2B.2 is called done
 
-## Verification before this phase is called done
+- Run every fixture group as SQL against transaction-scoped fixture rows, rolled back — no
+  production row created, updated or deleted — and record actual vs expected intermediates.
+- Backfill `trending_score_v2` for all candidates and show the two scales side by side, confirming
+  every v2 value is inside [0, 1.2].
+- Prove no v2 routine reads the legacy records table.
+- Full test suite, typecheck, production build; write
+  `docs/verification/phase-4-2b2-scoring-routines.md`; mark 4.2B.1 and 4.2B.2 in `roadmap.md`.
 
-- Re-run each fixture group as SQL against transaction-scoped fixture rows (rolled back; no
-  production row created, updated or deleted) and record actual vs expected intermediates.
-- Confirm zero remaining references to the legacy records inside any scoring routine.
-- Full test suite, typecheck, production build.
-- Write `docs/verification/phase-4-2b2-scoring-routines.md` and mark 4.2B.2 in `roadmap.md`.
+Hard stop for review after that.
 
-## Out of scope here
+## 4.2B.3 — switch consumers, one complete pipeline at a time
 
-Client pipelines (`socialIntelligenceService`, `collaborativeFilteringService`,
-`enhancedExploreService`, `userRecommendationService`, `calculate-lifestyle-similarity`) are 4.2B.3 —
-including the NULL-preservation rule that forbids `?? 0` on similarity. Legacy record *listing* in
-search and entity pages stays until 4.3. Consensus calibration remains a separate future experiment.
+Each pipeline moves atomically, routine plus every caller in the same step:
+
+1. **Trending**: `discoveryService`, `fallbackRecommendationService`, `searchRanking`,
+   `advancedPersonalizationService`, `enhancedExploreService`, `update-trending-scores` Edge Function
+   — thresholds rescaled to the [0, 1.2] range, all ordering moved to `trending_score_v2`.
+2. **Similarity**: `collaborativeFilteringService` and `calculate-lifestyle-similarity` switched to
+   the v2 routine with `|| 0` and `?? 0` removed; NULL means "no evidence" end to end.
+3. **Influence**: `socialIntelligenceService` switched to canonical types and the v2 table together.
+4. **Personalised / who-to-follow / reputation**: their callers switched to the v2 routines.
+
+## 4.2B.4 — contract: retire v1
+
+Only after 4.2B.3 proves zero v1 consumers: drop the v1 routines (including
+`calculate_trending_score`, after inspecting `calculate_trending_hashtags`), rename
+`trending_score_v2` into place or retire the old column, and retire `social_influence_scores`.
+
+## Two additions of my own
+
+- **A scale-guard test**, so this class of bug cannot recur: a test asserting no code compares
+  `trending_score` against a literal above 1.2, and a database check constraint on
+  `trending_score_v2` bounding it to [0, 1.2]. The contract's range then holds at the storage layer,
+  not just on paper.
+- **`backgroundService` runs the trending updater on a browser `setInterval` in production**
+  (`src/services/backgroundService.ts`), which conflicts with the project's timer policy and makes
+  every open tab a scheduler. 4.2B.3 should move that to the Edge Function on a real schedule and
+  delete the client loop; I've flagged it rather than folding it in silently.
 
 ## Technical notes
 
-One migration containing: `DROP FUNCTION calculate_trending_score`, `CREATE OR REPLACE` for the six
-remaining routines, the trending recompute, the influence-row reset, and the shared post↔entity
-linkage as `post_entities UNION posts.entity_id`. Review eligibility uses `status`/`visibility`
-(there is no `reviews.is_deleted`); posts and entities use `is_deleted = false`. No client code and
-no schema changes in this step.
+Separate migrations per family, in this order: trending v2 (column + check constraint + pure scorer +
+candidate selector + orchestrator), influence v2 (table with GRANTs and RLS + routine), similarity
+v2, reputation v2, who-to-follow v2, personalised v2. All are additive: no `DROP`, no `DELETE`, no
+in-place recompute of a column an existing consumer reads. `roadmap.md` gains the new 4.2B.2 /
+4.2B.3 / 4.2B.4 breakdown and the `backgroundService` follow-up as its own task.
