@@ -80,8 +80,10 @@ Cap and input corrections:
 
 - `interest_n = min(interest_score, 5) / 5`
 - `social_n = min(distinct followed reviewers in 30 d, 5) / 5`
-- `trending_n = stored trending score / 1.2` (already bounded by section 2)
+- `trending_n = clamp(stored trending score, 0, 1.2) / 1.2`
 - `score = 0.5·interest_n + 0.3·social_n + 0.2·trending_n`, range [0, 1].
+- **Deterministic tie-break**: `score DESC, trending_n DESC, item id ASC` — stable across calls, so
+  pagination cannot shuffle.
 
 Trending can no longer overwhelm personalisation by scale. Reason precedence unchanged
 (interests > follow activity > trending); sparse users fall back to trending-only ranking.
@@ -90,12 +92,11 @@ Trending can no longer overwhelm personalisation by scale. Reason precedence unc
 
 Frozen interpretation: **the three sources are candidate discovery only.** After deduplication,
 every feature (mutual count, 7-day activity, profile quality) is computed for every candidate,
-regardless of which source found them, and one global score orders the list. `source` is retained
-only for the reason string. Exclusions (self, already followed, 7-day impressions) are unchanged.
+regardless of which source found them, and one global score orders the list. Exclusions (self,
+already followed, 7-day impressions) are unchanged. When a candidate is found by several sources,
+the **reason follows a frozen priority: friends-of-friends > active > fresh**, so the explanation is
+as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
 
-## 5. Fixtures — cover every normative branch
-
-`contractVersion: 2` adds, alongside the retained similarity cases:
 
 - influence: positivity invariance (avg 1.0 vs 5.0 → identical score), multi-category post
   attribution, uncategorised post excluded, sparse user
