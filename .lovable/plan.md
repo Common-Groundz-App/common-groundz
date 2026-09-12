@@ -58,15 +58,21 @@ score families. This plan finishes 4.2B.2 exactly as frozen, still with no app-v
 - Prove bootstrap coverage and stale-row cleanup for influence.
 - Confirm no new routine reads the legacy records table.
 - Regenerate the generated database types; run the test suite, type check and build.
-- Write `docs/verification/phase-4-2b2-scoring-routines.md`, then tick 4.2B.2 in the roadmap.
+- Write `docs/verification/phase-4-2b2-scoring-routines.md`. 4.2B.2 is only ticked in the roadmap once
+  the migrations, bootstrap, evidence, regenerated types and green checks are all in place — not when
+  the migrations merely exist.
 
 ## Technical notes
 
 - One migration per family, in order: influence storage → influence calculator/refresh → similarity →
   reputation → who-to-follow → personalised.
+- Influence storage key is exactly `UNIQUE (user_id, canonical_type)`, with `canonical_type` constrained
+  to the 15 canonical entity types — not a person/item key.
 - Influence credited-set is the frozen one: one canonical published public review per author/item plus
-  the earliest eligible public item-linked post, shared by both the volume and engagement terms;
-  per-actor/item/24h engagement caps.
+  the earliest eligible public item-linked post, shared by both the volume and engagement terms.
+  Engagement is lifetime average likes on that set (self-likes excluded), saturating at 50. The 24-hour
+  window and 5-likes-per-actor cap stay exclusive to trending.
 - Trending stays as built; only the contract-version comment is added if missing.
 
 Hard stop at the end of 4.2B.2: no consumer cutover, no scheduling, no threshold rescaling.
+
