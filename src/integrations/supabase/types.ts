@@ -4472,6 +4472,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: number
       }
+      calculate_user_reputation_v2: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
       calculate_user_similarity: {
         Args: { user_a_id: string; user_b_id: string }
         Returns: number
