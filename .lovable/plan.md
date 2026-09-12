@@ -95,20 +95,21 @@ Cap and input corrections:
   decay to 0 is recorded and recomputed until it reaches its true no-activity value). Full-table
   scans are not used.
 - **Legacy transition**: stored pre-v2 trending scores are on the old unbounded scale. The 4.2B.2
-
   migration recomputes every stored score in the same transaction that installs the routine, and
   readers clamp defensively (`clamp(stored, 0, 1.2)`), so no old-scale value is ever consumed as a
   v2 normalised value.
 
-
 ## 3. Personalised items — normalise before weighting
 
-- `interest_n = min(interest_score, 5) / 5`
-- `social_n = min(distinct followed reviewers in 30 d, 5) / 5`
-- `trending_n = clamp(stored trending score, 0, 1.2) / 1.2`
-- `score = 0.5·interest_n + 0.3·social_n + 0.2·trending_n`, range [0, 1].
+Every term is null-safe and two-sided clamped, so [0, 1] is guaranteed rather than assumed:
+
+- `interest_n = clamp(coalesce(interest_score, 0), 0, 5) / 5`
+- `social_n = clamp(coalesce(distinct followed reviewers in 30 d, 0), 0, 5) / 5`
+- `trending_n = clamp(coalesce(stored trending score, 0), 0, 1.2) / 1.2`
+- `score = clamp(0.5·interest_n + 0.3·social_n + 0.2·trending_n, 0, 1)`
 - **Deterministic tie-break**: `score DESC, trending_n DESC, item id ASC` — stable across calls, so
   pagination cannot shuffle.
+
 
 Trending can no longer overwhelm personalisation by scale. Reason precedence unchanged
 (interests > follow activity > trending); sparse users fall back to trending-only ranking.
