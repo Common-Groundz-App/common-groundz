@@ -98,24 +98,44 @@ the **reason follows a frozen priority: friends-of-friends > active > fresh**, s
 as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
 
 
-- influence: positivity invariance (avg 1.0 vs 5.0 → identical score), multi-category post
-  attribution, uncategorised post excluded, sparse user
-- trending: normalised component maths, review+post contribution cap of 2 per person,
-  anonymous-view aggregate cap, self-activity exclusion, candidate-selection membership,
+## 5. Fixtures — cover every normative branch
+
+`contractVersion: 2` adds, alongside the retained similarity cases:
+
+- influence: positivity invariance (avg 1.0 vs 5.0 → identical score), multi-type post attribution
+  counted once per canonical type, uncategorised post excluded, sparse user
+- trending: normalised component maths, review+post contribution cap of 2 per person, a timeline
+  update counting once (and not twice with the review), anonymous-view aggregate cap,
+  self-engagement exclusion, entity-creator contribution *included*, negative/over-range
+  popularity and boost inputs clamped, legacy stored score clamped, candidate-selection membership,
   zero-activity decay
-- personalised: normalisation with a high trending score not overwhelming interest, tie-break,
+- personalised: high trending score not overwhelming interest, exact tie-break order,
   reviewed/saved exclusion, sparse fallback
-- who-to-follow: candidate found by one source but scored on all features, 7-day impression
-  exclusion with intermediates, tie-break by id
+- who-to-follow: candidate found by one source but scored on all features, multi-source reason
+  priority, 7-day impression exclusion with intermediates, tie-break by id
+- similarity: both users constant at 5, one constant 5 vs one constant 1, both constant at
+  different levels; and a NULL-preservation note for callers (`x ?? 0` is forbidden in 4.2B.3)
 - reputation: clamp at 1000, deleted/draft/private exclusion, negative review parity
 - privacy: private review never in any global aggregate; Circle-visible review counts only in
   viewer-specific surfaces
 - canonical selection: duplicate rows collapsed inside scoring inputs
 - sparse data returns 0/NULL as specified and is never an error
 
+## 6. Two additions of my own
+
+- **Saturation constants are named and reviewable.** Every `min(x, K)` constant (500 views, 200
+  engagement, 50 contributions, 1000 followers, 100 items, 50 likes, 1000 popularity) is listed in
+  one table in the contract, with the note that they set where a signal stops mattering and should
+  be re-tuned from real data after 4.2B.4 rather than silently edited in SQL.
+- **Every routine records the contract version it implements**, as a comment in the routine body,
+  so a future audit can tell a v2 routine from a v1 one without reading the maths.
+
 ## Technical notes
 
-- Two files change; `contractVersion` and `contractDocument` stay in sync.
-- Section 7 of the contract is updated to record that v2 supersedes v1 and lists the four
-  corrections, so the audit trail stays readable.
-- No SQL, no routine bodies, no client code, no migrations in this step.
+- Two files change: `docs/verification/phase-4-2b-scoring-contract.md` and
+  `docs/verification/phase-4-2b-scoring-fixtures.json`; `contractVersion` and `contractDocument`
+  stay in sync.
+- The contract's closing section records that v2 supersedes v1 and lists every correction, so the
+  audit trail stays readable.
+- No SQL, no routine bodies, no client code, no migrations in this step. Hard stop for review.
+
