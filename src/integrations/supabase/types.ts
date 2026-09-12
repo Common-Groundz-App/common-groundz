@@ -5084,6 +5084,22 @@ export type Database = {
           username: string
         }[]
       }
+      get_who_to_follow_v2: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          activity_count: number
+          avatar_url: string
+          first_name: string
+          last_name: string
+          mutuals: number
+          profile_quality: number
+          reason: string
+          score: number
+          source: string
+          user_id: string
+          username: string
+        }[]
+      }
       has_network_activity: {
         Args: { p_min_count?: number; p_user_id: string }
         Returns: boolean
