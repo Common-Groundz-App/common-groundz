@@ -43,16 +43,33 @@ Cap and input corrections:
 - **Contributions include entity-linked posts.** Per person, per item, per window:
   at most 1 canonical review **plus** at most 1 entity-linked post = max 2. This removes the
   fixture's contradiction with canonicalisation.
+- **Contribution recency is the content's own creation time**: a review contributes on its
+  canonical `created_at`, a post on its `created_at`. **Timeline updates also contribute**, but the
+  per-person-per-item review contribution stays 1: a new review *or* a qualifying timeline update
+  (rating, intent, comment or media changed) counts once, never both, and multiple edits in the
+  window count once. Living journeys therefore re-trend an item, without becoming a spam channel.
 - **Anonymous views are capped in aggregate.** Null-viewer rows count at most
   `min(anon_rows, 2 × identified_capped_views + 50)` and are additionally deduped by
   `(session_id, item)` where a session is recorded. No unbounded input remains.
-- **Self activity excluded**: the item's own author/creator does not generate views, engagement or
-  contributions for it.
-- Final score `(0.3·base_popularity_n + 0.4·velocity + 0.15·geo + 0.15·seasonal) × age_factor`,
-  where `base_popularity_n = min(base_popularity, 1000) / 1000`. Range [0, 1.2].
-- **Candidate selection is defined explicitly**: items with any view, engagement, review or
-  entity-linked post in the last 24 h, union items whose stored score is non-zero (so decay to 0
-  is recorded). Full-table scans are not used.
+- **Self activity is narrowed to self-engagement on one's own content**: an author's likes on their
+  own review or post, and their own views of it, give no credit. Whoever created the item's
+  database row is *not* treated as its owner — their reviews, posts and views count normally.
+- Final score `(0.3·base_popularity_n + 0.4·velocity + 0.15·geo_n + 0.15·seasonal_n) × age_factor`,
+  with **two-sided clamps** so the [0, 1.2] range is actually guaranteed:
+  `base_popularity_n = clamp(popularity_score, 0, 1000) / 1000`,
+  `geo_n = clamp(geographic_boost, 0, 1)`, `seasonal_n = clamp(seasonal_boost, 0, 1)`,
+  each NULL → 0, `age_factor ∈ {1.0, 1.1, 1.2}` and never NULL. Sources are the existing
+  `entities.popularity_score`, `entities.geographic_boost`, `entities.seasonal_boost` columns
+  (both boosts currently default 0 and are unpopulated, so they contribute 0 until a later phase
+  defines them).
+- **Candidate selection is defined explicitly**: items with any view, engagement, review, timeline
+  update or entity-linked post in the last 24 h, union items whose stored score is non-zero (so
+  decay to 0 is recorded). Full-table scans are not used.
+- **Legacy transition**: stored pre-v2 trending scores are on the old unbounded scale. The 4.2B.2
+  migration recomputes every stored score in the same transaction that installs the routine, and
+  readers clamp defensively (`clamp(stored, 0, 1.2)`), so no old-scale value is ever consumed as a
+  v2 normalised value.
+
 
 ## 3. Personalised items — normalise before weighting
 
