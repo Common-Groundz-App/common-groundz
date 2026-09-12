@@ -125,7 +125,11 @@ calculation, used for both per-item scoring and candidate selection.
 
 **Signals, units and caps:**
 
-- **views** — rows in `entity_views` in the window:
+- **views** — qualifying rows in `entity_views` in the window. `entity_views` is a **mixed
+  interaction table**, not a view log: `interaction_type` accepts `view`, `like`, `save`, `click`
+  (and all 603 live rows are `click`). Frozen: a **view** is `interaction_type IN ('view','click')`
+  or NULL — page-level attention. `like` and `save` rows are excluded, because engagement is already
+  its own weighted term and counting them here would double-count the same act.
   - identified viewers: capped at **20 per distinct viewer**;
   - anonymous (null `user_id`) rows: deduped by `(session_id, entity_id)` where a session is
     recorded, then capped in aggregate at `min(anon_rows, 2 × identified_capped_views + 50)`.
@@ -136,8 +140,11 @@ calculation, used for both per-item scoring and candidate selection.
   intent, comment or media changed) also counts as the review-side contribution, so a living journey
   can re-trend an item — but a new review *or* a timeline update counts once, never both, and several
   edits in the window count once.
-- **engagement** — distinct like events on the item's own reviews and entity-linked posts, capped at
-  **5 per actor per item per window** (explicitly *not* 5 per content row), excluding self-likes.
+- **engagement** — distinct like events on the item's **canonical** reviews and its entity-linked
+  posts, capped at **5 per actor per item per window** (explicitly *not* 5 per content row), excluding
+  self-likes. The review side uses the same canonical `(user_id, entity_id)` selection as
+  contributions: likes on a superseded duplicate review row do **not** count, so duplicate rows
+  cannot inflate engagement.
 
 **Normalise, then weight** — so the coefficients are real percentages:
 
