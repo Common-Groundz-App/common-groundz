@@ -36,7 +36,7 @@ Each score family is its own migration, independently verifiable, with no consum
 | Family | Added in 4.2B.2 | v1 during this phase |
 |---|---|---|
 | Trending | `calculate_entity_trending_score_v2(entity)` (pure, returns the score, **writes nothing**) plus `select_trending_candidates_v2()` and `update_all_trending_scores_v2()` writing to a **new** `entities.trending_score_v2` column | untouched: `trending_score` keeps its old scale and old writer |
-| Influence | `calculate_social_influence_score_v2(user, canonical_type)` writing to a new `social_influence_scores_v2` table on the canonical 15 types | legacy routine and empty table left in place |
+| Influence | `calculate_social_influence_score_v2(user, canonical_type)` — **pure, returns the score**, plus a separate `refresh_social_influence_scores_v2(user)` orchestrator that upserts into a new `social_influence_scores_v2` table on the canonical 15 types | legacy routine and empty table left in place |
 | Similarity | `calculate_user_similarity_v2(a, b)` with NULL for insufficient evidence | legacy routine untouched, so `|| 0` cannot corrupt anything |
 | Personalised items | `get_personalized_entities_v2(user, limit)`, reading `trending_score_v2` | legacy routine untouched |
 | Reputation | `calculate_user_reputation_v2(user)` — returns the score, **does not write** `user_reputation` | legacy writer untouched |
