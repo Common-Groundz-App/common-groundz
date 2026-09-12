@@ -218,6 +218,22 @@ excluding likes by the content's own author; the denominator is `|credited set|`
 with zero likes stay in it. Ten posts about one item can therefore inflate neither the volume nor
 the like average. `|credited set| = 0` → volume and engagement are 0 (never a division error).
 
+**Multi-entity engagement is content-deduped (explicit, not an artefact of SQL `IN` semantics).**
+A post linked to three items of the same canonical type produces **three** credited rows for volume,
+but the likes on that one underlying post are counted **once** for the type — not once per credited
+`(post, entity)` row. So a post with 6 likes linked to three products gives `credited_set_size = 3`,
+`credited_likes = 6`, `avg_likes = 2`. This is what the frozen fixture
+`infl-multi-entity-post-attribution` already asserts, and it is the intended product rule: tagging
+more items can never multiply received engagement. The accepted side-effect is that a multi-item post
+dilutes the like average relative to separate posts; that is deliberate, since the multi-item credit
+is already rewarded in the volume term.
+
+**Category domain is DB-enforced.** `canonical_type` is the Postgres `public.entity_type` enum,
+verified live to contain exactly the 15 canonical labels
+(`book, movie, place, product, food, tv_show, course, app, game, experience, brand, event, service,
+professional, others`), so no extra CHECK constraint is required to enforce the 15-type rule.
+
+
 **Sparse data:** a brand-new user scores 0. Never negative; clamped [0, 1].
 
 **Explicitly not included:** consensus calibration / judgment quality — Influence v2, separate
