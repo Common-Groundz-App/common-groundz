@@ -178,7 +178,9 @@ Only after that: drop the v1 routines, retire or rename the old column, and reti
 ## Technical notes
 
 Separate migrations per family, in this order: trending v2 (column + check constraint + pure scorer +
-candidate selector + orchestrator), influence v2 (table with GRANTs and RLS + routine), similarity
-v2, reputation v2, who-to-follow v2, personalised v2. All are additive: no `DROP`, no `DELETE`, no
-in-place recompute of a column an existing consumer reads. `roadmap.md` gains the new 4.2B.2 /
-4.2B.3 / 4.2B.4 breakdown and the `backgroundService` follow-up as its own task.
+candidate selector + orchestrator), influence v2 (table with GRANTs and RLS + pure calculator + refresh
+orchestrator), similarity v2, reputation v2, who-to-follow v2, personalised v2. All are additive against
+v1: no `DROP`, no deletion or recompute of anything an existing consumer reads. (The influence
+reconciler's deletion of stale rows from the *new* v2 cache is by design, not a v1 modification.)
+`roadmap.md` gains the new 4.2B.2 / 4.2B.3 / 4.2B.4 breakdown and the `backgroundService` follow-up as
+its own task.
