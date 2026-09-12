@@ -245,8 +245,9 @@ Integer, [0, 1000], base 100.
 
 - **Eligible contributions** (distinct records the author created, using the table-specific
   predicates in §0): published canonical reviews (one per item), published non-deleted posts,
-  created non-deleted entities. Draft, private and deleted records do not count. Old standalone
-  records are excluded. **+5 each.**
+  records are excluded. **+5 each.** Implemented predicate detail (4.2B.2): reviews additionally
+  require `entity_id IS NOT NULL` and public visibility; posts require public visibility; entities
+  require `created_by = user` and not deleted.
 - **Flag accuracy:** `helpful_flags_count × 3` from `user_reputation`.
 - **Quality bonus:** reserved, currently 0.
 - `final = clamp(100 + contributions + flag_accuracy, 0, 1000)` — the upper clamp is tested.
@@ -278,7 +279,8 @@ ranking.
 ## 6. Personalised items — `get_personalized_entities(user, limit)`
 
 **Candidate pool:** all non-deleted items, **excluding items the viewer has already reviewed or
-saved**.
+saved**. "Already reviewed" (clarified in 4.2B.2) means **any existing review record by the viewer
+for the item, drafts included** — an in-progress review means the item is already on their radar.
 
 Every term is null-safe and two-sided clamped, so [0, 1] is guaranteed rather than assumed:
 
