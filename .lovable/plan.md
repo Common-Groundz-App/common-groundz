@@ -61,21 +61,41 @@ Cap and input corrections:
 - **Anonymous views are capped in aggregate.** Null-viewer rows count at most
   `min(anon_rows, 2 × identified_capped_views + 50)` and are additionally deduped by
   `(session_id, item)` where a session is recorded. No unbounded input remains.
-- **Self activity is narrowed to self-engagement on one's own content**: an author's likes on their
-  own review or post, and their own views of it, give no credit. Whoever created the item's
-  database row is *not* treated as its owner — their reviews, posts and views count normally.
+- **Self activity is narrowed to what the data can actually express**: `entity_views` records
+  entity-page views only (`entity_id, user_id, session_id, interaction_type, created_at`) and
+  carries no review or post reference, so there is no "self view of a review" to exclude — entity
+  views count under the viewer/session caps for everyone, including people who have reviewed the
+  item. The exclusions that *are* implementable and frozen: a like on one's own review does not
+  count, a like on one's own post does not count. Whoever created the item's database row is **not**
+  treated as its owner; their reviews, posts, likes and views count normally. If per-review or
+  per-post view events are ever introduced, author self-view exclusion is added there, in a later
+  contract version.
 - Final score `(0.3·base_popularity_n + 0.4·velocity + 0.15·geo_n + 0.15·seasonal_n) × age_factor`,
-  with **two-sided clamps** so the [0, 1.2] range is actually guaranteed:
-  `base_popularity_n = clamp(popularity_score, 0, 1000) / 1000`,
-  `geo_n = clamp(geographic_boost, 0, 1)`, `seasonal_n = clamp(seasonal_boost, 0, 1)`,
-  each NULL → 0, `age_factor ∈ {1.0, 1.1, 1.2}` and never NULL. Sources are the existing
-  `entities.popularity_score`, `entities.geographic_boost`, `entities.seasonal_boost` columns
-  (both boosts currently default 0 and are unpopulated, so they contribute 0 until a later phase
-  defines them).
+  with **null-safe two-sided clamps** so the [0, 1.2] range is actually guaranteed:
+  `base_popularity_n = clamp(coalesce(popularity_score, 0), 0, 1000) / 1000`,
+  `geo_n = clamp(coalesce(geographic_boost, 0), 0, 1)`,
+  `seasonal_n = clamp(coalesce(seasonal_boost, 0), 0, 1)`,
+  `age_factor ∈ {1.0, 1.1, 1.2}` and never NULL.
+- **`popularity_score` provenance — audited, and the answer is clean**: `entities.popularity_score`
+  is NULL for all 353 rows and no migration or routine writes it, so no legacy standalone-record
+  value can leak into trending through it. The contract records this evidence and freezes
+  `base_popularity_n = 0` in practice until a later phase defines popularity from modern sources.
+  `geographic_boost` / `seasonal_boost` are likewise unpopulated (default 0) and contribute 0.
+- **Post-to-entity linkage is one frozen normalised relation**, used identically by trending
+  contributions, engagement attribution, influence categories and personalised activity:
+  `SELECT post_id, entity_id FROM post_entities UNION SELECT id, entity_id FROM posts WHERE
+  entity_id IS NOT NULL` — `UNION`, never `UNION ALL`, so a post linked both ways counts once.
+  Backfilling and retiring the legacy column is named as later cleanup, not part of 4.2B.
+- **Review eligibility uses the columns that exist.** `reviews` has no `is_deleted`: eligibility is
+  `status = 'published'` plus `visibility`. `posts` and `entities` do have `is_deleted = false` and
+  keep using it. The shared-rules section of v1 is corrected accordingly — this was a real defect
+  that would have made the 4.2B.2 migration fail.
 - **Candidate selection is defined explicitly**: items with any view, engagement, review, timeline
   update or entity-linked post in the last 24 h, union items whose stored score is non-zero (so
-  decay to 0 is recorded). Full-table scans are not used.
+  decay to 0 is recorded and recomputed until it reaches its true no-activity value). Full-table
+  scans are not used.
 - **Legacy transition**: stored pre-v2 trending scores are on the old unbounded scale. The 4.2B.2
+
   migration recomputes every stored score in the same transaction that installs the routine, and
   readers clamp defensively (`clamp(stored, 0, 1.2)`), so no old-scale value is ever consumed as a
   v2 normalised value.
