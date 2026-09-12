@@ -1,189 +1,433 @@
 {
-  "contractVersion": 1,
+  "contractVersion": 2,
   "contractDocument": "docs/verification/phase-4-2b-scoring-contract.md",
-  "notes": "Expected values are exact under the frozen formulas. Intermediates are included so a failure points at the step that broke, not just the total. Ratings are on the 1-5 ring scale.",
-  "scenarios": [
+  "status": "frozen for review; no routine implements these yet",
+  "notes": [
+    "Every scenario carries stable synthetic ids, explicit inputs, expected intermediates and an expected final value.",
+    "Ids are fixture-local labels, not database rows. 4.2B.2 materialises them as transaction-scoped fixtures.",
+    "Rounding: compare floats to 6 decimal places."
+  ],
+
+  "trending": [
     {
-      "id": "similarity_insufficient_overlap",
-      "signal": "similarity",
-      "input": { "shared_entities": 2, "ratings_a": [4, 2], "ratings_b": [4, 2] },
-      "expected": {
-        "shared_entities": 2,
-        "pearson_raw": null,
-        "overlap_confidence": null,
-        "final_similarity": null
-      },
-      "meaning": "Fewer than 3 shared entities yields NULL (insufficient evidence), never 0."
+      "id": "trend-normalised-maths",
+      "why": "components are normalised before weighting, so coefficients are real percentages",
+      "entity": { "id": "e-trend-1", "created_at_days_ago": 10, "popularity_score": null, "geographic_boost": null, "seasonal_boost": null },
+      "inputs": { "capped_views": 30, "capped_engagement": 5, "capped_contributions": 2 },
+      "expected_intermediates": { "views_n": 0.06, "engagement_n": 0.025, "contributions_n": 0.04, "velocity": 0.0455, "base_popularity_n": 0, "geo_n": 0, "seasonal_n": 0, "age_factor": 1.1 },
+      "expected_score": 0.02002
     },
     {
-      "id": "similarity_perfect_agreement_confidence_penalty",
-      "signal": "similarity",
-      "input": { "shared_entities": 4, "ratings_a": [5, 4, 2, 1], "ratings_b": [5, 4, 2, 1] },
-      "expected": {
-        "shared_entities": 4,
-        "pearson_raw": 1.0,
-        "pearson_mapped": 1.0,
-        "overlap_confidence": 0.8,
-        "final_similarity": 0.8
+      "id": "trend-contribution-cap-two",
+      "why": "per person per item: at most 1 review-side contribution plus 1 entity-linked post",
+      "entity": { "id": "e-trend-2", "created_at_days_ago": 400 },
+      "inputs": {
+        "person": "u-trend-a",
+        "reviews_in_window": ["r-1"],
+        "entity_linked_posts_in_window": ["p-1", "p-2", "p-3"],
+        "capped_views": 0,
+        "capped_engagement": 0
       },
-      "meaning": "Identical tastes with 4 shared items: Pearson 1.0, mapped 1.0, confidence 4/5, final 0.8."
+      "expected_intermediates": { "capped_contributions": 2, "contributions_n": 0.04, "velocity": 0.008, "age_factor": 1.0 },
+      "expected_score": 0.0032
     },
     {
-      "id": "similarity_zero_variance_uses_mean_difference",
-      "signal": "similarity",
-      "input": { "shared_entities": 5, "ratings_a": [3, 3, 3, 3, 3], "ratings_b": [4, 2, 4, 2, 3] },
-      "expected": {
-        "shared_entities": 5,
-        "pearson_raw": null,
-        "mean_abs_difference": 1.0,
-        "fallback_similarity": 0.75,
-        "overlap_confidence": 1.0,
-        "final_similarity": 0.75
+      "id": "trend-timeline-update-counts-once",
+      "why": "a qualifying timeline update re-trends the item, but review + update never count twice",
+      "entity": { "id": "e-trend-3", "created_at_days_ago": 400 },
+      "inputs": {
+        "person": "u-trend-b",
+        "reviews_in_window": [],
+        "review_outside_window": "r-old",
+        "qualifying_timeline_updates_in_window": ["ru-1", "ru-2"],
+        "entity_linked_posts_in_window": ["p-4"],
+        "capped_views": 0,
+        "capped_engagement": 0
       },
-      "meaning": "All-identical ratings on one side make Pearson undefined; fall back to 1 - mean|diff|/4 = 1 - 1/4 = 0.75, confidence 1.0 at 5 shared items."
+      "expected_intermediates": { "review_side_contribution": 1, "post_contribution": 1, "capped_contributions": 2, "contributions_n": 0.04, "velocity": 0.008 },
+      "expected_score": 0.0032
     },
     {
-      "id": "similarity_full_overlap_negative_correlation",
-      "signal": "similarity",
-      "input": { "shared_entities": 5, "ratings_a": [5, 4, 3, 2, 1], "ratings_b": [1, 2, 3, 4, 5] },
-      "expected": {
-        "shared_entities": 5,
-        "pearson_raw": -1.0,
-        "pearson_mapped": 0.0,
-        "overlap_confidence": 1.0,
-        "final_similarity": 0.0
-      },
-      "meaning": "Perfect disagreement maps to 0.0, which is a real value distinct from NULL."
+      "id": "trend-anonymous-view-aggregate-cap",
+      "why": "null-viewer rows cannot flood the input",
+      "entity": { "id": "e-trend-4", "created_at_days_ago": 400 },
+      "inputs": { "identified_capped_views": 10, "anonymous_rows_after_session_dedupe": 5000 },
+      "expected_intermediates": { "anonymous_cap": 70, "capped_views": 80, "views_n": 0.16, "velocity": 0.08 },
+      "expected_score": 0.032
     },
     {
-      "id": "trending_caps_bind_per_person",
-      "signal": "trending",
-      "input": {
-        "views_in_window": [ { "viewer": "u1", "count": 30 }, { "viewer": "u2", "count": 10 } ],
-        "contributions_in_window": [ { "person": "u1", "reviews": 3 } ],
-        "engagement_in_window": [ { "actor": "u3", "likes": 8 } ],
-        "base_popularity": 0, "geographic_boost": 0, "seasonal_boost": 0, "entity_age_days": 10
-      },
-      "expected": {
-        "capped_views": 30,
-        "capped_contributions": 2,
-        "capped_engagement": 5,
-        "velocity": 16.9,
-        "age_factor": 1.1,
-        "final_score": 7.436
-      },
-      "meaning": "Caps: views 20/viewer (20+10=30), contributions 2/person, engagement 5/actor. velocity = 0.5*30 + 0.3*5 + 0.2*2 = 16.9; score = 0.4*16.9 * 1.1 = 7.436."
+      "id": "trend-view-by-reviewer-counts",
+      "why": "entity_views has no review/post reference; there is no self-view to exclude",
+      "entity": { "id": "e-trend-5", "created_at_days_ago": 400 },
+      "inputs": { "viewer": "u-trend-c", "viewer_has_published_review_of_entity": true, "view_rows": 3 },
+      "expected_intermediates": { "capped_views": 3 },
+      "expected_note": "views count normally for reviewers of the item"
     },
     {
-      "id": "trending_no_activity_scores_zero",
-      "signal": "trending",
-      "input": { "views_in_window": [], "contributions_in_window": [], "engagement_in_window": [], "base_popularity": 0, "geographic_boost": 0, "seasonal_boost": 0, "entity_age_days": 100 },
-      "expected": {
-        "capped_views": 0, "capped_contributions": 0, "capped_engagement": 0,
-        "velocity": 0.0, "age_factor": 1.0, "final_score": 0.0
+      "id": "trend-self-like-excluded",
+      "why": "a like on one's own review or post gives no engagement credit",
+      "entity": { "id": "e-trend-6", "created_at_days_ago": 400 },
+      "inputs": {
+        "likes": [
+          { "actor": "u-author", "target": "r-own", "target_author": "u-author" },
+          { "actor": "u-author", "target": "p-own", "target_author": "u-author" },
+          { "actor": "u-other", "target": "r-own", "target_author": "u-author" },
+          { "actor": "u-other", "target": "p-own", "target_author": "u-author" }
+        ]
       },
-      "meaning": "Sparse data is 0, not an error; the item simply does not trend."
+      "expected_intermediates": { "capped_engagement": 2 },
+      "expected_note": "only u-other's two likes count"
     },
     {
-      "id": "influence_sparse_user",
-      "signal": "influence",
-      "input": { "followers": 0, "canonical_reviews_in_category": 0, "avg_effective_rating": null, "distinct_items": 0, "avg_likes_per_contribution": 0 },
-      "expected": {
-        "reach_term": 0.0, "rating_quality_term": 0.0, "activity_term": 0.0, "engagement_term": 0.0,
-        "final_influence": 0.0
-      },
-      "meaning": "A brand-new user scores 0 across all four terms; no error, clamped to [0,1]."
+      "id": "trend-engagement-cap-per-actor-per-item",
+      "why": "cap scope is actor x item x window, not actor x content row",
+      "entity": { "id": "e-trend-7", "created_at_days_ago": 400 },
+      "inputs": { "actor": "u-trend-d", "likes_on_reviews_of_entity": 3, "likes_on_entity_linked_posts": 4 },
+      "expected_intermediates": { "raw_actor_likes": 7, "capped_engagement": 5 }
     },
     {
-      "id": "influence_negative_review_still_counts",
-      "signal": "influence",
-      "input": { "followers": 500, "canonical_reviews_in_category": 10, "avg_effective_rating": 2.0, "distinct_items": 10, "avg_likes_per_contribution": 25 },
-      "expected": {
-        "reach_term": 0.15,
-        "rating_quality_term": 0.12,
-        "activity_term": 0.02,
-        "engagement_term": 0.1,
-        "final_influence": 0.39
-      },
-      "meaning": "A user whose reviews average 2.0 (negative taste) still gets activity and engagement credit; rating quality reflects the 2/5 average, not positivity. 500/1000*0.3=0.15; 2/5*0.3=0.12; 10/100*0.2=0.02; 25/50*0.2=0.1; total 0.39."
+      "id": "trend-entity-creator-is-not-owner",
+      "why": "whoever created the entity row is an ordinary participant",
+      "entity": { "id": "e-trend-8", "created_by": "u-creator", "created_at_days_ago": 400 },
+      "inputs": { "person": "u-creator", "reviews_in_window": ["r-creator"], "view_rows": 2, "capped_engagement": 0 },
+      "expected_intermediates": { "capped_contributions": 1, "capped_views": 2 },
+      "expected_note": "creator contributions and views are included"
     },
     {
-      "id": "reputation_contributions_and_flags",
-      "signal": "reputation",
-      "input": {
-        "canonical_published_reviews": 4,
-        "duplicate_review_rows_same_item": 1,
-        "posts": 3,
-        "entities_created": 1,
-        "legacy_standalone_records": 5,
+      "id": "trend-null-and-negative-inputs-clamped",
+      "why": "two-sided null-safe clamps guarantee the [0, 1.2] range",
+      "entity": { "id": "e-trend-9", "created_at_days_ago": 400, "popularity_score": null, "geographic_boost": -5, "seasonal_boost": 3 },
+      "inputs": { "capped_views": 0, "capped_engagement": 0, "capped_contributions": 0 },
+      "expected_intermediates": { "base_popularity_n": 0, "geo_n": 0, "seasonal_n": 1.0, "velocity": 0, "age_factor": 1.0 },
+      "expected_score": 0.15
+    },
+    {
+      "id": "trend-legacy-stored-score-clamped",
+      "why": "pre-v2 stored values are on an unbounded scale and must never be consumed raw",
+      "inputs": { "stored_trending_score": 37.5 },
+      "expected_intermediates": { "clamped_stored": 1.2, "trending_n": 1.0 }
+    },
+    {
+      "id": "trend-post-double-linked-counts-once",
+      "why": "post_entities UNION posts.entity_id, never UNION ALL",
+      "entity": { "id": "e-trend-10", "created_at_days_ago": 400 },
+      "inputs": { "person": "u-trend-e", "post": "p-both", "in_post_entities": true, "posts_entity_id_matches": true },
+      "expected_intermediates": { "capped_contributions": 1, "contributions_n": 0.02, "velocity": 0.004 },
+      "expected_score": 0.004
+    },
+    {
+      "id": "trend-candidate-selection",
+      "why": "candidate set is activity in 24 h union non-zero stored score",
+      "candidates": [
+        { "entity": "e-cand-1", "activity_24h": true, "stored_score": 0, "expected_selected": true },
+        { "entity": "e-cand-2", "activity_24h": false, "stored_score": 0.4, "expected_selected": true, "expected_score_after_recompute": 0 },
+        { "entity": "e-cand-3", "activity_24h": false, "stored_score": 0, "expected_selected": false }
+      ]
+    },
+    {
+      "id": "trend-privacy-private-review-excluded",
+      "why": "private reviews never enter a global aggregate",
+      "entity": { "id": "e-trend-11", "created_at_days_ago": 400 },
+      "inputs": { "reviews_in_window": [{ "id": "r-private", "visibility": "private" }], "capped_views": 0, "capped_engagement": 0 },
+      "expected_intermediates": { "capped_contributions": 0, "velocity": 0 },
+      "expected_score": 0
+    },
+    {
+      "id": "trend-canonicalisation-before-scoring",
+      "why": "duplicate (user, entity) review rows collapse to the current one",
+      "entity": { "id": "e-trend-12", "created_at_days_ago": 400 },
+      "inputs": { "person": "u-trend-f", "review_rows_same_entity": ["r-old", "r-new"], "capped_views": 0, "capped_engagement": 0 },
+      "expected_intermediates": { "selected_review": "r-new", "capped_contributions": 1 }
+    },
+    {
+      "id": "trend-zero-activity-decays-to-zero",
+      "why": "sparse data returns 0, never an error",
+      "entity": { "id": "e-trend-13", "created_at_days_ago": 400, "popularity_score": null },
+      "inputs": { "capped_views": 0, "capped_engagement": 0, "capped_contributions": 0 },
+      "expected_score": 0
+    }
+  ],
+
+  "influence": [
+    {
+      "id": "infl-positivity-invariance",
+      "why": "identical reach/volume/engagement must score identically regardless of average rating",
+      "category": "product",
+      "cases": [
+        { "user": "u-harsh", "average_rating_of_credited_reviews": 1.0 },
+        { "user": "u-generous", "average_rating_of_credited_reviews": 5.0 }
+      ],
+      "shared_inputs": { "followers": 500, "credited_set_size": 10, "total_likes_on_credited_set": 250 },
+      "expected_intermediates": { "reach": 0.175, "volume": 0.035, "avg_likes": 25, "engagement": 0.15 },
+      "expected_score_both": 0.36
+    },
+    {
+      "id": "infl-ten-posts-one-item-credit-one",
+      "why": "anti-spam: earliest eligible post per (author, entity) only, for both terms",
+      "category": "product",
+      "user": "u-spammy",
+      "inputs": { "followers": 0, "entity": "e-infl-1", "posts_about_entity": 10, "earliest_post": "p-first", "likes_on_p_first": 4, "likes_on_other_nine_posts": 36, "canonical_review_of_entity": null },
+      "expected_intermediates": { "credited_set": ["p-first"], "credited_set_size": 1, "reach": 0, "volume": 0.0035, "credited_likes": 4, "avg_likes": 4, "engagement": 0.024 },
+      "expected_score": 0.0275
+    },
+    {
+      "id": "infl-multi-entity-post-attribution",
+      "why": "one post linked to three items of the same type yields three credited rows",
+      "category": "product",
+      "user": "u-infl-a",
+      "inputs": { "followers": 0, "post": "p-multi", "linked_entities": ["e-p1", "e-p2", "e-p3"], "linked_entity_types": ["product", "product", "product"], "likes_on_p_multi": 6 },
+      "expected_intermediates": { "credited_set_size": 3, "volume": 0.0105, "credited_likes": 6, "avg_likes": 2, "engagement": 0.012 },
+      "expected_score": 0.0225
+    },
+    {
+      "id": "infl-uncategorised-post-excluded",
+      "why": "a post with no linked entity contributes to no category",
+      "user": "u-infl-b",
+      "inputs": { "followers": 0, "posts": [{ "id": "p-unlinked", "linked_entities": [] }] },
+      "expected_intermediates": { "credited_set_size": 0, "volume": 0, "engagement": 0 },
+      "expected_score": 0
+    },
+    {
+      "id": "infl-self-like-excluded",
+      "why": "likes by the content's own author never count",
+      "category": "book",
+      "user": "u-infl-c",
+      "inputs": { "followers": 0, "credited_set": ["r-b1", "p-b1"], "likes": [{ "actor": "u-infl-c", "target": "r-b1" }, { "actor": "u-infl-c", "target": "p-b1" }, { "actor": "u-x", "target": "r-b1" }, { "actor": "u-y", "target": "r-b1" }, { "actor": "u-z", "target": "p-b1" }, { "actor": "u-w", "target": "p-b1" }] },
+      "expected_intermediates": { "credited_set_size": 2, "credited_likes": 4, "avg_likes": 2, "volume": 0.007, "engagement": 0.012 },
+      "expected_score": 0.019
+    },
+    {
+      "id": "infl-zero-like-rows-stay-in-denominator",
+      "why": "credited content with no likes dilutes the average, as intended",
+      "category": "movie",
+      "user": "u-infl-d",
+      "inputs": { "followers": 0, "credited_set": ["r-m1", "r-m2", "r-m3", "r-m4"], "credited_likes": 8 },
+      "expected_intermediates": { "credited_set_size": 4, "avg_likes": 2, "volume": 0.014, "engagement": 0.012 },
+      "expected_score": 0.026
+    },
+    {
+      "id": "infl-canonical-15-type-domain",
+      "why": "category domain is the canonical entity types, not the 5-bucket projection or legacy enum",
+      "user": "u-infl-e",
+      "inputs": { "post": "p-mixed", "linked_entity_types": ["product", "course", "experience"] },
+      "expected_categories_credited": ["product", "course", "experience"],
+      "expected_note": "legacy social_influence_scores rows on the old domain are deleted and recomputed, not translated"
+    },
+    {
+      "id": "infl-sparse-user",
+      "why": "new users score 0, never negative or NULL",
+      "user": "u-new",
+      "inputs": { "followers": 0, "credited_set_size": 0 },
+      "expected_score": 0
+    },
+    {
+      "id": "infl-saturation",
+      "why": "all three terms saturate, so the score is bounded at 1",
+      "user": "u-mega",
+      "inputs": { "followers": 50000, "credited_set_size": 4000, "total_likes_on_credited_set": 900000 },
+      "expected_intermediates": { "reach": 0.35, "volume": 0.35, "avg_likes_capped": 50, "engagement": 0.3 },
+      "expected_score": 1.0
+    }
+  ],
+
+  "personalized": [
+    {
+      "id": "pers-trending-does-not-overwhelm-interest",
+      "why": "normalised terms keep trending at 20% of the decision",
+      "items": [
+        { "id": "e-pers-a", "interest_score": 5, "followed_reviewers_30d": 0, "stored_trending": 0, "expected_intermediates": { "interest_n": 1, "social_n": 0, "trending_n": 0 }, "expected_score": 0.5 },
+        { "id": "e-pers-b", "interest_score": 0, "followed_reviewers_30d": 0, "stored_trending": 1.2, "expected_intermediates": { "interest_n": 0, "social_n": 0, "trending_n": 1 }, "expected_score": 0.2 }
+      ],
+      "expected_order": ["e-pers-a", "e-pers-b"]
+    },
+    {
+      "id": "pers-null-interest-is-not-null-score",
+      "why": "coalesce before clamp; a missing interest row must not null out the score",
+      "item": { "id": "e-pers-c", "interest_score": null, "followed_reviewers_30d": null, "stored_trending": 0.6 },
+      "expected_intermediates": { "interest_n": 0, "social_n": 0, "trending_n": 0.5 },
+      "expected_score": 0.1
+    },
+    {
+      "id": "pers-deterministic-tie-break",
+      "why": "score DESC, trending_n DESC, id ASC — pagination must not shuffle",
+      "items": [
+        { "id": "e-pers-y", "interest_score": 1, "followed_reviewers_30d": 0, "stored_trending": 0, "expected_intermediates": { "interest_n": 0.2, "trending_n": 0 }, "expected_score": 0.1 },
+        { "id": "e-pers-x", "interest_score": 0, "followed_reviewers_30d": 0, "stored_trending": 0.6, "expected_intermediates": { "interest_n": 0, "trending_n": 0.5 }, "expected_score": 0.1 }
+      ],
+      "expected_order": ["e-pers-x", "e-pers-y"]
+    },
+    {
+      "id": "pers-clamped-inputs",
+      "why": "out-of-range and negative stored values cannot break the [0, 1] output",
+      "item": { "id": "e-pers-d", "interest_score": 9, "followed_reviewers_30d": 12, "stored_trending": 5 },
+      "expected_intermediates": { "interest_n": 1, "social_n": 1, "trending_n": 1 },
+      "expected_score": 1.0
+    },
+    {
+      "id": "pers-reviewed-or-saved-excluded",
+      "why": "candidate pool excludes items the viewer already reviewed or saved",
+      "viewer": "u-pers-1",
+      "items": [
+        { "id": "e-pers-e", "viewer_reviewed": true, "expected_selected": false },
+        { "id": "e-pers-f", "viewer_saved": true, "expected_selected": false },
+        { "id": "e-pers-g", "expected_selected": true }
+      ]
+    },
+    {
+      "id": "pers-circle-review-counts-for-viewer",
+      "why": "viewer-specific surface may use Circle-visible reviews the viewer is authorised to see",
+      "viewer": "u-pers-2",
+      "item": { "id": "e-pers-h", "reviews": [{ "author": "u-followed", "visibility": "circle_only", "viewer_authorised": true }, { "author": "u-stranger", "visibility": "private" }] },
+      "expected_intermediates": { "followed_reviewers_30d": 1, "social_n": 0.2 },
+      "expected_note": "the private stranger review is excluded; the Circle review counts here but never in a global aggregate"
+    },
+    {
+      "id": "pers-sparse-user-trending-only",
+      "why": "no interests and no follow activity → trending-only ranking with the trending reason",
+      "viewer": "u-pers-3",
+      "item": { "id": "e-pers-i", "interest_score": null, "followed_reviewers_30d": 0, "stored_trending": 1.2 },
+      "expected_score": 0.2,
+      "expected_reason": "Trending now"
+    }
+  ],
+
+  "who_to_follow": [
+    {
+      "id": "wtf-features-computed-for-every-candidate",
+      "why": "sources discover candidates; scoring is global",
+      "viewer": "u-wtf-viewer",
+      "max_mutuals_across_candidates": 4,
+      "candidates": [
+        { "id": "u-wtf-2", "sources": ["fof"], "mutuals": 4, "activity_7d": 12, "has_username": true, "has_avatar": true, "expected_intermediates": { "mutual_component": 1.0, "activity_component": 1.0, "profile_quality": 1.0 }, "expected_score": 1.0, "expected_reason": "fof" },
+        { "id": "u-wtf-3", "sources": ["active"], "mutuals": 2, "activity_7d": 5, "has_username": true, "has_avatar": false, "expected_intermediates": { "mutual_component": 0.5, "activity_component": 0.5, "profile_quality": 0.5 }, "expected_score": 0.5, "expected_reason": "active" },
+        { "id": "u-wtf-5", "sources": ["fof", "active", "fresh"], "mutuals": 2, "activity_7d": 5, "has_username": true, "has_avatar": false, "expected_score": 0.5, "expected_reason": "fof" }
+      ],
+      "expected_order": ["u-wtf-2", "u-wtf-3", "u-wtf-5"],
+      "expected_order_rationale": "u-wtf-3 and u-wtf-5 tie at 0.5; id ASC decides"
+    },
+    {
+      "id": "wtf-exclusions",
+      "why": "self, already-followed and recently-shown candidates never appear",
+      "viewer": "u-wtf-viewer",
+      "candidates": [
+        { "id": "u-wtf-viewer", "reason_excluded": "self", "expected_selected": false },
+        { "id": "u-wtf-4", "already_followed": true, "expected_selected": false },
+        { "id": "u-wtf-6", "impression_days_ago": 3, "expected_selected": false },
+        { "id": "u-wtf-7", "impression_days_ago": 9, "expected_selected": true }
+      ]
+    },
+    {
+      "id": "wtf-activity-uses-public-published-reviews",
+      "why": "activity counts posts plus public published canonical reviews only",
+      "candidate": { "id": "u-wtf-8", "posts_7d": 2, "public_published_reviews_7d": 1, "private_reviews_7d": 4, "duplicate_review_rows_same_entity": 2 },
+      "expected_intermediates": { "activity_7d": 3, "activity_component": 0.3 }
+    }
+  ],
+
+  "reputation": [
+    {
+      "id": "rep-upper-clamp",
+      "why": "reputation is clamped at 1000",
+      "user": "u-rep-1",
+      "inputs": { "eligible_contributions": 500, "helpful_flags_count": 0 },
+      "expected_intermediates": { "base": 100, "contributions": 2500, "flag_accuracy": 0, "raw": 2600 },
+      "expected_score": 1000
+    },
+    {
+      "id": "rep-eligibility-predicates",
+      "why": "draft, private and deleted records do not count; reviews use status/visibility, posts use is_deleted",
+      "user": "u-rep-2",
+      "inputs": {
+        "reviews": [{ "id": "r-1", "status": "published", "visibility": "public" }, { "id": "r-2", "status": "draft" }, { "id": "r-3", "status": "published", "visibility": "private" }],
+        "posts": [{ "id": "p-1", "status": "published", "is_deleted": false }, { "id": "p-2", "status": "published", "is_deleted": true }],
+        "entities_created": [{ "id": "e-1", "is_deleted": false }],
         "helpful_flags_count": 2
       },
-      "expected": {
-        "eligible_contributions": 8,
-        "contribution_bonus": 40,
-        "flag_accuracy_bonus": 6,
-        "quality_bonus": 0,
-        "final_reputation": 146
-      },
-      "meaning": "Base 100 + (4 canonical reviews [duplicate row collapsed, legacy rows excluded] + 3 posts + 1 entity)*5 + 2*3 = 146."
+      "expected_intermediates": { "eligible_contributions": 3, "contributions": 15, "flag_accuracy": 6 },
+      "expected_score": 121
     },
     {
-      "id": "reputation_negative_review_not_penalised",
-      "signal": "reputation",
-      "input": { "canonical_published_reviews": 2, "ratings": [1, 1], "posts": 0, "entities_created": 0, "helpful_flags_count": 0 },
-      "expected": { "eligible_contributions": 2, "contribution_bonus": 10, "final_reputation": 110 },
-      "meaning": "Two 1-ring reviews add the same +10 as any two reviews; rating value plays no part."
+      "id": "rep-negative-reviews-count-equally",
+      "why": "rating value plays no part in reputation",
+      "cases": [
+        { "user": "u-rep-3", "eligible_contributions": 4, "average_rating": 1.0, "expected_score": 120 },
+        { "user": "u-rep-4", "eligible_contributions": 4, "average_rating": 5.0, "expected_score": 120 }
+      ]
     },
     {
-      "id": "who_to_follow_score_and_exclusions",
-      "signal": "who_to_follow",
-      "input": {
-        "viewer": "u1",
-        "candidates": [
-          { "id": "u2", "source": "fof", "mutuals": 4, "activity_7d": 0, "has_username": true, "has_avatar": true },
-          { "id": "u3", "source": "active", "mutuals": 0, "activity_7d": 15, "has_username": true, "has_avatar": false },
-          { "id": "u4", "source": "fof", "mutuals": 2, "activity_7d": 0, "has_username": true, "has_avatar": true, "already_followed": true }
-        ]
-      },
-      "expected": {
-        "excluded": ["u4", "u1"],
-        "max_mutuals": 4,
-        "scores": [
-          { "id": "u2", "mutual_component": 1.0, "activity_component": 0.0, "profile_quality": 1.0, "score": 0.7 },
-          { "id": "u3", "mutual_component": 0.0, "activity_component": 1.0, "profile_quality": 0.5, "score": 0.35 }
-        ],
-        "order": ["u2", "u3"]
-      },
-      "meaning": "u4 excluded (already followed), viewer excluded. u2: 0.6*1 + 0.3*0 + 0.1*1 = 0.7. u3: activity capped at 10 then /10 = 1.0; 0.6*0 + 0.3*1 + 0.1*0.5 = 0.35."
+      "id": "rep-canonical-one-review-per-item",
+      "why": "duplicate review rows for one item count once",
+      "user": "u-rep-5",
+      "inputs": { "review_rows": [{ "id": "r-a", "entity": "e-z" }, { "id": "r-b", "entity": "e-z" }], "helpful_flags_count": 0 },
+      "expected_intermediates": { "eligible_contributions": 1, "contributions": 5 },
+      "expected_score": 105
+    }
+  ],
+
+  "similarity": [
+    {
+      "id": "sim-insufficient-overlap-is-null",
+      "why": "0 must stay distinguishable from 'no evidence'",
+      "inputs": { "shared_entities": 2 },
+      "expected_result": null
     },
     {
-      "id": "personalized_excludes_reviewed_and_saved",
-      "signal": "personalized",
-      "input": {
-        "viewer": "u1",
-        "viewer_interest_score_for_type": 2.0,
-        "items": [
-          { "id": "e1", "already_reviewed_by_viewer": true, "trending_score": 50 },
-          { "id": "e2", "saved_by_viewer": true, "trending_score": 50 },
-          { "id": "e3", "follow_activity_distinct_people": 7, "trending_score": 10, "matches_interest_type": true }
-        ]
-      },
-      "expected": {
-        "excluded": ["e1", "e2"],
-        "scores": [
-          { "id": "e3", "interest_term": 2.0, "follow_activity_capped_people": 5, "follow_activity_term": 0.5, "trending_term": 2.0, "personalization_score": 4.5, "reason": "Based on your interests" }
-        ]
-      },
-      "meaning": "Already-reviewed and saved items never surface. Follow activity counts distinct people, capped at 5: 2.0 + 0.1*5 + 0.2*10 = 4.5."
+      "id": "sim-both-constant-same-level",
+      "why": "zero-variance fallback: identical constant ratings are maximally close",
+      "inputs": { "shared_entities": 5, "ratings_a": [5, 5, 5, 5, 5], "ratings_b": [5, 5, 5, 5, 5] },
+      "expected_intermediates": { "pearson": "undefined", "mean_abs_diff": 0, "adjusted_similarity": 1.0, "confidence": 1.0 },
+      "expected_result": 1.0
     },
     {
-      "id": "personalized_sparse_user_falls_back_to_trending",
-      "signal": "personalized",
-      "input": { "viewer": "u_new", "viewer_interest_score_for_type": 0, "items": [ { "id": "e9", "follow_activity_distinct_people": 0, "trending_score": 20 } ] },
-      "expected": {
-        "scores": [ { "id": "e9", "personalization_score": 4.0, "reason": "Trending now" } ]
-      },
-      "meaning": "No interests, no follow activity: score is purely 0.2*trending, reason 'Trending now'."
+      "id": "sim-both-constant-opposite-levels",
+      "why": "zero-variance fallback must not report agreement between 5s and 1s",
+      "inputs": { "shared_entities": 5, "ratings_a": [5, 5, 5, 5, 5], "ratings_b": [1, 1, 1, 1, 1] },
+      "expected_intermediates": { "mean_abs_diff": 4, "adjusted_similarity": 0.0, "confidence": 1.0 },
+      "expected_result": 0.0
+    },
+    {
+      "id": "sim-both-constant-different-levels",
+      "why": "intermediate rating-level proximity",
+      "inputs": { "shared_entities": 5, "ratings_a": [4, 4, 4, 4, 4], "ratings_b": [2, 2, 2, 2, 2] },
+      "expected_intermediates": { "mean_abs_diff": 2, "adjusted_similarity": 0.5, "confidence": 1.0 },
+      "expected_result": 0.5
+    },
+    {
+      "id": "sim-overlap-confidence",
+      "why": "3-4 shared entities are discounted by shared/5",
+      "inputs": { "shared_entities": 3, "adjusted_similarity": 0.9 },
+      "expected_intermediates": { "confidence": 0.6 },
+      "expected_result": 0.54
+    },
+    {
+      "id": "sim-null-preservation-for-callers",
+      "why": "4.2B.3 callers must not coerce NULL to 0",
+      "inputs": { "routine_result": null },
+      "expected_caller_behaviour": "surface as 'not enough shared history'; `result || 0` and `result ?? 0` are forbidden"
+    },
+    {
+      "id": "sim-public-only-population",
+      "why": "similarity surfaces globally, so Circle and private reviews are excluded",
+      "inputs": { "shared_public_entities": 3, "shared_circle_only_entities": 4 },
+      "expected_intermediates": { "shared_entities_used": 3 }
+    }
+  ],
+
+  "cross_cutting": [
+    {
+      "id": "xcut-private-never-global",
+      "why": "private reviews are absent from trending, influence, reputation and similarity",
+      "inputs": { "review": { "id": "r-secret", "visibility": "private", "status": "published" } },
+      "expected": { "trending_contribution": 0, "influence_credited": false, "reputation_credited": false, "similarity_population": false }
+    },
+    {
+      "id": "xcut-no-legacy-standalone-records",
+      "why": "Phase 4.2B disconnects the old standalone records from app intelligence",
+      "expected": "no scoring routine reads the legacy standalone recommendations table; popularity_score is NULL for every entity and is not derived from it"
+    },
+    {
+      "id": "xcut-sparse-data-is-not-an-error",
+      "expected": { "trending": 0, "influence": 0, "reputation": 100, "personalized": "empty or trending-only list", "who_to_follow": "empty list", "similarity": null }
     }
   ]
 }
