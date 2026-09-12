@@ -53,8 +53,16 @@ post↔entity linkage via `post_entities UNION posts.entity_id`; boosts contribu
 |---|---|---|
 | `get_personalized_entities_v2`, `get_who_to_follow_v2` | `SECURITY DEFINER`, but the body **rejects any call where the requested user is not `auth.uid()`** unless the caller is `service_role` | `authenticated`, `service_role` |
 | `calculate_user_similarity_v2` | `SECURITY DEFINER`, public inputs only (public published canonical reviews) | `authenticated`, `service_role` |
-| `calculate_user_reputation_v2`, `calculate_entity_trending_score_v2`, `calculate_social_influence_score_v2` | `SECURITY DEFINER`, pure — return a value, write nothing | `authenticated`, `service_role` |
+| `calculate_entity_trending_score_v2` | `SECURITY DEFINER`, pure, public inputs | `authenticated`, `service_role` |
+| `calculate_user_reputation_v2`, `calculate_social_influence_score_v2` | `SECURITY DEFINER`, pure — return a value, write nothing | **`service_role` only** unless an input audit proves every input is globally public |
 | `select_trending_candidates_v2`, `update_all_trending_scores_v2`, `refresh_social_influence_scores_v2` | `SECURITY DEFINER`, write derived data | **`service_role` only** |
+
+**Reputation and influence calculators default to service-role-only.** Before granting arbitrary
+authenticated execution, each input is audited: if any input is non-public (unpublished or non-public
+reviews and posts, flags, internal counters), the calculator stays service-role-only — clients read the
+stored derived score, not the calculator. Only a proven all-public input set may be opened to
+`authenticated`, and even then a self-or-service-role check applies. The audit result is recorded in the
+verification document.
 
 **Role detection is frozen**: the `service_role` branch is decided from the request JWT role
 (`auth.role() = 'service_role'` / the JWT `role` claim), **never** from `current_user`, `session_user`
@@ -62,35 +70,58 @@ or function ownership — inside a definer function those name the owner, not th
 fixtures cover all four cases: normal user asking for self (allowed), normal user asking for another
 user (denied), anonymous (denied), `service_role` asking for an arbitrary user (allowed).
 
-`social_influence_scores_v2` gets GRANTs plus RLS in the same migration that creates it: read for
-`authenticated`, writes `service_role` only. Every routine sets an explicit `search_path`.
+`entities.trending_score_v2` is created **`NOT NULL DEFAULT 0`** with
+`CHECK (trending_score_v2 >= 0 AND trending_score_v2 <= 1.2)`. The contract already defines "no
+activity, no boosts" as 0, so an entity created after the bootstrap is correct by construction rather
+than left NULL until some future refresh happens to pick it up.
 
-**The v2 influence cache gets a real producer.** Today the only producer is a browser client
-(`socialIntelligenceService` calls the routine and upserts the row itself), which cannot write a
-service-role table — so without this the new table would silently stay empty. 4.2B.2 adds a
-`refresh-social-influence-v2` Edge Function (service role) that calls the refresh orchestrator, plus a
-one-time backfill for users with eligible contributions. 4.2B.3 puts it on a schedule and switches
-`socialIntelligenceService` to read-only against the v2 table; the client never writes it again.
+`social_influence_scores_v2` is created with `UNIQUE (user_id, canonical_type)`, the type column
+constrained to the canonical 15 values, the score constrained to [0, 1], and GRANTs plus RLS in the
+same migration: read for `authenticated`, writes `service_role` only. Every routine sets an explicit
+`search_path`.
+
+**The v2 influence cache gets a real producer, and a defined row lifecycle.** Today the only producer
+is a browser client (`socialIntelligenceService` calls the routine and upserts the row itself), which
+cannot write a service-role table — so without this the new table would silently stay empty. 4.2B.2
+adds a `refresh-social-influence-v2` Edge Function (service role, **deployed but not scheduled**)
+calling the refresh orchestrator, plus a one-time backfill run through a controlled administrative
+path, never the browser. 4.2B.3 schedules it and makes the client read-only.
+
+The row lifecycle is frozen in the contract rather than improvised in SQL:
+
+- **Which pairs exist:** a row exists for `(user, canonical_type)` only where the user has at least one
+  credited contribution in that type. Reach alone creates no row — reach is a multiplier on category
+  contribution, and a user with followers but no contributions has no category to attribute, so they
+  simply have no rows (not 15 zero rows).
+- **Refresh is reconciling, not append-only:** `refresh_social_influence_scores_v2(user)` recomputes the
+  user's full eligible pair set, upserts those pairs, and **deletes rows for pairs no longer eligible**
+  — so unpublishing, deleting, unlinking or re-categorising a credited review or post removes stale
+  influence instead of freezing it forever.
+- **Candidate population for a run:** users with eligible contributions **union** users who already
+  have rows in `social_influence_scores_v2`. The second half is what lets a user whose contributions
+  disappeared get their stale rows cleared.
 
 ## Verification before 4.2B.2 is called done
 
 - Run every fixture group as SQL against transaction-scoped fixture rows, rolled back — no
   production row created, updated or deleted — and record actual vs expected intermediates.
-- **Bootstrap once for every non-deleted entity**, not just the candidate set, so no row is left NULL
-  merely for lack of recent activity. `select_trending_candidates_v2()` is for ongoing incremental
-  refresh only. Then prove coverage explicitly: **non-deleted entities with NULL `trending_score_v2`
-  after bootstrap = 0**, every value inside [0, 1.2], and both scales shown side by side.
-- Influence backfill: verify every stored `social_influence_scores_v2` category is one of the 15
-  canonical types (measured, not inferred from the signature) and every score is inside [0, 1].
-- Authorization fixtures: the four caller cases above, for both viewer-scoped routines and the
-  service-role writers.
+- **Bootstrap once for every non-deleted entity**, not just the candidate set.
+  `select_trending_candidates_v2()` is for ongoing incremental refresh only. Then prove coverage:
+  every value inside [0, 1.2], the `NOT NULL` default in place, and both scales shown side by side.
+- Influence backfill and reconciliation: verify every stored category is one of the 15 canonical types
+  (measured, not inferred from the signature), every score inside [0, 1], no duplicate pair, and a
+  fixture proving a de-eligibilised contribution removes its row.
+- Authorization fixtures: the four caller cases above, for the viewer-scoped routines, the
+  service-role-only calculators, and the writers.
 - Prove no v2 routine reads the legacy records table.
 - Regenerate the Supabase types file so the new column, table and routines are typed.
 - Full test suite, typecheck, production build; write
-  `docs/verification/phase-4-2b2-scoring-routines.md`; mark 4.2B.1 and 4.2B.2 in `roadmap.md`.
+  `docs/verification/phase-4-2b2-scoring-routines.md`; mark 4.2B.1 and 4.2B.2 in `roadmap.md`, and add
+  the 4.2B.3 tasks (consumer cutover, scheduling the influence function, removing the browser
+  `setInterval` updater) as their own entries.
 
 Hard stop for review after that. No consumer changes and no old-threshold edits in this phase; the
-new Edge Function exists but nothing user-facing reads its output yet.
+new Edge Function exists, unscheduled, and nothing user-facing reads its output yet.
 
 ## 4.2B.3 — switch consumers, one complete pipeline at a time
 
