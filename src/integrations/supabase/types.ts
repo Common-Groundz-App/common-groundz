@@ -3639,6 +3639,53 @@ export type Database = {
         }
         Relationships: []
       }
+      social_influence_scores_v2: {
+        Row: {
+          canonical_type: Database["public"]["Enums"]["entity_type"]
+          contribution_count: number
+          created_at: string
+          engagement_avg: number
+          follower_count: number
+          id: string
+          influence_score: number
+          last_calculated: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          canonical_type: Database["public"]["Enums"]["entity_type"]
+          contribution_count?: number
+          created_at?: string
+          engagement_avg?: number
+          follower_count?: number
+          id?: string
+          influence_score?: number
+          last_calculated?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          canonical_type?: Database["public"]["Enums"]["entity_type"]
+          contribution_count?: number
+          created_at?: string
+          engagement_avg?: number
+          follower_count?: number
+          id?: string
+          influence_score?: number
+          last_calculated?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_influence_scores_v2_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suggestion_impressions: {
         Row: {
           created_at: string
@@ -4372,8 +4419,26 @@ export type Database = {
         Args: { p_entity_id: string }
         Returns: number
       }
+      calculate_social_influence_components_v2: {
+        Args: {
+          p_canonical_type: Database["public"]["Enums"]["entity_type"]
+          p_user_id: string
+        }
+        Returns: {
+          contribution_count: number
+          follower_count: number
+          total_likes: number
+        }[]
+      }
       calculate_social_influence_score: {
         Args: { p_category: string; p_user_id: string }
+        Returns: number
+      }
+      calculate_social_influence_score_v2: {
+        Args: {
+          p_canonical_type: Database["public"]["Enums"]["entity_type"]
+          p_user_id: string
+        }
         Returns: number
       }
       calculate_trending_hashtags:
@@ -5250,6 +5315,7 @@ export type Database = {
         Args: { p_review_id: string }
         Returns: undefined
       }
+      refresh_social_influence_scores_v2: { Args: never; Returns: number }
       repair_hashtag_relationships: { Args: never; Returns: Json }
       resolve_review_recommendation: {
         Args: {
