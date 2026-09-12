@@ -156,7 +156,24 @@ as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
 - sparse data returns 0/NULL as specified and is never an error
 
 
-## 6. Two additions of my own
+## 6. Deployment cutover — no mixed-version window
+
+Frozen in the contract so 4.2B.2 and 4.2B.3 cannot expose half-migrated semantics:
+
+- **Trending**: the routine install and the full recompute of every stored score happen in one
+  transaction, and every reader — old or new — clamps `stored` to [0, 1.2]. Because all boost inputs
+  are 0 today, old-scale values only ever existed as velocity output; the recompute removes them
+  before any normalised reader runs.
+- **Influence**: `social_influence_scores` rows on the legacy category domain are deleted in the same
+  transaction that installs the routine, then recomputed on canonical types. No stale row survives to
+  be mixed with new ones.
+- **Similarity**: NULL means "no evidence". 4.2B.3 migrates the routine and every caller as one unit;
+  `result || 0` and `result ?? 0` are forbidden and checked for before that step is called done.
+- **Boosts stay frozen at 0**: `geographic_boost` and `seasonal_boost` remain unwritten until a later
+  contract version defines them, so activity velocity — not dormant inputs — drives trending today.
+  Populating them requires another contract review, because they would otherwise be 30% of the score.
+
+## 7. Two additions of my own
 
 - **Saturation constants are named and reviewable.** Every `min(x, K)` constant (500 views, 200
   engagement, 50 contributions, 1000 followers, 100 items, 50 likes, 1000 popularity) is listed in
@@ -168,8 +185,8 @@ as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
   `reviews.is_deleted` defect is exactly what that check catches, and the contract will carry a
   short "fields this contract relies on" table so the next review can confirm it at a glance.
 
-
 ## Technical notes
+
 
 - Two files change: `docs/verification/phase-4-2b-scoring-contract.md` and
   `docs/verification/phase-4-2b-scoring-fixtures.json`; `contractVersion` and `contractDocument`
