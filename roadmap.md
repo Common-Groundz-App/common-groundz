@@ -172,11 +172,11 @@ Boundary rule (three separate concepts, never conflated):
 - [x] 4.2B.1 scoring contract + machine-readable fixtures (docs only); contract v2 and 48 fixtures
       approved and frozen. Evidence: `docs/verification/phase-4-2b-scoring-contract.md`,
       `docs/verification/phase-4-2b-scoring-fixtures.json`
-- [ ] 4.2B.2 additive v2 scoring build: `trending_score_v2` column + pure scorer + candidate
+- [x] 4.2B.2 additive v2 scoring build: `trending_score_v2` column + pure scorer + candidate
       selector + orchestrator; `social_influence_scores_v2` + pure calculator + reconciling refresh
       orchestrator; similarity/reputation/who-to-follow/personalised v2 routines; secured unscheduled
       `refresh-social-influence-v2` Edge Function; one-time trending + influence bootstrap; no v1 or
-      consumer changes
+      consumer changes. Evidence: `docs/verification/phase-4-2b-2-implementation-record.md`
 - [ ] 4.2B.3 consumer cutover: switch each pipeline atomically to v2 (trending thresholds rescaled,
       similarity NULL semantics, influence read-only v2 table), schedule the influence function,
       remove the browser `setInterval` updater in `backgroundService.ts`
