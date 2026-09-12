@@ -1,0 +1,189 @@
+{
+  "contractVersion": 1,
+  "contractDocument": "docs/verification/phase-4-2b-scoring-contract.md",
+  "notes": "Expected values are exact under the frozen formulas. Intermediates are included so a failure points at the step that broke, not just the total. Ratings are on the 1-5 ring scale.",
+  "scenarios": [
+    {
+      "id": "similarity_insufficient_overlap",
+      "signal": "similarity",
+      "input": { "shared_entities": 2, "ratings_a": [4, 2], "ratings_b": [4, 2] },
+      "expected": {
+        "shared_entities": 2,
+        "pearson_raw": null,
+        "overlap_confidence": null,
+        "final_similarity": null
+      },
+      "meaning": "Fewer than 3 shared entities yields NULL (insufficient evidence), never 0."
+    },
+    {
+      "id": "similarity_perfect_agreement_confidence_penalty",
+      "signal": "similarity",
+      "input": { "shared_entities": 4, "ratings_a": [5, 4, 2, 1], "ratings_b": [5, 4, 2, 1] },
+      "expected": {
+        "shared_entities": 4,
+        "pearson_raw": 1.0,
+        "pearson_mapped": 1.0,
+        "overlap_confidence": 0.8,
+        "final_similarity": 0.8
+      },
+      "meaning": "Identical tastes with 4 shared items: Pearson 1.0, mapped 1.0, confidence 4/5, final 0.8."
+    },
+    {
+      "id": "similarity_zero_variance_uses_mean_difference",
+      "signal": "similarity",
+      "input": { "shared_entities": 5, "ratings_a": [3, 3, 3, 3, 3], "ratings_b": [4, 2, 4, 2, 3] },
+      "expected": {
+        "shared_entities": 5,
+        "pearson_raw": null,
+        "mean_abs_difference": 1.0,
+        "fallback_similarity": 0.75,
+        "overlap_confidence": 1.0,
+        "final_similarity": 0.75
+      },
+      "meaning": "All-identical ratings on one side make Pearson undefined; fall back to 1 - mean|diff|/4 = 1 - 1/4 = 0.75, confidence 1.0 at 5 shared items."
+    },
+    {
+      "id": "similarity_full_overlap_negative_correlation",
+      "signal": "similarity",
+      "input": { "shared_entities": 5, "ratings_a": [5, 4, 3, 2, 1], "ratings_b": [1, 2, 3, 4, 5] },
+      "expected": {
+        "shared_entities": 5,
+        "pearson_raw": -1.0,
+        "pearson_mapped": 0.0,
+        "overlap_confidence": 1.0,
+        "final_similarity": 0.0
+      },
+      "meaning": "Perfect disagreement maps to 0.0, which is a real value distinct from NULL."
+    },
+    {
+      "id": "trending_caps_bind_per_person",
+      "signal": "trending",
+      "input": {
+        "views_in_window": [ { "viewer": "u1", "count": 30 }, { "viewer": "u2", "count": 10 } ],
+        "contributions_in_window": [ { "person": "u1", "reviews": 3 } ],
+        "engagement_in_window": [ { "actor": "u3", "likes": 8 } ],
+        "base_popularity": 0, "geographic_boost": 0, "seasonal_boost": 0, "entity_age_days": 10
+      },
+      "expected": {
+        "capped_views": 30,
+        "capped_contributions": 2,
+        "capped_engagement": 5,
+        "velocity": 16.9,
+        "age_factor": 1.1,
+        "final_score": 7.436
+      },
+      "meaning": "Caps: views 20/viewer (20+10=30), contributions 2/person, engagement 5/actor. velocity = 0.5*30 + 0.3*5 + 0.2*2 = 16.9; score = 0.4*16.9 * 1.1 = 7.436."
+    },
+    {
+      "id": "trending_no_activity_scores_zero",
+      "signal": "trending",
+      "input": { "views_in_window": [], "contributions_in_window": [], "engagement_in_window": [], "base_popularity": 0, "geographic_boost": 0, "seasonal_boost": 0, "entity_age_days": 100 },
+      "expected": {
+        "capped_views": 0, "capped_contributions": 0, "capped_engagement": 0,
+        "velocity": 0.0, "age_factor": 1.0, "final_score": 0.0
+      },
+      "meaning": "Sparse data is 0, not an error; the item simply does not trend."
+    },
+    {
+      "id": "influence_sparse_user",
+      "signal": "influence",
+      "input": { "followers": 0, "canonical_reviews_in_category": 0, "avg_effective_rating": null, "distinct_items": 0, "avg_likes_per_contribution": 0 },
+      "expected": {
+        "reach_term": 0.0, "rating_quality_term": 0.0, "activity_term": 0.0, "engagement_term": 0.0,
+        "final_influence": 0.0
+      },
+      "meaning": "A brand-new user scores 0 across all four terms; no error, clamped to [0,1]."
+    },
+    {
+      "id": "influence_negative_review_still_counts",
+      "signal": "influence",
+      "input": { "followers": 500, "canonical_reviews_in_category": 10, "avg_effective_rating": 2.0, "distinct_items": 10, "avg_likes_per_contribution": 25 },
+      "expected": {
+        "reach_term": 0.15,
+        "rating_quality_term": 0.12,
+        "activity_term": 0.02,
+        "engagement_term": 0.1,
+        "final_influence": 0.39
+      },
+      "meaning": "A user whose reviews average 2.0 (negative taste) still gets activity and engagement credit; rating quality reflects the 2/5 average, not positivity. 500/1000*0.3=0.15; 2/5*0.3=0.12; 10/100*0.2=0.02; 25/50*0.2=0.1; total 0.39."
+    },
+    {
+      "id": "reputation_contributions_and_flags",
+      "signal": "reputation",
+      "input": {
+        "canonical_published_reviews": 4,
+        "duplicate_review_rows_same_item": 1,
+        "posts": 3,
+        "entities_created": 1,
+        "legacy_standalone_records": 5,
+        "helpful_flags_count": 2
+      },
+      "expected": {
+        "eligible_contributions": 8,
+        "contribution_bonus": 40,
+        "flag_accuracy_bonus": 6,
+        "quality_bonus": 0,
+        "final_reputation": 146
+      },
+      "meaning": "Base 100 + (4 canonical reviews [duplicate row collapsed, legacy rows excluded] + 3 posts + 1 entity)*5 + 2*3 = 146."
+    },
+    {
+      "id": "reputation_negative_review_not_penalised",
+      "signal": "reputation",
+      "input": { "canonical_published_reviews": 2, "ratings": [1, 1], "posts": 0, "entities_created": 0, "helpful_flags_count": 0 },
+      "expected": { "eligible_contributions": 2, "contribution_bonus": 10, "final_reputation": 110 },
+      "meaning": "Two 1-ring reviews add the same +10 as any two reviews; rating value plays no part."
+    },
+    {
+      "id": "who_to_follow_score_and_exclusions",
+      "signal": "who_to_follow",
+      "input": {
+        "viewer": "u1",
+        "candidates": [
+          { "id": "u2", "source": "fof", "mutuals": 4, "activity_7d": 0, "has_username": true, "has_avatar": true },
+          { "id": "u3", "source": "active", "mutuals": 0, "activity_7d": 15, "has_username": true, "has_avatar": false },
+          { "id": "u4", "source": "fof", "mutuals": 2, "activity_7d": 0, "has_username": true, "has_avatar": true, "already_followed": true }
+        ]
+      },
+      "expected": {
+        "excluded": ["u4", "u1"],
+        "max_mutuals": 4,
+        "scores": [
+          { "id": "u2", "mutual_component": 1.0, "activity_component": 0.0, "profile_quality": 1.0, "score": 0.7 },
+          { "id": "u3", "mutual_component": 0.0, "activity_component": 1.0, "profile_quality": 0.5, "score": 0.35 }
+        ],
+        "order": ["u2", "u3"]
+      },
+      "meaning": "u4 excluded (already followed), viewer excluded. u2: 0.6*1 + 0.3*0 + 0.1*1 = 0.7. u3: activity capped at 10 then /10 = 1.0; 0.6*0 + 0.3*1 + 0.1*0.5 = 0.35."
+    },
+    {
+      "id": "personalized_excludes_reviewed_and_saved",
+      "signal": "personalized",
+      "input": {
+        "viewer": "u1",
+        "viewer_interest_score_for_type": 2.0,
+        "items": [
+          { "id": "e1", "already_reviewed_by_viewer": true, "trending_score": 50 },
+          { "id": "e2", "saved_by_viewer": true, "trending_score": 50 },
+          { "id": "e3", "follow_activity_distinct_people": 7, "trending_score": 10, "matches_interest_type": true }
+        ]
+      },
+      "expected": {
+        "excluded": ["e1", "e2"],
+        "scores": [
+          { "id": "e3", "interest_term": 2.0, "follow_activity_capped_people": 5, "follow_activity_term": 0.5, "trending_term": 2.0, "personalization_score": 4.5, "reason": "Based on your interests" }
+        ]
+      },
+      "meaning": "Already-reviewed and saved items never surface. Follow activity counts distinct people, capped at 5: 2.0 + 0.1*5 + 0.2*10 = 4.5."
+    },
+    {
+      "id": "personalized_sparse_user_falls_back_to_trending",
+      "signal": "personalized",
+      "input": { "viewer": "u_new", "viewer_interest_score_for_type": 0, "items": [ { "id": "e9", "follow_activity_distinct_people": 0, "trending_score": 20 } ] },
+      "expected": {
+        "scores": [ { "id": "e9", "personalization_score": 4.0, "reason": "Trending now" } ]
+      },
+      "meaning": "No interests, no follow activity: score is purely 0.2*trending, reason 'Trending now'."
+    }
+  ]
+}
