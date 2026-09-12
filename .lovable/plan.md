@@ -47,17 +47,33 @@ Rules for every v2 routine: legacy records table never read; `reviews` eligibili
 post↔entity linkage via `post_entities UNION posts.entity_id`; boosts contribute 0;
 `-- scoring contract v2` comment in each body. Nothing is dropped, deleted or recomputed in place.
 
+**Security contract, frozen per routine** (not left to implementation):
+
+| Routine | Identity | Access |
+|---|---|---|
+| `get_personalized_entities_v2`, `get_who_to_follow_v2` | `SECURITY DEFINER`, but the body **rejects any call where the requested user is not `auth.uid()`** unless the caller is `service_role` | `authenticated`, `service_role` |
+| `calculate_user_similarity_v2` | `SECURITY DEFINER`, public inputs only (public published canonical reviews) | `authenticated`, `service_role` |
+| `calculate_user_reputation_v2`, `calculate_entity_trending_score_v2` | `SECURITY DEFINER`, pure — return a value, write nothing | `authenticated`, `service_role` |
+| `select_trending_candidates_v2`, `update_all_trending_scores_v2`, `calculate_social_influence_score_v2` | `SECURITY DEFINER`, write derived data | **`service_role` only** — not callable by ordinary users |
+
+`social_influence_scores_v2` gets GRANTs plus RLS in the same migration that creates it: read for
+`authenticated`, writes `service_role` only. Every routine sets an explicit `search_path`.
+
 ## Verification before 4.2B.2 is called done
 
 - Run every fixture group as SQL against transaction-scoped fixture rows, rolled back — no
   production row created, updated or deleted — and record actual vs expected intermediates.
-- Backfill `trending_score_v2` for all candidates and show the two scales side by side, confirming
-  every v2 value is inside [0, 1.2].
+- **Bootstrap once for every non-deleted entity**, not just the candidate set, so no row is left NULL
+  merely for lack of recent activity. `select_trending_candidates_v2()` is for ongoing incremental
+  refresh only. Then show both scales side by side and confirm every v2 value is inside [0, 1.2].
+- Authorization tests: a signed-in user cannot get another user's personalised or who-to-follow rows,
+  and the writer routines refuse non-`service_role` callers.
 - Prove no v2 routine reads the legacy records table.
+- Regenerate the Supabase types file so the new column, table and routines are typed.
 - Full test suite, typecheck, production build; write
   `docs/verification/phase-4-2b2-scoring-routines.md`; mark 4.2B.1 and 4.2B.2 in `roadmap.md`.
 
-Hard stop for review after that.
+Hard stop for review after that. No consumer changes and no old-threshold edits in this phase.
 
 ## 4.2B.3 — switch consumers, one complete pipeline at a time
 
@@ -65,28 +81,37 @@ Each pipeline moves atomically, routine plus every caller in the same step:
 
 1. **Trending**: `discoveryService`, `fallbackRecommendationService`, `searchRanking`,
    `advancedPersonalizationService`, `enhancedExploreService`, `update-trending-scores` Edge Function
-   — thresholds rescaled to the [0, 1.2] range, all ordering moved to `trending_score_v2`.
+   — thresholds rescaled to the [0, 1.2] range, all ordering moved to `trending_score_v2`. In the same
+   step the scheduled Edge Function becomes the only v2 updater and the browser `setInterval` loop in
+   `src/services/backgroundService.ts` is removed, so there is never more than one live v2 scheduler.
 2. **Similarity**: `collaborativeFilteringService` and `calculate-lifestyle-similarity` switched to
    the v2 routine with `|| 0` and `?? 0` removed; NULL means "no evidence" end to end.
 3. **Influence**: `socialIntelligenceService` switched to canonical types and the v2 table together.
 4. **Personalised / who-to-follow / reputation**: their callers switched to the v2 routines.
 
-## 4.2B.4 — contract: retire v1
+## 4.2B.4 — prove zero dependency, and only then retire v1
 
-Only after 4.2B.3 proves zero v1 consumers: drop the v1 routines (including
-`calculate_trending_score`, after inspecting `calculate_trending_hashtags`), rename
-`trending_score_v2` into place or retire the old column, and retire `social_influence_scores`.
+Retirement is a separate gate, not a consequence of switching callers. 4.2B.4 must first prove:
+
+- zero live v1 callers in app code, Edge Functions, database routines, triggers and cron jobs —
+  including understanding the `calculate_trending_hashtags` reference to `calculate_trending_score`;
+- no scoring path reads the legacy records table;
+- v2 fixture results correct, scheduler behaving, tests/typecheck/build green;
+- no active consumer still assumes v1-scale `trending_score` (this is the stronger scale check, and it
+  belongs here — during coexistence `>= 5` on the old column is correct, not a bug).
+
+Only after that: drop the v1 routines, retire or rename the old column, and retire
+`social_influence_scores`. Physical drops may also be deferred into the existing 4.5 cleanup.
 
 ## Two additions of my own
 
-- **A scale-guard test**, so this class of bug cannot recur: a test asserting no code compares
-  `trending_score` against a literal above 1.2, and a database check constraint on
-  `trending_score_v2` bounding it to [0, 1.2]. The contract's range then holds at the storage layer,
-  not just on paper.
-- **`backgroundService` runs the trending updater on a browser `setInterval` in production**
-  (`src/services/backgroundService.ts`), which conflicts with the project's timer policy and makes
-  every open tab a scheduler. 4.2B.3 should move that to the Edge Function on a real schedule and
-  delete the client loop; I've flagged it rather than folding it in silently.
+- **The scale guard lives on the versioned column**, so it cannot flag the compatibility we are
+  deliberately preserving: a database `CHECK (trending_score_v2 BETWEEN 0 AND 1.2)` plus a test that
+  v2 *consumers* assume the v2 range. The old-threshold sweep is a 4.2B.4 check, as above.
+- **`backgroundService` runs the trending updater on a browser `setInterval` in production**, which
+  conflicts with the project's timer policy and makes every open tab a scheduler. It is explicitly
+  assigned to 4.2B.3 (paired with enabling the scheduled updater), not touched in 4.2B.2.
+
 
 ## Technical notes
 
