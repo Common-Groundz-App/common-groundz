@@ -70,6 +70,14 @@ or function ownership — inside a definer function those name the owner, not th
 fixtures cover all four cases: normal user asking for self (allowed), normal user asking for another
 user (denied), anonymous (denied), `service_role` asking for an arbitrary user (allowed).
 
+**Viewer identity is frozen**: in the viewer-scoped routines (`get_personalized_entities_v2`,
+`get_who_to_follow_v2`), the requested user parameter **is** the effective `viewer_id`. When
+`service_role` calls the routine on behalf of user B, every viewer-dependent predicate — Circle
+visibility, follow relationships, already-seen exclusions, blocks — is evaluated **as user B**, never
+as the function owner, the service role, or via implicit RLS. RLS is not the privacy mechanism inside
+a definer routine; the body's own predicates are. A fixture proves it: `service_role` requesting user
+B's personalised feed must not surface a review that is Circle-visible only to the caller's owner.
+
 `entities.trending_score_v2` is created **`NOT NULL DEFAULT 0`** with
 `CHECK (trending_score_v2 >= 0 AND trending_score_v2 <= 1.2)`. The contract already defines "no
 activity, no boosts" as 0, so an entity created after the bootstrap is correct by construction rather
@@ -86,6 +94,12 @@ cannot write a service-role table — so without this the new table would silent
 adds a `refresh-social-influence-v2` Edge Function (service role, **deployed but not scheduled**)
 calling the refresh orchestrator, plus a one-time backfill run through a controlled administrative
 path, never the browser. 4.2B.3 schedules it and makes the client read-only.
+
+**The Edge Function's HTTP boundary is itself protected.** The database grants only stop direct RPC
+access — an open endpoint would still let any anonymous caller trigger an expensive service-role
+refresh. The function therefore validates the request against the project's established admin/service
+secret before doing anything, and endpoint fixtures prove: anonymous HTTP call → denied, ordinary
+authenticated user → denied, approved service/admin invocation → allowed.
 
 The row lifecycle is frozen in the contract rather than improvised in SQL:
 
@@ -164,7 +178,9 @@ Only after that: drop the v1 routines, retire or rename the old column, and reti
 ## Technical notes
 
 Separate migrations per family, in this order: trending v2 (column + check constraint + pure scorer +
-candidate selector + orchestrator), influence v2 (table with GRANTs and RLS + routine), similarity
-v2, reputation v2, who-to-follow v2, personalised v2. All are additive: no `DROP`, no `DELETE`, no
-in-place recompute of a column an existing consumer reads. `roadmap.md` gains the new 4.2B.2 /
-4.2B.3 / 4.2B.4 breakdown and the `backgroundService` follow-up as its own task.
+candidate selector + orchestrator), influence v2 (table with GRANTs and RLS + pure calculator + refresh
+orchestrator), similarity v2, reputation v2, who-to-follow v2, personalised v2. All are additive against
+v1: no `DROP`, no deletion or recompute of anything an existing consumer reads. (The influence
+reconciler's deletion of stale rows from the *new* v2 cache is by design, not a v1 modification.)
+`roadmap.md` gains the new 4.2B.2 / 4.2B.3 / 4.2B.4 breakdown and the `backgroundService` follow-up as
+its own task.
