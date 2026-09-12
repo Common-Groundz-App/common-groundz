@@ -58,7 +58,9 @@ score families. This plan finishes 4.2B.2 exactly as frozen, still with no app-v
 - Replay the frozen fixtures for each family (transaction-scoped, rolled back), comparing to 6 decimals.
 - Prove access rules live: anonymous blocked, ordinary signed-in blocked where required, viewer-scoped
   routines return the requested viewer's view.
-- Prove bootstrap coverage and stale-row cleanup for influence.
+- Prove bootstrap coverage and stale-row cleanup for influence, including the specific case: a person
+  with an existing influence row loses their last eligible contribution, a refresh runs, and the stale
+  row is gone.
 - Confirm no new routine reads the legacy records table.
 - Regenerate the generated database types; run the test suite, type check and build.
 - Write `docs/verification/phase-4-2b2-scoring-routines.md`. 4.2B.2 is only ticked in the roadmap once
