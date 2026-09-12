@@ -14,29 +14,30 @@ of v2.
 New definition, all terms bounded, total in [0, 1]:
 
 - reach `min(followers, 1000) / 1000 × 0.35`
-- contribution volume `min(credited contributions in category, 100) / 100 × 0.35`, where credited
-  contributions are counted **per item**: at most 1 canonical review **plus** at most 1 entity-linked
-  post per person/item. Ten posts about one item credit one post, so post volume cannot manufacture
-  influence — and no judgment of the post's content is involved.
-- engagement received `min(avg likes per contribution, 50) / 50 × 0.30`, excluding likes by the
-  contribution's own author
+- contribution volume `min(|credited set|, 100) / 100 × 0.35`
+- engagement received `min(total likes on the credited set / |credited set|, 50) / 50 × 0.30`,
+  excluding likes by the contribution's own author
 
+**The credited set is defined once and both terms use exactly it** — this removes the ambiguity the
+last review found. For a given author and category, the credited set contains:
 
-The 0.30 previously held by "rating quality" is redistributed to reach and contribution (+0.05
-each) and engagement (+0.10). No term reads any rating value. A reviewer averaging 1.0 and one
-averaging 5.0 with identical reach, volume and engagement score identically — frozen as a fixture
-invariant.
+- one row per `(author, entity)` for the author's canonical published review of that entity, and
+- one row per `(author, entity)` for the author's **earliest eligible** entity-linked post about that
+  entity — a post linked to three product entities yields three product rows (one per entity), and
+  ten posts about one entity yield one row.
 
-**Category attribution** (previously undefined): the category domain is the **15 canonical entity
-types** — not the five-bucket search/filter projection and not the legacy recommendation-category
-domain. A review's category is its subject item's canonical type; a post's categories are the
-canonical types of its linked items, counted **once per type** even when several linked items share
-that type. A post spanning three types counts once in each, so per-category influence is
-deliberately not additive across categories. Posts with no linked item contribute to no category.
-Existing `social_influence_scores.category` rows on the old domain are recomputed, not translated.
+Engagement's numerator counts likes **only on the exact content selected into that set**, and its
+denominator is `|credited set|`, so ten posts about one item can neither inflate volume nor inflate
+the like average. Credited rows with zero likes stay in the denominator.
 
+Per-category influence is deliberately not additive across categories: a post spanning three types
+contributes to all three. Posts with no linked entity contribute to no category. The category domain
+is the **15 canonical entity types** (`src/services/entityType.ts`) — not the five-bucket
+search/filter projection and not the legacy recommendation-category enum. Existing
+`social_influence_scores` rows on the old domain are deleted and recomputed, not translated.
 
 Judgment/calibration quality stays out — Influence v2, separate experiment.
+
 
 ## 2. Trending — normalise, then weight
 
@@ -58,9 +59,13 @@ Cap and input corrections:
   per-person-per-item review contribution stays 1: a new review *or* a qualifying timeline update
   (rating, intent, comment or media changed) counts once, never both, and multiple edits in the
   window count once. Living journeys therefore re-trend an item, without becoming a spam channel.
+- **Engagement cap scope is per actor, per item, per window** — one actor contributes at most 5
+  qualifying likes to an item in 24 h, no matter how many reviews and posts attached to that item
+  they like. It is explicitly *not* 5 per content row.
 - **Anonymous views are capped in aggregate.** Null-viewer rows count at most
   `min(anon_rows, 2 × identified_capped_views + 50)` and are additionally deduped by
   `(session_id, item)` where a session is recorded. No unbounded input remains.
+
 - **Self activity is narrowed to what the data can actually express**: `entity_views` records
   entity-page views only (`entity_id, user_id, session_id, interaction_type, created_at`) and
   carries no review or post reference, so there is no "self view of a review" to exclude — entity
@@ -151,7 +156,24 @@ as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
 - sparse data returns 0/NULL as specified and is never an error
 
 
-## 6. Two additions of my own
+## 6. Deployment cutover — no mixed-version window
+
+Frozen in the contract so 4.2B.2 and 4.2B.3 cannot expose half-migrated semantics:
+
+- **Trending**: the routine install and the full recompute of every stored score happen in one
+  transaction, and every reader — old or new — clamps `stored` to [0, 1.2]. Because all boost inputs
+  are 0 today, old-scale values only ever existed as velocity output; the recompute removes them
+  before any normalised reader runs.
+- **Influence**: `social_influence_scores` rows on the legacy category domain are deleted in the same
+  transaction that installs the routine, then recomputed on canonical types. No stale row survives to
+  be mixed with new ones.
+- **Similarity**: NULL means "no evidence". 4.2B.3 migrates the routine and every caller as one unit;
+  `result || 0` and `result ?? 0` are forbidden and checked for before that step is called done.
+- **Boosts stay frozen at 0**: `geographic_boost` and `seasonal_boost` remain unwritten until a later
+  contract version defines them, so activity velocity — not dormant inputs — drives trending today.
+  Populating them requires another contract review, because they would otherwise be 30% of the score.
+
+## 7. Two additions of my own
 
 - **Saturation constants are named and reviewable.** Every `min(x, K)` constant (500 views, 200
   engagement, 50 contributions, 1000 followers, 100 items, 50 likes, 1000 popularity) is listed in
@@ -163,8 +185,8 @@ as deterministic as the ranking. Tie-break stays `score DESC, user id ASC`.
   `reviews.is_deleted` defect is exactly what that check catches, and the contract will carry a
   short "fields this contract relies on" table so the next review can confirm it at a glance.
 
-
 ## Technical notes
+
 
 - Two files change: `docs/verification/phase-4-2b-scoring-contract.md` and
   `docs/verification/phase-4-2b-scoring-fixtures.json`; `contractVersion` and `contractDocument`
