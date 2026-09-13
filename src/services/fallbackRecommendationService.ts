@@ -327,10 +327,12 @@ const applyDiversityControls = (
 const applyRatingBalance = (
   recommendations: ProcessedFallbackRecommendation[]
 ): ProcessedFallbackRecommendation[] => {
+  // Phase 4.2B.3: trending bucket membership is isTrendingV2 (> 0 on the
+  // bounded v2 scale), replacing the old 0.6 threshold on the retired scale.
   const highRated = recommendations.filter(rec => rec.average_rating >= 4.5);
-  const trending = recommendations.filter(rec => rec.trending_score > 0.6 && rec.average_rating < 4.5);
-  const others = recommendations.filter(rec => 
-    rec.average_rating < 4.5 && rec.trending_score <= 0.6
+  const trending = recommendations.filter(rec => isTrendingV2(rec.trending_score) && rec.average_rating < 4.5);
+  const others = recommendations.filter(rec =>
+    rec.average_rating < 4.5 && !isTrendingV2(rec.trending_score)
   );
   
   // Aim for 60% high-rated, 30% trending, 10% others
