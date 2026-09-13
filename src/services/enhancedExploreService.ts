@@ -569,17 +569,8 @@ export class EnhancedExploreService {
     return validTypes.includes(category);
   }
 
-  // Background job to update all trending scores
-  async updateAllTrendingScores(): Promise<number> {
-    try {
-      const { data: result } = await supabase.rpc('update_all_trending_scores');
-      console.log(`Updated trending scores for ${result} entities`);
-      return result || 0;
-    } catch (error) {
-      console.error('Error updating all trending scores:', error);
-      return 0;
-    }
-  }
+  // Phase 4.2B.3: trending score refreshes are server-only (scheduled job calling
+  // the `update-trending-scores` function). The client never triggers them.
 }
 
 export const enhancedExploreService = new EnhancedExploreService();
