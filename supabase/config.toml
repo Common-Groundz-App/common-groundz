@@ -128,3 +128,6 @@ verify_jwt = false
 [functions.analyze-entity-url-v2]
 verify_jwt = false
 
+
+[functions.refresh-social-influence-v2]
+verify_jwt = false
