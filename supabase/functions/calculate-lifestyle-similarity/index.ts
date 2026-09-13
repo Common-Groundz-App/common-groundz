@@ -363,24 +363,27 @@ async function calculateJourneyAlignment(
   };
 }
 
-// Calculate rating patterns using existing DB function
+// Calculate rating patterns using the v2 DB function (public canonical reviews).
+// v2 NULL semantics: fewer than 3 shared canonical entities means "not
+// comparable" — return null so the caller drops the dimension instead of
+// treating it as maximally dissimilar (zero).
 async function calculateRatingPatterns(
   supabaseClient: any,
   userAId: string,
   userBId: string
-): Promise<number> {
+): Promise<number | null> {
   const { data: similarityResult, error } = await supabaseClient
-    .rpc('calculate_user_similarity', {
-      user_a_id: userAId,
-      user_b_id: userBId
+    .rpc('calculate_user_similarity_v2', {
+      p_user_a: userAId,
+      p_user_b: userBId
     });
 
   if (error) {
     console.error('[Phase4] Error calculating rating patterns:', error);
-    return 0;
+    return null;
   }
 
-  return similarityResult || 0;
+  return similarityResult === null ? null : similarityResult;
 }
 
 // Calculate category preferences similarity
@@ -539,7 +542,18 @@ serve(async (req) => {
       }
 
       if (weights.rating_patterns > 0) {
-        scores.rating_patterns = await calculateRatingPatterns(supabaseClient, userId, candidateId);
+        const ratingPatterns = await calculateRatingPatterns(supabaseClient, userId, candidateId);
+        if (ratingPatterns === null) {
+          // Not comparable: drop the dimension and renormalize the remaining
+          // weights so a missing signal never becomes a zero score.
+          weights.rating_patterns = 0;
+          const remainingWeight = Object.values(weights).reduce((sum, w) => sum + w, 0);
+          if (remainingWeight > 0) {
+            Object.keys(weights).forEach(k => { weights[k] = weights[k] / remainingWeight; });
+          }
+        } else {
+          scores.rating_patterns = ratingPatterns;
+        }
       }
 
       if (weights.category_preferences > 0) {
