@@ -9,6 +9,36 @@ export interface DiscoveryCollection {
   reason: string;
 }
 
+/**
+ * Phase 4.2B.3 — discovery surfaces read canonical reviews, never the legacy
+ * recommendations table. Global surfaces use public + published reviews only;
+ * social surfaces rely on RLS to scope visibility to what the viewer may see.
+ * Endorsement eligibility is the DB-resolved reviews.is_recommended = true.
+ */
+interface CanonicalReview {
+  user_id: string;
+  entity_id: string;
+  rating: number | null;
+  latest_rating: number | null;
+  is_recommended: boolean | null;
+  created_at: string;
+}
+
+/** Keep the latest review per (user_id, entity_id). Input must be created_at DESC. */
+const canonicalize = (rows: CanonicalReview[]): CanonicalReview[] => {
+  const seen = new Set<string>();
+  const out: CanonicalReview[] = [];
+  for (const row of rows) {
+    const key = `${row.user_id}:${row.entity_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+};
+
+const effectiveRating = (r: CanonicalReview): number => r.latest_rating ?? r.rating ?? 0;
+
 export class DiscoveryService {
   
   // Get "New This Week" entities with good initial ratings
