@@ -16,47 +16,81 @@ export interface SocialRecommendation extends PersonalizedEntity {
   friendsWhoLiked: number;
 }
 
-export class SocialIntelligenceService {
+/**
+ * Phase 4.2B.3 — social pipeline contract:
+ *
+ * - social_influence_scores_v2 is READ-ONLY from the browser. Only the scheduled
+ *   service-role refresh writes influence rows; there is intentionally no caller
+ *   for that refresh here.
+ * - Influencer rule: followed users with influence_score > 0, ranked DESC, top N.
+ * - Recommendation sourcing: canonical published reviews with is_recommended = true,
+ *   restricted server-side by RLS to rows the viewer is authorized to see
+ *   (public reviews, plus the viewer's own). The client never re-implements
+ *   visibility rules.
+ * - Effective rating (latest_rating ?? rating) is used only for scoring/ordering.
+ * - The viewer's exclusion set is ALL of the viewer's own reviews.
+ */
 
-  // Calculate and cache social influence scores
-  async calculateSocialInfluenceScores(userId: string): Promise<void> {
-    try {
-      // Get all categories the user has recommendations in
-      const { data: userCategories } = await supabase
-        .from('recommendations')
-        .select('category')
-        .eq('user_id', userId);
+interface CanonicalReview {
+  user_id: string;
+  entity_id: string;
+  rating: number | null;
+  latest_rating: number | null;
+  is_recommended: boolean | null;
+  created_at: string;
+}
 
-      if (!userCategories) return;
-
-      const uniqueCategories = [...new Set(userCategories.map(c => c.category))];
-
-      // Calculate influence for each category
-      for (const category of uniqueCategories) {
-        const { data: influenceScore } = await supabase
-          .rpc('calculate_social_influence_score', {
-            p_user_id: userId,
-            p_category: category
-          });
-
-        if (influenceScore !== null) {
-          // Store the influence score
-          await supabase
-            .from('social_influence_scores')
-            .upsert({
-              user_id: userId,
-              category: category,
-              influence_score: influenceScore,
-              last_calculated: new Date().toISOString()
-            }, {
-              onConflict: 'user_id,category'
-            });
-        }
-      }
-    } catch (error) {
-      console.error('Error calculating social influence scores:', error);
-    }
+/** Keep the latest review per (user_id, entity_id). Input must be created_at DESC. */
+const canonicalize = (rows: CanonicalReview[]): CanonicalReview[] => {
+  const seen = new Set<string>();
+  const out: CanonicalReview[] = [];
+  for (const row of rows) {
+    const key = `${row.user_id}:${row.entity_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
   }
+  return out;
+};
+
+const effectiveRating = (r: CanonicalReview): number => r.latest_rating ?? r.rating ?? 0;
+
+/** All entity ids the viewer has ever reviewed (any visibility/status). */
+const getViewerReviewedEntityIds = async (userId: string): Promise<string[]> => {
+  const { data } = await supabase
+    .from('reviews')
+    .select('entity_id')
+    .eq('user_id', userId)
+    .not('entity_id', 'is', null);
+  return [...new Set((data || []).map(r => r.entity_id as string))];
+};
+
+/** Viewer-visible endorsed reviews by the given authors, latest first (pre-canonical). */
+const getEndorsedReviewsByUsers = async (userIds: string[]): Promise<CanonicalReview[]> => {
+  if (userIds.length === 0) return [];
+  const { data } = await supabase
+    .from('reviews')
+    .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
+    .eq('status', 'published')
+    .eq('is_recommended', true)
+    .in('user_id', userIds)
+    .not('entity_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(500);
+  return (data || []) as CanonicalReview[];
+};
+
+const fetchEntitiesByIds = async (ids: string[]) => {
+  if (ids.length === 0) return [];
+  const { data } = await supabase
+    .from('entities')
+    .select('*')
+    .eq('is_deleted', false)
+    .in('id', ids);
+  return data || [];
+};
+
+export class SocialIntelligenceService {
 
   // Get recommendations from influential users in social network
   async getInfluencerRecommendations(
@@ -76,58 +110,46 @@ export class SocialIntelligenceService {
 
       const followingIds = followingUsers.map(f => f.following_id);
 
-      // Get influential users from the network
+      // Influencer rule: followed users with influence_score > 0, ranked DESC, top 20
       const { data: influentialUsers } = await supabase
-        .from('social_influence_scores')
-        .select('user_id, category, influence_score')
+        .from('social_influence_scores_v2')
+        .select('user_id, canonical_type, influence_score')
         .in('user_id', followingIds)
-        .gte('influence_score', 0.3) // Minimum influence threshold
-        .order('influence_score', { ascending: false });
+        .gt('influence_score', 0)
+        .order('influence_score', { ascending: false })
+        .limit(20);
 
       if (!influentialUsers || influentialUsers.length === 0) {
         return [];
       }
 
-      const influencerIds = influentialUsers.map(u => u.user_id);
+      const influencerIds = [...new Set(influentialUsers.map(u => u.user_id))];
+      const maxInfluenceByUser = new Map<string, number>();
+      influentialUsers.forEach(u => {
+        const current = maxInfluenceByUser.get(u.user_id) || 0;
+        if (u.influence_score > current) maxInfluenceByUser.set(u.user_id, u.influence_score);
+      });
 
-      // Get user's already rated entities to exclude them
-      const { data: userRatedEntities } = await supabase
-        .from('recommendations')
-        .select('entity_id')
-        .eq('user_id', userId);
+      const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      const userRatedEntityIds = userRatedEntities?.map(r => r.entity_id) || [];
+      // Canonical endorsed reviews by influential users (viewer-authorized via RLS)
+      const endorsed = canonicalize(await getEndorsedReviewsByUsers(influencerIds))
+        .filter(r => !excludedIds.has(r.entity_id))
+        .slice(0, limit * 2);
 
-      // Get recommendations from influential users
-      const { data: recommendations } = await supabase
-        .from('entities')
-        .select(`
-          *,
-          recommendations!inner(user_id, rating, category, created_at)
-        `)
-        .eq('is_deleted', false)
-        .in('recommendations.user_id', influencerIds)
-        .gte('recommendations.rating', 4)
-        .not('id', 'in', userRatedEntityIds.length > 0 ? `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})` : '()')
-        .order('recommendations.created_at', { ascending: false })
-        .limit(limit * 2);
+      if (endorsed.length === 0) return [];
 
-      if (!recommendations) return [];
+      const entities = await fetchEntitiesByIds([...new Set(endorsed.map(r => r.entity_id))]);
 
       // Score recommendations based on influencer authority
-      const scoredRecommendations: SocialRecommendation[] = recommendations.map(entity => {
-        const recommendation = entity.recommendations?.[0];
-        const influencer = influentialUsers.find(u => 
-          u.user_id === recommendation?.user_id && 
-          u.category === recommendation?.category
-        );
-
-        const influenceScore = influencer?.influence_score || 0;
-        const socialProofScore = influenceScore * (recommendation?.rating || 0) / 5;
+      const scoredRecommendations: SocialRecommendation[] = entities.map(entity => {
+        const recommendation = endorsed.find(r => r.entity_id === entity.id);
+        const influenceScore = maxInfluenceByUser.get(recommendation?.user_id || '') || 0;
+        const socialProofScore = influenceScore * effectiveRating(recommendation!) / 5;
 
         return {
           ...entity,
-          influencerIds: [recommendation?.user_id].filter(Boolean),
+          influencerIds: [recommendation?.user_id].filter(Boolean) as string[],
           socialProofScore,
           friendsWhoLiked: 1,
           personalization_score: socialProofScore * 20, // Scale for comparison
@@ -175,39 +197,26 @@ export class SocialIntelligenceService {
       }
 
       const secondDegreeIds = [...new Set(secondDegreeUsers.map(u => u.following_id))];
+      const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      // Get user's already rated entities to exclude them
-      const { data: userRatedEntities } = await supabase
-        .from('recommendations')
-        .select('entity_id')
-        .eq('user_id', userId);
+      // Canonical endorsed reviews from second-degree connections (RLS-scoped visibility)
+      const endorsed = canonicalize(await getEndorsedReviewsByUsers(secondDegreeIds))
+        .filter(r => !excludedIds.has(r.entity_id))
+        .slice(0, limit * 2);
 
-      const userRatedEntityIds = userRatedEntities?.map(r => r.entity_id) || [];
+      if (endorsed.length === 0) return [];
 
-      // Get recommendations from second-degree connections
-      const { data: entities } = await supabase
-        .from('entities')
-        .select(`
-          *,
-          recommendations!inner(user_id, rating)
-        `)
-        .eq('is_deleted', false)
-        .in('recommendations.user_id', secondDegreeIds)
-        .gte('recommendations.rating', 4.5) // Higher threshold for extended network
-        .not('id', 'in', userRatedEntityIds.length > 0 ? `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})` : '()')
-        .limit(limit * 2);
+      const entities = await fetchEntitiesByIds([...new Set(endorsed.map(r => r.entity_id))]);
 
-      if (!entities) return [];
-
-      // Score based on rating and network distance
+      // Score based on effective rating and network distance
       const scoredEntities: SocialRecommendation[] = entities.map(entity => {
-        const recommendation = entity.recommendations?.[0];
-        const rating = recommendation?.rating || 0;
+        const recommendation = endorsed.find(r => r.entity_id === entity.id);
+        const rating = effectiveRating(recommendation!);
         const networkScore = rating / 5 * 0.7; // Reduced weight for extended network
 
         return {
           ...entity,
-          influencerIds: [recommendation?.user_id].filter(Boolean),
+          influencerIds: [recommendation?.user_id].filter(Boolean) as string[],
           socialProofScore: networkScore,
           friendsWhoLiked: 1,
           personalization_score: networkScore * 15,
@@ -267,37 +276,25 @@ export class SocialIntelligenceService {
 
       if (communityMembers.length === 0) return [];
 
-      // Get user's already rated entities to exclude them
-      const { data: userRatedEntities } = await supabase
-        .from('recommendations')
-        .select('entity_id')
-        .eq('user_id', userId);
+      const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      const userRatedEntityIds = userRatedEntities?.map(r => r.entity_id) || [];
+      // Canonical endorsed reviews from the community (RLS-scoped visibility)
+      const endorsed = canonicalize(await getEndorsedReviewsByUsers(communityMembers))
+        .filter(r => !excludedIds.has(r.entity_id))
+        .slice(0, limit * 2);
 
-      // Get recommendations from community
-      const { data: entities } = await supabase
-        .from('entities')
-        .select(`
-          *,
-          recommendations!inner(user_id, rating)
-        `)
-        .eq('is_deleted', false)
-        .in('recommendations.user_id', communityMembers)
-        .gte('recommendations.rating', 4)
-        .not('id', 'in', userRatedEntityIds.length > 0 ? `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})` : '()')
-        .limit(limit * 2);
+      if (endorsed.length === 0) return [];
 
-      if (!entities) return [];
+      const entities = await fetchEntitiesByIds([...new Set(endorsed.map(r => r.entity_id))]);
 
       const scoredEntities: SocialRecommendation[] = entities.map(entity => {
-        const recommendation = entity.recommendations?.[0];
-        const rating = recommendation?.rating || 0;
+        const recommendation = endorsed.find(r => r.entity_id === entity.id);
+        const rating = effectiveRating(recommendation!);
         const communityScore = rating / 5 * 0.8;
 
         return {
           ...entity,
-          influencerIds: [recommendation?.user_id].filter(Boolean),
+          influencerIds: [recommendation?.user_id].filter(Boolean) as string[],
           socialProofScore: communityScore,
           friendsWhoLiked: 1,
           personalization_score: communityScore * 18,
@@ -315,21 +312,21 @@ export class SocialIntelligenceService {
     }
   }
 
-  // Get cached influence scores
+  // Get cached influence scores (v2 read-only table)
   async getInfluenceScores(userIds: string[]): Promise<SocialInfluenceScore[]> {
     try {
       const { data: scores } = await supabase
-        .from('social_influence_scores')
+        .from('social_influence_scores_v2')
         .select('*')
         .in('user_id', userIds)
         .gte('last_calculated', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
       return scores?.map(score => ({
         userId: score.user_id,
-        category: score.category,
+        category: score.canonical_type,
         influenceScore: score.influence_score,
         followerCount: score.follower_count,
-        engagementRate: score.engagement_rate
+        engagementRate: score.engagement_avg
       })) || [];
     } catch (error) {
       console.error('Error getting influence scores:', error);

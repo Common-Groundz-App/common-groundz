@@ -38,7 +38,8 @@ Deno.serve(async (req) => {
 
     let authorized = false;
 
-    // Path 1: cron secret
+    // Path 1: cron secret (the pg_cron job presents the matching Vault secret
+    // 'influence_refresh_cron_secret'; both stores hold the same value)
     if (cronSecret && presented && presented === cronSecret) {
       authorized = true;
     }

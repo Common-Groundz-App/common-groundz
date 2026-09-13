@@ -4,6 +4,14 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { isTrendingV2, normalizeTrendingV2 } from '@/services/trending/trendingV2';
+
+/**
+ * Phase 4.2B.3: the RPC caps its candidate pool at 50 rows ranked by
+ * avg_rating/rec_count. Buckets below operate over this pool client-side so the
+ * server-side pre-limit can never discard trending candidates.
+ */
+const FALLBACK_CANDIDATE_POOL = 50;
 
 export interface FallbackRecommendationData {
   average_rating: number;
@@ -29,11 +37,11 @@ export interface ProcessedFallbackRecommendation extends FallbackRecommendationD
 export const getFallbackEntityRecommendations = async (
   entityId: string,
   entityType?: string,
-  limit: number = 6
-): Promise<any[]> => {
+  limit: number = FALLBACK_CANDIDATE_POOL
+): Promise<FallbackRecommendationData[]> => {
   try {
     console.log('🔍 Fetching fallback recommendations for entity:', entityId);
-    
+
     const { data, error } = await supabase.rpc('get_fallback_entity_recommendations', {
       p_entity_id: entityId,
       p_current_user_id: null,
@@ -51,8 +59,24 @@ export const getFallbackEntityRecommendations = async (
       return [];
     }
 
-    console.log('✅ Fallback recommendations raw data:', data);
-    return data;
+    // The RPC returns avg_rating/display_reason/trending_score (the v2 value);
+    // normalise into the interface shape consumers expect. popularity_score is
+    // frozen at zero in v2 and no longer returned.
+    const normalized: FallbackRecommendationData[] = data.map((row: any) => ({
+      entity_id: row.entity_id,
+      entity_name: row.entity_name,
+      entity_type: row.entity_type,
+      entity_image_url: row.entity_image_url,
+      entity_slug: row.entity_slug,
+      average_rating: row.avg_rating ?? 0,
+      recommendation_count: row.recommendation_count ?? 0,
+      reason: row.display_reason ?? 'Popular choice',
+      trending_score: row.trending_score ?? 0,
+      popularity_score: 0,
+    }));
+
+    console.log('✅ Fallback recommendations fetched:', normalized.length);
+    return normalized;
   } catch (error) {
     console.error('Exception in getFallbackEntityRecommendations:', error);
     return [];
@@ -71,7 +95,6 @@ const getFallbackDisplayReason = (recommendation: FallbackRecommendationData): s
  */
 const calculateFallbackScore = (recommendation: FallbackRecommendationData): number => {
   const {
-    popularity_score,
     trending_score,
     recommendation_count,
     average_rating
@@ -79,9 +102,11 @@ const calculateFallbackScore = (recommendation: FallbackRecommendationData): num
 
   let score = 0;
 
-  // Base scores (normalized 0-1)
-  score += (popularity_score || 0) * 0.3;
-  score += (trending_score || 0) * 0.3;
+  // Base scores (normalized 0-1).
+  // Phase 4.2B.3: popularity_score is frozen at zero in v2, so its old 0.3 term
+  // was always zero and is removed. trending_score is now the v2 value bounded
+  // [0, 1.2]; normalise before weighting.
+  score += normalizeTrendingV2(trending_score) * 0.3;
   score += Math.min((recommendation_count || 0) / 50, 1) * 0.2; // Normalize rec count
   score += ((average_rating || 0) / 5) * 0.2; // Normalize rating
 
@@ -98,16 +123,20 @@ const calculateFallbackScore = (recommendation: FallbackRecommendationData): num
 export const getTrendingEntities = async (
   entityId: string,
   entityType?: string,
-  limit: number = 3
+  limit: number = 3,
+  pool?: FallbackRecommendationData[]
 ): Promise<ProcessedFallbackRecommendation[]> => {
-  const fallbackRecs = await getFallbackEntityRecommendations(entityId, entityType, limit * 2);
-  
-  // Filter for trending entities (high trending score)
+  const fallbackRecs = pool ?? await getFallbackEntityRecommendations(entityId, entityType);
+
+  // Phase 4.2B.3: v2 bucket membership is trending_score_v2 > 0 (any measured
+  // 24h activity), ranked by the v2 value — not the old 0.5 threshold on the
+  // retired 0–100 scale.
   const trendingRecs = fallbackRecs
-    .filter(rec => rec.trending_score > 0.5)
+    .filter(rec => isTrendingV2(rec.trending_score))
+    .sort((a, b) => b.trending_score - a.trending_score || (a.entity_id < b.entity_id ? -1 : 1))
     .slice(0, limit);
 
-  return trendingRecs;
+  return trendingRecs.map(toProcessed);
 };
 
 /**
@@ -116,16 +145,17 @@ export const getTrendingEntities = async (
 export const getCategoryRecommendations = async (
   entityId: string,
   entityType: string,
-  limit: number = 3
+  limit: number = 3,
+  pool?: FallbackRecommendationData[]
 ): Promise<ProcessedFallbackRecommendation[]> => {
-  const fallbackRecs = await getFallbackEntityRecommendations(entityId, entityType, limit * 2);
-  
+  const fallbackRecs = pool ?? await getFallbackEntityRecommendations(entityId, entityType);
+
   // Filter for same type entities
   const categoryRecs = fallbackRecs
     .filter(rec => rec.entity_type === entityType)
     .slice(0, limit);
 
-  return categoryRecs;
+  return categoryRecs.map(toProcessed);
 };
 
 /**
@@ -134,17 +164,27 @@ export const getCategoryRecommendations = async (
 export const getHighlyRatedRecommendations = async (
   entityId: string,
   entityType?: string,
-  limit: number = 3
+  limit: number = 3,
+  pool?: FallbackRecommendationData[]
 ): Promise<ProcessedFallbackRecommendation[]> => {
-  const fallbackRecs = await getFallbackEntityRecommendations(entityId, entityType, limit * 2);
-  
+  const fallbackRecs = pool ?? await getFallbackEntityRecommendations(entityId, entityType);
+
   // Filter for highly rated (4.5+)
   const highlyRatedRecs = fallbackRecs
     .filter(rec => rec.average_rating >= 4.5)
     .slice(0, limit);
 
-  return highlyRatedRecs;
+  return highlyRatedRecs.map(toProcessed);
 };
+
+/**
+ * Attach the display reason and composite score.
+ */
+const toProcessed = (rec: FallbackRecommendationData): ProcessedFallbackRecommendation => ({
+  ...rec,
+  displayReason: getFallbackDisplayReason(rec),
+  score: calculateFallbackScore(rec),
+});
 
 /**
  * Cache configuration for fallback recommendations
@@ -202,13 +242,13 @@ export const getFallbackEntityRecommendationsWithCache = async (
     return cached.slice(0, limit);
   }
 
-  // Fetch fresh data
-  const recommendations = await getFallbackEntityRecommendations(entityId, entityType, limit);
+  // Fetch fresh data (full candidate pool, then bucket/limit client-side)
+  const recommendations = (await getFallbackEntityRecommendations(entityId, entityType)).map(toProcessed);
   
-  // Cache the results
+  // Cache the full pool; honour the caller's limit on the way out
   cacheFallbackRecommendations(entityId, entityType, recommendations);
-  
-  return recommendations;
+
+  return recommendations.slice(0, limit);
 };
 
 /**
@@ -220,10 +260,12 @@ export const getMixedFallbackRecommendations = async (
   limit: number = 6
 ): Promise<ProcessedFallbackRecommendation[]> => {
   try {
+    // One widened candidate pool feeds all three buckets (single RPC round-trip).
+    const pool = await getFallbackEntityRecommendations(entityId, entityType);
     const [trending, category, highlyRated] = await Promise.all([
-      getTrendingEntities(entityId, entityType, 3),
-      getCategoryRecommendations(entityId, entityType, 3),
-      getHighlyRatedRecommendations(entityId, entityType, 3)
+      getTrendingEntities(entityId, entityType, 3, pool),
+      getCategoryRecommendations(entityId, entityType ?? '', 3, pool),
+      getHighlyRatedRecommendations(entityId, entityType, 3, pool)
     ]);
 
     // Combine and deduplicate
@@ -285,10 +327,12 @@ const applyDiversityControls = (
 const applyRatingBalance = (
   recommendations: ProcessedFallbackRecommendation[]
 ): ProcessedFallbackRecommendation[] => {
+  // Phase 4.2B.3: trending bucket membership is isTrendingV2 (> 0 on the
+  // bounded v2 scale), replacing the old 0.6 threshold on the retired scale.
   const highRated = recommendations.filter(rec => rec.average_rating >= 4.5);
-  const trending = recommendations.filter(rec => rec.trending_score > 0.6 && rec.average_rating < 4.5);
-  const others = recommendations.filter(rec => 
-    rec.average_rating < 4.5 && rec.trending_score <= 0.6
+  const trending = recommendations.filter(rec => isTrendingV2(rec.trending_score) && rec.average_rating < 4.5);
+  const others = recommendations.filter(rec =>
+    rec.average_rating < 4.5 && !isTrendingV2(rec.trending_score)
   );
   
   // Aim for 60% high-rated, 30% trending, 10% others

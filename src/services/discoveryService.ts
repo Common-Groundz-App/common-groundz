@@ -9,6 +9,36 @@ export interface DiscoveryCollection {
   reason: string;
 }
 
+/**
+ * Phase 4.2B.3 — discovery surfaces read canonical reviews, never the legacy
+ * recommendations table. Global surfaces use public + published reviews only;
+ * social surfaces rely on RLS to scope visibility to what the viewer may see.
+ * Endorsement eligibility is the DB-resolved reviews.is_recommended = true.
+ */
+interface CanonicalReview {
+  user_id: string;
+  entity_id: string;
+  rating: number | null;
+  latest_rating: number | null;
+  is_recommended: boolean | null;
+  created_at: string;
+}
+
+/** Keep the latest review per (user_id, entity_id). Input must be created_at DESC. */
+const canonicalize = (rows: CanonicalReview[]): CanonicalReview[] => {
+  const seen = new Set<string>();
+  const out: CanonicalReview[] = [];
+  for (const row of rows) {
+    const key = `${row.user_id}:${row.entity_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+};
+
+const effectiveRating = (r: CanonicalReview): number => r.latest_rating ?? r.rating ?? 0;
+
 export class DiscoveryService {
   
   // Get "New This Week" entities with good initial ratings
@@ -16,25 +46,37 @@ export class DiscoveryService {
     try {
       const { data: entities } = await supabase
         .from('entities')
-        .select(`
-          *,
-          recommendations!inner(rating)
-        `)
+        .select('*')
         .eq('is_deleted', false)
         .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false })
         .limit(limit * 2);
 
-      if (!entities) return [];
+      if (!entities || entities.length === 0) return [];
 
-      // Filter entities with good initial engagement (rating >= 4 or multiple recommendations)
+      // Canonical public reviews for these entities (global surface population)
+      const { data: reviewRows } = await supabase
+        .from('reviews')
+        .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
+        .eq('status', 'published')
+        .eq('visibility', 'public')
+        .in('entity_id', entities.map(e => e.id))
+        .order('created_at', { ascending: false });
+
+      const byEntity = new Map<string, { count: number; total: number }>();
+      canonicalize((reviewRows || []) as CanonicalReview[]).forEach(r => {
+        const entry = byEntity.get(r.entity_id) || { count: 0, total: 0 };
+        entry.count += 1;
+        entry.total += effectiveRating(r);
+        byEntity.set(r.entity_id, entry);
+      });
+
+      // Filter entities with good initial engagement (avg rating >= 4 or multiple reviewers)
       const qualityNewEntities = entities
         .filter(entity => {
-          const recommendations = entity.recommendations || [];
-          const avgRating = recommendations.length > 0 
-            ? recommendations.reduce((sum: number, rec: any) => sum + rec.rating, 0) / recommendations.length
-            : 0;
-          return recommendations.length >= 2 || avgRating >= 4.0;
+          const agg = byEntity.get(entity.id);
+          if (!agg || agg.count === 0) return false;
+          return agg.count >= 2 || (agg.total / agg.count) >= 4.0;
         })
         .slice(0, limit);
 
@@ -63,24 +105,50 @@ export class DiscoveryService {
 
       const followingIds = followingUsers.map(f => f.following_id);
 
+      // Recent endorsed reviews by followed users. Visibility is scoped by RLS
+      // (the viewer sees what they are authorized to see); no client-side
+      // visibility re-implementation.
+      const { data: reviewRows } = await supabase
+        .from('reviews')
+        .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
+        .eq('status', 'published')
+        .eq('is_recommended', true)
+        .in('user_id', followingIds)
+        .not('entity_id', 'is', null)
+        .gte('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (!reviewRows || reviewRows.length === 0) return [];
+
+      // Canonical (latest per user+entity), preserving recency order of first appearance
+      const canonical = canonicalize(reviewRows as CanonicalReview[]);
+      const entityIdsInOrder: string[] = [];
+      const seenEntities = new Set<string>();
+      canonical.forEach(r => {
+        if (!seenEntities.has(r.entity_id)) {
+          seenEntities.add(r.entity_id);
+          entityIdsInOrder.push(r.entity_id);
+        }
+      });
+
       const { data: entities } = await supabase
         .from('entities')
-        .select(`
-          *,
-          recommendations!inner(user_id, rating, created_at)
-        `)
+        .select('*')
         .eq('is_deleted', false)
-        .in('recommendations.user_id', followingIds)
-        .gte('recommendations.created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
-        .order('recommendations.created_at', { ascending: false })
-        .limit(limit);
+        .in('id', entityIdsInOrder.slice(0, limit * 3));
 
       if (!entities) return [];
 
-      return entities.map(entity => ({
-        ...entity,
-        reason: 'Friends are loving this'
-      }));
+      const entityById = new Map(entities.map(e => [e.id, e]));
+      return entityIdsInOrder
+        .map(id => entityById.get(id))
+        .filter((e): e is NonNullable<typeof e> => Boolean(e))
+        .slice(0, limit)
+        .map(entity => ({
+          ...entity,
+          reason: 'Friends are loving this'
+        }));
     } catch (error) {
       console.error('Error getting social discovery:', error);
       return [];

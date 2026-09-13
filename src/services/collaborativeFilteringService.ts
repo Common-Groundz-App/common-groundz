@@ -29,25 +29,82 @@ export interface RecommendationExplanation {
   algorithm: string;
 }
 
+/**
+ * Phase 4.2B.3 — collaborative pipeline contract:
+ *
+ * - Candidate discovery and similarity operate over PUBLIC, published, canonical
+ *   reviews only (globally reusable population, same as calculate_user_similarity_v2).
+ * - Endorsement eligibility is the DB-resolved reviews.is_recommended = true.
+ *   These services never inspect questionnaire answers or timeline intent.
+ * - Effective rating (latest_rating ?? rating) is used only for scoring/ordering.
+ * - The viewer's exclusion set is ALL of the viewer's own reviews.
+ * - calculate_user_similarity_v2 returns NULL when two users share fewer than 3
+ *   canonical entities; NULL means "no measured similarity", not 0.
+ */
+
+interface CanonicalReview {
+  user_id: string;
+  entity_id: string;
+  rating: number | null;
+  latest_rating: number | null;
+  is_recommended: boolean | null;
+  created_at: string;
+}
+
+/** Keep the latest review per (user_id, entity_id). Input must be created_at DESC. */
+const canonicalize = (rows: CanonicalReview[]): CanonicalReview[] => {
+  const seen = new Set<string>();
+  const out: CanonicalReview[] = [];
+  for (const row of rows) {
+    const key = `${row.user_id}:${row.entity_id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
+};
+
+const effectiveRating = (r: CanonicalReview): number => r.latest_rating ?? r.rating ?? 0;
+
+/** All entity ids the viewer has ever reviewed (any visibility/status). */
+const getViewerReviewedEntityIds = async (userId: string): Promise<string[]> => {
+  const { data } = await supabase
+    .from('reviews')
+    .select('entity_id')
+    .eq('user_id', userId)
+    .not('entity_id', 'is', null);
+  return [...new Set((data || []).map(r => r.entity_id as string))];
+};
+
+/** Public published reviews by the given authors, latest first (pre-canonical). */
+const getPublicReviewsByUsers = async (userIds: string[]): Promise<CanonicalReview[]> => {
+  if (userIds.length === 0) return [];
+  const { data } = await supabase
+    .from('reviews')
+    .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
+    .eq('status', 'published')
+    .eq('visibility', 'public')
+    .in('user_id', userIds)
+    .not('entity_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(500);
+  return (data || []) as CanonicalReview[];
+};
+
 export class CollaborativeFilteringService {
 
-  // Find similar users based on rating patterns
+  // Find similar users based on rating patterns (v2 similarity over public canonical reviews)
   async findSimilarUsers(userId: string, limit: number = 10): Promise<UserSimilarity[]> {
     try {
-      // Get entity IDs that the user has rated
-      const { data: userEntityIds } = await supabase
-        .from('recommendations')
-        .select('entity_id')
-        .eq('user_id', userId);
+      const entityIds = await getViewerReviewedEntityIds(userId);
+      if (entityIds.length === 0) return [];
 
-      if (!userEntityIds || userEntityIds.length === 0) return [];
-
-      const entityIds = userEntityIds.map(r => r.entity_id);
-
-      // Get users who have rated similar entities
+      // Candidate authors: public published reviews on entities the viewer reviewed
       const { data: candidateUsers } = await supabase
-        .from('recommendations')
+        .from('reviews')
         .select('user_id')
+        .eq('status', 'published')
+        .eq('visibility', 'public')
         .neq('user_id', userId)
         .in('entity_id', entityIds);
 
@@ -59,12 +116,14 @@ export class CollaborativeFilteringService {
       // Calculate similarity for each candidate user
       for (const candidateUserId of uniqueUsers.slice(0, 50)) { // Limit to prevent timeouts
         const { data: similarityResult } = await supabase
-          .rpc('calculate_user_similarity', {
-            user_a_id: userId,
-            user_b_id: candidateUserId
+          .rpc('calculate_user_similarity_v2', {
+            p_user_a: userId,
+            p_user_b: candidateUserId
           });
 
-        if (similarityResult && similarityResult > 0.1) { // Minimum similarity threshold
+        // v2 NULL semantics: fewer than 3 shared canonical entities -> no measured
+        // similarity. NULL is not 0 and must not pass the threshold.
+        if (similarityResult !== null && similarityResult > 0.1) {
           similarities.push({
             userId: candidateUserId,
             similarityScore: similarityResult,
@@ -85,7 +144,7 @@ export class CollaborativeFilteringService {
     }
   }
 
-  // Get collaborative filtering recommendations
+  // Get collaborative filtering recommendations (things similar people endorse)
   async getCollaborativeRecommendations(
     userId: string, 
     limit: number = 6
@@ -99,50 +158,40 @@ export class CollaborativeFilteringService {
       }
 
       const similarUserIds = similarUsers.map(u => u.userId);
+      const similarityByUser = new Map(similarUsers.map(u => [u.userId, u.similarityScore]));
+      const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      // Get user's already rated entities to exclude them
-      const { data: userRatedEntities } = await supabase
-        .from('recommendations')
-        .select('entity_id')
-        .eq('user_id', userId);
+      // Canonical endorsed reviews by similar users (public + published population)
+      const endorsed = canonicalize(await getPublicReviewsByUsers(similarUserIds))
+        .filter(r => r.is_recommended === true && !excludedIds.has(r.entity_id));
 
-      const userRatedEntityIds = userRatedEntities?.map(r => r.entity_id) || [];
+      if (endorsed.length === 0) return [];
 
-      // Get entities liked by similar users that current user hasn't rated
+      // Weighted effective rating per entity, weighted by similarity
+      const byEntity = new Map<string, { weighted: number; weight: number }>();
+      endorsed.forEach(r => {
+        const w = similarityByUser.get(r.user_id) || 0;
+        if (w <= 0) return;
+        const entry = byEntity.get(r.entity_id) || { weighted: 0, weight: 0 };
+        entry.weighted += effectiveRating(r) * w;
+        entry.weight += w;
+        byEntity.set(r.entity_id, entry);
+      });
+
+      const entityIds = [...byEntity.keys()];
+      if (entityIds.length === 0) return [];
+
       const { data: entities } = await supabase
         .from('entities')
-        .select(`
-          *,
-          recommendations!inner(user_id, rating)
-        `)
+        .select('*')
         .eq('is_deleted', false)
-        .in('recommendations.user_id', similarUserIds)
-        .gte('recommendations.rating', 4) // Only high-rated recommendations
-        .not('id', 'in', userRatedEntityIds.length > 0 ? `(${userRatedEntityIds.map(id => `'${id}'`).join(',')})` : '()')
-        .order('recommendations.rating', { ascending: false })
-        .limit(limit * 2);
+        .in('id', entityIds);
 
       if (!entities) return [];
 
-      // Score entities based on similar users' ratings and similarity scores
       const scoredEntities = entities.map(entity => {
-        const similarUserRatings = entity.recommendations?.filter(r => 
-          similarUserIds.includes(r.user_id)
-        ) || [];
-
-        let weightedScore = 0;
-        let totalWeight = 0;
-
-        similarUserRatings.forEach(rating => {
-          const userSimilarity = similarUsers.find(u => u.userId === rating.user_id);
-          if (userSimilarity) {
-            const weight = userSimilarity.similarityScore;
-            weightedScore += rating.rating * weight;
-            totalWeight += weight;
-          }
-        });
-
-        const averageWeightedRating = totalWeight > 0 ? weightedScore / totalWeight : 0;
+        const agg = byEntity.get(entity.id) || { weighted: 0, weight: 0 };
+        const averageWeightedRating = agg.weight > 0 ? agg.weighted / agg.weight : 0;
 
         return {
           ...entity,
@@ -161,80 +210,86 @@ export class CollaborativeFilteringService {
     }
   }
 
-  // Get item-based collaborative filtering recommendations
+  // Get item-based collaborative filtering recommendations (co-endorsed items)
   async getItemBasedRecommendations(
     userId: string, 
     limit: number = 6
   ): Promise<PersonalizedEntity[]> {
     try {
-      // Get user's highly rated entities
-      const { data: userLikedEntities } = await supabase
-        .from('recommendations')
-        .select('entity_id, rating')
+      // Viewer-endorsed seeds: the viewer's own canonical reviews that resolve to endorsed
+      const { data: viewerRows } = await supabase
+        .from('reviews')
+        .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
         .eq('user_id', userId)
-        .gte('rating', 4)
-        .order('rating', { ascending: false })
-        .limit(10);
+        .not('entity_id', 'is', null)
+        .order('created_at', { ascending: false });
 
-      if (!userLikedEntities || userLikedEntities.length === 0) {
+      const viewerCanonical = canonicalize((viewerRows || []) as CanonicalReview[]);
+      const viewerEndorsed = viewerCanonical
+        .filter(r => r.is_recommended === true)
+        .sort((a, b) => effectiveRating(b) - effectiveRating(a))
+        .slice(0, 10);
+
+      if (viewerEndorsed.length === 0) {
         return [];
       }
 
-      const likedEntityIds = userLikedEntities.map(e => e.entity_id);
+      const likedEntityIds = viewerEndorsed.map(e => e.entity_id);
+      const excludedIds = new Set(viewerCanonical.map(r => r.entity_id));
 
-      // Get users who liked similar items
-      const { data: similarItemUsers } = await supabase
-        .from('recommendations')
-        .select('user_id')
+      // Co-endorsers: other users whose canonical public review endorses a seed entity
+      const { data: coEndorserRows } = await supabase
+        .from('reviews')
+        .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
+        .eq('status', 'published')
+        .eq('visibility', 'public')
+        .eq('is_recommended', true)
+        .neq('user_id', userId)
         .in('entity_id', likedEntityIds)
-        .gte('rating', 4);
+        .order('created_at', { ascending: false })
+        .limit(500);
 
-      if (!similarItemUsers) return [];
+      if (!coEndorserRows || coEndorserRows.length === 0) return [];
 
-      const similarUserIds = [...new Set(similarItemUsers.map(u => u.user_id))];
+      const coEndorserIds = [...new Set(canonicalize(coEndorserRows as CanonicalReview[]).map(u => u.user_id))];
 
-      // Find entities that users who liked similar items also liked
-      const { data: similarEntities } = await supabase
-        .from('entities')
-        .select(`
-          *,
-          recommendations!inner(user_id, rating, entity_id)
-        `)
-        .eq('is_deleted', false)
-        .in('recommendations.user_id', similarUserIds)
-        .not('id', 'in', likedEntityIds.length > 0 ? `(${likedEntityIds.map(id => `'${id}'`).join(',')})` : '()') // Exclude already rated entities
-        .gte('recommendations.rating', 4)
-        .order('recommendations.rating', { ascending: false })
-        .limit(limit * 2);
+      // Other entities those co-endorsers endorse
+      const otherEndorsed = canonicalize(await getPublicReviewsByUsers(coEndorserIds))
+        .filter(r => r.is_recommended === true && !excludedIds.has(r.entity_id));
 
-      if (!similarEntities) return [];
+      if (otherEndorsed.length === 0) return [];
 
-      // Score based on frequency and ratings
-      const entityScores = new Map<string, { entity: any, score: number, count: number }>();
-
-      similarEntities.forEach(entity => {
-        const existing = entityScores.get(entity.id);
-        const rating = entity.recommendations?.[0]?.rating || 0;
-        
+      // Score based on endorser count and effective ratings
+      const entityScores = new Map<string, { score: number, count: number }>();
+      otherEndorsed.forEach(r => {
+        const existing = entityScores.get(r.entity_id);
         if (existing) {
-          existing.score += rating;
+          existing.score += effectiveRating(r);
           existing.count += 1;
         } else {
-          entityScores.set(entity.id, {
-            entity,
-            score: rating,
-            count: 1
-          });
+          entityScores.set(r.entity_id, { score: effectiveRating(r), count: 1 });
         }
       });
 
-      // Convert to array and calculate final scores
-      const scoredEntities = Array.from(entityScores.values())
-        .map(({ entity, score, count }) => ({
-          ...entity,
-          personalization_score: (score / count) * Math.log(count + 1), // Boost popular items
-          reason: `${count} similar items suggest this`
-        }))
+      const entityIds = [...entityScores.keys()];
+      const { data: entities } = await supabase
+        .from('entities')
+        .select('*')
+        .eq('is_deleted', false)
+        .in('id', entityIds);
+
+      if (!entities) return [];
+
+      const scoredEntities = entities
+        .map(entity => {
+          const agg = entityScores.get(entity.id) || { score: 0, count: 0 };
+          return {
+            ...entity,
+            personalization_score: agg.count > 0 ? (agg.score / agg.count) * Math.log(agg.count + 1) : 0,
+            reason: `${agg.count} similar items suggest this`
+          };
+        })
+        .filter(e => (e.personalization_score || 0) > 0)
         .sort((a, b) => (b.personalization_score || 0) - (a.personalization_score || 0))
         .slice(0, limit);
 
@@ -378,66 +433,56 @@ export class CollaborativeFilteringService {
 
       const similarUserIds = similarUsers.map(u => u.user_b_id);
       const similarityMap = new Map(similarUsers.map(u => [u.user_b_id, u]));
+      const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      // Get user's already rated entities to exclude them
-      const { data: userRatedEntities } = await supabase
-        .from('recommendations')
-        .select('entity_id')
-        .eq('user_id', userId);
+      // Canonical endorsed reviews by similar users (public + published population)
+      const endorsed = canonicalize(await getPublicReviewsByUsers(similarUserIds))
+        .filter(r => r.is_recommended === true && !excludedIds.has(r.entity_id));
 
-      const userRatedEntityIds = userRatedEntities?.map(r => r.entity_id) || [];
+      if (endorsed.length === 0) return [];
 
-      // Get entities liked by similar users that current user hasn't rated
+      const byEntity = new Map<string, { weighted: number; weight: number; lifestyleBoost: number }>();
+      endorsed.forEach(r => {
+        const userSimilarity = similarityMap.get(r.user_id);
+        if (!userSimilarity) return;
+        const weight = userSimilarity.overall_score;
+        const lifestyleWeight = userSimilarity.lifestyle_score * 0.2;
+        const total = weight + lifestyleWeight;
+        if (total <= 0) return;
+        const entry = byEntity.get(r.entity_id) || { weighted: 0, weight: 0, lifestyleBoost: 0 };
+        entry.weighted += effectiveRating(r) * total;
+        entry.weight += total;
+        entry.lifestyleBoost = Math.max(entry.lifestyleBoost, userSimilarity.lifestyle_score);
+        byEntity.set(r.entity_id, entry);
+      });
+
+      const entityIds = [...byEntity.keys()];
+      if (entityIds.length === 0) return [];
+
       const { data: entities } = await supabase
         .from('entities')
-        .select(`
-          *,
-          recommendations!inner(user_id, rating)
-        `)
+        .select('*')
         .eq('is_deleted', false)
-        .in('recommendations.user_id', similarUserIds)
-        .gte('recommendations.rating', 4)
-        .limit(limit * 3);
+        .in('id', entityIds);
 
       if (!entities) return [];
 
-      // Filter out already rated and score entities
-      const scoredEntities = entities
-        .filter(e => !userRatedEntityIds.includes(e.id))
-        .map(entity => {
-          const similarUserRatings = entity.recommendations?.filter((r: any) => 
-            similarUserIds.includes(r.user_id)
-          ) || [];
+      const mode = similarUsers[0]?.calculation_metadata?.effective_mode || 'SPARSE';
 
-          let weightedScore = 0;
-          let totalWeight = 0;
-          let lifestyleBoost = 0;
+      const scoredEntities = entities.map(entity => {
+        const agg = byEntity.get(entity.id) || { weighted: 0, weight: 0, lifestyleBoost: 0 };
+        const averageWeightedRating = agg.weight > 0 ? agg.weighted / agg.weight : 0;
 
-          similarUserRatings.forEach((rating: any) => {
-            const userSimilarity = similarityMap.get(rating.user_id);
-            if (userSimilarity) {
-              // Weight by overall score with lifestyle boost
-              const weight = userSimilarity.overall_score;
-              const lifestyleWeight = userSimilarity.lifestyle_score * 0.2;
-              weightedScore += rating.rating * (weight + lifestyleWeight);
-              totalWeight += weight + lifestyleWeight;
-              lifestyleBoost = Math.max(lifestyleBoost, userSimilarity.lifestyle_score);
-            }
-          });
-
-          const averageWeightedRating = totalWeight > 0 ? weightedScore / totalWeight : 0;
-          const mode = similarUsers[0]?.calculation_metadata?.effective_mode || 'SPARSE';
-
-          return {
-            ...entity,
-            personalization_score: averageWeightedRating,
-            reason: mode === 'RICH' 
-              ? `People with similar lifestyle rated this ${averageWeightedRating.toFixed(1)}/5`
-              : mode === 'MODERATE'
-              ? `Similar users rated this ${averageWeightedRating.toFixed(1)}/5`
-              : `Users like you rated this ${averageWeightedRating.toFixed(1)}/5`
-          };
-        });
+        return {
+          ...entity,
+          personalization_score: averageWeightedRating,
+          reason: mode === 'RICH' 
+            ? `People with similar lifestyle rated this ${averageWeightedRating.toFixed(1)}/5`
+            : mode === 'MODERATE'
+            ? `Similar users rated this ${averageWeightedRating.toFixed(1)}/5`
+            : `Users like you rated this ${averageWeightedRating.toFixed(1)}/5`
+        };
+      });
 
       return scoredEntities
         .sort((a, b) => (b.personalization_score || 0) - (a.personalization_score || 0))

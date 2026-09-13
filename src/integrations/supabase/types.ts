@@ -4889,6 +4889,7 @@ export type Database = {
           entity_slug: string
           entity_type: string
           recommendation_count: number
+          trending_score: number
         }[]
       }
       get_follower_count_by_user_id: {
