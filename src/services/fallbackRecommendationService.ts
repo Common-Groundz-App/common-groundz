@@ -95,7 +95,6 @@ const getFallbackDisplayReason = (recommendation: FallbackRecommendationData): s
  */
 const calculateFallbackScore = (recommendation: FallbackRecommendationData): number => {
   const {
-    popularity_score,
     trending_score,
     recommendation_count,
     average_rating
@@ -103,9 +102,11 @@ const calculateFallbackScore = (recommendation: FallbackRecommendationData): num
 
   let score = 0;
 
-  // Base scores (normalized 0-1)
-  score += (popularity_score || 0) * 0.3;
-  score += (trending_score || 0) * 0.3;
+  // Base scores (normalized 0-1).
+  // Phase 4.2B.3: popularity_score is frozen at zero in v2, so its old 0.3 term
+  // was always zero and is removed. trending_score is now the v2 value bounded
+  // [0, 1.2]; normalise before weighting.
+  score += normalizeTrendingV2(trending_score) * 0.3;
   score += Math.min((recommendation_count || 0) / 50, 1) * 0.2; // Normalize rec count
   score += ((average_rating || 0) / 5) * 0.2; // Normalize rating
 
