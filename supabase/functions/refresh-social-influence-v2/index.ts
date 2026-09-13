@@ -3,9 +3,14 @@
 // Phase 4.2B.2: reconciling refresh of the additive social_influence_scores_v2 cache.
 // Deployed UNSCHEDULED — the cron schedule is added in 4.2B.3.
 //
-// HTTP boundary (either path authorizes):
-//   1. Cron path:    x-cron-secret header must equal INFLUENCE_REFRESH_CRON_SECRET
-//   2. Admin path:   Bearer JWT + has_role('admin') via service client
+// HTTP boundary (any path authorizes):
+//   1. Cron path:    x-cron-secret header validated by the service-role-only SQL
+//                    validator is_valid_influence_cron_secret(), which compares the
+//                    presented value against the Vault entry 'influence_refresh_cron_secret'
+//                    inside the database (the value is never hard-coded or persisted
+//                    outside Vault; it travels only over HTTPS in the cron request).
+//   2. Manual path:  x-cron-secret equal to the INFLUENCE_REFRESH_CRON_SECRET env secret.
+//   3. Admin path:   Bearer JWT + has_role('admin') via service client.
 // Both paths then execute the service-role-only refresh_social_influence_scores_v2() routine,
 // which upserts current eligible (user, canonical_type) rows and removes stale v2 rows only.
 
@@ -33,20 +38,29 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   try {
-    // Accepted cron secrets: the scheduled pg_cron job presents the Vault secret
-    // 'influence_refresh_cron_secret', which is mirrored in INFLUENCE_CRON_VAULT_SECRET.
-    // INFLUENCE_REFRESH_CRON_SECRET remains accepted for manual triggers.
-    const cronSecrets = [
-      Deno.env.get('INFLUENCE_CRON_VAULT_SECRET'),
-      Deno.env.get('INFLUENCE_REFRESH_CRON_SECRET'),
-    ].filter(Boolean) as string[];
+    // Path 1: cron secret. The pg_cron job presents the Vault entry
+    // 'influence_refresh_cron_secret' as the x-cron-secret header; the presented
+    // value is validated by the service-role-only SQL validator so the stored
+    // secret never needs to be duplicated outside Vault.
+    // INFLUENCE_REFRESH_CRON_SECRET (env) remains accepted for manual triggers.
     const presented = req.headers.get('x-cron-secret');
+    const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     let authorized = false;
 
-    // Path 1: cron secret
-    if (presented && cronSecrets.includes(presented)) {
-      authorized = true;
+    if (presented) {
+      const envSecret = Deno.env.get('INFLUENCE_REFRESH_CRON_SECRET');
+      if (envSecret && presented === envSecret) {
+        authorized = true;
+      } else {
+        const { data: valid, error: validErr } = await adminClient.rpc(
+          'is_valid_influence_cron_secret',
+          { p_presented: presented },
+        );
+        if (!validErr && valid === true) authorized = true;
+      }
     }
 
     // Path 2: admin JWT
@@ -59,9 +73,6 @@ Deno.serve(async (req) => {
         const token = authHeader.replace('Bearer ', '');
         const { data: claimsData, error: claimsErr } = await anonClient.auth.getClaims(token);
         if (!claimsErr && claimsData?.claims?.sub) {
-          const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-            auth: { autoRefreshToken: false, persistSession: false },
-          });
           const { data: isAdmin, error: roleErr } = await adminClient.rpc('has_role', {
             _user_id: claimsData.claims.sub,
             _role: 'admin',
@@ -75,9 +86,6 @@ Deno.serve(async (req) => {
       return json({ error: 'unauthorized', code: 'UNAUTHORIZED' }, 401);
     }
 
-    const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
     const { data, error } = await adminClient.rpc('refresh_social_influence_scores_v2');
     if (error) {
       console.error('[refresh-social-influence-v2] rpc failed', error);
