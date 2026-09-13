@@ -46,25 +46,37 @@ export class DiscoveryService {
     try {
       const { data: entities } = await supabase
         .from('entities')
-        .select(`
-          *,
-          recommendations!inner(rating)
-        `)
+        .select('*')
         .eq('is_deleted', false)
         .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: false })
         .limit(limit * 2);
 
-      if (!entities) return [];
+      if (!entities || entities.length === 0) return [];
 
-      // Filter entities with good initial engagement (rating >= 4 or multiple recommendations)
+      // Canonical public reviews for these entities (global surface population)
+      const { data: reviewRows } = await supabase
+        .from('reviews')
+        .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
+        .eq('status', 'published')
+        .eq('visibility', 'public')
+        .in('entity_id', entities.map(e => e.id))
+        .order('created_at', { ascending: false });
+
+      const byEntity = new Map<string, { count: number; total: number }>();
+      canonicalize((reviewRows || []) as CanonicalReview[]).forEach(r => {
+        const entry = byEntity.get(r.entity_id) || { count: 0, total: 0 };
+        entry.count += 1;
+        entry.total += effectiveRating(r);
+        byEntity.set(r.entity_id, entry);
+      });
+
+      // Filter entities with good initial engagement (avg rating >= 4 or multiple reviewers)
       const qualityNewEntities = entities
         .filter(entity => {
-          const recommendations = entity.recommendations || [];
-          const avgRating = recommendations.length > 0 
-            ? recommendations.reduce((sum: number, rec: any) => sum + rec.rating, 0) / recommendations.length
-            : 0;
-          return recommendations.length >= 2 || avgRating >= 4.0;
+          const agg = byEntity.get(entity.id);
+          if (!agg || agg.count === 0) return false;
+          return agg.count >= 2 || (agg.total / agg.count) >= 4.0;
         })
         .slice(0, limit);
 
