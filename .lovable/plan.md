@@ -1,93 +1,81 @@
-# 4.2B.3 consumer cutover — revised after review
+# 4.2B.3 consumer cutover — revision 2 (endorsement truth + frozen cutoffs)
 
-Both reviews are right, and I checked their claims against the project rather than accepting them.
-4.2B.2 stands as complete (all six score families live with the frozen access rules, new trending
-value on 329 live items, 21 bootstrapped influence rows across 7 canonical types, refresh endpoint
-deployed and deliberately unscheduled, nothing reading v2 yet). Three changes to B3, plus two
-additions of my own.
+Both reviews are right on the substance. Rating thresholds must not become a stand-in for endorsement,
+and the influence cutoff has to be frozen from measurement, not carried over. I measured it: the 21
+influence rows range from 0.0039 to **0.0637** (average 0.0135) — so the existing 0.3 cutoff would wipe
+out the social surface entirely. That is now settled below rather than left to implementation.
 
-## What the reviews got right (verified)
+4.2B.2 stands as complete. Everything the reviews approved is unchanged; three things change.
 
-- **Legacy record reads really are inside the pipelines B3 migrates.** Confirmed: the collaborative
-  pipeline reads the old standalone records in six places for candidate discovery, matching and
-  exclusions, and the social-intelligence pipeline reads them for a person's categories, viewer
-  exclusions and every candidate list, with old `>= 4` / `>= 4.5` rating cut-offs. Switching only the
-  score source would leave "new score, old candidates", and would make a person with modern reviews
-  but no legacy record invisible. So candidate discovery in **these two services** moves in B3.
-  (Legacy record *listing* in search and item pages still belongs to 4.3 — that is display, not
-  scoring.)
-- **A literal secret in scheduling SQL is unacceptable**, and the project already has the right
-  pattern: existing scheduled jobs read the secret from the encrypted secret store at run time and
-  never contain the value. B3 uses that same pattern, added as a tracked migration (idempotent:
-  unschedule-if-exists then schedule), not an untracked one-off statement.
-- **Thresholds must be frozen before coding**, not written up afterwards. Done below.
-- **Personalised items**: `get_personalized_entities_v2` has zero live callers. The personalisation
-  service is live but only consumes the *trending* value through its own path — recorded explicitly so
-  4.2B.4 isn't confused by it.
+## Frozen semantics for every legacy-record read (the main fix)
 
-## Frozen trending cutover rules (no arithmetic rescaling, no guessed cut points)
+Each legacy read is classified by what it *meant*, and replaced accordingly. Endorsement comes from
+the review's explicit recommendation answer; rating is only ever a taste/ordering input.
 
-Old and new trending values come from different formulas, and every new value is currently 0, so any
-positive cut point would empty a surface today. The rule for every reader: **rank by the new value,
-never gate a surface's existence on it.**
-
-| Surface | Today | Frozen B3 behaviour |
+| Where | Old read meant | Frozen replacement |
 |---|---|---|
-| Discovery "trending" list (`>= 5` cut) | absolute cut then order | cut removed. Order by new value DESC, then the surface's existing secondary order (recency), then id. If no item has a non-zero new value, the list is the secondary order alone — never empty |
-| Other discovery / explore lists ordering by trending | order by old value | order by new value DESC, same deterministic tiebreak |
-| Fallback suggestions `> 0.5` "trending" bucket | absolute cut | bucket membership becomes "new value > 0"; when nothing qualifies the bucket is skipped and the remaining buckets fill the surface, as they already do when empty |
-| Fallback suggestions `> 0.6 && rating < 4.5` split | absolute cut | same rule: `> 0` on the new value, rating condition unchanged |
-| Fallback blended score (`+ trending * 0.3`) | raw old value | normalised `new value / 1.2` (so it is 0–1), weight unchanged |
-| Search ranking trend term | raw old value | normalised `new value / 1.2`, weight unchanged |
-| Personalisation contextual/temporal terms | raw old value | normalised `new value / 1.2`, weights unchanged |
+| Collaborative: viewer's own items, and the pool of people who touched the same items | "people with overlapping history" — taste, not endorsement | canonical eligible reviews, **all** effective ratings (low and high both count) |
+| Collaborative: candidate items from similar people (`rating >= 4`) | "things those people recommend" | canonical eligible review with **explicit recommendation = yes**; effective rating only weights the ordering |
+| Collaborative: item-based seeds from the viewer (`rating >= 4`) | "items the viewer endorses" | viewer's canonical review with **recommendation = yes** |
+| Collaborative: co-endorsers of those items (`rating >= 4`) | "other people who endorse the same items" | canonical review with **recommendation = yes** |
+| Collaborative: viewer exclusions | "already covered by the viewer" | any canonical review by the viewer for that item |
+| Social: a person's categories | "what they contribute in" | canonical item types from their eligible reviews |
+| Social: influencer candidate items (`rating >= 4`) | "what influential people recommend" | canonical review with **recommendation = yes**, ordered by influence and effective rating |
+| Social: extended-network candidates (`rating >= 4.5`) | "strongly endorsed further out" | canonical review with **recommendation = yes**; the extra strictness becomes a *ranking* preference (higher effective rating ranks first), not an eligibility gate — a 4.0-rated explicit yes must not be excluded, and a 5.0 explicit "no" must not be included |
+| Social: community candidates (`rating >= 4`) | "what the community recommends" | canonical review with **recommendation = yes** |
+| Social: viewer exclusions | "already covered by the viewer" | any canonical review by the viewer for that item |
 
-Two consequences stated up front and accepted: while activity is absent, trending contributes 0 to
-blended scores (identical to today's behaviour for items with no old score), and trending buckets stay
-empty until real 24-hour activity exists — surfaces stay populated through their fallback ordering.
+"Canonical eligible review" is the existing frozen definition: one current review per person per item,
+published and visible to the requester, with the effective (latest timeline) rating. No rating
+threshold is used anywhere as a proxy for endorsement.
+
+## Frozen influence eligibility (measured, not inherited)
+
+- Current v2 distribution: 21 rows, min 0.0039, avg 0.0135, **max 0.0637** — nothing reaches 0.3.
+- Frozen rule: **no absolute cutoff.** Eligible influencers are those with a stored score `> 0`,
+  ranked by score descending then id, and the surface takes its top N. Influence keeps weighting
+  social proof exactly as before; it no longer decides whether the surface exists.
+- Recorded in the cutover document with the distribution above, so the decision is auditable.
+
+## Frozen trending rules (unchanged from the approved revision)
+
+Rank by the new value, never gate a surface on it: the `>= 5` discovery cut is removed in favour of
+ordering by the new value then recency then id; the fallback "trending" buckets use "new value > 0" as
+bucket membership only, with the remaining buckets filling the surface when empty; every blended score
+uses `new value / 1.2` with existing weights untouched.
 
 ## Pipelines, in order, each verified before the next
 
-1. **Trending** — apply the table above across discovery, fallback suggestions, explore, search
-   ranking and personalisation; the trending updater endpoint switches to the v2 orchestrator
-   (incremental candidates, not bootstrap); schedule it server-side; **delete the browser 30-minute
-   timer and its production auto-start** so a single scheduler exists. Old value and old updater left
-   in place.
-2. **Similarity** — both callers switch to the new routine with `|| 0` / `?? 0` removed, so "not
-   comparable" never collapses to zero; each downstream consumer handles the absent case explicitly.
-3. **Collaborative candidate discovery** — the collaborative pipeline's candidate pool, matching set
-   and viewer exclusions move from legacy records to canonical published public reviews (effective
-   rating, one per person per item), keeping its existing rating intent. Same step as similarity's
-   consumer, since they are the same pipeline.
-4. **Influence** — the social path becomes read-only against the new store on canonical item types;
-   the browser stops computing and writing scores; its 0.3 minimum is re-expressed on the new 0–1
-   score; the refresh endpoint is scheduled via the vault-backed job. Its candidate discovery and
-   viewer exclusions also move to canonical reviews, with the `>= 4` / `>= 4.5` intent preserved
-   against effective ratings.
-5. **Who-to-follow** — switches to the new routine (same output shape, UI unchanged).
-6. **Reputation and personalised items** — verified no live callers; recorded as no-ops, not skipped
-   silently.
-
-## Two additions of mine
-
-- **Deterministic ordering everywhere.** Every switched list gets an explicit final tiebreak on id, so
-  the all-zero trending period cannot produce shuffling results between page loads.
-- **Guard against double scheduling.** Both scheduled jobs are created with unschedule-then-schedule
-  and verified as exactly one job each; the browser timer removal happens in the same step as enabling
-  the server job, so there is never a window with two updaters or none.
+1. **Trending** — apply the rules above across discovery, fallback suggestions, explore, search
+   ranking and personalisation; the trending endpoint switches to the incremental v2 orchestrator;
+   the server job is scheduled and the browser 30-minute timer plus its production auto-start are
+   deleted.
+2. **Similarity + collaborative pipeline** — the new similarity routine with `|| 0` / `?? 0` removed
+   ("not comparable" never becomes zero), *and* every collaborative legacy read replaced per the table.
+3. **Influence + social pipeline** — client becomes read-only against the new store on canonical item
+   types with the frozen `> 0` rule; every social legacy read replaced per the table; the refresh
+   endpoint is scheduled through the vault-backed job.
+4. **Who-to-follow** — switches to the new routine (same output shape, UI unchanged).
+5. **Reputation and personalised items** — verified no live callers, recorded as no-ops.
+   `get_personalized_entities_v2` has zero callers; the personalisation service is live but only
+   consumes the *trending* value through its own path.
 
 ## Verification before 4.2B.3 is marked done
 
-- Each surface exercised after its own step, proving it is non-empty where it was non-empty before.
-- Exactly one trending scheduler and one influence scheduler live; browser timer gone.
-- No browser code writes the influence store; a scheduled run reconciles it as expected.
-- No similarity consumer collapses "not comparable" to zero.
-- Zero legacy-record reads left in the collaborative and social-intelligence *scoring/candidate*
-  paths (listing elsewhere still deferred to 4.3, stated as such).
-- No secret value in migrations, SQL, source or documents — only the secret's name.
+- Per-read evidence that endorsement-shaped surfaces select on the explicit recommendation answer, and
+  a fixture-style check that a low-rated explicit yes is included while a high-rated explicit no is not.
+- Each surface exercised after its own step and shown non-empty where it was non-empty before,
+  including the influence surface under the frozen `> 0` rule.
+- Acceptance criterion for scheduling (wording corrected): **after deployment, exactly one server
+  scheduler exists for each job and no browser scheduler exists** — measured, not asserted as a
+  zero-gap transition.
+- No browser code writes the influence store; one scheduled run reconciles it as expected.
+- Zero legacy-record reads left in the collaborative and social **scoring, candidate, exclusion,
+  ranking and social-proof** paths. Legacy record *listing* in search and item pages stays 4.3.
+- No secret value in migrations, SQL, source or docs — only the secret's vault entry name.
 - Full test suite, typecheck, production build; write
-  `docs/verification/phase-4-2b3-consumer-cutover.md` recording the frozen table above as implemented,
-  plus the personalised-routine zero-caller note; tick 4.2B.3 in the roadmap. Nothing is dropped —
-  retirement stays 4.2B.4.
+  `docs/verification/phase-4-2b3-consumer-cutover.md` with the two frozen tables, the influence
+  distribution, and the no-caller notes; tick 4.2B.3. Nothing dropped — retirement stays 4.2B.4.
 
 ## Technical notes
 
@@ -95,11 +83,12 @@ empty until real 24-hour activity exists — surfaces stay populated through the
   `advancedPersonalizationService.ts`, `searchRanking.ts`, `collaborativeFilteringService.ts`,
   `socialIntelligenceService.ts`, `userRecommendationService.ts`, `backgroundService.ts`, Edge
   Functions `update-trending-scores` and `calculate-lifestyle-similarity`.
-- Scheduling migration uses `cron.unschedule` (guarded) + `cron.schedule` with `net.http_post`, the
-  header value read via `(select decrypted_secret from vault.decrypted_secrets where name = ...)`,
-  matching the existing cleanup jobs. The influence endpoint's secret is already stored; only its
-  vault entry name appears in SQL.
-- `trending_score_v2` is `NOT NULL DEFAULT 0`, so no null handling on sorts; normalisation divisor is
-  the contract bound 1.2.
-- roadmap.md gains: the frozen trending mapping as part of 4.2B.3, the collaborative/social candidate
-  migration as an explicit 4.2B.3 sub-task, and a note that legacy record *listing* remains 4.3.
+- Endorsement source is `reviews.is_recommended` on the canonical row (explicit questionnaire intent →
+  latest timeline intent, per the frozen resolution order); rating thresholds never substitute for it.
+- Scheduling is a tracked migration using guarded `cron.unschedule` + `cron.schedule` with
+  `net.http_post`, the header read via `vault.decrypted_secrets` by name — matching the existing
+  cleanup jobs.
+- `trending_score_v2` is `NOT NULL DEFAULT 0`; normalisation divisor is the contract bound 1.2.
+- roadmap.md gains, as explicit 4.2B.3 sub-tasks: the endorsement-semantics mapping, the frozen
+  trending rules, the frozen influence rule, and the collaborative/social candidate migration; with a
+  note that legacy record listing remains 4.3.
