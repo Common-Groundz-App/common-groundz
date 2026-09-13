@@ -177,6 +177,7 @@ Boundary rule (three separate concepts, never conflated):
       orchestrator; similarity/reputation/who-to-follow/personalised v2 routines; secured unscheduled
       `refresh-social-influence-v2` Edge Function; one-time trending + influence bootstrap; no v1 or
       consumer changes. Evidence: `docs/verification/phase-4-2b-2-implementation-record.md`
+- [ ] 4.2B.3 schedule influence refresh via cron → protected Edge Function → Vault secret (no direct pg_cron call; guard needs service_role JWT)
 - [ ] 4.2B.3 consumer cutover: switch each pipeline atomically to v2 (trending thresholds rescaled,
       similarity NULL semantics, influence read-only v2 table), schedule the influence function,
       remove the browser `setInterval` updater in `backgroundService.ts`
