@@ -22,7 +22,7 @@ export const getUserRecommendations = async (currentUserId?: string, limit: numb
   try {
     // Call the enhanced RPC function with new signature
     const { data: recommendations, error } = await supabase
-      .rpc('get_who_to_follow', {
+      .rpc('get_who_to_follow_v2', {
         p_user_id: currentUserId,
         p_limit: limit
       });
