@@ -181,9 +181,14 @@ Boundary rule (three separate concepts, never conflated):
 - [x] 4.2B.3 consumer cutover: switch each pipeline atomically to v2 (trending thresholds rescaled,
       similarity NULL semantics, influence read-only v2 table), schedule the influence function,
       remove the browser `setInterval` updater in `backgroundService.ts`
-- [ ] 4.2B.4 dependency proof gate, then retire v1 routines/columns/table (inspect
-      `calculate_trending_hashtags` reference to `calculate_trending_score` first); old-threshold
-      sweep happens here, not before
+- [x] 4.2B.4A proof gate only — evidence recorded in
+      `docs/verification/phase-4-2b4a-proof-gate.md`; `calculate_trending_hashtags` confirmed a
+      name-match false positive (no dependency); two open decisions: nothing schedules the trending
+      v2 orchestrator (all `trending_score_v2` values are 0), and the zero-impact 3.5 filter
+- [ ] 4.2B.4B retirement, only after those two decisions: drop the proven-dead v1 routines, the v1
+      influence table, `entity_stats_view` + its hourly job, the stale quality-score table, and
+      (last, after v2 trending is actually produced) `entities.trending_score` + its two indexes;
+      no CASCADE; then apply the approved threshold changes, regenerate types once, re-verify
 
 
 - [ ] 4.3 Remove the legacy application layer **and** its dummy data together (notifications point at
