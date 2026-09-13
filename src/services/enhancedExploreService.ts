@@ -303,7 +303,8 @@ export class EnhancedExploreService {
         .select('*')
         .in('type', validEntityTypes)
         .eq('is_deleted', false)
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
+        .order('id', { ascending: true })
         .limit(limit * 3); // Get more for diversity filtering
 
       if (!entities) return [];
@@ -318,7 +319,9 @@ export class EnhancedExploreService {
         
         const interestScore = userInterest?.interest_score || 0;
         const temporalBoost = timePattern?.activity_score || 0;
-        const trendingScore = entity.trending_score || 0;
+        // Phase 4.2B.3: v2 trending is bounded [0, 1.2]; normalise to [0, 1]
+        // before blending so existing weights keep their meaning.
+        const trendingScore = (entity.trending_score_v2 || 0) / TRENDING_V2_BOUND;
         const velocityBoost = (entity.view_velocity || 0) * 0.1;
         const geographicBoost = entity.geographic_boost || 0;
         const seasonalBoost = entity.seasonal_boost || 0;
