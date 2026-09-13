@@ -319,7 +319,7 @@ export class SocialIntelligenceService {
         .from('social_influence_scores_v2')
         .select('*')
         .in('user_id', userIds)
-        .gte('computed_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+        .gte('last_calculated', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
       return scores?.map(score => ({
         userId: score.user_id,
