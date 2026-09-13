@@ -123,8 +123,8 @@ export class EnhancedExploreService {
       // Update activity patterns for temporal personalization
       await this.updateActivityPatterns(userId, entityType, category, timeOfDay, dayOfWeek, interactionScore);
       
-      // Trigger trending score update for this entity (async)
-      this.updateEntityTrendingScore(entityId);
+      // Phase 4.2B.3: trending scores are computed server-side only. The browser
+      // records the interaction (above) and never writes a score.
     } catch (error) {
       console.error('Error tracking interaction:', error);
     }
@@ -256,17 +256,6 @@ export class EnhancedExploreService {
     }
   }
 
-  // Update entity trending score (background operation)
-  private async updateEntityTrendingScore(entityId: string) {
-    try {
-      // Call the enhanced trending score function
-      await supabase.rpc('calculate_enhanced_trending_score', {
-        p_entity_id: entityId
-      });
-    } catch (error) {
-      console.error('Error updating entity trending score:', error);
-    }
-  }
 
   // Enhanced personalized featured entities with discovery integration
   async getPersonalizedFeaturedEntities(userId?: string, limit: number = 3): Promise<PersonalizedEntity[]> {
