@@ -101,7 +101,7 @@ export interface ScorableResult {
   id?: string;
   // Local entities may carry these:
   popularity_score?: number | null;
-  trending_score?: number | null;
+  trending_score_v2?: number | null;
   is_verified?: boolean | null;
   image_url?: string | null;
   description?: string | null;

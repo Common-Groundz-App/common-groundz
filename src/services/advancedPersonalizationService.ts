@@ -4,6 +4,7 @@ import { PersonalizedEntity } from './enhancedExploreService';
 import { collaborativeFilteringService } from './collaborativeFilteringService';
 import { socialIntelligenceService } from './socialIntelligenceService';
 import { getEntityTypeLabel } from './entityTypeHelpers';
+import { normalizeTrendingV2 } from './trending/trendingV2';
 
 export interface PersonalizationContext {
   timeOfDay: number;
