@@ -463,10 +463,7 @@ export class EnhancedExploreService {
     try {
       let query = supabase
         .from('entities')
-        .select(`
-          *,
-          recommendations!inner(rating)
-        `)
+        .select('*')
         .eq('is_deleted', false)
         .lt('recent_views_24h', 50); // Low views
 
@@ -476,15 +473,35 @@ export class EnhancedExploreService {
 
       const { data: entities } = await query.limit(limit * 2);
 
-      if (!entities) return [];
+      if (!entities || entities.length === 0) return [];
+
+      // Canonical public reviews for these entities (global surface population)
+      const { data: reviewRows } = await supabase
+        .from('reviews')
+        .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
+        .eq('status', 'published')
+        .eq('visibility', 'public')
+        .in('entity_id', entities.map(e => e.id))
+        .order('created_at', { ascending: false });
+
+      const byEntity = new Map<string, { count: number; total: number }>();
+      const seen = new Set<string>();
+      ((reviewRows || []) as Array<{ user_id: string; entity_id: string; rating: number | null; latest_rating: number | null }>).forEach(r => {
+        const key = `${r.user_id}:${r.entity_id}`;
+        if (seen.has(key)) return; // canonical: latest per user+entity
+        seen.add(key);
+        const entry = byEntity.get(r.entity_id) || { count: 0, total: 0 };
+        entry.count += 1;
+        entry.total += r.latest_rating ?? r.rating ?? 0;
+        byEntity.set(r.entity_id, entry);
+      });
 
       // Filter entities with good ratings but low visibility
       const hiddenGems = entities
         .filter(entity => {
-          const avgRating = entity.recommendations?.length > 0 
-            ? entity.recommendations.reduce((sum: number, rec: any) => sum + rec.rating, 0) / entity.recommendations.length
-            : 0;
-          return avgRating >= 4.0;
+          const agg = byEntity.get(entity.id);
+          if (!agg || agg.count === 0) return false;
+          return (agg.total / agg.count) >= 4.0;
         })
         .slice(0, limit);
 
