@@ -145,16 +145,17 @@ export const getTrendingEntities = async (
 export const getCategoryRecommendations = async (
   entityId: string,
   entityType: string,
-  limit: number = 3
+  limit: number = 3,
+  pool?: FallbackRecommendationData[]
 ): Promise<ProcessedFallbackRecommendation[]> => {
-  const fallbackRecs = await getFallbackEntityRecommendations(entityId, entityType, limit * 2);
-  
+  const fallbackRecs = pool ?? await getFallbackEntityRecommendations(entityId, entityType);
+
   // Filter for same type entities
   const categoryRecs = fallbackRecs
     .filter(rec => rec.entity_type === entityType)
     .slice(0, limit);
 
-  return categoryRecs;
+  return categoryRecs.map(toProcessed);
 };
 
 /**
