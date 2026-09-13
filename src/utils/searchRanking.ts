@@ -25,6 +25,8 @@
  * No external dependencies. All functions are pure.
  */
 
+import { normalizeTrendingV2 } from '@/services/trending/trendingV2';
+
 // ============================================================
 // Shared normalization — used by EVERY ranking function.
 // Prevents "exact match doesn't fire because dedupe stripped a
