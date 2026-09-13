@@ -1,70 +1,91 @@
 # Finish 4.2B.3 consumer cutover
 
-Scheduler and security work is closed. What remains is finishing the last unswitched consumer,
-auditing every switched surface against the frozen rules, and writing the record. No v1 routine,
-table or column is dropped in this step.
+Scheduler and security work is closed. What remains is fixing two real correctness defects in the
+already-switched code, finishing the one unswitched consumer, auditing every surface against the
+frozen rules, and writing the record. No v1 routine, table or column is dropped in this step.
 
-All three review corrections are accepted, and two of them are settled by measurement:
+## Settled review points
 
 - **The type cast stays.** Verified in the live path: the interests column is text and the item type
-  is the canonical enum, so comparing enum-as-text to text is correct. Nothing to change — the
-  earlier "remove the cast" line was wrong and is withdrawn.
-- **Draft-inclusive exclusion is narrowed.** It applies only where the set already means "the viewer
-  has this covered": personalised items, and the collaborative and social recommendation exclusions.
-  Generic browse and discovery lists keep their existing behaviour and do not start hiding items the
-  viewer has reviewed.
-- **Trending wording is split in two.** No overall surface may require a positive trending value to
-  exist. A bucket explicitly labelled "trending" may still use "greater than zero" for membership
-  only; when it is empty the other buckets fill the surface.
+  is the canonical enum, so comparing enum-as-text to text is correct. The earlier "remove the cast"
+  line was wrong and is withdrawn.
+- **Draft-inclusive exclusion is narrowed** to sets that already mean "the viewer has this covered":
+  personalised items, and the collaborative and social recommendation exclusions. Generic browse and
+  discovery lists keep their current behaviour and do not start hiding reviewed items.
+- **Trending is split in two.** No overall surface may require a positive trending value to exist. A
+  bucket explicitly labelled "trending" may use "greater than zero" for membership only; when empty,
+  the other buckets fill the surface.
+- **Both new findings are real and accepted.** Confirmed by reading the live access rules: the only
+  read policy on reviews is "public, or your own". There is no Circle grant, so no browser query can
+  honestly claim Circle coverage today, and the ordering defect below is present as described.
+
+## Defect 1 — endorsement filtered before canonical selection
+
+Two paths filter on the endorsement flag (and apply a row cap) *before* reducing to one current
+review per person per item. An older "yes" can therefore outlive a newer "no" — exactly the stale
+endorsement bug fixed earlier for entity pages — and a cap applied pre-reduction can silently drop
+candidates.
+
+Fix by moving canonical selection into SQL, so the correct order is enforced by the database and
+never re-implemented in the browser: reduce to the current review per person and item, then inspect
+the endorsement flag, then take the effective rating, then apply any cap. The client stops filtering
+and stops capping pre-reduction.
+
+## Defect 2 — Circle visibility must be enforced, not assumed
+
+The frozen matrix requires viewer-specific social surfaces (influencer, extended-network, community)
+to include Circle-visible reviews, while similarity and collaborative candidate discovery stay on the
+public population. The access rules cannot deliver that, so these surfaces move to a viewer-scoped
+routine that enforces identity server-side: the caller may only request their own viewer id, and the
+routine returns public reviews plus Circle-visible reviews by authors the viewer follows plus the
+viewer's own. Same ownership, revoke-then-grant and viewer-gate conventions as the other v2 routines.
+
+This also removes the ambiguity in the earlier wording: collaborative candidate discovery and
+similarity are public-only; viewer-specific social sourcing is viewer-authorised.
 
 ## Scope guards
 
 - No new caller for `get_personalized_entities_v2` — zero callers, verified no-op.
 - `calculate_user_reputation_v2` likewise stays a verified no-op.
-- The v4 entity page is untouched. Its fallback call keeps its own mapping, documented as intentional.
+- The v4 entity page is untouched; its fallback call keeps its own mapping, documented as intentional.
 
-## Work
+## Remaining work
 
-1. **Lifestyle similarity (the one real gap)** — the scheduled similarity job still calls the v1
-   similarity routine and coerces a missing value to zero. Switch it to the v2 routine and preserve
-   "not comparable" as absent rather than zero, so an incomparable pair never reads as maximally
-   dissimilar. Weighting and output shape unchanged.
-
-2. **Viewer exclusion** — draft-inclusive "any review record, any visibility" applied to exactly the
-   three sets named above, each confirmed by reading its use before changing it.
-
-3. **Trending readers** — every approved reader orders by the new value with a deterministic
-   tie-break; no overall surface gated on it; the labelled trending bucket keeps its membership rule.
-   Fallback keeps the widened candidate pool fetched once and shared across buckets.
-
-4. **Similarity + collaborative** — no zero-coercion of the similarity value, public published
-   canonical population only, endorsement reads on the stored endorsement flag.
-
-5. **Influence + social** — browser read-only against the new store, endorsement flag everywhere,
-   viewer-specific surfaces under the frozen Circle visibility rule while similarity and candidate
-   discovery stay public-only, and no legacy recommendation rows in scoring, candidate, exclusion,
-   ranking or social-proof paths.
-
-6. **Who-to-follow** — on the v2 routine, suggestion UI unchanged.
-
-7. **Types** — regenerate generated database types once the shape is final.
+1. The two fixes above (canonical-first endorsement routine, viewer-scoped social routine).
+2. **Lifestyle similarity** — the scheduled job still calls the v1 similarity routine and coerces a
+   missing value to zero. Switch to v2 and keep "not comparable" as absent, never zero. Weighting and
+   output shape unchanged.
+3. **Viewer exclusion** — draft-inclusive "any review record, any visibility" on exactly the three
+   named sets, each confirmed by reading its use first.
+4. **Trending readers** — order by the new value with a deterministic tie-break, no overall surface
+   gated on it, labelled trending bucket keeps its membership rule, fallback pool fetched once and
+   shared across buckets.
+5. **Similarity + collaborative** — no zero-coercion, public published canonical population only,
+   endorsement reads via the canonical-first routine.
+6. **Influence + social** — browser read-only against the new influence store, no legacy
+   recommendation rows in scoring, candidate, exclusion, ranking or social-proof paths.
+7. **Who-to-follow** — on the v2 routine, suggestion UI unchanged.
+8. **Types** — regenerate generated database types last, after the routines above are final.
 
 ## Close-out audit
 
+- Zero remaining paths that filter on endorsement or cap rows before canonical selection.
+- Endorsement fixtures: newer "no" over older "yes" excluded; low rating with explicit yes included;
+  high rating with explicit no excluded; rating-inferred yes included.
+- Visibility fixtures: a Circle-only review moves a viewer-specific social list and does **not** move
+  similarity or the collaborative candidate set; a non-follower sees nothing from it.
+- Draft-inclusive exclusion fixtures on the three named sets, plus one browse list that deliberately
+  still shows reviewed items.
 - Exactly one trending scheduler and one influence scheduler; no browser scheduler or writer anywhere.
 - No secret literal in migrations, SQL, source or docs — only the Vault entry name.
-- Each switched surface exercised and still returning sensible results, including the influence
-  surface under the "greater than zero" rule, and a fixture proving a Circle-only review moves a
-  viewer-specific social list but not similarity or the candidate set.
-- Fixtures for draft-inclusive exclusion on the three named sets, and for a browse list that
-  deliberately still shows reviewed items.
+- Every switched surface exercised and still returning sensible results, including influence under the
+  "greater than zero" rule.
 - Full test suite, typecheck and production build pass.
 
-Then write `docs/verification/phase-4-2b3-consumer-cutover.md` with the three frozen tables
-(endorsement eligibility, visibility matrix, influence rule), the measured influence distribution,
-the verified type-cast note, the narrowed exclusion scope, the trending surface-versus-bucket
-distinction and the no-caller notes; tick 4.2B.3 in the roadmap; and report the deferred list below,
-confirmed by audit.
+Then write `docs/verification/phase-4-2b3-consumer-cutover.md` with the three frozen tables, the
+measured influence distribution, both defect fixes and their fixtures, the verified type-cast note,
+the narrowed exclusion scope, the trending surface-versus-bucket distinction and the no-caller notes;
+tick 4.2B.3; and report the deferred list below. Stop before 4.2B.4.
 
 ## Deferred, deliberately
 
