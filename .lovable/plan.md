@@ -90,9 +90,10 @@ deliverables, plus a roadmap update splitting 4.2B.4 into 4.2B.4A (proof, ticked
 
 ## Not in this stage
 
-No `DROP` of any kind, no threshold edits, no filter changes, no type regeneration, no scheduler
-changes. Legacy recommendation listing and display, and clearing the two conversion fields on reviews,
-stay 4.3; table and enum drops stay 4.5.
+No `DROP` of any kind, no threshold edits, no filter changes, no scheduler changes, and **no
+regeneration of generated database types** — those types are evidence of the current contracts and must
+change only after approved retirement. Legacy recommendation listing and display, and clearing the two
+conversion fields on reviews, stay 4.3; table and enum drops stay 4.5.
 
 ## 4.2B.4B — retirement (authorised separately, after review)
 
