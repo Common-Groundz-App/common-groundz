@@ -1,4 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
+import { TRENDING_V2_BOUND } from '@/services/trending/trendingV2';
+
 
 export interface PersonalizedEntity {
   id: string;
@@ -9,7 +11,7 @@ export interface PersonalizedEntity {
   venue?: string;
   metadata?: any;
   personalization_score?: number;
-  trending_score?: number;
+  trending_score_v2?: number;
   view_velocity?: number;
   is_hidden_gem?: boolean;
   reason?: string;
@@ -434,10 +436,11 @@ export class EnhancedExploreService {
         query = query.eq('type', category as 'book' | 'movie' | 'place' | 'product' | 'food');
       }
 
-      // Order by enhanced trending score with velocity consideration
+      // Order by v2 trending score, then velocity, then id (deterministic)
       const { data: entities } = await query
-        .order('trending_score', { ascending: false })
+        .order('trending_score_v2', { ascending: false })
         .order('view_velocity', { ascending: false })
+        .order('id', { ascending: true })
         .limit(limit);
 
       if (!entities) return [];
