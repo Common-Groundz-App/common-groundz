@@ -33,26 +33,15 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   try {
+    const cronSecret = Deno.env.get('INFLUENCE_REFRESH_CRON_SECRET');
     const presented = req.headers.get('x-cron-secret');
 
     let authorized = false;
 
-    // Path 1: cron secret. Resolved from Vault (single source of truth, shared
-    // with the pg_cron job) with the env var as a fallback for manual triggers.
-    if (presented) {
-      const vaultClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
-      const { data: vaultRows } = await vaultClient
-        .from('decrypted_secrets')
-        .select('decrypted_secret')
-        .eq('name', 'influence_refresh_cron_secret')
-        .limit(1);
-      const vaultSecret = vaultRows?.[0]?.decrypted_secret as string | undefined;
-      const envSecret = Deno.env.get('INFLUENCE_REFRESH_CRON_SECRET');
-      if ((vaultSecret && presented === vaultSecret) || (envSecret && presented === envSecret)) {
-        authorized = true;
-      }
+    // Path 1: cron secret (the pg_cron job presents the matching Vault secret
+    // 'influence_refresh_cron_secret'; both stores hold the same value)
+    if (cronSecret && presented && presented === cronSecret) {
+      authorized = true;
     }
 
     // Path 2: admin JWT
