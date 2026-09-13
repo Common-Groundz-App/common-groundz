@@ -5182,6 +5182,10 @@ export type Database = {
       is_search_brand_logo_lookup_enabled: { Args: never; Returns: boolean }
       is_search_image_cse_fallback_enabled: { Args: never; Returns: boolean }
       is_search_image_firecrawl_enabled: { Args: never; Returns: boolean }
+      is_valid_influence_cron_secret: {
+        Args: { p_presented: string }
+        Returns: boolean
+      }
       log_admin_action: {
         Args: {
           p_action_type: string
