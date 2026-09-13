@@ -4682,6 +4682,35 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      get_canonical_endorsements_for_viewer: {
+        Args: {
+          p_entity_ids?: string[]
+          p_limit?: number
+          p_since?: string
+          p_user_ids?: string[]
+          p_viewer_id: string
+        }
+        Returns: {
+          created_at: string
+          effective_rating: number
+          entity_id: string
+          user_id: string
+        }[]
+      }
+      get_canonical_endorsements_public: {
+        Args: {
+          p_entity_ids?: string[]
+          p_limit?: number
+          p_since?: string
+          p_user_ids?: string[]
+        }
+        Returns: {
+          created_at: string
+          effective_rating: number
+          entity_id: string
+          user_id: string
+        }[]
+      }
       get_categories_by_parent: {
         Args: { parent_uuid?: string }
         Returns: {

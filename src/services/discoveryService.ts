@@ -105,24 +105,20 @@ export class DiscoveryService {
 
       const followingIds = followingUsers.map(f => f.following_id);
 
-      // Recent endorsed reviews by followed users. Visibility is scoped by RLS
-      // (the viewer sees what they are authorized to see); no client-side
-      // visibility re-implementation.
+      // Recent canonical endorsements by followed users. Visibility and
+      // canonical-first endorsement selection are enforced in SQL
+      // (public + circle_only by followed authors), never re-implemented here.
       const { data: reviewRows } = await supabase
-        .from('reviews')
-        .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
-        .eq('status', 'published')
-        .eq('is_recommended', true)
-        .in('user_id', followingIds)
-        .not('entity_id', 'is', null)
-        .gte('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false })
-        .limit(500);
+        .rpc('get_canonical_endorsements_for_viewer', {
+          p_viewer_id: userId,
+          p_user_ids: followingIds,
+          p_since: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+        });
 
       if (!reviewRows || reviewRows.length === 0) return [];
 
-      // Canonical (latest per user+entity), preserving recency order of first appearance
-      const canonical = canonicalize(reviewRows as CanonicalReview[]);
+      // Already canonical + endorsed (recency-ordered by the routine)
+      const canonical = reviewRows as Array<{ user_id: string; entity_id: string; created_at: string }>;
       const entityIdsInOrder: string[] = [];
       const seenEntities = new Set<string>();
       canonical.forEach(r => {

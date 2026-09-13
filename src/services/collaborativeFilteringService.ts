@@ -34,15 +34,27 @@ export interface RecommendationExplanation {
  *
  * - Candidate discovery and similarity operate over PUBLIC, published, canonical
  *   reviews only (globally reusable population, same as calculate_user_similarity_v2).
- * - Endorsement eligibility is the DB-resolved reviews.is_recommended = true.
- *   These services never inspect questionnaire answers or timeline intent.
- * - Effective rating (latest_rating ?? rating) is used only for scoring/ordering.
- * - The viewer's exclusion set is ALL of the viewer's own reviews.
+ * - Endorsement reads go through `get_canonical_endorsements_public`, which
+ *   canonicalizes (one current review per person per item) BEFORE inspecting
+ *   reviews.is_recommended and before any row cap. The client never filters on
+ *   the endorsement flag and never caps pre-canonical rows.
+ * - Effective rating is used only for scoring/ordering.
+ * - The viewer's exclusion set is ALL of the viewer's own reviews (any status or
+ *   visibility, including drafts).
  * - calculate_user_similarity_v2 returns NULL when two users share fewer than 3
  *   canonical entities; NULL means "no measured similarity", not 0.
  */
 
-interface CanonicalReview {
+/** Row returned by get_canonical_endorsements_public — already canonical + endorsed. */
+interface EndorsementRow {
+  user_id: string;
+  entity_id: string;
+  effective_rating: number;
+  created_at: string;
+}
+
+/** Raw review row used only for canonicalizing the VIEWER's own reviews (seeds). */
+interface RawReview {
   user_id: string;
   entity_id: string;
   rating: number | null;
@@ -52,9 +64,9 @@ interface CanonicalReview {
 }
 
 /** Keep the latest review per (user_id, entity_id). Input must be created_at DESC. */
-const canonicalize = (rows: CanonicalReview[]): CanonicalReview[] => {
+const canonicalizeOwn = (rows: RawReview[]): RawReview[] => {
   const seen = new Set<string>();
-  const out: CanonicalReview[] = [];
+  const out: RawReview[] = [];
   for (const row of rows) {
     const key = `${row.user_id}:${row.entity_id}`;
     if (seen.has(key)) continue;
@@ -64,9 +76,7 @@ const canonicalize = (rows: CanonicalReview[]): CanonicalReview[] => {
   return out;
 };
 
-const effectiveRating = (r: CanonicalReview): number => r.latest_rating ?? r.rating ?? 0;
-
-/** All entity ids the viewer has ever reviewed (any visibility/status). */
+/** All entity ids the viewer has any review record for (any status/visibility, incl. drafts). */
 const getViewerReviewedEntityIds = async (userId: string): Promise<string[]> => {
   const { data } = await supabase
     .from('reviews')
@@ -76,19 +86,17 @@ const getViewerReviewedEntityIds = async (userId: string): Promise<string[]> => 
   return [...new Set((data || []).map(r => r.entity_id as string))];
 };
 
-/** Public published reviews by the given authors, latest first (pre-canonical). */
-const getPublicReviewsByUsers = async (userIds: string[]): Promise<CanonicalReview[]> => {
+/** Canonical endorsed reviews by the given authors — canonical-first in SQL. */
+const getPublicEndorsements = async (userIds: string[]): Promise<EndorsementRow[]> => {
   if (userIds.length === 0) return [];
-  const { data } = await supabase
-    .from('reviews')
-    .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
-    .eq('status', 'published')
-    .eq('visibility', 'public')
-    .in('user_id', userIds)
-    .not('entity_id', 'is', null)
-    .order('created_at', { ascending: false })
-    .limit(500);
-  return (data || []) as CanonicalReview[];
+  const { data, error } = await supabase.rpc('get_canonical_endorsements_public', {
+    p_user_ids: userIds
+  });
+  if (error) {
+    console.error('Error fetching canonical endorsements:', error);
+    return [];
+  }
+  return (data || []) as EndorsementRow[];
 };
 
 export class CollaborativeFilteringService {
@@ -161,9 +169,9 @@ export class CollaborativeFilteringService {
       const similarityByUser = new Map(similarUsers.map(u => [u.userId, u.similarityScore]));
       const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      // Canonical endorsed reviews by similar users (public + published population)
-      const endorsed = canonicalize(await getPublicReviewsByUsers(similarUserIds))
-        .filter(r => r.is_recommended === true && !excludedIds.has(r.entity_id));
+      // Canonical endorsed reviews by similar users (canonical-first in SQL)
+      const endorsed = (await getPublicEndorsements(similarUserIds))
+        .filter(r => !excludedIds.has(r.entity_id));
 
       if (endorsed.length === 0) return [];
 
@@ -173,7 +181,7 @@ export class CollaborativeFilteringService {
         const w = similarityByUser.get(r.user_id) || 0;
         if (w <= 0) return;
         const entry = byEntity.get(r.entity_id) || { weighted: 0, weight: 0 };
-        entry.weighted += effectiveRating(r) * w;
+        entry.weighted += r.effective_rating * w;
         entry.weight += w;
         byEntity.set(r.entity_id, entry);
       });
@@ -224,10 +232,10 @@ export class CollaborativeFilteringService {
         .not('entity_id', 'is', null)
         .order('created_at', { ascending: false });
 
-      const viewerCanonical = canonicalize((viewerRows || []) as CanonicalReview[]);
+      const viewerCanonical = canonicalizeOwn((viewerRows || []) as RawReview[]);
       const viewerEndorsed = viewerCanonical
         .filter(r => r.is_recommended === true)
-        .sort((a, b) => effectiveRating(b) - effectiveRating(a))
+        .sort((a, b) => (b.latest_rating ?? b.rating ?? 0) - (a.latest_rating ?? a.rating ?? 0))
         .slice(0, 10);
 
       if (viewerEndorsed.length === 0) {
@@ -237,25 +245,25 @@ export class CollaborativeFilteringService {
       const likedEntityIds = viewerEndorsed.map(e => e.entity_id);
       const excludedIds = new Set(viewerCanonical.map(r => r.entity_id));
 
-      // Co-endorsers: other users whose canonical public review endorses a seed entity
-      const { data: coEndorserRows } = await supabase
-        .from('reviews')
-        .select('user_id, entity_id, rating, latest_rating, is_recommended, created_at')
-        .eq('status', 'published')
-        .eq('visibility', 'public')
-        .eq('is_recommended', true)
-        .neq('user_id', userId)
-        .in('entity_id', likedEntityIds)
-        .order('created_at', { ascending: false })
-        .limit(500);
+      // Co-endorsers: other users whose canonical public review endorses a seed
+      // entity (canonical-first in SQL; the endorsement flag is never filtered
+      // before canonical selection)
+      const { data: coEndorserRows, error: coErr } = await supabase
+        .rpc('get_canonical_endorsements_public', {
+          p_entity_ids: likedEntityIds
+        });
 
-      if (!coEndorserRows || coEndorserRows.length === 0) return [];
+      if (coErr || !coEndorserRows || coEndorserRows.length === 0) return [];
 
-      const coEndorserIds = [...new Set(canonicalize(coEndorserRows as CanonicalReview[]).map(u => u.user_id))];
+      const coEndorserIds = [...new Set(
+        (coEndorserRows as EndorsementRow[])
+          .map(r => r.user_id)
+          .filter(id => id !== userId)
+      )];
 
-      // Other entities those co-endorsers endorse
-      const otherEndorsed = canonicalize(await getPublicReviewsByUsers(coEndorserIds))
-        .filter(r => r.is_recommended === true && !excludedIds.has(r.entity_id));
+      // Other entities those co-endorsers endorse (canonical-first in SQL)
+      const otherEndorsed = (await getPublicEndorsements(coEndorserIds))
+        .filter(r => !excludedIds.has(r.entity_id));
 
       if (otherEndorsed.length === 0) return [];
 
@@ -264,10 +272,10 @@ export class CollaborativeFilteringService {
       otherEndorsed.forEach(r => {
         const existing = entityScores.get(r.entity_id);
         if (existing) {
-          existing.score += effectiveRating(r);
+          existing.score += r.effective_rating;
           existing.count += 1;
         } else {
-          entityScores.set(r.entity_id, { score: effectiveRating(r), count: 1 });
+          entityScores.set(r.entity_id, { score: r.effective_rating, count: 1 });
         }
       });
 
@@ -435,9 +443,9 @@ export class CollaborativeFilteringService {
       const similarityMap = new Map(similarUsers.map(u => [u.user_b_id, u]));
       const excludedIds = new Set(await getViewerReviewedEntityIds(userId));
 
-      // Canonical endorsed reviews by similar users (public + published population)
-      const endorsed = canonicalize(await getPublicReviewsByUsers(similarUserIds))
-        .filter(r => r.is_recommended === true && !excludedIds.has(r.entity_id));
+      // Canonical endorsed reviews by similar users (canonical-first in SQL)
+      const endorsed = (await getPublicEndorsements(similarUserIds))
+        .filter(r => !excludedIds.has(r.entity_id));
 
       if (endorsed.length === 0) return [];
 
@@ -450,7 +458,7 @@ export class CollaborativeFilteringService {
         const total = weight + lifestyleWeight;
         if (total <= 0) return;
         const entry = byEntity.get(r.entity_id) || { weighted: 0, weight: 0, lifestyleBoost: 0 };
-        entry.weighted += effectiveRating(r) * total;
+        entry.weighted += r.effective_rating * total;
         entry.weight += total;
         entry.lifestyleBoost = Math.max(entry.lifestyleBoost, userSimilarity.lifestyle_score);
         byEntity.set(r.entity_id, entry);
