@@ -106,8 +106,14 @@ the full test suite, typecheck and build.
 
 ## Technical notes
 
-- Blocking-reference evidence comes from: repository search over `src/` and `supabase/functions/`;
-  catalogue queries over `pg_proc` bodies, views, triggers, policies and index definitions; and the
-  scheduled-job list. Each row records the method used, so the audit is reproducible.
+- Blocking-reference evidence comes from: repository-wide search across the whole tree, not just
+  `src/` and `supabase/functions/` — including `.github/workflows/`, `scripts/`, root-level commands,
+  SQL outside `supabase/migrations/`, Supabase configuration and test/setup code; catalogue queries over
+  `pg_proc` bodies, views, triggers, policies and index definitions **plus the `pg_depend` /
+  `pg_rewrite` dependency graph**, since an unqualified name in stored SQL text is not a reliable way to
+  find a dependency; and the scheduled-job list. Each row records the method used, so the audit is
+  reproducible.
+- The proposed drop list is published together with the exact migration order B4B would follow, so the
+  order itself is reviewed rather than improvised later.
 - Measurement of the 3.5 filter uses read-only queries against canonical endorsed reviews; no writes,
   no fixtures left behind.
