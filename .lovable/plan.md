@@ -1,121 +1,107 @@
-# 4.2B.3 audit result, then 4.2B.4 proof gate and v1 retirement (revision 2)
+# 4.2B.4A — proof gate only (no drops, no behaviour change)
 
-Both reviews are right, and one of them corrects a factual error in my first draft. Verified now: the
-two old Circle routines (`has_network_recommendations`, `get_network_entity_recommendations`) have
-**no caller anywhere** — the only references are their own unused service wrappers. The active v4 path
-goes through the aggregated discovery routine, which was already migrated in 4.2A. So they are dead
-code to retire after proof, not contracts to rebuild. That removes the migration risk entirely.
+I agree with the split, and for the reason both reviews give: the previous plan bundled evidence
+gathering, two open decisions and irreversible drops into one run. Two of those steps can't honestly be
+automated — whether the trending-hashtags routine migrates or retires depends on evidence I don't have
+yet, and the 3.5 average-rating filter changes what people actually see. So this stage produces
+evidence and recommendations and then stops. Retirement becomes 4.2B.4B, authorised separately.
 
-Both safeguards are accepted: the threshold sweep becomes a semantic audit, and physical drops stop on
-any unexpected dependency, never `CASCADE`.
+The one addition I'd make on top of both reviews: the proof table must record *how* each reference was
+found (source search, catalogue query, job list), so the evidence can be re-run and re-checked rather
+than trusted. A dependency table without a reproducible method is just an assertion.
 
-## Audit of 4.2B.3 — complete
+## 4.2B.3 — accepted as complete
 
-Verified directly:
+Verified: no source calls any v1 routine; exactly one trending scheduler and one influence scheduler;
+no browser scheduler or writer; trending readers order by the v2 value with deterministic tie-breaks;
+similarity/collaborative on the public canonical population with the stored endorsement flag and no
+zero-coercion; social surfaces on the viewer-scoped routine. Record and roadmap tick in place.
 
-- No source file (outside generated database types) calls any v1 routine: similarity, who-to-follow,
-  personalised items, reputation, trending scorer/orchestrator, or the v1 influence table.
-- Schedulers: exactly one influence job (`refresh-social-influence-v2-daily`, `12 4 * * *`) and one
-  trending scheduler (the daily workflow calling the trending function → v2 orchestrator). No browser
-  scheduler and no browser writer of either score.
-- Trending readers order by the v2 value with deterministic tie-breaks; the fallback pool is fetched
-  once, widened and shared; the "trending" bucket uses greater-than-zero for membership only.
-- Similarity/collaborative use the public canonical routine and the stored endorsement flag, with no
-  zero-coercion of a missing similarity. Social surfaces use the viewer-scoped routine.
-- Verification record and roadmap tick in place.
+Also verified, correcting my earlier draft: the two old Circle routines have **zero callers** — the
+active v4 page uses the aggregated discovery routine, already migrated in 4.2A. They are dead code to
+retire, not contracts to rebuild.
 
-Three residues remain, none in a path B3 switched, all handled below:
+## Deliverables of 4.2B.4A
 
-1. **Stale quality scoring** — the discovery quality scorer computes ratings/spam/relevance/social
-   proof from legacy recommendation rows and their likes. Its writer has no caller, so the table is
-   stale and the reading surface already falls back to neutral defaults.
-2. **Dead Circle routines** — the two routines above still read legacy rows with `rating >= 3` / `>= 4`
-   cutoffs, but have zero callers.
-3. **Two entity-stats refreshers coexist** — the v1 view refresher and the v2 materialized-view
-   refresher both run hourly.
+### 1. The artefact/dependency table
 
-## 4.2B.4 — dependency proof gate, then retire v1
+One row per v1 artefact, treating each function overload as its own artefact: trending scorer,
+enhanced trending scorer, trending orchestrator, similarity, who-to-follow, personalised items,
+reputation, influence calculator and refresh path, the v1 trending column, the v1 influence table, the
+v1 stats view and its hourly job, the quality-score table, and both `has_network_recommendations`
+overloads plus `get_network_entity_recommendations`.
 
-Nothing is dropped until the gate passes. Prove, classify, retire, verify.
+Every reference is classified, with the search or query that found it:
 
-### Step 1 — the proof gate (evidence only, no changes)
+| Blocking (live) | Non-blocking (historical) |
+|---|---|
+| application source, Edge Functions | past migration files |
+| database function bodies, views, triggers, policies, indexes | verification documents, comments |
+| scheduled jobs | generated database types before regeneration |
+| any required display or historical data dependency | archived plans |
 
-Build one artefact/dependency table covering every v1 artefact: trending scorer, enhanced trending
-scorer, trending orchestrator, similarity, who-to-follow, personalised items, reputation, influence
-calculator and its refresh path, the v1 trending column, the v1 influence table, the v1 stats view and
-its job, the quality-score table, and the two dead Circle routines.
+An artefact is a retirement candidate only when every blocking column is zero. Non-blocking mentions
+are recorded and explicitly do not block.
 
-Each row records, with evidence: live source callers, database references (routine bodies, triggers,
-policies, indexes, views), scheduler references, and any required historical or display dependency.
-An artefact is retirable only when all four are zero, or its only references are themselves being
-retired in the same step. **Publish this table before authoring any drop migration.**
+### 2. Reachability of the trending-hashtags routine
 
-Resolve first: the trending-hashtags routine references the v1 trending scorer. Either point it at the
-v2 value or prove the whole routine is dead and retire both together. No drop of the v1 scorer before
-that is settled.
+Show whether it is live (callers, schedulers, triggers) and what it uses the v1 trending scorer for,
+then recommend one: migrate the dependency to the v2 value, or retire the routine together with the
+scorer. No change made in this stage; the v1 scorer is not a drop candidate until this is settled.
 
-### Step 2 — decide each residue
+### 3. Impact measurement of the 3.5 average-rating filter
 
-- **Quality scoring:** retire reader dependence and the legacy-fed writer together, once the gate
-  confirms the surface's neutral-default behaviour is unaffected. No new scoring introduced here.
-- **Dead Circle routines:** retire the routines and their unused service wrappers. No rebuild, no
-  additive replacement, no change to the v4 page or to the aggregated routine it uses. If the gate
-  ever finds a live caller, the routine stops being a retirement candidate and gets an additive,
-  exactly-compatible replacement instead — that is the only path that touches a live contract.
-- **Entity stats:** keep the v2 refresher; retire the v1 refresher and view only after zero readers is
-  proven.
+The network service filters already-endorsed Circle results below a 3.5 average rating. Measure, on
+live data, how many currently endorsed results it removes and for how many viewers/entities it empties
+the surface. Present keep-versus-remove with that number and a recommendation. Change nothing.
 
-### Step 3 — semantic threshold audit (not a numeric sweep)
+### 4. Semantic threshold audit
 
-Enumerate every remaining old cutoff (`>= 3`, `>= 3.5`, `>= 4`, `>= 4.5`, `>= 5`, `> 0.3`, `> 0.6`)
-in scoring, candidate, ranking and social-proof paths and record, per occurrence, what it *means*:
+Enumerate every remaining old cutoff (`>= 3`, `>= 3.5`, `>= 4`, `>= 4.5`, `>= 5`, `> 0.3`, `> 0.6`) in
+scoring, candidate, ranking and social-proof paths and classify each by meaning:
 
-| Meaning | Action |
+| Meaning | Proposed action (for B4B) |
 |---|---|
 | rating standing in for "recommended" | remove; use the stored endorsement flag |
-| trending value used as an existence gate | remove; v2 ordering replaces it |
-| influence value used as an existence gate | remove; greater-than-zero eligibility already applies |
-| a genuine rating/quality/confidence product rule | keep, documented as intentional |
+| trending or influence value used as an existence gate | remove; ordering / greater-than-zero eligibility replaces it |
+| a genuine rating, quality or confidence product rule | keep, documented as intentional |
 | labelled-bucket membership (`trending_score_v2 > 0`) | keep; approved classification rule |
 
-Explicitly flagged for a decision rather than automatic removal: the network service's 3.5
-average-rating quality filter, applied *after* results are already endorsed. Two honest options —
-keep it as an explicit quality bar, or drop it so every explicit endorsement qualifies. I'll present
-the count of items it currently removes and recommend one; it is a product call, not a cleanup.
+No numeric pattern is removed just for being a number.
 
-### Step 4 — retire
+### 5. The proposed retirement list, plus the residue recommendations
 
-One migration family per artefact group, dropping only what the table proved unreferenced. **No
-`CASCADE` anywhere.** If Postgres reports a remaining dependency, that artefact's retirement stops and
-the dependency is investigated and recorded as new evidence — never worked around. Regenerate
-generated database types once, after the final migration.
+- Stale quality scoring: recommend retiring reader dependence and the legacy-fed writer together,
+  with the evidence that the reading surface already falls back to neutral defaults.
+- Dead Circle routines and their unused service wrappers: recommend retirement, no rebuild. If the
+  proof ever finds a live caller, that artefact leaves the drop list and would need an additive,
+  **exactly** compatible replacement — superset shapes are not compatible.
+- Entity stats: recommend keeping the v2 refresher and retiring the v1 refresher and view, with the
+  zero-reader evidence.
 
-### Step 5 — verification
+Then stop. Output of this stage: `docs/verification/phase-4-2b4a-proof-gate.md` containing all five
+deliverables, plus a roadmap update splitting 4.2B.4 into 4.2B.4A (proof, ticked) and 4.2B.4B
+(retirement, open, blocked on approval of the two decisions and the drop list).
 
-- Re-run the reference sweep: zero references to every dropped artefact.
-- Exercise every switched surface and confirm sensible results: discovery, explore, search ranking,
-  personalisation, collaborative, social, who-to-follow, the v4 entity page Circle block, quality
-  new-this-week.
-- Re-measure schedulers: one trending, one influence, one entity-stats.
-- Full test suite, typecheck and production build pass.
-- Write `docs/verification/phase-4-2b4-v1-retirement.md` with the artefact/dependency table, the
-  semantic threshold table, the residue decisions, the dead-routine reclassification and the dropped
-  list; tick 4.2B.4 in roadmap.md, adding these B4 sub-tasks: proof table, threshold audit,
-  hashtags-dependency resolution, dead-Circle retirement, stats-refresher consolidation. Stop before
-  4.3.
+## Not in this stage
 
-## Explicitly out of scope
+No `DROP` of any kind, no threshold edits, no filter changes, no type regeneration, no scheduler
+changes. Legacy recommendation listing and display, and clearing the two conversion fields on reviews,
+stay 4.3; table and enum drops stay 4.5.
 
-Legacy recommendation listing and display — profile service, entity page legacy section, feed hook,
-notification targets, content viewer, the `/recommendations/:id` route — plus clearing the two
-conversion fields on reviews, stay 4.3. Table and enum drops stay 4.5. Consensus calibration of
-influence remains a separate experiment.
+## 4.2B.4B — retirement (authorised separately, after review)
+
+For the record, so the boundary is explicit: resolve the hashtags dependency as decided, apply the
+approved threshold changes and the 3.5-filter decision, drop only the approved artefacts with **no
+`CASCADE`** — any unexpected dependency Postgres reports stops that artefact's retirement and is
+recorded as new evidence — then regenerate generated types once, re-run the reference sweep, exercise
+every switched surface, re-measure schedulers (one trending, one influence, one entity-stats), and run
+the full test suite, typecheck and build.
 
 ## Technical notes
 
-- Retirement migrations use the established pattern: explicit owner, revoke-then-grant where relevant,
-  one family per migration, guarded `cron.unschedule`, no `CASCADE`.
-- Both `has_network_recommendations` overloads exist; the proof table treats each overload as its own
-  artefact so neither is dropped on the other's evidence.
-- Any replacement routine (only if a live caller appears) must be additive with an exactly compatible
-  signature and output columns; superset shapes are not treated as compatible.
+- Blocking-reference evidence comes from: repository search over `src/` and `supabase/functions/`;
+  catalogue queries over `pg_proc` bodies, views, triggers, policies and index definitions; and the
+  scheduled-job list. Each row records the method used, so the audit is reproducible.
+- Measurement of the 3.5 filter uses read-only queries against canonical endorsed reviews; no writes,
+  no fixtures left behind.
