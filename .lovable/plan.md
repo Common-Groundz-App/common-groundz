@@ -36,12 +36,17 @@ Every reference is classified, with the search or query that found it:
 | Blocking (live) | Non-blocking (historical) |
 |---|---|
 | application source, Edge Functions | past migration files |
-| database function bodies, views, triggers, policies, indexes | verification documents, comments |
-| scheduled jobs | generated database types before regeneration |
-| any required display or historical data dependency | archived plans |
+| CI/CD workflows, deployment and operational scripts | verification documents, comments |
+| root and `scripts/` maintenance commands, SQL outside `supabase/migrations/`, Supabase configuration | generated database types before regeneration |
+| test and setup code that invokes live routines | archived plans |
+| database function bodies, views, triggers, policies, indexes, plus the catalogue dependency graph | |
+| scheduled jobs | |
+| any required display or historical data dependency | |
 
-An artefact is a retirement candidate only when every blocking column is zero. Non-blocking mentions
-are recorded and explicitly do not block.
+An artefact is a retirement candidate only when every blocking row is zero. Non-blocking mentions are
+recorded and explicitly do not block. The trending scheduler being a CI workflow rather than app code
+is exactly why the workflow directory is a blocking surface.
+
 
 ### 2. Reachability of the trending-hashtags routine
 
